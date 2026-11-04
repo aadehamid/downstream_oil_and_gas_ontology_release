@@ -1,0 +1,1583 @@
+#!/usr/bin/env python3
+"""epm-facts: the figures and row facts that agents quote, computed from source.
+
+One place to get the numbers right, so no agent writes its own counting script.
+Every answer names the files it read and the commit it read them at.
+
+Usage (from anywhere in the repo):
+
+    python3 scripts/epm_facts.py counts            # ledger, scoped sequences, gate, facts, Phase 1, reviews, taxonomy
+    python3 scripts/epm_facts.py row REL-00436     # where one row stands
+    python3 scripts/epm_facts.py section 201       # row IDs for one Phase 1 issue
+    python3 scripts/epm_facts.py find "0024"       # repo-wide search, including text split across lines;
+                                                   # skips a generated HTML page that matches its Markdown
+    python3 scripts/epm_facts.py sweep main        # where wording this branch replaced or deleted still stands
+    python3 scripts/epm_facts.py decisions         # check the decision records against their index
+    python3 scripts/epm_facts.py names             # no tracked file names the decision owner (the decision of 2026-10-19)
+    python3 scripts/epm_facts.py citations         # words a document attributes to the decision owner are in the source it names
+    uv run --with rdflib python scripts/epm_facts.py modules    # each released module, its releases, what it requires
+    uv run --with rdflib python scripts/epm_facts.py coverage --processes lifecycle   # which processes lack RACI, systems, KPIs ...
+    add --json for machine-readable output
+
+How it gets the numbers:
+
+- Ledger and per-row status come from running the Step 4 pipeline
+  (`mapping_v2.py`) and the evidence gate (`evidence-gate.py`) as they are, in a
+  temporary copy of the step4 folder, so the repo is never written to and the
+  counting logic is never duplicated.
+- A Phase 1 row is a row of the source-correction backlog
+  (`step4/source-workbook-backlog.md`): the first cell of a table row in a
+  Phase 1 section, both cells of the earlier change pairs table, and the IDs listed in
+  the prose sections (the text before any parenthesis). An ID cited inside a
+  rationale ("Precedent: REL-00366") is not a row. See the decision of 2026-10-06.
+- A review hold is a non-blank `owner_decision` cell that records a hold, in
+  any wording ("HOLD ...", "Held for source correction", "Carry forward
+  (remains held)"). Other columns are ignored (see test_review_holds_read_only_the_decision_column).
+
+Standard library only, except taxonomy triple counts, which use rdflib when it
+is installed, the quotes command, which needs markdown-it-py, and the
+modules (for core's triple count) and coverage commands, which need rdflib (`uv run --with rdflib python3 scripts/epm_facts.py counts`).
+"""
+import argparse
+import collections
+import contextlib
+import csv
+import difflib
+import glob
+import html
+import io
+import json
+import os
+import posixpath
+import re
+import runpy
+import shutil
+import subprocess
+import sys
+import tempfile
+import urllib.parse
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STEP4 = os.path.join(ROOT, "business_architecture", "ontology", "step4")
+BACKLOG = os.path.join(STEP4, "source-workbook-backlog.md")
+REVIEWS = os.path.join(STEP4, "review-evidence")
+FACTS = os.path.join(STEP4, "canonical-facts.csv")
+TAXONOMY = os.path.join(ROOT, "business_architecture", "ontology", "build", "output", "step3-taxonomy.ttl")
+DECISIONS = os.path.join(ROOT, "business_architecture", "domain", "decisions")
+ANSWERS = os.path.join(REVIEWS, "the review comments of a subject matter expert")
+SCOPED = os.path.join(STEP4, "scoped-sequence")
+# The share release (the decision of 2026-10-31) leaves the Step 4 gate out; in release mode (EPM_SHARE_RELEASE, or release.json
+# at the tree's root) `counts` gives the taxonomy figures alone. On main the gate must be here, as before.
+SHARE_RELEASE = bool(os.environ.get("EPM_SHARE_RELEASE")) or os.path.isfile(os.path.join(ROOT, "release.json"))
+
+NOT_HELD = {"AmbiguousDeferred", "ExternalGovernanceReference", "StructuredFlowValue"}
+HOLD_WORD = re.compile(r"(?i)\bhold\b|\bheld\b")
+REL = re.compile(r"REL-\d{5}")
+# A list line: IDs separated by commas, semicolons or "and", ending with optional
+# punctuation or with a separator when the list wraps onto the next line.
+ID_LIST = re.compile(r"REL-\d{5}(?:\s*(?:,|;|and|,\s*and)\s*REL-\d{5})*\s*(?:,\s*and|and|[,.;:])?")
+
+# Backlog section heading prefix -> Phase 1 issue. Sections not listed here
+# (the index, Definitions, the identity-rule ruling) hold no Phase 1 rows.
+SECTION_ISSUE = [
+    ("G3 Section B", 201),
+    ("G1b pairs held on both sides", 202),
+    ("G1b rows held for a verb correction", 202),
+    ("Supply & Trading recommend/advise rows", 203),
+    ("Triggers pass", 204),
+    ("Precedes/follows holds", 205),
+    ("Governed-by rows held in the verb reviews", 206),
+    ("Governed-by pass backlog", 206),
+    ("Governed-by superseded approvals", 206),
+    ("G3 Section A", 209),
+    ("Other verb-review holds", 210),
+]
+
+# The pipeline's named hold sets, in the order used to explain a hold.
+HOLD_SETS = [
+    "USES_INPUT_20260926_HOLDS", "USES_INPUT_G1A_20260926_HOLDS", "INFORMEDBY_20260926_HOLDS",
+    "GOVERNEDBY_20260926_HOLDS", "TRIGGERS_20260926_HOLDS", "PRECEDES_20260927_HOLDS",
+]
+
+
+def rel(path):
+    return os.path.relpath(path, ROOT)
+
+
+def commit():
+    try:
+        if not os.path.exists(os.path.join(ROOT, ".git")):
+            return "unknown (not a Git checkout)"
+        sha = subprocess.check_output(["git", "-C", ROOT, "rev-parse", "--short", "HEAD"], text=True).strip()
+        dirty = subprocess.call(["git", "-C", ROOT, "diff", "--quiet", "HEAD", "--", rel(STEP4)]) != 0
+        return sha + (" (step4 has uncommitted changes)" if dirty else "")
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+
+
+# ---------- pipeline ----------
+
+def run_pipeline():
+    """Run mapping_v2.py and evidence-gate.py in a temp copy; return their globals."""
+    tmp = tempfile.mkdtemp(prefix="epm-facts-")
+    try:
+        work = os.path.join(tmp, "step4")
+        shutil.copytree(STEP4, work, ignore=shutil.ignore_patterns("__pycache__", "proposal"))
+        # The gate compares the published taxonomy with the pinned baseline, at ../build/output.
+        published = os.path.join(os.path.dirname(STEP4), "build", "output", "step3-taxonomy.ttl")
+        os.makedirs(os.path.join(tmp, "build", "output"))
+        shutil.copyfile(published, os.path.join(tmp, "build", "output", "step3-taxonomy.ttl"))
+        cwd = os.getcwd()
+        os.chdir(work)
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                mapping = runpy.run_path(os.path.join(work, "mapping_v2.py"), run_name="__main__")
+            gate, gate_ok, gate_text = run_keeping_globals(os.path.join(work, "evidence-gate.py"))
+        finally:
+            os.chdir(cwd)
+        return mapping, gate, gate_ok and "GATE GREEN" in gate_text, gate_text
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def run_keeping_globals(path):
+    """Run a script as __main__ and keep its globals even if it calls sys.exit.
+
+    The evidence gate exits non-zero when a check fails; the counts it computed
+    before exiting are exactly what a caller needs to see in that case.
+    Returns (globals, exited_cleanly, captured stdout).
+    """
+    namespace = {"__name__": "__main__", "__file__": path}
+    out = io.StringIO()
+    ok = True
+    with open(path) as f:
+        code = compile(f.read(), path, "exec")
+    try:
+        with contextlib.redirect_stdout(out):
+            exec(code, namespace)
+    except SystemExit as e:
+        ok = e.code in (0, None)
+    return namespace, ok, out.getvalue()
+
+
+def scoped_rows(mapping):
+    """Rows emitted as scoped sequences; empty on trees before the decision of 2026-10-12."""
+    return set(mapping.get("SCOPED_SEQUENCE_ROWS", ()))
+
+
+def ledger(mapping):
+    """Ledger categories. A scoped-sequence row (the decision of 2026-10-12) emits a node, not a core fact."""
+    v2 = mapping["v2"]
+    emitting = set(mapping["emitting_ids"])
+    scoped = scoped_rows(mapping)
+    disp = collections.Counter(r["disposition"] for r in v2)
+    held = {r["row_id"] for r in v2
+            if r["row_id"] not in emitting and r["row_id"] not in scoped and r["disposition"] not in NOT_HELD}
+    return {
+        "mentions": len(v2),
+        "emitting": len(emitting),
+        "held": len(held),
+        "deferred": disp["AmbiguousDeferred"],
+        "external_governance": disp["ExternalGovernanceReference"],
+        "structured_flow": disp["StructuredFlowValue"],
+        "scoped_sequence": len(scoped),
+        "canonical_facts_pipeline": len(mapping["facts"]),
+    }, held, emitting
+
+
+def hold_reason(mapping, row_id):
+    for name in HOLD_SETS:
+        if row_id in mapping[name]:
+            return name
+    if row_id in mapping["PROPERTY_RULE_HOLDS"]:
+        return "PROPERTY_RULE_HOLDS"
+    if mapping["ctx"].get(row_id) == "HOLD":
+        return "context-pass HOLD"
+    return "disposition"
+
+
+# ---------- backlog ----------
+
+def issue_for(heading):
+    for prefix, issue in SECTION_ISSUE:
+        if heading.startswith(prefix):
+            return issue
+    return None
+
+
+def phase1_rows(text=None):
+    """Map each Phase 1 row ID to (issue, section heading), from the backlog's structure.
+
+    Formatting does not matter: table cells are read with their padding
+    stripped, and list lines are read after stripping indentation, bullets and
+    bold. A row's own section wins over the earlier change pairs table, which repeats
+    some rows held in other sections (REL-00469 in an earlier change, REL-00489 in an earlier change).
+    An ID that is only cited inside a sentence or a parenthesis is not a row.
+    """
+    if text is None:
+        with open(BACKLOG) as f:
+            text = f.read()
+    home, paired = {}, {}
+    section = None
+    for raw in text.split("\n"):
+        line = raw.strip()
+        if line.startswith("## "):
+            section = line[3:].strip()
+            continue
+        issue = issue_for(section or "")
+        if issue is None or not line:
+            continue
+        if line.startswith("|"):
+            cells = [c.strip().strip("*`").strip() for c in line.strip("|").split("|")]
+            if not cells or not re.fullmatch(r"REL-\d{5}", cells[0]):
+                continue
+            if section.startswith("G1b pairs held on both sides"):
+                for cell in cells[:2]:
+                    if re.fullmatch(r"REL-\d{5}", cell):
+                        paired.setdefault(cell, (issue, section))
+            else:
+                home.setdefault(cells[0], (issue, section))
+            continue
+        # A list line: "- REL-1 (note)", "- **REL-1** (...)", "REL-1, REL-2,", "* REL-1".
+        item = re.sub(r"^([-*+]\s+)", "", line)
+        prefix = item.split("(")[0].replace("*", "").replace("`", "").strip()
+        if not ID_LIST.fullmatch(prefix):
+            continue  # a sentence, not a list of row IDs
+        for row_id in REL.findall(prefix):
+            home.setdefault(row_id, (issue, section))
+    rows = dict(paired)
+    rows.update(home)
+    return rows
+
+
+# ---------- reviews ----------
+
+def review_holds():
+    """Per review file: rows whose owner_decision records a hold; and per row, its decisions."""
+    per_file, per_row = {}, collections.defaultdict(list)
+    for path in sorted(glob.glob(os.path.join(REVIEWS, "*.csv"))):
+        try:
+            with open(path, newline="") as f:
+                reader = list(csv.DictReader(f))
+        except (csv.Error, UnicodeDecodeError):
+            continue
+        if not reader or "owner_decision" not in reader[0]:
+            continue
+        held = []
+        for r in reader:
+            decision = (r.get("owner_decision") or "").strip()
+            row_id = (r.get("row_id") or "").strip()
+            if not row_id.startswith("REL-") or not decision:
+                continue
+            per_row[row_id].append((os.path.basename(path), decision))
+            if HOLD_WORD.search(decision):
+                held.append(row_id)
+        per_file[os.path.basename(path)] = len(set(held))
+    return per_file, per_row
+
+
+# ---------- facts ----------
+
+def stored_facts():
+    with open(FACTS, newline="") as f:
+        return list(csv.DictReader(f))
+
+
+# ---------- scoped sequences ----------
+
+def scoped_sequences():
+    """Nodes and handoffs from scoped-sequence/scoped-sequences.csv, with its check results."""
+    # Load by path under its own name: the evidence gate loads a temporary copy of
+    # the same file, and a cached plain "build" module would point at that copy.
+    if not os.path.exists(os.path.join(SCOPED, "build.py")):
+        return {"nodes": 0, "handoffs": 0, "rows": [], "problems": []}  # a tree before the decision of 2026-10-12
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("epm_scoped_sequence_build", os.path.join(SCOPED, "build.py"))
+    build = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(build)
+    columns, rows = build.load()
+    out = build.counts(rows)
+    out["problems"] = build.check(columns, rows)
+    return out
+
+
+# ---------- taxonomy ----------
+
+def taxonomy():
+    try:
+        import rdflib
+    except ImportError:
+        return {"note": "rdflib not installed; run with `uv run --with rdflib`"}
+    g = rdflib.Graph().parse(TAXONOMY, format="turtle")
+    skos = rdflib.Namespace("http://www.w3.org/2004/02/skos/core#")
+    intake = "https://w3id.org/mpc/ontology/intake/"
+    concepts = set(g.subjects(rdflib.RDF.type, skos.Concept))
+    return {
+        "triples": len(g),
+        "concepts": len(concepts),
+        "concepts_with_definition": len({s for s in concepts if (s, skos.definition, None) in g}),
+        "broader_links": len(list(g.triples((None, skos.broader, None)))),
+        "intake_triples": sum(1 for _, p, _ in g if str(p).startswith(intake)),
+    }
+
+
+# ---------- commands ----------
+
+def cmd_counts(args):
+    if SHARE_RELEASE and not os.path.isfile(os.path.join(STEP4, "mapping_v2.py")):
+        # The share release, without the Step 4 gate: the taxonomy figures only. On main a missing gate fails below.
+        out = {"commit": commit(), "step4_gate": "not in this tree", "taxonomy": taxonomy(), "sources": [rel(TAXONOMY)]}
+        if args.json:
+            print(json.dumps(out, indent=2))
+            return 0
+        print(f"commit {out['commit']}")
+        print("the Step 4 gate is not in this tree: no ledger, evidence-gate or Phase 1 figures")
+        print("taxonomy: " + ", ".join(f"{k} {v}" for k, v in out["taxonomy"].items()))
+        print("sources: " + "; ".join(out["sources"]))
+        return 0
+    mapping, gate, gate_green, gate_text = run_pipeline()
+    gate_lines = gate_text.splitlines()
+    led, held, emitting = ledger(mapping)
+    facts = stored_facts()
+    p1 = phase1_rows()
+    p1_ids = set(p1)
+    by_issue = collections.Counter(issue for issue, _ in p1.values())
+    outside = held - p1_ids
+    per_file, _ = review_holds()
+    out = {
+        "commit": commit(),
+        "ledger": led,
+        "conservation": (led["emitting"] + led["held"] + led["deferred"] + led["external_governance"]
+                         + led["structured_flow"] + led["scoped_sequence"]),
+        "canonical_facts_file": len(facts),
+        "evidence_gate": {
+            "green": gate_green,
+            "promoted": gate.get("promoted"),
+            "held": gate.get("held_ctx"),
+            "pass_checks": sum(1 for line in gate_lines if line.startswith("PASS")),
+            "fail_checks": sum(1 for line in gate_lines if line.startswith("FAIL")),
+        },
+        "phase1": {
+            "rows": len(p1_ids),
+            "held": len(p1_ids & held),
+            "not_held": sorted(p1_ids - held),
+            "by_issue": dict(sorted(by_issue.items())),
+            "held_outside": len(outside),
+            "held_outside_by_reason": dict(collections.Counter(hold_reason(mapping, i) for i in outside).most_common()),
+        },
+        "review_holds_by_file": per_file,
+        "emitting_by_verb": {f"{v} -> {p}": n for (v, p), n in sorted(mapping["perverb"].items())},
+        "scoped_sequences": scoped_sequences(),
+        "taxonomy": taxonomy(),
+        "sources": [rel(os.path.join(STEP4, "mapping_v2.py")), rel(os.path.join(STEP4, "evidence-gate.py")),
+                    rel(FACTS), rel(BACKLOG), rel(REVIEWS) + "/*.csv",
+                    rel(os.path.join(SCOPED, "scoped-sequences.csv")), rel(TAXONOMY)],
+    }
+    if args.json:
+        print(json.dumps(out, indent=2))
+        return 0
+    led = out["ledger"]
+    print(f"commit {out['commit']}")
+    print(f"ledger: {led['emitting']} emitting / {led['held']} held / {led['deferred']} deferred / "
+          f"{led['external_governance']} external governance / {led['structured_flow']} structured flow / "
+          f"{led['scoped_sequence']} scoped sequence = {out['conservation']} (of {led['mentions']} mentions)")
+    ss = out["scoped_sequences"]
+    print(f"scoped sequences (the decision of 2026-10-12): {ss['nodes']} nodes, {ss['handoffs']} handoffs; "
+          f"source table: {len(ss['problems'])} problem(s)")
+    print(f"canonical facts: {out['canonical_facts_file']} in canonical-facts.csv; pipeline builds {led['canonical_facts_pipeline']}")
+    print("emitting by raw verb -> stored predicate: " + ", ".join(f"{k} {n}" for k, n in out["emitting_by_verb"].items()))
+    eg = out["evidence_gate"]
+    print(f"evidence gate: {'GREEN' if eg['green'] else 'NOT GREEN'}; promoted {eg['promoted']} / held {eg['held']}; "
+          f"{eg['pass_checks']} PASS / {eg['fail_checks']} FAIL")
+    ph = out["phase1"]
+    print(f"Phase 1 (the decision of 2026-10-06): {ph['rows']} rows, {ph['held']} held; not held: {', '.join(ph['not_held']) or 'none'}")
+    print("  by issue: " + ", ".join(f"#{k} {v}" for k, v in ph["by_issue"].items()))
+    print(f"  held outside Phase 1: {ph['held_outside']}: " + ", ".join(f"{k} {v}" for k, v in ph["held_outside_by_reason"].items()))
+    print("review holds (owner_decision) by file:")
+    for name, n in out["review_holds_by_file"].items():
+        if n:
+            print(f"  {n:4d}  {name}")
+    print("taxonomy: " + ", ".join(f"{k} {v}" for k, v in out["taxonomy"].items()))
+    print("sources: " + "; ".join(out["sources"]))
+    return 0
+
+
+def cmd_row(args):
+    row_id = args.row_id.upper()
+    mapping, _, _, _ = run_pipeline()
+    _, held, emitting = ledger(mapping)
+    scoped = scoped_rows(mapping)
+    rec = next((r for r in mapping["v2"] if r["row_id"] == row_id), None)
+    if rec is None:
+        print(f"{row_id}: not in target-dispositions-v2.csv", file=sys.stderr)
+        return 1
+    facts = [f for f in stored_facts() if row_id in f["row_ids"].split(";")]
+    p1 = phase1_rows()
+    _, per_row = review_holds()
+    status = ("emitting" if row_id in emitting else "scoped sequence" if row_id in scoped
+              else "held" if row_id in held else rec["disposition"])
+    out = {
+        "commit": commit(),
+        "row_id": row_id,
+        "verb": rec["verb"],
+        "source": rec["source_slug"],
+        "candidate_targets": rec["candidate_slugs"],
+        "disposition": rec["disposition"],
+        "status": status,
+        "hold_reason": hold_reason(mapping, row_id) if row_id in held else None,
+        "stored_facts": [f"{f['subject']} {f['predicate']} {f['object']}" for f in facts],
+        "review_decisions": per_row.get(row_id, []),
+        "phase1_issue": p1[row_id][0] if row_id in p1 else None,
+        "backlog_section": p1[row_id][1] if row_id in p1 else None,
+    }
+    if args.json:
+        print(json.dumps(out, indent=2))
+        return 0
+    print(f"commit {out['commit']}")
+    print(f"{row_id}: {out['source']} {out['verb']} -> {out['candidate_targets'] or '?'}")
+    print(f"  status: {status}" + (f" ({out['hold_reason']})" if out["hold_reason"] else "") + f"; disposition {out['disposition']}")
+    print(f"  stored facts carrying it: {'; '.join(out['stored_facts']) or 'none'}")
+    if out["phase1_issue"]:
+        print(f"  Phase 1: issue #{out['phase1_issue']}, section \"{out['backlog_section']}\"")
+    else:
+        print("  Phase 1: not a backlog row")
+    for name, decision in out["review_decisions"]:
+        print(f"  review {name}: {decision[:120]}")
+    return 0
+
+
+def cmd_section(args):
+    rows = phase1_rows()
+    ids = sorted(r for r, (issue, _) in rows.items() if issue == args.issue)
+    if args.json:
+        print(json.dumps({"commit": commit(), "issue": args.issue, "rows": ids}, indent=2))
+        return 0
+    print(f"commit {commit()}")
+    print(f"#{args.issue}: {len(ids)} rows (from {rel(BACKLOG)})")
+    print(" ".join(ids))
+    return 0 if ids else 1
+
+
+_BUILT = {}
+
+
+def built_pages(root=ROOT):
+    """The pages scripts/build_docs_html.py makes from Markdown, path -> HTML, for this repository only
+    (an empty dict for another root, or when the builder refuses its sources). Built once per process:
+    sweep searches many phrases."""
+    if os.path.normpath(root) != os.path.normpath(ROOT):
+        return {}
+    if root not in _BUILT:
+        import build_docs_html
+        try:
+            _BUILT[root] = build_docs_html.build_all()
+        except ValueError:
+            _BUILT[root] = {}
+    return _BUILT[root]
+
+
+def generated_copies(root=ROOT):
+    """The tracked pages that equal the builder's fresh output for their source: their Markdown is the master
+    copy, so searches skip them. A page that is stale, hand-written, or no longer built is searched as it is."""
+    copies = set()
+    for name, page in built_pages(root).items():
+        try:
+            with open(os.path.join(root, name), encoding="utf-8") as f:
+                if f.read() == page:
+                    copies.add(name)
+        except OSError:
+            continue
+    return copies
+
+
+def find_hits(needle, root=ROOT):
+    """Hits for needle in every tracked text file under root: (file, line, kind, text), kind "line" or
+    "split" (the text runs across two lines). A file is text when it is UTF-8 with no NUL byte,
+    whatever its extension (.sql, .jsonld and .page files included). The HTML pages generated from
+    Markdown that equal a fresh build (generated_copies) are skipped: their Markdown is searched instead."""
+    # -z: git quotes paths with non-ASCII characters otherwise, and a quoted path cannot be opened.
+    files = subprocess.check_output(["git", "-C", root, "ls-files", "-z"], text=True).split("\0")
+    copies = generated_copies(root)
+    flat_needle = re.sub(r"\s+", " ", needle).strip().lower()
+    hits = []
+    for name in files:
+        if not name:
+            continue
+        path = os.path.join(root, name)
+        try:
+            with open(path, "rb") as f:
+                data = f.read()
+            if b"\0" in data:
+                continue
+            text = data.decode("utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if name in copies:
+            continue
+        lines = text.split("\n")
+        for i, line in enumerate(lines, 1):
+            if needle.lower() in line.lower():
+                hits.append((name, i, "line", line.strip()))
+        # Split across lines: join each line with the next one and search the joined text.
+        for i in range(len(lines) - 1):
+            joined = re.sub(r"\s+", " ", lines[i] + " " + lines[i + 1]).lower()
+            if flat_needle in joined and flat_needle not in lines[i].lower() and flat_needle not in lines[i + 1].lower():
+                hits.append((name, i + 1, "split", (lines[i].strip() + " / " + lines[i + 1].strip())))
+    return hits
+
+
+def cmd_find(args):
+    """Search tracked text files; also match text split across lines."""
+    needle = args.text
+    hits = find_hits(needle)
+    if args.json:
+        print(json.dumps({"commit": commit(), "text": needle, "hits": [dict(zip(("file", "line", "kind", "text"), h)) for h in hits]}, indent=2))
+        return 0
+    print(f"commit {commit()}: {len(hits)} hits for {needle!r}")
+    for name, i, kind, line in hits:
+        print(f"{name}:{i}: [{kind}] {line[:200]}")
+    return 0
+
+
+
+# ---------- sweep ----------
+
+# A date on the line (YYYY-MM-DD). The repository writes dated notes in many forms (*2026-10-21:*,
+# (Superseded 2026-10-13: ...), Added 2026-10-20 ...), so the sweep marks any line that holds a date
+# and leaves it to the reader to see whether the date notes the clause in question.
+DATED = re.compile(r"\b(19|20)\d\d-\d\d-\d\d\b")
+
+
+def changed_phrases(diff):
+    """The old wording a unified diff (-U1) replaced or deleted: each run of changed words on one line, with
+    one unchanged word of context on each side, kept when that makes at least two words and eight characters,
+    so "at 34 answerable" is searched, not "34" alone. Lines are matched first and words only within a
+    replaced line and its replacement, so a word moved to another line still counts as changed there. The
+    context may come from an unchanged word on the next or previous line, which -U1 supplies, but not from
+    another change or across a blank line. An addition has no old wording and gives none."""
+    phrases = []
+    for hunk in re.split(r"^@@[^\n]*@@[^\n]*\n", diff, flags=re.M)[1:]:
+        # A hunk ends where the next file's header begins; its "--- a/..." and "+++ b/..." lines are not text.
+        body = re.split(r"^diff --git ", hunk, maxsplit=1, flags=re.M)[0]
+        # Unchanged lines (" ") belong to both sides, so a word on one can be the context of a change.
+        old = [l[1:] for l in body.split("\n") if l[:1] in (" ", "-")]
+        new = [l[1:] for l in body.split("\n") if l[:1] in (" ", "+")]
+        a = [(n, w) for n, line in enumerate(old) for w in line.split()]   # each old word with its line
+        start = [0]                                                         # index in a of each old line's first word
+        for line in old:
+            start.append(start[-1] + len(line.split()))
+        changed = set()
+
+        def word_changes(i1, i2, j1, j2):
+            # The old words of lines i1..i2 that their replacement, lines j1..j2, does not keep.
+            ow = [w for _, w in a[start[i1]:start[i2]]]
+            nw = " ".join(new[j1:j2]).split()
+            for op, k1, k2, _, _ in difflib.SequenceMatcher(None, ow, nw, autojunk=False).get_opcodes():
+                if op in ("replace", "delete"):
+                    changed.update(range(start[i1] + k1, start[i1] + k2))
+
+        for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, old, new, autojunk=False).get_opcodes():
+            if op == "delete":
+                changed.update(range(start[i1], start[i2]))
+            elif op == "replace" and i2 - i1 == j2 - j1:
+                for k in range(i2 - i1):          # line by line, so a word cannot match its twin on another line
+                    word_changes(i1 + k, i1 + k + 1, j1 + k, j1 + k + 1)
+            elif op == "replace":
+                word_changes(i1, i2, j1, j2)
+        i = 0
+        while i < len(a):
+            if i not in changed:
+                i += 1
+                continue
+            j = i
+            while j + 1 in changed and a[j + 1][0] == a[i][0]:   # one run: changed words on one line
+                j += 1
+            words = [w for _, w in a[i:j + 1]]
+            # Context: an unchanged word on this line or the one next to it; a blank line breaks adjacency.
+            if i > 0 and i - 1 not in changed and a[i][0] - a[i - 1][0] <= 1:
+                words.insert(0, a[i - 1][1])
+            if j + 1 < len(a) and j + 1 not in changed and a[j + 1][0] - a[j][0] <= 1:
+                words.append(a[j + 1][1])
+            phrase = " ".join(words).strip(" .,;:()|*`\"'")
+            if len(words) >= 2 and len(phrase) >= 8 and phrase not in phrases:
+                phrases.append(phrase)
+            i = j + 1
+    return phrases
+
+
+def sweep(base, root=ROOT):
+    """For each phrase the branch replaced or deleted since base, every place in the tracked text files that
+    still holds it (generated HTML pages skipped, as in find_hits), each marked "dated" when its line holds
+    a date (DATED) and "live" otherwise."""
+    try:
+        diff = subprocess.check_output(["git", "-C", root, "diff", "-U1", "--no-color", f"{base}...HEAD"],
+                                       text=True, stderr=subprocess.PIPE)
+    except subprocess.CalledProcessError as e:
+        raise SystemExit(f"sweep: cannot diff {base}...HEAD: {e.stderr.strip()}")
+    report = []
+    for phrase in changed_phrases(diff):
+        hits = [(name, i, "dated" if DATED.search(text) else "live", text) for name, i, _, text in find_hits(phrase, root)]
+        report.append((phrase, hits))
+    return report
+
+
+def cmd_sweep(args):
+    report = sweep(args.base)
+    if args.json:
+        print(json.dumps({"commit": commit(), "base": args.base, "phrases": [
+            {"phrase": p, "hits": [dict(zip(("file", "line", "state", "text"), h)) for h in hits]} for p, hits in report]}, indent=2))
+        return 0
+    found = [(p, hits) for p, hits in report if hits]
+    places = len({(name, i) for _, hits in found for name, i, _, _ in hits})
+    print(f"commit {commit()}: {len(report)} replaced or deleted phrase(s) since {args.base}; {len(found)} still found, "
+          f"in {places} place(s). A date on a line may note another clause, or none: read each place.")
+    for phrase, hits in found:
+        live = sum(1 for h in hits if h[2] == "live")
+        print(f"\n{phrase!r}: {live} on a line without a date, {len(hits) - live} on a line with one")
+        for name, i, state, text in sorted(hits, key=lambda h: h[2] != "live")[:5]:
+            print(f"  {name}:{i}: [{'no date on line' if state == 'live' else 'date on line'}] {text[:150]}")
+        if len(hits) > 5:
+            print(f"  ... and {len(hits) - 5} more (epm_facts.py --json sweep {args.base} lists them all)")
+    return 0
+
+
+# ---------- decision records ----------
+
+STATUS_WORDS = {"Proposed", "Decided", "Superseded"}
+QUOTE = re.compile(r'"[^"]{3,}"')
+
+
+def _status_parts(status):
+    """Return (lead word, set of record numbers named after 'amended by')."""
+    lead = re.match(r"\s*(\w+)", status)
+    amended = set()
+    for clause in re.findall(r"amended by ([^;]*)", status):
+        clause = re.sub(r"\([^)]*\)", "", clause)  # drop dates such as "(2026-10-06)"
+        amended.update(re.findall(r"(?:DEC-)?\b(\d{4})\b", clause))
+    return (lead.group(1) if lead else ""), amended
+
+
+RECORDED_WORDS = re.compile(r"^## the words of a subject matter expert reviewing the documents\s*\n(.*?)(?=^## |\Z)", re.M | re.S)  # a record's quote section
+
+def decision_problems(folder=DECISIONS):
+    """Return a list of problems in the decision records and their index."""
+    problems = []
+    records = {}
+    for path in sorted(glob.glob(os.path.join(folder, "DEC-*.md"))):
+        number = re.search(r"DEC-(\d{4})", os.path.basename(path)).group(1)
+        with open(path) as f:
+            text = f.read()
+        m = re.search(r"^\| Status \| (.+?) \|\s*$", text, re.M)
+        if not m:
+            problems.append(f"{number}: no Status row")
+            continue
+        records[number] = (path, text, m.group(1).strip())
+    index_path = os.path.join(folder, "README.md")
+    with open(index_path) as f:
+        index = {}
+        for line in f:
+            m = re.match(r"\| \[DEC-(\d{4})\]\(([^)]+)\) \|[^|]*\| ([^|]+) \|", line)
+            if m:
+                if m.group(1) in index:
+                    problems.append(f"{m.group(1)}: listed twice in the index")
+                index[m.group(1)] = (m.group(2), m.group(3).strip())
+    for number in sorted(set(records) - set(index)):
+        problems.append(f"{number}: record not listed in the index")
+    for number in sorted(set(index) - set(records)):
+        problems.append(f"{number}: index lists a record that does not exist")
+    for number, (path, text, status) in sorted(records.items()):
+        lead, amended = _status_parts(status)
+        if lead not in STATUS_WORDS:
+            problems.append(f"{number}: status {status!r} does not start with Proposed, Decided or Superseded")
+        for other in sorted(amended):
+            if other not in records:
+                problems.append(f"{number}: amended by {other}, which does not exist")
+        if number in index:
+            link, index_status = index[number]
+            if link != os.path.basename(path):
+                problems.append(f"{number}: index links {link}, file is {os.path.basename(path)}")
+            if _status_parts(index_status) != (lead, amended):
+                problems.append(f"{number}: index status {index_status!r} differs from record status {status!r}")
+        # From 0026 on, quote_problems() checks the recorded words more strictly (block
+        # quotes and curly quotes included, against the saved answers); this simpler
+        # presence rule covers the earlier records it skips.
+        if lead == "Decided" and int(number) < FIRST_QUOTE_CHECKED_DECISION:
+            words = RECORDED_WORDS.search(text)
+            if not words or not QUOTE.search(words.group(1)):
+                problems.append(f"{number}: Decided, but no quote under \"the words of a subject matter expert reviewing the documents\"")
+    return problems
+
+
+# ---------- quotes ----------
+
+# A quoted span of three or more words, in straight or curly double quotes.
+QUOTED = re.compile(r'"([^"]+)"|“([^”]+)”')
+
+
+def _flat(text):
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def answer_corpus(folder=ANSWERS):
+    """The decision owner's saved answers, whitespace-collapsed, without each file's HTML header comment."""
+    parts = []
+    for path in sorted(glob.glob(os.path.join(folder, "*.md"))):
+        with open(path) as f:
+            parts.append(_flat(re.sub(r"<!--.*?-->", "", f.read(), flags=re.S)))
+    return "\n".join(parts)
+
+
+def _spans(text):
+    """Quoted spans of three or more words; an ellipsis splits a span into parts."""
+    for m in QUOTED.finditer(text):
+        for part in (m.group(1) or m.group(2)).split("…"):
+            part = _flat(part)   # punctuation inside the quote marks is kept and must match
+            if len(part.split()) >= 3:
+                yield part
+
+
+def block_quotes(text):
+    """The paragraphs of every Markdown block quote, found by a CommonMark parser.
+
+    A parser, not a regex: quotes nested in lists, lazy continuation lines and
+    blocks that interrupt a quote all follow CommonMark (markdown-it-py). Code
+    and HTML inside a quote are checked too, so no quoted text goes unread.
+    """
+    from markdown_it import MarkdownIt
+    paras, depth = [], 0
+    for tok in MarkdownIt("commonmark").parse(text):
+        if tok.type == "blockquote_open":
+            depth += 1
+        elif tok.type == "blockquote_close":
+            depth -= 1
+        elif depth > 0 and tok.type in ("inline", "fence", "code_block"):
+            paras.append(tok.content)
+        elif depth > 0 and tok.type == "html_block":
+            paras.append(re.sub(r"<[^>]+>", " ", tok.content))   # the visible text
+    return [p for p in paras if p.strip()]
+
+
+def displayed_text(tok):
+    """The words a reader sees for one block token, as the CommonMark parser renders them.
+
+    Inline text comes from the parsed children: text (entities decoded) and
+    inline code, with emphasis markers dropped. Code blocks are shown verbatim.
+    Raw HTML is not rendered here; callers that must not miss text refuse it
+    (see has_html).
+    """
+    if tok.type == "inline":
+        out = []
+        for child in tok.children or []:
+            if child.type in ("text", "code_inline"):
+                out.append(child.content)
+            elif child.type in ("softbreak", "hardbreak"):
+                out.append(" ")
+        return "".join(out)
+    if tok.type in ("fence", "code_block"):
+        return tok.content
+    return ""
+
+
+def has_html(tok):
+    """True when a block token is, or contains, raw HTML (including comments) or an image.
+
+    Both can hide words or show words the text reading misses (an image shows its
+    alt text when it fails to load), so checked text refuses them.
+    """
+    return tok.type == "html_block" or any(c.type in ("html_inline", "image") for c in (tok.children or []))
+
+
+def rendered_blocks(text):
+    """A Markdown document's displayed text, one whitespace-collapsed line per block.
+
+    Each paragraph, heading, list item and code block is its own line, so a
+    quote can match only inside one block. A block that holds raw HTML (such
+    as a saved answer's header comment) is left out: its displayed words
+    cannot be read reliably, so nothing may be quoted from it.
+    """
+    from markdown_it import MarkdownIt
+    lines = (_flat(displayed_text(t)) for t in MarkdownIt("commonmark").parse(text) if not has_html(t))
+    return [line for line in lines if line]
+
+
+APOSTROPHES = "'\u2019\u02bc"   # U+2018 only opens a quotation; it is never an apostrophe
+
+
+def _is_delimiter(ch):
+    """Punctuation or a symbol that ends a word. Apostrophes, dashes and soft
+    hyphens join a word ("agreement’s", "source-author", "Q1–Q18"), so they do not."""
+    import unicodedata
+    cat = unicodedata.category(ch)
+    return cat[0] in "PS" and cat != "Pd" and ch not in APOSTROPHES
+
+
+def in_corpus_as_words(span, corpus):
+    """True when the span's words appear, in order, as whole words of one corpus line.
+
+    Words are whitespace-separated tokens. Inner words must match exactly. The
+    first and last words may differ from their source tokens only by delimiter
+    punctuation outside them ("approve" in "(approve", "change" in "change.").
+    So "agreement" does not match "agreement’s", "workers" does not match
+    "workers’", and "author" does not match "source-author". The rule is strict
+    on purpose: a quote that fails it can always quote the whole token instead.
+    """
+    words = span.split()
+    if not words:
+        return False
+    n = len(words)
+    for line in corpus.split("\n"):
+        tokens = line.split()
+        for i in range(len(tokens) - n + 1):
+            window = tokens[i:i + n]
+            if n > 1 and window[1:-1] != words[1:-1]:
+                continue
+            first, last = words[0], words[-1]
+            if n == 1:
+                if _edge_ok(window[0], first, start=True) and _edge_ok(window[0], first, start=False):
+                    return True
+                continue
+            if _edge_ok(window[0], first, start=True) and _edge_ok(window[-1], last, start=False):
+                return True
+    return False
+
+
+def _edge_ok(token, word, start):
+    """The quoted edge word sits in the source token without cutting a word.
+
+    start=True: word must be a suffix of token; any extra text before it must be
+    delimiters. start=False: the mirror image at the end.
+    """
+    if start:
+        if not token.endswith(word):
+            return False
+        extra = token[:len(token) - len(word)]
+    else:
+        if not token.startswith(word):
+            return False
+        extra = token[len(word):]
+    return all(_is_delimiter(c) for c in extra)
+
+
+def rendered_answer_corpus(folder=ANSWERS):
+    """The decision owner's saved answers as displayed text, one line per block, to compare with displayed quotes."""
+    lines = []
+    for path in sorted(glob.glob(os.path.join(folder, "*.md"))):
+        with open(path) as f:
+            lines.extend(rendered_blocks(f.read()))
+    return "\n".join(lines)
+
+
+def displayed_status_rows(text):
+    """(value, contains raw HTML) for every displayed table row whose first cell reads "Status"."""
+    from markdown_it import MarkdownIt
+    tokens = MarkdownIt("commonmark").enable("table").parse(text)
+    rows, current = [], None
+    for tok in tokens:
+        if tok.type == "tr_open":
+            current = []
+            rows.append(current)
+        elif tok.type == "tr_close":
+            current = None
+        elif tok.type == "inline" and current is not None:
+            current.append((_flat(displayed_text(tok)), has_html(tok)))
+    return [(row[1][0], any(html for _, html in row)) for row in rows
+            if len(row) >= 2 and row[0][0].lower() == "status"]
+
+
+RECORDED_WORDS_KEY = "thedecisionownersrecordedwords"
+INVISIBLE_MARKS = re.compile("[\ufe00-\ufe0f\U000e0100-\U000e01ef]")   # variation selectors
+
+
+def section_key(heading):
+    """A heading's letters only, normalised and lower-cased, so look-alikes compare equal."""
+    import unicodedata
+    return "".join(ch for ch in unicodedata.normalize("NFKC", heading).casefold() if ch.isalpha())
+
+
+def has_invisible(text):
+    """True when text holds an invisible format character (Unicode Cf) or a variation selector."""
+    import unicodedata
+    return bool(INVISIBLE_MARKS.search(text)) or any(unicodedata.category(ch) == "Cf" for ch in text)
+
+
+def recorded_words(text):
+    """Each "the words of a subject matter expert reviewing the documents" section: (displayed blocks, contains raw HTML, block-quote paragraphs).
+
+    The displayed text comes back as one string per block, so quote marks pair
+    only within a block: a stray mark in one paragraph cannot open a quote that
+    closes in the next (an earlier change). quote_problems reports a block whose quote
+    marks do not pair, so an unclosed quotation is not left unchecked.
+
+    A block-quote paragraph is a quotation in its own right, so it is returned
+    whole, to be checked like a quoted span.
+
+    Sections are bounded by the document's own level-two headings (parser level
+    0), so a "## " line in a code fence or a heading nested in a block quote is
+    not a boundary, and a heading written with a tab or with emphasis is one.
+    Raw HTML is reported rather than interpreted: it can hide words or show
+    words the text extraction misses.
+    """
+    from markdown_it import MarkdownIt
+    tokens = MarkdownIt("commonmark").parse(text)
+    sections, current, depth = [], None, 0
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok.type == "heading_open" and tok.tag == "h2" and tok.level == 0:
+            current = None
+            if section_key(displayed_text(tokens[i + 1])) == RECORDED_WORDS_KEY:
+                current = {"parts": [], "html": has_html(tokens[i + 1]), "quoted": []}
+                sections.append(current)
+            i += 3  # heading_open, inline, heading_close
+            continue
+        depth += {"blockquote_open": 1, "blockquote_close": -1}.get(tok.type, 0)
+        if current is not None:
+            current["parts"].append(displayed_text(tok))
+            current["html"] = current["html"] or has_html(tok)
+            if depth > 0 and tok.type in ("inline", "fence", "code_block"):
+                current["quoted"].append(_flat(displayed_text(tok)))
+        i += 1
+    return [([p for p in sec["parts"] if p], sec["html"], [q for q in sec["quoted"] if q])
+            for sec in sections]
+
+
+# Decision records from this number on quote only saved answers. Records 0001 to
+# 0025 quote sessions that were never saved (an earlier change added this check).
+FIRST_QUOTE_CHECKED_DECISION = 26
+
+
+def quote_problems(reviews=REVIEWS, backlog=BACKLOG, answers=ANSWERS, decisions=DECISIONS):
+    """Text attributed to the decision owner that is not word for word in a saved answer.
+
+    Checked: in every review file with an `owner_words` column, that column, the
+    `scope_note_sentence`, and each quoted span of three or more words in
+    `semantic_reason` and `owner_decision`; every block quote in the
+    source-correction backlog; and each quoted span of three or more words in
+    the displayed text of the "the words of a subject matter expert reviewing the documents" section of the decision records
+    records from 0026 on, compared with the saved answers' displayed text; a
+    Decided record must have at least one, raw HTML there is reported, and so is a paragraph there whose quote marks do not pair (an odd count of straight marks, or unequal curly ones). An ellipsis (…) splits a quoted span, and each
+    part of three or more words is checked. Each text is searched across all
+    saved answers, not only the comment its row cites. Paraphrases are not
+    checked. Needs markdown-it-py (check.sh supplies it).
+    """
+    corpus = answer_corpus(answers)
+    problems = []
+    if not corpus.strip():
+        problems.append(f"no saved answer text in {answers}: nothing to check quotes against")
+
+    def check(where, text):
+        if text and _flat(text) not in corpus:
+            problems.append(f"{where}: not in a saved answer: {_flat(text)[:90]!r}")
+
+    checked_files = 0
+    for path in sorted(glob.glob(os.path.join(reviews, "*.csv"))):
+        with open(path, newline="") as f:
+            header = next(csv.reader(f), [])
+            f.seek(0)
+            rows = list(csv.DictReader(f))
+        if "owner_words" not in header:
+            continue
+        repeated = sorted({h for h in header if header.count(h) > 1})
+        if repeated:
+            problems.append(f"{os.path.basename(path)}: repeated column {repeated}; cannot check it unambiguously")
+            continue
+        if not rows:
+            problems.append(f"{os.path.basename(path)}: has an owner_words column but no rows")
+            continue
+        checked_files += 1
+        name = os.path.basename(path)
+        for r in rows:
+            where = f"{name} {r.get('row_id', '?')}"
+            if not (r["owner_words"] or "").strip():
+                problems.append(f"{where}: owner_words is blank")
+            check(f"{where} owner_words", r["owner_words"])
+            check(f"{where} scope_note_sentence", r.get("scope_note_sentence", ""))
+            for col in ("semantic_reason", "owner_decision"):
+                for span in _spans(r.get(col, "")):
+                    check(f"{where} {col}", span)
+    if not checked_files:
+        problems.append(f"no review file with an owner_words column in {reviews}: nothing checked")
+    with open(backlog) as f:
+        text = f.read()
+    for para in block_quotes(text):
+        check(f"{os.path.basename(backlog)} block quote", para)
+    rendered_corpus = rendered_answer_corpus(answers)
+    for path in sorted(glob.glob(os.path.join(decisions, "DEC-*.md"))):
+        number = int(re.search(r"DEC-(\d{4})", os.path.basename(path)).group(1))
+        if number < FIRST_QUOTE_CHECKED_DECISION:
+            continue
+        with open(path) as f:
+            record = f.read()
+        name = f"DEC-{number:04d}"
+        # Raw HTML can hide or relabel any part of a record (a status, a heading, a
+        # quote), so a checked record must be plain Markdown throughout.
+        from markdown_it import MarkdownIt
+        if any(has_html(t) for t in MarkdownIt("commonmark").enable("table").parse(record)):
+            problems.append(f"{name}: raw HTML or an image in a checked decision record; write it in plain Markdown")
+            continue
+        # Invisible format characters (zero-width spaces, joiners, a BOM) can make two
+        # headings or statuses look alike while comparing differently.
+        # Checked in the raw file and in the displayed text, where entities are decoded.
+        if has_invisible(record) or has_invisible("\n".join(rendered_blocks(record))):
+            problems.append(f"{name}: invisible format characters in a checked decision record; remove them")
+            continue
+        # The status a reader sees: the Status row of the record's displayed tables.
+        # A row inside an HTML comment or code block is not a table row, and any
+        # pipe-table spelling is. Exactly one is required.
+        statuses = displayed_status_rows(record)
+        if len(statuses) != 1:
+            problems.append(f"{name}: has {len(statuses)} Status rows; a record needs exactly one")
+            continue
+        if statuses[0][1]:
+            problems.append(f"{name}: raw HTML in the Status row; write it in plain Markdown")
+            continue
+        if not re.fullmatch(r"(Proposed|Decided|Superseded)\b[^\u200b-\u200f\ufeff]*", statuses[0][0]):
+            problems.append(f"{name}: Status {statuses[0][0]!r} is not a recognised status (Proposed, Decided or Superseded)")
+            continue
+        decided = _status_parts(statuses[0][0])[0] == "Decided"
+        sections = recorded_words(record)
+        if len(sections) > 1:
+            problems.append(f"{name}: more than one \"the words of a subject matter expert reviewing the documents\" section; cannot check it unambiguously")
+            continue
+        blocks, html, quoted = sections[0] if sections else ([], False, [])
+        if html:
+            problems.append(f"{name}: raw HTML in \"the words of a subject matter expert reviewing the documents\"; write the section in plain Markdown")
+            continue
+        unpaired = [b for b in blocks if b.count('"') % 2 or b.count("“") != b.count("”")]
+        for block in unpaired:
+            # Quote marks pair only within a block, so an unclosed quotation would go unchecked.
+            problems.append(f"{name} recorded words: a paragraph has an unpaired quote mark; close the quotation: {_flat(block)[:90]!r}")
+        spans = [span for block in blocks for span in _spans(block)] + [q for q in quoted if len(q.split()) >= 3]
+        if decided and not spans:
+            problems.append(f"{name}: Decided, but its \"the words of a subject matter expert reviewing the documents\" section has no quote of three or more words to check")
+        for span in spans:
+            if not in_corpus_as_words(span, rendered_corpus):
+                problems.append(f"{name} recorded words: not in a saved answer: {span[:90]!r}")
+    return problems
+
+
+def cmd_quotes(args):
+    problems = quote_problems()
+    if args.json:
+        print(json.dumps({"commit": commit(), "problems": problems}, indent=2))
+    else:
+        print(f"commit {commit()}: {len(problems)} quote problem(s) against {rel(ANSWERS)}")
+        for p in problems:
+            print(f"  {p}")
+    return 1 if problems else 0
+
+
+def cmd_decisions(args):
+    problems = decision_problems()
+    if args.json:
+        print(json.dumps({"commit": commit(), "problems": problems}, indent=2))
+    else:
+        print(f"commit {commit()}: {len(problems)} problem(s) in {rel(DECISIONS)}")
+        for p in problems:
+            print(f"  {p}")
+    return 1 if problems else 0
+
+
+# Words a document attributes to the decision owner, outside the decision records (which `quotes` checks): each attribution
+# verb that follows "the decision owner" closely (within 120 characters, in the same sentence, no quote mark between),
+# or follows a quote already theirs through a plain connective ("asked: ..., then chose ..." gives two), and the quote
+# after it. A quote another subject says ("GitHub's documentation says") or one with no attribution verb before it, such
+# as a process name, is not attributed. citation_problems says which sources count.
+OWNER = re.compile(r'\bdecision owner\b', re.I)  # the repo's one name for the role (the decision of 2026-10-19); "the owner" also
+# names owners of processes and data
+VERB = re.compile(r'\b(?:said|says|asked|asks|chose|chooses|answered|replied|wrote|typed|told|decided|added|allowed|approved|gave|accepted|agreed|set|confirmed|requested)\b', re.I)
+SENTENCE_END = r'[.!?][*_)\]]*\s'  # a sentence ends at a stop, even inside emphasis or brackets (".* (A" ends one)
+SAID = re.compile(r'(?:(?!' + SENTENCE_END + r')[^"”“]){0,160}?["“]([^"”]+)["”]')  # the quote in the verb's own sentence
+# "..." (answers-x.md), then chose": between a quote of theirs and the next verb, only a citation in brackets (answers
+# files, records, change or comment numbers), a comma and "then", "later" or "and". Any other word, such as a subject
+# ("the reviewer replied", "(the reviewer) then replied"), ends the chain.
+CITE_TOKEN = r'(?:`?[\w-]+\.md`?|DEC-\d{4}|#\d+|comment \d{6,})'
+CITED = r'(?:\([\s,]*' + CITE_TOKEN + r'(?:[\s,]+' + CITE_TOKEN + r')*[\s,]*\))?'  # an optional bracketed citation
+CONNECTIVE = re.compile(r'^\s*' + CITED + r'\s*,?\s*'
+                        r'(?:and\s+)?(?:then|later|and)\s+$', re.I)
+LISTED = re.compile(r'\s*' + CITED + r'\s*(?:,\s*(?:(?:and|or)\s+)?|(?:and|or)\s+)["“]([^"”]+)["”]')  # 'said "A", "B" and "C"': one verb, three quotes
+ANSWERS_FILE = re.compile(r"answers-[\w-]+\.md")  # the usual name; a cited name that fits it must exist
+MD_NAME = re.compile(r"[\w-]+\.md")  # any saved answer counts by its own name, such as delegation.md
+RECORD_ID = re.compile(r"DEC-(\d{4})")
+COMMENT_ID = re.compile(r"comment (\d{6,})")
+
+
+def markdown_files(root=ROOT):
+    """Every tracked Markdown file from the root; in a tree without Git (the share release), every .md file in it."""
+    if os.path.exists(os.path.join(root, ".git")):
+        out = subprocess.run(["git", "ls-files", "-z", "*.md"], cwd=root, capture_output=True, text=True, check=True).stdout
+        return [f for f in out.split("\0") if f]
+    return sorted(os.path.relpath(os.path.join(r, f), root) for r, ds, fs in os.walk(root)
+                  for f in fs if f.endswith(".md") and ".git" not in r.split(os.sep))
+
+
+def citation_problems(root=ROOT, answers=ANSWERS, decisions=DECISIONS, files=None):
+    """Words a tracked Markdown document attributes to the decision owner, outside the decision records, the saved
+    answers and the review evidence (whose quotes `quotes` checks). Every quote of three or more words after an
+    attribution must be word for word in a source its paragraph names: an answers file that exists, a decision record
+    that exists (in its "the words of a subject matter expert reviewing the documents" section), or a change comment by number ("comment 6115615577").
+    A comment is looked up in the answers files' headers ("comment:6115615577"). Only when the paragraph names no other
+    source and no answers file records its comments must its quotes merely be in some saved answer. A citation with no recorded source cost a review on an earlier change."""
+    corpus = answer_corpus(answers)
+    files_by_name, files_by_comment = {}, {}
+    for path in glob.glob(os.path.join(answers, "*.md")):
+        raw = open(path).read()
+        files_by_name[os.path.basename(path)] = _flat(re.sub(r"<!--.*?-->", "", raw, flags=re.S))
+        header = re.match(r"\s*<!--(.*?)-->", raw, re.S)  # the file's own header records its source, nothing later
+        for comment in re.findall(r"comment:(\d{6,})", header.group(1) if header else ""):
+            files_by_comment[comment] = files_by_comment.get(comment, "") + files_by_name[os.path.basename(path)]
+    def recorded_words(path):
+        found = RECORDED_WORDS.search(open(path).read())
+        return _flat(found.group(1)) if found else ""
+    record_texts = {m.group(1): recorded_words(p) for p in glob.glob(os.path.join(decisions, "DEC-*.md"))
+                    for m in [re.search(r"DEC-(\d{4})", os.path.basename(p))] if m}
+    records = set(record_texts)
+    if files is None:
+        files = markdown_files(root)
+    # the saved answers, the decision records (checked by `quotes`) and the rest of the review evidence: records kept as
+    # they were made, not documents to correct
+    skip = (os.path.relpath(answers, root), os.path.relpath(decisions, root), os.path.relpath(REVIEWS, root))
+    problems = []
+    for f in files:
+        if f.startswith(skip):
+            continue
+        with open(os.path.join(root, f), encoding="utf-8", errors="replace") as fh:
+            paragraphs = re.split(r"\n\s*\n", fh.read())
+        for para in paragraphs:
+            flat = _flat(para)
+            # a verb counts when it follows the role closely with no quote between, or follows a quote already
+            # theirs closely ("asked: ..., then chose ...")
+            owners, quotes_end, said = [m.end() for m in OWNER.finditer(flat)], [], []
+            for v in VERB.finditer(flat):  # every verb in turn: an earlier one cannot hide a later one
+                q = SAID.match(flat, v.end())
+                if not q:
+                    continue
+                near_owner = any(0 <= v.start() - o <= 120 and not re.search(r'["”“]|' + SENTENCE_END, flat[o:v.start()]) for o in owners)
+                chained = any(0 <= v.start() - e and CONNECTIVE.match(flat[e:v.start()]) for e in quotes_end)  # CONNECTIVE bounds the gap
+                while q and (near_owner or chained):
+                    said.append(q)
+                    quotes_end.append(q.end())
+                    q = LISTED.match(flat, q.end())
+            if not said:
+                continue
+            named = [n for n in MD_NAME.findall(flat) if n in files_by_name or ANSWERS_FILE.fullmatch(n)]
+            for name in named:
+                if name not in files_by_name:
+                    problems.append(f"{f}: cites {name}, which is not a saved answer")
+            for rid in RECORD_ID.findall(flat):
+                if rid not in records:
+                    problems.append(f"{f}: cites DEC-{rid}, which is not a decision record")
+            cited, comments = RECORD_ID.findall(flat), COMMENT_ID.findall(flat)
+            sources = ([files_by_name.get(n, "") for n in named] + [record_texts.get(rid, "") for rid in cited]
+                       + [files_by_comment[c] for c in comments if c in files_by_comment])
+            if not sources and comments:
+                sources = [corpus]  # only comments no answers file records: the words must be in some saved answer
+            for m in said:
+                words = _flat(m.group(1)).rstrip(".,;:!?")  # a stop inside the quote marks is the writer's
+                if len(words.split()) < 3 or any(in_corpus_as_words(words, text) for text in sources):
+                    continue  # short terms are not checked; the rest must be in a source the paragraph names
+                if sources:
+                    problems.append(f"{f}: not in the answers file, record or comment it names: {words[:90]!r}")
+                elif not in_corpus_as_words(words, corpus):
+                    problems.append(f"{f}: not in a saved answer: {words[:90]!r}")
+                else:
+                    problems.append(f"{f}: names no answers file, decision record or comment for: {words[:90]!r}")
+    return problems
+
+
+def cmd_citations(args):
+    problems = citation_problems()
+    print(f"commit {commit()}: {len(problems)} citation problem(s) outside the decision records")
+    for p in problems:
+        print(f"  {p}")
+    return 1 if problems else 0
+
+
+# the decision of 2026-10-19: the repo names the decision owner by role. These are the personal name,
+# the family name and the GitHub username, built from fragments so this file does not match itself.
+OWNER_NAMES = re.compile("|".join(["ha" + "mid", "ade" + "sokan", "aade" + "ha" + "mid"]), re.I)
+
+
+def _office_texts(where, data):
+    """An Office part's raw XML, and its decoded values: each cell, shared string or paragraph
+    as Office displays it, plus every element's text and every attribute value.
+
+    Parsing decodes character references (H&#97;...), and a cell's text comes from its text
+    runs (`t` elements) alone, so a name split across runs, or indented XML, is still found.
+    """
+    import xml.etree.ElementTree as ET
+    local = lambda el: el.tag.rsplit("}", 1)[-1]
+    out = [(where, data.decode("utf-8", "replace"))]
+    try:
+        root = ET.fromstring(data)
+    except ET.ParseError:
+        return out
+    shown = ["".join(t.text or "" for t in el.iter() if local(t) == "t")
+             for el in root.iter() if local(el) in ("c", "si", "is", "p")]
+    values = [v for el in root.iter() for v in [el.text or "", *el.attrib.values()] if v.strip()]
+    out.append((f"{where} (displayed text)", "\n".join(shown)))
+    out.append((f"{where} (decoded values)", "\n".join(values)))
+    return out
+
+
+def browser_text(markup):
+    """The text a browser shows for an HTML document: inline elements joined with nothing between them (so
+    h<strong>a</strong>mid reads as one word), block elements on their own lines, scripts and styles left out."""
+    from html.parser import HTMLParser
+    blocks = {"p", "div", "li", "td", "th", "tr", "br", "h1", "h2", "h3", "h4", "h5", "h6", "pre", "section",
+              "article", "header", "footer", "nav", "table", "ul", "ol", "blockquote", "title", "figcaption"}
+
+    class Shown(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.parts, self.skip = [], 0
+
+        def handle_starttag(self, tag, attrs):
+            if tag in ("script", "style"):
+                self.skip += 1
+            elif tag in blocks:
+                self.parts.append("\n")
+
+        def handle_endtag(self, tag):
+            if tag in ("script", "style"):
+                self.skip = max(0, self.skip - 1)
+            elif tag in blocks:
+                self.parts.append("\n")
+
+        def handle_data(self, data):
+            if not self.skip:
+                self.parts.append(data)
+
+    p = Shown()
+    p.feed(markup)
+    p.close()
+    return "\n".join(line.strip() for line in "".join(p.parts).split("\n") if line.strip())
+
+
+def _name_texts(path, name):
+    """(label, text) to scan in one file: the file itself, or each part of an Office file. A Markdown or HTML
+    file is also scanned as displayed, so a name split by formatting (**Ha**mid, h<em>a</em>mid) is found.
+    Markdown is rendered with markdown-it-py, which check.sh supplies."""
+    with open(path, "rb") as f:
+        data = f.read()
+    if name.lower().endswith((".xlsx", ".docx", ".pptx")):
+        import zipfile
+        texts = []
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            for n in z.namelist():
+                texts += _office_texts(f"{name}!{n}", z.read(n))
+        return texts
+    text = data.decode("utf-8", "replace")
+    texts = [(name, text)]
+    if name.lower().endswith(".md"):
+        from markdown_it import MarkdownIt
+        texts.append((f"{name} (displayed text)",
+                      browser_text(MarkdownIt("commonmark").enable(["table", "strikethrough"]).render(text))))
+    elif name.lower().endswith((".html", ".htm")):
+        texts.append((f"{name} (displayed text)", browser_text(text)))
+    return texts
+
+
+def tracked_files(root=ROOT):
+    """Every tracked path from the root, or, in a tree without Git (the share release), every file in it but the
+    caches and environments a run leaves behind."""
+    if os.path.exists(os.path.join(root, ".git")):
+        # Inherited GIT_DIR or GIT_INDEX_FILE (a hook sets them) would point git at another repository.
+        env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+        return [n for n in subprocess.check_output(["git", "-C", root, "ls-files", "-z"], env=env).decode().split("\0") if n]
+    left_out = {".git", "__pycache__", ".venv", "node_modules", ".pytest_cache"}
+    return sorted(os.path.relpath(os.path.join(r, f), root) for r, ds, fs in os.walk(root) for f in fs
+                  if not left_out & set(os.path.relpath(r, root).split(os.sep)))
+
+
+def name_problems(root=ROOT):
+    """Each tracked path, and each line of a tracked file, that names the decision owner, in any case."""
+    names = tracked_files(root)
+    problems = []
+    for name in names:
+        if not name:
+            continue
+        if OWNER_NAMES.search(name):
+            problems.append(f"{name}: the path names the decision owner")
+        path = os.path.join(root, name)
+        if os.path.islink(path) or not os.path.isfile(path):
+            continue
+        for where, text in _name_texts(path, name):
+            for i, line in enumerate(text.split("\n"), 1):
+                if OWNER_NAMES.search(line):
+                    problems.append(f"{where}:{i}: names the decision owner")
+    return problems
+
+
+def cmd_names(args):
+    problems = name_problems()
+    if args.json:
+        print(json.dumps({"commit": commit(), "problems": problems}, indent=2))
+    else:
+        print(f"commit {commit()}: {len(problems)} tracked line(s) name the decision owner")
+        for p in problems:
+            print(f"  {p}")
+    return 1 if problems else 0
+
+
+RELEASES = os.path.join(ROOT, "business_architecture", "ontology", "releases")
+
+
+# The module map (item C of the store-tests handoff): every figure comes from the release folders on
+# disk, so the README and MODULES.md name the command instead of copying a version or a count.
+MODULE_BUILDER = os.path.join(ROOT, "business_architecture", "ontology", "release", "build_module.py")
+
+
+def _version_key(version):
+    return tuple(int(x) for x in re.findall(r"\d+", version.split("-")[0]))
+
+
+def module_sources(builder=MODULE_BUILDER):
+    """Each non-core module's source folders: the top folder of every part build_module.py packages.
+    Read from the MODULES literal, so the check needs no pyshacl to import the builder."""
+    import ast
+    tree = ast.parse(open(builder, encoding="utf-8").read())
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", None) == "MODULES":
+            modules = ast.literal_eval(node.value)
+            return {m: sorted({part.split("/")[0] + "/" for part in spec["parts"]}) for m, spec in modules.items()}
+    return {}
+
+
+def _triples(folder, module, manifest):
+    """The manifest's triple count, or, for core, whose manifest has none, its Turtle parsed."""
+    if "triples" in manifest:
+        return manifest["triples"]
+    import rdflib
+    return len(rdflib.Graph().parse(os.path.join(folder, module + ".ttl"), format="turtle"))
+
+
+def _built_from(manifest):
+    """Core's sources: each built_from entry, named by its key when its value is only a hash."""
+    return [k if re.fullmatch(r"[0-9a-f]{64}", v) else v for k, v in sorted(manifest.get("built_from", {}).items())]
+
+
+def module_releases(releases=None, builder=None):
+    """One entry per released module: its newest release, the earlier ones, what the newest requires,
+    its triple count, what the release's manifest says it was built from (core's built_from), and,
+    for a release whose manifest records none, the source folders build_module.py packages today."""
+    releases, builder = releases or RELEASES, builder or MODULE_BUILDER
+    sources = module_sources(builder)
+    out = []
+    for module in sorted(os.listdir(releases)):
+        folder = os.path.join(releases, module)
+        if module == "previous":  # the share release's history folder: each module's previous package
+            continue
+        versions = sorted((v for v in os.listdir(folder) if os.path.isfile(os.path.join(folder, v, "manifest.json")))
+                          if os.path.isdir(folder) else [], key=_version_key)
+        if not versions:
+            continue
+        newest = os.path.join(folder, versions[-1])
+        previous = os.path.join(releases, "previous", module)
+        earlier = sorted((v for v in os.listdir(previous) if os.path.isfile(os.path.join(previous, v, "manifest.json")))
+                         if os.path.isdir(previous) else [], key=_version_key)
+        manifest = json.load(open(os.path.join(newest, "manifest.json"), encoding="utf-8"))
+        out.append({
+            "module": module,
+            "newest": versions[-1],
+            "earlier": earlier + versions[:-1],
+            "requires": manifest.get("depends_on", {}),
+            "triples": _triples(newest, module, manifest),
+            # A manifest that records what the release was built from wins; otherwise the folders are
+            # build_module.py's parts today, which a later change to the builder can move away from
+            # what this release was built from, so the output labels them as the builder's.
+            "built_from": _built_from(manifest),
+            "builder_sources": [] if manifest.get("built_from") else sources.get(module, []),
+        })
+    return out
+
+
+def cmd_modules(args):
+    mods = module_releases()
+    if args.json:
+        print(json.dumps({"commit": commit(), "modules": mods}, indent=2))
+        return 0
+    print(f"commit {commit()}: {len(mods)} released modules")
+    for m in mods:
+        earlier = ", ".join(m["earlier"]) or "none"
+        requires = ", ".join(f"{k} {v}" for k, v in m["requires"].items()) or "nothing"
+        where = (f"built from (release manifest): {', '.join(m['built_from'])}" if m["built_from"]
+                 else f"sources (builder today): {', '.join(m['builder_sources']) or 'none listed'}")
+        print(f"  {m['module']} {m['newest']} (earlier: {earlier}); requires {requires}; {m['triples']} triples; {where}")
+    return 0
+
+
+def projection_figures():
+    """The last load, from the committed report and manifest (projection/README.md): what the graph stores hold."""
+    folder = os.path.join(ROOT, "business_architecture", "ontology", "projection")
+    with open(os.path.join(folder, "projection-report.json"), encoding="utf-8") as f:
+        report = json.load(f)
+    with open(os.path.join(folder, "projection-manifest.json"), encoding="utf-8") as f:
+        manifest = json.load(f)
+    relationships = report["relationships"]
+    return {"nodes": report["nodes"], "relationships": relationships,
+            "schema_relationships": report["schema_relationships"], "inferred_triples": manifest["inferred_triples"],
+            "content_relationships": relationships - report["schema_relationships"] - manifest["inferred_triples"],
+            "triples": manifest["loadable_triples"], "in_graph_constraints": report["in_graph_shape_constraints"],
+            "method": report["versions"]["method"]}
+
+
+def cmd_projection(args):
+    f = projection_figures()
+    print(f"commit {commit()}: the last load, by {f['method']}")
+    print(f"  {f['nodes']:,} nodes and {f['relationships']:,} relationships from {f['triples']:,} triples and "
+          f"{f['inferred_triples']} inferred")
+    print(f"  of the relationships: {f['content_relationships']:,} from the releases' triples, "
+          f"{f['schema_relationships']} schema, {f['inferred_triples']} from inferences")
+    print(f"  {f['in_graph_constraints']} in-graph constraints")
+    return 0
+
+
+PROCESS = "https://w3id.org/mpc/ontology/process/"
+MODULES_NS = "https://w3id.org/mpc/ontology/modules/"
+# What a process can have, the module that says so, the predicates (each read from that module's
+# released Turtle), the end of the triple the process must be on, and the type the other end must
+# have in that module (2026-10-25: without the type, a process IRI on the wrong end counted).
+# A data product is a dp:DataProduct; a portfolio segment's dp:anchoredIn does not count.
+COVERAGE_LINKS = [
+    ("raci", "a RACI assignment", "organization", ["organization/forProcess"], "object",
+     "organization/ResponsibilityAssignment"),
+    ("system", "a system-module link", "system", ["system/supports"], "object", "system/System"),
+    ("kpi", "a KPI", "kpi", ["kpi/informsProcess"], "object", "kpi/MeasureDefinition"),
+    ("lane", "a lane", "lane", ["lane/officeLane"], "subject", "lane/OfficeLane"),
+    ("value_stream", "a value-stream step", "value-stream", ["value-stream/realizes"], "object",
+     "value-stream/ValueStreamProcess"),
+    ("data_product", "a data product", "data-product", ["data-product/producedBy", "data-product/consumedBy"],
+     "object", "data-product/DataProduct"),
+]
+
+
+def newest_graph(module, releases=None):
+    import rdflib
+    folder = os.path.join(releases or RELEASES, module)
+    versions = sorted((v for v in os.listdir(folder) if os.path.isfile(os.path.join(folder, v, "manifest.json"))),
+                      key=_version_key)
+    return rdflib.Graph().parse(os.path.join(folder, versions[-1], module + ".ttl"), format="turtle")
+
+
+def _linked(g, link):
+    """The nodes on the process end of a COVERAGE_LINKS pattern whose other end has the pattern's type."""
+    import rdflib
+    from rdflib.namespace import RDF
+    _key, _what, _module, preds, end, other_type = link
+    other_type = rdflib.URIRef(MODULES_NS + other_type)
+    have = set()
+    for pred in preds:
+        for subj, obj in g.subject_objects(rdflib.URIRef(MODULES_NS + pred)):
+            proc, other = (subj, obj) if end == "subject" else (obj, subj)
+            if (other, RDF.type, other_type) in g:
+                have.add(proc)
+    return have
+
+
+def coverage(selection="core", releases=None):
+    """For a set of processes, how many have each kind of link, and which have none.
+
+    selection: "core" (every process concept in core), "module:<name>" (the processes that module
+    links through its patterns in COVERAGE_LINKS, or party's stage processes), "lifecycle" (every customer-lifecycle stage's processes) or
+    "stage:<name>" (one stage, by the end of its IRI or its label). Links are direct: a parent's
+    link does not count for its children.
+    """
+    import rdflib
+    from rdflib.namespace import RDF, SKOS
+    releases = releases or RELEASES
+    core = newest_graph("core", releases)
+    all_procs = {s for s in core.subjects(RDF.type, SKOS.Concept) if str(s).startswith(PROCESS)}
+    graphs = {m: newest_graph(m, releases) for m in {link[2] for link in COVERAGE_LINKS}}
+    if selection == "core":
+        procs = all_procs
+    elif selection.startswith("module:") and selection != "module:party":
+        module = selection.split(":", 1)[1]
+        patterns = [link for link in COVERAGE_LINKS if link[2] == module]
+        if not patterns:
+            raise ValueError("no process link is defined for module " + module)
+        procs = all_procs & set().union(*(_linked(graphs[module], link) for link in patterns))
+    elif selection in ("lifecycle", "module:party") or selection.startswith("stage:"):
+        party = newest_graph("party", releases)
+        stage_process = rdflib.URIRef(MODULES_NS + "party/stageProcess")
+        want = selection.split(":", 1)[1].lower() if selection.startswith("stage:") else None
+        procs = set()
+        for stage, proc in party.subject_objects(stage_process):
+            labels = {str(stage).rstrip("/").rsplit("/", 1)[-1].lower()}
+            labels |= {str(o).lower() for o in party.objects(stage, SKOS.prefLabel)}
+            if want is None or want in labels:
+                procs.add(proc)
+    else:
+        raise ValueError("unknown selection: " + selection)
+    label = {p: " ".join(str(x) for x in (core.value(p, SKOS.notation), core.value(p, SKOS.prefLabel) or p) if x)
+             for p in procs}
+    out = {"selection": selection, "processes": len(procs), "links": {}, "with_none": []}
+    linked_any = set()
+    for link in COVERAGE_LINKS:
+        key, what, module = link[:3]
+        have = _linked(graphs[module], link) & procs
+        linked_any |= have
+        out["links"][key] = {"what": what, "module": module, "with": len(have),
+                             "without": sorted(label[p] for p in procs - have)}
+    out["with_none"] = sorted(label[p] for p in procs - linked_any)
+    return out
+
+
+def cmd_coverage(args):
+    c = coverage(args.processes)
+    if args.json:
+        print(json.dumps({"commit": commit(), **c}, indent=2))
+        return 0
+    print(f"commit {commit()}: {c['processes']} processes in '{c['selection']}' (newest releases)")
+    for v in c["links"].values():
+        print(f"  {v['with']} have {v['what']} ({v['module']})")
+    print(f"  {len(c['with_none'])} have none of these:")
+    for name in c["with_none"]:
+        print(f"    {name}")
+    return 0
+
+
+def cmd_viewer(args):
+    """The viewer population, from the same parser used to build the page."""
+    import importlib.util
+    from pathlib import Path
+    spec = importlib.util.spec_from_file_location("epm_viewer_build", Path(ROOT) / "business_architecture/ontology/viewer/build.py")
+    viewer = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(viewer)
+    viewer.pinned_source(Path(args.tree).resolve())
+    data = viewer.build_data(Path(args.tree).resolve())
+    print(json.dumps({"commit": commit(), "sourceCommit": data["sourceCommit"], "tree": str(Path(args.tree).resolve()), "terms": data["terms"], "triples": data["triples"], "counts": data["counts"], "inputs": data["inputs"]}, indent=2))
+    return 0
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(prog="epm-facts", description=__doc__.split("\n")[0])
+    parser.add_argument("--json", action="store_true", help="machine-readable output")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("viewer", help="viewer term population and input hashes from a release tree")
+    p.add_argument("--tree", required=True)
+    sub.add_parser("counts", help="ledger, scoped sequences, gate, facts, Phase 1, review holds, taxonomy")
+    p = sub.add_parser("row", help="where one row stands")
+    p.add_argument("row_id")
+    p = sub.add_parser("section", help="row IDs for one Phase 1 issue")
+    p.add_argument("issue", type=int)
+    p = sub.add_parser("find", help="repo-wide search, including text split across lines; skips the generated HTML pages")
+    p.add_argument("text")
+    p = sub.add_parser("sweep", help="where wording the branch replaced or deleted since BASE still stands, in every tracked text file but the generated HTML pages")
+    p.add_argument("base")
+    sub.add_parser("decisions", help="check the decision records against their index (exit 1 on problems)")
+    sub.add_parser("quotes", help="check text attributed to the decision owner against their saved answers (exit 1 on problems)")
+    sub.add_parser("names", help="check that no tracked file names the decision owner (exit 1 on problems)")
+    sub.add_parser("citations", help="check words other documents attribute to the decision owner against the source each names (exit 1)")
+    sub.add_parser("modules", help="each released module: newest and earlier releases, what it requires, triples, built from (manifest) or sources (builder today)")
+    sub.add_parser("projection", help="the last load: nodes, relationships, triples and in-graph constraints (committed report)")
+    p = sub.add_parser("coverage", help="how many processes have a RACI assignment, system, KPI, lane, value-stream step, data product")
+    p.add_argument("--processes", default="core", help="core (default), module:<name>, lifecycle or stage:<name>")
+    args = parser.parse_args(argv)
+    return {"viewer": cmd_viewer, "projection": cmd_projection, "counts": cmd_counts, "row": cmd_row, "section": cmd_section, "find": cmd_find, "decisions": cmd_decisions,
+            "quotes": cmd_quotes, "names": cmd_names, "citations": cmd_citations, "sweep": cmd_sweep,
+            "modules": cmd_modules, "coverage": cmd_coverage}[args.cmd](args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

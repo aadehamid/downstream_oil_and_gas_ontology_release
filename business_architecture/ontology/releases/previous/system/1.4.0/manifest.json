@@ -1,0 +1,21 @@
+{
+  "module": "system",
+  "version": "1.4.0",
+  "release_candidate": false,
+  "ontology_iri": "https://w3id.org/mpc/ontology/modules/system",
+  "version_iri": "https://w3id.org/mpc/ontology/modules/system/1.4.0",
+  "depends_on": {
+    "core": "2.4.0"
+  },
+  "triples": 906,
+  "approved_by": {
+    "who": "a subject matter expert reviewing the documents"
+  },
+  "files": {
+    "CHANGELOG.md": "235a3124f84bcce9ea788fea04265ae75bae71910a7a2b72ffdd874ca9bd0b83",
+    "catalog.ttl": "058158b2984821a629e9cf62facbc1431278d68bb996878f865ad4597ea7ba51",
+    "shapes.ttl": "56e85ca3383adf07da36451153342280093a4482a1234eca508b192d0f0abe76",
+    "system.jsonld": "94a35bdd94c0a21d67614957dd42057944971cf74dc5fc235e39c40d441f0156",
+    "system.ttl": "243bff8144e8e27a6c6957416ebefe86fd371addb8f5601013be2aac3317af11"
+  }
+}

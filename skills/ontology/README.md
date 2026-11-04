@@ -1,0 +1,137 @@
+# ontology
+
+An agent skill for building a business ontology in any domain, on the W3C stack (RDF, SKOS, OWL, SHACL, PROV-O, DCAT). The agent starts with an intake of what you bring, then works in thirteen gated steps, to a released, checked package and an optional Neo4j property-graph projection, which the `ontology-to-lpg` skill carries out. You, the ontology owner, make every decision; the agent brings the evidence, the options and a recommendation, and records your answers word for word.
+
+The method comes from a downstream refining enterprise's process ontology, built privately and rewritten here in neutral terms. The examples use a public library's lending and, in two places, Marathon Petroleum's public SEC filings.
+
+This README is for people. Agents read `SKILL.md` and the files it points to.
+
+## What to bring
+
+The agent starts by sorting what you have into six kinds of input, and it stops to ask you about any that are missing or thin (`references/governance.md`, rule 1). Plan for these:
+
+| Input | What it means | Example |
+|---|---|---|
+| Purpose | Who will use the ontology, for what, and what is in and out of scope | Staff and a lending system need one meaning of "loan" |
+| Competency questions | The questions it must answer. Draft them at intake; you lock them at Step 1 | "Which events start and end a loan?" |
+| Representative data | **The backbone:** a hierarchy of the business's processes or concepts. Tables and lists beside it, such as value streams and measure lists, return as overlays at Step 7 | A process map |
+| Reusable vocabularies | Frameworks, public ontologies and code lists to check against or map to | A published process framework, a code list |
+| Semantic evidence | Sources that say what things mean | Glossaries, policies, filings, definitions |
+| Constraints | What limits the work | Licences, privacy, hosting, deadlines |
+
+**The backbone is what Steps 2 and 3 turn into identities and a taxonomy.** A file of any format works if each node has a name and exactly one parent, except the top nodes, which have none. An ID is kept when a node has one, and Step 2 mints a slug when it does not. Levels and descriptions help. Nodes need no definitions on day one: Step 3 writes the missing ones with the owner.
+
+If you have no hierarchy, the agent records it as missing, says how that limits the design, and stops for your answer. It does not build one for you. A published framework checks your hierarchy at Step 0; it does not replace it.
+
+## Where it starts
+
+1. **Intake:** fill `templates/requirements.yaml`, including draft competency questions.
+2. **Step 0:** check the reference framework and survey existing ontologies.
+3. **Step 8:** review the scope. It runs early because scope shapes the foundations.
+4. **Step 1:** record the ten policies, and lock the competency questions.
+5. **Steps 2 to 7 and 9 to 12,** in order.
+
+To add a module to an ontology that already has releases, start at `references/new-module.md` instead.
+
+## How to use it
+
+1. Install the skill where your agent finds skills, and ask the agent to start an ontology for your domain.
+2. The agent fills `templates/requirements.yaml` with you: purpose, users, scope, draft competency questions, and the inputs you have. Where an input is missing, it stops and asks.
+3. It then works through Steps 0 to 12 in `SKILL.md`. Each step names the reference to read, the template to fill and the "Done when" gate. Expect a question from the agent at every decision; answer "not yet" when you are unsure, and the agent marks the item as assumed and keeps it reversible.
+4. From Step 3, run the checks the agent runs:
+
+   ```sh
+   uv run --with pyyaml python3 scripts/check_requirements.py requirements.yaml
+   uv run --with rdflib python3 scripts/check_taxonomy.py <your module>.ttl
+   ```
+
+   Each prints one line per failure and exits 1, or prints a pass line and exits 0.
+
+The skill works on its own: `references/governance.md` and the templates carry the rules for decision records, review, the check script and figures.
+
+## Files
+
+| Path | Read by | What it does |
+|---|---|---|
+| `SKILL.md` | agent, every run | The index: the scope line, where to start, Steps 0 to 12 with their gates and references, the rules that apply at every step, and the templates and scripts. Its `description` decides when the skill triggers. |
+| `references/playbook.md` | people, and the agent when asked why | The narrative guide to the method: why each step comes where it does and what it hands to the next, with a pointer to the reference that holds its rules; the standards and why each is used; why to split into modules, the integration-module pattern, deciding between sources, and a worked example in a library's lending. It points to the references below for the rules. `scripts/test_playbook_guide.py` keeps it free of any one project's names. |
+| [`references/ontology-build-playbook.html`](references/ontology-build-playbook.html) | people | The same guide as one page to read in a browser. `scripts/build_playbook_html.py`, at the repository root, generates it from `playbook.md`: edit the Markdown, then rebuild. |
+| `references/foundations.md` | agent, Steps 0, 1 and 8 | Conceptual modelling, aligning a reference framework, the ten policies, source policies, and the scope review. |
+| `references/identity-taxonomy.md` | agent, Steps 2 and 3 | Stable IRIs and slugs, the SKOS concept scheme, code lists, and the register that maps source strings to code values. |
+| `references/domain-model.md` | agent, Step 3 | When a term is a concept, a class, a property, a metadata (annotation) property, a code-list value or a reference individual, and how to write classes and properties (definition; for object and datatype properties, domain, range and cardinality shape; for annotation properties, label and definition only). |
+| `references/quality.md` | agent, Step 3 onward and before any hand-off | The definition quality bar, with a form for each kind of term, and the soundness checks on every change. |
+| `references/promotion.md` | agent, Step 4 | Promoting provisional source data into governed triples: eleven rules, the predicate review, the source-correction backlog, the first release, example predicate definitions. |
+| `references/organization.md` | agent, Step 5 | Roles and the role register, RACI assignments, party roles as dated nodes, and real organizations in a reference module. |
+| `references/provenance.md` | agent, Step 6 | Definitions against runs: PROV-O and P-Plan, and the shapes a consumer's run must meet. |
+| `references/integration.md` | agent, Step 7 | Bringing back overlays: measures, market series, data products, value streams, systems, placement kinds, source tiers and consumer rules. |
+| `references/shacl.md` | agent, Step 9 | What to shape and in what order, how to test shapes, and how to check a SHACL feature in a target engine. |
+| `references/release.md` | agent, Step 10 and any release | Change classification, deprecation, approvals, release packages, candidates, the catalog and the ontology header. |
+| `references/regression.md` | agent, Step 11 | Tracing elements to competency questions, writing them as SPARQL, question statuses, and when the suite runs. |
+| `references/lpg-projection.md` | agent, Step 12 and Step 1's target formats | When to project into a property graph and the Rule 4 choice; points to the `ontology-to-lpg` skill, which holds the method. |
+| `references/external-ontologies.md` | agent, Step 0 or when asked about existing ontologies | Where to find public ontologies and code lists, how to assess them, and the map, import or ignore choice. |
+| `references/packaging-walkthrough.md` | agent, Step 10, when a user has files but no packages | The interview that turns files into a release: releases versus plain files, the git setup, twelve questions with an example and a reason each, then build, show and check. |
+| `references/new-module.md` | agent, when a module joins an ontology that already has releases | Whether it should be a new module, what each step covers for it, and how to release it beside the others. |
+| `references/logical-model.md` | agent, when a logical data model exported from a modelling tool joins the ontology | The two views (the export as the tool wrote it, and an annotation layer linking it), keying, collisions, link drafting, confidential exports and the release. |
+| `references/governance.md` | agent, before a new ontology, a decision, a delegation, setting up checks, a review, a release or publication | Intake and requirements, "not yet" answers, decision records, delegation, checks, generated content, review, privacy, and claims. |
+| `templates/requirements.yaml` | agent, before Step 0 | The intake and requirements file, with its schema in the header. |
+| `templates/survey-register.md` | agent, Step 0 | The reference framework's verified elements, boundary notes, and the survey of public ontologies. |
+| `templates/scope-review.md` | agent, Step 8 | In or out call per candidate area, with boundary notes and revival triggers. |
+| `templates/policies.md` | agent, Step 1 | The ten policies with choice, reason and deciding record. |
+| `templates/parked-list.md` | agent, from Step 1 | Parked future concepts with their questions, "done when" and revival trigger. |
+| `templates/competency-questions.md` | agent, Step 1 and Step 11 | The regression table: tested parts, status, what each waits for, the elements it needs, and what was left out. |
+| `templates/identity-table.md` | agent, Step 2 | Each node's IRI, kind, notation, slug source and renames, and the source-string register. |
+| `templates/ontology-skeleton.ttl` | agent, Step 3 | A module header, a concept scheme, a code-list scheme, three classes, four object and datatype properties and one annotation property, for a library. Passes `check_taxonomy.py`. |
+| `templates/shapes-skeleton.ttl` | agent, Step 3 | The SHACL node and property shapes for the skeleton's loan class and its concepts, with cardinalities. |
+| `templates/definition-review.md` | agent, Step 3 | The quality-bar review sheet, one row per term. |
+| `templates/decision-record.md` | agent, when recording a decision | A numbered record: the question and recommendation quoted, context with the agent's plan, the owner's decision (their words only), alternatives, the owner's recorded words, evidence. |
+| `templates/decision-package.md` | agent, when asking the owner a question | A question with context, options (recommendation first), what each changes, and an answer box. |
+| `templates/answers-file.md` | agent, when saving the owner's answers | The owner's words verbatim, with the agent's questions inside comments. |
+| `templates/release-checklist.md` | agent, before each release | The release gate as a checklist, each item pointing to its rule. |
+| `templates/package-answers.yaml` | agent, Step 10 | One module release's answers, filled in for the library skeleton: what `build_package.py` reads, and what the packaging walk-through asks for. |
+| `templates/check.sh` | agent, when setting up a repository | A check-script skeleton with the four-snapshot no-writes guard (two snapshots over every file when the folder is not a git checkout); it fails until every TODO is replaced. |
+| `scripts/check_requirements.py` | agent and check script | Checks the requirements file's structure (fields, types, allowed values, ids, record rules) and its scope conflicts; a person still reviews what the text means. Needs PyYAML. |
+| `templates/intake/` | agent, Steps 0 and 3 | A worked example of candidate terms from a document: a policy excerpt, a result in OntoGPT's output shape, and the candidate register. |
+| `scripts/check_candidates.py` | agent and check script | Steps 0 and 3: an OntoGPT result belongs to the supplied document and each entity's span reads its label; each candidate's passage is in the document and its row is well formed and still a candidate; warns when a term's words are not in its passage. It does not check that a definition says what its passage says; a person does. Needs PyYAML. |
+| `templates/tabular/` | agent, Step 4 | A worked example of spreadsheet rows to triples: a CSV of loan states, the same mapping as RML and as a maplib template, and the committed output both reproduce. Morph-KGC (RML) is the engine to use; the maplib template stays for comparison and to test the maplib route. |
+| `scripts/build_tabular.py` | agent and check script | Builds triples from a reviewed RML mapping (Morph-KGC, the engine to use) or a maplib template (for a source already a Python dataframe) as sorted N-Triples; `--verify` fails unless the committed output equals a fresh build. Needs rdflib and the engine. |
+| `scripts/check_taxonomy.py` | agent and check script | The Step 2 and 3 mechanical checks on data Turtle files (not shapes files). Needs rdflib. |
+| `templates/regression-expected.csv` | agent, Step 11 | The file `run_regression.py` reads: one row per competency question with its status, its query files and what it waits for. Starts as the two drafted rows of `templates/competency-questions.md`. |
+| `templates/mappings.sssom.tsv` | agent, Step 7 | A mapping set in SSSOM/TSV: the metadata block, then one row per mapping with its justification, confidence, author role and comment. |
+| `scripts/check_sssom.py` | agent and check script | Step 7: every SSSOM mapping set is well formed: metadata, required columns, declared CURIE prefixes, an allowed SKOS predicate, confidence from 0 to 1, a released SEMAPV justification, a comment on a non-exact match, and the other vocabulary's version. Needs PyYAML. |
+| `scripts/check_shapes.py` | agent and check script | Step 9's whole-graph gate: every shapes file over every data file gives no SHACL result at any severity, and, with `--every-shapes-file-under`, no `*-shapes.ttl` under that folder is left out (a release package's own `shapes.ttl` is not a gate input); a shapes graph holding `sh:rule` fails. Needs rdflib and pySHACL. |
+| `scripts/check_cardinality.py` | agent and check script | Step 9: every property the modules declare has an applied property shape of its own stating a cardinality, and no targeted node shape is empty. Needs rdflib. |
+| `scripts/check_code_lists.py` | agent and check script | Step 9: every property that takes values from a code list has a shape pinning its own list, its values are in that list, and the shape fails when a value moves to another list; a run over definitions alone, where no property takes a value, fails. Needs rdflib and pySHACL. |
+| `scripts/check_packages.py` | agent and check script | Steps 9 and 10: every release package is pinned by hand, matches its manifest's hashes, and conforms to its own shapes with its released closure loaded. Needs rdflib and pySHACL. |
+| `scripts/build_package.py` | agent and check script | Step 10: writes one module's release package from an answers file (Turtle with its header set, JSON-LD, shapes, a DCAT record, a changelog with Known gaps, and a manifest of SHA-256 hashes), checks it with `check_packages.py` and `check_changelogs.py` before moving it into place, never overwrites a released package, and `verify` fails unless the written package equals a fresh build. With git it tags `<module>-v<version>` locally and says whether a remote holds the tag; it never pushes. Needs rdflib, PyYAML and pySHACL. |
+| `scripts/test_build_package.py` | this repository's check script | Tests for `build_package.py`: the library package's manifest, byte-identical rebuilds, the header, a changed source or a hand edit failing `verify`, no overwrite, known gaps and approval required, an unreleased dependency, an import, a package that breaks its shapes, and the three git setups (none, local, a bare remote). |
+| `scripts/build_catalog.py` | agent and check script | Step 10: writes the combined catalog, the union of every package's `catalog.ttl` under the releases folder plus the catalog's own title and description, and `verify` fails unless the written catalog equals a fresh build. Fails on a second catalog IRI, a record with other than one dataset, or a distribution not described or naming no file in its package. Needs rdflib and pySHACL. |
+| `scripts/test_build_catalog.py` | this repository's check script | Tests for `build_catalog.py`: two packages catalogued and verified, a byte-identical rebuild in another process, only the title and description added, and each break (a package added, a hand edit, a changed title, two catalog IRIs, a distribution naming no file or not described, two datasets, an unlisted dataset, a missing record) failing with its message. |
+| `scripts/check_changelogs.py` | agent and check script | Step 10: every release's changelog has a "Known gaps" section, each gap with a `Reason:` and a `Record:` value, or "None."; `--exempt` leaves out packages released before a project adopted the rule, and a releases folder with no package fails. Needs only Python. |
+| `scripts/test_changelogs.py` | this repository's check script | Tests for `check_changelogs.py`: a changelog with listed gaps or "None." passes, and each missing section, empty section, missing or empty `Reason:` or `Record:`, empty releases folder and non-version folder fails or is skipped as documented. Needs only Python. |
+| `scripts/build_docs.py` | agent, Step 10 | Builds each released package's documentation pages with Widoco (Java, local) beside the package, after checking the package against its manifest; replaces a page set only after the new one is built. Needs Java and a Widoco jar. |
+| `scripts/check_docs.py` | agent and check script | Step 10: every released package has pages built from its current manifest (by the SHA-256 recorded in `docs-source.json`), and no pages exist for a package that is not released. Needs only Python. |
+| `scripts/run_regression.py` | agent and check script | Step 11: runs the competency-question queries on the released packages (and any example graph under `new-module.md`, rule 9), with each question's status checked (answerable, partial, waiting, parked, drafted). Needs rdflib. |
+| `scripts/test_validation.py` | this repository's check script | Tests for the five Step 9 to 11 scripts: a clean case passes, and each planted error fails with its own message. Needs rdflib and pySHACL. |
+| `scripts/test_docs.py` | this repository's check script | Tests for `check_docs.py` and `build_docs.py`: each missing, stale, orphan or unreadable page set fails; a package that differs from its manifest stops the build; a failed build or promotion keeps the previous pages. One test runs Widoco when `WIDOCO_JAR` is set. Needs only Python. |
+| `scripts/test_sssom.py` | this repository's check script | Tests for `check_sssom.py`: the template passes, and each one-break change fails with only its own check. Needs PyYAML. |
+| `scripts/test_candidates.py` | this repository's check script | Tests for `check_candidates.py`: the worked example passes, each one-break change fails with its own check, and an unsupported definition beside a valid passage still passes, which documents the limit. Needs PyYAML. |
+| `scripts/test_tabular.py` | this repository's check script | Tests for `build_tabular.py`, run once per engine: each reproduces the committed output byte for byte, writes only governed triples, passes `check_taxonomy.py`, and a changed cell or hand edit fails `--verify`. Needs rdflib and Morph-KGC or maplib. |
+| `scripts/test_checks.py` | this repository's check script | Tests: the templates pass; each deliberate break fails with only its own check and message; both command lines exit 0, 1 or 2 as documented; the shapes skeleton works under pySHACL; and `templates/check.sh`, copied into a fresh repository and into a plain folder with no git, fails while TODOs remain, catches a write, and checks data files but not shapes files. Needs rdflib, PyYAML and pySHACL. |
+| `SOURCES.md` | you | Every source the skill draws on, what it took, versions, how to check for updates, and which outside proposals it adopted. |
+| `README.md` | you | This file. |
+
+## Common tasks
+
+**Change a rule.** Edit the reference file that holds it; `SKILL.md` only points. Keep each rule in one place, with a one-sentence reason and a source.
+
+**Check the sources for updates.** Follow "How to check for updates" in each section of `SOURCES.md`.
+
+## Status
+
+Last updated 2026-10-23.
+
+- **No evals yet.** One walk-through on a library's lending process (Steps 0, 8, 1, 2 and 3) shaped this version. Write test prompts for three branches before tuning: starting a new ontology, promoting a workbook into triples, and choosing the target formats (the Neo4j projection itself is `ontology-to-lpg`'s branch).
+- **Check scripts cover part of the method** (their tests are listed in the table above): the requirements file (`check_requirements.py`), candidate terms drawn from documents at Steps 0 and 3 (`check_candidates.py`), Steps 2 and 3 (`check_taxonomy.py`), Step 4's spreadsheet promotion (`build_tabular.py --verify`), Step 7's mapping sets (`check_sssom.py`), and Steps 9 to 11 (`check_shapes.py`, `check_cardinality.py`, `check_code_lists.py`, `check_packages.py`, `build_package.py`, `build_catalog.py`, `check_changelogs.py`, `check_docs.py`, `run_regression.py`). The other checks each step describes are for the project to write.
+- **Outside proposals not adopted yet:** a check that cited sources still hold, a queryable decision trace, a quality scorecard, views for the projection's consumers, and extraction artifacts. Reasons are in `SOURCES.md`, section 6.
+- **The projection method moved to `ontology-to-lpg`** (2026-10-23). Its README tracks the open items on RDF 1.2 and option 4b.
+- **Two sources of experience.** Most rules come from one private build and one walk-through. Expect changes after a second full build.

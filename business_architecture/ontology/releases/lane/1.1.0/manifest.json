@@ -1,0 +1,28 @@
+{
+  "module": "lane",
+  "version": "1.1.0",
+  "release_candidate": false,
+  "ontology_iri": "https://w3id.org/mpc/ontology/modules/lane",
+  "version_iri": "https://w3id.org/mpc/ontology/modules/lane/1.1.0",
+  "depends_on": {
+    "core": "2.4.0"
+  },
+  "decisions": [
+    "the decision of 2026-10-19",
+    "the decision of 2026-10-22",
+    "the decision of 2026-10-25",
+    "the decision of 2026-10-26"
+  ],
+  "triples": 67,
+  "approved_by": {
+    "who": "a subject matter expert reviewing the documents",
+    "words": "Approved as described"
+  },
+  "files": {
+    "CHANGELOG.md": "0efae1fc1697e1f96040945b642b4bd9488a46b05cf2022f261bfb72d0915d75",
+    "catalog.ttl": "e7ee2d5c209d76f5d294dd5e58654d15b7751022cbd5c472400fec96bcb09ad1",
+    "lane.jsonld": "954ca34c594cb86e77a6493ec433994d95370578019b9bc7f221b6a201956909",
+    "lane.ttl": "51df895729b02f865cc1dffa444be03accb03515d2f584e5365b78316f582fb8",
+    "shapes.ttl": "46213456548f090d109b2d8e9700163d1575780d8f1bd4619c44d060adc25bf3"
+  }
+}

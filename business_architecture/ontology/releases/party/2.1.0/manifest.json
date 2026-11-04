@@ -1,0 +1,40 @@
+{
+  "module": "party",
+  "version": "2.1.0",
+  "release_candidate": false,
+  "ontology_iri": "https://w3id.org/mpc/ontology/modules/party",
+  "version_iri": "https://w3id.org/mpc/ontology/modules/party/2.1.0",
+  "depends_on": {
+    "core": "2.4.0",
+    "system": "1.5.0"
+  },
+  "decisions": [
+    "the decision of 2026-10-21",
+    "the decision of 2026-10-21",
+    "the decision of 2026-10-21",
+    "the decision of 2026-10-21",
+    "the decision of 2026-10-21",
+    "the decision of 2026-10-21",
+    "the decision of 2026-10-22",
+    "the decision of 2026-10-23",
+    "the decision of 2026-10-23",
+    "the decision of 2026-10-23",
+    "the decision of 2026-10-25",
+    "the decision of 2026-10-25",
+    "the decision of 2026-10-26",
+    "the decision of 2026-10-26",
+    "the decision of 2026-10-27"
+  ],
+  "triples": 4349,
+  "approved_by": {
+    "who": "a subject matter expert reviewing the documents",
+    "words": "Approved as described"
+  },
+  "files": {
+    "CHANGELOG.md": "89654ba55fde21c9dec041893b65a757476c513d99ce4f06e9d97df53d311c6d",
+    "catalog.ttl": "3d5ba9757b281b8d444a4c05978be238097718294631bfe09dd6f62c6e71acfd",
+    "party.jsonld": "8386578a793fe6e6c3fca5885375a0a44d4d4f19edcc46c9f80d916ec713261f",
+    "party.ttl": "62a83a7b8ce4c98d8cc8b0615109c811059ab0eff9f4494c50abd2c518b38201",
+    "shapes.ttl": "848870d4dc38cc05202f07ec242acc0d941d36d74b9f0d828b7b9c6021400eb9"
+  }
+}

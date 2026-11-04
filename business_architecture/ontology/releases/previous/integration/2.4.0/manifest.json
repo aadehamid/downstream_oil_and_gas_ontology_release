@@ -1,0 +1,29 @@
+{
+  "module": "integration",
+  "version": "2.4.0",
+  "release_candidate": false,
+  "ontology_iri": "https://w3id.org/mpc/ontology/modules/integration",
+  "version_iri": "https://w3id.org/mpc/ontology/modules/integration/2.4.0",
+  "depends_on": {
+    "core": "2.4.0",
+    "organization": "2.1.0",
+    "kpi": "1.2.0",
+    "data-product": "1.2.0",
+    "value-stream": "1.2.0",
+    "system": "1.5.0",
+    "lane": "1.1.0",
+    "market-data": "1.1.0",
+    "party": "2.0.0"
+  },
+  "triples": 450,
+  "approved_by": {
+    "who": "a subject matter expert reviewing the documents"
+  },
+  "files": {
+    "CHANGELOG.md": "d41ba38c57f384df814b4b0c438b34354ceda954bb5114e8e93856f9115708ff",
+    "catalog.ttl": "fa99ad1e4d2b594fb69f48acee9db31ee3bcb49c1ac8c27030cded3b0980c62f",
+    "integration.jsonld": "2a196078b6e41f280ca1e1292bf97a959c922dd3b454504e34f3a8e5614ccf4f",
+    "integration.ttl": "55c669d1004393cf6be830bc13ff8d671ce9cdb0fb004ec102a57c640f6fbfff",
+    "shapes.ttl": "5f9cfac096dafd49b9501b01bac9331e15ff3501702b5b965e074f1df153558c"
+  }
+}

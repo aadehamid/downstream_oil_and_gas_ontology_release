@@ -1,0 +1,21 @@
+{
+  "module": "lane",
+  "version": "1.0.0",
+  "release_candidate": false,
+  "ontology_iri": "https://w3id.org/mpc/ontology/modules/lane",
+  "version_iri": "https://w3id.org/mpc/ontology/modules/lane/1.0.0",
+  "depends_on": {
+    "core": "2.2.0"
+  },
+  "triples": 59,
+  "approved_by": {
+    "who": "a subject matter expert reviewing the documents"
+  },
+  "files": {
+    "CHANGELOG.md": "59459eaabc4cf7a0e315d7b8750957b087bbf13a43322a38d7df83bb79226016",
+    "catalog.ttl": "07282df6de3e46544db4c1edbae93ae3909006db2caafce6179bfb790ebbeb02",
+    "lane.jsonld": "d353dc1cfa0bf495143538dc5a163a8b026621f988cdb17768f1946584b3c9cf",
+    "lane.ttl": "b37dd2df7a566cd54735c1df6c3e3eb81ff465b0befb22c2e2960e0bd115830c",
+    "shapes.ttl": "fdd1add9f29dc980d2b38f28eff7083fbb973a10f098e86bf29c09cdbaab1cde"
+  }
+}

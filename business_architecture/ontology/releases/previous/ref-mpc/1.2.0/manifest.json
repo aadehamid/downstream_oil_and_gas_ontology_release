@@ -1,0 +1,22 @@
+{
+  "module": "ref-mpc",
+  "version": "1.2.0",
+  "release_candidate": false,
+  "ontology_iri": "https://w3id.org/mpc/ontology/modules/ref-mpc",
+  "version_iri": "https://w3id.org/mpc/ontology/modules/ref-mpc/1.2.0",
+  "depends_on": {
+    "organization": "2.0.0",
+    "party": "1.0.0"
+  },
+  "triples": 180,
+  "approved_by": {
+    "who": "a subject matter expert reviewing the documents"
+  },
+  "files": {
+    "CHANGELOG.md": "198a429624c617319bb5d9d3ff75a810281546c467a2b14d3f2141e892dc5e4e",
+    "catalog.ttl": "5aa34c1c883418f62b0a3529fed5cee518f3f1856a0155132ad65534576a3e00",
+    "ref-mpc.jsonld": "746ea6895f056a47b0045740053b6a981f60b369fdc98668ba7a2c8193292f53",
+    "ref-mpc.ttl": "4da521643676d05f0ad04d897c4ed901186f01def6869dc5062985064a31d2d6",
+    "shapes.ttl": "e1f86593ee91b9a7658b818f8da2d0c8332e74e3cdcc235f6c072b411856bff0"
+  }
+}

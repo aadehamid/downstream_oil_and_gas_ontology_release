@@ -1,0 +1,173 @@
+[
+ {
+  "@id": "https://w3id.org/mpc/ontology/modules/logical-model",
+  "@type": [
+   "http://www.w3.org/2002/07/owl#Ontology"
+  ],
+  "http://purl.org/dc/terms/description": [
+   {
+    "@language": "en",
+    "@value": "Logical data models exported from ER Studio Data Architect, each kept as two graphs: ER Studio's export as it is, in ER Studio's own namespace, and a layer of annotations that links its entities to the party, system and data-product modules. This package holds the module's vocabulary; each model's two graphs ship beside it."
+   }
+  ],
+  "http://purl.org/dc/terms/issued": [
+   {
+    "@type": "http://www.w3.org/2001/XMLSchema#date",
+    "@value": "2026-11-03"
+   }
+  ],
+  "http://purl.org/dc/terms/modified": [
+   {
+    "@type": "http://www.w3.org/2001/XMLSchema#date",
+    "@value": "2026-11-03"
+   }
+  ],
+  "http://purl.org/dc/terms/requires": [
+   {
+    "@id": "https://w3id.org/mpc/ontology/modules/data-product/1.2.0"
+   },
+   {
+    "@id": "https://w3id.org/mpc/ontology/modules/party/2.1.0"
+   },
+   {
+    "@id": "https://w3id.org/mpc/ontology/modules/system/1.5.0"
+   }
+  ],
+  "http://purl.org/dc/terms/title": [
+   {
+    "@language": "en",
+    "@value": "MPC Logical Model Module"
+   }
+  ],
+  "http://www.w3.org/2002/07/owl#versionIRI": [
+   {
+    "@id": "https://w3id.org/mpc/ontology/modules/logical-model/1.0.0"
+   }
+  ],
+  "http://www.w3.org/2002/07/owl#versionInfo": [
+   {
+    "@value": "1.0.0"
+   }
+  ]
+ },
+ {
+  "@id": "https://w3id.org/mpc/ontology/modules/logical-model/LogicalModel",
+  "@type": [
+   "http://www.w3.org/2002/07/owl#Class"
+  ],
+  "http://purl.org/dc/terms/bibliographicCitation": [
+   {
+    "@language": "en",
+    "@value": "the decision of 2026-11-02, decisions 3 and 4"
+   }
+  ],
+  "http://www.w3.org/2000/01/rdf-schema#label": [
+   {
+    "@language": "en",
+    "@value": "logical model"
+   }
+  ],
+  "http://www.w3.org/2004/02/skos/core#definition": [
+   {
+    "@language": "en",
+    "@value": "A named logical data model exported from a data modelling tool, such as ER Studio Data Architect: a set of entities, their attributes, keys and relationships, designed one level above the tables a data platform builds. Each model is one individual of this class, and the entities of its export belong to it."
+   }
+  ]
+ },
+ {
+  "@id": "https://w3id.org/mpc/ontology/modules/logical-model/describes",
+  "@type": [
+   "http://www.w3.org/2002/07/owl#AnnotationProperty"
+  ],
+  "http://purl.org/dc/terms/bibliographicCitation": [
+   {
+    "@language": "en",
+    "@value": "the decision of 2026-11-02, decisions 4 and 8"
+   }
+  ],
+  "http://www.w3.org/2000/01/rdf-schema#label": [
+   {
+    "@language": "en",
+    "@value": "describes"
+   }
+  ],
+  "http://www.w3.org/2004/02/skos/core#definition": [
+   {
+    "@language": "en",
+    "@value": "The concept, class or code list of the party module that the entity holds data about, such as a customer account, or a code list such as the dealer classes for a lookup table that holds the whole list. Asserted only where the entity's name and description make the link clear; a doubtful link goes to the decision owner instead."
+   }
+  ]
+ },
+ {
+  "@id": "https://w3id.org/mpc/ontology/modules/logical-model/implementedBy",
+  "@type": [
+   "http://www.w3.org/2002/07/owl#AnnotationProperty"
+  ],
+  "http://purl.org/dc/terms/bibliographicCitation": [
+   {
+    "@language": "en",
+    "@value": "the decision of 2026-11-02, decisions 4 and 9 (question 55)"
+   }
+  ],
+  "http://www.w3.org/2000/01/rdf-schema#label": [
+   {
+    "@language": "en",
+    "@value": "implemented by"
+   }
+  ],
+  "http://www.w3.org/2004/02/skos/core#definition": [
+   {
+    "@language": "en",
+    "@value": "The platform table or data product of the data-product module that builds the entity on the data platform. An entity with none has no recorded implementation."
+   }
+  ]
+ },
+ {
+  "@id": "https://w3id.org/mpc/ontology/modules/logical-model/inModel",
+  "@type": [
+   "http://www.w3.org/2002/07/owl#AnnotationProperty"
+  ],
+  "http://purl.org/dc/terms/bibliographicCitation": [
+   {
+    "@language": "en",
+    "@value": "the decision of 2026-11-02, decisions 4 and 5"
+   }
+  ],
+  "http://www.w3.org/2000/01/rdf-schema#label": [
+   {
+    "@language": "en",
+    "@value": "in model"
+   }
+  ],
+  "http://www.w3.org/2004/02/skos/core#definition": [
+   {
+    "@language": "en",
+    "@value": "The logical model an entity of an export belongs to. The subject is the modelling tool's own entity IRI, found from the tool's identifier of the entity at each build; the value is a logical model. Every entity of a model has exactly one."
+   }
+  ]
+ },
+ {
+  "@id": "https://w3id.org/mpc/ontology/modules/logical-model/sourceSystem",
+  "@type": [
+   "http://www.w3.org/2002/07/owl#AnnotationProperty"
+  ],
+  "http://purl.org/dc/terms/bibliographicCitation": [
+   {
+    "@language": "en",
+    "@value": "the decision of 2026-11-02, decisions 4 and 8"
+   }
+  ],
+  "http://www.w3.org/2000/01/rdf-schema#label": [
+   {
+    "@language": "en",
+    "@value": "source system"
+   }
+  ],
+  "http://www.w3.org/2004/02/skos/core#definition": [
+   {
+    "@language": "en",
+    "@value": "The system whose records the entity holds data from: a system of the system module, or a customer system of the party module, which says where the two are the same system. It is drafted from the entity's name."
+   }
+  ]
+ }
+]

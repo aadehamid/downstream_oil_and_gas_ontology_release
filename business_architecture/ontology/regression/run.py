@@ -1,0 +1,99 @@
+"""Step 11 regression: run the competency-question queries against a release (the decision of 2026-10-05).
+
+expected.csv gives each of the 55 questions in competency-questions.md a status:
+answerable (its queries must run), partial (the graph part's queries must run;
+waits_for names the rest), waits:<step or decision> (no query yet), or
+parked:<decision> (parked by a recorded decision, which counts as green; no query). A query
+whose first comment line says "(must be none)" must return zero rows; every other
+query must return at least one row. Prints a coverage summary; exits 1 on a failure.
+
+Run: python3 run.py [path/to/core.ttl]   (default: the current core release; the module graphs in
+MODULES are always loaded with it)
+"""
+import csv
+import os
+import sys
+from collections import Counter
+
+from rdflib import Graph
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "release"))
+import newest  # noqa: E402
+RELEASE = newest.core_file()
+# The module graphs loaded with the release (Step 5: roles and RACI assignments; Step 7: the kpi, data-product, value-stream, system, lane and market-data modules; Steps 5 to 7: the `party` module).
+MODULES = [os.path.join(HERE, "..", "organization", n) for n in ("vocabulary.ttl", "roles.ttl", "assignments.ttl")] \
+    + [os.path.join(HERE, "..", "kpi", n) for n in ("vocabulary.ttl", "measures.ttl")] \
+    + [os.path.join(HERE, "..", "data-product", n) for n in ("vocabulary.ttl", "data-products.ttl", "pricing.ttl")] \
+    + [os.path.join(HERE, "..", "value-stream", n) for n in ("vocabulary.ttl", "value-streams.ttl")] \
+    + [os.path.join(HERE, "..", "system", n) for n in ("vocabulary.ttl", "systems.ttl")] \
+    + [os.path.join(HERE, "..", "lane", n) for n in ("vocabulary.ttl", "lanes.ttl")] \
+    + [os.path.join(HERE, "..", "market-data", n) for n in ("vocabulary.ttl", "market-data.ttl")] \
+    + [os.path.join(HERE, "..", "placement", "vocabulary.ttl")] \
+    + [os.path.join(HERE, "..", "authority", n) for n in ("vocabulary.ttl", "source-tiers.ttl")] \
+    + [os.path.join(HERE, "..", "apqc", "apqc-elements.ttl")] \
+    + [os.path.join(HERE, "..", "consumer", "vocabulary.ttl")] \
+    + [os.path.join(HERE, "..", "population", n) for n in ("vocabulary.ttl", "population.ttl")] \
+    + [os.path.join(HERE, "..", "party", n) for n in ("vocabulary.ttl", "code-lists.ttl", "systems.ttl", "lifecycle.ttl")] \
+    + [os.path.join(HERE, "..", "ref-mpc", "reference-parties.ttl")] \
+    + [os.path.join(HERE, "..", "technical-graph", n) for n in ("vocabulary.ttl", os.path.join("example", "example-graph.ttl"))]  # Step 7 overlays and rules; Steps 5 to 7: the `party` module; MPC and MPLX as parties (the decision of 2026-10-22); the technical-graph module and its example graph, test data that answers questions 45 to 50 (the decision of 2026-11-02)
+# The logical-model module and its made-up example model, test data that answers questions 51 to 55 (the decision of 2026-11-02):
+# ER Studio's export as it is and the annotation layer, both built by build_logical_model.py.
+MODULES += [os.path.join(HERE, "..", "logical-model", n) for n in (
+    "vocabulary.ttl", os.path.join("example", "example-logical-model.erstudio.ttl"),
+    os.path.join("example", "example-logical-model.layer.ttl"))]
+QUESTIONS = os.path.join(HERE, "..", "competency-questions.md")
+
+
+def load_expected():
+    with open(os.path.join(HERE, "expected.csv"), newline="") as f:
+        return list(csv.DictReader(f))
+
+
+def check(graph, rows):
+    """Return (failures, status counts). A failure is a string naming the query."""
+    failures, statuses = [], Counter()
+    for row in rows:
+        status = row["status"]
+        statuses[status.split(":")[0]] += 1
+        queries = [q for q in row["queries"].split(";") if q]
+        if status in ("answerable", "partial") and not queries:
+            failures.append(f"Q{row['question']}: {status} with no query")
+        if status.startswith("waits:") and queries:
+            failures.append(f"Q{row['question']}: waits but lists queries")
+        if status.startswith("parked:") and queries:
+            failures.append(f"Q{row['question']}: parked but lists queries")
+        for name in queries:
+            with open(os.path.join(HERE, "queries", name)) as f:
+                text = f.read()
+            n = len(list(graph.query(text)))
+            must_be_none = "(must be none)" in text.splitlines()[0]
+            if must_be_none and n:
+                failures.append(f"Q{row['question']} {name}: {n} rows, expected none")
+            if not must_be_none and not n:
+                failures.append(f"Q{row['question']} {name}: no rows")
+    return failures, statuses
+
+
+def load(path):
+    """The release at path, plus the module graphs."""
+    graph = Graph()
+    for part in [path] + MODULES:
+        graph.parse(part)
+    return graph
+
+
+def main(path):
+    rows = load_expected()
+    graph = load(path)
+    failures, statuses = check(graph, rows)
+    print(f"competency coverage on {os.path.relpath(path, HERE)}: {len(rows)} questions; "
+          f"answerable {statuses['answerable']}, partial {statuses['partial']}, waiting {statuses['waits']}, "
+          f"parked {statuses['parked']}")
+    for line in failures:
+        print("FAIL", line)
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else RELEASE))

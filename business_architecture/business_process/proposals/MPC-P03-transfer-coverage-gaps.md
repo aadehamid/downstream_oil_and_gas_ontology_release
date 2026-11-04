@@ -1,0 +1,35 @@
+# Proposal MPC-P03: two gaps in the physical execution of inter-refinery transfers
+
+| Field | Value |
+|---|---|
+| Status | Question 1 answered by the subject matter expert on 2026-10-19 and applied: CM 1.1.3.7.13 Reconcile Movement Losses and Gains (the decision of 2026-10-19). Question 2 (quality of transferred intermediates) answered on 2026-10-19 and applied: CM 1.2.5.1's description now covers intermediates received as feed from another refinery (the decision of 2026-10-19) |
+| Date | 2026-10-18 |
+| Decision | the decision of 2026-10-18: the subject matter expert accepted MPC-P03 "with a physical-execution coverage check" |
+| Source suggestion | `business_architecture/reference/mpc/process-map-suggestions.md`, MPC-P03 |
+
+## What the check found
+
+MPC's refineries move intermediate products between sites, including during partial shutdowns (`reference/mpc/mpc-fy2025-10k-fact-sheet.md`, Item 1 operating facts). The decision owner ruled "P03: A with a physical-execution coverage check" (the review comments of a subject matter expert reviewing the documents). This check carries out that condition. It goes through the steps a transfer passes from nomination to settlement; rows 2 to 6 are its physical execution, and rows 1 and 7 frame it. CM 1.1.7's description now names the existing steps.
+
+| Step of a transfer | Covered by | Finding |
+|---|---|---|
+| Nomination and scheduling | CM 1.1.3.6.1 Plan & Execute Nominations | Covered. The node is generic: it does not say it includes intermediates moving between refineries |
+| Movement execution | CM 1.1.3.6.2 Loading Shipment; CM 1.1.3.6.3 Track Movements and Inventory Management | Covered, generic |
+| Quantity measurement | CM 1.1.3.7.4 Measure Inventory; CM 1.2.3 Actualizations (final ticket volumes) | Covered |
+| Quality measurement | CM 1.2.5.1 Crude/Feed Quality Management | **Was a gap; filled** by widening CM 1.2.5.1's description to cover intermediates received as feed from another refinery (the decision of 2026-10-19). Before 2026-10-19 CM 1.2.5.1 covered crude and feedstock quality, and no step named the quality of an intermediate that one refinery sends and another receives |
+| Receipt and inventory reconciliation | CM 1.1.3.6.4 Discharge & Reconcile Load; CM 1.1.3.7.5 Perform Inventory Reconciliation; CM 1.1.5.1.2.5 Receive actual data for inventory & transfers | Covered |
+| Loss and gain | CM 1.1.3.7.13 Reconcile Movement Losses and Gains (added 2026-10-19, the decision of 2026-10-19) | **Was a gap; filled** by CM 1.1.3.7.13, which produces the Loss Control data product ("Custody transfer, gain/loss, and shrinkage data across movements and terminal operations", `data_product_portfolio.json`). Before 2026-10-19 no step named the loss and gain reconciliation of a movement. Integration with the data product and the value streams is what remains under the worklog's Step 7 "Loss Control ownership" |
+| Settlement | CM 1.2.4.1.18 Settle Intermediates | Covered |
+
+Assumption behind "covered": CM 1.1.3 (Distribution Planning & Scheduling and Inventory Management) handles intermediates as well as finished products. Its inventory steps include "Develop Intermediates Inventory Policy" (CM 1.1.3.7.2), which supports that reading. If the decision owner reads CM 1.1.3 as finished products only, the rows that rest on CM 1.1.3 alone become gaps: nomination and scheduling, and movement execution. Quantity measurement keeps CM 1.2.3, receipt and reconciliation keep CM 1.1.5.1.2.5, and settlement keeps CM 1.2.4.1.18, because those sit outside CM 1.1.3.
+
+## What the decision owner decides
+
+1. **Loss and gain.** *Decided 2026-10-19: a subject matter expert reviewing the documents said to address the gap (the decision of 2026-10-19); option A was applied.* (A, recommended) Add one step, "Reconcile Movement Losses and Gains", under CM 1.1.3.7 Inventory, covering every movement, not only inter-refinery transfers; it produces the Loss Control data product. (B) Record loss and gain as part of CM 1.1.3.6.4 Discharge & Reconcile Load, by description only. (C) Leave the gap open.
+2. **Quality of transferred intermediates.** *Decided 2026-10-19: a subject matter expert reviewing the documents chose "Widen CM 1.2.5.1 (Recommended)" (the decision of 2026-10-19); option A was applied.* (A, recommended) Widen CM 1.2.5.1's description so it covers intermediates received as feed from another refinery. (B) Add a step under CM 1.1.7. (C) Leave it.
+
+A is recommended for 1 because the data product already exists and needs a producing process (Step 7 integration), and one generic step avoids a transfer-only duplicate. A is recommended for 2 because a received intermediate is feed to the receiving refinery, which is the scope of CM 1.2.5.1.
+
+## Why nothing was added
+
+The decision owner's ruling set the check as a condition. The map gets no new process from a gap the check finds unless they rule on it (the decision of 2026-10-18, What follows, item 4).

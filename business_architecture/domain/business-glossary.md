@@ -1,0 +1,25 @@
+# Business glossary (EPM-GLOS-001)
+
+The terms this repository uses, with one definition each. Use these names in
+issues, proposals and documents. A term says **Approved Baseline** only when
+The decision owner has recorded that approval. A change merge alone does not approve it. See
+`docs/agents/domain.md` for the entry format.
+
+| Term | Definition | Avoid | Source | Status |
+|---|---|---|---|---|
+| Decision owner | The subject matter expert who reviewed the documents and recorded each decision the build relied on; the sources and documents name the role, never the person. Words attributed to "a subject matter expert reviewing the documents" are theirs. | "the owner" (also an owner of a process or of data) | The release's README, "Names, namespaces and terms" | Draft |
+| Reference fact | A publicly available fact about a real organization, site or asset, such as a refinery's capacity or an ownership share, held in the ontology with a cited source and an as-of date. | "data", "master data" | the decision of 2026-10-05 | Draft |
+| Event record | A record of something that happened on a date, such as a sale, a shipment or a process run. The ontology never holds event records; consuming systems do. | "transaction" (when the record is not a financial transaction) | the decision of 2026-10-05 | Draft |
+| Observed measure value | The value a measure took at a time, such as a day's crack spread. The ontology never holds observed values. | "KPI value", "actual" | the decision of 2026-10-05 | Draft |
+| Measure definition | What a named measure is: its population, grain, formula basis and what it is not. The ontology holds measure definitions, not their values. | "KPI" (for the value) | the decision of 2026-10-05, the decision of 2026-10-05 | Draft |
+| Reference module | An ontology module that holds reference facts about one real company and its assets (for example `ref-mpc`), kept apart from the company-neutral core modules. | "instance module" | the decision of 2026-10-05 | Draft |
+| Qualified-relation node | A node with its own IRI that stands for one relationship between two things and holds that relationship's properties, such as a share, a date or a source. Used instead of RDF 1.2 reifiers. | "reifier", "edge record" | the decision of 2026-10-05 | Draft |
+| Scoped sequence | A qualified-relation node stating that, for each instance of a named scope unit, a stated part of an earlier process happens before a stated part of a later process. Neither process needs to complete. It may hold only under a stated condition. | "precedes" (which means the whole earlier process completes first), "handoff" | the decision of 2026-10-12 | Draft |
+| Scope unit | The kind of business object a scoped sequence repeats for, such as a transaction, a delivery period or a forecast version. A scope unit names a kind of object, never a particular trade or claim. | "scope" (alone), "instance" | the decision of 2026-10-12 | Draft |
+| Evidence basis | How firm the evidence for a relationship is: source-confirmed, or a reference-model assumption that the decision owner adopted from industry practice without a verified MPC procedure. | "verified" (for an assumption) | the decision of 2026-10-12 | Draft |
+| LPG projection | Loading the finished ontology into a labelled property graph (Neo4j) by the fixed pipeline in `business_architecture/ontology/projection/`. Turtle stays the master copy. The method is the `ontology-to-lpg` skill; the pipeline implements the guideline's version 2.2, whose copy stays in the superseded projection guideline folder (not in this release). | "Neo4j migration" | the decision of 2026-10-05, the decision of 2026-10-13, the decision of 2026-10-23 | Draft |
+| Downstream consumer | A system that validates against or uses an EPM release without being an EPM authority. PPC is the first one, planned and not yet active. | "client" | the decision of 2026-10-05; EPM-FOUND-000 D-18 | Draft |
+| Commercial Pricing & Price Realization | The data domain for the price a company offers or contracts, how it is applied and adjusted, and what it realizes. | "Pricing" (alone) | the decision of 2026-10-05; `data-domain-register.md` | Draft |
+| Market Data | The data domain that governs externally sourced market observations and shared market-data products: benchmark identifiers, source provenance, licensing restrictions, timestamps, assessment conventions and approved curve-construction metadata. | "price data" | the decision of 2026-10-05, the decision of 2026-10-18 | Draft |
+| Commercial Risk | The data domain that governs commercial exposure, risk measures, limits, risk-model methodologies and parameters, and trading-counterparty credit assessment and exposure. | "trading risk" | the decision of 2026-10-05, the decision of 2026-10-18 | Draft |
+| Accounting consolidation | The relation in which one legal entity's accounts are fully consolidated into another's financial statements, as MPC consolidates MPLX. Mapped to GLEIF Level 2. | "parent company" (without the basis) | the decision of 2026-10-05, the decision of 2026-10-05 | Draft |

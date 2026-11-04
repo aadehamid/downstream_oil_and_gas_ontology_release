@@ -1,0 +1,118 @@
+"""Tests for the consumer rules (Step 7; the decision of 2026-10-19): the rules conform, each relies on
+its decided terms (pinned by hand) and on terms the graph defines, the rule counts are the decided ones, and the catalog binding accepts
+a defined data product and measure and rejects an undefined end.
+
+Run: python3 -m pytest test_consumer_rules.py (needs rdflib, pyshacl).
+"""
+import os
+import sys
+import unittest
+
+from pyshacl import validate
+from rdflib import Graph, Namespace, URIRef
+from rdflib.namespace import RDF, RDFS
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "regression"))
+import run  # noqa: E402
+
+CON = Namespace("https://w3id.org/mpc/ontology/modules/consumer/")
+RK = Namespace("https://w3id.org/mpc/ontology/modules/consumer/rule-kind/")
+VOCAB = Graph().parse(os.path.join(HERE, "vocabulary.ttl"))
+SHAPES = Graph().parse(os.path.join(HERE, "shapes.ttl"))
+GRAPH = run.load(run.RELEASE)
+PRODUCT = URIRef("https://w3id.org/mpc/ontology/modules/data-product/product/master-pricing")
+MEASURE = URIRef("https://w3id.org/mpc/ontology/modules/kpi/measure/crack-spreads")
+
+
+def conforms(extra=None):
+    g = Graph()
+    g += GRAPH
+    if extra:
+        g += extra
+    return validate(g, shacl_graph=SHAPES, advanced=True)[0]
+
+
+class Rules(unittest.TestCase):
+    def test_counts(self):
+        # the decision of 2026-10-19: six things an agent may answer, five it must refuse; the decision of 2026-10-19 adds a seventh;
+        # the decision of 2026-10-25, item 6, an eighth: a value quoted through the bound metric view (integration 2.2.0).
+        rules = set(VOCAB.subjects(RDF.type, CON.Rule))
+        self.assertEqual(len([r for r in rules if (r, CON.ruleKind, RK["may-answer"]) in VOCAB]), 8)
+        self.assertEqual(len([r for r in rules if (r, CON.ruleKind, RK["must-refuse"]) in VOCAB]), 5)
+
+    def test_each_rule_relies_on_its_decided_terms(self):
+        # Pinned by hand from the decision of 2026-10-19: a term that exists but means something else fails.
+        R = Namespace("https://w3id.org/mpc/ontology/modules/consumer/rule/")
+        KPI = Namespace("https://w3id.org/mpc/ontology/modules/kpi/")
+        MKT = Namespace("https://w3id.org/mpc/ontology/modules/market-data/")
+        VS = Namespace("https://w3id.org/mpc/ontology/modules/value-stream/")
+        PLC = Namespace("https://w3id.org/mpc/ontology/modules/placement/")
+        AUTH = Namespace("https://w3id.org/mpc/ontology/modules/authority/")
+        ORGM = Namespace("https://w3id.org/mpc/ontology/modules/organization/")
+        SKOS = Namespace("http://www.w3.org/2004/02/skos/core#")
+        DCT = Namespace("http://purl.org/dc/terms/")
+        POP = Namespace("https://w3id.org/mpc/ontology/modules/population/")
+        expected = {
+            "definitions": {SKOS.definition, SKOS.prefLabel, SKOS.altLabel, KPI.measureKind},
+            "not-to-be-confused-with": {KPI.notToBeConfusedWith, MKT.seriesOf},
+            "placement": {KPI.informsProcess, VS.measureLink, VS.produces, VS.consumes, PLC.placementKind},
+            "recipe": {MKT.leg, MKT.barrels, MKT.region, MKT.excludesRINCost},
+            "who-does-it": {ORGM.forProcess},
+            "which-source": {DCT.source, AUTH.evidenceTier},
+            "no-values": {KPI.basis},
+            "no-crack-from-legs": {MKT.leg, MKT.seriesOf},
+            "no-report-as-kpi": {KPI.measureKind, KPI.kpiCandidate},
+            # the decision of 2026-10-21; since integration 2.0.0 the process concept is an rdfs:seeAlso, not a reliesOn (the decision of 2026-10-23).
+            "no-customer-without-role": {URIRef("https://w3id.org/mpc/ontology/modules/party/roleType")},
+            "no-context-as-ownership": {PLC.placementKind},
+            "what-a-measure-counts": {POP.includes, POP.excludes, POP.populationEvidence},  # the decision of 2026-10-19
+            "value-through-bound-view": {URIRef("https://w3id.org/mpc/ontology/modules/data-product/servesMeasure")},  # 0097
+        }
+        rules = set(VOCAB.subjects(RDF.type, CON.Rule))
+        self.assertEqual(rules, {R[k] for k in expected})
+        for key, terms in expected.items():
+            self.assertEqual(set(VOCAB.objects(R[key], CON.reliesOn)), terms, key)
+
+    def test_relies_on_ranges_over_properties(self):
+        # the decision of 2026-10-23: rdfs:range rdf:Property, and the one process concept is a see-also.
+        self.assertEqual(set(VOCAB.objects(CON.reliesOn, RDFS.range)), {RDF.Property})
+        rule = URIRef("https://w3id.org/mpc/ontology/modules/consumer/rule/no-customer-without-role")
+        self.assertEqual(set(VOCAB.objects(rule, RDFS.seeAlso)),
+                         {URIRef("https://w3id.org/mpc/ontology/process/CM-1-3-7-1-1")})
+
+    def test_rules_rely_on_defined_terms(self):
+        for term in set(VOCAB.objects(None, CON.reliesOn)):
+            if str(term).startswith("https://w3id.org/mpc/"):
+                self.assertTrue(list(GRAPH.triples((term, None, None))), term)
+
+    def test_no_values_still_refuses_computing_and_unbound_sources(self):
+        # the decision of 2026-10-25, item 6: the amendment allows the bound view only.
+        rule = URIRef("https://w3id.org/mpc/ontology/modules/consumer/rule/no-values")
+        text = str(VOCAB.value(rule, URIRef("http://www.w3.org/2004/02/skos/core#definition")))
+        self.assertIn("Calculate a measure's value from the graph", text)
+        self.assertIn("a source the graph does not bind", text)
+
+    def test_rules_conform(self):
+        self.assertTrue(conforms())
+
+
+class Binding(unittest.TestCase):
+    def test_a_defined_binding_conforms(self):
+        g = Graph()
+        g.add((PRODUCT, CON.publishesMeasure, MEASURE))
+        self.assertTrue(conforms(g))
+
+    def test_an_undefined_measure_fails(self):
+        g = Graph()
+        g.add((PRODUCT, CON.publishesMeasure, URIRef(str(MEASURE) + "-homemade")))
+        self.assertFalse(conforms(g))
+
+    def test_an_undefined_data_product_fails(self):
+        g = Graph()
+        g.add((URIRef(str(PRODUCT) + "-unknown"), CON.publishesMeasure, MEASURE))
+        self.assertFalse(conforms(g))
+
+
+if __name__ == "__main__":
+    unittest.main()

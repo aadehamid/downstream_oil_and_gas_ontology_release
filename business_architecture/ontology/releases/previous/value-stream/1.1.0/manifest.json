@@ -1,0 +1,23 @@
+{
+  "module": "value-stream",
+  "version": "1.1.0",
+  "release_candidate": false,
+  "ontology_iri": "https://w3id.org/mpc/ontology/modules/value-stream",
+  "version_iri": "https://w3id.org/mpc/ontology/modules/value-stream/1.1.0",
+  "depends_on": {
+    "core": "2.3.0",
+    "data-product": "1.0.0",
+    "kpi": "1.1.0"
+  },
+  "triples": 995,
+  "approved_by": {
+    "who": "a subject matter expert reviewing the documents"
+  },
+  "files": {
+    "CHANGELOG.md": "7a22ef636b7b0d6137bfe99240aadca7fa1abbe7d3af3d0d8b70c506ed764376",
+    "catalog.ttl": "7acd24a91dd4772faec69d754046d73af35a2dca2f914aa0ffb9f364ecea3ba8",
+    "shapes.ttl": "2808943c3e1993ffa0a422de31f32bbde624ea1bf2a75dff66919292268650d8",
+    "value-stream.jsonld": "f775d1aa6f0338a32433638d5f56480898d9d233f5c874fe74ac0354c3b6d1c3",
+    "value-stream.ttl": "3510b6cebd936d4f45d24a8365842ebfec3359045b59e58b5be89a996fcdc8a9"
+  }
+}

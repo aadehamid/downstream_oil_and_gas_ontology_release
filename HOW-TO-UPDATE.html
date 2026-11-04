@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="scripts/build_docs_html.py">
+<title>How to update this ontology</title>
+<style>
+/* Style: framed-sheet (tasteskill app sheet), screen "report", the same tokens as the stores runbook and the
+   ontology guide so the documents read as one set. Face: the frame tinted blue-grey, the accent teal on
+   links and the current contents entry. Generated from Markdown by scripts/build_docs_html.py: change the
+   Markdown or the template, never a generated page. */
+:root {
+  --ground: #f1f4f6;  --surface: #ffffff;  --raised: #f4f6f8;  --active: #ebedee;
+  --border: #e3e6e9;  --rule: #eef0f2;     --control: #cdced1;
+  --text: #131416;    --muted: #5d5f60;    --faint: #66686a;
+  --accent: #1b6c80;  --accent-soft: #e5f0f3;
+  --notice-bg: #fffbeb; --notice-line: #fde68a; --notice-ink: #92400e;
+  --code-bg: #f4f6f8;
+  --radius-card: 8px; --radius-control: 6px; --radius-sheet: 16px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --fs-title: 24px; --fs-section: 19px; --fs-sub: 16px; --fs-body: 15.5px; --fs-small: 12.5px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0b0c0d; --surface: #141516; --raised: #1b1c1e; --active: #242628;
+    --border: #2a2c2f; --rule: #222426; --control: #44474b;
+    --text: #f2f3f3; --muted: #b4b6b8; --faint: #9a9c9e;
+    --accent: #5fb3c7; --accent-soft: #15292e;
+    --notice-bg: #261d0c; --notice-line: #3b2e14; --notice-ink: #f2cf94;
+    --code-bg: #1b1c1e;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--ground); color: var(--text); font: var(--fs-body)/1.65 var(--font); }
+.bar { height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 20px; border-bottom: 1px solid var(--border); background: var(--ground); position: sticky; top: 0; z-index: 3; }
+.bar .name { font-weight: 600; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar .scope { color: var(--muted); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar nav { margin-left: auto; display: flex; gap: 16px; }
+.bar nav a { color: var(--muted); font-size: 13.5px; text-decoration: none; white-space: nowrap; }
+.bar nav a:hover { color: var(--text); }
+
+.sheet { max-width: 1136px; margin: 24px auto 40px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sheet); padding: 32px 24px 56px; }
+.head { max-width: 1088px; margin: 0 auto; }
+h1 { font-size: var(--fs-title); font-weight: 600; margin: 0; line-height: 1.25; letter-spacing: -.01em; }
+.lead { color: var(--text); font-size: 16px; margin: 8px 0 0; max-width: 76ch; }
+.from-line { color: var(--muted); font-size: var(--fs-small); margin: 8px 0 0; max-width: 100ch; }
+.notice { margin: 18px 0 0; background: var(--notice-bg); border: 1px solid var(--notice-line); color: var(--notice-ink); border-radius: var(--radius-control); padding: 8px 12px; font-size: 13px; max-width: 1088px; }
+.notice code { background: transparent; color: inherit; }
+
+/* contents rail and the text: 248 + 32 + 808 = 1088 */
+.layout { max-width: 1088px; margin: 28px auto 0; display: grid; grid-template-columns: 248px minmax(0, 1fr); gap: 32px; align-items: start; }
+.toc { position: sticky; top: 72px; max-height: calc(100vh - 96px); overflow-y: auto; font-size: 13.5px; padding-right: 4px; }
+.toc p { margin: 0 0 8px; font-weight: 600; font-size: 13.5px; }
+.toc ul { list-style: none; margin: 0; padding: 0; }
+.toc li a { display: block; color: var(--muted); text-decoration: none; padding: 4px 8px; border-radius: var(--radius-control); line-height: 1.4; }
+.toc li.l3 a { padding-left: 20px; font-size: 13px; }
+.toc li a:hover { color: var(--text); background: var(--raised); }
+.toc li a.on { color: var(--text); background: var(--accent-soft); }
+article { min-width: 0; }
+
+h2, h3, h4, h5, h6 { scroll-margin-top: 64px; line-height: 1.35; position: relative; }
+h2 { font-size: var(--fs-section); font-weight: 600; margin: 44px 0 8px; }
+article > h2:first-child, section.src:first-child > h2 { margin-top: 0; }
+h3 { font-size: var(--fs-sub); font-weight: 600; margin: 32px 0 6px; }
+h4, h5, h6 { font-size: 15px; font-weight: 600; margin: 24px 0 4px; }
+.hl { margin-left: 8px; color: var(--faint); text-decoration: none; font-weight: 400; opacity: 0; }
+h2:hover .hl, h3:hover .hl, h4:hover .hl, .hl:focus { opacity: 1; }
+section.src { padding-top: 8px; }
+section.src + section.src { margin-top: 56px; padding-top: 28px; border-top: 1px solid var(--border); }
+.from { color: var(--muted); font-size: var(--fs-small); margin: 0 0 14px; }
+p, li { max-width: 76ch; }
+p { margin: 10px 0; }
+ul, ol { padding-left: 24px; margin: 10px 0; }
+li { margin: 5px 0; }
+li > ul, li > ol { margin: 4px 0; }
+a { color: var(--accent); overflow-wrap: anywhere; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+strong { font-weight: 600; }
+code { font: 13.5px var(--mono); background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+pre { position: relative; background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 14px 16px; overflow-x: auto; margin: 12px 0 16px; max-width: 100%; }
+pre code { background: none; padding: 0; font-size: 13px; line-height: 1.6; white-space: pre; overflow-wrap: normal; }
+.copy { position: absolute; top: 8px; right: 8px; font: 12px var(--font); background: var(--surface); color: var(--muted); border: 1px solid var(--border); border-radius: var(--radius-control); padding: 3px 8px; cursor: pointer; }
+.copy:hover { color: var(--text); }
+.tblwrap { overflow-x: auto; margin: 14px 0 12px; border: 1px solid var(--border); border-radius: var(--radius-card); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+th.num, td.num { text-align: right; }
+th { text-align: left; font-weight: 600; font-size: 13px; color: var(--muted); padding: 9px 12px; border-bottom: 1px solid var(--border); background: var(--raised); vertical-align: bottom; }
+td { padding: 10px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+td p { margin: 0; }
+tr:last-child td { border-bottom: 0; }
+td code, th code { font-size: 12.5px; }
+td:first-child code { white-space: nowrap; overflow-wrap: normal; }
+blockquote { margin: 12px 0; padding: 4px 0 4px 16px; border-left: 3px solid var(--control); color: var(--text); }
+blockquote p { margin: 6px 0; }
+del { color: var(--muted); }
+section.rec { padding-top: 8px; }
+section.rec + section.rec { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border); }
+table.index td:first-child { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.toc li.l3 a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+figure.pic { margin: 16px 0 20px; }
+figure.pic img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: var(--radius-card); background: #ffffff; }
+figure.pic figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
+.end { color: var(--muted); font-size: var(--fs-small); margin-top: 48px; border-top: 1px solid var(--rule); padding-top: 14px; }
+
+@media (max-width: 960px) {
+  .sheet { margin: 0; border-radius: 0; border-width: 0; padding: 20px 16px 40px; }
+  .layout { grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 20px; }
+  .toc { position: static; max-height: none; border: 1px solid var(--border); border-radius: var(--radius-card); padding: 4px 8px; }
+  .toc details summary { cursor: pointer; font-weight: 600; padding: 8px 4px; list-style-position: inside; }
+  .toc ul { padding-bottom: 8px; }
+  .toc details > p { display: none; }
+}
+@media (min-width: 961px) {
+  .toc details > summary { display: none; }
+}
+@media (max-width: 640px) {
+  pre { padding-top: 40px; }
+  /* The records index stacks on a phone: number and decision on one line, status and date under it. */
+  table.index thead { display: none; }
+  table.index tr { display: grid; grid-template-columns: 52px minmax(0, 1fr); border-bottom: 1px solid var(--rule); padding: 8px 0; }
+  table.index td { border: 0; padding: 0 10px; }
+  table.index td:nth-child(3), table.index td:nth-child(4) { grid-column: 2; color: var(--muted); font-size: 13px; text-align: left; white-space: normal; }
+  table.index td:first-child { grid-row: span 3; }
+  .bar .scope { display: none; }
+  .bar nav { gap: 12px; flex: none; }
+  /* A file name in a table's first column wraps on a phone, so the text beside it keeps its width. */
+  td:first-child { min-width: 9em; }
+  td:first-child code { white-space: normal; overflow-wrap: anywhere; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body id="top">
+<header class="bar">
+  <span class="name">How to update this ontology</span>
+  <span class="scope">This release</span>
+  <nav aria-label="Documents">
+    <a href="business_architecture/ontology/epm-ontology-guide.html">Ontology guide</a>
+    <a href="#top">Top</a>
+  </nav>
+</header>
+<div class="sheet">
+  <div class="head">
+    <h1>How to update this ontology</h1>
+    <p class="lead">How to change what you received: a definition, a concept, a process or a module.</p>
+    <p class="from-line">Built from <code>HOW-TO-UPDATE.md</code>.</p>
+  </div>
+  <p class="notice">This page is generated from the Markdown beside it, which is the master copy. A change goes into the Markdown first; then <code>python3 scripts/build_docs_html.py</code> rebuilds this page.</p>
+  <div class="layout">
+    <nav class="toc" aria-label="Contents">
+      <details open>
+        <summary>Contents</summary>
+        <p>Contents</p>
+        <ul>
+<li class="l2"><a href="#start-here">Start here</a></li>
+<li class="l2"><a href="#patch-minor-or-major">Patch, minor or major</a></li>
+<li class="l2"><a href="#the-release-steps">The release steps</a></li>
+<li class="l2"><a href="#change-a-concept-s-definition">Change a concept's definition</a></li>
+<li class="l2"><a href="#add-a-concept-or-property">Add a concept or property</a></li>
+<li class="l2"><a href="#change-a-process">Change a process</a></li>
+<li class="l2"><a href="#add-a-module">Add a module</a></li>
+<li class="l2"><a href="#add-a-logical-model">Add a logical model</a></li>
+<li class="l2"><a href="#inputs-from-outside-the-repository">Inputs from outside the repository</a></li>
+<li class="l2"><a href="#the-cascade">The cascade</a></li>
+<li class="l2"><a href="#keep-the-catalog-regression-and-projection-current">Keep the catalog, regression and projection current</a></li>
+<li class="l2"><a href="#project-into-neo4j-and-jena">Project into Neo4j and Jena</a></li>
+<li class="l2"><a href="#keep-every-copy-in-step">Keep every copy in step</a></li>
+<li class="l2"><a href="#the-optional-check-against-this-release">The optional check against this release</a></li>
+<li class="l2"><a href="#the-namespace">The namespace</a></li>
+<li class="l2"><a href="#what-you-can-ignore">What you can ignore</a></li>
+        </ul>
+      </details>
+    </nav>
+    <article>
+<p>This release is your starting point. Your copy is yours to change: add a module, change a module, reword a definition, add a process. This guide says what to do and who decides. Use whichever tools you prefer to do it. Every command here has been run on this release.</p>
+<p>If your copy includes <code>viewer/index.html</code>, that page shows the ontology as you received it. Changing a package does not refresh the page. Use the changed Turtle or JSON-LD to inspect your edits; a newly cut viewer is needed to view a later release.</p>
+<p><strong>Who decides.</strong> Your ontology owner is the person your organisation names to decide what the ontology means. A module owner is the person they name for one module. The ontology owner approves every major release and every module's first release. The module owner approves minor and patch releases. Until a module has an owner, the ontology owner decides for it.</p>
+<p><strong>What the words mean.</strong> A <em>module</em> is one part of the ontology with its own version, such as <code>kpi</code>. A <em>package</em> is one released version of a module: the folder <code>business_architecture/ontology/releases/&lt;module&gt;/&lt;version&gt;/</code>. A package never changes after its release. A change makes a new package.</p>
+<p>Commands below start from the top folder of your copy unless they say otherwise. They use this shorthand, so define it first:</p>
+<pre><code class="lang-sh">py() { uv run -q --no-project --with rdflib --with pyshacl --with openpyxl --with jsonschema --with pytest --with "markdown-it-py&gt;=4,&lt;5" python3 -B "$@"; }
+ONT=business_architecture/ontology</code></pre>
+<p>The versions in the worked commands are those of this release as you received it. After your first change, read the one you hold, from <code>$ONT/release</code>: <code>py next_version.py current kpi</code>.</p>
+<h2 id="start-here">Start here<a class="hl" href="#start-here" aria-label="Link to this section">#</a></h2>
+<ol><li>Make your own copy. A Git clone keeps your history; an unpacked export works too. The process-map section says what changes without Git.</li><li>Check that the copy works before you change it. The script takes about 10 minutes:
+<pre><code class="lang-sh">bash scripts/check.sh</code></pre></li></ol>
+<ol start="3"><li>Run <code>scripts/check.sh</code> again after each change. It proves your copy is valid: every package equals a fresh build of its sources, the shapes conform, the competency questions answer and the tests pass. Do not share a change until it passes. In a Git copy, run <code>git add -A</code> first, because one test reads which generated pages Git tracks. The log shows skipped tests and a line that starts <code>FAIL a store request</code>. Both are expected. Most skipped tests read what this release does not hold, a few depend on your machine, and adding <code>-rs</code> to the script's pytest line prints each reason. That <code>FAIL</code> line comes from <code>skills/rdf-store/scripts/test_rdf_store.py</code>, which makes a write fail on purpose. Any other <code>FAIL</code> line is a real failure, such as a generated page that differs from its source, and the script does not reach its last line. The last line, <code>all checks passed</code>, tells you the result. Do not edit files while the script runs: it compares the tree at its start and end, and a change fails the run. Commit when it passes. To try one test file first, run <code>py -m pytest -q &lt;file&gt;</code>, which takes seconds.</li></ol>
+<h2 id="patch-minor-or-major">Patch, minor or major<a class="hl" href="#patch-minor-or-major" aria-label="Link to this section">#</a></h2>
+<p>Classify every change before you make it, then ask your owner to approve it. <code>skills/ontology/references/release.md</code> holds the full rules; rules 3 and 4 are the ones you use most.</p>
+<div class="tblwrap"><table><thead><tr><th>Kind</th><th>What it covers</th></tr></thead><tbody><tr><td>Major</td><td>An IRI changes or a concept is removed; a definition's meaning changes; a hierarchy change alters what a concept means; any deprecation. A new module's first release, 1.0.0, also counts as a major of that module, so your ontology owner approves it</td></tr><tr><td>Minor</td><td>New concepts, aliases, references, instances or shapes that existing content already meets</td></tr><tr><td>Patch</td><td>Typos; clearer wording with the same meaning; an added example or scope note</td></tr></tbody></table></div>
+<p>Use this test: would every query, report and answer made under the old definition still be correct under the new one? If yes, it is a patch or a minor. If no, or if you are unsure, it is a major.</p>
+<p><strong>Never delete a term.</strong> Mark it <code>owl:deprecated true</code>, add <code>dcterms:isReplacedBy</code> for its successor, keep its triples and say why in the changelog. Do this only in a major release.</p>
+<h2 id="the-release-steps">The release steps<a class="hl" href="#the-release-steps" aria-label="Link to this section">#</a></h2>
+<p>Every change below ends with these steps. Run them once for the module you changed and once for each module that depends on it.</p>
+<ol><li>List the modules to release, in order. The first line is the one you changed. <code>core</code> is the exception: its list holds only the modules that depend on it, because you release <code>core</code> by hand first ("Change a process"):
+<pre><code class="lang-sh">(cd $ONT/release &amp;&amp; py dependents.py kpi)</code></pre></li></ol>
+<ol start="2"><li>Save the approval. Create the folder <code>$ONT/approvals/</code> if you have none, and write the sentence that approved the release in a file there, such as <code>$ONT/approvals/2026-11-01-kpi.md</code>. One file can cover all the modules of one change. That file is your decision record unless your team keeps its own.</li><li>For each module in that order, set its version, write its package, and move its old package. <code>next_version.py</code> does the edits; <code>pins</code> has no effect in this release, so leave it. A module that only takes the new version of what it requires gets a patch.
+<pre><code class="lang-sh">cd $ONT/release
+py next_version.py start kpi 1.3.1 patch --why "Reworded Unit Utilization's definition; the meaning is the same." \
+    --approver "The kpi module owner" --where "approvals/2026-11-01-kpi.md" --words "Approved as a patch."
+py build_module.py kpi --write
+cd ../../..</code></pre>
+<p><code>start</code> sets <code>version</code>, <code>issued</code>, <code>approver</code> and <code>approval</code> in the module's entry in <code>build_module.py</code>, and adds a section to the top of <code>$ONT/releases/&lt;module&gt;/CHANGELOG.md</code>, carrying forward any known gap. Edit that section when you have more to say. <code>start</code> leaves the entry's <code>decisions</code> list alone, so add your approval file there if you want the package's manifest to name it. Nothing fails without it. <strong>The write stops if the version is already released and the content differs.</strong> Raise the version first, because a released package never changes. Before the package is shared, you may correct it with <code>--rebuild-released</code>.</p></li></ol>
+<ol start="4"><li>When every module in the list is written, finish each one. This moves the old package to <code>$ONT/releases/previous/&lt;module&gt;/</code>, which keeps every earlier package, and changes the version in <code>$ONT/projection/pipeline.py</code> (<code>PACKAGES</code>) and <code>$ONT/projection/skill-run/epm-config.json</code> (<code>packages</code>):
+<pre><code class="lang-sh">(cd $ONT/release &amp;&amp; py next_version.py finish kpi 1.3.0)</code></pre></li></ol>
+<ol start="5"><li>Rebuild what follows from the packages, and check:
+<pre><code class="lang-sh">(cd $ONT/release &amp;&amp; py build_catalog.py --write)
+(cd $ONT/projection &amp;&amp; py pipeline.py build)
+(cd $ONT/regression &amp;&amp; py run.py)
+git add -A
+bash scripts/check.sh</code></pre>
+<p>After a change, the script prints a note that the projection report describes an earlier build, until you project into Neo4j again. The note does not fail the check.</p></li></ol>
+<ol start="6"><li>If you keep stores loaded, reload them ("Project into Neo4j and Jena") and run the check in its step 5. The release is done only when every store you keep reads <code>current</code>, on its ontology line and on its <code>tech:</code> line, which is the technical graph's.
+<p>This release holds <code>logical-model</code>, so the check also prints an <code>lm:</code> line for the local Neo4j and AuraDB, one per store, and the release is done only when each of those reads <code>current</code> too.</p></li></ol>
+<h2 id="change-a-concept-s-definition">Change a concept's definition<a class="hl" href="#change-a-concept-s-definition" aria-label="Link to this section">#</a></h2>
+<p>The worked example changes the definition of the measure Unit Utilization in <code>kpi</code>. The wording changes and the meaning does not, so it is a patch.</p>
+<ol><li>Find where the definition lives. A release is built from its sources, never edited in <code>releases/</code>. Most sources are tables and Turtle files in the module's folder, so search there for the text. A file that starts "Built by" is generated: edit the source it names. For <code>lane</code>, that is <code>business_architecture/business_process/office_lanes.json</code>, and rewording a lane there is still a release of <code>lane</code>.
+<pre><code class="lang-sh">grep -n "unit-utilization" $ONT/kpi/measure-details.csv</code></pre></li></ol>
+<ol start="2"><li>Edit the text in that file. Keep the citation of its source. If the new wording rests on a new source, cite it.</li><li>Rebuild the module's source file. Each module has its own builder in its folder, listed in <code>scripts/check.sh</code>:
+<pre><code class="lang-sh">(cd $ONT/kpi &amp;&amp; py build_measures.py --write)</code></pre></li></ol>
+<ol start="4"><li>Follow the release steps for <code>kpi</code>.</li><li>Search the whole copy for the old wording, and update each document that quotes it. No check catches a copy of a sentence. This command leaves out this guide, which quotes the wording as its example, and the packages, which never change. In a plain folder with no Git, use <code>grep -rn</code> and skip the same paths. For this example:
+<pre><code class="lang-sh">git grep -n "as a share of its constrained capacity" -- . ':!HOW-TO-UPDATE.*' ':!business_architecture/ontology/releases/'</code></pre></li></ol>
+<p>If the meaning changed, the release is a major, and your ontology owner approves it.</p>
+<h2 id="add-a-concept-or-property">Add a concept or property<a class="hl" href="#add-a-concept-or-property" aria-label="Link to this section">#</a></h2>
+<p>The worked example adds a property <code>kpi:reviewCadence</code>. It adds and removes nothing else, so it is a minor.</p>
+<ol><li>Add the term to the module's <code>vocabulary.ttl</code>, with <code>rdfs:label</code>, <code>skos:definition</code>, and its source in <code>dcterms:bibliographicCitation</code>. Copy a neighbouring term of the same kind, because the module's tests may ask for more: <code>kpi</code>'s ask for one <code>rdfs:range</code> and one kind. When the source is your owner's request, cite the file that holds their approval.</li><li>Add what checks it to the module's <code>shapes.ttl</code>. Each property on a class states its cardinality in a <code>sh:property</code> line on that class's shape. If the module also has a closed shape, add the property to its <code>sh:ignoredProperties</code> list too. <code>kpi/shapes.ttl</code> needs both: the <code>sh:property</code> line on <code>shp:Measure</code>, and the list on <code>shp:NoValuesOnMeasures</code>.</li><li>For a value on instances, add a column to the module's table and to its builder, then run the builder with <code>--write</code>. Use the table that holds fields of the same kind, such as <code>kpi/measure-details.csv</code> for a measure's <code>grain</code> and <code>basis</code>. Give every row the column, even when it is empty, because a short row passes with no warning. A concept in a code list is a new row in that table.</li><li>Add a test that names the term, in the module's <code>test_*.py</code>.</li><li>Follow the release steps for the module.</li></ol>
+<h2 id="change-a-process">Change a process<a class="hl" href="#change-a-process" aria-label="Link to this section">#</a></h2>
+<p>The process map is the source of the taxonomy in <code>core</code>. Every module depends on <code>core</code>, so this is the widest change. A change to an existing process's meaning is a major. A new process is a minor.</p>
+<ol><li>Add the node to <code>business_architecture/business_process/downstream_process_map.json</code>, with its <code>id</code>, <code>level</code>, <code>name</code> and <code>description</code>. The builder makes the description's first sentence the definition and the rest the scope note, so put the whole definition in the first sentence.</li><li>Add its row to <code>$ONT/build/output/step2-identity-map.json</code>, beside its siblings, with the same fields as they have. The description belongs in the map only. Copy <code>minted</code> and <code>deprecated</code> from a sibling: <code>false</code> for an ordinary new process.</li><li>Save the approval, as the release steps say, because the builder below names it. Commit, and note the commit before your change and the commit of the change. <code>scripts/check.sh</code> does not pass on this commit, because the map has a node that <code>core</code> lacks yet, so do not share it. The builder compares the two copies of the map. In a plain folder with no Git, choose a label for each instead, at least 12 letters or digits long.</li><li>Save both copies under <code>$ONT/release/frozen/</code>. Each file's name starts with the first 12 characters of its commit or label:
+<pre><code class="lang-sh">M=business_architecture/business_process/downstream_process_map.json
+git show &lt;earlier commit&gt;:$M &gt; $ONT/release/frozen/&lt;first 12 of earlier&gt;-downstream_process_map.json
+git show &lt;your commit&gt;:$M &gt; $ONT/release/frozen/&lt;first 12 of yours&gt;-downstream_process_map.json</code></pre></li></ol>
+<ol start="5"><li>Copy the core builder and fill in the block it marks. <code>build_core_template.py</code> follows <code>build_core_2_3.py</code>, the builder that added a node. To change an existing node's ID or description, read <code>build_core_2_2.py</code>, which applies those changes.
+<pre><code class="lang-sh">cp $ONT/release/build_core_template.py $ONT/release/build_core_2_5.py</code></pre>
+<p>These names are for the first change to this release. A later change raises them. A patch of <code>core</code> is a new builder too, named for its major and minor.</p></li></ol>
+<ol start="6"><li>Write its changelog, <code>$ONT/releases/core/CHANGELOG-2.5.0.md</code>, in the form of <code>CHANGELOG-2.4.0.md</code> beside it: the title line <code># core changelog</code>, a heading with the version and date, one sentence on the kind of release, and a line per change.</li><li>Add a short test, <code>$ONT/release/test_build_core_2_5.py</code>, that says what the release adds and that it removes no IRI. Add it to the test list in <code>scripts/check.sh</code>.</li><li>Write the package and move the old one:
+<pre><code class="lang-sh">(cd $ONT/release &amp;&amp; py build_core_2_5.py --write)
+mkdir -p $ONT/releases/previous/core &amp;&amp; mv $ONT/releases/core/2.4.0 $ONT/releases/previous/core/2.4.0</code></pre>
+<p><code>scripts/check.sh</code> reads the newest core builder and the builders read the newest core package, so neither needs an edit.</p></li><li>Rebuild every module's source files, since they read <code>core</code>. The list is in <code>scripts/check.sh</code>, after the comment on each module's source Turtle. Each runs from its folder with <code>--write</code>.</li><li>Follow the release steps for the modules <code>dependents.py core</code> lists. For <code>core</code> itself, you have already written the package and moved the old one, so change its version by hand in <code>PACKAGES</code> and in <code>epm-config.json</code>.</li></ol>
+<h2 id="add-a-module">Add a module<a class="hl" href="#add-a-module" aria-label="Link to this section">#</a></h2>
+<p>Copy <code>$ONT/lane/</code>, the smallest module: a README, <code>vocabulary.ttl</code>, <code>shapes.ttl</code>, a build script, its output and its test. Keep the shape of its build script and test, and rewrite their content: <code>test_lanes.py</code> pins <code>lane</code>'s versions, and <code>build_lanes.py</code> reads two JSON files outside the folder. Read <code>skills/ontology/references/new-module.md</code> first. It says when a new module is the right answer, and it holds the full method for a large module. For a small module, this section is enough. Name the competency question the existing modules cannot answer. Your ontology owner approves a module's first release, and names its owner. Write that name in the approval file, because no other field holds it.</p>
+<p><code>next_version.py</code> works on modules already in <code>MODULES</code>, so write this first entry and changelog by hand. Each module has a table or a Turtle source and one builder. <code>build_lanes.py</code> is in the <code>lane</code> folder, and <code>kpi</code> is built by <code>build_measures.py</code>. Name yours for what it builds, and give it <code>--write</code> and <code>--verify</code>.</p>
+<p>Register the module in every place below. A place you miss fails a check or leaves the module out of a store.</p>
+<div class="tblwrap"><table><thead><tr><th>Place</th><th>What to add</th></tr></thead><tbody><tr><td><code>$ONT/release/build_module.py</code></td><td>An entry in <code>MODULES</code>: title, description, version, stage (<code>None</code>), approver, approval, issued, parts, shapes, <code>depends_on</code>, pins and decisions</td></tr><tr><td><code>$ONT/releases/&lt;module&gt;/CHANGELOG.md</code></td><td>A new file: a title line, then the section for its first release</td></tr><tr><td><code>scripts/check.sh</code></td><td>The builder's <code>--verify</code>, <code>build_module.py &lt;module&gt; --verify</code>, and the test file in the test list</td></tr><tr><td><code>$ONT/projection/pipeline.py</code></td><td><code>PACKAGES</code>, <code>OWN</code> and <code>PREFIXES</code></td></tr><tr><td><code>$ONT/projection/skill-run/epm-config.json</code></td><td>The version under <code>packages</code>, the namespace under <code>own_namespaces</code>, the prefix under <code>prefixes</code></td></tr><tr><td><code>$ONT/regression/</code></td><td>Its questions in <code>expected.csv</code>, a query in <code>queries/</code>, and the module's files in the list in <code>run.py</code></td></tr><tr><td><code>$ONT/validation/test_all_module_shapes.py</code></td><td>Its <code>shapes.ttl</code> in <code>SHAPE_FILES</code></td></tr><tr><td><code>$ONT/competency-questions.md</code></td><td>Each new question, numbered after the last, in the section it fits or a new one. "Locked" there, and "44 questions" in <code>$ONT/epm-ontology-guide.html</code> and <code>$ONT/regression/run.py</code>, describe this release's set: your owner may add to it. No check reads the count, so change it where your readers use it</td></tr><tr><td><code>scripts/epm_facts.py</code></td><td>An entry in the <code>coverage</code> table, if processes link to the module</td></tr><tr><td><code>$ONT/MODULES.md</code></td><td>A section on the module, with a <code>&lt;!-- module: name --&gt;</code> example, and a row in the table under "The three files of each package"</td></tr><tr><td><code>scripts/build_docs_html.py</code></td><td>The module's folder in <code>MODULE_READMES</code>, then run the builder for its HTML page</td></tr><tr><td><code>$ONT/authority/source-tiers.csv</code></td><td>A row with its evidence tier, for each <code>dcterms:source</code> the module cites; <code>build_source_tiers.py</code> and <code>vocabulary.ttl</code> in that folder define the five tiers: 1 process authority, 2 MPC, 3 peers, 4 industry and 5 framework. Choose the tier of the kind of source it is. Run <code>build_source_tiers.py --write</code> in that folder. This table is part of <code>integration</code>, so release <code>integration</code> as a minor after your module. A source written only as a <code>dcterms:bibliographicCitation</code> needs no row</td></tr><tr><td><code>$ONT/placement/vocabulary.ttl</code></td><td>Optional. A placement kind for a property that links to a process, as <code>lane:officeLane</code> has, if a competency question reads it</td></tr><tr><td><code>$ONT/projection/skill-run/queries.json</code></td><td>Optional. A saved "walk" that starts from one of the module's terms</td></tr><tr><td><code>integration</code>'s entry in <code>build_module.py</code></td><td>Not now, unless the row above releases it. Add the module to <code>depends_on</code> the next time <code>integration</code> is released, if <code>integration</code> links to it. A tier row is not a link</td></tr></tbody></table></div>
+<p>Then build, in this order, starting with the module's own builder:</p>
+<pre><code class="lang-sh">(cd $ONT/&lt;module&gt; &amp;&amp; py build_&lt;your builder&gt;.py --write)
+(cd $ONT/release &amp;&amp; py build_module.py &lt;module&gt; --write)
+# Only if you added a row to source-tiers.csv: rebuild the table and release integration, as the release steps say.
+(cd $ONT/authority &amp;&amp; py build_source_tiers.py --write)
+# 2.6.0 and 2.5.0 fit the release as you received it. Read yours: next_version.py current integration.
+(cd $ONT/release &amp;&amp; py next_version.py start integration 2.6.0 minor --why "Adds the new module's source." --approver "Your ontology owner" --where "approvals/your-file.md" --words "The sentence that approved it.")
+(cd $ONT/release &amp;&amp; py build_module.py integration --write)
+(cd $ONT/release &amp;&amp; py next_version.py finish integration 2.5.0)
+# Then, always:
+(cd $ONT/release &amp;&amp; py build_catalog.py --write)
+(cd $ONT/projection &amp;&amp; py pipeline.py build)
+py scripts/build_docs_html.py
+git add -A
+bash scripts/check.sh</code></pre>
+<h2 id="add-a-logical-model">Add a logical model<a class="hl" href="#add-a-logical-model" aria-label="Link to this section">#</a></h2>
+<p><code>logical-model</code> holds logical data models exported from ER Studio Data Architect. A new model joins this module as one more model; it is not a new module. Each model is two files in <code>$ONT/logical-model/models/</code>: ER Studio's Turtle export, saved as <code>&lt;model&gt;.erstudio.ttl</code>, and a links file, <code>&lt;model&gt;.links.csv</code>. Name the model in lower-case words joined by hyphens, such as <code>supplier-logical-model</code>. <code>$ONT/logical-model/README.md</code> describes the links file's columns: one row per entity, keyed on ER Studio's identifier, with the source system, the <code>party</code> concept and the <code>data-product</code> table it links to, and <code>asserted</code> or <code>doubtful</code>. Only <code>asserted</code> rows become triples, and the builder prints each <code>doubtful</code> row for your ontology owner. Every link target must be in the newest package of its module, so use this release's IRIs (<code>https://w3id.org/mpc/ontology/modules/...</code>).</p>
+<ol><li>Build the model's graphs. The builder writes <code>&lt;model&gt;.layer.ttl</code> beside the export, and fails on an IRI that your model and a model already in <code>models/</code> both define:
+<pre><code class="lang-sh">(cd $ONT/logical-model &amp;&amp; py build_logical_model.py --export models/&lt;model&gt;.erstudio.ttl --links models/&lt;model&gt;.links.csv \
+    --model &lt;model&gt; --title "&lt;Model title&gt;" --out models --write)</code></pre></li></ol>
+<ol start="2"><li>In <code>$ONT/release/build_module.py</code>, add the model's two files to the <code>graphs</code> list of the <code>logical-model</code> entry: <code>"logical-model/models/&lt;model&gt;.erstudio.ttl"</code> and <code>"logical-model/models/&lt;model&gt;.layer.ttl"</code>. Delete the entry's <code>augment</code> list, which names the files this release was cut from, unless you keep a record of your own files in it.</li><li>Release <code>logical-model</code> as a minor, with the release steps above: save the approval, then <code>next_version.py start logical-model 1.1.0 minor</code>, <code>build_module.py logical-model --write</code> and <code>next_version.py finish logical-model 1.0.0</code>.</li><li>In <code>scripts/check.sh</code>, add <code>--export</code>, <code>--links</code>, <code>--model</code> and <code>--title</code> for the new model to the line that runs <code>build_logical_model.py ... --verify</code>, so the check rebuilds every model.</li><li>Rebuild the catalog and the projection manifest, and check, as in step 5 of the release steps.</li></ol>
+<p>Questions 51 to 55 in <code>$ONT/regression/</code> run on the made-up example model. To ask them of your models, run the queries in <code>$ONT/regression/queries/q51-*.rq</code> to <code>q55b-*.rq</code> over the package's files.</p>
+<p>The stores load each model too: Jena and Delta its two graphs as named graphs, the local Neo4j and AuraDB the model as its own subgraph. <code>sync_stores.py check</code>, in step 5 of "Project into Neo4j and Jena", then prints an <code>lm:</code> line for each Neo4j store, and a release is done only when each of those reads <code>current</code> too (release steps, step 6).</p>
+<h2 id="inputs-from-outside-the-repository">Inputs from outside the repository<a class="hl" href="#inputs-from-outside-the-repository" aria-label="Link to this section">#</a></h2>
+<p>A build can read an input from a folder outside the repository instead of from your copy. The builders take each input's location as an option, so the same build runs whether the files sit in the repository or in such a folder.</p>
+<p>This release's logical models were built that way. When the release was made, the build read each model's ER Studio export and links file from a folder outside the repository, <code>release-cut/augment/logical-model/</code>, and copied them into <code>$ONT/logical-model/models/</code>. <code>release.json</code> and the package's <code>manifest.json</code> record each of those files by its path relative to that folder and its SHA-256. For a model you add, choose either way:</p>
+<ul><li><strong>Keep the files outside the repository.</strong> Save the export and the links file in a folder of your own, outside your copy. Point <code>build_logical_model.py</code>'s <code>--export</code> and <code>--links</code> at them, and give <code>--out $ONT/logical-model/models</code> so the two graphs it writes go where the package build reads them. List each file with its SHA-256 in the <code>augment</code> list of the <code>logical-model</code> entry in <code>$ONT/release/build_module.py</code>, and compare the files with those hashes before you build from them again. The line in <code>scripts/check.sh</code> that runs <code>build_logical_model.py ... --verify</code> then needs <code>--links</code> pointed at your folder, so a copy without that folder cannot run it.</li><li><strong>Move the files into the repository.</strong> Save them in <code>$ONT/logical-model/models/</code>, beside the module's sources, as "Add a logical model" does, and build from there.</li></ul>
+<h2 id="the-cascade">The cascade<a class="hl" href="#the-cascade" aria-label="Link to this section">#</a></h2>
+<p>A package names the exact version of each module it requires. So a new version of a module means a new version of every module that depends on it. <code>dependents.py</code> lists them, each after what it requires. Raise each version before you write its package, and write them in that order. A module that only takes the new version of what it requires gets a patch, with a changelog line that says so. A change to <code>core</code> reaches every module, so use a loop. It patches each module on the list and then finishes them all, and it stops at the first failing step. For any other module, change the list to <code>py dependents.py &lt;module&gt;</code>, and start the loop with <code>for m in $(echo "$list" | tail -n +2)</code>, which leaves out the module you released yourself.</p>
+<pre><code class="lang-sh">(
+  set -e
+  cd $ONT/release
+  moved=""
+  list="$(py dependents.py core)"
+  for m in $(echo "$list"); do
+    old=$(py next_version.py current "$m"); new="${old%.*}.$(( ${old##*.} + 1 ))"
+    py next_version.py start "$m" "$new" patch --why "Takes the new version of what it requires; nothing else changes." \
+        --approver "Your ontology owner" --where "approvals/your-file.md" --words "The sentence that approved it."
+    py build_module.py "$m" --write
+    moved="$moved $m:$old"
+  done
+  for pair in $(echo "$moved"); do py next_version.py finish "${pair%:*}" "${pair#*:}"; done
+)</code></pre>
+<h2 id="keep-the-catalog-regression-and-projection-current">Keep the catalog, regression and projection current<a class="hl" href="#keep-the-catalog-regression-and-projection-current" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>Catalog:</strong> <code>build_catalog.py --write</code> rebuilds <code>$ONT/releases/catalog.ttl</code> from the packages on disk.</li><li><strong>Regression:</strong> <code>regression/run.py</code> runs the competency questions. A new question goes in <code>regression/expected.csv</code>, with its query in <code>regression/queries/</code>.</li><li><strong>Projection manifest:</strong> <code>pipeline.py build</code> checks the projection's rules and records the hash of every input. <code>scripts/check.sh</code> fails until you run it after a change.</li></ul>
+<h2 id="project-into-neo4j-and-jena">Project into Neo4j and Jena<a class="hl" href="#project-into-neo4j-and-jena" aria-label="Link to this section">#</a></h2>
+<p>The packages are the source. Neo4j and Jena are copies that you can empty and reload. <code>scripts/check.sh</code> does not need them: when the stores are behind, it prints a note and still passes. One command, <code>rebuild_stores.py</code>, loads both from an environment file, in about five minutes. You need Docker, Java 11 or later and ROBOT 1.9.10 at <code>~/epm-lpg/robot.jar</code>; the script refuses any other file. By default the local Neo4j listens on port 17711 and Jena on 13031. <code>$ONT/epm-walkthrough.html</code>, "Connect and load every store", says how to get ROBOT and explains each step, and <code>$ONT/projection/ontology-stores-runbook.html</code> shows each store hands on.</p>
+<ol><li>Copy the environment file outside your copy, and let only yourself read it. The script refuses a file that others can read. Every key has a default, so for these two stores you can leave the file as it is.
+<pre><code class="lang-sh">mkdir -p ~/.config/epm
+cp $ONT/projection/skill-run/environment.example ~/.config/epm/qa.env
+chmod 600 ~/.config/epm/qa.env</code></pre></li></ol>
+<ol start="2"><li>List the steps. This changes nothing. Name the two stores, because the default is all four, and the other two need logins:
+<pre><code class="lang-sh">python3 $ONT/projection/rebuild_stores.py --env ~/.config/epm/qa.env --store driver --store jena --plan</code></pre></li></ol>
+<ol start="3"><li>Load the stores. <strong><code>--empty</code> replaces what the two stores hold.</strong> Without it, the script refuses a store that holds data.
+<pre><code class="lang-sh">python3 $ONT/projection/rebuild_stores.py --env ~/.config/epm/qa.env --store driver --store jena --empty</code></pre>
+<p>The script stops at the first failing step and names it. The load fails if it lost a triple, added one or found a violation. The script also takes the result into <code>$ONT/projection/</code> and checks the stores against your packages.</p></li><li>Commit <code>inferred.nt</code>, <code>projection-manifest.json</code> and <code>projection-report.json</code> from <code>$ONT/projection/</code>. <code>scripts/check.sh</code> then stops printing its note, and <code>python3 scripts/epm_facts.py projection</code> prints the new figures.</li><li>To see later which store is behind your newest packages, or holds other technical-graph files than the demo's (the line that starts <code>tech:</code>):
+<pre><code class="lang-sh">(cd $ONT/projection &amp;&amp; uv run -q --no-project --with rdflib --with neo4j python sync_stores.py check --ref worktree --store driver --store jena)</code></pre></li></ol>
+<h2 id="keep-every-copy-in-step">Keep every copy in step<a class="hl" href="#keep-every-copy-in-step" aria-label="Link to this section">#</a></h2>
+<p>Your packages are the master copy, and everything you load from them is a copy that falls behind when you release. Each kind of copy has its own check:</p>
+<ul><li><strong>The ontology in each store.</strong> The check in step 5 of "Project into Neo4j and Jena" reads each store's ontology line as <code>current</code>, <code>behind</code>, <code>changed</code>, <code>unmarked</code> or <code>unreachable</code> (Jena, which has no marker, reads <code>empty</code> after a restart). For Jena it compares each named graph's triple count with your packages; Jena reads <code>empty</code> after a restart, because its dataset is in memory.</li><li><strong>The technical graph.</strong> It is loaded from the demo's graph files, not from your packages. The same check's <code>tech:</code> line compares each store's technical graph with those files, by the marker the load wrote and by a fingerprint of the content.</li></ul>
+<ul><li><strong>The logical models.</strong> The <code>lm:</code> line compares each Neo4j store's logical-model subgraph with the package's graphs. <code>release.json</code> and the package's <code>manifest.json</code> record each file the models were built from under <code>augment</code>, by its path and its SHA-256. If you keep those originals, compare each one's SHA-256 with its record before you build from it again ("Inputs from outside the repository").</li></ul>
+<p>To repair any of them, run step 3 of "Project into Neo4j and Jena" again, which reloads the stores from your packages and ends with the check. Do not fix a store by hand. A release is done only when every store you keep reads <code>current</code> (release steps, step 6).</p>
+<h2 id="the-optional-check-against-this-release">The optional check against this release<a class="hl" href="#the-optional-check-against-this-release" aria-label="Link to this section">#</a></h2>
+<p><code>scripts/check-pinned.sh</code> asks a different question from <code>scripts/check.sh</code>: does your copy still equal EPM 1.0 as shipped? Its tests pin versions, counts, approvals and the figures in the guide. They pass on the release as shipped. After your first change some of them fail, and that means only that your copy has moved on. Ignore them from then on, or edit <code>scripts/pinned-tests.txt</code> when you want your own pins.</p>
+<p>The documents that state figures or versions, such as <code>$ONT/epm-ontology-guide.html</code> and the module READMEs that name a core version, describe EPM 1.0. They do not update themselves. Update the ones your readers use.</p>
+<h2 id="the-namespace">The namespace<a class="hl" href="#the-namespace" aria-label="Link to this section">#</a></h2>
+<p>The IRIs begin with <code>https://w3id.org/mpc/ontology/</code>. Keep them as working names unless you have a reason to change them. They identify terms and resolve nowhere. A term's IRI is its identity, so a change is a major release of every module.</p>
+<p>If you do change the namespace, do it first, before other changes, and with your ontology owner's approval:</p>
+<ol><li>Raise <code>core</code> and every module to the next major version, following the sections above.</li><li>Replace the base in the sources: the module folders, the process map's identity map, the builders, <code>$ONT/projection/</code>, the shapes and the regression queries.</li><li>Leave <code>$ONT/releases/previous/</code> alone. Those packages keep the old IRIs, because a released package never changes.</li><li>Write every package again in the order <code>dependents.py core</code> prints, and run <code>scripts/check.sh</code>.</li></ol>
+<h2 id="what-you-can-ignore">What you can ignore<a class="hl" href="#what-you-can-ignore" aria-label="Link to this section">#</a></h2>
+<p>These describe how the ontology was first built. You need none of them to update it:</p>
+<ul><li><code>$ONT/epm-walkthrough.html</code>, Part 2, and <code>$ONT/build/</code>, apart from the identity map named above.</li><li><code>$ONT/step4/</code> and the older core builders, <code>build_core_next.py</code> and <code>build_core_2_1.py</code>, which rebuild earlier releases.</li><li><code>$ONT/release/frozen/</code>, apart from the copies you add.</li><li><code>business_architecture/domain/decision-packages/</code>, questions put to the subject matter expert during the build.</li><li><code>$ONT/business-closeout.md</code>, and any note in a README or changelog dated before you received this release.</li></ul>
+      <p class="end">Generated from <code>HOW-TO-UPDATE.md</code> by <code>scripts/build_docs_html.py</code>. Start with the <a href="business_architecture/ontology/epm-ontology-guide.html">ontology guide</a>.</p>
+    </article>
+  </div>
+</div>
+<script>
+(function () {
+  if (navigator.clipboard) {
+    document.querySelectorAll("pre").forEach(function (pre) {
+      var b = document.createElement("button");
+      b.className = "copy"; b.type = "button"; b.textContent = "Copy";
+      b.addEventListener("click", function () {
+        navigator.clipboard.writeText(pre.querySelector("code").innerText).then(function () {
+          b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1500);
+        });
+      });
+      pre.appendChild(b);
+    });
+  }
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute("href").slice(1)] = a; });
+  var heads = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); })
+    .filter(Boolean);
+  if (!("IntersectionObserver" in window) || !heads.length) return;
+  var current = null;
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) {
+        if (current) current.classList.remove("on");
+        current = byId[e.target.id];
+        if (current) current.classList.add("on");
+      }
+    });
+  }, { rootMargin: "-60px 0px -75% 0px" });
+  heads.forEach(function (h) { io.observe(h); });
+  if (window.matchMedia("(max-width: 960px)").matches) {
+    var d = document.querySelector(".toc details");
+    if (d) d.removeAttribute("open");
+  }
+})();
+</script>
+</body>
+</html>

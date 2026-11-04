@@ -1,0 +1,43 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix lm: <https://w3id.org/mpc/ontology/modules/logical-model/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://w3id.org/mpc/ontology/modules/logical-model> a owl:Ontology ;
+    dcterms:description "Logical data models exported from ER Studio Data Architect, each kept as two graphs: ER Studio's export as it is, in ER Studio's own namespace, and a layer of annotations that links its entities to the party, system and data-product modules. This package holds the module's vocabulary; each model's two graphs ship beside it."@en ;
+    dcterms:issued "2026-11-03"^^xsd:date ;
+    dcterms:modified "2026-11-03"^^xsd:date ;
+    dcterms:requires <https://w3id.org/mpc/ontology/modules/data-product/1.2.0>,
+        <https://w3id.org/mpc/ontology/modules/party/2.1.0>,
+        <https://w3id.org/mpc/ontology/modules/system/1.5.0> ;
+    dcterms:title "MPC Logical Model Module"@en ;
+    owl:versionIRI lm:1.0.0 ;
+    owl:versionInfo "1.0.0" .
+
+lm:LogicalModel a owl:Class ;
+    rdfs:label "logical model"@en ;
+    dcterms:bibliographicCitation "the decision of 2026-11-02, decisions 3 and 4"@en ;
+    skos:definition "A named logical data model exported from a data modelling tool, such as ER Studio Data Architect: a set of entities, their attributes, keys and relationships, designed one level above the tables a data platform builds. Each model is one individual of this class, and the entities of its export belong to it."@en .
+
+lm:describes a owl:AnnotationProperty ;
+    rdfs:label "describes"@en ;
+    dcterms:bibliographicCitation "the decision of 2026-11-02, decisions 4 and 8"@en ;
+    skos:definition "The concept, class or code list of the party module that the entity holds data about, such as a customer account, or a code list such as the dealer classes for a lookup table that holds the whole list. Asserted only where the entity's name and description make the link clear; a doubtful link goes to the decision owner instead."@en .
+
+lm:implementedBy a owl:AnnotationProperty ;
+    rdfs:label "implemented by"@en ;
+    dcterms:bibliographicCitation "the decision of 2026-11-02, decisions 4 and 9 (question 55)"@en ;
+    skos:definition "The platform table or data product of the data-product module that builds the entity on the data platform. An entity with none has no recorded implementation."@en .
+
+lm:inModel a owl:AnnotationProperty ;
+    rdfs:label "in model"@en ;
+    dcterms:bibliographicCitation "the decision of 2026-11-02, decisions 4 and 5"@en ;
+    skos:definition "The logical model an entity of an export belongs to. The subject is the modelling tool's own entity IRI, found from the tool's identifier of the entity at each build; the value is a logical model. Every entity of a model has exactly one."@en .
+
+lm:sourceSystem a owl:AnnotationProperty ;
+    rdfs:label "source system"@en ;
+    dcterms:bibliographicCitation "the decision of 2026-11-02, decisions 4 and 8"@en ;
+    skos:definition "The system whose records the entity holds data from: a system of the system module, or a customer system of the party module, which says where the two are the same system. It is drafted from the entity's name."@en .
+

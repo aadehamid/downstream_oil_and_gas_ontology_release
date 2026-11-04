@@ -1,0 +1,21 @@
+{
+  "module": "kpi",
+  "version": "1.2.0",
+  "release_candidate": false,
+  "ontology_iri": "https://w3id.org/mpc/ontology/modules/kpi",
+  "version_iri": "https://w3id.org/mpc/ontology/modules/kpi/1.2.0",
+  "depends_on": {
+    "core": "2.3.0"
+  },
+  "triples": 1157,
+  "approved_by": {
+    "who": "a subject matter expert reviewing the documents"
+  },
+  "files": {
+    "CHANGELOG.md": "771e56c30f754303fa2c99e954f246ea5c02493a42a4dc1424735095a461825b",
+    "catalog.ttl": "19688c910609768e75340402cb01513b00692863cd30c0e8daad9adb0b2558de",
+    "kpi.jsonld": "93c537f589bd272861a71e02a511c1c31d0e161bc232d98e9fd080a2c0942d4d",
+    "kpi.ttl": "d035837f7f0b5a9f62ed3994758b0398c0a9d11e47553360a3da2405f3c272ae",
+    "shapes.ttl": "e9db0c93167d7c56120dcc4c64bb71dee00e324b246d3c8fb3e471c05dd55d19"
+  }
+}

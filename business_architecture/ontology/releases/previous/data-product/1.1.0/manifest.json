@@ -1,0 +1,21 @@
+{
+  "module": "data-product",
+  "version": "1.1.0",
+  "release_candidate": false,
+  "ontology_iri": "https://w3id.org/mpc/ontology/modules/data-product",
+  "version_iri": "https://w3id.org/mpc/ontology/modules/data-product/1.1.0",
+  "depends_on": {
+    "core": "2.3.0"
+  },
+  "triples": 730,
+  "approved_by": {
+    "who": "a subject matter expert reviewing the documents"
+  },
+  "files": {
+    "CHANGELOG.md": "4b62ed067c0b86529ea3ae45da3c23a834a2c618b3e22935baaab07a38da324b",
+    "catalog.ttl": "d17dafad3c800de6e363693bede6985b6d936b6e7da234b2d1b3c198eabe12d3",
+    "data-product.jsonld": "2eab4c20e44d614b88229e474627754ab3da63be3a86a2d1f2a928c9075a8d38",
+    "data-product.ttl": "c6fb10d65646da60693430750c1bd20dfc34c4de7a9bdc55450b9e8eb92eb946",
+    "shapes.ttl": "314d80a6a5fd6a8cc510fc6abd9181fc4ec132b5856766a92a374418dc9987a9"
+  }
+}

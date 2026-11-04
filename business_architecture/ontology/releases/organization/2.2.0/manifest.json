@@ -1,0 +1,30 @@
+{
+  "module": "organization",
+  "version": "2.2.0",
+  "release_candidate": false,
+  "ontology_iri": "https://w3id.org/mpc/ontology/modules/organization",
+  "version_iri": "https://w3id.org/mpc/ontology/modules/organization/2.2.0",
+  "depends_on": {
+    "core": "2.4.0"
+  },
+  "decisions": [
+    "the decision of 2026-10-13",
+    "the decision of 2026-10-13",
+    "the decision of 2026-10-13",
+    "the decision of 2026-10-18",
+    "the decision of 2026-10-25",
+    "the decision of 2026-10-26"
+  ],
+  "triples": 5996,
+  "approved_by": {
+    "who": "a subject matter expert reviewing the documents",
+    "words": "Approved as described"
+  },
+  "files": {
+    "CHANGELOG.md": "ae4af38bfb5b03619f03fa1121b937128f01cab2a5ef041da8c55f21616ed0de",
+    "catalog.ttl": "7941163d1feb6be47b96eb4743588412d284463d66a97928bd51428f7af6cf5d",
+    "organization.jsonld": "76accce6cc58c229aea1c7afa7e4cc65b1e731e7e4a9c095b6aa8f6e6963c288",
+    "organization.ttl": "8c4a7b75b181a0958edb82e75ce110ab3818c45135934a99d15803fba635e899",
+    "shapes.ttl": "27cc4ddcf2979f61e495146ee8bccbb634059b3e55db55a10c95fb7311f313bc"
+  }
+}

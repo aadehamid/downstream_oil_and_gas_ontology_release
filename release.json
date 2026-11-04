@@ -1,0 +1,19 @@
+{
+  "release": "EPM 1.0",
+  "built": "2026-11-04",
+  "mode": "share release: each module's builder builds against the newest package of every module it requires; the Neo4j projection names labels, relationship types and property keys with one underscore",
+  "augment": {
+    "module": "logical-model",
+    "version": "1.0.0",
+    "files": [
+      {
+        "path": "customer-logical-model.ttl",
+        "sha256": "967fedabfad83f21ce9b20413fb471eb4998220fc3c267b9437f7df4b15259be"
+      },
+      {
+        "path": "customer-logical-model.links.csv",
+        "sha256": "65b811c9dd9f2ebee98037c89872688c613cc1c95517b00a29cb3256a1ee4cc7"
+      }
+    ]
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "module": "logical-model",
+  "version": "1.0.0",
+  "release_candidate": false,
+  "ontology_iri": "https://w3id.org/mpc/ontology/modules/logical-model",
+  "version_iri": "https://w3id.org/mpc/ontology/modules/logical-model/1.0.0",
+  "depends_on": {
+    "party": "2.1.0",
+    "system": "1.5.0",
+    "data-product": "1.2.0"
+  },
+  "decisions": [
+    "the decision of 2026-11-02"
+  ],
+  "triples": 30,
+  "approved_by": {
+    "who": "The decision owner",
+    "words": "I approve logical-model 1.0.0,"
+  },
+  "augment": [
+    {
+      "path": "customer-logical-model.ttl",
+      "sha256": "967fedabfad83f21ce9b20413fb471eb4998220fc3c267b9437f7df4b15259be"
+    },
+    {
+      "path": "customer-logical-model.links.csv",
+      "sha256": "65b811c9dd9f2ebee98037c89872688c613cc1c95517b00a29cb3256a1ee4cc7"
+    }
+  ],
+  "files": {
+    "CHANGELOG.md": "2750313108714cfb5c024b1eee1ad4ac68dfa794c31590765e257d428159c899",
+    "catalog.ttl": "0e33714aa964b4d06db9979aa2cdfd14ff6dfd6dcc0f47fbb80c29b3d46063f4",
+    "customer-logical-model.erstudio.ttl": "967fedabfad83f21ce9b20413fb471eb4998220fc3c267b9437f7df4b15259be",
+    "customer-logical-model.layer.ttl": "a18a24e147604cebf5d6f6cf9305c0512dd7d67e1dcb6a125acf7555a2e278d0",
+    "logical-model.jsonld": "fd34ffbe31ac377fa953a89895c829da71cbcc32809e9dc548f6ca3d8e81ca6d",
+    "logical-model.ttl": "31e329dc9e1aee6782658a0bc9f10409e238e21956812b6853a4de267120d875",
+    "shapes.ttl": "031df2a39b046d7dfc0cdb0e8be0344da9fa7db36c6904b0c601379779d83de2"
+  }
+}

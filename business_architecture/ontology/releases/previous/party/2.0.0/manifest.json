@@ -1,0 +1,22 @@
+{
+  "module": "party",
+  "version": "2.0.0",
+  "release_candidate": false,
+  "ontology_iri": "https://w3id.org/mpc/ontology/modules/party",
+  "version_iri": "https://w3id.org/mpc/ontology/modules/party/2.0.0",
+  "depends_on": {
+    "core": "2.4.0",
+    "system": "1.5.0"
+  },
+  "triples": 4336,
+  "approved_by": {
+    "who": "a subject matter expert reviewing the documents"
+  },
+  "files": {
+    "CHANGELOG.md": "9ca24428cae87f87e25786ca77553410fcd495a44183bd6c7ee06a89f532d640",
+    "catalog.ttl": "58abb65d3fb19982c33d148f90c00f391d130ea1537c3d4b3ed671bb512f0ab8",
+    "party.jsonld": "d8adcc2a2cd4a862806e9210906a555efc766462697d3c4c7e13675e26230028",
+    "party.ttl": "62af3726c4f4b1e16ac6f43cefd7eead668f7a46509dbd2e772473f11ffd7863",
+    "shapes.ttl": "848870d4dc38cc05202f07ec242acc0d941d36d74b9f0d828b7b9c6021400eb9"
+  }
+}

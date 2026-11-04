@@ -1,0 +1,21 @@
+{
+  "module": "organization",
+  "version": "2.1.0",
+  "release_candidate": false,
+  "ontology_iri": "https://w3id.org/mpc/ontology/modules/organization",
+  "version_iri": "https://w3id.org/mpc/ontology/modules/organization/2.1.0",
+  "depends_on": {
+    "core": "2.3.0"
+  },
+  "triples": 5995,
+  "approved_by": {
+    "who": "a subject matter expert reviewing the documents"
+  },
+  "files": {
+    "CHANGELOG.md": "4bfa06445190ff117be4b8f42900eb453a6f4a3b34f7b9a9308a940eef1f5ec3",
+    "catalog.ttl": "39797393bc88b0d6afb799ea4dfd5c1125ee967110466d93c1ab90816d677a5f",
+    "organization.jsonld": "339d77d418e32e0a3c7b864ea992ad1d46fddb0d747fb74e4f568d8be630de9f",
+    "organization.ttl": "482392bfee1a253aa900a5eedf582866c7f13f1905a7501efe103acd9546cf47",
+    "shapes.ttl": "27cc4ddcf2979f61e495146ee8bccbb634059b3e55db55a10c95fb7311f313bc"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "module": "core",
+  "version": "2.4.0",
+  "release_candidate": false,
+  "ontology_iri": "https://w3id.org/mpc/ontology/modules/core",
+  "version_iri": "https://w3id.org/mpc/ontology/modules/core/2.4.0",
+  "built_from": {
+    "core 2.3.0 manifest": "1b9ea9abacdbc4d339f86fa4cf884d5540e15de15c0e1a8efe6bd561f268dc56",
+    "process map": "business_architecture/business_process/downstream_process_map.json at 4906666a06507d9c7d996d83df7b24ab824038d7"
+  },
+  "decisions": [
+    "the decision of 2026-10-12",
+    "the decision of 2026-10-25",
+    "the decision of 2026-10-26"
+  ],
+  "approval": {
+    "who": "a subject matter expert reviewing the documents",
+    "words": "Approved as described"
+  },
+  "files": {
+    "CHANGELOG.md": "4d5ce120ed301985fc417c734e83474377ea48c469def796c064a201486bb4f8",
+    "canonical-facts.csv": "3f98542e323f300be4b6ff85fb733342b238287fbd92fa5fb96626f91312a851",
+    "catalog.ttl": "4f5637a665ff6106932a4e1ad68631bb387d1a6dfbe5ad37a5780410a2505086",
+    "core.jsonld": "71cc711eb7dbce6c9c37e27653f8a5564b710865b2fd37cc05e90d72a21704bf",
+    "core.ttl": "5e397453088b9b00cb4b2f57802c491ea8b29e285f34459fe8b5dfdea9a56777",
+    "counts.json": "08c50d5c2d170196c8d92a7f44decf1cf681e07f9356b1fec3128ca6774b9345",
+    "shapes.ttl": "452e38bf277f39c7a3d6e73bc522429d0d351a799e8f3d69cd044e6c521bbee3"
+  }
+}

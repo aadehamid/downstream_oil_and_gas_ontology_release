@@ -1,0 +1,44 @@
+# SHACL shapes for the system module (Step 7; the decision of 2026-10-19). A stated cardinality on every
+# property (the decision of 2026-10-05, rule 2; playbook Appendix B).
+@prefix sys: <https://w3id.org/mpc/ontology/modules/system/> .
+@prefix kind: <https://w3id.org/mpc/ontology/modules/system/kind/> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix src: <https://w3id.org/mpc/ontology/source/> .
+@prefix shp: <https://w3id.org/mpc/ontology/modules/system/shapes/> .
+
+shp:System a sh:NodeShape ;
+    sh:targetClass sys:System ;
+    sh:property [ sh:path skos:prefLabel ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype rdf:langString ;
+                  sh:languageIn ( "en" ) ; sh:message "A system has exactly one English name." ] ;
+    sh:property [ sh:path skos:notation ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path skos:inScheme ; sh:minCount 1 ; sh:maxCount 1 ; sh:hasValue sys:Systems ] ;
+    sh:property [ sh:path skos:altLabel ; sh:minCount 0 ; sh:datatype rdf:langString ] ;
+    sh:property [ sh:path skos:editorialNote ; sh:minCount 0 ; sh:maxCount 1 ; sh:datatype rdf:langString ;
+                  sh:languageIn ( "en" ) ] ;
+    sh:property [ sh:path skos:definition ; sh:minCount 0 ; sh:maxCount 1 ; sh:datatype rdf:langString ;
+                  sh:languageIn ( "en" ) ] ;
+    # A system either has a definition and a source for it beside the process map, or a note saying
+    # why it has none (the decision of 2026-10-19; item G, the decision of 2026-10-25).
+    sh:xone (
+        [ sh:property [ sh:path skos:definition ; sh:minCount 1 ] ;
+          sh:property [ sh:path dcterms:source ; sh:minCount 2 ;
+                        sh:hasValue <https://w3id.org/mpc/ontology/source/downstream-process-map> ] ]
+        [ sh:property [ sh:path skos:definition ; sh:maxCount 0 ] ;
+          sh:property [ sh:path skos:editorialNote ; sh:minCount 1 ] ]
+        # Since 1.2.0: a system the process map does not name is named by another source (sys:namedBy), cites no
+        # process map, and is defined (the decision of 2026-10-25).
+        [ sh:property [ sh:path sys:namedBy ; sh:minCount 1 ] ;
+          sh:property [ sh:path skos:definition ; sh:minCount 1 ] ;
+          sh:not [ sh:property [ sh:path dcterms:source ;
+                                 sh:hasValue <https://w3id.org/mpc/ontology/source/downstream-process-map> ] ] ]
+    ) ;
+    sh:message "A system has a definition with its source, or a note saying why it has none." ;
+    sh:property [ sh:path sys:systemKind ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:in ( kind:application kind:office-tool kind:document ) ] ;
+    sh:property [ sh:path sys:supports ; sh:minCount 0 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path sys:namedBy ; sh:minCount 0 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path dcterms:source ; sh:minCount 1 ; sh:nodeKind sh:IRI ] .

@@ -1,0 +1,32 @@
+{
+  "module": "system",
+  "version": "1.5.0",
+  "release_candidate": false,
+  "ontology_iri": "https://w3id.org/mpc/ontology/modules/system",
+  "version_iri": "https://w3id.org/mpc/ontology/modules/system/1.5.0",
+  "depends_on": {
+    "core": "2.4.0"
+  },
+  "decisions": [
+    "the decision of 2026-10-19",
+    "the decision of 2026-10-22",
+    "the decision of 2026-10-25",
+    "the decision of 2026-10-25",
+    "the decision of 2026-10-25",
+    "the decision of 2026-10-26",
+    "the decision of 2026-10-26",
+    "the decision of 2026-10-27"
+  ],
+  "triples": 1008,
+  "approved_by": {
+    "who": "a subject matter expert reviewing the documents",
+    "words": "I am aligned with all your recommendation in the input plan."
+  },
+  "files": {
+    "CHANGELOG.md": "e152ff6dd1382830beb2bb397a9f8865dc2b6327475303b596594a1e6e90a192",
+    "catalog.ttl": "0e7bee15439299f35f14c2c8151a309a84946de59d771747e133f8798366364a",
+    "shapes.ttl": "56e85ca3383adf07da36451153342280093a4482a1234eca508b192d0f0abe76",
+    "system.jsonld": "cfd6e216a7113e35c4811d8d9ffb6a88de42b7d56721a3d9c0106cad27368a35",
+    "system.ttl": "a517c778b6effd37c9e02d196c6b9baa94e866ca00d1165aa071872f0ae2c0e6"
+  }
+}

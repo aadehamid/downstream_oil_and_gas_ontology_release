@@ -1,0 +1,105 @@
+# Versioning, release packages and publication
+
+Serves Step 10, and every module release from Step 4 on. Read it before you classify a change, build or approve a release, deprecate a term, or publish a catalog. When a user has files but no packages yet, run the interview in `packaging-walkthrough.md`: it asks for each answer these rules need and ends with `scripts/build_package.py` writing the package.
+
+## The rule
+
+1. **Put versions on each module's `owl:Ontology` header (`owl:versionInfo`, `owl:versionIRI`) and on versioned distributions (`.../releases/1.2.0/core.ttl`).** Term IRIs: `identity-taxonomy.md`, Step 2, rule 3. *Why:* the header and the distribution are what a consumer pins.
+2. **Version each module, and each release as a whole, with `MAJOR.MINOR.PATCH`.** A release records exactly which module versions it bundles. *Why:* a consumer pins what it tested against.
+
+## Classify every change
+
+3. **Major:** an IRI changes or a concept is removed (both should never happen); a definition's meaning changes, not only its wording; a hierarchy change alters what a concept means; any deprecation.
+   **Minor:** new concepts, modules, aliases, references, instances or constraint shapes; additive hierarchy; an added range or cardinality shape that the released content already meets.
+   **Patch:** typos; clearer wording with the same meaning; an added example or scope note.
+4. **Apply the meaning-change test:** would every query, report and assistant answer produced under the old definition still be correct under the new one? Yes means patch or minor; no means major. When unsure, major. *Why:* a false major costs a version number; a false patch corrupts consumers silently.
+
+## Deprecate, never delete
+
+5. **Mark the term `owl:deprecated true`, add `dcterms:isReplacedBy` to its successor, keep every existing triple, log the reason in the changelog, and do it only in a major release.** *Why:* deleting an IRI orphans every catalog row, assignment and measure binding that pointed at it, and kept triples still answer "what did this use to mean?".
+
+## Who approves
+
+6. **The module owner (the role the ontology owner names for a module in its decision record; the ontology owner until one is named) approves minor and patch releases. The ontology owner approves every major release, including a module's first release (1.0.0) and any deprecation.** *Why:* a major can make existing consumers wrong, and a first release sets the meaning every consumer starts from.
+7. **Quote the sentence that approved the release in the manifest, and keep the saved approval beside your decision records.** *Why:* the release cannot then be issued without the approval it claims.
+
+## The release package
+
+8. **Give every module the same package, built by one script:** the module's Turtle and JSON-LD, its shapes, a DCAT record, a changelog, and a manifest with the SHA-256 of each file and the module versions it requires. `scripts/build_package.py build <answers.yaml> --releases <dir>` is that script for any project: it reads one module's answers (`templates/package-answers.yaml`), writes the package to a staging folder, runs `check_packages.py`'s package check and `check_changelogs.py` on it, and moves it into place only when both pass. `scripts/check_packages.py` reads this layout: `releases/<module>/<version>/` holding `<module>.ttl`, `shapes.ttl` and `manifest.json`, whose `files` maps each other file to its SHA-256 and whose `depends_on` maps each required module to its version. *Why:* consumers validate against a package, not a working tree, and one builder keeps every package the same shape.
+9. **Make the builder deterministic, and give it a verify command (`build_package.py verify`; `build_tabular.py --verify`), which fails unless the written package equals a fresh build, byte for byte.** The check script runs it for every package. *Why:* a hand edit to a package, or a drift in its sources, then fails the check.
+10. **Never change a released package; cut a new release instead.** *Why:* consumers pinned it by version and checksum.
+11. **Name each dependency's version with `dcterms:requires` on the header and an entry in the manifest; import no module.** The build fails if a named version does not exist. *Why:* an import pulls a moving target into a pinned release.
+12. **Resolve a package's dependency closure from the released manifests:** what a dependency itself requires is read from that release's own manifest, and where two paths reach different releases of one module, only the highest is loaded. *Why:* a later release of a dependency then changes neither the package nor what its checks load.
+13. **Build the next release of a module from its released graph, not from the evidence again.** The builder reads the released package, applies the decided changes, and records a hash of the released manifest so the check fails if that package changes. Test that every earlier triple is kept, except the version header and what a decision changed. *Why:* the earlier release stays reproducible from its own pinned evidence, and the new one shows exactly what changed.
+
+## Candidates and the cut
+
+14. **Until the owner approves, build a release candidate (`1.0.0-rc.1`):** the candidate label in `owl:versionInfo`, the version IRI, the catalog and the manifest, and no `dcterms:issued`. *Why:* a candidate cannot be mistaken for a release.
+15. **Cut in one commit after the approval:** drop the stage, set `dcterms:issued` and `dcterms:modified` from the cut date (never copied from an earlier release), update the test that pins the version, rebuild, and remove the candidate package. *Why:* only the release is left to consume.
+16. **With a remote, tag the merge commit after the merge.** Records written before the merge say the tag comes at merge, never that it exists. *Why:* the tag records the immutable commit the release was built from.
+
+## Without a remote
+
+Releases need neither git nor a remote: a package's integrity is its manifest, whose SHA-256 for every file `check_packages.py` and `build_package.py verify` recompute. Rules 15 and 16 assume a remote and a pull-request flow; without one, follow the setup `build_package.py git --releases <dir>` reports:
+
+- **No git:** the manifest's hashes are the whole guarantee. Keep the `verify` line in the check script, and keep an earlier release's folder exactly as it was written (rule 10).
+- **Git with no remote:** commit the package, then `build_package.py tag` tags `<module>-v<version>` on that commit; from then on `verify` also compares the written files with the tag's copy.
+- **Git with a remote:** as rules 15 and 16, through a pull request. After the merge, `build_package.py tag` tags the commit that brought the package onto the remote's default branch: the earliest commit on its first-parent line whose package folder is exactly this release's (the merge commit, the squash commit, or the package's own commit after a fast-forward); a later edit of the folder is never the tag and says whether the remote holds the tag; it reads the default branch from the remote itself, and refuses before the merge or when it cannot read it. It never pushes.
+
+## Before every release
+
+17. **Check the gate:** the source-correction backlog is settled (`promotion.md`); the build, the evidence and the consumer-impact scan cite one commit; the consumer attestation is fresh; the package conforms to its shapes over its closure (`shacl.md`, rule 9); the competency questions run on it, with the example graph of a module under `new-module.md`, rule 9 (`regression.md`); the approval in rule 6 is recorded in writing.
+18. **Ship with every release:** `owl:versionInfo` on each module and on the release; `dcterms:issued` and `dcterms:modified`; a changelog entry per change (what, why, who approved, classification); a "Known gaps" section in the changelog; a new DCAT dataset version with its distributions. The section lists what the release still lacks, one bullet per gap, each with `Reason:` and `Record:` (the decision record or the open question that holds it), or says "None."; `scripts/check_changelogs.py --releases releases` fails on a changelog without it, with `--exempt <module>/<version>` for packages released before the project adopted the rule, which stay as released (rule 10). *Why:* a consumer reads what a release is not yet fit for in the same place as what changed, and a gap with no record behind it is a gap nobody owns.
+
+## Keeping copies in step
+
+Every store loaded from the releases (a property graph, a triple store, a lakehouse table), and every graph loaded beside them from other files, is a copy that falls behind when a release lands. The markers, the drift check and the sync are the `ontology-to-lpg` skill's (`references/multi-store.md`, "Keeping the stores in step"). Where no workflow runs the drift check, run it as a written step of every release, once the release is cut and tagged (rules 15 and 16; with no remote, once `build_package.py tag` has tagged it; with no git, once the approved candidate is cut and rebuilt as the issued release, rule 15), and sync each store to that issued release, never to a merged candidate. The release checklist carries the step after its tag item.
+
+## Inputs kept outside Git
+
+Some releases read files that may never enter the repository, such as an export a client keeps private, read through a release option from a folder git ignores (`logical-model.md`, rule 12). That content, and anything built from it, never enters the main branch: no package, test fixture, page or commit message there holds it, so the release that carries it ships as its own archive.
+
+- **Record each file's hash in the input record, never the folder.** The release build writes one release-level record, `release-inputs.json` at the archive's root beside the packages and separate from every package's manifest (a package's manifest lists only its package's files, rule 8). It lists each file read from the folder by its path relative to that folder, with its SHA-256. It never records the folder's own path, which names a machine and often the client.
+- **Validate the release from its archive alone.** The archive validates without the folder: the package check (`check_packages.py`), the shapes and the competency questions pass on the unpacked archive with no folder present, since a recipient of the release has none.
+- **Check the folder separately.** A second check compares each file in the folder with `release-inputs.json` and fails on a changed, missing or extra file. Run it wherever the folder is present and before any rebuild; the byte-for-byte rebuild (rule 9) needs the folder, so it runs with this check. A changed file ships only as a new release, which records the new hash.
+
+## The catalog
+
+19. **Build one combined catalog of every release from the packages on disk**, as the union of their DCAT records plus the catalog's own title and description, and verify it in the check script: `scripts/build_catalog.py build --releases <dir> --title <text> --description <text>` writes `<dir>/catalog.ttl` from every package's `catalog.ttl` (rule 8), and its `verify` fails unless the written catalog equals a fresh build. The script checks that every package names one catalog IRI and holds one dataset, and that every distribution a dataset links to is described and names a file in its package; the byte comparison proves the catalog adds only its own title and description. *Why:* a release missing from the catalog then fails the check, and the catalog never says more about a release than the release's own record.
+20. **Treat namespace hosting as an explicit decision.** Until the owner decides to host the base IRI, the IRIs identify and do not resolve, releases are retrievable from the repository at their tags, and the gate's "catalog resolves" is parked by that decision with its trigger. If the base IRI later changes, every term's identity changes: that needs its own decision and a major release of every module. *Why:* choosing the domain before anyone consumes the ontology keeps that cost low.
+
+## The ontology header
+
+```turtle
+<https://w3id.org/example/ontology/modules/lending>
+    a owl:Ontology, skos:ConceptScheme ;
+    dcterms:title "Example Library Lending Ontology"@en ;
+    owl:versionIRI <https://w3id.org/example/ontology/modules/lending/1.0.0> ;
+    owl:versionInfo "1.0.0" ;
+    dcterms:issued "2026-10-05"^^xsd:date ;
+    dcterms:modified "2026-10-05"^^xsd:date ;
+    dcterms:requires <https://w3id.org/example/ontology/modules/core/2.1.0> ;
+    dcterms:rights "All rights reserved."@en .
+```
+
+21. **Type a module `skos:ConceptScheme` as well as `owl:Ontology` when its concepts are `skos:inScheme` the module IRI.** *Why:* otherwise the concepts sit in a scheme the release never declares.
+22. **State rights with a licence that names real licence text, or with `dcterms:rights`;** never a `dcterms:license` IRI that resolves to nothing. *Why:* a dangling licence IRI claims terms nobody can read.
+
+Consumers who need the current meaning use the ontology IRI; consumers who need reproducibility pin the version IRI or a versioned distribution.
+
+## When the reference framework changes
+
+23. **Leave your IRIs where they are, review each `dcterms:references` link against the new version, send newly relevant elements through the scope review (`foundations.md`, Step 8), and record the framework version on the release.** This is a minor release at most, usually a patch. *Why:* the framework is the check, not the source of truth.
+
+## Documentation pages
+
+24. **Build each released package's pages with Widoco, from the package's own Turtle:** `scripts/build_docs.py --jar <widoco.jar> --releases releases --docs docs/ontology`, one page set per package at `docs/ontology/<module>/<version>/`. Widoco runs locally on Java, so nothing leaves the machine. The builder first checks every file the package's manifest lists against its SHA-256 and refuses a package that differs, and it replaces a page set only after the new one is built. *Why:* a reader gets classes, properties, definitions and metadata as a web page without reading Turtle, the pages describe the package as released, and a failed rebuild leaves the last good pages in place.
+25. **Keep the pages beside the packages, never inside them.** *Why:* a released package never changes (rule 10), and adding pages would change its manifest; the pages change on their own schedule (a new Widoco version, a style fix) and are fully derived from the package.
+26. **Record what each page set was built from, and check it:** `build_docs.py` writes `docs-source.json` with the SHA-256 of the package's `manifest.json`, and `scripts/check_docs.py --releases releases --docs docs/ontology` fails when a released package has no pages, when a page set's recorded hash no longer matches its manifest, or when pages exist for a package that is not released. Run it in the check script. The pages themselves are not compared, because Widoco writes the generation date into them. *Why:* the hash says which package the pages describe, which a byte comparison of generated HTML cannot.
+27. **Publishing the pages waits for the hosting decision** (rule 20); until then they are read from the repository.
+
+## Tests every release carries
+
+28. **Prove the classification with a test that compares the release with the one before it:** every IRI the previous release declares is still declared, nothing is newly deprecated in a minor or patch release, and every deprecated term names its successor (rule 5). Pin the previous release's version in the test. A module's first release (1.0.0) has no earlier package to compare: its test checks only that every deprecated term names its successor. *Why:* "minor" is a claim about the IRI diff; a test that reads both packages turns the claim into a fact, and catches a term a builder dropped without anyone deciding to.
+29. **Pin the release's own figures by hand in the module's tests:** the count of each kind of term, each new IRI, and each corrected statement, written out from the decision, not read back from the build. *Why:* a figure the test computes from the same code it checks agrees with any mistake that code makes; a figure written from the decision disagrees with it.
+30. **Run the mechanical checks on the new package and on the one it replaces, and compare:** `check_taxonomy.py` (`identity-taxonomy.md`, rule 13) on both; a finding the new release fixes is gone, a finding it adds blocks the release unless a recorded decision accepts it, and every other finding is the same. Record the before and after counts in the changelog or the decision record. A module's first release has no package it replaces: run the checker on it and record its counts as the baseline; every finding blocks unless a recorded decision accepts it. *Why:* a check adopted once and never rerun lets a release bring back what an earlier one fixed (`quality.md`, "The qSKOS issues").

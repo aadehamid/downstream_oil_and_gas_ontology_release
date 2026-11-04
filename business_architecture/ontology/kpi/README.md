@@ -1,0 +1,34 @@
+# kpi: measure definitions
+
+The `kpi` module defines the measures that the decision owner's planning team uses and that MPC publishes. It holds definitions only, never values (the decision of 2026-10-05). Its namespace is `https://w3id.org/mpc/ontology/modules/kpi/`; its 1.1.1 release requires `core` 2.3.0 for process IRIs (the decision of 2026-10-23; 2.2.0 in 1.1.0, the decision of 2026-10-22; 2.1.0 before), and its build reads `core` 2.4.0 (since 2026-10-26, the decision of 2026-10-26; 2.3.0 from 2026-10-23, the decision of 2026-10-23) and uses W3C ORG's `org:Role` by IRI.
+
+| File | What |
+|---|---|
+| `measure-classification.csv` | One row per distinct measure: its class, whether it is a KPI candidate, the personas who use it, what it is compared against, MPC's counterpart, the reason and the evidence (the decision of 2026-10-18) |
+| `measure-details.csv` | Each measure's definition, grain, basis, aliases, the measures it is not to be confused with and how, and the core processes it informs (the decision of 2026-10-18) |
+| `personas.csv` | The four planning personas, with plan type and horizon |
+| `measure-identifiers.csv` | Each measure's identifier: KPI-0001 to KPI-0003 and OPM-0001 to OPM-0030, none for trackers, reports and non-measures (kpi 1.3.0, the decision of 2026-10-28) |
+| `vocabulary.ttl`, `shapes.ttl` | The module's terms and SHACL shapes, with a stated cardinality on every property (the decision of 2026-10-18) |
+| `build_measures.py`, `measures.ttl` | The build: four tables in (three until kpi 1.3.0 added `measure-identifiers.csv`), 41 measure definitions and 4 personas out. `python3 build_measures.py` prints the figures; `--verify` fails unless `measures.ttl` equals a fresh build. `scripts/check.sh` runs it |
+| `test_measures.py` | Tests: the vocabulary is well formed, every value stream names only measures this module defines (MPC-P09; schema validation is in `business_process/test_business_process.py`), the build is current and reconciles, SHACL accepts the module and rejects broken measures, and no person's name from the measure list is in any tracked text file (every extension; binary files skipped), in any case, hyphenated, CamelCase or accented spelling |
+
+The module is released as 1.0.0 (`../releases/kpi/1.0.0/`), approved by the decision owner, and 1.0.1 (`../releases/kpi/1.0.1/`), a patch that names the measure list's source. Both require core 2.1.0. *2026-10-22:* released as 1.1.0 (`../releases/kpi/1.1.0/`), a minor approved with the release plan: the package carries the eight measure populations from `../population/`, the measure shape is closed so no value hangs off a measure, and it requires core 2.2.0 (the decision of 2026-10-22). *2026-10-23:* released as 1.1.1 (`../releases/kpi/1.1.1/`), a patch approved with the close-out releases: `pop:populationEvidence` takes `rdfs:range xsd:string`, and it requires core 2.3.0 (the decision of 2026-10-23). *2026-10-25:* released as 1.2.0 (`../releases/previous/kpi/1.2.0/`): KPI-0001 on Crack Spreads Pricing, Additional Market Prices narrowed to renewables and NGLs, R&M Margin Indicator's repeated alias dropped, top concepts both ways (the decision of 2026-10-25, the decision of 2026-10-25, the decision of 2026-10-25). *2026-10-28:* released as 1.3.0 (`../releases/kpi/1.3.0/`): a KPI or OPM identifier on every measure but the trackers, reports and non-measures, from `measure-identifiers.csv`: KPI-0001 stays Crack Spreads Pricing, KPI-0002 and KPI-0003 go to the two measures classed as KPIs, and OPM-0001 to OPM-0030 to the operational metrics, market indicators, plan-variance diagnostics, the decision-support indicator and the alerts (the decision of 2026-10-28).
+
+Where the rows come from: the planning team's measure list for Value Chain Optimization Decision Support and Visualization (VCO DSV), as the subject matter expert sent it on 2026-10-18 (the decision of 2026-10-18), and MPC's public measures (`../../reference/mpc/mpc-performance-measures-evidence.md`).
+
+Personas are planning roles, not people: Prompt Planner (prompt month, hourly and daily schedule), Short-Term Planner (M+1 to M+3 LP plan), Distribution Planner (distribution plan, prompt to M+3) and Mid-Term Planner (M+4 to M+36).
+
+## Classes
+
+| Class | Meaning |
+|---|---|
+| `kpi` | Designated as one of the few measures of a stated objective, with a target and an owner |
+| `operational-metric` | A recurring performance measure of a unit, asset or flow, watched by exception |
+| `plan-variance-diagnostic` | Actual results, or a plan, compared with a plan, forecast, plan version or history, for one period |
+| `market-indicator` | An external price, spread or benchmark the region cannot influence |
+| `decision-support-indicator` | A value computed from market prices and the planning model to start or rank a decision, with no performance target |
+| `tracker-or-report` | A list, status or schedule; no formula, unit or grain |
+| `alert` | An event raised when a condition is met |
+| `not-a-measure` | A capability request, parked for a later phase |
+
+`kpi_candidate = yes` marks an operational metric that the evidence makes a strong KPI candidate. It becomes a KPI only by a recorded decision that names its target and owner.

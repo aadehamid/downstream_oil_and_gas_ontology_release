@@ -1,0 +1,21 @@
+{
+  "module": "market-data",
+  "version": "1.0.0",
+  "release_candidate": false,
+  "ontology_iri": "https://w3id.org/mpc/ontology/modules/market-data",
+  "version_iri": "https://w3id.org/mpc/ontology/modules/market-data/1.0.0",
+  "depends_on": {
+    "kpi": "1.0.1"
+  },
+  "triples": 668,
+  "approved_by": {
+    "who": "a subject matter expert reviewing the documents"
+  },
+  "files": {
+    "CHANGELOG.md": "fd5210e76e368786d278d4b04ab9d8f3aed3748cd42071a3eef03df96c8e70f7",
+    "catalog.ttl": "0ea1da005085a55c5bd9130db21dc0fad526136c92457619cb06c0e844e88191",
+    "market-data.jsonld": "a49f92fe3dd2833209ac1d88c8fcc50273bb9280564934552043bf0f821ca16d",
+    "market-data.ttl": "b70bf3edf3ee781c568cecde47ecb9b5559eedc58e9f28d7aa9ad2b9d0d4f890",
+    "shapes.ttl": "023b9e6c06e3a14d7073b1e7ec3bce52ec92924b803662a433bf60c2871e797c"
+  }
+}

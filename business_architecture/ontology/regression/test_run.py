@@ -1,0 +1,220 @@
+"""Tests for run.py: expected.csv covers the 55 locked questions (44 until 2026-11-02, then 50 until the logical-model module's five were added the same day), every query file is
+used, the release passes, and a broken graph fails."""
+import os
+import re
+import sys
+import unittest
+
+from rdflib import Graph, Literal, URIRef
+from rdflib.namespace import DCTERMS, SKOS
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import run  # noqa: E402
+
+GRAPH = run.load(run.RELEASE)
+MOD = URIRef("https://w3id.org/mpc/ontology/modules/core")
+
+
+class Coverage(unittest.TestCase):
+    def test_one_row_per_locked_question(self):
+        with open(run.QUESTIONS) as f:
+            numbers = [int(n) for n in re.findall(r"^(\d+)\. ", f.read(), re.M)]
+        self.assertEqual(numbers, list(range(1, 56)))
+        self.assertEqual([int(r["question"]) for r in run.load_expected()], numbers)
+
+    def test_every_query_file_is_listed_once(self):
+        listed = [q for r in run.load_expected() for q in r["queries"].split(";") if q]
+        self.assertEqual(sorted(listed), sorted(os.listdir(os.path.join(HERE, "queries"))))
+        self.assertEqual(len(listed), len(set(listed)))
+
+    def test_each_waiting_question_names_what_it_waits_for(self):
+        for r in run.load_expected():
+            if r["status"] != "answerable":
+                self.assertTrue(r["waits_for"], r["question"])
+
+
+class Release(unittest.TestCase):
+    def test_q7_lists_loss_control_produced_by_its_process(self):
+        # the decision of 2026-10-19: CM 1.1.3.7.13 produces Loss Control, a link core 2.2.0 made possible (the decision of 2026-10-22).
+        with open(os.path.join(HERE, "queries", "q07a-produces-consumes.rq")) as f:
+            rows = {(str(r.process), str(r.relation), str(r.item)) for r in GRAPH.query(f.read())}
+        self.assertIn(("https://w3id.org/mpc/ontology/process/CM-1-1-3-7-13",
+                       "https://w3id.org/mpc/ontology/modules/value-stream/produces",
+                       "https://w3id.org/mpc/ontology/modules/data-product/product/loss-control"), rows)
+        with open(os.path.join(HERE, "queries", "q07-no-owning-process.rq")) as f:
+            orphans = {str(r.product).rsplit("/", 1)[1] for r in GRAPH.query(f.read())}
+        self.assertNotIn("loss-control", orphans)
+
+    def test_the_release_passes(self):
+        failures, statuses = run.check(GRAPH, run.load_expected())
+        self.assertEqual(failures, [])
+        self.assertEqual((statuses["answerable"], statuses["partial"], statuses["waits"], statuses["parked"]), (54, 0, 0, 1))
+
+    def test_q15b_reports_the_systems_in_two_modules_as_one(self):
+        # the decision of 2026-10-21 item 1: three party systems are the system module's nodes of the same name;
+        # the decision of 2026-10-21: the Terminal Margin Ranking System is its TMR, which the party node carries as an alternative label.
+        with open(os.path.join(HERE, "queries", "q15b-same-word-linked.rq")) as f:
+            found = [r for r in GRAPH.query(f.read()) if r.link == SKOS.exactMatch]
+        party, system = "https://w3id.org/mpc/ontology/modules/party/system/", "https://w3id.org/mpc/ontology/modules/system/system/"
+        # Since party 2.0.0 the query also finds Dealer Master's dealer class 2, Sub-jobber, matched to the sub-jobber role
+        # of the same name (the decision of 2026-10-27); that pair is a correct answer, pinned here, and the rest are systems.
+        codes = "https://w3id.org/mpc/ontology/modules/party/"
+        self.assertEqual({(str(r.a), str(r.b)) for r in found if not str(r.a).startswith(party)},
+                         {(codes + "dealer-class/2", codes + "party-role/sub-jobber"),
+                          (codes + "party-role/sub-jobber", codes + "dealer-class/2")})
+        rows = [r for r in found if str(r.a).startswith(party)]
+        self.assertEqual({(str(r.a), str(r.b)) for r in rows},
+                         {(party + "rightangle", system + "rightangle"), (party + "kittyhawk", system + "kittyhawk"),
+                          (party + "profisee", system + "profisee"), (party + "terminal-margin-ranking-system", system + "tmr"),
+                          (party + "sap-s4hana", system + "sap")}  # the decision of 2026-10-25
+                         # MPC-P11's seven systems, in both modules since system 1.4.0 and party 1.4.0 (the decision of 2026-10-26).
+                         | {(party + s, system + s) for s in ("sap-mdg", "salesforce", "magic", "bridger-insight",
+                                                              "information-steward", "sirion", "customer-portal")}
+                         # The eight systems of 2026-10-27, in both modules since system 1.5.0 and party 2.0.0 (the decision of 2026-10-27).
+                         | {(party + s, system + s) for s in ("prm", "station-pos", "street-price-aggregator",
+                                                              "credit-card-summary", "enterprise-data-lake", "msmis", "mcs",
+                                                              "terminaling-throughputs")})
+        self.assertEqual({str(r.word) for r in rows if str(r.a) == party + "terminal-margin-ranking-system"}, {"TMR"})
+
+    def test_an_orphan_fails_q2(self):
+        g = Graph()
+        g += GRAPH
+        g.add((URIRef("https://example.org/orphan"), SKOS.inScheme, MOD))
+        failures, _ = run.check(g, run.load_expected())
+        self.assertTrue(any(f.startswith("Q2 q02a") for f in failures), failures)
+
+    def test_q8_processes_carry_both_flows_or_neither(self):
+        # The worklog's "504 have neither" depends on this: no process has inputs without outputs.
+        core = "https://w3id.org/mpc/ontology/modules/core/"
+        inputs = set(GRAPH.subjects(URIRef(core + "plannedInput"), None))
+        outputs = set(GRAPH.subjects(URIRef(core + "plannedOutput"), None))
+        self.assertEqual(inputs, outputs)
+        self.assertEqual(len(inputs), 153)
+
+    def test_a_crack_without_its_not_links_fails_q32_and_q36(self):
+        g = Graph()
+        g += GRAPH
+        g.remove((URIRef("https://w3id.org/mpc/ontology/modules/kpi/measure/crack-spreads"),
+                  URIRef("https://w3id.org/mpc/ontology/modules/kpi/notToBeConfusedWith"), None))
+        failures, _ = run.check(g, run.load_expected())
+        self.assertTrue(any(f.startswith("Q32") for f in failures), failures)
+        self.assertTrue(any(f.startswith("Q36") for f in failures), failures)
+
+    def test_each_source_has_one_title(self):
+        # A source node shared by two modules must carry one title, not one per module.
+        title = URIRef("http://purl.org/dc/terms/title")
+        many = {s for s in set(GRAPH.subjects(title, None)) if len(set(GRAPH.objects(s, title))) > 1}
+        self.assertEqual(many, set())
+
+    def test_an_empty_graph_fails_every_query(self):
+        failures, _ = run.check(Graph(), run.load_expected())
+        self.assertEqual(len([f for f in failures if "no rows" in f]), 68)  # 45 before the `party` module, plus its 10 row-returning queries, plus the technical-graph module's 6, plus the logical-model module's 7 (2026-11-02)
+
+    def mutated(self, change):
+        g = Graph()
+        g += GRAPH
+        change(g)
+        return run.check(g, run.load_expected())[0]
+
+    def test_losing_the_planned_child_notes_fails_q2(self):
+        note = URIRef("https://w3id.org/mpc/ontology/modules/core/plannedChildNote")
+        failures = self.mutated(lambda g: g.remove((None, note, None)))
+        self.assertTrue(any(f.startswith("Q2 q02b") for f in failures), failures)
+
+    def test_references_to_a_non_apqc_source_fail_q11(self):
+        def rewrite(g):
+            other = URIRef("https://w3id.org/mpc/ontology/source/src-api-mpms-001")
+            for s, o in list(g.subject_objects(DCTERMS.references)):
+                g.remove((s, DCTERMS.references, o))
+                g.add((s, DCTERMS.references, other))
+        self.assertTrue(any(f.startswith("Q11") for f in self.mutated(rewrite)))
+
+    def test_a_lost_definition_fails_q40(self):
+        concept = URIRef("https://w3id.org/mpc/ontology/process/CM-1-1-1")
+        failures = self.mutated(lambda g: g.remove((concept, SKOS.definition, None)))
+        self.assertTrue(any(f.startswith("Q40") for f in failures), failures)
+
+    def test_a_second_definition_fails_q43(self):
+        concept = URIRef("https://w3id.org/mpc/ontology/process/CM-1-1-1")
+        failures = self.mutated(lambda g: g.add((concept, SKOS.definition, Literal("A copy.", lang="en"))))
+        self.assertTrue(any(f.startswith("Q43") for f in failures), failures)
+
+    def test_a_raci_process_without_an_accountable_role_fails_q4(self):
+        orgm = "https://w3id.org/mpc/ontology/modules/organization/"
+        accountable = URIRef(orgm + "raci-level/accountable")
+        process = URIRef("https://w3id.org/mpc/ontology/process/CM-1-1-2-1")
+
+        def drop(g):
+            for a in list(g.subjects(URIRef(orgm + "forProcess"), process)):
+                if (a, URIRef(orgm + "raciLevel"), accountable) in g:
+                    g.remove((a, None, None))
+        failures = self.mutated(drop)
+        self.assertTrue(any(f.startswith("Q4 q04b") for f in failures), failures)
+
+    def test_an_assignment_to_a_process_outside_core_fails_q3(self):
+        orgm = "https://w3id.org/mpc/ontology/modules/organization/"
+        a = next(GRAPH.subjects(URIRef(orgm + "forProcess"), None))
+        failures = self.mutated(lambda g: g.set((a, URIRef(orgm + "forProcess"), URIRef("https://example.org/nowhere"))))
+        self.assertTrue(any(f.startswith("Q3 q03b") for f in failures), failures)
+
+    def test_an_assignment_on_a_structural_anchor_fails_q3(self):
+        orgm = "https://w3id.org/mpc/ontology/modules/organization/"
+        kind = URIRef("https://w3id.org/mpc/ontology/modules/core/conceptKind")
+        anchor = next(GRAPH.subjects(kind, URIRef("https://w3id.org/mpc/ontology/modules/core/concept-kind/structural-anchor")))
+        a = next(GRAPH.subjects(URIRef(orgm + "forProcess"), None))
+        failures = self.mutated(lambda g: g.set((a, URIRef(orgm + "forProcess"), anchor)))
+        self.assertTrue(any(f.startswith("Q3 q03b") for f in failures), failures)
+
+    def test_a_ship_to_role_fails_q21(self):
+        role = URIRef("https://w3id.org/mpc/ontology/modules/party/party-role/ship-to")
+        failures = self.mutated(lambda g: (g.add((role, SKOS.inScheme, URIRef("https://w3id.org/mpc/ontology/modules/party/party-role"))),
+                                           g.add((role, SKOS.prefLabel, Literal("Ship-To", lang="en")))))
+        self.assertIn("Q21 q21c-no-ship-to-role.rq: 1 rows, expected none", failures)
+
+    def test_a_customer_class_of_party_fails_q24(self):
+        cust = "https://w3id.org/mpc/ontology/modules/party/"
+        failures = self.mutated(lambda g: g.add((URIRef(cust + "Customer"),
+                                                 URIRef("http://www.w3.org/2000/01/rdf-schema#subClassOf"), URIRef(cust + "Party"))))
+        self.assertIn("Q24 q24b-no-customer-class.rq: 1 rows, expected none", failures)
+
+    def test_the_role_labels_alone_fail_q24(self):
+        # Q24 asks how one party holds several roles: keeping the three role labels but removing every
+        # role a party plays must fail it.
+        plays = URIRef("https://w3id.org/mpc/ontology/modules/party/plays")
+        failures = self.mutated(lambda g: g.remove((None, plays, None)))
+        self.assertTrue(any(f.startswith("Q24 q24a-one-party-many-roles.rq") for f in failures), failures)
+
+    def test_a_waiting_question_with_a_query_fails(self):
+        rows = run.load_expected()
+        rows[16] = dict(rows[16], status="waits:the decision of 2026-10-18", queries="q01a-children.rq")
+        failures, _ = run.check(GRAPH, rows)
+        self.assertIn("Q17: waits but lists queries", failures)
+
+    def test_a_parked_question_with_a_query_fails(self):
+        rows = run.load_expected()
+        self.assertEqual(rows[16]["status"], "parked:the decision of 2026-10-23")  # Q17, parked by the decision owner
+        rows[16] = dict(rows[16], queries="q01a-children.rq")
+        failures, _ = run.check(GRAPH, rows)
+        self.assertIn("Q17: parked but lists queries", failures)
+
+
+
+class Ask(unittest.TestCase):
+    def test_a_question_answers_with_labels(self):
+        import ask
+        question, count, rows = ask.ask(GRAPH, ask.questions()["q36-the-crack"])
+        self.assertIn("the crack", question)
+        self.assertEqual(count, 3)
+        self.assertEqual({r[0] for r in rows}, {"Crack Spreads Pricing"})
+        self.assertIn("Margin Capture", {r[1] for r in rows})
+
+    def test_an_unbound_value_is_a_dash_and_a_predicate_shows_its_label(self):
+        import ask
+        self.assertEqual(ask.label(GRAPH, None), "-")
+        _, _, rows = ask.ask(GRAPH, ask.questions()["q39-downstream"], limit=500)
+        self.assertFalse([c for r in rows for c in r if c.startswith("https://w3id.org/mpc/ontology/modules/core/")])
+
+
+if __name__ == "__main__":
+    unittest.main()

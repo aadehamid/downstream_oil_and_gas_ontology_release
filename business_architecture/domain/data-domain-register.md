@@ -1,0 +1,101 @@
+# Data Domain Register
+
+**ID:** EPM-BA-DOM-001
+**Version:** 0.2
+**Status:** Draft
+**Owner:** Enterprise Performance Model initiative
+**Last updated:** 2026-10-18
+**Scope:** Downstream Oil & Gas data domains, anchored on Marathon Petroleum Corporation (MPC) public filings
+**Review trigger:** Each new domain proposal; Step 5 (party / organization modules) design
+
+## Purpose
+
+One place listing the data domains the Enterprise Performance Model
+recognizes: their status, what each owns, where the evidence is, and how they
+connect. Evidence stays in the linked reference files. This register records
+the outcome.
+
+## Evidence rule
+
+Domain evidence must be close to Downstream Oil & Gas. The order is:
+
+1. MPC's own SEC filings and MPC public materials (`../reference/mpc/`)
+2. U.S. refining peers' SEC filings (`../reference/industry-view/`)
+3. Downstream-specific industry sources (e.g. SAP IS-Oil, the
+   industry-specific elements of the APQC Downstream Petroleum PCF, EIA
+   petroleum definitions)
+4. Broader energy or cross-industry sources, as support only
+
+Generic frameworks never decide a boundary on their own.
+
+## Domains
+
+| Domain | Status | Owns | Classification / key concepts | Evidence |
+|---|---|---|---|---|
+| **Customer** | Classification adopted (2026-09-29). Domain model: Draft (`customer_domain_problem_statement_v0.1.md`) | Parties in a customer role, customer accounts, roles, channel classification | C1 Brand jobber · C2 Direct dealer · C3 Wholesale marketing customer · C4 Independent retailer · C5 Unbranded customer (C5.1–C5.4) · C6 Spot market buyer · C7 Export / international customer · C8 Crude oil customer; facets: brand status, contract type, product line, segment, geography, delivery tier | `../reference/mpc/customer-classification-evidence.md` |
+| **Commercial Pricing & Price Realization** | Decided as a domain, with its name and scope split (D1 to D4, the decisions of 2026-10-05 to 2026-10-05, 2026-10-05). Domain model not yet written | Proposed scope: the price MPC offers or contracts, how it is applied and adjusted, and what is realized | P3 realized price · P4 feedstock and purchased-product pricing · P5 regional / location differentials · P6 product and quality · P7 customer and contract · P8 logistics and tariff · P9 incentives, promotions and rebates · P11 (price-list governance) | `../reference/mpc/pricing-domain-evidence.md` |
+| **Market Data** | Decided as a separate domain (D1, the decision of 2026-10-05). Defined 2026-10-18 (the decision of 2026-10-18). Owner: the Risk Group, provisionally, pending confirmation of its mandate; operational stewardship, licensing controls and independent validation recorded separately | Externally sourced market observations and shared market-data products, including benchmark identifiers, source provenance, licensing restrictions, timestamps, assessment conventions, approved curve-construction metadata; vendor-supplied volatility observations | P1 market benchmark pricing · P11 (benchmark methodology and publication) | `../reference/industry-view/pricing-market-data-risk-evidence.md` |
+| **Commercial Risk** | Decided as the owner of P10 (D2, the decision of 2026-10-05). Defined 2026-10-18 (the decision of 2026-10-18). Owner: the Risk Group | Commercial exposure, risk measures, limits, risk-model methodologies and parameters (including volatilities and correlations as risk-model parameters), trading-counterparty credit assessment and exposure (CM 1.2.2.1). Not customer AR credit. Trade confirmations (CM 1.2.2.2) stay with trade operations and feed the domain | P10 price risk and hedging; process map CM 1.2.2 Confirmations & Risk Management | `../reference/industry-view/pricing-market-data-risk-evidence.md` |
+
+D3 (the decision of 2026-10-05): P2 (benchmark margin indicators, margin capture)
+isn't a domain. It becomes KPI measure definitions built on Market Data,
+entered at Step 7. The ontology holds the definitions, not the values
+(the decision of 2026-10-05).
+
+The pricing split above (D1 to D4) was decided on 2026-10-05
+(the decisions of 2026-10-05 to 2026-10-05). It follows
+`../reference/mpc/pricing-domain-evidence.md` §5.
+
+## Boundary rules
+
+1. **Customer isn't the parent of Pricing.** They connect through agreements and
+   eligibility. The customer master holds stable classification (C1–C8). An
+   agreement or eligibility record decides which price schedule or formula
+   applies.
+2. **Pricing references Market Data and doesn't own it** (D1, decided). A contract formula
+   points to a benchmark. The benchmark observation, its source, methodology
+   version and licence live in Market Data.
+3. **Pricing creates exposure and Commercial Risk manages it** (D2, decided). Fixed-price sales
+   and purchases are Pricing records. The resulting exposure, hedges and limits
+   are Commercial Risk records.
+4. **Exchange and matching buy/sell counterparties aren't customers** unless
+   they also buy under a revenue-recognized sale (MPC reports these receivables
+   as "non-customer balances").
+5. **Retail pump prices sit outside MPC's data.** MPC has no company-operated
+   retail. Jobbers and direct dealers set posted prices. MPC's retail pricing
+   data is limited to brand-program incentives.
+6. **Prices are bitemporal.** Keep both when a price applied and when it was
+   recorded, approved or corrected.
+
+## How the ontology carries this (Step 5 onward, proposal)
+
+- Each classification (C1–C8, P1–P11) becomes a SKOS concept scheme with codes
+  as `skos:notation`, MPC wording as `skos:definition`, and `dcterms:source`
+  citations. *2026-10-21:* for C1 to C8 the `party` module carries the codes
+  on its own customer classes instead (the decision of 2026-10-21, item 8).
+- Customer classes are assigned at the customer account / relationship level,
+  following the role pattern in `customer_domain_problem_statement_v0.1.md`.
+- Domain boundaries map onto the ontology modules (`party`, `organization`,
+  `kpi`, and any new module), each introduced by its own decision.
+
+## Open items
+
+- Define the Market Data and Commercial Risk domains (scope, owners, entities) at Step 7 (the decision of 2026-10-05). Draft definitions for the subject matter expert's decision: `market-data-and-commercial-risk-draft.md` (2026-10-13). *2026-10-18:* scope and owners decided by the decision owner (the decision of 2026-10-18); the key entities are still open.
+- Customer: Step 5 use of C1 to C8, and the lubricants and marine product-line evidence, wait for the decision owner's additional customer details (the decision of 2026-10-05). *2026-10-21:* the details arrived and the Customer work resumes (the decision of 2026-10-21). C1 to C8 are used as customer-class codes (the decision of 2026-10-21, item 8). The details do not cover the lubricants and marine evidence, which is parked until the product line has values (the decision of 2026-10-21, item 14).
+- Reconcile the proposed pricing data products with the existing Master
+  Pricing and Rack Pricing data products.
+- Confirm the capacity-utilization basis and regional per-barrel margins
+  before any KPI is defined on them.
+  *2026-10-18:* both confirmed: utilization uses average calendar-day
+  capacity, and the regional per-barrel margins are in MPC-S07
+  (`../reference/mpc/mpc-performance-measures-evidence.md`, findings 1 and 2).
+
+## Change log
+
+| Date | Change |
+|---|---|
+| 2026-09-29 | v0.1 created: Customer (classification adopted), Commercial Pricing & Price Realization, Market Data and Commercial Risk (proposed) |
+| 2026-10-05 | v0.2: D1 to D4 decided (the decisions of 2026-10-05 to 2026-10-05); Market Data and Commercial Risk definitions set for Step 7; Customer work waits for the decision owner's details |
+| 2026-10-13 | Open item points to the draft Market Data and Commercial Risk definitions (`market-data-and-commercial-risk-draft.md`) for the subject matter expert's decision |
+| 2026-10-18 | Open item on the capacity basis and regional per-barrel margins closed (the decision of 2026-10-18 evidence) |
+| 2026-10-18 | Market Data and Commercial Risk defined, with owners (the decision of 2026-10-18) |

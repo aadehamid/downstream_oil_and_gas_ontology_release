@@ -1,0 +1,117 @@
+"""Tests for the definition-to-run pattern (Step 6; the decision of 2026-10-13): no core definition is a
+run, the example run conforms, and broken runs fail.
+
+Run: python3 -m pytest test_run_shapes.py (needs rdflib, pyshacl).
+"""
+import os
+import sys
+import unittest
+
+from pyshacl import validate
+from rdflib import Graph, Literal, Namespace, URIRef
+from rdflib.namespace import OWL, PROV, RDF, SH, XSD
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "release"))
+import build_module as bm  # noqa: E402  (release mode, and where a released package sits in either layout)
+
+
+def core_package():
+    """core 1.0.0's Turtle, always on main. In the share release, which holds the newest and previous core only, the
+    newest core, whose run shapes are the same."""
+    folder = bm.package_folder("core", "1.0.0")
+    if folder is None and bm.SHARE_RELEASE:
+        folder = os.path.join(bm.ONTOLOGY, "releases", "core", bm.newest_on_disk("core"))
+    return os.path.join(folder, "core.ttl")
+
+
+CORE = Graph().parse(core_package())
+SHAPES = Graph().parse(os.path.join(HERE, "run-shapes.ttl"))
+EXAMPLE = Graph().parse(os.path.join(HERE, "example-run.ttl"))
+EX = Namespace("https://example.org/consumer/")
+PROC = Namespace("https://w3id.org/mpc/ontology/process/")
+CORE_NS = Namespace("https://w3id.org/mpc/ontology/modules/core/")
+KIND = Namespace("https://w3id.org/mpc/ontology/modules/core/concept-kind/")
+SHP = Namespace("https://w3id.org/mpc/ontology/modules/core/run-shapes/")
+RUN, ASSOCIATION = EX["run-2026-10-01-001"], EX["run-2026-10-01-001-association"]
+
+
+def report(*graphs):
+    data = Graph()
+    for g in graphs:
+        data += g
+    return validate(data, shacl_graph=SHAPES)
+
+
+def conforms(*graphs):
+    return report(*graphs)[0]
+
+
+def failing_shapes(*graphs):
+    """The shapes whose violations the report names."""
+    results = report(*graphs)[1]
+    return set(results.objects(None, SH.sourceShape))
+
+
+def with_example(change):
+    g = Graph()
+    g += EXAMPLE
+    change(g)
+    return conforms(CORE, g)
+
+
+class Definitions(unittest.TestCase):
+    def test_the_core_release_holds_no_runs(self):
+        self.assertEqual(list(CORE.subjects(RDF.type, PROV.Activity)), [])
+        self.assertTrue(conforms(CORE))
+
+    def test_a_definition_typed_as_a_run_fails_the_definition_shape(self):
+        # Typing a definition as a run also trips the run shape (no start time), so the test
+        # checks that the definition shape itself fired.
+        g = Graph()
+        g.add((PROC["CM-1-1-2-1"], RDF.type, PROV.Activity))
+        self.assertIn(SHP.DefinitionIsNotARun, failing_shapes(CORE, g))
+
+
+class Runs(unittest.TestCase):
+    def test_the_example_run_conforms(self):
+        self.assertTrue(conforms(CORE, EXAMPLE))
+
+    def test_a_run_without_a_definition_fails(self):
+        self.assertFalse(with_example(lambda g: g.remove((ASSOCIATION, PROV.hadPlan, None))))
+
+    def test_a_run_following_two_definitions_fails(self):
+        self.assertFalse(with_example(lambda g: g.add((ASSOCIATION, PROV.hadPlan, PROC["CM-1-1-2"]))))
+
+    def test_a_run_following_something_outside_the_scheme_fails(self):
+        def change(g):
+            g.set((ASSOCIATION, PROV.hadPlan, URIRef("https://example.org/not-a-process")))
+        self.assertFalse(with_example(change))
+
+    def test_a_run_following_a_retired_definition_fails(self):
+        retired = next(CORE.subjects(OWL.deprecated, Literal(True)))
+        self.assertFalse(with_example(lambda g: g.set((ASSOCIATION, PROV.hadPlan, retired))))
+
+    def test_a_run_following_a_structural_anchor_fails(self):
+        anchor = next(CORE.subjects(CORE_NS.conceptKind, KIND["structural-anchor"]))
+        self.assertFalse(with_example(lambda g: g.set((ASSOCIATION, PROV.hadPlan, anchor))))
+
+    def test_a_run_following_a_capability_fails(self):
+        capability = next(CORE.subjects(CORE_NS.conceptKind, KIND.capability))
+        self.assertFalse(with_example(lambda g: g.set((ASSOCIATION, PROV.hadPlan, capability))))
+
+    def test_a_run_without_a_start_fails(self):
+        self.assertFalse(with_example(lambda g: g.remove((RUN, PROV.startedAtTime, None))))
+
+    def test_a_run_with_two_associations_fails(self):
+        def change(g):
+            g.add((RUN, PROV.qualifiedAssociation, EX.second))
+            g.add((EX.second, PROV.hadPlan, PROC["CM-1-1-2"]))
+        self.assertFalse(with_example(change))
+
+    def test_a_start_that_is_not_a_timestamp_fails(self):
+        self.assertFalse(with_example(lambda g: g.set((RUN, PROV.startedAtTime, Literal("2026-10-01", datatype=XSD.date)))))
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,175 @@
+# The annotation layer of logical model customer-logical-model (the decision of 2026-11-02): links from ER Studio's entities to the
+# ontology, keyed on ER Studio's identifiers. Built by build_logical_model.py. Do not edit by hand.
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix lm: <https://w3id.org/mpc/ontology/modules/logical-model/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Allocation_Manager_Customer_Accounts_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/CustomerAccount> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/allocation-manager> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Asphalt_Customer_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/customer-class/asphalt-bitumen-buyer> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Brand_Credit_Card_Common_Lookup_Dim> lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/brand-credit-card-system> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Brand_Credit_Card_Common_Lookup_Master_Dim> lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/brand-credit-card-system> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Brand_Credit_Card_Dealer_Address_Dim> lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/brand-credit-card-system> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Brand_Credit_Card_Dealer_Class_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/dealer-class> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/brand-credit-card-system> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Brand_Credit_Card_Dealer_Contact_Dim> lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/brand-credit-card-system> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Brand_Credit_Card_Dealer_External_Number_Xref> lm:describes <https://w3id.org/mpc/ontology/modules/party/ExternalIdentifier> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/brand-credit-card-system> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Brand_Credit_Card_Dealer_Hierarchy_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/PartyRelationship> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/brand-credit-card-system> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Brand_Credit_Card_Dealer_Master_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/party-role/dealer> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/dealer-master> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Brand_Credit_Card_Dealer_Master_Loyalty_Dim> lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/dealer-master> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Brand_Credit_Card_Dealer_Master_MDG_Ship_To_History_Dim> lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/dealer-master> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Brand_Credit_Card_Dealer_Master_Xref> lm:describes <https://w3id.org/mpc/ontology/modules/party/PartyRelationship> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/dealer-master> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Brand_Credit_Card_Rep_Customer_Master_Dim> lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/brand-credit-card-system> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_CBS_Customer_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/CustomerAccount> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/fuelfacs> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_CBS_Customer_User_Field_Detail_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/SystemRecord> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/fuelfacs> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_CBS_Customer_User_Field_Detail_History_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/SystemRecord> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/fuelfacs> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_CBS_Route_Customer_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/party-role/loading-authorized-party> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/fuelfacs> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_CBS_Terminal_Customer_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/party-role/loading-authorized-party> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/fuelfacs> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_CBS_Terminal_Customer_History_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/party-role/loading-authorized-party> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/fuelfacs> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_EIS_Forecast_Customer_Rollup_Dim> lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/eis> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Flowcal_Customer_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/customer-class/pipeline-customer> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/party/system/flowcal> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Kittyhawk_Business_Associate_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/Party> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/kittyhawk> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Kittyhawk_Customer_Portal_Access_Dim> lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/kittyhawk> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Kittyhawk_TDL_Exchange_Customer_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/party-role/exchange-counterparty> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/kittyhawk> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_MSMIS_Customers_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/ContactPoint> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/msmis> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_SAP_Business_Address_Services_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/Address> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/sap> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_SAP_Business_Address_Services_Fax_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/ContactPoint> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/sap> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_SAP_Business_Address_Services_Telephone_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/ContactPoint> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/sap> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_SAP_Business_Partner_Attributes_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/Party> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/sap> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_SAP_Business_Partner_Bank_Details_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/CustomerAccount> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/sap> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_SAP_Business_Partner_Identification_Numbers_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/ExternalIdentifier> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/sap> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_SAP_Business_Partner_Relationships_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/PartyRelationship> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/sap> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_SAP_Business_Partner_Role_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/PartyRole> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/sap> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_SAP_Business_Partner_Tax_Numbers_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/ExternalIdentifier> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/sap> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_SAP_Customer_Company_Code_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/CustomerAccount> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/sap> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_SAP_Customer_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/CustomerAccount> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/sap> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_SAP_Customer_Sales_Area_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/CustomerAccount> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/sap> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_SAP_Language_Keys_Dim> lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/sap> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Salesforce_Customer_Dim> lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/salesforce> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Sap_Business_Partner_General_Data_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/Party> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/sap> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_TMR_Customer_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/Party> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/tmr> .
+
+<https://www.erstudio.com/semanticmodel/mdm_core_Terminaling_Throughputs_Customers_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/party-role/throughput-holder> ;
+    lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/terminaling-throughputs> .
+
+<https://www.erstudio.com/semanticmodel/udm_core_MCS_Cogeneral_Dim> lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> ;
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/mcs> .
+
+<https://w3id.org/mpc/ontology/modules/logical-model/model/customer-logical-model> a lm:LogicalModel ;
+    rdfs:label "Customer logical model"@en ;
+    dcterms:created "2026-11-02T07:27:56+00:00"^^xsd:dateTime ;
+    dcterms:identifier "customer-logical-model" .
+
