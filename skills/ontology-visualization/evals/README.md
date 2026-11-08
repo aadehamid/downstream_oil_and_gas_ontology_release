@@ -9,7 +9,7 @@ results. A review of the skill's wording does not substitute for these tasks.
 
 Request:
 
-> Build an offline ontology reference for library staff from the two Turtle
+> Build an offline ontology reference for library staff from the Catalog and Lending Turtle
 > files in fixtures/v1. Keep the input files unchanged. Use the
 > ontology-visualization skill. Readers need to understand Catalog and Lending,
 > find a definition, distinguish taxonomy from class hierarchy, and follow a
@@ -149,7 +149,3 @@ Record the skill commit or file hashes, evaluator, input hashes, artifact paths,
 checks actually run, defects and fixes. Keep run outputs outside the skill
 source. Repeat only the affected tasks after a change. Do not mark an unexecuted
 task as passed.
-
-The [2026-11-07 results](results-2026-11-07.md) record the initial trials and
-focused follow-up. The [2026-11-08 results](results-2026-11-08.md) record the
-guided-path trial. Re-run the applicable tasks when the method changes.
