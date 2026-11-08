@@ -17,7 +17,7 @@ To understand it, start with `business_architecture/ontology/epm-ontology-guide.
 | `business_architecture/reference/` | The evidence behind the definitions: MPC's public filings, the industry view (analysis of publicly available filings from U.S. refining peers), the APQC framework, vendor descriptions |
 | `business_architecture/domain/` | The business glossary, the data domains, the problem statement, and the decision packages |
 | `demos/downstream-pricing-databricks-free/` | The pricing demo: synthetic pricing data in Databricks Free Edition, metric views bound to the ontology's measures, Genie agents, a technical graph and the acceptance tests |
-| `skills/` | The four skills that hold the method: `ontology` (the method), `ontology-to-lpg` (the projection into a property graph), `rdf-store` (triple stores) and `clear-writing` |
+| `skills/` | Five skills: `ontology` (the method), `ontology-visualization` (the reusable viewer playbook), `ontology-to-lpg` (the projection into a property graph), `rdf-store` (triple stores) and `clear-writing` |
 | `scripts/` | `check.sh`, the one command that proves your copy is valid; `check-pinned.sh`, the optional check that it still equals this release; `epm_facts.py`, which reports figures from the sources; the page builder |
 | `best-practices/` | General guides on production-ready ontologies and enterprise KPIs |
 | `HOW-TO-UPDATE.md` | How to change what you received, with worked commands |

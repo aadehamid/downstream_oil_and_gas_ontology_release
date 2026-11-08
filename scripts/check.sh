@@ -136,7 +136,7 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   scripts/test_epm_facts.py \
   scripts/test_modules_guide.py \
   scripts/test_published_figures.py
-# The four skills' own checks, each with the dependencies its own check names (the list is written at the cut from
+# The bundled skills' own checks, each with the dependencies its own check names (the list is written at the cut from
 # one table, the same one the cut's skills-tests row runs). A test command that found no test is a failure.
 (cd skills/ontology/scripts && run_tests uv run -q --no-project --with rdflib --with pyyaml --with pyshacl python3 -m unittest discover -q -p 'test_*.py')
 (cd skills/ontology && run uv run -q --no-project --with pyyaml python3 scripts/check_sssom.py templates/mappings.sssom.tsv)
