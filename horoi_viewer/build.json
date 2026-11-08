@@ -1,0 +1,192 @@
+{
+  "source_commit": "8307c88d8896504d342a0d44880271ed4e6846ab",
+  "horoi_commit": "33caa8cc916e7efb767a5c2831216ff1cb11c509",
+  "modules": [
+    "core",
+    "data-product",
+    "integration",
+    "kpi",
+    "lane",
+    "logical-model",
+    "market-data",
+    "organization",
+    "party",
+    "ref-mpc",
+    "system",
+    "technical-graph",
+    "value-stream"
+  ],
+  "inputs": [
+    {
+      "path": "business_architecture/ontology/releases/core/2.4.0/catalog.ttl",
+      "sha256": "4f5637a665ff6106932a4e1ad68631bb387d1a6dfbe5ad37a5780410a2505086"
+    },
+    {
+      "path": "business_architecture/ontology/releases/core/2.4.0/core.ttl",
+      "sha256": "5e397453088b9b00cb4b2f57802c491ea8b29e285f34459fe8b5dfdea9a56777"
+    },
+    {
+      "path": "business_architecture/ontology/releases/core/2.4.0/shapes.ttl",
+      "sha256": "452e38bf277f39c7a3d6e73bc522429d0d351a799e8f3d69cd044e6c521bbee3"
+    },
+    {
+      "path": "business_architecture/ontology/releases/data-product/1.2.0/catalog.ttl",
+      "sha256": "a2501f446f53c3c8e517bc595d1c7a656aceafdf0648230b238e3869875c9cab"
+    },
+    {
+      "path": "business_architecture/ontology/releases/data-product/1.2.0/data-product.ttl",
+      "sha256": "247695590ba8241c383fe2f4ccf2be0272c20c0d7c850bd91087d31d9e430a93"
+    },
+    {
+      "path": "business_architecture/ontology/releases/data-product/1.2.0/shapes.ttl",
+      "sha256": "12f33bccfa70cffee8140ce89f306f63f4103ba73b38ccb16541d10da96cbb7f"
+    },
+    {
+      "path": "business_architecture/ontology/releases/integration/2.5.0/catalog.ttl",
+      "sha256": "ab77f31076e530a13d3d3b0a98589200857ba69aba2c5a3545789717a7d6cb01"
+    },
+    {
+      "path": "business_architecture/ontology/releases/integration/2.5.0/integration.ttl",
+      "sha256": "4dc51d83174842f4ab1dc811730c69c38aad4142c26af112cc32ca590692f9bf"
+    },
+    {
+      "path": "business_architecture/ontology/releases/integration/2.5.0/shapes.ttl",
+      "sha256": "5f9cfac096dafd49b9501b01bac9331e15ff3501702b5b965e074f1df153558c"
+    },
+    {
+      "path": "business_architecture/ontology/releases/kpi/1.3.0/catalog.ttl",
+      "sha256": "8d843d1c7985171c0a2b3f7a78e4332c52638c948c9e563ec6433b768fbae5df"
+    },
+    {
+      "path": "business_architecture/ontology/releases/kpi/1.3.0/kpi.ttl",
+      "sha256": "484142c656332db4616f5e56c100c83d28e7a10b617bdc2c3f3813db62dc25f7"
+    },
+    {
+      "path": "business_architecture/ontology/releases/kpi/1.3.0/shapes.ttl",
+      "sha256": "d6fcdb6940d5e71539d8e30284fb6f5f4b2e5ada5be938c4bb9b29d75cdeb973"
+    },
+    {
+      "path": "business_architecture/ontology/releases/lane/1.1.0/catalog.ttl",
+      "sha256": "e7ee2d5c209d76f5d294dd5e58654d15b7751022cbd5c472400fec96bcb09ad1"
+    },
+    {
+      "path": "business_architecture/ontology/releases/lane/1.1.0/lane.ttl",
+      "sha256": "51df895729b02f865cc1dffa444be03accb03515d2f584e5365b78316f582fb8"
+    },
+    {
+      "path": "business_architecture/ontology/releases/lane/1.1.0/shapes.ttl",
+      "sha256": "46213456548f090d109b2d8e9700163d1575780d8f1bd4619c44d060adc25bf3"
+    },
+    {
+      "path": "business_architecture/ontology/releases/logical-model/1.0.0/catalog.ttl",
+      "sha256": "0e33714aa964b4d06db9979aa2cdfd14ff6dfd6dcc0f47fbb80c29b3d46063f4"
+    },
+    {
+      "path": "business_architecture/ontology/releases/logical-model/1.0.0/customer-logical-model.erstudio.ttl",
+      "sha256": "967fedabfad83f21ce9b20413fb471eb4998220fc3c267b9437f7df4b15259be"
+    },
+    {
+      "path": "business_architecture/ontology/releases/logical-model/1.0.0/customer-logical-model.layer.ttl",
+      "sha256": "a18a24e147604cebf5d6f6cf9305c0512dd7d67e1dcb6a125acf7555a2e278d0"
+    },
+    {
+      "path": "business_architecture/ontology/releases/logical-model/1.0.0/logical-model.ttl",
+      "sha256": "31e329dc9e1aee6782658a0bc9f10409e238e21956812b6853a4de267120d875"
+    },
+    {
+      "path": "business_architecture/ontology/releases/logical-model/1.0.0/shapes.ttl",
+      "sha256": "031df2a39b046d7dfc0cdb0e8be0344da9fa7db36c6904b0c601379779d83de2"
+    },
+    {
+      "path": "business_architecture/ontology/releases/market-data/1.1.0/catalog.ttl",
+      "sha256": "9b70f130451cc85b7439982fbfb9101f1940f565074c72458fa1fc0c0006eeab"
+    },
+    {
+      "path": "business_architecture/ontology/releases/market-data/1.1.0/market-data.ttl",
+      "sha256": "6a1239a3400ac2245873d96b8e91c06db8e9298ff8ef903ef651be843469a98f"
+    },
+    {
+      "path": "business_architecture/ontology/releases/market-data/1.1.0/shapes.ttl",
+      "sha256": "1685bc251b472b31533debcff00ace53701951a088cc8b4bc37d00156f15b0f9"
+    },
+    {
+      "path": "business_architecture/ontology/releases/organization/2.2.0/catalog.ttl",
+      "sha256": "7941163d1feb6be47b96eb4743588412d284463d66a97928bd51428f7af6cf5d"
+    },
+    {
+      "path": "business_architecture/ontology/releases/organization/2.2.0/organization.ttl",
+      "sha256": "8c4a7b75b181a0958edb82e75ce110ab3818c45135934a99d15803fba635e899"
+    },
+    {
+      "path": "business_architecture/ontology/releases/organization/2.2.0/shapes.ttl",
+      "sha256": "27cc4ddcf2979f61e495146ee8bccbb634059b3e55db55a10c95fb7311f313bc"
+    },
+    {
+      "path": "business_architecture/ontology/releases/party/2.1.0/catalog.ttl",
+      "sha256": "3d5ba9757b281b8d444a4c05978be238097718294631bfe09dd6f62c6e71acfd"
+    },
+    {
+      "path": "business_architecture/ontology/releases/party/2.1.0/party.ttl",
+      "sha256": "62a83a7b8ce4c98d8cc8b0615109c811059ab0eff9f4494c50abd2c518b38201"
+    },
+    {
+      "path": "business_architecture/ontology/releases/party/2.1.0/shapes.ttl",
+      "sha256": "848870d4dc38cc05202f07ec242acc0d941d36d74b9f0d828b7b9c6021400eb9"
+    },
+    {
+      "path": "business_architecture/ontology/releases/ref-mpc/1.3.0/catalog.ttl",
+      "sha256": "e13a0f6a2860f75533736fe80ac73b4c850171719140f363f4c609930ab53fd4"
+    },
+    {
+      "path": "business_architecture/ontology/releases/ref-mpc/1.3.0/ref-mpc.ttl",
+      "sha256": "2c4ceceaab19b3ae43dc89829dfc98df32436dd93396138ab1f6b26927b719c1"
+    },
+    {
+      "path": "business_architecture/ontology/releases/ref-mpc/1.3.0/shapes.ttl",
+      "sha256": "b4a6e55d9884b0887f60b78fa1a49d5c3bede556c03d8a52902f3a7f6e9e034b"
+    },
+    {
+      "path": "business_architecture/ontology/releases/system/1.5.0/catalog.ttl",
+      "sha256": "0e7bee15439299f35f14c2c8151a309a84946de59d771747e133f8798366364a"
+    },
+    {
+      "path": "business_architecture/ontology/releases/system/1.5.0/shapes.ttl",
+      "sha256": "56e85ca3383adf07da36451153342280093a4482a1234eca508b192d0f0abe76"
+    },
+    {
+      "path": "business_architecture/ontology/releases/system/1.5.0/system.ttl",
+      "sha256": "a517c778b6effd37c9e02d196c6b9baa94e866ca00d1165aa071872f0ae2c0e6"
+    },
+    {
+      "path": "business_architecture/ontology/releases/technical-graph/1.0.0/catalog.ttl",
+      "sha256": "66a921a9dde322ebe690639d94a4cded20245a17a9c058d4e0f16a615acba8fc"
+    },
+    {
+      "path": "business_architecture/ontology/releases/technical-graph/1.0.0/shapes.ttl",
+      "sha256": "b4709f138f4dd73e2315e17a40da54a30a491c0c617588b5e2420bdd2c99d5f8"
+    },
+    {
+      "path": "business_architecture/ontology/releases/technical-graph/1.0.0/technical-graph.ttl",
+      "sha256": "98b4c7898b0ddd3022152aa6e591a401c594b8c61dcd1ae59b706fd608107630"
+    },
+    {
+      "path": "business_architecture/ontology/releases/value-stream/1.2.0/catalog.ttl",
+      "sha256": "437f2713d19ac956891c85a9eac51a926395078e8d32dbd7b63122447b5216f1"
+    },
+    {
+      "path": "business_architecture/ontology/releases/value-stream/1.2.0/shapes.ttl",
+      "sha256": "2808943c3e1993ffa0a422de31f32bbde624ea1bf2a75dff66919292268650d8"
+    },
+    {
+      "path": "business_architecture/ontology/releases/value-stream/1.2.0/value-stream.ttl",
+      "sha256": "95a78121671d9516561b3e472ce2eb778d09a5f539ae0d984efe8ac09e1cbf7c"
+    },
+    {
+      "path": "business_architecture/ontology/releases/catalog.ttl",
+      "sha256": "f3f99b25bd37ce23b3c7894e3c641b3507d50d53f2f2730a965069d80e4ddf83"
+    }
+  ],
+  "reference_terms": 6562,
+  "triples_available": 58104,
+  "index_sha256": "feeaa56bb0f1a9f872b2a736565db758fd7829ac1c0b24baa80c8a84afb94c41"
+}
