@@ -82,8 +82,7 @@ def clean_packages(root):
             "--",
             str(ONTOLOGY / "releases"),
         ],
-        text=True,
-    )
+        text=True, encoding="utf-8")
     if changed:
         raise ValueError("The release packages have local changes")
 

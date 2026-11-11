@@ -12,6 +12,7 @@ import io
 import json
 import os
 import shutil
+import stat
 import subprocess
 import tempfile
 import unittest
@@ -21,6 +22,17 @@ import yaml
 import build_package
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def remove_tree(path):
+    """Delete a folder that may hold a Git repository. Git makes its object files read-only, and Windows does not
+    delete a read-only file, so each refused file is made writable and tried again."""
+    def writable(function, name, _):
+        os.chmod(name, stat.S_IWRITE)
+        function(name)
+    shutil.rmtree(path, onerror=writable)
+
+
 TEMPLATES = os.path.join(HERE, "..", "templates")
 ANSWERS = os.path.join(TEMPLATES, "package-answers.yaml")
 CLEAN_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
@@ -38,7 +50,7 @@ def run(argv):
 
 
 def git(*args, cwd):
-    return subprocess.run(["git", *args], cwd=cwd, env=CLEAN_ENV, capture_output=True, text=True, check=True)
+    return subprocess.run(["git", *args], cwd=cwd, env=CLEAN_ENV, capture_output=True, text=True, check=True, encoding="utf-8")
 
 
 class Workspace(unittest.TestCase):
@@ -46,7 +58,7 @@ class Workspace(unittest.TestCase):
 
     def setUp(self):
         self.root = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self.root)
+        self.addCleanup(remove_tree, self.root)
         self.saved_env = dict(os.environ)
         for k in [k for k in os.environ if k.startswith("GIT_")]:
             del os.environ[k]
@@ -65,7 +77,7 @@ class Workspace(unittest.TestCase):
             else:
                 answers[key] = value
         path = os.path.join(self.root, "answers.yaml")
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             yaml.safe_dump(answers, f, sort_keys=False)
         return path
 
@@ -77,10 +89,10 @@ class Workspace(unittest.TestCase):
             return json.load(f)
 
     def release_core(self):
-        with open(os.path.join(self.root, "core.ttl"), "w", encoding="utf-8") as f:
+        with open(os.path.join(self.root, "core.ttl"), "w", encoding="utf-8", newline="\n") as f:
             f.write(CORE_TTL)
         path = os.path.join(self.root, "core-answers.yaml")
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             yaml.safe_dump({"module": "core", "version": "1.0.0", "ontology_iri": "https://id.example.org/library/core",
                             "title": "Library core", "description": "The core classes.", "sources": ["core.ttl"],
                             "issued": "2026-10-20", "changes": ["First release, a major."], "known_gaps": "none",
@@ -125,7 +137,7 @@ class Build(Workspace):
         path = self.write_answers()
         self.assertEqual(run(["build", path, "--releases", self.releases])[0], 0)
         self.assertEqual(run(["verify", path, "--releases", self.releases])[0], 0)
-        with open(os.path.join(self.root, "ontology-skeleton.ttl"), "a", encoding="utf-8") as f:
+        with open(os.path.join(self.root, "ontology-skeleton.ttl"), "a", encoding="utf-8", newline="\n") as f:
             f.write('\nlib:lending skos:editorialNote "changed after release"@en .\n')
         code, out = run(["verify", path, "--releases", self.releases])
         self.assertEqual(code, 1)
@@ -134,7 +146,7 @@ class Build(Workspace):
     def test_a_hand_edit_to_the_package_fails_verify(self):
         path = self.write_answers()
         run(["build", path, "--releases", self.releases])
-        with open(os.path.join(self.releases, "lending", "1.0.0", "CHANGELOG.md"), "a", encoding="utf-8") as f:
+        with open(os.path.join(self.releases, "lending", "1.0.0", "CHANGELOG.md"), "a", encoding="utf-8", newline="\n") as f:
             f.write("edited\n")
         code, out = run(["verify", path, "--releases", self.releases])
         self.assertEqual(code, 1)
@@ -213,14 +225,14 @@ class Build(Workspace):
         self.assertFalse(os.path.exists(os.path.join(self.releases, "lending")))
 
     def test_another_subject_with_a_version_iri_is_refused(self):
-        with open(os.path.join(self.root, "ontology-skeleton.ttl"), "a", encoding="utf-8") as f:
+        with open(os.path.join(self.root, "ontology-skeleton.ttl"), "a", encoding="utf-8", newline="\n") as f:
             f.write("\nlib:stray owl:versionIRI <https://id.example.org/library/stray/1.0.0> .\n")
         code, out = self.build()
         self.assertEqual(code, 2)
         self.assertIn("https://id.example.org/library/stray", out)
 
     def test_an_import_is_refused(self):
-        with open(os.path.join(self.root, "ontology-skeleton.ttl"), "a", encoding="utf-8") as f:
+        with open(os.path.join(self.root, "ontology-skeleton.ttl"), "a", encoding="utf-8", newline="\n") as f:
             f.write("\nlib:lending owl:imports <https://id.example.org/library/core/1.0.0> .\n")
         code, out = self.build()
         self.assertEqual(code, 2)
@@ -239,7 +251,7 @@ class Build(Workspace):
         self.assertFalse(os.path.exists(os.path.join(self.releases, "lending")))
 
     def test_a_package_that_breaks_its_shapes_is_not_left_behind(self):
-        with open(os.path.join(self.root, "ontology-skeleton.ttl"), "a", encoding="utf-8") as f:
+        with open(os.path.join(self.root, "ontology-skeleton.ttl"), "a", encoding="utf-8", newline="\n") as f:
             f.write("\nlib:loan-1 a lib:Loan .\n")   # a loan with no borrower breaks LoanShape-borrower
         code, out = self.build()
         self.assertEqual(code, 1)
@@ -299,7 +311,7 @@ class Git(Workspace):
         self.assertEqual(run(["verify", path, "--releases", self.releases])[0], 0)
         # Rewrite the package and its sources the same way: a fresh build agrees, the tag does not.
         shutil.rmtree(os.path.join(self.releases, "lending", "1.0.0"))
-        with open(os.path.join(self.root, "ontology-skeleton.ttl"), "a", encoding="utf-8") as f:
+        with open(os.path.join(self.root, "ontology-skeleton.ttl"), "a", encoding="utf-8", newline="\n") as f:
             f.write('\nlib:lending skos:editorialNote "rewritten"@en .\n')
         self.assertEqual(run(["build", path, "--releases", self.releases])[0], 0)
         code, out = run(["verify", path, "--releases", self.releases])
@@ -331,7 +343,7 @@ class Git(Workspace):
         self.assertEqual(run(["build", path, "--releases", self.releases])[0], 0)
         self.commit_all()
         package_commit = git("rev-parse", "HEAD", cwd=self.root).stdout.strip()
-        with open(os.path.join(self.root, "notes.txt"), "w", encoding="utf-8") as f:
+        with open(os.path.join(self.root, "notes.txt"), "w", encoding="utf-8", newline="\n") as f:
             f.write("an unrelated change\n")
         self.commit_all()
         code, out = run(["tag", path, "--releases", self.releases])
@@ -340,11 +352,11 @@ class Git(Workspace):
 
     def test_with_a_remote_the_tag_goes_on_the_merge_commit(self):
         bare = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, bare)
+        self.addCleanup(remove_tree, bare)
         git("init", "-q", "--bare", "-b", "main", cwd=bare)
         git("init", "-q", "-b", "main", cwd=self.root)
         git("remote", "add", "origin", bare, cwd=self.root)
-        with open(os.path.join(self.root, "README"), "w", encoding="utf-8") as f:
+        with open(os.path.join(self.root, "README"), "w", encoding="utf-8", newline="\n") as f:
             f.write("project\n")
         self.commit_all()
         git("checkout", "-q", "-b", "release", cwd=self.root)
@@ -362,11 +374,11 @@ class Git(Workspace):
 
     def remote_with_release_branch(self):
         bare = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, bare)
+        self.addCleanup(remove_tree, bare)
         git("init", "-q", "--bare", "-b", "main", cwd=bare)
         git("init", "-q", "-b", "main", cwd=self.root)
         git("remote", "add", "origin", bare, cwd=self.root)
-        with open(os.path.join(self.root, "README"), "w", encoding="utf-8") as f:
+        with open(os.path.join(self.root, "README"), "w", encoding="utf-8", newline="\n") as f:
             f.write("project\n")
         self.commit_all()
         git("checkout", "-q", "-b", "release", cwd=self.root)
@@ -391,7 +403,7 @@ class Git(Workspace):
         path = self.remote_with_release_branch()
         git("-c", "user.name=t", "-c", "user.email=t@t", "merge", "-q", "--no-ff", "-m", "merge release", "release", cwd=self.root)
         merge_commit = git("rev-parse", "HEAD", cwd=self.root).stdout.strip()
-        with open(os.path.join(self.releases, "lending", "1.0.0", "CHANGELOG.md"), "a", encoding="utf-8") as f:
+        with open(os.path.join(self.releases, "lending", "1.0.0", "CHANGELOG.md"), "a", encoding="utf-8", newline="\n") as f:
             f.write("edited after the merge\n")
         self.commit_all()
         git("push", "-q", "origin", "main", cwd=self.root)
@@ -403,11 +415,11 @@ class Git(Workspace):
 
     def test_with_a_remote_a_package_only_on_a_side_branch_is_not_tagged(self):
         bare = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, bare)
+        self.addCleanup(remove_tree, bare)
         git("init", "-q", "--bare", "-b", "main", cwd=bare)
         git("init", "-q", "-b", "main", cwd=self.root)
         git("remote", "add", "origin", bare, cwd=self.root)
-        with open(os.path.join(self.root, "README"), "w", encoding="utf-8") as f:
+        with open(os.path.join(self.root, "README"), "w", encoding="utf-8", newline="\n") as f:
             f.write("project\n")
         self.commit_all()
         git("push", "-q", "origin", "main", cwd=self.root)
@@ -422,7 +434,7 @@ class Git(Workspace):
 
     def test_with_a_remote_it_says_whether_the_tag_is_pushed_and_never_pushes(self):
         bare = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, bare)
+        self.addCleanup(remove_tree, bare)
         git("init", "-q", "--bare", "-b", "main", cwd=bare)
         git("init", "-q", cwd=self.root)
         git("remote", "add", "origin", bare, cwd=self.root)
@@ -439,13 +451,13 @@ class Git(Workspace):
         self.assertEqual(code, 0, out)
         self.assertIn("lending-v1.0.0 is not on origin; push it when you are ready: git push origin lending-v1.0.0", out)
         self.assertEqual(subprocess.run(["git", "ls-remote", "--tags", bare], env=CLEAN_ENV, capture_output=True,
-                                        text=True).stdout.strip(), "")
+                                        text=True, encoding="utf-8").stdout.strip(), "")
         git("push", "-q", "origin", "lending-v1.0.0", cwd=self.root)
         # The default branch is rewritten on the remote to a commit without the package; the cached remote-tracking ref still has it.
         package_commit = git("rev-parse", "HEAD", cwd=self.root).stdout.strip()
         git("checkout", "-q", "--orphan", "other", cwd=self.root)
         git("rm", "-rq", "--cached", ".", cwd=self.root)
-        with open(os.path.join(self.root, "README"), "w", encoding="utf-8") as f:
+        with open(os.path.join(self.root, "README"), "w", encoding="utf-8", newline="\n") as f:
             f.write("unrelated\n")
         git("add", "README", cwd=self.root)
         git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "unrelated", cwd=self.root)

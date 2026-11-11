@@ -41,7 +41,7 @@ GUIDE = os.path.join(ROOT, "business_architecture", "ontology", "epm-ontology-gu
 
 @pytest.fixture(scope="module")
 def facts():
-    out = subprocess.check_output([sys.executable, os.path.join(HERE, "epm_facts.py"), "--json", "counts"], text=True)
+    out = subprocess.check_output([sys.executable, os.path.join(HERE, "epm_facts.py"), "--json", "counts"], text=True, encoding="utf-8")
     return json.loads(out)
 
 
@@ -65,7 +65,7 @@ def facts_0025(tmp_path_factory):
     os.makedirs(tree / "scripts", exist_ok=True)
     shutil.copy(os.path.join(HERE, "epm_facts.py"), tree / "scripts" / "epm_facts.py")
     out = subprocess.check_output([sys.executable, str(tree / "scripts" / "epm_facts.py"), "--json", "counts"],
-                                  text=True, stderr=subprocess.DEVNULL)
+                                  text=True, stderr=subprocess.DEVNULL, encoding="utf-8")
     result = json.loads(out)
     result["backlog"] = str(tree / os.path.relpath(epm_facts.BACKLOG, ROOT))
     return result

@@ -19,7 +19,7 @@ import epm_facts  # noqa: E402
 
 
 def run(*args):
-    out = subprocess.check_output([sys.executable, os.path.join(HERE, "epm_facts.py"), "--json", *args], text=True)
+    out = subprocess.check_output([sys.executable, os.path.join(HERE, "epm_facts.py"), "--json", *args], text=True, encoding="utf-8")
     return json.loads(out)
 
 

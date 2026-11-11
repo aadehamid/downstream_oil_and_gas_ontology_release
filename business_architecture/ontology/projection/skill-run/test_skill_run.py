@@ -22,7 +22,7 @@ ONTOLOGY = os.path.realpath(pipeline.ONTOLOGY)
 
 def listed(kind):
     out = subprocess.run([sys.executable, os.path.join(HERE, "inputs.py"), kind], check=True,
-                         capture_output=True, text=True, env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+                         capture_output=True, text=True, env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}, encoding="utf-8")
     return out.stdout.splitlines()
 
 

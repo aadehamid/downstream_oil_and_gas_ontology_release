@@ -180,7 +180,7 @@ figure.pic figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
 <p><strong>Who decides.</strong> Your ontology owner is the person your organisation names to decide what the ontology means. A module owner is the person they name for one module. The ontology owner approves every major release and every module's first release. The module owner approves minor and patch releases. Until a module has an owner, the ontology owner decides for it.</p>
 <p><strong>What the words mean.</strong> A <em>module</em> is one part of the ontology with its own version, such as <code>kpi</code>. A <em>package</em> is one released version of a module: the folder <code>business_architecture/ontology/releases/&lt;module&gt;/&lt;version&gt;/</code>. A package never changes after its release. A change makes a new package.</p>
 <p>Commands below start from the top folder of your copy unless they say otherwise. They use this shorthand, so define it first:</p>
-<pre><code class="lang-sh">py() { uv run -q --no-project --with rdflib --with pyshacl --with openpyxl --with jsonschema --with pytest --with "markdown-it-py&gt;=4,&lt;5" python3 -B "$@"; }
+<pre><code class="lang-sh">py() { uv run -q --no-project --with rdflib --with pyshacl --with openpyxl --with jsonschema --with pytest --with "markdown-it-py&gt;=4,&lt;5" python -B "$@"; }
 ONT=business_architecture/ontology</code></pre>
 <p>The versions in the worked commands are those of this release as you received it. After your first change, read the one you hold, from <code>$ONT/release</code>: <code>py next_version.py current kpi</code>.</p>
 <h2 id="start-here">Start here<a class="hl" href="#start-here" aria-label="Link to this section">#</a></h2>

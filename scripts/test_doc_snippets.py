@@ -9,6 +9,7 @@ Run: uv run --no-project --with pytest --with rdflib --with pyyaml --with sqlglo
 import hashlib
 import os
 import sys
+import tempfile
 import uuid
 from pathlib import Path
 
@@ -67,7 +68,7 @@ def check(tmp_path, text, *, files=None, environ=None, registry=REGISTRY, **opti
     for name, content in (files or {}).items():
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         (root / name).write_text(content, encoding="utf-8", newline="\n")
-    (tmp_path / "registry.toml").write_text(registry, encoding="utf-8")
+    (tmp_path / "registry.toml").write_text(registry, encoding="utf-8", newline="\n")
     env = {k: v for k, v in os.environ.items() if k not in (d.NESTED, d.NESTED_FILE)}
     env.update(environ or {})
     checker = d.Checker(root, d.load_registry(tmp_path / "registry.toml"), environ=env, **options)
@@ -281,9 +282,9 @@ def test_the_nested_variable_alone_never_turns_the_check_off(tmp_path):
             assert result.failures == message, (environ, options)
             assert result.summary() == "0 blocks: 0 run (0 status-only), 0 checked, 0 skipped"
     wrong = tmp_path / "nested-token"
-    wrong.write_text("another value", encoding="utf-8")
+    wrong.write_text("another value", encoding="utf-8", newline="\n")
     assert check(tmp_path, text, environ={d.NESTED: "abc", d.NESTED_FILE: str(wrong)}).failures == message
-    wrong.write_text("abc", encoding="utf-8")
+    wrong.write_text("abc", encoding="utf-8", newline="\n")
     proved = check(tmp_path, text, environ={d.NESTED: "abc", d.NESTED_FILE: str(wrong)})
     assert proved.failures == [] and proved.nested
     assert proved.skipped == {"not run: a check started by a block runs no block": 1}
@@ -310,8 +311,8 @@ def test_in_a_context_with_a_temporary_home_a_block_writes_to_its_copy_and_that_
     root = tmp_path / "tree"
     root.mkdir()
     (root / "data").mkdir()
-    (root / "data" / "a.txt").write_text("from the tree\n", encoding="utf-8")
-    (root / "guide.md").write_text(text, encoding="utf-8")
+    (root / "data" / "a.txt").write_text("from the tree\n", encoding="utf-8", newline="\n")
+    (root / "guide.md").write_text(text, encoding="utf-8", newline="\n")
     before = snapshot(root)
     result = check(tmp_path, text)
     assert result.failures == [] and result.ran == 2
@@ -334,10 +335,10 @@ def test_the_tool_leaves_no_python_cache_in_the_tree(tmp_path):
         shutil.copy(d.ROOT / "scripts" / name, tree / "scripts" / name)
     shutil.copytree(d.ROOT / "scripts" / "doc_snippets_parts", tree / "scripts" / "doc_snippets_parts",
                     ignore=shutil.ignore_patterns("__pycache__"))
-    (tree / "guide.md").write_text(fence("cypher parse", "MATCH (n) RETURN n"), encoding="utf-8")
+    (tree / "guide.md").write_text(fence("cypher parse", "MATCH (n) RETURN n"), encoding="utf-8", newline="\n")
     env = {k: v for k, v in os.environ.items() if k not in ("PYTHONDONTWRITEBYTECODE", d.NESTED, d.NESTED_FILE)}
     r = subprocess.run([sys.executable, str(tree / "scripts" / "doc_snippets.py"), "check"], cwd=tree, env=env,
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, encoding="utf-8")
     assert r.stdout == "1 blocks: 0 run (0 status-only), 1 checked, 0 skipped\n", r.stdout + r.stderr
     assert [p.as_posix() for p in tree.rglob("__pycache__")] == []
 
@@ -370,7 +371,18 @@ def test_a_block_cannot_find_the_tree_through_a_variable(tmp_path):
     assert sorted(p.name for p in root.iterdir()) == ["guide.md"]
 
 
-needs_links = pytest.mark.skipif(os.name == "nt", reason="making a link needs a privilege on Windows")
+def _can_link():
+    """True when this account may make a symbolic link. On Windows that takes administrator rights or Developer Mode."""
+    with tempfile.TemporaryDirectory() as folder:
+        try:
+            os.symlink("target", os.path.join(folder, "link"))
+        except (OSError, NotImplementedError):
+            return False
+    return True
+
+
+# Without the right to make a link, how the copy treats a link in the tree is not proven on this machine.
+needs_links = pytest.mark.skipif(not _can_link(), reason="this account cannot make a symbolic link")
 
 
 @needs_links
@@ -378,7 +390,7 @@ def test_a_link_inside_the_tree_is_copied_as_what_it_points_to(tmp_path):
     """Copied as a link, it pointed back into the tree, and a block that wrote through it changed the tree."""
     root = tmp_path / "tree"
     (root / "data").mkdir(parents=True)
-    (root / "data" / "a.txt").write_text("from the tree\n", encoding="utf-8")
+    (root / "data" / "a.txt").write_text("from the tree\n", encoding="utf-8", newline="\n")
     os.symlink(root / "data" / "a.txt", root / "link.txt")
     os.symlink("data", root / "linked-folder")
     text = (fence("bash run=copy", "cat link.txt", "echo changed > link.txt", "echo changed > linked-folder/a.txt",
@@ -394,7 +406,7 @@ def test_a_link_that_leads_outside_the_tree_is_refused(tmp_path):
     root = tmp_path / "tree"
     root.mkdir()
     outside = tmp_path / "outside.txt"
-    outside.write_text("not part of the release\n", encoding="utf-8")
+    outside.write_text("not part of the release\n", encoding="utf-8", newline="\n")
     os.symlink(outside, root / "out.txt")
     result = check(tmp_path, fence("bash run=copy status-only", "echo changed > out.txt"))
     assert result.failures == ["guide.md:1: the link out.txt leads outside the release, so the release cannot be "
@@ -726,11 +738,11 @@ def test_a_nested_block_must_hold_a_block(tmp_path):
 
 
 def test_the_command_prints_each_failure_and_the_count_and_exits_1(tmp_path, capsys):
-    (tmp_path / "guide.md").write_text(fence("json parse", "{}") + fence("text", "no tag"), encoding="utf-8")
+    (tmp_path / "guide.md").write_text(fence("json parse", "{}") + fence("text", "no tag"), encoding="utf-8", newline="\n")
     assert d.main(["--root", str(tmp_path), "check"]) == 1
     assert capsys.readouterr().out == ("FAIL guide.md:4: the block has no tag after its language `text`\n"
                                        "2 blocks: 0 run (0 status-only), 1 checked, 0 skipped, 1 failed\n")
-    (tmp_path / "guide.md").write_text(fence("json parse", "{}"), encoding="utf-8")
+    (tmp_path / "guide.md").write_text(fence("json parse", "{}"), encoding="utf-8", newline="\n")
     assert d.main(["--root", str(tmp_path), "check", "guide.md"]) == 0
     assert capsys.readouterr().out == "1 blocks: 0 run (0 status-only), 1 checked, 0 skipped\n"
     assert d.main(["--root", str(tmp_path), "list"]) == 0
@@ -738,26 +750,26 @@ def test_the_command_prints_each_failure_and_the_count_and_exits_1(tmp_path, cap
 
 
 def test_the_html_command_counts_only_pages_with_no_markdown_source(tmp_path, capsys):
-    (tmp_path / "a.md").write_text("# A\n", encoding="utf-8")
-    (tmp_path / "a.html").write_text("<pre>from a.md</pre>", encoding="utf-8")
-    (tmp_path / "built.html").write_text('<meta name="generator" content="x"><pre>built</pre>', encoding="utf-8")
+    (tmp_path / "a.md").write_text("# A\n", encoding="utf-8", newline="\n")
+    (tmp_path / "a.html").write_text("<pre>from a.md</pre>", encoding="utf-8", newline="\n")
+    (tmp_path / "built.html").write_text('<meta name="generator" content="x"><pre>built</pre>', encoding="utf-8", newline="\n")
     (tmp_path / "hand.html").write_text("<pre><code>one</code></pre><p><code>two</code> <code>three</code></p>"
-                                        "<pre class='x'>four</pre>", encoding="utf-8")
+                                        "<pre class='x'>four</pre>", encoding="utf-8", newline="\n")
     assert d.html_pages(tmp_path) == [("hand.html", 2, 2)]
 
 
 def test_a_registry_with_an_unknown_key_or_base_is_refused(tmp_path):
     path = tmp_path / "r.toml"
-    path.write_text('[contexts.a]\nbase = "empty"\nshell = true\n', encoding="utf-8")
+    path.write_text('[contexts.a]\nbase = "empty"\nshell = true\n', encoding="utf-8", newline="\n")
     with pytest.raises(d.RegistryError, match="context a has unknown key"):
         d.load_registry(path)
-    path.write_text('[contexts.a]\nbase = "the tree itself"\n', encoding="utf-8")
+    path.write_text('[contexts.a]\nbase = "the tree itself"\n', encoding="utf-8", newline="\n")
     with pytest.raises(d.RegistryError, match="context a needs base"):
         d.load_registry(path)
-    path.write_text('[reasons]\nillustration = "x"\ntemporary_reasons = ["illustration"]\n', encoding="utf-8")
+    path.write_text('[reasons]\nillustration = "x"\ntemporary_reasons = ["illustration"]\n', encoding="utf-8", newline="\n")
     with pytest.raises(d.RegistryError, match="the reason temporary_reasons needs a sentence"):
         d.load_registry(path)
-    path.write_text('temporary_reasons = ["later"]\n', encoding="utf-8")
+    path.write_text('temporary_reasons = ["later"]\n', encoding="utf-8", newline="\n")
     with pytest.raises(d.RegistryError, match="temporary reason later is not a reason"):
         d.load_registry(path)
 
@@ -803,7 +815,7 @@ def test_a_markdown_file_git_ignores_is_outside_the_scan(tmp_path):
         (tmp_path / folder).mkdir()
         for name, content in (("tracked.md", "# T\n"), ("new.md", "# N\n"), ("notes.md", "# I\n"),
                               (".gitignore", "notes.md\n")):
-            (tmp_path / folder / name).write_text(content, encoding="utf-8")
+            (tmp_path / folder / name).write_text(content, encoding="utf-8", newline="\n")
     for args in (["init", "-q"], ["add", "tracked.md", ".gitignore"]):
         subprocess.run(["git", *args], cwd=tmp_path / "repository", env=env, check=True, capture_output=True)
     assert d.documents(tmp_path / "repository") == ["new.md", "tracked.md"]

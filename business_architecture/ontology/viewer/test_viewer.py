@@ -178,7 +178,7 @@ def test_local_package_changes_are_refused_and_a_tree_without_git_is_not_checked
     viewer.clean_packages(tmp_path)  # no Git here: nothing to compare with
 
     def git(*args):
-        return subprocess.check_output(["git", "-C", str(tmp_path), *args], env=env, text=True).strip()
+        return subprocess.check_output(["git", "-C", str(tmp_path), *args], env=env, text=True, encoding="utf-8").strip()
 
     git("init", "-q")
     git("add", ".")

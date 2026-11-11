@@ -126,7 +126,7 @@ class Records(unittest.TestCase):
 
     def write(self, name, text):
         path = os.path.join(self.tmp, name)
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
         return path
 
@@ -204,7 +204,7 @@ class Records(unittest.TestCase):
         second_module = MODULE.replace(f"<{BASE}> a", "<https://x.org/modules/n> a")
         second_catalog = CATALOG.replace(f"dcterms:isVersionOf <{BASE}>", "dcterms:isVersionOf <https://x.org/modules/n>").replace("m.ttl", "n.ttl")
         for name, text in (("n.ttl", second_module), ("catalog.ttl", second_catalog), ("shapes.ttl", SHAPES)):
-            with open(os.path.join(other, name), "w", encoding="utf-8") as f:
+            with open(os.path.join(other, name), "w", encoding="utf-8", newline="\n") as f:
                 f.write(text)
         row = lambda name, text: {"path": os.path.join(other, name), "sha256": sha_of(text)}   # noqa: E731
         first = manifest(self.tmp)

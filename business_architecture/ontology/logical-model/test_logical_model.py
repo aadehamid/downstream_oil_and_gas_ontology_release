@@ -59,7 +59,7 @@ class Build(unittest.TestCase):
 
     def write(self, name, text):
         path = os.path.join(self.tmp, name)
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
         return path
 

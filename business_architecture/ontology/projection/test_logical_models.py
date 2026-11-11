@@ -317,7 +317,7 @@ class Drift(Package):
         self.git("add", "-A")
         self.git("-c", "user.name=t", "-c", "user.email=t@example.org", "commit", "-q", "-m", "c")
         env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-        return subprocess.run(["git", "-C", self.root, "rev-parse", "HEAD"], capture_output=True, text=True, env=env).stdout.strip()
+        return subprocess.run(["git", "-C", self.root, "rev-parse", "HEAD"], capture_output=True, text=True, env=env, encoding="utf-8").stdout.strip()
 
     def lines(self, ref):
         return [r[:2] for r in lm.check({"neo4j": None}, ref)]  # a database whose subgraph was wiped: no marker

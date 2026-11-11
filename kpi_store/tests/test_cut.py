@@ -252,7 +252,7 @@ def test_a_report_of_another_release_or_another_version_is_refused(tmp_path):
     other = json.loads(cleared(tmp_path, {"R002": "accept"}, name="other").read_text(encoding="utf-8"))
     other["release"] = "Another Store 9.9"
     path = tmp_path / "other" / rep.JSON_NAME
-    path.write_text(json.dumps(other), encoding="utf-8")
+    path.write_text(json.dumps(other), encoding="utf-8", newline="\n")
     with pytest.raises(cut.CutRefused, match="the report is of Another Store 9.9, and this folder holds KPI Store 1.1"):
         cut.cut(path, root, ask=never, say=quiet)
     with pytest.raises(cut.CutRefused, match="the report cannot be read"):
@@ -331,7 +331,7 @@ def test_malformed_standing_decisions_stop_the_read(tmp_path):
     assert rep.read_standing(tmp_path) == frozenset()
     path = tmp_path / rep.STANDING_DECISIONS
     path.parent.mkdir(parents=True)
-    path.write_text('{"format": 1, "decisions": [{"kind": "object-extra"}]}', encoding="utf-8")
+    path.write_text('{"format": 1, "decisions": [{"kind": "object-extra"}]}', encoding="utf-8", newline="\n")
     with pytest.raises(rep.ReportError, match="cannot read the standing decisions"):
         rep.read_standing(tmp_path)
 
@@ -478,7 +478,7 @@ def test_a_failure_leaves_the_tree_untouched_and_a_cut_in_local_git_commits_and_
     before, head = digest(root), git(root, "rev-parse", "HEAD")
 
     # A change that is not committed stops the cut before it asks anything.
-    (root / "note.txt").write_text("not committed\n", encoding="utf-8")
+    (root / "note.txt").write_text("not committed\n", encoding="utf-8", newline="\n")
     with pytest.raises(cut.CutRefused, match="has changes that are not committed"):
         cut.cut(path, root, ask=never, say=quiet)
     (root / "note.txt").unlink()
@@ -499,9 +499,9 @@ def test_a_failure_leaves_the_tree_untouched_and_a_cut_in_local_git_commits_and_
         cut._run("list the modules to release", ["dependents.py", "data-product"], root)   # the script is not in this folder
     with pytest.raises(cut.CutFailed, match="writing the release failed at b.txt: FileNotFoundError: .* The release is as it was."):
         (tmp_path / "staging").mkdir()
-        (tmp_path / "staging" / "a.txt").write_text("new", encoding="utf-8")
+        (tmp_path / "staging" / "a.txt").write_text("new", encoding="utf-8", newline="\n")
         (tmp_path / "target").mkdir()
-        (tmp_path / "target" / "a.txt").write_text("old", encoding="utf-8")
+        (tmp_path / "target" / "a.txt").write_text("old", encoding="utf-8", newline="\n")
         cut._Steps(quiet, None)("write the release", lambda: cut._apply(tmp_path / "target", tmp_path / "staging", ["a.txt", "b.txt"], tmp_path / "backup"))
     assert (tmp_path / "target" / "a.txt").read_text(encoding="utf-8") == "old"   # the file written before the failure is put back
 
@@ -587,7 +587,7 @@ def written(root, tmp_path, name):
     staging, backup = tmp_path / f"staging-{name}", tmp_path / f"backup-{name}"
     for rel, text in ((CHANGED, '{"release": "KPI Store 1.1", "made-up": true}\n'), (CREATED, "# A made-up record\n")):
         (staging / rel).parent.mkdir(parents=True, exist_ok=True)
-        (staging / rel).write_text(text, encoding="utf-8")
+        (staging / rel).write_text(text, encoding="utf-8", newline="\n")
     files = sorted([CHANGED, CREATED, REMOVED])
     cut._apply(root, staging, files, backup)
     assert not (root / REMOVED).exists() and (root / CREATED).is_file() and "made-up" in (root / CHANGED).read_text(encoding="utf-8")
@@ -597,14 +597,14 @@ def written(root, tmp_path, name):
 def hidden_work(root):
     """Work in the Git copy that `git status` does not show: an edit to a tracked file that Git was told to assume
     unchanged, and a file in an ignored folder. Returns the two paths with their text."""
-    (root / "notes.md").write_text("as committed\n", encoding="utf-8")
-    (root / ".gitignore").write_text("scratch/\n", encoding="utf-8")
+    (root / "notes.md").write_text("as committed\n", encoding="utf-8", newline="\n")
+    (root / ".gitignore").write_text("scratch/\n", encoding="utf-8", newline="\n")
     git(root, "add", "-A")
     git(root, "commit", "-q", "-m", "Notes and an ignore rule")
-    (root / "notes.md").write_text("an edit that is not committed\n", encoding="utf-8")
+    (root / "notes.md").write_text("an edit that is not committed\n", encoding="utf-8", newline="\n")
     git(root, "update-index", "--assume-unchanged", "notes.md")
     (root / "scratch").mkdir()
-    (root / "scratch" / "keep.txt").write_text("an ignored file\n", encoding="utf-8")
+    (root / "scratch" / "keep.txt").write_text("an ignored file\n", encoding="utf-8", newline="\n")
     assert git(root, "status", "--porcelain") == ""
     return {"notes.md": "an edit that is not committed\n", "scratch/keep.txt": "an ignored file\n"}
 
@@ -655,7 +655,7 @@ def test_when_git_cannot_reset_nothing_is_deleted_and_the_message_says_what_stat
     before = digest(root, FILES_ONLY)
     files, backup = written(root, tmp_path, "locked")
     lock = root / ".git" / "index.lock"
-    lock.write_text("", encoding="utf-8")   # another Git process holds the index: add and reset both fail
+    lock.write_text("", encoding="utf-8", newline="\n")   # another Git process holds the index: add and reset both fail
     with pytest.raises(cut.CutFailed) as failed:
         cut._commit(root, "ready", plan, cut.Outcome("recorded", plan, Path(CREATED), files), backup)
     lock.unlink()
@@ -693,7 +693,7 @@ def test_a_write_failure_followed_by_a_restore_failure_names_the_paths_that_are_
     for folder, texts in ((root, {"a.txt": "old a", "b.txt": "old b", "c.txt": "old c"}), (staging, {"a.txt": "new a", "b.txt": "new b", "c.txt": "new c"})):
         folder.mkdir()
         for name, text in texts.items():
-            (folder / name).write_text(text, encoding="utf-8")
+            (folder / name).write_text(text, encoding="utf-8", newline="\n")
     real_copy = shutil.copy2
 
     def copy(source, target, **more):
@@ -703,7 +703,7 @@ def test_a_write_failure_followed_by_a_restore_failure_names_the_paths_that_are_
         if (source, target) == (backup / "a.txt", root / "a.txt"):
             raise PermissionError("made-up: the file is open")    # and the first file cannot be put back
         if (source, target) == (backup / "b.txt", root / "b.txt"):
-            target.write_text("ol", encoding="utf-8")             # and the second is put back only in part, with no error
+            target.write_text("ol", encoding="utf-8", newline="\n")             # and the second is put back only in part, with no error
             return target
         return real_copy(source, target, **more)
     monkeypatch.setattr(cut.shutil, "copy2", copy)
@@ -718,7 +718,7 @@ def test_a_write_failure_followed_by_a_restore_failure_names_the_paths_that_are_
     monkeypatch.setattr(cut.shutil, "copy2", lambda s, t, **more: (_ for _ in ()).throw(OSError("made-up: the disk is full"))
                         if (Path(s), Path(t)) == (staging / "c.txt", root / "c.txt") else real_copy(s, t, **more))
     for name in ("a.txt", "b.txt"):
-        (root / name).write_text(f"old {name[0]}", encoding="utf-8")
+        (root / name).write_text(f"old {name[0]}", encoding="utf-8", newline="\n")
     with pytest.raises(cut.CutFailed) as failed:
         cut._Steps(quiet, None)("write the release", lambda: cut._apply(root, staging, ["a.txt", "b.txt", "c.txt"], tmp_path / "backup-2"))
     assert str(failed.value) == "writing the release failed at c.txt: OSError: made-up: the disk is full. The release is as it was."
@@ -729,11 +729,11 @@ def test_the_restore_reports_each_state_from_the_files_and_an_error_in_the_folde
     root, backup = tmp_path / "root", tmp_path / "backup"
     (root / "made").mkdir(parents=True)
     backup.mkdir()
-    (root / "changed.txt").write_text("the cut's", encoding="utf-8")
-    (backup / "changed.txt").write_text("before", encoding="utf-8")
-    (backup / "removed.txt").write_text("before", encoding="utf-8")       # the cut removed it
-    (root / "made" / "created.txt").write_text("the cut's", encoding="utf-8")
-    (root / "stuck.txt").write_text("the cut's", encoding="utf-8")          # created by the cut; cannot be deleted below
+    (root / "changed.txt").write_text("the cut's", encoding="utf-8", newline="\n")
+    (backup / "changed.txt").write_text("before", encoding="utf-8", newline="\n")
+    (backup / "removed.txt").write_text("before", encoding="utf-8", newline="\n")       # the cut removed it
+    (root / "made" / "created.txt").write_text("the cut's", encoding="utf-8", newline="\n")
+    (root / "stuck.txt").write_text("the cut's", encoding="utf-8", newline="\n")          # created by the cut; cannot be deleted below
     real_unlink = Path.unlink
     monkeypatch.setattr(Path, "unlink", lambda self, **more: (_ for _ in ()).throw(PermissionError("made-up")) if self.name == "stuck.txt"
                         else real_unlink(self, **more))
@@ -779,7 +779,7 @@ def test_a_failed_tag_is_finished_by_the_next_run_and_both_runs_say_what_to_do_n
     monkeypatch.setattr(cut, "_git", real)
 
     # A later commit must not take the tag: the next run of the same report tags the cut's own commit.
-    (root / "later.txt").write_text("later work\n", encoding="utf-8")
+    (root / "later.txt").write_text("later work\n", encoding="utf-8", newline="\n")
     git(root, "add", "-A")
     git(root, "commit", "-q", "-m", "Later work")
     said = []
@@ -904,13 +904,13 @@ def test_a_report_whose_run_fields_are_not_a_time_and_checksums_is_refused(tmp_p
         report = json.loads(REPORT.read_text(encoding="utf-8"))
         report["run"][key] = value
         path = tmp_path / f"run-{n}.json"
-        path.write_text(json.dumps(report), encoding="utf-8")
+        path.write_text(json.dumps(report), encoding="utf-8", newline="\n")
         with pytest.raises(cut.CutRefused, match="the report's run must hold its time as"):
             cut.load_report(path)
     report = json.loads(REPORT.read_text(encoding="utf-8"))
     report["ontology"]["jane.doe@example.com"] = "1.0.0"
     report["ontology"]["kpi"] = "the newest one"
-    (tmp_path / "ontology.json").write_text(json.dumps(report), encoding="utf-8")
+    (tmp_path / "ontology.json").write_text(json.dumps(report), encoding="utf-8", newline="\n")
     with pytest.raises(cut.CutRefused, match="the report's ontology versions are not module names with versions: 'jane.doe@example.com', 'kpi'"):
         cut.load_report(tmp_path / "ontology.json")
 
@@ -987,7 +987,7 @@ def test_a_line_end_or_a_leading_space_is_refused_in_the_run_the_versions_and_th
         report["rows"][1].update(decision="accept", decided_by="the ontology owner")
         change(report)
         path = tmp_path / f"{name}.json"
-        path.write_text(json.dumps(report), encoding="utf-8")
+        path.write_text(json.dumps(report), encoding="utf-8", newline="\n")
         return cut.load_report(path)
     load(lambda r: None, "plain")   # the report as it is loads
     for key, message in (("id", "cannot name a file"), ("at", "the report's run must hold"), ("settings_sha256", "the report's run must hold"),
@@ -1023,7 +1023,7 @@ def test_free_text_as_who_decided_or_as_the_approver_stops_the_cut_and_a_note_ne
         report = json.loads(cleared(tmp_path, {"R002": "reject"}, name=f"who-{n}").read_text(encoding="utf-8"))
         report["rows"][1]["decided_by"] = who
         path = tmp_path / f"who-{n}" / rep.JSON_NAME
-        path.write_text(json.dumps(report), encoding="utf-8")
+        path.write_text(json.dumps(report), encoding="utf-8", newline="\n")
         with pytest.raises(cut.CutRefused) as refused:
             cut.cut(path, root, ask=never, say=quiet)
         assert str(refused.value) == (

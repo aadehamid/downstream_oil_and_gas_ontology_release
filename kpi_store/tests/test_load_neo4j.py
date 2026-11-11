@@ -45,7 +45,7 @@ def stub_code(calls, fails=None, report=REPORT):
             if fails:
                 raise REAL.rp.Failed(fails)
             Path(self.cfg["out"]).mkdir(parents=True, exist_ok=True)
-            (Path(self.cfg["out"]) / "projection-report.json").write_text(json.dumps(report), encoding="utf-8")
+            (Path(self.cfg["out"]) / "projection-report.json").write_text(json.dumps(report), encoding="utf-8", newline="\n")
 
     return SimpleNamespace(
         pipeline=REAL.pipeline,
@@ -103,7 +103,7 @@ def test_the_run_configuration_names_this_release_and_the_local_store(tmp_path, 
     assert (cfg["mode"], cfg["separator"], cfg["release_graphs"]) == ("releases", "_", ["shapes", "catalog"])
     with_plugins = stores_support.local_settings(tmp_path, plugins_folder='plugins_folder = "plugins"')
     assert ln.run_config(support.ROOT, with_plugins, "x.env")["plugins_dir"] == str(tmp_path / "plugins")
-    (tmp_path / "run.json").write_text(json.dumps(cfg), encoding="utf-8")
+    (tmp_path / "run.json").write_text(json.dumps(cfg), encoding="utf-8", newline="\n")
     assert REAL.rp.read_config(str(tmp_path / "run.json"))["out"] == str(tmp_path / "lpg-out")   # the skill accepts it
 
 
@@ -148,7 +148,7 @@ def test_the_inputs_are_the_newest_releases_of_the_folder_not_a_fixed_list(tmp_p
     root = support.small_release(tmp_path / "release", versions=("1.0.0", "1.0.1-correction.1"))
     ontology = root / "business_architecture" / "ontology"
     (ontology / "provenance").mkdir()
-    (ontology / "provenance" / "run-shapes.ttl").write_text("", encoding="utf-8")
+    (ontology / "provenance" / "run-shapes.ttl").write_text("", encoding="utf-8", newline="\n")
     # The projection's own list still names the version before the correction, and lists kpi first.
     code = SimpleNamespace(pipeline=SimpleNamespace(PACKAGES=[("kpi", "1.0.0"), ("data-product", "1.0.0")],
                                                     SHAPES=["releases/kpi/1.0.0/shapes.ttl", "provenance/run-shapes.ttl"]))
@@ -162,7 +162,7 @@ def test_the_inputs_are_the_newest_releases_of_the_folder_not_a_fixed_list(tmp_p
     with pytest.raises(ln.LoadError, match="the release lacks .*2.0.0"):
         ln.newest_inputs(root, [DP[:-len("1.0.0")] + "2.0.0", KPI], code)
 
-    (tmp_path / "config.json").write_text(json.dumps({"rule4": "4a", "packages": {"kpi": "1.0.0", "data-product": "1.0.0"}}), encoding="utf-8")
+    (tmp_path / "config.json").write_text(json.dumps({"rule4": "4a", "packages": {"kpi": "1.0.0", "data-product": "1.0.0"}}), encoding="utf-8", newline="\n")
     cfg = ln.with_newest_inputs({"mode": "releases", "inputs_script": "inputs.py", "projection_config": str(tmp_path / "config.json")},
                                 root, [correction, KPI], code, tmp_path)
     assert "inputs_script" not in cfg and cfg["data"] == data and cfg["shapes"] == shapes
@@ -179,10 +179,10 @@ def test_a_report_must_exist_pass_and_be_of_this_release(tmp_path):
         ln.read_report(tmp_path, code, WANT)
     for report, message in (({**REPORT, "passed": False}, r"did not pass 1 check\(s\), e.g. report passed is false"),
                             ({**REPORT, "input_fingerprint": "fingerprint-0"}, "is of other release files")):
-        (tmp_path / "projection-report.json").write_text(json.dumps(report), encoding="utf-8")
+        (tmp_path / "projection-report.json").write_text(json.dumps(report), encoding="utf-8", newline="\n")
         with pytest.raises(ln.LoadError, match=message):
             ln.read_report(tmp_path, code, WANT)
-    (tmp_path / "projection-report.json").write_text(json.dumps(REPORT), encoding="utf-8")
+    (tmp_path / "projection-report.json").write_text(json.dumps(REPORT), encoding="utf-8", newline="\n")
     assert ln.read_report(tmp_path, code, WANT)["nodes"] == 5
 
 
@@ -243,7 +243,7 @@ def test_the_load_runs_the_five_steps_then_marks_and_removes_the_login_file(tmp_
 def test_a_second_load_on_the_same_release_changes_nothing(tmp_path, local):
     calls, db = [], graph()
     (tmp_path / "lpg-out").mkdir()
-    (tmp_path / "lpg-out" / "projection-report.json").write_text(json.dumps(REPORT), encoding="utf-8")
+    (tmp_path / "lpg-out" / "projection-report.json").write_text(json.dumps(REPORT), encoding="utf-8", newline="\n")
     result = ln.load(local, support.ROOT, tmp_path / "run", code=stub_code(calls), connect=connect_to(db))
     assert result["status"] == "current" and calls == [] and db.writes() == []
     assert not (tmp_path / "run" / "neo4j-local.env").exists()
@@ -254,7 +254,7 @@ def test_a_second_load_on_the_same_release_changes_nothing(tmp_path, local):
 def test_an_extra_load_also_runs_when_the_ontology_is_current(tmp_path, local):
     calls, db, seen = [], graph(), []
     (tmp_path / "lpg-out").mkdir()
-    (tmp_path / "lpg-out" / "projection-report.json").write_text(json.dumps(REPORT), encoding="utf-8")
+    (tmp_path / "lpg-out" / "projection-report.json").write_text(json.dumps(REPORT), encoding="utf-8", newline="\n")
     def technical_graph(session, store):
         seen.append(store)
         return {"name": "technical graph", "status": "loaded", "nodes": 53}
@@ -280,7 +280,7 @@ def test_the_technical_graphs_loader_passes_the_files_on_and_words_a_refusal(mon
 def test_a_database_that_moved_is_loaded_again(tmp_path, local):
     calls, db = [], graph(hash_="hash-2")
     (tmp_path / "lpg-out").mkdir()
-    (tmp_path / "lpg-out" / "projection-report.json").write_text(json.dumps(REPORT), encoding="utf-8")
+    (tmp_path / "lpg-out" / "projection-report.json").write_text(json.dumps(REPORT), encoding="utf-8", newline="\n")
     db_after = graph(marked=False)
     drivers = iter([stores_support.FakeDriver({"neo4j": db}), stores_support.FakeDriver({"neo4j": db_after})])
     result = ln.load(local, support.ROOT, tmp_path / "run", code=stub_code(calls), connect=lambda neo4j: next(drivers))

@@ -35,8 +35,7 @@ def _fixture(rows: list[dict], edits: list[tuple[str, str]]) -> tuple[Path, Path
 def _run(wb: Path, review: Path, *extra: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, str(SCRIPT), "--workbook", str(wb), "--corrections", str(review), *extra],
-        capture_output=True, text=True,
-    )
+        capture_output=True, text=True, encoding="utf-8")
 
 
 def _notes(wb: Path) -> dict:

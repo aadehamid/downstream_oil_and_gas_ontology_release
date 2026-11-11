@@ -110,7 +110,7 @@ class Release(unittest.TestCase):
 class Build(unittest.TestCase):
     def test_build_is_current(self):
         r = subprocess.run([sys.executable, os.path.join(HERE, "build_value_streams.py"), "--verify"],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
     def test_figures(self):

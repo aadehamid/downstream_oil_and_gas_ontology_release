@@ -318,7 +318,7 @@ class CommandLine(unittest.TestCase):
             raw = raw_config()
             raw["release_exceptions"] = {"Rule 1: lib:copyOf has no single concrete range": "never closes"}
             path = os.path.join(tmp, "config.json")
-            with open(path, "w", encoding="utf-8") as f:
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
                 json.dump(raw, f)
             code, out = run_main(cpr.main, ["--config", path, "--shapes", SHAPES, MODULE])
         self.assertEqual(code, 1, out)
@@ -334,7 +334,7 @@ class CommandLine(unittest.TestCase):
             raw = raw_config()
             raw["rule4"] = "4c"
             path = os.path.join(tmp, "config.json")
-            with open(path, "w", encoding="utf-8") as f:
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
                 json.dump(raw, f)
             code, out = run_main(cpr.main, ["--config", path, MODULE])
         self.assertEqual(code, 2, out)
@@ -347,7 +347,7 @@ class CommandLine(unittest.TestCase):
     def test_unreadable_file_is_2(self):
         with tempfile.TemporaryDirectory() as tmp:
             bad = os.path.join(tmp, "bad.ttl")
-            with open(bad, "w", encoding="utf-8") as f:
+            with open(bad, "w", encoding="utf-8", newline="\n") as f:
                 f.write("this is not turtle .")
             self.assertEqual(run_main(cpr.main, ["--config", CONFIG, bad])[0], 2)
 
@@ -519,7 +519,7 @@ class ReviewRoundOne(OneBreak, unittest.TestCase):
             raw = raw_config()
             raw["rule4"] = "4b"
             path = os.path.join(tmp, "config.json")
-            with open(path, "w", encoding="utf-8") as f:
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
                 json.dump(raw, f)
             code, out = run_main(cpr.main, ["--config", path, "--shapes", SHAPES, MODULE])
         self.assertEqual(code, 2, out)
@@ -1092,7 +1092,7 @@ class Connection(unittest.TestCase):
     """load_verify.py reaches a server that already runs: an env file, or --bolt with the environment."""
 
     def env(self, text):
-        f = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False, encoding="utf-8")
+        f = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False, encoding="utf-8", newline="\n")
         f.write(text)
         f.close()
         self.addCleanup(os.remove, f.name)
@@ -1163,7 +1163,7 @@ class RoundFour(OneBreak, unittest.TestCase):
         raw = raw_config()
         raw["rule4"] = "4b"
         path = os.path.join(tmp, "config.json")
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             json.dump(raw, f)
         return path
 
@@ -1278,7 +1278,7 @@ class RoundFive(unittest.TestCase):
         self.addCleanup(shutil.rmtree, tmp)
         path = os.path.join(tmp, "r.json")
         if existing is not None:
-            with open(path, "w", encoding="utf-8") as f:
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
                 f.write(existing)
         patch = mock.patch.object(lv, "run", side_effect=run_error) if run_error else \
             mock.patch.object(lv, "run", return_value=run_result)
@@ -1302,7 +1302,7 @@ class FinalRun(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             loadable, inferred_path = os.path.join(tmp, "loadable.nt"), os.path.join(tmp, "inferred.nt")
             self.assertEqual(run_main(build.main, ["loadable", "--output", loadable, MODULE])[0], 0)
-            with open(inferred_path, "w", encoding="utf-8") as f:
+            with open(inferred_path, "w", encoding="utf-8", newline="\n") as f:
                 f.write(f"<{LIB}work/W-0043> <{RDF.type}> <{LIB}Work> .\n")
             code, out = run_main(build.main, ["check-serialised", "--loadable", loadable, "--inferred", inferred_path])
         self.assertEqual(code, 0, out)
@@ -1740,7 +1740,7 @@ class Separator(unittest.TestCase):
             raw = raw_config()
             raw["prefixes"]["my_ns"] = "https://example.org/my-ns/"
             clashing = os.path.join(tmp, "config.json")
-            with open(clashing, "w", encoding="utf-8") as f:
+            with open(clashing, "w", encoding="utf-8", newline="\n") as f:
                 json.dump(raw, f)
             for command in ("graph-type", "data-model"):
                 target = os.path.join(tmp, command + ".out")

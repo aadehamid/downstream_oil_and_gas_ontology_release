@@ -44,7 +44,7 @@ base:p1 skos:broader base:p0 .
 
 def write(folder, name, text):
     path = os.path.join(folder, name)
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
     return path
 

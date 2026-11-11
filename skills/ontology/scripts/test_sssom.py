@@ -154,7 +154,7 @@ class CheckSssom(unittest.TestCase):
     def test_main_exit_codes(self):
         with tempfile.TemporaryDirectory() as d:
             bad = os.path.join(d, "bad.sssom.tsv")
-            with open(bad, "w", encoding="utf-8") as f:
+            with open(bad, "w", encoding="utf-8", newline="\n") as f:
                 f.write(replace(template(), "\tskos:exactMatch\t", "\towl:sameAs\t"))
             out = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):

@@ -12,6 +12,7 @@ import copy
 import io
 import os
 import shutil
+import stat
 import subprocess
 import tempfile
 import unittest
@@ -24,6 +25,17 @@ import check_requirements
 import check_taxonomy
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def remove_tree(path):
+    """Delete a folder that may hold a Git repository. Git makes its object files read-only, and Windows does not
+    delete a read-only file, so each refused file is made writable and tried again."""
+    def writable(function, name, _):
+        os.chmod(name, stat.S_IWRITE)
+        function(name)
+    shutil.rmtree(path, onerror=writable)
+
+
 TEMPLATES = os.path.join(HERE, "..", "templates")
 SKELETON = os.path.join(TEMPLATES, "ontology-skeleton.ttl")
 SHAPES = os.path.join(TEMPLATES, "shapes-skeleton.ttl")
@@ -821,7 +833,7 @@ class RequirementsChecks(OneBreak, unittest.TestCase):
         req["competency_questions"][0]["needs"].append("fines")
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "requirements.yaml")
-            with open(path, "w", encoding="utf-8") as f:
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
                 yaml.safe_dump(req, f)
             code, out = run_main(check_requirements.main, [path])
         self.assertEqual(code, 1)
@@ -966,7 +978,7 @@ class CheckScriptSkeleton(unittest.TestCase):
         self.git("config", "user.name", "test")
 
     def tearDown(self):
-        shutil.rmtree(self.tmp)
+        remove_tree(self.tmp)
 
     def git(self, *args):
         subprocess.run(["git", *args], cwd=self.tmp, env=self.env, check=True,
@@ -980,12 +992,12 @@ class CheckScriptSkeleton(unittest.TestCase):
         path = os.path.join(self.tmp, "scripts", "check.sh")
         with open(path, encoding="utf-8") as f:
             text = f.read()
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(transform(text))
 
     def run_script(self):
         return subprocess.run(["bash", "scripts/check.sh"], cwd=self.tmp, env=self.env,
-                              stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300)
+                              stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300, encoding="utf-8")
 
     @staticmethod
     def drop_todos(text):
@@ -1051,7 +1063,7 @@ class CheckScriptSkeleton(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("all checks pass", result.stdout)
 
-        with open(os.path.join(modules, "lending.ttl"), "a", encoding="utf-8") as f:
+        with open(os.path.join(modules, "lending.ttl"), "a", encoding="utf-8", newline="\n") as f:
             f.write('\nlib:Copy rdfs:comment "untagged" .\n')
         self.commit()
         result = self.run_script()
@@ -1132,12 +1144,12 @@ class CheckScriptWithoutGit(CheckScriptSkeleton):
         env = self.without_git()
         self.assertIsNone(shutil.which("git", path=env["PATH"]))
         result = subprocess.run(["bash", "scripts/check.sh"], cwd=self.tmp, env=env,
-                                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300)
+                                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300, encoding="utf-8")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("all checks passed", result.stdout)
         self.inject("echo made > made.txt")
         result = subprocess.run(["bash", "scripts/check.sh"], cwd=self.tmp, env=env,
-                                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300)
+                                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300, encoding="utf-8")
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("the checks changed the working tree", result.stderr)
 
@@ -1151,7 +1163,7 @@ class CheckScriptWithoutGit(CheckScriptSkeleton):
             f.write("#!/bin/sh\necho 'fatal: detected dubious ownership in repository' >&2\nexit 128\n")
         os.chmod(fake, 0o755)
         result = subprocess.run(["bash", "scripts/check.sh"], cwd=self.tmp, env=env,
-                                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300)
+                                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300, encoding="utf-8")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("git rev-parse failed, so the guard cannot tell whether this is a checkout: fatal: detected dubious ownership",
                       result.stderr)

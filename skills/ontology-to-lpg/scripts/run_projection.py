@@ -211,7 +211,7 @@ def git_env():
 def inside_repository(out, base):
     try:
         top = subprocess.run(["git", "-C", base, "rev-parse", "--show-toplevel"], capture_output=True,
-                             text=True, check=True, stdin=subprocess.DEVNULL, env=git_env()).stdout.strip()
+                             text=True, check=True, stdin=subprocess.DEVNULL, env=git_env(), encoding="utf-8").stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         return False
     top = os.path.realpath(top)
@@ -491,7 +491,7 @@ def compare_reports(rebuild, baseline):
 def run_command(cmd, cwd=None, env=None, capture=False):
     """Runs one command with stdin closed; returns (exit code, captured stdout or None)."""
     result = subprocess.run(cmd, cwd=cwd, env=env, stdin=subprocess.DEVNULL, text=True,
-                            capture_output=capture)
+                            capture_output=capture, encoding="utf-8")
     return result.returncode, (result.stdout if capture else None)
 
 
@@ -607,7 +607,7 @@ class Driver:
                     "shapes": [{"path": p, "sha256": sha256_file(p)} for p in self.shapes],
                     "catalogs": [{"path": c, "sha256": sha256_file(c)} for c in self.catalogs()],
                     "default_shapes": self.default_shapes, "notes": notes}
-        with open(self.out_file("run-manifest.json"), "w", encoding="utf-8") as f:
+        with open(self.out_file("run-manifest.json"), "w", encoding="utf-8", newline="\n") as f:
             json.dump(manifest, f, indent=2)
             f.write("\n")
         for note in notes:

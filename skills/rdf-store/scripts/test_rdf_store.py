@@ -51,7 +51,7 @@ G_CAT = ox.NamedNode("https://example.org/catalog/2.1.0")
 
 def write(folder, name, text):
     path = os.path.join(folder, name)
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
     return path
 
@@ -677,7 +677,7 @@ class GraphStoreProtocol(unittest.TestCase):
 class CommandLine(unittest.TestCase):
     def run_cli(self, *args, env=None):
         return subprocess.run([sys.executable, os.path.join(HERE, "rdfstore.py"), *args], capture_output=True, text=True,
-                              env={**os.environ, **(env or {})})
+                              env={**os.environ, **(env or {})}, encoding="utf-8")
 
     def test_compare_exits_1_with_a_diff(self):
         folder, files = release_files()

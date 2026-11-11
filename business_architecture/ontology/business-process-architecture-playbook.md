@@ -148,7 +148,7 @@ These rules were locked by explicit review decisions and govern all content, pre
 The complete mapping of **every registered external source → the process areas and rows it informs**, with each source's permitted-use limits, is generated from the workbook itself so it can never drift:
 
 ```sh run=release-copy
-uv run --with openpyxl python business_architecture/ontology/build/scripts/step3c-source-traceability.py
+uv run -q --with openpyxl python business_architecture/ontology/build/scripts/step3c-source-traceability.py
 ```
 
 ```text expect

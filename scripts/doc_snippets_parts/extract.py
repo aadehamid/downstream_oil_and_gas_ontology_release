@@ -44,7 +44,7 @@ def tree_entries(root: Path) -> list:
     try:
         env = no_git_env(os.environ)
         top = subprocess.run(["git", "-C", str(root), "rev-parse", "--show-toplevel"], capture_output=True,
-                             text=True, env=env)
+                             text=True, env=env, encoding="utf-8")
         if top.returncode == 0 and Path(top.stdout.strip()).resolve() == root.resolve():
             out = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--cached", "--others",
                                   "--exclude-standard"], capture_output=True, check=True, env=env).stdout

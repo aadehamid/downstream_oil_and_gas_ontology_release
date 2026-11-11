@@ -33,8 +33,9 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PENDING = os.path.join("scripts", "standalone-pending.txt")
-EXCEPTIONS = os.path.join("scripts", "standalone-exceptions.txt")
+# Written with /, which every system opens, so a finding names the same path on Windows.
+PENDING = "scripts/standalone-pending.txt"
+EXCEPTIONS = "scripts/standalone-exceptions.txt"
 # The only lines the pending list may hold. A change may delete a line of the list, and then deletes it here too.
 # No line may be added or widened: a new document must be clean when it arrives.
 ALLOWED_PENDING = (

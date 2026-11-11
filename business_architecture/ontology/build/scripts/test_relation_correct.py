@@ -34,7 +34,7 @@ def _fixture(cell: str, edits: list[list[str]], status: str = "approved") -> tup
 
 def _run(wb: Path, c: Path, *extra: str) -> subprocess.CompletedProcess:
     return subprocess.run([sys.executable, str(SCRIPT), "--workbook", str(wb), "--corrections", str(c), *extra],
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, encoding="utf-8")
 
 
 def _cell(wb: Path) -> str:

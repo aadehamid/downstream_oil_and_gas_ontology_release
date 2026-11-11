@@ -27,7 +27,7 @@ def test_the_newest_version_reads_a_correction_and_needs_a_manifest(tmp_path):
     for version, released in (("1.2.0", True), ("1.2.1-correction.1", True), ("1.2.1-correction.2", False), ("1.10.0-draft", True)):
         (tmp_path / "data-product" / version).mkdir(parents=True)
         if released:
-            (tmp_path / "data-product" / version / "manifest.json").write_text("{}", encoding="utf-8")
+            (tmp_path / "data-product" / version / "manifest.json").write_text("{}", encoding="utf-8", newline="\n")
     assert ov.newest_version("data-product", tmp_path) == "1.2.1-correction.1"
     (tmp_path / "previous" / "data-product" / "9.9.9").mkdir(parents=True)
     (tmp_path / "empty").mkdir()

@@ -108,7 +108,7 @@ PASSWORD_FILE = '[neo4j.enterprise]\npassword = "pw-That-Must-Not-Travel"\n'
 @pytest.mark.parametrize("name", ["machine-stores.toml", "conf/local.env", ".env.production", "conf/db.ini"])
 def test_a_plain_folder_with_a_password_file_of_any_name_is_not_zipped(setup, name):
     (setup.root / name).parent.mkdir(parents=True, exist_ok=True)
-    (setup.root / name).write_text(PASSWORD_FILE if name.endswith(".toml") else "NEO4J_PASSWORD=pw-That-Must-Not-Travel\n", encoding="utf-8")
+    (setup.root / name).write_text(PASSWORD_FILE if name.endswith(".toml") else "NEO4J_PASSWORD=pw-That-Must-Not-Travel\n", encoding="utf-8", newline="\n")
     with pytest.raises(runner.StepFailed, match=f"{name} in the release folder sets a password or another secret") as err:
         runner.build_zip(setup.root, setup.tmp / "a.zip")
     assert "pw-That-Must-Not-Travel" not in str(err.value) and not (setup.tmp / "a.zip").exists()
@@ -130,7 +130,7 @@ def test_a_plain_folder_with_a_password_file_of_any_name_is_not_zipped(setup, na
 ])
 def test_a_secret_is_found_by_parsing_the_file_not_by_its_spelling(setup, name, text, keys):
     (setup.root / name).parent.mkdir(parents=True, exist_ok=True)
-    (setup.root / name).write_text(text, encoding="utf-8")
+    (setup.root / name).write_text(text, encoding="utf-8", newline="\n")
     assert runner.secret_keys(setup.root / name) == [keys]
     with pytest.raises(runner.StepFailed, match="sets a password or another secret") as err:
         runner.build_zip(setup.root, setup.tmp / "a.zip")
@@ -147,7 +147,7 @@ def test_a_secret_is_found_by_parsing_the_file_not_by_its_spelling(setup, name, 
     ("g.ini", "; password = secret\n[section]\nuser = neo4j\n"),
 ])
 def test_a_near_miss_is_not_a_secret(setup, name, text):
-    (setup.root / name).write_text(text, encoding="utf-8")
+    (setup.root / name).write_text(text, encoding="utf-8", newline="\n")
     assert runner.secret_keys(setup.root / name) == []
 
 
@@ -159,9 +159,9 @@ def test_which_names_say_secret(key, secret):
 
 
 def test_the_example_settings_file_and_a_commented_password_line_may_travel(setup):
-    (setup.root / "kpi_store" / "stores.example.toml").write_text(stores_support.STORES_TEXT, encoding="utf-8")
-    (setup.root / "environment.example").write_text("# NEO4J_PASSWORD=\n", encoding="utf-8")
-    (setup.root / "notes.toml").write_text('# password = "an example in a comment"\ntitle = "the password rule"\n', encoding="utf-8")
+    (setup.root / "kpi_store" / "stores.example.toml").write_text(stores_support.STORES_TEXT, encoding="utf-8", newline="\n")
+    (setup.root / "environment.example").write_text("# NEO4J_PASSWORD=\n", encoding="utf-8", newline="\n")
+    (setup.root / "notes.toml").write_text('# password = "an example in a comment"\ntitle = "the password rule"\n', encoding="utf-8", newline="\n")
     _, count = runner.build_zip(setup.root, setup.tmp / "a.zip")
     assert count == 11
 
@@ -175,8 +175,8 @@ def git(root, *args):
 def test_in_a_git_checkout_the_zip_holds_only_the_files_git_tracks(setup):
     git(setup.root, "init", "-q")
     git(setup.root, "add", "README.md", "release.json", "kpi_store/__init__.py", "data/sample.ttl")
-    (setup.root / "machine-stores.toml").write_text(PASSWORD_FILE, encoding="utf-8")   # left in the folder, never added
-    (setup.root / "draft-notes.md").write_text("not part of the release\n", encoding="utf-8")
+    (setup.root / "machine-stores.toml").write_text(PASSWORD_FILE, encoding="utf-8", newline="\n")   # left in the folder, never added
+    (setup.root / "draft-notes.md").write_text("not part of the release\n", encoding="utf-8", newline="\n")
     runner.build_zip(setup.root, setup.tmp / "a.zip")
     with zipfile.ZipFile(setup.tmp / "a.zip") as z:
         assert z.namelist() == ["README.md", "data/sample.ttl", "kpi_store/__init__.py", "release.json"]
@@ -201,7 +201,7 @@ def test_a_settings_file_inside_the_release_given_is_refused_whatever_its_name(s
 
 def test_a_changed_file_changes_the_checksum(setup):
     before, _ = runner.build_zip(setup.root, setup.tmp / "a.zip")
-    (setup.root / "data" / "sample.ttl").write_text("<urn:a> a <urn:C> .\n", encoding="utf-8")
+    (setup.root / "data" / "sample.ttl").write_text("<urn:a> a <urn:C> .\n", encoding="utf-8", newline="\n")
     assert runner.build_zip(setup.root, setup.tmp / "a.zip")[0] != before
 
 
@@ -441,7 +441,7 @@ def pending_report(setup, edit=None):
     """A pending report as the report step leaves it, with the to-clear CSV edited as a person would."""
     setup.pending.mkdir(parents=True)
     report = sample_report()
-    (setup.pending / "discovery-report.json").write_text(rep.to_json(report), encoding="utf-8")
+    (setup.pending / "discovery-report.json").write_text(rep.to_json(report), encoding="utf-8", newline="\n")
     rows = list(csv.DictReader(runner.prefilled_csv(report).splitlines()))
     for row in rows:
         row.update((edit or {}).get(row["id"], {}))
@@ -579,7 +579,7 @@ def test_the_cut_tool_is_called_as_a_module_with_the_report_and_the_release(setu
     run = Recorder()
     assert runner.cut_with_tool("cleared.json", setup.root, setup.run_dir, "confirmed.csv", run) == {
         "status": "failed", "why": "this release has no cut tool (kpi_store/cut.py)"}
-    (setup.root / "kpi_store" / "cut.py").write_text("", encoding="utf-8")
+    (setup.root / "kpi_store" / "cut.py").write_text("", encoding="utf-8", newline="\n")
     assert runner.cut_with_tool("cleared.json", setup.root, setup.run_dir, "confirmed.csv", run) == {"status": "cut"}
     assert run.calls == [[sys.executable, "-m", "kpi_store.cut", "--report", "cleared.json", "--decisions", "confirmed.csv",
                           "--release", str(setup.root)]]
@@ -595,7 +595,7 @@ def test_the_zip_after_a_cut_is_built_from_the_tree_the_cut_left(setup):
     def cut(report_json, release_root, run_dir, decisions):   # the cut writes a correction version into the release
         package = Path(release_root) / "releases" / "data-product" / "1.2.1-correction.1" / "data-product.ttl"
         package.parent.mkdir(parents=True)
-        package.write_text("<urn:a> a <urn:Corrected> .\n", encoding="utf-8")
+        package.write_text("<urn:a> a <urn:Corrected> .\n", encoding="utf-8", newline="\n")
         return {"status": "cut"}
     ctx = setup.make(hooks={"cut": cut})
     assert runner.run_steps(ctx, ["cut", "zip"]) == 0

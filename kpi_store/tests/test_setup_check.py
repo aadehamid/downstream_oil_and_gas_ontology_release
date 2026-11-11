@@ -67,20 +67,21 @@ def test_the_kpi_store_settings_file_must_be_valid(tmp_path):
     ok, detail, fix = sc.kpi_store_settings(context(tmp_path))   # the example names no SQL warehouse
     assert not ok and "names no SQL warehouse, so the sync check cannot read Databricks" in detail
     assert fix == f"In {tmp_path / 'kpi_store.toml'} set [databricks] warehouse_id to the ID of a SQL warehouse you may use"
-    (tmp_path / "kpi_store.toml").write_text(support.SETTINGS_TEXT.replace('warehouse_id = ""', 'warehouse_id = "0a1b2c3d4e5f"'), encoding="utf-8")
+    (tmp_path / "kpi_store.toml").write_text(support.SETTINGS_TEXT.replace('warehouse_id = ""', 'warehouse_id = "0a1b2c3d4e5f"'), encoding="utf-8", newline="\n")
     ok, detail, _ = sc.kpi_store_settings(context(tmp_path))
     assert ok and detail == f"{tmp_path / 'kpi_store.toml'}: writes to idp_sbx.kpi_store, volume releases, SQL warehouse 0a1b2c3d4e5f"
-    (tmp_path / "kpi_store.toml").write_text("[release]\n", encoding="utf-8")
+    (tmp_path / "kpi_store.toml").write_text("[release]\n", encoding="utf-8", newline="\n")
     ok, detail, fix = sc.kpi_store_settings(context(tmp_path))
     assert not ok and fix == f"Copy kpi_store/kpi_store.example.toml to {tmp_path / 'kpi_store.toml'} and fill it in"
 
 
 def test_java_must_be_found_and_be_21_or_later(tmp_path):
     which = lambda name: "/sample/java" if name == "java" else None   # noqa: E731
+    java = str(Path("/sample/java"))   # the check prints the path as this system writes it: \\sample\\java on Windows
     version = lambda text: (lambda cmd, **k: SimpleNamespace(returncode=0, stdout="", stderr=text))   # noqa: E731
-    assert sc.java(context(tmp_path, which=which, run=version('openjdk version "21.0.2"'))) == (True, "Java 21 at /sample/java", "")
+    assert sc.java(context(tmp_path, which=which, run=version('openjdk version "21.0.2"'))) == (True, f"Java 21 at {java}", "")
     ok, detail, fix = sc.java(context(tmp_path, which=which, run=version('java version "1.8.0_292"')))
-    assert not ok and detail == "/sample/java is Java 8; Fuseki 6.2.0 needs 21 or later" and "Install a Java 21 runtime" in fix
+    assert not ok and detail == f"{java} is Java 8; Fuseki 6.2.0 needs 21 or later" and "Install a Java 21 runtime" in fix
     assert sc.java(context(tmp_path))[1] == "Java was not found"
 
 
@@ -102,9 +103,9 @@ def test_bash_on_windows_is_git_bash_and_never_the_linux_subsystems(tmp_path):
     git = tmp_path / "Git"
     (git / "bin").mkdir(parents=True)
     (git / "cmd").mkdir()
-    (git / "bin" / "bash.exe").write_text("", encoding="utf-8")
+    (git / "bin" / "bash.exe").write_text("", encoding="utf-8", newline="\n")
     (tmp_path / "System32").mkdir()
-    (tmp_path / "System32" / "bash.exe").write_text("", encoding="utf-8")
+    (tmp_path / "System32" / "bash.exe").write_text("", encoding="utf-8", newline="\n")
     wsl = str(tmp_path / "System32" / "bash.exe")
     beside_git = lambda name: str(git / "cmd" / "git.exe") if name == "git" else wsl   # noqa: E731
     assert sc.find_bash(None, {}, beside_git, windows=True) == git / "bin" / "bash.exe"
@@ -123,19 +124,25 @@ def test_uv_must_be_on_the_path(tmp_path):
     assert sc.uv(context(tmp_path)) == (False, "uv was not found; scripts/check.sh runs its checks through uv", "py -m pip install uv")
 
 
-def test_the_check_script_needs_python3_and_uv_inside_bash(tmp_path):
+def test_the_check_script_needs_a_python_and_uv_inside_bash(tmp_path):
     bash = tmp_path / "bash"
-    bash.write_text("", encoding="utf-8")
+    bash.write_text("", encoding="utf-8", newline="\n")
     calls = []
     def run(cmd, **k):
         calls.append(cmd)
-        return SimpleNamespace(returncode=0, stdout="3 12\nuv 0.9.2\n", stderr="")
+        return SimpleNamespace(returncode=0, stdout="python 3 12\nuv 0.9.2\n", stderr="")
     ctx = context(tmp_path / "s", run=run, bash=f'bash = "{bash.as_posix()}"')
-    assert sc.check_script_tools(ctx) == (True, "inside bash: python3 3.12 and uv 0.9.2", "")
-    assert calls == [[str(bash), "-c", "python3 -c 'import sys; print(sys.version_info[0], sys.version_info[1])' && uv --version"]]
+    assert sc.check_script_tools(ctx) == (True, "inside bash: python 3.12 and uv 0.9.2", "")
+    assert calls == [[str(bash), "-c",
+                      "for p in python3 python py; do "
+                      "if \"$p\" -c 'import sys; sys.exit(sys.version_info < (3, 11))' >/dev/null 2>&1; then "
+                      "\"$p\" -c 'import sys; print(sys.argv[1], sys.version_info[0], sys.version_info[1])' \"$p\"; "
+                      "uv --version; exit; fi; done; exit 1"]]
+    ctx.run = lambda cmd, **k: SimpleNamespace(returncode=127, stdout="py 3 13\n", stderr="uv: command not found")
+    assert sc.check_script_tools(ctx)[0] is False     # a Python and no uv
     ctx.run = lambda cmd, **k: SimpleNamespace(returncode=127, stdout="", stderr="uv: command not found")
     ok, detail, fix = sc.check_script_tools(ctx)
-    assert not ok and "python3 or uv was not found" in detail and fix.startswith("Run py -m pip install uv")
+    assert not ok and "(python3, python or py) or uv was not found" in detail and fix.startswith("Run py -m pip install uv")
 
 
 def test_the_databricks_cli_must_run_and_the_profile_must_be_signed_in(tmp_path):
@@ -145,10 +152,11 @@ def test_the_databricks_cli_must_run_and_the_profile_must_be_signed_in(tmp_path)
         return SimpleNamespace(returncode=0, stdout="Databricks CLI v1.25.0\n", stderr="")
     which = lambda name: "/sample/databricks" if name == "databricks" else None   # noqa: E731
     ctx = context(tmp_path, run=run, which=which)
-    assert sc.databricks_cli(ctx) == (True, "Databricks CLI v1.25.0 at /sample/databricks", "")
+    cli = str(Path("/sample/databricks"))   # as this system writes it
+    assert sc.databricks_cli(ctx) == (True, f"Databricks CLI v1.25.0 at {cli}", "")
     assert sc.databricks_auth(ctx) == (True, "signed in through the profile DEFAULT", "")
-    assert calls == [["/sample/databricks", "--version"],
-                     ["/sample/databricks", "current-user", "me", "--profile", "DEFAULT", "--output", "json"]]
+    assert calls == [[cli, "--version"],
+                     [cli, "current-user", "me", "--profile", "DEFAULT", "--output", "json"]]
     ctx.run = lambda cmd, **k: SimpleNamespace(returncode=1, stdout="", stderr="cannot configure default credentials")
     assert sc.databricks_auth(ctx) == (False, "the profile DEFAULT is not signed in",
                                        "databricks auth login --host <your workspace> --profile DEFAULT")

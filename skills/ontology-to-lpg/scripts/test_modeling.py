@@ -358,7 +358,7 @@ class Timeouts(unittest.TestCase):
         self.assertEqual(lv.query_timeout({}), 120)
 
     def test_copy_graph_wraps_both_sessions(self):
-        env = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False, encoding="utf-8")
+        env = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False, encoding="utf-8", newline="\n")
         env.write("NEO4J_URI=bolt://h\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD=x\n")
         env.close()
         self.addCleanup(os.remove, env.name)
@@ -594,7 +594,7 @@ class Secrets(unittest.TestCase):
         self.assertIn("the review query failed (Exception)", out)
 
     def test_copy_graph_prints_no_credential(self):
-        env = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False, encoding="utf-8")
+        env = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False, encoding="utf-8", newline="\n")
         env.write(f"NEO4J_URI=neo4j+s://neo4j:{CANARY}@x.io\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD={CANARY}\n")
         env.close()
         self.addCleanup(os.remove, env.name)

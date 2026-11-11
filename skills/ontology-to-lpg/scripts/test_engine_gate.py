@@ -304,7 +304,7 @@ class FailClosedReport(unittest.TestCase):
         self.addCleanup(lambda: __import__("shutil").rmtree(self.tmp))
         self.path = os.path.join(self.tmp, "my report.json")
         for name in (self.path, self.path + ".failed"):
-            with open(name, "w", encoding="utf-8") as f:
+            with open(name, "w", encoding="utf-8", newline="\n") as f:
                 f.write('{"passed": true, "manual_cases": [{"cypher": "old"}]}')
 
     def main(self, run_result=None, run_error=None, extra=()):
@@ -349,7 +349,7 @@ class FailClosedReport(unittest.TestCase):
             raw = json.load(f)
         raw["prefixes"]["my_ns"] = "https://example.org/my-ns/"
         config = os.path.join(self.tmp, "config.json")
-        with open(config, "w", encoding="utf-8") as f:
+        with open(config, "w", encoding="utf-8", newline="\n") as f:
             json.dump(raw, f)
         args = ["--config", config, "--shapes", SHAPES, "--bolt", "bolt://127.0.0.1:1", "--merged", MODULE, "--loadable", MODULE, "--inferred", MODULE, "--report", self.path, MODULE]
         neo4j = mock.MagicMock()
@@ -440,7 +440,7 @@ def earned_report(**change):
 def passing_report(case, **change):
     """A temporary projection report that earns its pass, with hash h, changed by **change."""
     rep = earned_report(**change)
-    f = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+    f = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8", newline="\n")
     json.dump(rep, f)
     f.close()
     case.addCleanup(os.remove, f.name)
@@ -449,7 +449,7 @@ def passing_report(case, **change):
 
 class CopyGraph(unittest.TestCase):
     def env(self, text):
-        f = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False, encoding="utf-8")
+        f = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False, encoding="utf-8", newline="\n")
         f.write(text)
         f.close()
         self.addCleanup(os.remove, f.name)
@@ -550,7 +550,7 @@ class CopyToANamedDatabase(unittest.TestCase):
     EDGES = [{"s": "u1", "t": "lib_author", "o": "u2", "u": None, "props": {}},
              {"s": "u1", "t": "lib_about", "o": "u3", "u": None, "props": {}}]
     def env(self, text):
-        f = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False, encoding="utf-8")
+        f = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False, encoding="utf-8", newline="\n")
         f.write(text)
         f.close()
         self.addCleanup(os.remove, f.name)
@@ -1023,7 +1023,7 @@ class RunWiring(unittest.TestCase):
         self.tmp = tempfile.mkdtemp()
         self.addCleanup(lambda: __import__("shutil").rmtree(self.tmp))
         loadable, self.inferred = os.path.join(self.tmp, "l.nt"), os.path.join(self.tmp, "i.nt")
-        with open(loadable, "w", encoding="utf-8") as f:
+        with open(loadable, "w", encoding="utf-8", newline="\n") as f:
             f.write(build.sorted_nt(build.parse([MODULE])))
         open(self.inferred, "w", encoding="utf-8", newline="\n").close()
         self.loadable = loadable
@@ -1257,7 +1257,7 @@ class RoundEight(unittest.TestCase):
 
     # 3: copy only a verified graph, and never touch the target otherwise
     def copy_main(self, report_args, source_hash="h", present=5):
-        env = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False, encoding="utf-8")
+        env = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False, encoding="utf-8", newline="\n")
         env.write("NEO4J_URI=bolt://h\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD=s3cret\n")
         env.close()
         self.addCleanup(os.remove, env.name)
@@ -1612,7 +1612,7 @@ class QuickCheckTen(unittest.TestCase):
             def run(self, query, **_):
                 return FakeResult([{"id": "one-database"}] if "db.info()" in query else [{"n": 5}])
 
-        env = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False, encoding="utf-8")
+        env = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False, encoding="utf-8", newline="\n")
         env.write("NEO4J_URI=bolt://localhost:7687\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD=p\n")
         env.close()
         self.addCleanup(os.remove, env.name)

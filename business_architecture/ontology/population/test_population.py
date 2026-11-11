@@ -19,7 +19,7 @@ DATA = Graph().parse(os.path.join(HERE, "population.ttl"))
 
 class Population(unittest.TestCase):
     def test_build_is_current(self):
-        r = subprocess.run([sys.executable, os.path.join(HERE, "build_population.py"), "--verify"], capture_output=True, text=True)
+        r = subprocess.run([sys.executable, os.path.join(HERE, "build_population.py"), "--verify"], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
     def test_counts(self):
