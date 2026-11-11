@@ -77,7 +77,7 @@ TOKEN = re.compile(r"""
     | (?P<name>`(?:``|[^`])*`)                           # a name in backticks
     | (?P<placeholder>\{\{.*?\}\})                       # a role placeholder
     | (?P<param>\$[A-Za-z0-9_]+)                         # a parameter
-    | (?P<word>[A-Za-z0-9_]+)                            # a keyword, a variable or a number
+    | (?P<word>\w+)                            # a keyword, a variable or a number
     | (?P<mark>.)                                        # any other single character
 """, re.S | re.X)
 

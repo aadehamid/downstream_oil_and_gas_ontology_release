@@ -384,6 +384,8 @@ def test_a_write_word_inside_a_comment_a_string_or_a_name_is_not_a_clause():
     "MATCH (n:`CALL`) RETURN count(n) AS found", "WITH name AS recall, name AS callsign RETURN 1 AS found",
     "MATCH (n) WHERE n.callsign = 'x' OR n.call = 1 OR n.`CALL` = 2 RETURN count(n) AS found",
     "WITH $call AS x, $CALL AS y RETURN 1 AS found",
+    # A name may hold letters outside ASCII; it is still one word.
+    "WITH name AS na\u00efve CALL (na\u00efve) { RETURN size(na\u00efve) AS found }",
 ])
 def test_the_two_subquery_forms_are_allowed(subquery):
     text = SMALL.replace("RETURN name\n", f"WITH name, name AS name2 {subquery}\nRETURN name\n")
