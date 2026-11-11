@@ -147,7 +147,7 @@ def run_keeping_globals(path):
     namespace = {"__name__": "__main__", "__file__": path}
     out = io.StringIO()
     ok = True
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         code = compile(f.read(), path, "exec")
     try:
         with contextlib.redirect_stdout(out):
@@ -212,7 +212,7 @@ def phase1_rows(text=None):
     An ID that is only cited inside a sentence or a parenthesis is not a row.
     """
     if text is None:
-        with open(BACKLOG) as f:
+        with open(BACKLOG, encoding="utf-8") as f:
             text = f.read()
     home, paired = {}, {}
     section = None
@@ -254,7 +254,7 @@ def review_holds():
     per_file, per_row = {}, collections.defaultdict(list)
     for path in sorted(glob.glob(os.path.join(REVIEWS, "*.csv"))):
         try:
-            with open(path, newline="") as f:
+            with open(path, newline="", encoding="utf-8") as f:
                 reader = list(csv.DictReader(f))
         except (csv.Error, UnicodeDecodeError):
             continue
@@ -276,7 +276,7 @@ def review_holds():
 # ---------- facts ----------
 
 def stored_facts():
-    with open(FACTS, newline="") as f:
+    with open(FACTS, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
@@ -662,7 +662,7 @@ def decision_problems(folder=DECISIONS):
     records = {}
     for path in sorted(glob.glob(os.path.join(folder, "DEC-*.md"))):
         number = re.search(r"DEC-(\d{4})", os.path.basename(path)).group(1)
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             text = f.read()
         m = re.search(r"^\| Status \| (.+?) \|\s*$", text, re.M)
         if not m:
@@ -670,7 +670,7 @@ def decision_problems(folder=DECISIONS):
             continue
         records[number] = (path, text, m.group(1).strip())
     index_path = os.path.join(folder, "README.md")
-    with open(index_path) as f:
+    with open(index_path, encoding="utf-8") as f:
         index = {}
         for line in f:
             m = re.match(r"\| \[DEC-(\d{4})\]\(([^)]+)\) \|[^|]*\| ([^|]+) \|", line)
@@ -719,7 +719,7 @@ def answer_corpus(folder=ANSWERS):
     """The decision owner's saved answers, whitespace-collapsed, without each file's HTML header comment."""
     parts = []
     for path in sorted(glob.glob(os.path.join(folder, "*.md"))):
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             parts.append(_flat(re.sub(r"<!--.*?-->", "", f.read(), flags=re.S)))
     return "\n".join(parts)
 
@@ -859,7 +859,7 @@ def rendered_answer_corpus(folder=ANSWERS):
     """The decision owner's saved answers as displayed text, one line per block, to compare with displayed quotes."""
     lines = []
     for path in sorted(glob.glob(os.path.join(folder, "*.md"))):
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             lines.extend(rendered_blocks(f.read()))
     return "\n".join(lines)
 
@@ -968,7 +968,7 @@ def quote_problems(reviews=REVIEWS, backlog=BACKLOG, answers=ANSWERS, decisions=
 
     checked_files = 0
     for path in sorted(glob.glob(os.path.join(reviews, "*.csv"))):
-        with open(path, newline="") as f:
+        with open(path, newline="", encoding="utf-8") as f:
             header = next(csv.reader(f), [])
             f.seek(0)
             rows = list(csv.DictReader(f))
@@ -994,7 +994,7 @@ def quote_problems(reviews=REVIEWS, backlog=BACKLOG, answers=ANSWERS, decisions=
                     check(f"{where} {col}", span)
     if not checked_files:
         problems.append(f"no review file with an owner_words column in {reviews}: nothing checked")
-    with open(backlog) as f:
+    with open(backlog, encoding="utf-8") as f:
         text = f.read()
     for para in block_quotes(text):
         check(f"{os.path.basename(backlog)} block quote", para)
@@ -1003,7 +1003,7 @@ def quote_problems(reviews=REVIEWS, backlog=BACKLOG, answers=ANSWERS, decisions=
         number = int(re.search(r"DEC-(\d{4})", os.path.basename(path)).group(1))
         if number < FIRST_QUOTE_CHECKED_DECISION:
             continue
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             record = f.read()
         name = f"DEC-{number:04d}"
         # Raw HTML can hide or relabel any part of a record (a status, a heading, a
@@ -1118,13 +1118,13 @@ def citation_problems(root=ROOT, answers=ANSWERS, decisions=DECISIONS, files=Non
     corpus = answer_corpus(answers)
     files_by_name, files_by_comment = {}, {}
     for path in glob.glob(os.path.join(answers, "*.md")):
-        raw = open(path).read()
+        raw = open(path, encoding="utf-8").read()
         files_by_name[os.path.basename(path)] = _flat(re.sub(r"<!--.*?-->", "", raw, flags=re.S))
         header = re.match(r"\s*<!--(.*?)-->", raw, re.S)  # the file's own header records its source, nothing later
         for comment in re.findall(r"comment:(\d{6,})", header.group(1) if header else ""):
             files_by_comment[comment] = files_by_comment.get(comment, "") + files_by_name[os.path.basename(path)]
     def recorded_words(path):
-        found = RECORDED_WORDS.search(open(path).read())
+        found = RECORDED_WORDS.search(open(path, encoding="utf-8").read())
         return _flat(found.group(1)) if found else ""
     record_texts = {m.group(1): recorded_words(p) for p in glob.glob(os.path.join(decisions, "DEC-*.md"))
                     for m in [re.search(r"DEC-(\d{4})", os.path.basename(p))] if m}

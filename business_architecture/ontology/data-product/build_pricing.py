@@ -62,7 +62,7 @@ SOURCES = {
 
 
 def read(name):
-    with open(os.path.join(TABLES, name), newline="") as f:
+    with open(os.path.join(TABLES, name), newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
@@ -75,7 +75,7 @@ def load():
     agents, view_systems = read("agents.csv"), read("view-systems.csv")
     systems = set()
     for path in (SYSTEMS, os.path.join(os.path.dirname(SYSTEMS), "other-systems.csv")):
-        with open(path, newline="") as f:
+        with open(path, newline="", encoding="utf-8") as f:
             systems |= {r["slug"] for r in csv.DictReader(f)}
     measures = {str(n) for n in Graph().parse(MEASURES).objects(None, SKOS.notation)}
     by = {t["slug"]: t for t in tables}
@@ -205,11 +205,11 @@ def main():
             + build(*loaded).serialize(format="turtle"))
     print("; ".join(f"{k} {v}" for k, v in figures(*loaded).items()))
     if args.verify:
-        if not (os.path.exists(OUTPUT) and open(OUTPUT).read() == text):
+        if not (os.path.exists(OUTPUT) and open(OUTPUT, encoding="utf-8").read() == text):
             sys.exit("pricing.ttl is not current: run build_pricing.py --write")
         print("pricing.ttl is current")
     if args.write:
-        with open(OUTPUT, "w") as f:
+        with open(OUTPUT, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
         print(f"wrote {OUTPUT}")
 

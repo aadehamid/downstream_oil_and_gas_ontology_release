@@ -25,7 +25,7 @@ def _fixture(cell: str, edits: list[list[str]], status: str = "approved") -> tup
     ws.append(HEADERS)
     ws.append(["A-1", "Source", cell, status])
     wb.save(tmp / "wb.xlsx")
-    with open(tmp / "c.csv", "w", newline="") as f:
+    with open(tmp / "c.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(COLUMNS)
         w.writerows(edits)

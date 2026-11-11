@@ -650,7 +650,7 @@ class FilesMode(Base):
                 self.assertIn(f"{books}={rp.FILE_GRAPH}plain/books.ttl", cmd)
             if any(c.endswith("explore.py") for c in cmd):
                 self.assertIn("--files", cmd)
-        with open(os.path.join(d.out, "run-manifest.json")) as f:
+        with open(os.path.join(d.out, "run-manifest.json"), encoding="utf-8") as f:
             manifest = json.load(f)
         self.assertEqual(manifest["mode"], "files")
         self.assertEqual(manifest["data"][0]["sha256"], rp.sha256_file(books))

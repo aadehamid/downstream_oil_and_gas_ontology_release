@@ -37,13 +37,13 @@ class Frozen(unittest.TestCase):
                 with self.assertRaises(FileNotFoundError):
                     bm.released_requires("core", "2.3.0")
                 os.makedirs(previous)
-                with open(os.path.join(previous, "manifest.json"), "w") as f:
+                with open(os.path.join(previous, "manifest.json"), "w", encoding="utf-8", newline="\n") as f:
                     f.write("{}\n")
                 self.assertEqual(fs.package_dir(tmp, "core", "2.3.0"), previous)
                 self.assertEqual(bm.package_folder("core", "2.3.0"), previous)
                 self.assertEqual(bm.released_requires("core", "2.3.0"), {})
                 os.makedirs(plain)
-                with open(os.path.join(plain, "manifest.json"), "w") as f:
+                with open(os.path.join(plain, "manifest.json"), "w", encoding="utf-8", newline="\n") as f:
                     f.write('{"depends_on": {"x": "1.0.0"}}\n')
                 self.assertEqual(fs.package_dir(tmp, "core", "2.3.0"), plain)  # releases/ wins when both hold it
                 self.assertEqual(bm.package_folder("core", "2.3.0"), plain)

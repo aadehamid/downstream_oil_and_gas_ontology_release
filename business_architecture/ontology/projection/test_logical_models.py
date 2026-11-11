@@ -44,7 +44,7 @@ class Package(unittest.TestCase):
                  f"{SLUG}.layer.ttl": os.path.join(EXAMPLE, f"{SLUG}.layer.ttl")}
         for name, source in names.items():
             shutil.copy(source, os.path.join(self.folder, name))
-        with open(os.path.join(self.folder, "catalog.ttl"), "w") as f:
+        with open(os.path.join(self.folder, "catalog.ttl"), "w", encoding="utf-8", newline="\n") as f:
             f.write(f"<{VERSION_IRI}/catalog> <http://www.w3.org/ns/dcat#dataset> <{VERSION_IRI}> .\n")
         self.write_manifest([*names, "catalog.ttl", "logical-model.jsonld", "CHANGELOG.md"])
         for patch in (mock.patch.object(ss, "REPO", self.root), mock.patch.object(lm, "RELEASES", os.path.dirname(os.path.dirname(self.folder)))):
@@ -52,7 +52,7 @@ class Package(unittest.TestCase):
             self.addCleanup(patch.stop)
 
     def write_manifest(self, files):
-        with open(os.path.join(self.folder, "manifest.json"), "w") as f:
+        with open(os.path.join(self.folder, "manifest.json"), "w", encoding="utf-8", newline="\n") as f:
             json.dump({"module": lm.MODULE, "version": "1.0.0", "files": {n: "0" * 64 for n in files}}, f)
 
     def rows(self):
@@ -312,7 +312,7 @@ class Drift(Package):
     def commit_catalog(self, with_package):
         """Writes the repository's catalog, with or without the package's dataset, and commits the tree; returns the commit."""
         catalog = os.path.join(self.root, ss.CATALOG)
-        with open(catalog, "w") as f:
+        with open(catalog, "w", encoding="utf-8", newline="\n") as f:
             f.write(f"<{VERSION_IRI}/../catalog> <http://www.w3.org/ns/dcat#dataset> <{VERSION_IRI}> .\n" if with_package else "")
         self.git("add", "-A")
         self.git("-c", "user.name=t", "-c", "user.email=t@example.org", "commit", "-q", "-m", "c")
@@ -326,7 +326,7 @@ class Drift(Package):
         self.git("init", "-q")
         ref = self.commit_catalog(with_package=True)
         shutil.rmtree(self.folder)  # the tree has no package; the ref does
-        with open(os.path.join(self.root, ss.CATALOG), "w") as f:
+        with open(os.path.join(self.root, ss.CATALOG), "w", encoding="utf-8", newline="\n") as f:
             f.write("")
         self.assertEqual(self.lines(ref), [("neo4j", "unmarked")])
         self.assertEqual(self.lines("worktree"), [])
@@ -334,7 +334,7 @@ class Drift(Package):
     def test_the_lm_line_follows_a_ref_that_holds_no_package_though_the_working_tree_does(self):
         self.git("init", "-q")
         ref = self.commit_catalog(with_package=False)
-        with open(os.path.join(self.root, ss.CATALOG), "w") as f:
+        with open(os.path.join(self.root, ss.CATALOG), "w", encoding="utf-8", newline="\n") as f:
             f.write(f"<{VERSION_IRI}/../catalog> <http://www.w3.org/ns/dcat#dataset> <{VERSION_IRI}> .\n")
         self.assertEqual(self.lines(ref), [])
         self.assertEqual(self.lines("worktree"), [("neo4j", "unmarked")])

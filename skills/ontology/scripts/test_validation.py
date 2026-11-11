@@ -518,7 +518,7 @@ class Packages(Files):
                  "shapes.ttl": self.write(os.path.join(folder, "shapes.ttl"), shapes)}
         manifest = {"module": module, "version": version, "depends_on": depends_on or {},
                     "files": {n: sha256(p) for n, p in files.items()}}
-        with open(os.path.join(self.dir, folder, "manifest.json"), "w") as f:
+        with open(os.path.join(self.dir, folder, "manifest.json"), "w", encoding="utf-8", newline="\n") as f:
             json.dump(manifest, f)
         return os.path.join(self.dir, folder)
 
@@ -544,7 +544,7 @@ class Packages(Files):
         self.assertIn("loans 1.0.0: Violation on https://id.example.org/library/loan1", out)
 
     def test_a_changed_file_fails(self):
-        with open(os.path.join(self.loans, "loans.ttl"), "a") as f:
+        with open(os.path.join(self.loans, "loans.ttl"), "a", encoding="utf-8", newline="\n") as f:
             f.write("lib:loan2 a lib:Loan ; lib:item lib:dune .\n")
         code, out = self.check(self.pins)
         self.assertEqual(code, 1)
@@ -622,15 +622,15 @@ class Packages(Files):
     def test_each_broken_manifest_or_file_fails(self):
         def manifest(**kw):
             path = os.path.join(self.loans, "manifest.json")
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 m = json.load(f)
             m.update(kw)
-            with open(path, "w") as f:
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
                 json.dump(m, f)
         cases = [
             (lambda: manifest(files=["loans.ttl"]), 'no readable manifest.json: manifest "files" is not an object'),
             (lambda: manifest(depends_on=["catalog"]), 'no readable manifest.json: manifest "depends_on" is not an object'),
-            (lambda: open(os.path.join(self.loans, "manifest.json"), "w").write("{not json"), "no readable manifest.json"),
+            (lambda: open(os.path.join(self.loans, "manifest.json"), "w", encoding="utf-8", newline="\n").write("{not json"), "no readable manifest.json"),
             (lambda: os.remove(os.path.join(self.loans, "shapes.ttl")), "shapes.ttl is in the manifest but missing"),
         ]
         for i, (breakit, message) in enumerate(cases):

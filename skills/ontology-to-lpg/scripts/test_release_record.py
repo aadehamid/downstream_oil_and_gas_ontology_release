@@ -154,7 +154,7 @@ class Records(unittest.TestCase):
     def test_a_file_edited_after_the_load_makes_no_record(self):
         for name, text in (("shapes.ttl", SHAPES + "# edited\n"), ("catalog.ttl", CATALOG + "# edited\n"), ("m.ttl", MODULE + "# edited\n")):
             with self.subTest(name=name):
-                before = open(os.path.join(self.tmp, name)).read()
+                before = open(os.path.join(self.tmp, name), encoding="utf-8").read()
                 self.write(name, text)
                 with self.assertRaisesRegex(rr.Refusal, "not the file the run read"):
                     rr.build_records([self.path], earned_report(), "t", manifest(self.tmp))

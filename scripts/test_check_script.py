@@ -8,7 +8,7 @@ CHECK = os.path.join(HERE, "check.sh")
 
 
 def _lines():
-    with open(CHECK) as f:
+    with open(CHECK, encoding="utf-8") as f:
         return f.read().split("\n")
 
 
@@ -38,7 +38,7 @@ def _modules():
     """The module names build_module.py's MODULES table declares, read without importing it."""
     import ast
     path = os.path.join(HERE, "..", "business_architecture", "ontology", "release", "build_module.py")
-    tree = ast.parse(open(path).read())
+    tree = ast.parse(open(path, encoding="utf-8").read())
     table = next(n.value for n in tree.body if isinstance(n, ast.Assign) and any(
         isinstance(t, ast.Name) and t.id == "MODULES" for t in n.targets))
     return [k.value for k in table.keys]

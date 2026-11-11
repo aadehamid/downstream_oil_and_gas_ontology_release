@@ -130,7 +130,7 @@ def lpg_name(iri, sep=None):
 def shapes_fingerprint():
     """SHA-256 over every shape file, in order. The committed report records it, so a shape change makes
     the report stale even when the loaded triples do not change."""
-    return sha(*(open(os.path.join(ONTOLOGY, p)).read() for p in SHAPES))
+    return sha(*(open(os.path.join(ONTOLOGY, p), encoding="utf-8").read() for p in SHAPES))
 
 
 # ---------- Step 1: check the rules, then validate the data ----------
@@ -199,7 +199,7 @@ def check(data, shapes):
 
 def build():
     data, shapes = graph(INPUTS), graph(SHAPES)
-    inferred = open(INFERRED).read() if os.path.exists(INFERRED) else ""
+    inferred = open(INFERRED, encoding="utf-8").read() if os.path.exists(INFERRED) else ""
     # Step 1 checks every triple that is loaded: the asserted data and the inferred triples.
     checked = Graph()
     checked += data
@@ -209,8 +209,8 @@ def build():
         sys.exit("Step 1 stops the build:\n  " + "\n  ".join(problems))
     loadable = sorted_nt(data)
     manifest = {
-        "inputs": {p: sha(open(os.path.join(ONTOLOGY, p)).read()) for p in INPUTS},
-        "shapes": {p: sha(open(os.path.join(ONTOLOGY, p)).read()) for p in SHAPES},
+        "inputs": {p: sha(open(os.path.join(ONTOLOGY, p), encoding="utf-8").read()) for p in INPUTS},
+        "shapes": {p: sha(open(os.path.join(ONTOLOGY, p), encoding="utf-8").read()) for p in SHAPES},
         "loadable_triples": loadable.count("\n"),
         "inferred_triples": inferred.count("\n"),
         "input_fingerprint": sha(loadable, inferred),
@@ -245,15 +245,15 @@ def report_problems(report):
 def record(run):
     """Takes a driver run's result into this folder, once its inputs are proven to be this tree's: every file its
     run-manifest.json lists has the SHA-256 of the file this tree projects, and it loaded the same triples."""
-    with open(os.path.join(run, "run-manifest.json")) as f:
+    with open(os.path.join(run, "run-manifest.json"), encoding="utf-8") as f:
         ran = json.load(f)
-    with open(os.path.join(run, "projection-report.json")) as f:
+    with open(os.path.join(run, "projection-report.json"), encoding="utf-8") as f:
         report = json.load(f)
-    with open(os.path.join(run, "inferred.nt")) as f:
+    with open(os.path.join(run, "inferred.nt"), encoding="utf-8") as f:
         inferred = f.read()
-    with open(os.path.join(run, "loadable.nt")) as f:
+    with open(os.path.join(run, "loadable.nt"), encoding="utf-8") as f:
         loaded = f.read()
-    tree = sorted(sha(open(os.path.join(ONTOLOGY, p)).read()) for p in INPUTS + SHAPES)
+    tree = sorted(sha(open(os.path.join(ONTOLOGY, p), encoding="utf-8").read()) for p in INPUTS + SHAPES)
     if sorted(e["sha256"] for e in ran["data"] + ran["shapes"]) != tree:
         sys.exit("record: that run read other inputs than this tree's; run the driver on this tree")
     problems = report_problems(report)
@@ -261,15 +261,15 @@ def record(run):
         sys.exit("record: the run's report cannot stand: " + "; ".join(problems))
     if set(loaded.splitlines()) != set(sorted_nt(graph(INPUTS)).splitlines()):
         sys.exit("record: that run loaded other triples than this tree's")
-    with open(INFERRED, "w") as f:
+    with open(INFERRED, "w", encoding="utf-8", newline="\n") as f:
         f.write(inferred)
     loadable, inferred, manifest = build()  # Step 1 now covers the run's inferences too
     summary = {k: report[k] for k in REPORT_FIELDS}
     summary.update({"input_fingerprint": sha(loadable, inferred), "shapes_fingerprint": shapes_fingerprint(),
                     "versions": report["versions"]})
-    with open(MANIFEST, "w") as f:
+    with open(MANIFEST, "w", encoding="utf-8", newline="\n") as f:
         f.write(manifest)
-    with open(REPORT, "w") as f:
+    with open(REPORT, "w", encoding="utf-8", newline="\n") as f:
         f.write(json.dumps(summary, indent=2, sort_keys=True) + "\n")
     print(f"recorded: {summary['nodes']} nodes, {summary['relationships']} relationships, "
           f"{loadable.count(chr(10))} triples and {inferred.count(chr(10))} inferred")
@@ -291,11 +291,11 @@ def main():
         loadable, inferred, manifest = build()
         print(f"Step 1 passed; loadable.nt {loadable.count(chr(10))} triples, inferred.nt {inferred.count(chr(10))}")
         if args.verify:
-            if not os.path.exists(MANIFEST) or open(MANIFEST).read() != manifest:
+            if not os.path.exists(MANIFEST) or open(MANIFEST, encoding="utf-8").read() != manifest:
                 sys.exit("projection-manifest.json is not current: run pipeline.py build")
             print("projection-manifest.json is current")
         else:
-            with open(MANIFEST, "w") as f:
+            with open(MANIFEST, "w", encoding="utf-8", newline="\n") as f:
                 f.write(manifest)
             print("wrote projection-manifest.json")
     else:

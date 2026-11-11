@@ -28,7 +28,7 @@ def test_find_catches_text_split_across_lines(tmp_path):
     # decided") moved to the worklog on one line when the playbook's evidence moved there (2026-10-23).
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, env=env)
-    (tmp_path / "doc.md").write_text("In this repository this is the decision of 2026-10-05,\n  decided 2026-10-06.\n")
+    (tmp_path / "doc.md").write_text("In this repository this is the decision of 2026-10-05,\n  decided 2026-10-06.\n", encoding="utf-8", newline="\n")
     subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True, env=env)
     hits = epm_facts.find_hits("the decision of 2026-10-05, decided", str(tmp_path))
     assert [(name, line, kind) for name, line, kind, _ in hits] == [("doc.md", 1, "split")]
@@ -42,11 +42,11 @@ def test_find_skips_only_a_fresh_generated_copy(tmp_path, monkeypatch):
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, env=env)
     head = f"<html><head>{build_docs_html.MARK}</head>\n"
     fresh = head + "<p>The crack spread is a margin.</p></html>\n"
-    (tmp_path / "README.md").write_text("The crack spread is a margin.\n")
-    (tmp_path / "README.html").write_text(fresh)
-    (tmp_path / "stale.html").write_text(head + "<p>The crack spread was edited by hand.</p></html>\n")
-    (tmp_path / "orphan.html").write_text(head + "<p>A crack spread page no source builds.</p></html>\n")
-    (tmp_path / "ontology-stores-runbook.html").write_text("<html><head></head>\n<p>The crack spread is a margin.</p></html>\n")
+    (tmp_path / "README.md").write_text("The crack spread is a margin.\n", encoding="utf-8", newline="\n")
+    (tmp_path / "README.html").write_text(fresh, encoding="utf-8", newline="\n")
+    (tmp_path / "stale.html").write_text(head + "<p>The crack spread was edited by hand.</p></html>\n", encoding="utf-8", newline="\n")
+    (tmp_path / "orphan.html").write_text(head + "<p>A crack spread page no source builds.</p></html>\n", encoding="utf-8", newline="\n")
+    (tmp_path / "ontology-stores-runbook.html").write_text("<html><head></head>\n<p>The crack spread is a margin.</p></html>\n", encoding="utf-8", newline="\n")
     subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True, env=env)
     monkeypatch.setattr(epm_facts, "built_pages", lambda root: {"README.html": fresh, "stale.html": fresh})
     hits = epm_facts.find_hits("crack spread", str(tmp_path))
@@ -92,11 +92,11 @@ def test_sweep_finds_a_phrase_whose_context_is_on_an_unchanged_line(tmp_path, mo
     git("init", "-q", "-b", "main")
     git("config", "user.email", "t@example.com")
     git("config", "user.name", "t")
-    (tmp_path / "source.md").write_text("At 686\nanswerable.\n")
-    (tmp_path / "stale.md").write_text("At 686 answerable.\n")
+    (tmp_path / "source.md").write_text("At 686\nanswerable.\n", encoding="utf-8", newline="\n")
+    (tmp_path / "stale.md").write_text("At 686 answerable.\n", encoding="utf-8", newline="\n")
     git("add", ".")
     git("commit", "-q", "-m", "base")
-    (tmp_path / "source.md").write_text("At 409\nanswerable.\n")
+    (tmp_path / "source.md").write_text("At 409\nanswerable.\n", encoding="utf-8", newline="\n")
     git("commit", "-q", "-am", "change")
     report = dict(epm_facts.sweep("HEAD~1", root=str(tmp_path)))
     assert [(name, i) for name, i, _, _ in report["At 686 answerable"]] == [("stale.md", 1)]
@@ -111,12 +111,12 @@ def test_sweep_finds_both_old_values_of_two_swapped_lines(tmp_path, monkeypatch)
     git("init", "-q", "-b", "main")
     git("config", "user.email", "t@example.com")
     git("config", "user.name", "t")
-    (tmp_path / "source.md").write_text("the ledger holds 34\n9 waiting\n")
-    (tmp_path / "stale-one.md").write_text("the ledger holds 34\n")
-    (tmp_path / "stale-two.md").write_text("9 waiting\n")
+    (tmp_path / "source.md").write_text("the ledger holds 34\n9 waiting\n", encoding="utf-8", newline="\n")
+    (tmp_path / "stale-one.md").write_text("the ledger holds 34\n", encoding="utf-8", newline="\n")
+    (tmp_path / "stale-two.md").write_text("9 waiting\n", encoding="utf-8", newline="\n")
     git("add", ".")
     git("commit", "-q", "-m", "base")
-    (tmp_path / "source.md").write_text("the ledger holds 9\n34 waiting\n")
+    (tmp_path / "source.md").write_text("the ledger holds 9\n34 waiting\n", encoding="utf-8", newline="\n")
     git("commit", "-q", "-am", "swap")
     report = dict(epm_facts.sweep("HEAD~1", root=str(tmp_path)))
     assert [name for name, *_ in report["holds 34"]] == ["stale-one.md"]
@@ -140,15 +140,15 @@ def test_sweep_finds_the_old_wording_left_elsewhere(tmp_path, monkeypatch):
     git("init", "-q", "-b", "main")
     git("config", "user.email", "t@example.com")
     git("config", "user.name", "t")
-    (tmp_path / "a.md").write_text("Three systems are matched.\n")
-    (tmp_path / "b.md").write_text("Here three\nsystems are matched, split across lines.\n")
-    (tmp_path / "c.md").write_text("Three systems are matched *2026-10-21:* four.\n")
-    (tmp_path / "d.sql").write_text("-- Three systems feed this view (Superseded 2026-10-22: four).\n")
-    (tmp_path / "e.page").write_text("Three systems, as the page says.\n")
-    (tmp_path / "f — guide.md").write_text("Three systems, in a file whose name git quotes.\n")
+    (tmp_path / "a.md").write_text("Three systems are matched.\n", encoding="utf-8", newline="\n")
+    (tmp_path / "b.md").write_text("Here three\nsystems are matched, split across lines.\n", encoding="utf-8", newline="\n")
+    (tmp_path / "c.md").write_text("Three systems are matched *2026-10-21:* four.\n", encoding="utf-8", newline="\n")
+    (tmp_path / "d.sql").write_text("-- Three systems feed this view (Superseded 2026-10-22: four).\n", encoding="utf-8", newline="\n")
+    (tmp_path / "e.page").write_text("Three systems, as the page says.\n", encoding="utf-8", newline="\n")
+    (tmp_path / "f — guide.md").write_text("Three systems, in a file whose name git quotes.\n", encoding="utf-8", newline="\n")
     git("add", ".")
     git("commit", "-q", "-m", "base")
-    (tmp_path / "a.md").write_text("Four systems are matched.\n")
+    (tmp_path / "a.md").write_text("Four systems are matched.\n", encoding="utf-8", newline="\n")
     git("commit", "-q", "-am", "change")
     report = dict(epm_facts.sweep("HEAD~1", root=str(tmp_path)))
     states = {(name, state) for name, _, state, _ in report["Three systems"]}
@@ -156,13 +156,13 @@ def test_sweep_finds_the_old_wording_left_elsewhere(tmp_path, monkeypatch):
 
 
 def _backlog():
-    with open(epm_facts.BACKLOG) as f:
+    with open(epm_facts.BACKLOG, encoding="utf-8") as f:
         return f.read()
 
 
 def test_gate_figures_survive_a_failing_gate(tmp_path):
     fake = tmp_path / "evidence-gate.py"
-    fake.write_text("import sys\npromoted = 1066\nheld_ctx = 237\nprint('GATE FAILED: 1 check(s)')\nsys.exit(1)\n")
+    fake.write_text("import sys\npromoted = 1066\nheld_ctx = 237\nprint('GATE FAILED: 1 check(s)')\nsys.exit(1)\n", encoding="utf-8", newline="\n")
     ns, ok, out = epm_facts.run_keeping_globals(str(fake))
     assert ok is False and "GATE FAILED" in out
     assert (ns["promoted"], ns["held_ctx"]) == (1066, 237)
@@ -182,22 +182,22 @@ def _quote_fixture(tmp_path, reason="", owner_words=None, block=None):
     reviews = tmp_path / "reviews"
     reviews.mkdir(parents=True)
     src = os.path.join(epm_facts.REVIEWS, "precedes-follows-batch1-review.csv")
-    with open(src, newline="") as f:
+    with open(src, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     if reason:
         rows[7]["semantic_reason"] = reason
     if owner_words:
         rows[0]["owner_words"] = owner_words
-    with open(reviews / "batch.csv", "w", newline="") as f:
+    with open(reviews / "batch.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         w.writeheader()
         w.writerows(rows)
     backlog = tmp_path / "backlog.md"
-    with open(epm_facts.BACKLOG) as f:
+    with open(epm_facts.BACKLOG, encoding="utf-8") as f:
         text = f.read()
     if block:
         text += f"\n\n> {block}\n"
-    backlog.write_text(text)
+    backlog.write_text(text, encoding="utf-8", newline="\n")
     return epm_facts.quote_problems(str(reviews), str(backlog), epm_facts.ANSWERS)
 
 
@@ -205,7 +205,7 @@ def test_quotes_report_when_nothing_was_checked(tmp_path):
     empty = tmp_path / "empty"
     empty.mkdir()
     backlog = tmp_path / "backlog.md"
-    backlog.write_text("no quotes\n")
+    backlog.write_text("no quotes\n", encoding="utf-8", newline="\n")
     problems = epm_facts.quote_problems(str(empty), str(backlog), str(empty))
     assert any("no saved answer text" in p for p in problems)
     assert any("no review file" in p for p in problems)
@@ -214,12 +214,12 @@ def test_quotes_report_when_nothing_was_checked(tmp_path):
 def test_quotes_reject_empty_answers_and_blank_rows(tmp_path):
     answers = tmp_path / "answers"
     answers.mkdir()
-    (answers / "empty.md").write_text("<!-- source header only -->\n")
+    (answers / "empty.md").write_text("<!-- source header only -->\n", encoding="utf-8", newline="\n")
     reviews = tmp_path / "reviews"
     reviews.mkdir()
-    (reviews / "batch.csv").write_text("row_id,owner_words,scope_note_sentence,semantic_reason,owner_decision\nREL-00193,,,,\n")
+    (reviews / "batch.csv").write_text("row_id,owner_words,scope_note_sentence,semantic_reason,owner_decision\nREL-00193,,,,\n", encoding="utf-8", newline="\n")
     backlog = tmp_path / "backlog.md"
-    backlog.write_text("")
+    backlog.write_text("", encoding="utf-8", newline="\n")
     problems = epm_facts.quote_problems(str(reviews), str(backlog), str(answers))
     assert any("no saved answer text" in p for p in problems)
     assert any("owner_words is blank" in p for p in problems)
@@ -232,7 +232,7 @@ def _decision_fixture(tmp_path, number, words, status="Decided"):
     (folder / f"DEC-{number:04d}-test.md").write_text(
         f"# DEC-{number:04d}: test\n\n| Field | Value |\n|---|---|\n| Status | {status} |\n\n"
         f"## Decision\n\nThe definition \"The source completes before the target begins\" stays.\n\n"
-        f"## the words of a subject matter expert reviewing the documents\n\n{words}\n\n## Evidence\n\nNone.\n")
+        f"## the words of a subject matter expert reviewing the documents\n\n{words}\n\n## Evidence\n\nNone.\n", encoding="utf-8", newline="\n")
     reviews = os.path.dirname(epm_facts.REVIEWS + "/")
     return epm_facts.quote_problems(reviews, epm_facts.BACKLOG, epm_facts.ANSWERS, str(folder))
 
@@ -243,7 +243,7 @@ SAVED = '"Approved: Q1–Q18 as recommended in the comment above"'
 def _answers(tmp_path, text):
     folder = tmp_path / "answers"
     folder.mkdir(parents=True)
-    (folder / "a.md").write_text("<!-- header -->\n\n" + text)
+    (folder / "a.md").write_text("<!-- header -->\n\n" + text, encoding="utf-8", newline="\n")
     return str(folder)
 
 
@@ -270,7 +270,7 @@ def _decision_with_answers(tmp_path, answer_text, words):
     folder = tmp_path / "decisions"
     folder.mkdir()
     (folder / "the decision of 2026-10-12-test.md").write_text(
-        f"# t\n\n| Field | Value |\n|---|---|\n| Status | Decided |\n\n## the words of a subject matter expert reviewing the documents\n\n{words}\n")
+        f"# t\n\n| Field | Value |\n|---|---|\n| Status | Decided |\n\n## the words of a subject matter expert reviewing the documents\n\n{words}\n", encoding="utf-8", newline="\n")
     return [p for p in epm_facts.quote_problems(epm_facts.REVIEWS, epm_facts.BACKLOG, answers, str(folder))
             if "the decision of 2026-10-12" in p]
 
@@ -322,10 +322,10 @@ def test_names_check_finds_the_owner_in_any_case_path_and_office_file(tmp_path):
     # A clean environment, so an inherited GIT_DIR or GIT_INDEX_FILE cannot point git elsewhere.
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, env=env)
-    (tmp_path / "clean.md").write_text("the subject matter expert approved it.\n")
-    (tmp_path / "prose.md").write_text(f"line one\n{first.upper()} approved it.\n")
-    (tmp_path / "link.md").write_text(f"https://github.com/{user}/repo\n")
-    (tmp_path / f"{first.lower()}-notes.txt").write_text("no name inside\n")
+    (tmp_path / "clean.md").write_text("the subject matter expert approved it.\n", encoding="utf-8", newline="\n")
+    (tmp_path / "prose.md").write_text(f"line one\n{first.upper()} approved it.\n", encoding="utf-8", newline="\n")
+    (tmp_path / "link.md").write_text(f"https://github.com/{user}/repo\n", encoding="utf-8", newline="\n")
+    (tmp_path / f"{first.lower()}-notes.txt").write_text("no name inside\n", encoding="utf-8", newline="\n")
     os.symlink("clean.md", tmp_path / f"{first}-link.md")
     with zipfile.ZipFile(tmp_path / "book.xlsx", "w") as z:
         z.writestr("xl/worksheets/sheet1.xml", f"<t>{first}'s verdict</t>")
@@ -360,10 +360,10 @@ def test_names_check_reads_every_file_where_there_is_no_git(tmp_path):
     # A tree without .git: every file under the root is read, not only the tracked ones.
     first = "Ha" + "mid"
     (tmp_path / "deep").mkdir()
-    (tmp_path / "deep" / "prose.md").write_text(f"line one\n{first} approved it.\n")
-    (tmp_path / "clean.md").write_text("the subject matter expert approved it.\n")
+    (tmp_path / "deep" / "prose.md").write_text(f"line one\n{first} approved it.\n", encoding="utf-8", newline="\n")
+    (tmp_path / "clean.md").write_text("the subject matter expert approved it.\n", encoding="utf-8", newline="\n")
     (tmp_path / "__pycache__").mkdir()
-    (tmp_path / "__pycache__" / "x.pyc").write_text(first)
+    (tmp_path / "__pycache__" / "x.pyc").write_text(first, encoding="utf-8", newline="\n")
     assert set(epm_facts.name_problems(str(tmp_path))) == {
         "deep/prose.md:2: names the decision owner", "deep/prose.md (displayed text):2: names the decision owner"}
 
@@ -372,9 +372,9 @@ def test_names_check_finds_a_name_split_by_markdown_or_html_formatting(tmp_path)
     # A browser shows these as the name in one piece; a scan of the raw lines does not see it.
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, env=env)
-    (tmp_path / "emphasis.md").write_text("Approved by H**a**" + "mid on 2026-10-26.\n")
-    (tmp_path / "page.html").write_text("<p>Approved by h<strong>a</strong>" + "mid.</p>\n")
-    (tmp_path / "plain.html").write_text("<p>Approved by the decision owner.</p>\n")
+    (tmp_path / "emphasis.md").write_text("Approved by H**a**" + "mid on 2026-10-26.\n", encoding="utf-8", newline="\n")
+    (tmp_path / "page.html").write_text("<p>Approved by h<strong>a</strong>" + "mid.</p>\n", encoding="utf-8", newline="\n")
+    (tmp_path / "plain.html").write_text("<p>Approved by the decision owner.</p>\n", encoding="utf-8", newline="\n")
     subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True, env=env)
     assert sorted(epm_facts.name_problems(str(tmp_path))) == [
         "emphasis.md (displayed text):1: names the decision owner",
@@ -390,13 +390,13 @@ BUILDER_STUB = 'MODULES = {"lane": {"parts": ["lane/vocabulary.ttl", "lane/lanes
 def plant_release(releases, module, version, manifest, ttl=""):
     folder = releases / module / version
     folder.mkdir(parents=True)
-    (folder / "manifest.json").write_text(json.dumps({"module": module, "version": version, **manifest}))
-    (folder / (module + ".ttl")).write_text(ttl)
+    (folder / "manifest.json").write_text(json.dumps({"module": module, "version": version, **manifest}), encoding="utf-8", newline="\n")
+    (folder / (module + ".ttl")).write_text(ttl, encoding="utf-8", newline="\n")
 
 
 def test_module_map_follows_a_new_release_and_a_changed_requirement(tmp_path):
     releases, builder = tmp_path / "releases", tmp_path / "build_module.py"
-    builder.write_text(BUILDER_STUB)
+    builder.write_text(BUILDER_STUB, encoding="utf-8", newline="\n")
     plant_release(releases, "core", "1.0.0", {"triples": 5, "built_from": {"process map": "map.json at abc"}})
     plant_release(releases, "lane", "1.0.0", {"triples": 3, "depends_on": {"core": "1.0.0"}})
     before = {m["module"]: m for m in epm_facts.module_releases(str(releases), str(builder))}
@@ -418,7 +418,7 @@ def test_module_map_follows_the_manifest_and_labels_the_builders_folders(tmp_pat
     # folders under their own label, never as the release's.
     releases, builder = tmp_path / "releases", tmp_path / "build_module.py"
     builder.write_text('MODULES = {"lane": {"parts": ["lane/lanes.ttl", "extra/more.ttl"]},'
-                       ' "system": {"parts": ["system/systems.ttl"]}}\n')
+                       ' "system": {"parts": ["system/systems.ttl"]}}\n', encoding="utf-8", newline="\n")
     plant_release(releases, "lane", "1.0.0", {"triples": 3})
     plant_release(releases, "lane", "2.0.0", {"triples": 3, "built_from": {"lane table": "lane/old.csv at 123"}})
     plant_release(releases, "system", "1.0.0", {"triples": 2})
@@ -516,18 +516,18 @@ NAMED_MISS = "not in the answers file, record or comment it names"  # a quote it
 def _citation_fixture(tmp_path, doc):
     answers, decisions = tmp_path / "answers", tmp_path / "decisions"
     answers.mkdir(parents=True, exist_ok=True); decisions.mkdir(exist_ok=True)
-    (answers / "answers-y.md").write_text("<!-- verbatim from urn:epm:comment:7000001 -->\nship the ledger as it stands today\n")
-    (answers / "answers-x.md").write_text("<!-- context -->\nkeep the old figures as they were recorded\n")
-    (tmp_path / "doc.md").write_text(doc)
+    (answers / "answers-y.md").write_text("<!-- verbatim from urn:epm:comment:7000001 -->\nship the ledger as it stands today\n", encoding="utf-8", newline="\n")
+    (answers / "answers-x.md").write_text("<!-- context -->\nkeep the old figures as they were recorded\n", encoding="utf-8", newline="\n")
+    (tmp_path / "doc.md").write_text(doc, encoding="utf-8", newline="\n")
     return epm_facts.citation_problems(root=str(tmp_path), answers=str(answers), decisions=str(decisions), files=["doc.md"])
 
 
 def test_citations_walk_every_markdown_file_where_there_is_no_git(tmp_path):
     # files=None in a tree without .git: every .md under the root is read, nothing is tracked.
     (tmp_path / "deep").mkdir()
-    (tmp_path / "deep" / "doc.md").write_text("a document\n")
-    (tmp_path / "top.md").write_text("another\n")
-    (tmp_path / "other.txt").write_text("not Markdown\n")
+    (tmp_path / "deep" / "doc.md").write_text("a document\n", encoding="utf-8", newline="\n")
+    (tmp_path / "top.md").write_text("another\n", encoding="utf-8", newline="\n")
+    (tmp_path / "other.txt").write_text("not Markdown\n", encoding="utf-8", newline="\n")
     assert epm_facts.markdown_files(str(tmp_path)) == ["deep/doc.md", "top.md"]
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, env=env)

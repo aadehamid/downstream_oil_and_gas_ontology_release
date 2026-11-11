@@ -27,7 +27,7 @@ x:individual a x:Thing; rdfs:label "A designed individual" .
 def package(root, module="core", version="1.0.0", ttl=TTL):
     p = root / viewer.ONTOLOGY / "releases" / module / version
     p.mkdir(parents=True)
-    (p / (module + ".ttl")).write_text(ttl)
+    (p / (module + ".ttl")).write_text(ttl, encoding="utf-8", newline="\n")
     (p / "manifest.json").write_text(
         json.dumps(
             {
@@ -36,8 +36,7 @@ def package(root, module="core", version="1.0.0", ttl=TTL):
                 "release_candidate": False,
                 "files": {module + ".ttl": hashlib.sha256(ttl.encode()).hexdigest()},
             }
-        )
-    )
+        ), encoding="utf-8", newline="\n")
     return p
 
 
@@ -63,7 +62,7 @@ def test_history_examples_and_live_graph_are_not_inputs(tmp_path):
     ]:
         p = tmp_path / viewer.ONTOLOGY / extra
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text("invalid RDF must never be read")
+        p.write_text("invalid RDF must never be read", encoding="utf-8", newline="\n")
     data = viewer.build_data(tmp_path)
     assert not any(n["id"].endswith("/Old") for n in data["nodes"])
     assert len(data["inputs"]) == 1
@@ -71,7 +70,7 @@ def test_history_examples_and_live_graph_are_not_inputs(tmp_path):
 
 def test_changed_or_missing_package_fails(tmp_path):
     p = package(tmp_path)
-    (p / "core.ttl").write_text(TTL + "\nx:Invented a owl:Class .")
+    (p / "core.ttl").write_text(TTL + "\nx:Invented a owl:Class .", encoding="utf-8", newline="\n")
     with pytest.raises(ValueError, match="hash mismatch"):
         viewer.build_data(tmp_path)
     (p / "core.ttl").unlink()
@@ -99,7 +98,7 @@ def test_embed_is_script_safe_and_needs_no_network(tmp_path):
     )
     out = tmp_path / "viewer/index.html"
     viewer.build(tmp_path, out, require_clean=False)
-    text = out.read_text()
+    text = out.read_text(encoding="utf-8")
     payload = text.split('<script id="ontology-data" type="application/json">')[
         1
     ].split("</script>")[0]
@@ -132,7 +131,7 @@ def test_cut_emits_the_neutral_source_title_and_actual_file_hashes(tmp_path):
     current = package(cut, ttl=ttl.replace(OLD_TITLE, NEW_TITLE))
     output = tmp_path / "index.html"
     viewer.build(source, output, compare=cut, require_clean=False)
-    payload = output.read_text().split('<script id="ontology-data" type="application/json">')[1].split("</script>")[0]
+    payload = output.read_text(encoding="utf-8").split('<script id="ontology-data" type="application/json">')[1].split("</script>")[0]
     data = json.loads(payload)
     assert OLD_TITLE not in payload
     assert NEW_TITLE in payload
@@ -186,7 +185,7 @@ def test_local_package_changes_are_refused_and_a_tree_without_git_is_not_checked
     git("-c", "user.name=Test fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "Fixture")
     viewer.clean_packages(tmp_path)
     manifest = next((tmp_path / viewer.ONTOLOGY / "releases").glob("*/*/manifest.json"))
-    manifest.write_text(manifest.read_text() + "\n")
+    manifest.write_text(manifest.read_text(encoding="utf-8") + "\n", encoding="utf-8", newline="\n")
     with pytest.raises(ValueError, match="local changes"):
         viewer.clean_packages(tmp_path)
 
@@ -239,17 +238,17 @@ def test_payload_preserves_every_rdf_triple(tmp_path):
 @pytest.mark.parametrize("defect", ["identity", "candidate", "escape", "missing-newest"])
 def test_invalid_package_cannot_be_viewed(tmp_path, defect):
     p = package(tmp_path)
-    manifest = json.loads((p / "manifest.json").read_text())
+    manifest = json.loads((p / "manifest.json").read_text(encoding="utf-8"))
     if defect == "identity":
         manifest["module"] = "other"
     elif defect == "candidate":
         manifest["release_candidate"] = True
     elif defect == "escape":
-        (p.parent / "escape.ttl").write_text(TTL)
+        (p.parent / "escape.ttl").write_text(TTL, encoding="utf-8", newline="\n")
         manifest["files"] = {"../escape.ttl": hashlib.sha256(TTL.encode()).hexdigest()}
     else:
         (p.parent / "2.0.0").mkdir()
-    (p / "manifest.json").write_text(json.dumps(manifest))
+    (p / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8", newline="\n")
     with pytest.raises((ValueError, FileNotFoundError)):
         viewer.build_data(tmp_path)
 
@@ -257,7 +256,7 @@ def test_invalid_package_cannot_be_viewed(tmp_path, defect):
 def test_catalog_metadata_is_preserved_but_not_counted_as_terms(tmp_path):
     package(tmp_path, ttl=TTL + '\nx:file a <http://www.w3.org/ns/dcat#Distribution> .')
     catalog = tmp_path / viewer.ONTOLOGY / "releases/catalog.ttl"
-    catalog.write_text('@prefix dcat: <http://www.w3.org/ns/dcat#> . <https://example.test/catalog> a dcat:Catalog; <http://purl.org/dc/terms/title> "Whole release catalog" .')
+    catalog.write_text('@prefix dcat: <http://www.w3.org/ns/dcat#> . <https://example.test/catalog> a dcat:Catalog; <http://purl.org/dc/terms/title> "Whole release catalog" .', encoding="utf-8", newline="\n")
     data = viewer.build_data(tmp_path)
     assert data["terms"] == 5
     assert data["counts"]["Metadata"] == 2

@@ -40,7 +40,7 @@ class Inputs(unittest.TestCase):
         self.assertTrue(os.path.isdir(listed("releases")[0]))
 
     def test_the_config_pins_the_pipeline_packages(self):
-        with open(os.path.join(HERE, "epm-config.json")) as f:
+        with open(os.path.join(HERE, "epm-config.json"), encoding="utf-8") as f:
             config = json.load(f)
         self.assertEqual(config["packages"], dict(pipeline.PACKAGES))
 
@@ -51,7 +51,7 @@ class Inputs(unittest.TestCase):
 
 class RunConfig(unittest.TestCase):
     def setUp(self):
-        with open(os.path.join(HERE, "epm-run.json")) as f:
+        with open(os.path.join(HERE, "epm-run.json"), encoding="utf-8") as f:
             self.cfg = json.load(f)
 
     def path(self, value):
@@ -83,7 +83,7 @@ class RunConfig(unittest.TestCase):
                 self.assertTrue(os.path.isfile(os.path.join(os.path.dirname(data), name + ".ttl")), (data, name))
 
     def test_every_saved_walk_names_a_start_and_hops(self):
-        with open(os.path.join(HERE, "queries.json")) as f:
+        with open(os.path.join(HERE, "queries.json"), encoding="utf-8") as f:
             queries = json.load(f)["queries"]
         self.assertEqual(len(queries), 14)
         for q in queries:

@@ -38,7 +38,7 @@ CONTEXT = Graph().parse(bv.DATA_PRODUCTS).parse(bv.MEASURES) \
     .parse(os.path.join(HERE, "..", "data-product", "vocabulary.ttl")).parse(os.path.join(HERE, "..", "kpi", "vocabulary.ttl"))
 SOURCES = {}
 for path in bv.STREAMS:
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         SOURCES[os.path.basename(path)] = json.load(f)
 
 

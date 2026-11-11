@@ -31,7 +31,7 @@ def questions():
 
 def ask(graph, path, limit=20):
     """The query's first line, its row count, and up to `limit` rows with labels."""
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         text = f.read()
     rows = list(graph.query(text))
     return text.splitlines()[0].lstrip("# "), len(rows), [[label(graph, v) for v in r] for r in rows[:limit]]
@@ -45,7 +45,7 @@ def main():
     known = questions()
     if not args.question:
         for name, path in known.items():
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 print(f"{name}: {f.readline().lstrip('# ').strip()}")
         return
     if args.question not in known:

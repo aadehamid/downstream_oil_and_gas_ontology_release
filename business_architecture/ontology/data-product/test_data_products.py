@@ -23,7 +23,7 @@ DCAT = Namespace("http://www.w3.org/ns/dcat#")
 VOCAB = Graph().parse(os.path.join(HERE, "vocabulary.ttl"))
 SHAPES = Graph().parse(os.path.join(HERE, "shapes.ttl"))
 PRODUCTS = Graph().parse(os.path.join(HERE, "data-products.ttl"))
-with open(bd.PORTFOLIO) as f:
+with open(bd.PORTFOLIO, encoding="utf-8") as f:
     PORTFOLIO = json.load(f)
 
 

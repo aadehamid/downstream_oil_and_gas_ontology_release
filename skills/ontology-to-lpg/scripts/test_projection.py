@@ -672,7 +672,7 @@ class Build(unittest.TestCase):
             loadable, inferred_path = os.path.join(tmp, "loadable.nt"), os.path.join(tmp, "inferred.nt")
             out = os.path.join(tmp, "manifest.json")
             self.assertEqual(run_main(build.main, ["loadable", "--output", loadable, MODULE])[0], 0)
-            open(inferred_path, "w").close()
+            open(inferred_path, "w", encoding="utf-8", newline="\n").close()
             args = ["manifest", "--config", CONFIG, "--shapes", SHAPES, "--loadable", loadable,
                     "--inferred", inferred_path, "--output", out, MODULE]
             self.assertEqual(run_main(build.main, args)[0], 0)
@@ -686,7 +686,7 @@ class Build(unittest.TestCase):
             self.assertIn("is not current", text)
             with open(out, "wb") as f:
                 f.write(lf)
-            with open(inferred_path, "w") as f:
+            with open(inferred_path, "w", encoding="utf-8", newline="\n") as f:
                 f.write(f"<{LIB}work/W-0043> <{RDF.type}> <{LIB}Work> .\n")
             code, text = run_main(build.main, args + ["--verify"])
             self.assertEqual(code, 1, text)
@@ -845,8 +845,8 @@ class RoundTwo(OneBreak, unittest.TestCase):
             for src in (MODULE, SHAPES, CONFIG):
                 shutil.copy(src, os.path.join(a, "data"))
             loadable, inferred_path = os.path.join(a, "loadable.nt"), os.path.join(a, "inferred.nt")
-            open(loadable, "w").close()
-            open(inferred_path, "w").close()
+            open(loadable, "w", encoding="utf-8", newline="\n").close()
+            open(inferred_path, "w", encoding="utf-8", newline="\n").close()
 
             def args(root):
                 return ["manifest", "--config", os.path.join(root, "data", "projection-config.json"),
@@ -1092,7 +1092,7 @@ class Connection(unittest.TestCase):
     """load_verify.py reaches a server that already runs: an env file, or --bolt with the environment."""
 
     def env(self, text):
-        f = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False)
+        f = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False, encoding="utf-8")
         f.write(text)
         f.close()
         self.addCleanup(os.remove, f.name)

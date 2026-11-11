@@ -24,7 +24,7 @@ def _fixture(rows: list[dict], edits: list[tuple[str, str]]) -> tuple[Path, Path
     for row in rows:
         ws.append([row.get(h, "") for h in HEADERS])
     wb.save(tmp / "wb.xlsx")
-    with open(tmp / "review.csv", "w", newline="") as f:
+    with open(tmp / "review.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["row_id", "scope_note_slug", "scope_note_sentence"])
         for slug, sentence in edits:

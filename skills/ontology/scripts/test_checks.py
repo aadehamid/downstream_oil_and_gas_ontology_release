@@ -1006,7 +1006,7 @@ class CheckScriptSkeleton(unittest.TestCase):
 
     def test_write_guard_catches_a_dropped_execute_bit(self):
         tool = os.path.join(self.tmp, "tool.sh")
-        with open(tool, "w") as f:
+        with open(tool, "w", encoding="utf-8", newline="\n") as f:
             f.write("echo hi\n")
         os.chmod(tool, 0o755)
         self.edit_script(lambda t: self.drop_todos(t).replace(
@@ -1077,7 +1077,7 @@ class CheckScriptSkeleton(unittest.TestCase):
         self.assertIn("the checks changed the working tree", result.stderr)
 
     def test_write_guard_catches_a_changed_file(self):
-        with open(os.path.join(self.tmp, "note.txt"), "w") as f:
+        with open(os.path.join(self.tmp, "note.txt"), "w", encoding="utf-8", newline="\n") as f:
             f.write("before\n")
         self.inject("echo after > note.txt")
         result = self.run_script()
@@ -1087,7 +1087,7 @@ class CheckScriptSkeleton(unittest.TestCase):
     def test_write_guard_ignores_build_output(self):
         # In a checkout the repository's own ignore file keeps build output out of git's listing; in a plain
         # folder the guard's own list does.
-        with open(os.path.join(self.tmp, ".gitignore"), "w") as f:
+        with open(os.path.join(self.tmp, ".gitignore"), "w", encoding="utf-8", newline="\n") as f:
             f.write("__pycache__/\n.pytest_cache/\n")
         self.inject("mkdir -p __pycache__ .pytest_cache && echo x > __pycache__/a.pyc && echo y > .pytest_cache/b")
         result = self.run_script()
@@ -1147,7 +1147,7 @@ class CheckScriptWithoutGit(CheckScriptSkeleton):
         self.edit_script(self.drop_todos)
         env = self.without_git()
         fake = os.path.join(env["PATH"], "git")
-        with open(fake, "w") as f:
+        with open(fake, "w", encoding="utf-8", newline="\n") as f:
             f.write("#!/bin/sh\necho 'fatal: detected dubious ownership in repository' >&2\nexit 128\n")
         os.chmod(fake, 0o755)
         result = subprocess.run(["bash", "scripts/check.sh"], cwd=self.tmp, env=env,
@@ -1160,7 +1160,7 @@ class CheckScriptWithoutGit(CheckScriptSkeleton):
     def test_a_broken_git_directory_stops_the_guard(self):
         # git says "not a git repository" here too, but names the path: this is a broken checkout, not a plain folder.
         self.edit_script(self.drop_todos)
-        with open(os.path.join(self.tmp, ".git"), "w") as f:
+        with open(os.path.join(self.tmp, ".git"), "w", encoding="utf-8", newline="\n") as f:
             f.write("gitdir: /no/such/folder\n")
         result = self.run_script()
         self.assertNotEqual(result.returncode, 0)
@@ -1173,7 +1173,7 @@ class CheckScriptWithoutGit(CheckScriptSkeleton):
         self.edit_script(self.drop_todos)
         locked = os.path.join(self.tmp, "locked")
         os.makedirs(locked)
-        with open(os.path.join(locked, "inside.txt"), "w") as f:
+        with open(os.path.join(locked, "inside.txt"), "w", encoding="utf-8", newline="\n") as f:
             f.write("x\n")
         os.chmod(locked, 0o100)
         try:

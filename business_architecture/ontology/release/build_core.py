@@ -237,7 +237,7 @@ def build():
                 out.add((iri, prop, en(row[field])))
 
     # 4. Former names: the approved label report (Q10).
-    with open(LABELS, newline="") as f:
+    with open(LABELS, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
             s, label = PROC[row["concept_slug"]], en(row["historical_label"])
             disposition = row["proposed_disposition"]
@@ -250,7 +250,7 @@ def build():
                 tally(f"label:{disposition if row['label_kind'] == 'prior_name' else 'scoped alias'}")
 
     # 5. Canonical facts, the scoped sequences and the core vocabulary.
-    with open(FACTS, newline="") as f:
+    with open(FACTS, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
             out.add((PROC[row["subject"]], CORE[row["predicate"].split(":", 1)[1]], PROC[row["object"]]))
             tally("canonical facts")
@@ -358,7 +358,7 @@ def catalog():
 
 def package(graph, counts, rows):
     files = {"core.ttl": graph.serialize(format="turtle"), "core.jsonld": jsonld(graph)}
-    with open(SHAPES) as f:
+    with open(SHAPES, encoding="utf-8") as f:
         files["shapes.ttl"] = f.read()
     files["catalog.ttl"] = catalog()
     buf = io.StringIO()
@@ -366,14 +366,14 @@ def package(graph, counts, rows):
     w.writeheader()
     w.writerows(rows)
     files["conservation.csv"] = buf.getvalue()
-    with open(FACTS, newline="") as f:
+    with open(FACTS, newline="", encoding="utf-8") as f:
         files["canonical-facts.csv"] = f.read()
-    with open(LABELS, newline="") as f:
+    with open(LABELS, newline="", encoding="utf-8") as f:
         files["label-dispositions.csv"] = f.read()
     files["counts.json"] = json.dumps(dict(sorted(counts.items())), indent=2) + "\n"
-    with open(CHANGELOG) as f:
+    with open(CHANGELOG, encoding="utf-8") as f:
         files["CHANGELOG.md"] = f.read()
-    with open(PINNED) as f:
+    with open(PINNED, encoding="utf-8") as f:
         pin = f.read().strip()
     # The manifest names the evidence commit the package was built from, and each file's SHA-256.
     files["manifest.json"] = json.dumps({
@@ -400,7 +400,7 @@ def main():
             path = os.path.join(RELEASE_DIR, n)
             if not os.path.exists(path):
                 return False
-            with open(path, newline="") as f:  # byte-for-byte: the CSVs keep their CRLF line ends
+            with open(path, newline="", encoding="utf-8") as f:  # byte-for-byte: the CSVs keep their CRLF line ends
                 return f.read() == text
         stale = [n for n, text in files.items() if not current(n, text)]
         if stale:
@@ -409,7 +409,7 @@ def main():
     if args.write:
         os.makedirs(RELEASE_DIR, exist_ok=True)
         for n, text in files.items():
-            with open(os.path.join(RELEASE_DIR, n), "w", newline="") as f:
+            with open(os.path.join(RELEASE_DIR, n), "w", newline="", encoding="utf-8") as f:
                 f.write(text)
         print(f"wrote {RELEASE_DIR}")
 

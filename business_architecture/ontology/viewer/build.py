@@ -43,7 +43,7 @@ def release_files(root):
         if not versions:
             continue
         manifest_path = max(versions, key=lambda p: version_key(p.name)) / "manifest.json"
-        manifest = json.loads(manifest_path.read_text())
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if (
             manifest["module"] != module.name
             or manifest["version"] != manifest_path.parent.name
@@ -254,18 +254,18 @@ def build(root, output, compare=None, require_clean=True):
     )
     page = (
         (HERE / "viewer.html")
-        .read_text()
+        .read_text(encoding="utf-8")
         .replace("/* EMBEDDED_FONTS */", font_css)
     )
     import html
 
     page = page.replace(
-        "FONT_LICENSE_TEXT", html.escape((HERE / "fonts/OFL.txt").read_text())
+        "FONT_LICENSE_TEXT", html.escape((HERE / "fonts/OFL.txt").read_text(encoding="utf-8"))
     )
     page = page.replace("/* EMBEDDED_DATA */", payload)
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(page)
+    output.write_text(page, encoding="utf-8", newline="\n")
     return {k: data[k] for k in ("release", "counts", "terms", "triples")}
 
 
