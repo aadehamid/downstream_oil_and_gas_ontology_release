@@ -153,6 +153,10 @@ and the end. Two marks stand for text that changes from run to run:
 
 Everything else must match letter for letter.
 
+One kind of line is left out of the output before the check compares. On a machine that has not run a `uv`
+command before, `uv` first reports its own work, for example `Installed 2 packages in 3ms`. The next run does
+not print it. So do not show such a line in an `expect` block: the check would never find it.
+
 An `expect` block needs at least one line with text of its own. An empty block, a lone `...` or a line made
 only of placeholders would match any output, so the check refuses it.
 

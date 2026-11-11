@@ -500,6 +500,9 @@ def test_a_raw_html_code_block_fails(tmp_path):
     ("...\nall checks passed", "--- one\n--- two\nall checks passed"),
     ("a\n...\nb\n...\nc", "a\nx\nb\nb\nc"),
     ("wrote <path>\n...", "wrote /tmp/x/report.json"),
+    # uv reports its own work on a machine that has not run the command before
+    ("hello", "Resolved 3 packages in 12ms\nPrepared 2 packages in 1.04s\nInstalled 2 packages in 3ms\nhello"),
+    ("hello", "Installed 1 package in 1ms\nhello"),
 ])
 def test_output_that_matches(expected, actual):
     assert d.output_matches(expected, actual)
@@ -514,6 +517,9 @@ def test_output_that_matches(expected, actual):
     ("run <run id>", "run 1\nrun 2"),                               # and never crosses a line
     ("first\n...\nlast", "first\nlast\nafter"),
     ("a.c", "abc"),                                                 # the text is literal, not a pattern
+    ("hello", "Installed 2 parts in 3ms\nhello"),                   # only uv's own lines are left out
+    ("hello", "note: Installed 2 packages in 3ms\nhello"),
+    ("Installed 2 packages in 3ms\nhello", "Installed 2 packages in 3ms\nhello"),  # and never asked for
 ])
 def test_output_that_differs(expected, actual):
     assert not d.output_matches(expected, actual)
