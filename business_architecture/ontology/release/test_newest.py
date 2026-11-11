@@ -43,7 +43,8 @@ class Newest(unittest.TestCase):
         self.assertEqual(sorted(reversed(order), key=newest.version_key), order)
         self.assertEqual(newest.version_key("1.2.1-correction.1"), (1, 2, 1, 1))
         self.assertEqual(newest.version_key("1.2.1"), (1, 2, 1, 0))
-        for name in ("previous", "1.2", "1.2.1-rc.1", "1.2.1-correction", "1.2.1-correction.x", "v1.2.1", "1.2.1-correction.1.bak", ""):
+        for name in ("previous", "1.2", "1.2.1-rc.1", "1.2.1-correction", "1.2.1-correction.x", "v1.2.1", "1.2.1-correction.1.bak", "",
+                     "1.2.1\n", "1.2.1\r\n", " 1.2.1", "1.2.1-correction.1\n"):
             self.assertIsNone(newest.version_key(name), name)
 
     def test_the_newest_folder_may_be_a_correction(self):

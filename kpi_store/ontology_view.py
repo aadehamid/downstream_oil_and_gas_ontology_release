@@ -4,8 +4,8 @@ The data-product package names every table, view and metric view as a dp:Platfor
 workspace needs only the facts below, so this module reduces the package to them. Needs rdflib.
 """
 import functools
-import importlib.util
 import json
+import types
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -29,11 +29,12 @@ def release_scripts_newest(release_root=None):
 
 @functools.lru_cache(maxsize=None)
 def _load_newest(path):
-    spec = importlib.util.spec_from_file_location("kpi_store_release_newest", path)
-    if spec is None or not path.is_file():
+    if not path.is_file():
         raise ReleaseError(f"{path} is missing")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    # Compiled here, not imported: an import would write a __pycache__ folder into the release it only reads.
+    module = types.ModuleType("kpi_store_release_newest")
+    module.__file__ = str(path)
+    exec(compile(path.read_text(encoding="utf-8"), str(path), "exec"), module.__dict__)
     return module
 
 

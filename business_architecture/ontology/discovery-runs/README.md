@@ -24,7 +24,7 @@ py -m kpi_store.cut --report discovery-report.json --approver "the ontology owne
 ```
 
 - `--report` names the report's JSON file. To use decisions written in the CSV file, add `--decisions discovery-report.csv`, or give the CSV file as `--report` when the JSON file lies beside it.
-- `--approver` is optional. Write the role of the person who cleared the report, not a name. The tool writes what you type, as you type it, and it writes no name that you did not give.
+- `--approver` is optional. Write the role or the initials of the person who cleared the report, such as "the ontology owner". The tool refuses anything else: it takes letters, digits, spaces, dots, hyphens and apostrophes, at most 60 characters, and no number of four digits or more. The same rule holds for the "decided by" of each row in the report. The record is committed, so it must hold no address and no phone number.
 - `--plan` shows what the cut would do and changes nothing.
 
 The tool shows each row and what it will change. It then asks two things:
@@ -44,6 +44,8 @@ In a Git copy the tool commits the change and tags it `data-product-<version>`. 
 - The tag does not exist yet.
 
 If the commit is made and Git cannot make the tag, the tool says so and stops. Run the same command again: it makes the tag on the cut's commit.
+
+If the commit itself fails, the tool puts back the files it wrote, from the copies it kept, and takes them out of Git's index. It touches no other file. If it cannot put a file back, it names that file and says what state it is in.
 
 A plain folder, one with no `.git` folder, needs no Git. The tool writes the same files there.
 
@@ -65,7 +67,7 @@ bash scripts/check.sh
 
 The tool refuses a report in which a row that blocks the load has no decision.
 
-A report is a file that a person may have edited, so the tool takes no text from it on trust. It refuses an accepted row unless the row's object, its found value and each field of its proposed fix have the form of a name, and the fix names the `data-product` module. A column name is letters, digits, underscores and dollar signs. An object name is one to three such parts, which may also hold a hyphen, joined by dots. A column or an object whose name has another form goes through the release steps in `HOW-TO-UPDATE.md`.
+A report is a file that a person may have edited, so the tool takes no text from it on trust. It refuses an accepted row unless the row's object, its found value and each field of its proposed fix have the form of a name, and the fix names the module its action belongs to. This holds for every accepted row, also one the tool then leaves for a minor version. A column name is letters, digits, underscores and dollar signs. An object name is one to three such parts, which may also hold a hyphen, joined by dots. A column or an object whose name has another form goes through the release steps in `HOW-TO-UPDATE.md`.
 
 ## The record
 
@@ -75,11 +77,11 @@ Each cut writes `<run ID>.md` here. Each corrected module's changelog names it, 
 |---|---|
 | The table at the top | The run ID and time, the SHA-256 of the report file, of the decisions file when one was used, of the settings file and of the release zip, the module versions the report read, when the cut ran, who cleared the report (the `--approver` text) and the approval. |
 | Versions written | Each module, the version it had, the version the cut wrote, and why. |
-| Rows | Every row of the report: its kind, whether it blocks, the object, the ontology's value, the found value, the decision, who decided, what the cut did, and why. |
+| Rows | Every row of the report: its kind, whether it blocks, the object, the ontology's value, the found value, the decision, who decided, what the cut did, and why, in the tool's own words. |
 | Changes | For each applied row: the file, the value before and the value after. |
 | Files the cut changed | Every path the cut added, changed or removed. |
 
-The report stays in the volume. From a row's object, ontology value and found value, the record holds names only. A value that does not have the form of a name, such as a Genie filter's title, the time of a table's last write or anything a person typed into one of these fields, appears as "(kept in the report)". The record holds no evidence text, no query result and no filter. It holds the "decided by" text and the note of each row as the person wrote them, so write a role there, not a name.
+The report stays in the volume. From a row's object, ontology value and found value, the record holds names only. A value that does not have the form of a name, such as a Genie filter's title, the time of a table's last write or anything a person typed into one of these fields, appears as "(kept in the report)". The record holds no evidence text, no query result and no filter. It does not hold a row's note: a note is free text and stays in the report. It holds who decided each row, which must be a role or initials.
 
 ## Standing decisions
 

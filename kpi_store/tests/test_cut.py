@@ -287,7 +287,8 @@ def test_rejections_alone_write_the_record_and_the_standing_decisions_and_no_ver
     record = (root / RECORD).read_text(encoding="utf-8")
     assert "None. No accepted row changed the ontology." in record
     assert f"| Decisions file checksum (SHA-256) | {hashlib.sha256(csv_path.read_bytes()).hexdigest()} |" in record
-    assert "| the data platform lead | rejected | no change; a standing decision keeps the row out of the next comparison; Not a pricing table. |" in record
+    assert "| the data platform lead | rejected | no change; a standing decision keeps the row out of the next comparison |" in record
+    assert "Not a pricing table." not in record   # a note stays in the report
     assert "| Cleared by | Not given |" in record
     assert any(line.startswith("Row R002: record this difference in kpi_store.toml") for line in said)
     # The next comparison leaves the two rejected rows out and still raises the others.
@@ -553,43 +554,149 @@ def test_a_git_copy_that_cannot_commit_is_refused_before_anything_changes(tmp_pa
     assert git(root, "log", "-1", "--format=%s").strip() == f"Record the decisions of discovery run {RUN}"
 
 
+def failing(verb, real):
+    """Stands in for cut._git: the named Git command fails, and every other one runs."""
+    def run(root_, *args, **more):
+        if args[0] == verb:
+            return subprocess.CompletedProcess(args, 1, "", f"made-up {verb} failure")
+        return real(root_, *args, **more)
+    return run
+
+
+CHANGED, CREATED, REMOVED = "release.json", (ONTOLOGY / "discovery-runs" / "made-up.md").as_posix(), (ONTOLOGY / "data-product" / "pricing" / "agents.csv").as_posix()
+
+
+def written(root, tmp_path, name):
+    """Writes three paths into the release as a cut does (one changed, one created, one removed), keeping the
+    backup. Returns the paths and the backup folder."""
+    staging, backup = tmp_path / f"staging-{name}", tmp_path / f"backup-{name}"
+    for rel, text in ((CHANGED, '{"release": "KPI Store 1.1", "made-up": true}\n'), (CREATED, "# A made-up record\n")):
+        (staging / rel).parent.mkdir(parents=True, exist_ok=True)
+        (staging / rel).write_text(text, encoding="utf-8")
+    files = sorted([CHANGED, CREATED, REMOVED])
+    cut._apply(root, staging, files, backup)
+    assert not (root / REMOVED).exists() and (root / CREATED).is_file() and "made-up" in (root / CHANGED).read_text(encoding="utf-8")
+    return files, backup
+
+
+def hidden_work(root):
+    """Work in the Git copy that `git status` does not show: an edit to a tracked file that Git was told to assume
+    unchanged, and a file in an ignored folder. Returns the two paths with their text."""
+    (root / "notes.md").write_text("as committed\n", encoding="utf-8")
+    (root / ".gitignore").write_text("scratch/\n", encoding="utf-8")
+    git(root, "add", "-A")
+    git(root, "commit", "-q", "-m", "Notes and an ignore rule")
+    (root / "notes.md").write_text("an edit that is not committed\n", encoding="utf-8")
+    git(root, "update-index", "--assume-unchanged", "notes.md")
+    (root / "scratch").mkdir()
+    (root / "scratch" / "keep.txt").write_text("an ignored file\n", encoding="utf-8")
+    assert git(root, "status", "--porcelain") == ""
+    return {"notes.md": "an edit that is not committed\n", "scratch/keep.txt": "an ignored file\n"}
+
+
+FILES_ONLY = ("__pycache__", ".git")   # Git's own folder changes when Git works; the release's files must not
+
+
 @as_shipped
 @pytest.mark.skipif(shutil.which("git") is None, reason="Git is not installed")
-def test_a_failed_commit_puts_the_release_back_and_a_failed_tag_is_finished_by_the_next_run(tmp_path, no_global_git, monkeypatch):
+def test_a_failed_commit_restores_only_what_the_cut_wrote_and_keeps_hidden_work(tmp_path, no_global_git, monkeypatch):
     root = small_git_release(tmp_path)
     with_author(root)
-    report_path = cleared(tmp_path, {"R002": "accept"})
-    report, sums = cut.load_report(report_path)
-    plan = cut.Plan(report, [], {"data-product": ("1.2.0", "1.2.1-correction.1")}, None)
-    record = f"# Discovery run {RUN}\n\n| Report checksum (SHA-256) | {sums['report']} |\n\n| data-product | 1.2.0 | 1.2.1-correction.1 | Rows R002 |\n"
-    files = ("__pycache__", ".git")   # Git's own folder changes when Git resets; the release's files must not
-    real, before = cut._git, digest(root, files)
+    hidden = hidden_work(root)
+    report, _ = cut.load_report(cleared(tmp_path, {"R002": "reject"}))
+    plan = cut.Plan(report, [], {}, None)
+    before, head = digest(root, FILES_ONLY), git(root, "rev-parse", "HEAD")
+    files, backup = written(root, tmp_path, "one")
+    monkeypatch.setattr(cut, "_git", failing("commit", cut._git))
+    with pytest.raises(cut.CutFailed) as failed:
+        cut._commit(root, "ready", plan, cut.Outcome("recorded", plan, Path(CREATED), files), backup)
+    assert str(failed.value) == "git commit failed: made-up commit failure. The release is as it was."
+    monkeypatch.undo()
+    assert digest(root, FILES_ONLY) == before and git(root, "rev-parse", "HEAD") == head
+    for rel, text in hidden.items():
+        assert (root / rel).read_text(encoding="utf-8") == text, rel   # reset --hard would lose the first, clean -x the second
+    assert not (root / CREATED).exists() and not (root / CREATED).parent.exists()
+    assert git(root, "status", "--porcelain") == "" and git(root, "diff", "--cached", "--name-only") == ""
 
-    def failing(verb):
-        def run(root_, *args):
-            if args[0] == verb:
-                return subprocess.CompletedProcess(args, 1, "", f"made-up {verb} failure")
-            return real(root_, *args)
-        return run
+    # The same paths, committed: the commit holds exactly them and not the hidden edit, and a version gets its tag.
+    files, backup = written(root, tmp_path, "two")
+    versioned = cut.Plan(report, [], {"data-product": ("1.2.0", "1.2.1-correction.1")}, None)
+    outcome = cut.Outcome("cut", versioned, Path(CREATED), files)
+    cut._commit(root, "ready", versioned, outcome, backup)
+    assert (outcome.committed, outcome.tag) == (True, "data-product-1.2.1-correction.1")
+    assert sorted(git(root, "show", "--name-only", "--no-renames", "--format=", "HEAD").split()) == files
+    assert git(root, "tag", "--points-at", "HEAD").split() == ["data-product-1.2.1-correction.1"]
+    assert (root / "notes.md").read_text(encoding="utf-8") == hidden["notes.md"] and git(root, "status", "--porcelain") == ""
 
-    # The commit fails after the files are written: the release goes back to its last commit.
-    (root / RECORD).parent.mkdir(parents=True)
-    (root / RECORD).write_text(record, encoding="utf-8")
-    monkeypatch.setattr(cut, "_git", failing("commit"))
-    with pytest.raises(cut.CutFailed, match="git commit failed: made-up commit failure. The release is as it was."):
-        cut._commit(root, "ready", plan, cut.Outcome("cut", plan, RECORD))
-    assert digest(root, files) == before and git(root, "status", "--porcelain") == "" and not (root / RECORD).exists()
-    assert git(root, "rev-list", "--count", "HEAD").strip() == "1"
 
-    # The tag fails after the commit: the cut is not complete, and says how to finish.
-    (root / RECORD).parent.mkdir(parents=True)
-    (root / RECORD).write_text(record, encoding="utf-8")
-    monkeypatch.setattr(cut, "_git", failing("tag"))
+@as_shipped
+@pytest.mark.skipif(shutil.which("git") is None, reason="Git is not installed")
+def test_when_git_cannot_reset_nothing_is_deleted_and_the_message_says_what_state_the_copy_is_in(tmp_path, no_global_git, monkeypatch):
+    root = small_git_release(tmp_path)
+    with_author(root)
+    hidden = hidden_work(root)
+    report, _ = cut.load_report(cleared(tmp_path, {"R002": "reject"}))
+    plan = cut.Plan(report, [], {}, None)
+    before = digest(root, FILES_ONLY)
+    files, backup = written(root, tmp_path, "locked")
+    lock = root / ".git" / "index.lock"
+    lock.write_text("", encoding="utf-8")   # another Git process holds the index: add and reset both fail
+    with pytest.raises(cut.CutFailed) as failed:
+        cut._commit(root, "ready", plan, cut.Outcome("recorded", plan, Path(CREATED), files), backup)
+    lock.unlink()
+    message = str(failed.value)
+    assert message.startswith("git add failed: ") and "index.lock" in message
+    assert "The release's files are as they were. Git could not take the cut's paths out of its index (git reset failed: " in message
+    assert message.endswith("so some may still be staged: look at git status.")
+    assert digest(root, FILES_ONLY) == before   # every file is back, the removed one too, and nothing else is gone
+    for rel, text in hidden.items():
+        assert (root / rel).read_text(encoding="utf-8") == text, rel
+    assert git(root, "status", "--porcelain") == ""
+
+    # A file that cannot be put back is named with its state; the others are put back.
+    files, backup = written(root, tmp_path, "stuck")
+    real_copy = shutil.copy2
+
+    def copy_but_one(source, target, **more):
+        if Path(target) == root / CHANGED and Path(source).is_relative_to(backup):
+            raise PermissionError("made-up: the file is open in another program")
+        return real_copy(source, target, **more)
+    monkeypatch.setattr(cut.shutil, "copy2", copy_but_one)
+    monkeypatch.setattr(cut, "_git", failing("commit", cut._git))
+    with pytest.raises(cut.CutFailed) as failed:
+        cut._commit(root, "ready", plan, cut.Outcome("recorded", plan, Path(CREATED), files), backup)
+    monkeypatch.undo()
+    assert str(failed.value) == ("git commit failed: made-up commit failure. The release could NOT be put back in full. These 1 paths "
+                                 "are not as they were: release.json (still holds the cut's content: PermissionError). Every other path is as it was.")
+    assert (root / REMOVED).is_file() and not (root / CREATED).exists() and "made-up" in (root / CHANGED).read_text(encoding="utf-8")
+
+
+def stub_build(plan_, staging, approver, now, step):
+    """Stands in for the build: the tables only, so the test reaches the commit in a second."""
+    step("write the module's tables", lambda: plan_.tables.write(staging))
+
+
+@as_shipped
+@pytest.mark.skipif(shutil.which("git") is None, reason="Git is not installed")
+def test_a_failed_tag_is_finished_by_the_next_run_and_both_runs_say_what_to_do_next(tmp_path, no_global_git, monkeypatch):
+    root = small_git_release(tmp_path)
+    with_author(root)
+    report_path = cleared(tmp_path, {"R002": "accept", "R004": "environment setting"})
+    check = "Run the full check before you load: bash scripts/check.sh (on Windows, in Git Bash; the runner does it)."
+    setting = ("Row R004: record this difference in kpi_store.toml ([names] for a catalog's name, [skip] for a schema or a table to leave out); "
+               "the ontology keeps idp_sbx.gold_commercial_core.sample_margin_fact.")
+    monkeypatch.setattr(cut, "_build", stub_build)
+
+    # The tag fails after the commit: the cut is not complete, and says how to finish and what follows the cut.
+    real = cut._git
+    monkeypatch.setattr(cut, "_git", failing("tag", real))
+    said = []
     with pytest.raises(cut.CutIncomplete, match="the cut is committed, and git tag data-product-1.2.1-correction.1 failed: made-up tag failure. "
                                                 "Run the same command again to finish the tag."):
-        cut._commit(root, "ready", plan, cut.Outcome("cut", plan, RECORD))
+        cut.cut(report_path, root, ask=Answers("Change_Value_Amount", "yes"), say=said.append, now=NOW)
+    assert said[-2:] == [setting, check]
     cut_commit = git(root, "rev-parse", "HEAD").strip()
-    assert git(root, "rev-list", "--count", "HEAD").strip() == "2" and git(root, "tag") == ""
+    assert git(root, "rev-list", "--count", "HEAD").strip() == "2" and git(root, "tag") == "" and git(root, "status", "--porcelain") == ""
     assert cut.main(["--report", str(report_path), "--release", str(root)]) == 1   # still failing: the command says so
     monkeypatch.setattr(cut, "_git", real)
 
@@ -601,11 +708,25 @@ def test_a_failed_commit_puts_the_release_back_and_a_failed_tag_is_finished_by_t
     outcome = cut.cut(report_path, root, ask=never, say=said.append)
     assert (outcome.status, outcome.tag) == ("already cut", "data-product-1.2.1-correction.1")
     assert git(root, "rev-parse", "data-product-1.2.1-correction.1^{commit}").strip() == cut_commit
-    assert said[-1] == f"The tag data-product-1.2.1-correction.1 was missing. It now marks the cut's commit {cut_commit[:12]}."
-    # Once the tag is there, a further run has nothing to do.
+    assert said[-3:] == [f"The tag data-product-1.2.1-correction.1 was missing. It now marks the cut's commit {cut_commit[:12]}.", setting, check]
+    assert outcome.messages == [setting, check]
+    # Once the tag is there, a further run has nothing to do and nothing more to say.
     said.clear()
-    assert cut.cut(report_path, root, ask=never, say=said.append).tag == "data-product-1.2.1-correction.1"
-    assert said[-1].endswith("Nothing to do.")
+    again = cut.cut(report_path, root, ask=never, say=said.append)
+    assert again.tag == "data-product-1.2.1-correction.1" and again.messages == [] and said[-1].endswith("Nothing to do.")
+
+
+@as_shipped
+def test_the_plan_writes_nothing_into_the_release_even_when_python_may_write_bytecode(tmp_path, monkeypatch):
+    import sys
+    root = release_copy(tmp_path)
+    before = digest(root, skip=())
+    monkeypatch.delenv("PYTHONDONTWRITEBYTECODE", raising=False)
+    monkeypatch.setattr(sys, "dont_write_bytecode", False)
+    ov._load_newest.cache_clear()
+    report, sums = cut.load_report(cleared(tmp_path, {"R002": "accept"}))
+    assert cut.plan(report, root, sums).versions == CORRECTED
+    assert digest(root, skip=()) == before
 
 
 @as_shipped
@@ -714,3 +835,138 @@ def test_a_report_whose_run_fields_are_not_a_time_and_checksums_is_refused(tmp_p
     (tmp_path / "ontology.json").write_text(json.dumps(report), encoding="utf-8")
     with pytest.raises(cut.CutRefused, match="the report's ontology versions are not module names with versions: 'jane.doe@example.com', 'kpi'"):
         cut.load_report(tmp_path / "ontology.json")
+
+
+@as_shipped
+@pytest.mark.parametrize("fix, why", [
+    ({"action": "add-object", "module": "evil", "object": "idp_sbx.a.b"}, "its proposed fix names a module other than data-product"),
+    ({"action": "add-object", "module": "data-product", "object": "ask jane.doe@example.com"}, "the 'object' of its proposed fix is not a name"),
+    ({"action": "add-measure-link", "module": "data-product", "view": "../../x", "measure": "crude-prices"}, "the 'view' of its proposed fix is not a name"),
+    ({"action": "add-measure-link", "module": "data-product", "view": "idp_sbx.a.b"}, "the 'measure' of its proposed fix is not a name"),
+    ({"action": "add-edge", "module": "../../x", "from": "idp_sbx.a.b", "to": "idp_sbx.a.c"}, "its proposed fix names a module other than data-product"),
+    ({"action": "record-replaces", "module": "data-product", "table": "idp_sbx.a.b", "replaces": "synapse_dev.a.b"},
+     "its proposed fix names a module other than technical-graph"),
+    ({"action": "record-replaces", "module": "technical-graph", "table": "idp_sbx.a.b", "replaces": "see jane"}, "the 'replaces' of its proposed fix is not a name"),
+    ({"action": "set-catalog-name", "setting": "names", "ontology_catalog": "a b"}, "the 'ontology_catalog' of its proposed fix is not a name"),
+    ({"action": "drop-everything", "module": "data-product"}, "its proposed fix names an action the cut does not know"),
+])
+def test_an_accepted_row_the_cut_would_leave_is_checked_all_the_same(tmp_path, fix, why):
+    report, sums = cut.load_report(cleared(tmp_path, {}, rows=[row(1, "object-extra", "idp_sbx.a.b", fix)]))
+    with pytest.raises(cut.CutRefused) as refused:
+        cut.plan(report, support.ROOT, sums)
+    assert str(refused.value) == f"row R001 cannot be applied: {why}. Correct the report, or reject the row."
+
+
+@as_shipped
+def test_an_accepted_row_the_cut_leaves_and_whose_fields_are_names_is_listed():
+    for n, (kind, obj, fix, outcome) in enumerate((
+            ("object-extra", "idp_sbx.a.b", {"action": "add-object", "module": "data-product", "object": "idp_sbx.a.b"}, "needs a minor version"),
+            ("migration-pair", "idp_sbx.a.b", {"action": "record-replaces", "module": "technical-graph", "table": "idp_sbx.a.b", "replaces": "synapse_dev.a.b"},
+             "needs a minor version"),
+            ("object-missing", "prod.a.b", {"action": "set-catalog-name", "setting": "names", "ontology_catalog": "idp_sbx"}, "environment setting"),
+            ("question", "Genie space Sample pricing", {"action": "none"}, "waits"))):
+        item = cut._item(row(n + 1, kind, obj, fix), cut.Tables(support.ROOT))
+        assert item.outcome == outcome, fix
+    # The plan shows a person the object only in the form the record would hold.
+    listed = cut.describe(cut.Plan({"run": {"id": RUN}, "release": "KPI Store 1.1", "rows": []}, [item], {}, None))
+    assert "  R004 question: (kept in the report): a question for the owner; no change is proposed" in listed
+
+
+LINE_ENDS = ("{}\n", "{}\r\n", " {}")
+ROW_FIELDS = [("R002", "fix.to", "Change_Value_Amount"), ("R002", "fix.from", "ChangeValue"), ("R002", "fix.module", "data-product"),
+              ("R002", "object", GOLD), ("R002", "found_value", "Change_Value_Amount"),
+              ("R020", "fix.view", SUMMARY_VIEW), ("R020", "fix.measure", "crack-spreads"), ("R020", "object", SUMMARY_VIEW),
+              ("R011", "fix.table", GOLD), ("R011", "fix.replaces", "synapse_dev.commercial_core.mips_mpr_executive_summary_fact"),
+              ("R011", "fix.module", "technical-graph"), ("R011", "found_value", "synapse_dev.commercial_core.mips_mpr_executive_summary_fact"),
+              ("R004", "fix.object", "idp_sbx.gold_commercial_core.sample_margin_fact"), ("R004", "found_value", "MANAGED")]
+
+
+@as_shipped
+@pytest.mark.parametrize("form", LINE_ENDS, ids=["LF", "CRLF", "leading-space"])
+@pytest.mark.parametrize("row_id, field, good", ROW_FIELDS, ids=[f"{r}-{f}" for r, f, _ in ROW_FIELDS])
+def test_a_name_with_a_line_end_or_a_leading_space_is_refused_in_every_field_of_an_accepted_row(tmp_path, row_id, field, good, form):
+    def change(r):
+        if r["id"] == row_id:
+            if field.startswith("fix."):
+                assert r["proposed_fix"][field[4:]] == good   # the field holds this value as the comparison wrote it
+                r["proposed_fix"][field[4:]] = form.format(good)
+            else:
+                assert r[field] == good
+                r[field] = form.format(good)
+    decisions = {"R002": "accept", row_id: "accept"}
+    report, sums = cut.load_report(edited(tmp_path, change, decisions, "edited"))
+    with pytest.raises(cut.CutRefused, match=f"row {row_id} cannot be applied: "):
+        cut.plan(report, support.ROOT, sums)
+    # The same report without the edit is planned.
+    report, sums = cut.load_report(edited(tmp_path, lambda r: None, decisions, "plain"))
+    assert cut.plan(report, support.ROOT, sums).versions
+
+
+@pytest.mark.parametrize("form", LINE_ENDS, ids=["LF", "CRLF", "leading-space"])
+def test_a_line_end_or_a_leading_space_is_refused_in_the_run_the_versions_and_the_roles(tmp_path, form):
+    def load(change, name):
+        report = json.loads(REPORT.read_text(encoding="utf-8"))
+        report["rows"][1].update(decision="accept", decided_by="the ontology owner")
+        change(report)
+        path = tmp_path / f"{name}.json"
+        path.write_text(json.dumps(report), encoding="utf-8")
+        return cut.load_report(path)
+    load(lambda r: None, "plain")   # the report as it is loads
+    for key, message in (("id", "cannot name a file"), ("at", "the report's run must hold"), ("settings_sha256", "the report's run must hold"),
+                         ("zip_sha256", "the report's run must hold")):
+        with pytest.raises(cut.CutRefused, match=message):
+            load(lambda r: r["run"].update({key: form.format(r["run"][key])}), key)
+    with pytest.raises(cut.CutRefused, match="the report's ontology versions are not module names with versions: 'kpi'"):
+        load(lambda r: r["ontology"].update(kpi=form.format("1.3.0")), "version")
+    with pytest.raises(cut.CutRefused, match="the report's ontology versions are not module names with versions"):
+        load(lambda r: r["ontology"].update({form.format("lane"): "1.1.0"}), "module")
+    with pytest.raises(cut.CutRefused, match="row R002: its 'decided by' is not a role or initials"):
+        load(lambda r: r["rows"][1].update(decided_by=form.format("the ontology owner")), "role")
+    assert not cut.is_role(form.format("the ontology owner"))
+    # A rejected row is never refused for its names; its value is then left out of the record and the standing decisions.
+    kept = cut._recorded({"kind": "column-renamed", "object": form.format(GOLD), "ontology_value": form.format("ChangeValue"),
+                          "found_value": form.format("Change_Value_Amount")})
+    assert kept == ("(kept in the report)",) * 3
+
+
+def test_who_decided_is_a_role_or_initials():
+    for good in ("the ontology owner", "J.D.", "the owner's deputy", "Team 12", "data-platform lead", "Ö", "x" * 60):
+        assert cut.is_role(good), good
+    for bad in ("jane.doe@example.com", "Jane Doe 555-0100", "call 5550100", "x" * 61, "a_b", "", "owner; see e-mail", "owner (acting)",
+                "a/b", "line one\nline two", 7, None):
+        assert not cut.is_role(bad), bad
+
+
+@as_shipped
+def test_free_text_as_who_decided_or_as_the_approver_stops_the_cut_and_a_note_never_reaches_the_record(tmp_path):
+    root = release_copy(tmp_path)
+    before = digest(root)
+    for n, who in enumerate(("jane.doe@example.com", "Jane Doe 555-0100")):
+        report = json.loads(cleared(tmp_path, {"R002": "reject"}, name=f"who-{n}").read_text(encoding="utf-8"))
+        report["rows"][1]["decided_by"] = who
+        path = tmp_path / f"who-{n}" / rep.JSON_NAME
+        path.write_text(json.dumps(report), encoding="utf-8")
+        with pytest.raises(cut.CutRefused) as refused:
+            cut.cut(path, root, ask=never, say=quiet)
+        assert str(refused.value) == (
+            "row R002: its 'decided by' is not a role or initials. In the report, write a role or initials, such as \"the ontology owner\": "
+            "letters, digits, spaces, dots, hyphens and apostrophes, at most 60 characters, and no number of four digits or more.")
+        with pytest.raises(cut.CutRefused, match="--approver is not a role or initials: write a role or initials"):
+            cut.cut(cleared(tmp_path, {"R002": "reject"}, name=f"approver-{n}"), root, approver=who, ask=never, say=quiet)
+    assert cut.main(["--report", str(path), "--release", str(root), "--approver", "jane.doe@example.com"]) == 1
+    assert digest(root) == before
+    # A note is free text: the decisions file may hold one, and the record does not copy it.
+    report = json.loads(REPORT.read_text(encoding="utf-8"))
+    for r in report["rows"]:
+        if r["id"] == "R002":
+            r["decision"], r["decided_by"], r["note"] = "reject", "J.D.", "Ask jane.doe@example.com or call 555-0100 first."
+    csv_path = tmp_path / "cleared.csv"
+    csv_path.write_text(rep.to_csv(report), encoding="utf-8", newline="\n")
+    cut.cut(cleared(tmp_path, {}, name="noted"), root, decisions=csv_path, approver="the owner's deputy", ask=Answers("yes"), say=quiet, now=NOW)
+    record = (root / RECORD).read_text(encoding="utf-8")
+    assert "jane" not in record and "555-0100" not in record and "Ask" not in record
+    assert f"| R002 | column-renamed | yes | {GOLD} | ChangeValue | Change_Value_Amount | reject | J.D. | rejected | no change; a standing decision keeps the row out of the next comparison |" in record
+    assert "| Cleared by | the owner's deputy |" in record
+    # The measure links' own note, which the comparison writes, is not copied either.
+    assert "The Genie space's creator confirms" not in record
+

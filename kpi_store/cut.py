@@ -16,8 +16,9 @@ passed, so a failure leaves it as it was. A report that was cut before changes n
 Rules:
 - A report is cut only when every row that blocks has a decision.
 - A report is a file a person may have edited. An accepted row is refused unless its object, its found value and
-  each field of its proposed fix have the form of a name, and the fix names the data-product module. The record
-  holds a value of any other row only when it has that form.
+  each field of its proposed fix have the form of a name, and the fix names its action's module. The record holds
+  a value of any other row only when it has that form. It holds who decided each row, which must be a role or
+  initials, and never a row's note.
 - `accept` applies the row's proposed fix when a correction can hold it. A fix that adds a concept needs a minor
   version, and a question waits for its answer: the tool lists both and leaves them.
 - `reject` changes nothing in the ontology. It becomes a standing decision, so the next comparison leaves the row out.
@@ -55,7 +56,7 @@ MODULE = "data-product"
 TABLES = ("tables", "lineage", "columns", "agents", "view-systems")
 IGNORED = {".git", "__pycache__", ".venv", ".pytest_cache"}
 TEXT_SUFFIXES = {".ttl", ".json", ".jsonld", ".md", ".py", ".csv", ".nt", ".txt"}
-RUN_ID = re.compile(r"^[0-9A-Za-z][0-9A-Za-z._-]{0,99}$")
+RUN_ID = re.compile(r"[0-9A-Za-z][0-9A-Za-z._-]{0,99}")
 NEEDS_MINOR = {"add-measure-link": "a measure link with its filter needs a new property",
                "record-replaces": "the table a Databricks table replaces belongs to the technical-graph module",
                "add-object": "a new object is a new concept",
@@ -64,25 +65,43 @@ NEEDS_MINOR = {"add-measure-link": "a measure link with its filter needs a new p
 # the record, the standing decisions or the module's tables only when it has the form of the name it stands for.
 # A column name is letters, digits, underscores and dollar signs. An object name is one to three such parts, which
 # may also hold a hyphen, joined by dots. A table type is capital letters and underscores.
-COLUMN_NAME = re.compile(r"^[\w$]{1,255}$")
-NAME_PART = r"[\w$-]{1,255}"
-OBJECT_NAME = re.compile(rf"^{NAME_PART}(?:\.{NAME_PART}){{0,2}}$")
-FULL_NAME = re.compile(rf"^{NAME_PART}(?:\.{NAME_PART}){{2}}$")
-TABLE_TYPE = re.compile(r"^[A-Z][A-Z_]{0,39}$")
+# Every form is applied with fullmatch: with match, a "$" would let a final line end through.
+COLUMN_NAME = re.compile(r"[\w$]{1,255}")
+PART = r"[\w$-]{1,255}"
+NAME_PART = re.compile(PART)
+OBJECT_NAME = re.compile(rf"{PART}(?:\.{PART}){{0,2}}")
+FULL_NAME = re.compile(rf"{PART}(?:\.{PART}){{2}}")
+TABLE_TYPE = re.compile(r"[A-Z][A-Z_]{0,39}")
 # The form of the found value, by row kind. A found value of any other kind stays in the report.
 FOUND_FORM = {"column-renamed": COLUMN_NAME, "column-case": COLUMN_NAME, "object-renamed": OBJECT_NAME,
               "migration-pair": OBJECT_NAME, "object-extra": TABLE_TYPE}
 COLUMN_KINDS = {"column-missing", "column-renamed", "column-case"}
-# The form of each field of a proposed fix that a correction applies.
+# The form of each field of a proposed fix, for every action the comparison writes: those a correction applies and
+# those it leaves for a minor version. A fix's other fields (a Genie filter and its title) are never used or copied.
 FIX_FORM = {"rename-column": {"from": COLUMN_NAME, "to": COLUMN_NAME},
-            "add-serves-measure": {"view": OBJECT_NAME, "measure": re.compile(rf"^{NAME_PART}$")},
+            "add-serves-measure": {"view": OBJECT_NAME, "measure": NAME_PART},
             "rename-object": {"from": OBJECT_NAME, "to": FULL_NAME},
             "remove-column": {"column": COLUMN_NAME},
             "remove-edge": {"from": OBJECT_NAME, "to": OBJECT_NAME},
-            "remove-object": {"object": OBJECT_NAME}}
+            "remove-object": {"object": OBJECT_NAME},
+            "add-measure-link": {"view": OBJECT_NAME, "measure": NAME_PART},
+            "add-object": {"object": OBJECT_NAME},
+            "add-edge": {"from": OBJECT_NAME, "to": OBJECT_NAME},
+            "record-replaces": {"table": OBJECT_NAME, "replaces": OBJECT_NAME},
+            "set-catalog-name": {"ontology_catalog": NAME_PART},
+            "none": {}}
+# The module each action's fix must name. An action that is not here names none.
+FIX_MODULE = {**{action: MODULE for action in ("rename-column", "add-serves-measure", "rename-object", "remove-column",
+                                               "remove-edge", "remove-object", "add-measure-link", "add-object", "add-edge")},
+              "record-replaces": "technical-graph"}
 KEPT = "(kept in the report)"
-SHA256 = re.compile(r"^[0-9a-f]{64}$")
-RUN_AT = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
+SHA256 = re.compile(r"[0-9a-f]{64}")
+RUN_AT = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ")
+# Who decided a row, and who cleared the report: a role or initials. The record is committed, so it takes no free
+# text: letters, digits, spaces, dots, hyphens and apostrophes, at most 60 characters, and no run of four digits.
+ROLE = re.compile(r"(?:[^\W_]|[ .'-]){1,60}")
+ROLE_HELP = ("write a role or initials, such as \"the ontology owner\": letters, digits, spaces, dots, hyphens and "
+             "apostrophes, at most 60 characters, and no number of four digits or more")
 DEFAULT_APPROVER = "The person who ran the cut"
 CHECK_COMMAND = "bash scripts/check.sh"
 GIT_PLACE = {"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR", "GIT_PREFIX", "GIT_NAMESPACE"}
@@ -291,16 +310,24 @@ def load_report(report_path, decisions=None):
     except (rep.ReportError, OSError, KeyError) as err:
         raise CutRefused(f"the report cannot be read: {err}") from None
     run = report["run"]
-    if not RUN_ID.match(run["id"]):
+    if not RUN_ID.fullmatch(run["id"]):
         raise CutRefused(f"the report's run ID {run['id']!r} cannot name a file")
     # The record copies these, so each must have its form.
-    if not RUN_AT.match(run["at"]) or not SHA256.match(run["settings_sha256"]) or not SHA256.match(run["zip_sha256"]):
+    if not RUN_AT.fullmatch(run["at"]) or not SHA256.fullmatch(run["settings_sha256"]) or not SHA256.fullmatch(run["zip_sha256"]):
         raise CutRefused("the report's run must hold its time as <date>T<time>Z and two SHA-256 checksums in lower-case hexadecimal")
     newest = ov.release_scripts_newest()
-    odd = sorted(m for m, v in report["ontology"].items() if not re.match(rf"^{NAME_PART}$", m) or newest.version_key(v) is None)
+    odd = sorted(m for m, v in report["ontology"].items() if not NAME_PART.fullmatch(m) or newest.version_key(v) is None)
     if odd:
         raise CutRefused(f"the report's ontology versions are not module names with versions: {', '.join(repr(m) for m in odd)}")
+    for row in report["rows"]:
+        if row["decided_by"] and not is_role(row["decided_by"]):
+            raise CutRefused(f"row {row['id']}: its 'decided by' is not a role or initials. In the report, {ROLE_HELP}.")
     return report, sums
+
+
+def is_role(text):
+    """True when the text names who decided in the form the record may hold: a role or initials."""
+    return isinstance(text, str) and bool(ROLE.fullmatch(text)) and text == text.strip() and not re.search(r"\d{4}", text)
 
 
 def record_path(report):
@@ -342,19 +369,18 @@ def _item(row, tables):
     action = fix.get("action", "none")
     if decision == "reject":
         return Item(row, "rejected", "no change; a standing decision keeps the row out of the next comparison")
+    if decision == "accept":
+        _check_fix(row, action)   # before anything else: an accepted row is refused unless it holds names only
+    if _is_setting(row):
+        return Item(row, "environment setting", _setting(row))
     if action == "none" and row["kind"] == "question":
         return Item(row, "waits", "a question for the owner; no change is proposed")
     if not decision:
         return Item(row, "no decision", "left as it is")
-    if decision == "environment setting" or action == "set-catalog-name":
-        return Item(row, "environment setting", _setting(row))
     if action in NEEDS_MINOR:
         return Item(row, "needs a minor version", NEEDS_MINOR[action])
     if action == "none":
         return Item(row, "not applied", "the row proposes no change")
-    if action not in APPLY:
-        return Item(row, "not applied", "a correction cannot apply this row's action")
-    _check_fix(row, action)
     try:
         done = APPLY[action](tables, row, fix)
     except Unappliable as err:
@@ -367,22 +393,31 @@ def _item(row, tables):
     return Item(row, "apply", text, breaking, confirm, changes)
 
 
+def _is_setting(row):
+    """True when the row's decision makes it a line for kpi_store.toml."""
+    return row["decision"] == "environment setting" or (row["decision"] == "accept" and row["proposed_fix"].get("action") == "set-catalog-name")
+
+
 def _check_fix(row, action):
-    """Stops the cut when an accepted row's fix holds anything but names: the module must be data-product, and the
-    object, the found value and each field of the fix must have the form of the name they stand for."""
+    """Stops the cut when an accepted row holds anything but names, whatever the cut then does with the row: the
+    action must be one the comparison writes, its fix must name the action's module, and the object, the found value
+    and each field of the fix must have the form of the name they stand for. A row that proposes no change has no
+    object to apply, so its object is left to the record's own rule (_recorded)."""
     fix = row["proposed_fix"]
 
     def refuse(what):
         raise CutRefused(f"row {row['id']} cannot be applied: {what}. Correct the report, or reject the row.")
-    if fix.get("module") != MODULE:
-        refuse(f"its proposed fix names a module other than {MODULE}")
+    if action not in FIX_FORM:
+        refuse("its proposed fix names an action the cut does not know")
+    if action in FIX_MODULE and fix.get("module") != FIX_MODULE[action]:
+        refuse(f"its proposed fix names a module other than {FIX_MODULE[action]}")
     for key, form in FIX_FORM[action].items():
-        if not isinstance(fix.get(key), str) or not form.match(fix[key]):
+        if not isinstance(fix.get(key), str) or not form.fullmatch(fix[key]):
             refuse(f"the '{key}' of its proposed fix is not a name")
-    if not OBJECT_NAME.match(row["object"]):
+    if action != "none" and not OBJECT_NAME.fullmatch(row["object"]):
         refuse("its object is not an object name")
     form = FOUND_FORM.get(row["kind"])
-    if form and row["found_value"] and not form.match(row["found_value"]):
+    if form and row["found_value"] and not form.fullmatch(row["found_value"]):
         refuse("its found value is not a name")
 
 
@@ -391,7 +426,7 @@ def _recorded(row):
     each as it is when it has the form of a name, and "(kept in the report)" otherwise. Evidence, query results,
     Genie filter text and anything a person typed into these fields stay in the report."""
     def name(value, form):
-        return value if not value or (form and form.match(value)) else KEPT
+        return value if not value or (form and form.fullmatch(value)) else KEPT
     return (name(row["object"], OBJECT_NAME),
             name(row["ontology_value"], COLUMN_NAME if row["kind"] in COLUMN_KINDS else OBJECT_NAME),
             name(row["found_value"], FOUND_FORM.get(row["kind"])))
@@ -401,7 +436,7 @@ def _setting(row):
     fix = row["proposed_fix"]
     if fix.get("action") == "set-catalog-name":
         catalog = fix.get("ontology_catalog")
-        catalog = catalog if isinstance(catalog, str) and re.match(rf"^{NAME_PART}$", catalog) else "the ontology's catalog name"
+        catalog = catalog if isinstance(catalog, str) and NAME_PART.fullmatch(catalog) else "the ontology's catalog name"
         return f"in kpi_store.toml, under [names], set {catalog} to the name this environment gives that catalog"
     return (f"record this difference in kpi_store.toml ([names] for a catalog's name, [skip] for a schema or a table "
             f"to leave out); the ontology keeps {_recorded(row)[1] or _recorded(row)[0]}")
@@ -449,7 +484,7 @@ def describe(plan_):
         lines.append(f"{title} ({len(chosen)}):")
         for i in chosen:
             mark = "  BREAKING" if i.breaking else ""
-            where = "" if i.outcome == "apply" else f"{i.row['object']}: "
+            where = "" if i.outcome == "apply" else f"{_recorded(i.row)[0]}: "
             lines.append(f"  {i.row['id']} {i.row['kind']}: {where}{i.text}{mark}")
             lines += [f"      {file}: {before} -> {after}" for file, before, after in i.changes]
     if plan_.versions:
@@ -472,6 +507,8 @@ def cut(report_path, release_root=".", decisions=None, approver=None, ask=input,
     finishes the tag."""
     root = Path(release_root).resolve()
     _requirements()
+    if approver is not None and not is_role(approver):
+        raise CutRefused(f"--approver is not a role or initials: {ROLE_HELP}.")
     report, sums = load_report(report_path, decisions)
     plan_ = plan(report, root, sums)
     for line in describe(plan_):
@@ -480,7 +517,8 @@ def cut(report_path, release_root=".", decisions=None, approver=None, ask=input,
         return Outcome("already cut" if plan_.already_cut else "planned", plan_, record_path(report) if plan_.already_cut else None)
     if plan_.already_cut:
         outcome = Outcome("already cut", plan_, record_path(report))
-        _finish_tag(root, report, outcome, say)
+        if _finish_tag(root, report, outcome, say):
+            _follow_up(report, True, outcome, say)
         return outcome
     git = _git_ready(root, plan_)
     for item in plan_.applied:
@@ -494,7 +532,7 @@ def cut(report_path, release_root=".", decisions=None, approver=None, ask=input,
     now = now or dt.datetime.now(dt.timezone.utc)
     step = _Steps(say, before_step)
     with tempfile.TemporaryDirectory(prefix="kpi-store-cut-") as tmp:
-        staging = Path(tmp) / "release"
+        staging, backup = Path(tmp) / "release", Path(tmp) / "backup"
         step("copy the release", lambda: shutil.copytree(root, staging, ignore=shutil.ignore_patterns(*IGNORED)))
         _build(plan_, staging, approver, now, step)
         step("write the standing decisions", lambda: _write_standing(plan_, staging))
@@ -502,18 +540,28 @@ def cut(report_path, release_root=".", decisions=None, approver=None, ask=input,
         record = _record(plan_, sums, approver, now, sorted(set(files) | {record_path(report).as_posix()}))
         _write(staging / record_path(report), record)
         files = _difference(root, staging)
-        step("write the release", lambda: _apply(root, staging, files, Path(tmp) / "backup"))
-    outcome = Outcome("cut" if plan_.versions else "recorded", plan_, record_path(report), sorted(files))
-    _commit(root, git, plan_, outcome)
-    for item in plan_.items:
-        if item.outcome == "environment setting":
-            outcome.messages.append(f"Row {item.row['id']}: {item.text}.")
-    if plan_.versions:
-        outcome.messages.append(f"Run the full check before you load: {CHECK_COMMAND} (on Windows, in Git Bash; the runner does it).")
+        step("write the release", lambda: _apply(root, staging, files, backup))
+        outcome = Outcome("cut" if plan_.versions else "recorded", plan_, record_path(report), sorted(files))
+        try:
+            # Inside the temporary folder: a failed commit restores the release from the backup kept there.
+            _commit(root, git, plan_, outcome, backup)
+        except CutIncomplete:
+            _follow_up(report, bool(plan_.versions), outcome, say)   # the cut is made, so what follows it still applies
+            raise
     say(f"Done. The record is {record_path(report).as_posix()}; the cut changed {len(files)} files.")
-    for message in outcome.messages:
-        say(message)
+    _follow_up(report, bool(plan_.versions), outcome, say)
     return outcome
+
+
+def _follow_up(report, wrote_version, outcome, say):
+    """What the person does after a cut: each environment setting, and the full check when a version was written.
+    Shown on every path that ends with a cut or with a finished tag, and kept in the outcome's messages."""
+    messages = [f"Row {row['id']}: {_setting(row)}." for row in report["rows"] if _is_setting(row)]
+    if wrote_version:
+        messages.append(f"Run the full check before you load: {CHECK_COMMAND} (on Windows, in Git Bash; the runner does it).")
+    for message in messages:
+        outcome.messages.append(message)
+        say(message)
 
 
 class _Steps:
@@ -704,10 +752,10 @@ def _record(plan_, sums, approver, now, files):
               "|---|---|---|---|---|---|---|---|---|---|"]
     for i in plan_.items:
         r = i.row
-        why = "; ".join(t for t in (i.text, r["note"]) if t)
+        # "Why" is the tool's own wording. The person's note stays in the report.
         lines.append("| " + " | ".join(_cell(c) for c in (
             r["id"], r["kind"], "yes" if r["blocks"] else "no", *_recorded(r),
-            r["decision"] or "none", r["decided_by"], i.outcome, why)) + " |")
+            r["decision"] or "none", r["decided_by"], i.outcome, i.text)) + " |")
     lines += ["", "## Changes", ""]
     changes = [(i.row["id"], *c) for i in plan_.applied for c in i.changes]
     if changes:
@@ -750,7 +798,8 @@ def _difference(root, staging):
 
 
 def _apply(root, staging, files, backup):
-    """Writes the changed files into the release. A failure puts every file back."""
+    """Writes the changed files into the release, keeping a copy of each file it replaces or removes in `backup`.
+    A failure puts every file back."""
     done = []
     try:
         for rel in files:
@@ -765,16 +814,29 @@ def _apply(root, staging, files, backup):
             else:
                 target.unlink()
     except BaseException:
-        for rel in done:
-            target, kept = root / rel, backup / rel
+        _restore(root, done, backup)
+        raise
+    _prune(root, files)
+
+
+def _restore(root, files, backup):
+    """Puts back exactly the paths the cut wrote: a file the cut changed or removed is copied back from the backup,
+    and a file the cut created is deleted. No other path is touched. Returns the paths it could not put back, each
+    with its state; an empty list means the release's files are as they were."""
+    failed = []
+    for rel in files:
+        target, kept = root / rel, backup / rel
+        try:
             if kept.is_file():
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(kept, target)
             elif target.exists():
                 target.unlink()
-        _prune(root, done)
-        raise
+        except OSError as err:
+            state = "still holds the cut's content" if kept.is_file() else "is a file the cut created and could not be deleted"
+            failed.append(f"{rel} ({state}: {type(err).__name__})")
     _prune(root, files)
+    return failed
 
 
 def _prune(root, files):
@@ -787,10 +849,16 @@ def _prune(root, files):
 
 # ---------- Git, when the release is a Git copy ----------
 
-def _git(root, *args):
+def _git(root, *args, stdin=None):
     # A caller such as a Git hook sets these to its own repository; the cut works on the release it was given.
     env = {k: v for k, v in os.environ.items() if k not in GIT_PLACE}
-    return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, encoding="utf-8", env=env, check=False)
+    return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, encoding="utf-8", env=env,
+                          input=stdin, check=False)
+
+
+def _paths(files):
+    """The paths as Git reads them from standard input, so a cut of many files meets no limit on a command's length."""
+    return "\0".join(files) + "\0"
 
 
 def _git_state(root):
@@ -834,25 +902,44 @@ def _git_ready(root, plan_):
     return state
 
 
-def _commit(root, git, plan_, outcome):
-    """Commits the cut and tags it. A failed commit puts the release back as it was. A failed tag leaves the commit
-    and raises CutIncomplete: the same command again finishes the tag (_finish_tag)."""
+def _commit(root, git, plan_, outcome, backup):
+    """Commits the paths the cut wrote and tags the commit. A failed commit puts the release back from the backup
+    (_undo). A failed tag leaves the commit and raises CutIncomplete: the same command again finishes the tag
+    (_finish_tag)."""
     if git == "none":
         return
     run, tag = plan_.report["run"]["id"], _tag(plan_)
     subject = (f"Cut {MODULE} {plan_.versions[MODULE][1]} from discovery run {run}" if plan_.versions
                else f"Record the decisions of discovery run {run}")
-    for args in (["add", "-A"], ["commit", "-q", "-m", subject, "-m", f"The record is {outcome.record.as_posix()}."]):
-        done = _git(root, *args)
+    spec = ["--pathspec-from-file=-", "--pathspec-file-nul"]
+    for args in (["add", "-A", *spec], ["commit", "-q", "-m", subject, "-m", f"The record is {outcome.record.as_posix()}.", *spec]):
+        done = _git(root, *args, stdin=_paths(outcome.files))
         if done.returncode != 0:
-            # The copy was clean before the cut, so the last commit is exactly the release as it was.
-            _git(root, "reset", "-q", "--hard", "HEAD")
-            _git(root, "clean", "-fdq")
-            raise CutFailed(f"git {args[0]} failed: {(done.stderr or done.stdout).strip()}. The release is as it was.")
+            raise CutFailed(f"git {args[0]} failed: {(done.stderr or done.stdout).strip()}. " + _undo(root, outcome.files, backup))
     outcome.committed = True
     if tag:
         _make_tag(root, tag, "HEAD")
         outcome.tag = tag
+
+
+def _undo(root, files, backup):
+    """After a failed commit: puts back the paths the cut wrote, from the backup, and takes them out of Git's index.
+    It touches no other path, so a file Git was told to ignore or to assume unchanged keeps its content. Returns
+    the sentence that says what state the release is in."""
+    failed = _restore(root, files, backup)
+    unstage = _git(root, "reset", "-q", *["--pathspec-from-file=-", "--pathspec-file-nul"], stdin=_paths(files))
+    if not failed and unstage.returncode == 0:
+        return "The release is as it was."
+    said = []
+    if failed:
+        said.append(f"The release could NOT be put back in full. These {len(failed)} paths are not as they were: "
+                    + "; ".join(failed) + ". Every other path is as it was.")
+    else:
+        said.append("The release's files are as they were.")
+    if unstage.returncode != 0:
+        said.append(f"Git could not take the cut's paths out of its index (git reset failed: "
+                    f"{(unstage.stderr or unstage.stdout).strip()}), so some may still be staged: look at git status.")
+    return " ".join(said)
 
 
 def _make_tag(root, tag, commit):
@@ -864,7 +951,7 @@ def _make_tag(root, tag, commit):
 
 def _finish_tag(root, report, outcome, say):
     """For a run that was cut before: makes the cut's tag when the Git copy lacks it, on the commit that added the
-    run's record. A cut whose tag failed is finished this way."""
+    run's record. A cut whose tag failed is finished this way. Returns True when it made the tag."""
     if _git_state(root) in ("none", "no git"):
         return
     written = re.search(rf"^\| {re.escape(MODULE)} \| \S+ \| (\S+) \|", (root / record_path(report)).read_text(encoding="utf-8"), re.M)
@@ -881,6 +968,7 @@ def _finish_tag(root, report, outcome, say):
     _make_tag(root, tag, commit)
     outcome.tag = tag
     say(f"The tag {tag} was missing. It now marks the cut's commit {commit[:12]}.")
+    return True
 
 
 # ---------- helpers and the command line ----------
@@ -900,7 +988,8 @@ def main(argv=None):
     ap.add_argument("--report", required=True, help="discovery-report.json, or the cleared discovery-report.csv beside it")
     ap.add_argument("--decisions", help="a cleared CSV whose decisions replace those in the JSON file")
     ap.add_argument("--release", default=".", help="the release's top folder (default: this folder)")
-    ap.add_argument("--approver", help="the role of the person who clears the report, such as \"the ontology owner\"; write a role, not a name")
+    ap.add_argument("--approver", help="the role or initials of the person who clears the report, such as \"the ontology owner\"; a name, "
+                                       "an address or a number is refused")
     ap.add_argument("--plan", action="store_true", help="show what a cut would do and change nothing")
     a = ap.parse_args(argv)
     try:

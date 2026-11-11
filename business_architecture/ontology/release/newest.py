@@ -10,7 +10,7 @@ ONTOLOGY = os.path.dirname(HERE)
 CORE_BUILDER = re.compile(r"^build_core_(\d+)_(\d+)\.py$")
 # A version as a pattern, for a builder or test that finds one inside a longer text.
 VERSION_PATTERN = r"\d+\.\d+\.\d+(?:-correction\.\d+)?"
-VERSION = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:-correction\.(\d+))?$")
+VERSION = re.compile(r"(\d+)\.(\d+)\.(\d+)(?:-correction\.(\d+))?")
 
 
 def version_key(version):
@@ -18,7 +18,7 @@ def version_key(version):
     <major>.<minor>.<patch>-correction.<n>, is newer than the plain version of the same three numbers and older than
     the next patch: 1.2.0, 1.2.1, 1.2.1-correction.1, 1.2.1-correction.2, 1.2.2. This is not SemVer's order, where a
     suffix after a hyphen sorts before the plain version. Returns None for any other text."""
-    m = VERSION.match(version)
+    m = VERSION.fullmatch(version)   # fullmatch: with match and "$", a version with a final line end would pass
     return tuple(int(n or 0) for n in m.groups()) if m else None
 
 
