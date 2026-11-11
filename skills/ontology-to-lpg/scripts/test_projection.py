@@ -667,6 +667,15 @@ class Build(unittest.TestCase):
         self.assertEqual(man["shapes_fingerprint"], hashlib.sha256(open(SHAPES, "rb").read()).hexdigest())
         self.assertEqual(man["rule4"], "4a")
 
+    def test_a_file_on_another_drive_is_recorded_by_its_whole_path(self):
+        # On Windows the working files may sit on another drive than the release, and there is no relative path.
+        other_drive = ValueError("path is on mount 'C:', start on mount 'D:'")
+        with mock.patch.object(build.os.path, "relpath", side_effect=other_drive):
+            recorded = build.relative(os.path.join(os.sep, "elsewhere", "loadable.nt"), ".")
+        self.assertTrue(recorded.endswith("/elsewhere/loadable.nt"), recorded)
+        self.assertNotIn("\\", recorded)
+        self.assertEqual(build.relative(os.path.join("a", "b.ttl"), "."), "a/b.ttl")
+
     def test_manifest_verify_fails_when_an_input_changes(self):
         with tempfile.TemporaryDirectory() as tmp:
             loadable, inferred_path = os.path.join(tmp, "loadable.nt"), os.path.join(tmp, "inferred.nt")

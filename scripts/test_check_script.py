@@ -100,3 +100,31 @@ def test_a_test_command_that_ran_no_test_fails_and_one_that_ran_some_passes():
     assert _call_run_tests("echo Ran 0 tests in 0s").returncode == 1
     done = _call_run_tests("echo Ran 3 tests in 1s")
     assert done.returncode == 0 and done.stdout.endswith("after\n")
+
+
+def _find_python(tmp_path, exits):
+    """Runs check.sh's search for a Python with stand-ins first on PATH: {name: the exit status of that stand-in}."""
+    lines = _lines()
+    start = lines.index('PYTHON=""')
+    end = next(i for i, line in enumerate(lines) if line.startswith('[ -n "$PYTHON" ]'))
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    for name, status in exits.items():
+        stand_in = bin_dir / name
+        stand_in.write_text(f"#!/bin/sh\nexit {status}\n", encoding="utf-8", newline="\n")
+        stand_in.chmod(0o755)
+    # cd and pwd give the folder as bash names it; under Git Bash that is /c/..., which PATH needs.
+    script = 'PATH="$(cd "$1" && pwd):$PATH"\n' + "\n".join(lines[start:end + 1]) + '\necho "$PYTHON"\n'
+    return subprocess.run([BASH, "-c", script, "find-python", str(bin_dir)], capture_output=True, text=True, encoding="utf-8")
+
+
+def test_the_script_takes_the_first_python_that_runs(tmp_path):
+    """Windows may hold a python3.exe that only opens the Store. A name counts only when it runs."""
+    done = _find_python(tmp_path, {"python3": 9, "python": 0, "py": 0})
+    assert (done.returncode, done.stdout) == (0, "python\n")
+
+
+def test_the_script_stops_when_no_python_runs(tmp_path):
+    done = _find_python(tmp_path, {"python3": 9, "python": 1, "py": 1})
+    assert done.returncode == 1 and done.stdout == ""
+    assert done.stderr == "no Python 3.11 or later was found: tried python3, python and py\n"
