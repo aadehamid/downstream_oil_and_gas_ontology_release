@@ -1,33 +1,28 @@
-"""Keeps the ontology stores in step with the repository (brief item 7c, 2026-10-29).
+"""Says what a current ontology store holds, and judges a store against it.
 
-The Neo4j stores and the Delta table each hold a marker saying which release set they were loaded from: the catalog's
-datasets (their count and a digest of their IRIs, from releases/catalog.ttl) and the projection's input fingerprint
-(projection-manifest.json). The drift check compares each marker with main's newest catalog and manifest. Jena holds
-no marker: its named graphs are version IRIs, so the check reads its graph names and each graph's triple count and
-compares them with the newest release files, and the technical graph's two named graphs, which stay out of the release's
-proof, with the graph files the demo would load. Each store also holds the technical graph's own marker, a digest of
-those graph files, which the demo's tech_graph load writes (and tech_graph sync, for the Delta copy); the check reports
-it on a tech:<store> line beside the ontology's, with a fingerprint of the content the store holds compared with the
-files', so a missing, stale or edited technical graph shows when the ontology is current. sync reloads what is behind with the ontology-to-lpg driver, takes the driver's result into this folder,
-loads the pricing demo's technical graph again where a reload wiped it or its marker is not current, copies it to
-Delta with tech_graph sync when the Delta copy is reloaded or behind, and marks the stores it reloaded.
-When the newest releases hold the logical-model module, Jena and the triple
-table also hold each package graph its manifest lists (package_graphs: each model's ER Studio export and annotation
-layer), which jena_graphs counts with the release graphs, and each Neo4j store holds the models as a subgraph apart from
-the projection, which check reports on an lm:<store> line (logical_models.py) and sync reloads with logical_models.py
-load, last, where a reload wiped it or it is not current. Releases without the module give no lm: line and no such step.
+Three stores hold the release: a Neo4j database, a Jena dataset and the Delta triple table in Databricks.
+- Neo4j and Databricks each hold a marker that says which release set they were loaded from: the catalog's datasets
+  (their count and a digest of their IRIs, from releases/catalog.ttl) and the projection's input fingerprint
+  (projection-manifest.json). In Neo4j the marker is a node labelled EpmStoreMarker, never Resource, so the
+  projection's counts, hash and round trip do not read it. In Databricks it is a row of epm_store_markers, beside
+  epm_triples.
+- Jena holds no marker. Its named graphs are version IRIs, so its graph names and each graph's triple count are
+  compared with the newest release files.
+- When the newest releases hold the logical-model module, Jena and the triple table also hold each package graph its
+  manifest lists (package_graphs). A Neo4j database holds the models as a subgraph apart from the projection, which
+  check reports on an lm:neo4j line (logical_models.py).
 
-    python3 sync_stores.py expected [--ref origin/main]   # what a current store holds
-    python3 sync_stores.py mark --store driver ...         # check a store against the repository, then mark it
-    python3 sync_stores.py check [--ref origin/main] [--store driver ...]   # the drift check: ontology, technical graph and any logical models (default: all stores)
-    python3 sync_stores.py sync [--cloud] [--dry-run]      # reload what is behind, then mark it
+    python3 sync_stores.py expected [--ref <git ref>]             # what a current store holds
+    python3 sync_stores.py check [--store neo4j] [--store jena]   # judge the stores the settings name
+    python3 sync_stores.py mark                                   # check the Neo4j database, then write its marker
 
-The markers stay out of the projection: in Neo4j a node labelled EpmStoreMarker, never Resource, which the
-projection's counts, hash and round trip do not read (test_sync_stores.py, OntologyLabelsOnly); in Databricks a row in
-epm_store_markers, beside epm_triples. A reload's wipe removes the Neo4j marker, so a store reloaded by hand reads as
-unmarked until it is marked again. Jena's dataset is in memory, so a restart empties it and the check reads empty.
-Logins come from the files the stores runbook names; none is printed.
-Needs rdflib; mark, check and sync also need neo4j and databricks-sql-connector (uv run --with ...).
+This file reads Neo4j over Bolt and Jena over its SPARQL query URL. It does not connect to Databricks: the load that
+writes the triple table also writes its marker (marker), and a caller that has read the table and the marker passes
+them to drift. Every expectation comes from this tree's files. --ref reads them at a Git ref instead.
+
+The settings come from one place (settings): the file EPM_STORES_ENV names, kept outside the repository, and the
+process environment, which wins. No password is printed.
+Needs rdflib; check and mark also need neo4j (uv run --with ...).
 """
 import argparse
 import hashlib
@@ -43,73 +38,83 @@ REPO = os.path.normpath(os.path.join(HERE, "..", "..", ".."))
 CATALOG = "business_architecture/ontology/releases/catalog.ttl"
 MANIFEST = "business_architecture/ontology/projection/projection-manifest.json"
 REPORT = os.path.join(HERE, "projection-report.json")
-DEMO = os.path.join(REPO, "demos", "downstream-pricing-databricks-free")
-NEO4J_STORES = {  # the stores runbook; the driver's login is in whichever of its two run files is newer
-    "driver": ("bolt://127.0.0.1:17711", ("~/lpg-out/epm-rebuild/neo4j-run/run.env", "~/lpg-out/epm/neo4j-run/run.env")),
-    "aura": (None, ("~/.config/neo4j/aura.env",)),
-}
-JENA_QUERY = "http://127.0.0.1:13031/ds/query"  # skill-run/epm-run.json's "jena"
-DATABRICKS_ENV = "~/.config/databricks/epm.env"
-RUN_CONFIG = os.path.join(HERE, "skill-run", "epm-run.json")
-DRIVER_OUT = "~/lpg-out/epm"  # the run configuration's "out"
-TRIPLES_TABLE = "epm_triples"  # the run configuration's "databricks" table
+TRIPLES_TABLE = "epm_triples"
+MARKER_TABLE = "epm_store_markers"
+MARKER_LABEL = "EpmStoreMarker"
 RELEASE_GRAPHS = ("shapes", "catalog")  # skill-run/epm-run.json's "release_graphs"
-TECH_GRAPHS = {"tech-graph.ttl": "urn:pricing-demo:graph:tech-graph", "decision-trail.ttl": "urn:pricing-demo:graph:decision-trail"}  # tech_graph.JENA_GRAPHS
-# The technical graph's marker, as the demo's tech_graph load and sync write it (tech_graph.MARKER_LABEL, MARKER_GRAPH,
-# MARKER_DIGEST, MARKER_ROW): a digest of the graph files a store holds.
-TECH_MARKER_LABEL = "TechGraphMarker"
-TECH_MARKER_GRAPH = "urn:pricing-demo:graph:tech-marker"
-TECH_MARKER_DIGEST = "urn:pricing-demo:tech-marker:digest"
-TECH_MARKER_ROW = "tech_graph"
-STORES = (*NEO4J_STORES, "jena", "databricks")
+STORES = ("neo4j", "jena", "databricks")
+READ_HERE = ("neo4j", "jena")  # the stores check and mark connect to
 MARKER_FIELDS = ("catalog_datasets", "catalog_digest", "input_fingerprint")
+WORKTREE = "worktree"  # the ref that means this tree's files
+DEFAULT_GRAPH = "(the default graph)"  # triples outside any named graph: no release graph has this name, so they read as a stray
+SETTINGS = ("NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD", "NEO4J_DATABASE", "EPM_JENA_QUERY")
 
 
-def apply_store_overrides():
-    """EPM_STORES_JSON names other stores for a test run, so the test never points at the loaded ones (the share
-    release's validation): {"driver": {"bolt": ..., "env": [...]}, "aura": {"env": [...]}, "jena": {"query": ...},
-    "databricks_env": "...", "run_config": "...", "driver_out": "...", "triples_table": "..."}. Each key is optional; the
-    same keys point the tool at another environment's stores."""
-    global JENA_QUERY, DATABRICKS_ENV, RUN_CONFIG, DRIVER_OUT, TRIPLES_TABLE
-    raw = os.environ.get("EPM_STORES_JSON")
-    if not raw:
-        return
-    over = json.loads(raw)
-    for store in NEO4J_STORES:
-        if store in over:
-            bolt = over[store].get("bolt", NEO4J_STORES[store][0])
-            envs = tuple(over[store].get("env", NEO4J_STORES[store][1]))
-            NEO4J_STORES[store] = (bolt, envs)
-    if "jena" in over:
-        JENA_QUERY = over["jena"].get("query", JENA_QUERY)
-    DATABRICKS_ENV = over.get("databricks_env", DATABRICKS_ENV)
-    RUN_CONFIG = over.get("run_config", RUN_CONFIG)
-    DRIVER_OUT = over.get("driver_out", DRIVER_OUT)
-    TRIPLES_TABLE = over.get("triples_table", TRIPLES_TABLE)
+# ---------- the settings ----------
+
+class Unset(LookupError):
+    """A setting a command needs has no value. The message is the setting's name, never a value."""
 
 
-apply_store_overrides()
+def read_env(path):
+    """The KEY=value lines of a file. Blank lines and lines that start with # are skipped."""
+    values = {}
+    with open(os.path.expanduser(path), encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                values[k.strip()] = v.strip().strip('"').strip("'")
+    return values
+
+
+def settings(environ=None):
+    """The store endpoints and the Neo4j login, read from one place.
+
+    NEO4J_URI (Bolt), NEO4J_USERNAME (default neo4j), NEO4J_PASSWORD, NEO4J_DATABASE (default: the server's own
+    default database) and EPM_JENA_QUERY (the dataset's SPARQL query URL). The file EPM_STORES_ENV names gives them;
+    a value in the process environment wins. Nothing has a default address: a command that needs a missing setting
+    stops and names it (need)."""
+    environ = os.environ if environ is None else environ
+    found = read_env(environ["EPM_STORES_ENV"]) if environ.get("EPM_STORES_ENV") else {}
+    found.update({k: environ[k] for k in SETTINGS if environ.get(k)})
+    return {k: found[k] for k in SETTINGS if found.get(k)}
+
+
+def need(values, key):
+    if not values.get(key):
+        raise Unset(key)
+    return values[key]
+
+
+def reason(err):
+    """Why a store could not be read: the error's name, never its message, which can carry an address. An unset
+    setting adds its name."""
+    return f"unreachable ({type(err).__name__}{': ' + str(err) if isinstance(err, Unset) else ''})"
 
 
 # ---------- what a current store holds ----------
 
 def repo_file(path, ref=None):
-    """A file's text in the working tree, or at a git ref (main's newest catalog for the drift check). The ref
-    `worktree` reads the tree itself, for a tree without Git such as the share release."""
-    if ref is None or ref == "worktree":
-        return open(os.path.join(REPO, path)).read()
-    return subprocess.run(["git", "-C", REPO, "show", f"{ref}:{path}"], check=True, capture_output=True, text=True).stdout
+    """A file's text in this tree, or at a Git ref. The ref `worktree`, like None, reads the tree itself, so a tree
+    without Git works."""
+    if ref is None or ref == WORKTREE:
+        with open(os.path.join(REPO, path), encoding="utf-8") as f:
+            return f.read()
+    return subprocess.run(["git", "-C", REPO, "show", f"{ref}:{path}"], check=True, capture_output=True,
+                          encoding="utf-8").stdout
 
 
 def repo_bytes(path, ref=None):
-    """A file's bytes in the working tree, or at a git ref, as repo_file reads its text."""
-    if ref is None or ref == "worktree":
+    """A file's bytes in this tree, or at a Git ref, as repo_file reads its text."""
+    if ref is None or ref == WORKTREE:
         with open(os.path.join(REPO, path), "rb") as f:
             return f.read()
     return subprocess.run(["git", "-C", REPO, "show", f"{ref}:{path}"], check=True, capture_output=True).stdout
 
 
 def catalog_datasets(text):
+    """The dataset IRIs a catalog lists, sorted."""
     from rdflib import Graph, Namespace
     DCAT = Namespace("http://www.w3.org/ns/dcat#")
     return sorted(str(d) for d in Graph().parse(data=text, format="turtle").objects(None, DCAT.dataset))
@@ -127,6 +132,7 @@ def newest_releases(datasets):
 
 
 def expected(ref=None):
+    """What a current store's marker holds (MARKER_FIELDS), and the newest release IRIs."""
     datasets = catalog_datasets(repo_file(CATALOG, ref))
     return {"catalog_datasets": len(datasets),
             "catalog_digest": hashlib.sha256("\n".join(datasets).encode()).hexdigest(),
@@ -157,7 +163,7 @@ def package_graphs(iri, ref=None):
 def jena_graphs(newest, ref=None):
     """{graph IRI: triple count} that a current Jena holds, and the triple table too: for each newest release, its
     content under the version IRI, each release graph under <version IRI>/<name>, and each package graph
-    (package_graphs, which logical_models.py load adds), counted from the release's files."""
+    (package_graphs), counted from the release's files."""
     from rdflib import Graph
     graphs = {}
     for iri in newest:
@@ -170,88 +176,63 @@ def jena_graphs(newest, ref=None):
     return graphs
 
 
-def tech_folder():
-    """The folder the demo's tech_graph load reads: a refreshed copy when a build wrote one, or what the release ships."""
-    refreshed = os.path.join(DEMO, "out", "tech", "graph")
-    return refreshed if all(os.path.isfile(os.path.join(refreshed, n)) for n in TECH_GRAPHS) else os.path.join(DEMO, "graph")
+def expected_for(ref, stores):
+    """What the named stores should hold. The graph counts are read from the release files only when Jena or
+    Databricks is named, since both are judged per graph."""
+    want = expected(ref)
+    return want | {"jena_graphs": jena_graphs(want["newest"], ref)} if {"jena", "databricks"} & set(stores) else want
 
 
-def tech_graph_counts():
-    """{graph IRI: triple count} of the technical graph as the demo would load it."""
-    from rdflib import Graph
-    folder = tech_folder()
-    return {iri: len(Graph().parse(os.path.join(folder, name), format="turtle")) for name, iri in TECH_GRAPHS.items()}
+# ---------- judging ----------
+
+def graphs_differ(held, graphs):
+    """Why a store's {graph: triple or row count} is not the expected one (jena_graphs), naming a graph; None when
+    they are equal. checked_rows refuses the triple table on it, and drift reads it as changed."""
+    missing, stray = sorted(set(graphs) - set(held)), sorted(set(held) - set(graphs))
+    if missing or stray:
+        return (f"lacks {len(missing)} graph(s) of the newest releases, e.g. {missing[:3]}, "
+                f"and holds {len(stray)} other(s), e.g. {stray[:3]}")
+    moved = sorted(g for g in graphs if held[g] != graphs[g])
+    if moved:
+        return (f"has {len(moved)} graph(s) with another row count than the release files' triples, "
+                f"e.g. {moved[0]}: {held[moved[0]]}, not {graphs[moved[0]]}")
+    return None
 
 
-def demo_graph():
-    """The demo's tech_graph module, whose fingerprints of the technical graph's content this check shares, so the
-    files and every store are reduced the same way (it needs only the standard library and rdflib to import)."""
-    if DEMO not in sys.path:
-        sys.path.insert(0, DEMO)
-    import pricing_demo.tech_graph as tg
-    return tg
-
-
-def logical_models():
-    """logical_models.py, which imports this module: the logical models' subgraph and the package graphs."""
-    import logical_models as lm
-    return lm
-
-
-def tech_content(folder=None):
-    """{"neo4j", "jena", "delta"}: the content fingerprint a store holds when it equals the graph files."""
-    return demo_graph().files_fingerprints(folder or tech_folder())
-
-
-def tech_digest(folder=None):
-    """The digest a current store's technical-graph marker holds: tech_graph.graph_digest of the files load reads."""
-    h = hashlib.sha256()
-    for name in TECH_GRAPHS:
-        with open(os.path.join(folder or tech_folder(), name), "rb") as f:
-            h.update(name.encode() + b"\0" + f.read() + b"\0")
-    return h.hexdigest()
-
-
-def judge_jena(held, want, tech=None):
-    """Jena's status from the graphs it holds and those the release files say it should: its graph names are its marker.
-    The technical graph's named graphs stay out of that comparison and are judged on their own against tech."""
-    tech = tech or {}
-    held = dict(held)
-    held.pop(TECH_MARKER_GRAPH, None)  # the technical graph's marker, judged by tech_drift
-    held_tech = {g: held.pop(g) for g in list(held) if g in TECH_GRAPHS.values()}
-    if not held and not held_tech:
-        return "empty", "it holds no graph; a restart empties its in-memory dataset; sync reloads it"
+def judge_jena(held, want, apart=()):
+    """Jena's status from the graphs it holds and those the release files say it should: its graph names are its
+    marker. `apart` names graphs that are not part of the release (another load's, judged by its own check); they
+    stay out of the comparison."""
+    held = {g: n for g, n in held.items() if g not in set(apart)}
+    if not held:
+        return "empty", "it holds no graph of the releases; load it again"
     missing, stray = sorted(set(want) - set(held)), sorted(set(held) - set(want))
     if missing or stray:
         return "behind", f"{len(missing)} graph(s) of the newest releases missing and {len(stray)} other(s) held"
     moved = [g for g in want if held[g] != want[g]]
     if moved:
         return "changed", f"{len(moved)} graph(s) hold another triple count than the release files, e.g. {moved[0]}"
-    if held_tech != tech:
-        return "changed", f"the technical graph differs from its files: {sum(held_tech.values())} triples, not {sum(tech.values())}; run tech_graph load --store jena"
-    return "current", (f"{len(held)} graphs, {sum(held.values())} triples, each equal to the release files"
-                       + (f"; technical graph {sum(tech.values())} triples" if tech else ""))
+    return "current", f"{len(held)} graphs, {sum(held.values())} triples, each equal to the release files"
 
-
-# ---------- the drift check ----------
 
 def drift(markers, live, want, stores=STORES):
-    """Each store's status from its marker, its live count and the repository's expected values:
-    current, behind (marked from another release set), changed (its count moved since it was marked), unmarked, or
-    unreachable (the store could not be read: no connection, no login file or a missing table, for example; the
-    error's name follows the word). Jena has no marker: judge_jena reads it as current, behind, changed or empty.
-    Databricks is also judged per graph (live["databricks_graphs"], one GROUP BY): a graph missing, extra or holding
-    another row count than the release files' triples reads changed, with the graph named, even when the total holds.
-    `stores` narrows the report to the stores named (check --store)."""
+    """Each store's status from its marker, its live count and the expected values (expected_for).
+
+    current; behind (marked from another release set); changed (its count moved since it was marked); unmarked; or
+    unreachable (live[store] is a string that says why). Jena has no marker: judge_jena reads it as current, behind,
+    changed or empty, leaving out the graphs want["jena_apart"] names. Databricks is also judged per graph
+    (live["databricks_graphs"], {graph: rows}): a graph missing, extra or holding another row count than the release
+    files' triples reads changed, with the graph named, even when the total holds. A store with any other name is a
+    Neo4j database, so a caller can judge two of them."""
     rows = []
     for store in stores:
         m = markers.get(store)
         if isinstance(live.get(store), str):
             rows.append((store, "unreachable", live[store]))
         elif store == "jena":
-            rows.append((store, *judge_jena(live.get(store) or {}, want["jena_graphs"], want.get("jena_tech"))))
+            rows.append((store, *judge_jena(live.get(store) or {}, want["jena_graphs"], want.get("jena_apart", ()))))
         elif not m:
-            rows.append((store, "unmarked", "no marker: mark it after a checked load, or sync it"))
+            rows.append((store, "unmarked", "no marker: mark it after a checked load"))
         elif any(m.get(k) != want[k] for k in MARKER_FIELDS):
             moved = [k for k in MARKER_FIELDS if m.get(k) != want[k]]
             rows.append((store, "behind", f"marked {m.get('marked_at')} from another release set ({', '.join(moved)})"))
@@ -265,208 +246,14 @@ def drift(markers, live, want, stores=STORES):
     return rows
 
 
-def tech_drift(markers, live, digest, stores=STORES, content=None):
-    """Each store's technical-graph status from its marker (read_tech_markers, which adds the store's live content
-    fingerprint as "content") and the files the demo loads, their digest and their content fingerprints (tech_content):
-    current only when the marker names those files and the content equals them; behind (it holds other graph files),
-    changed (a Neo4j store's Tech node count moved, or the content differs while the marker matches: a hand edit, say),
-    unmarked (no marker: a reload wiped it, or the graph was never loaded) or unreachable. The Delta copy is the
-    databricks store's: tech_graph sync marks it with the digest of the Neo4j store it copied."""
-    rows = []
-    for store in stores:
-        m = markers.get(store)
-        if isinstance(m, str):
-            rows.append((store, "unreachable", m))
-        elif not m:
-            how = "tech_graph sync" if store == "databricks" else f"tech_graph load --store {store}"
-            rows.append((store, "unmarked", f"no technical-graph marker: run {how}, or sync"))
-        elif m.get("digest") != digest:
-            rows.append((store, "behind", f"marked {m.get('marked_at')} from other graph files ({str(m.get('digest'))[:12]}, "
-                                          f"not {digest[:12]})"))
-        elif store in NEO4J_STORES and isinstance(live.get(store), list) and live[store][2:] != [m.get("nodes")]:
-            rows.append((store, "changed", f"marked with {m.get('nodes')} Tech nodes, now holds {live[store][2:]}"))
-        elif content is not None and m.get("content") != content[tech_kind(store)]:
-            why = m.get("content_error") or "its technical graph's content differs from the graph files although its marker matches"
-            rows.append((store, "changed", f"{why}; run tech_graph load (tech_graph sync for Delta), or sync"))
-        else:
-            rows.append((store, "current", f"marked {m.get('marked_at')} with the graph files' digest {digest[:12]}"))
-    return rows
-
-
-def tech_kind(store):
-    return "neo4j" if store in NEO4J_STORES else "jena" if store == "jena" else "delta"
-
-
-# ---------- logins and readers ----------
-
-def read_env(path):
-    values = {}
-    for line in open(os.path.expanduser(path)):
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            k, v = line.split("=", 1)
-            values[k.strip()] = v.strip().strip('"').strip("'")
-    return values
-
-
-def newest(paths):
-    found = [os.path.expanduser(p) for p in paths if os.path.exists(os.path.expanduser(p))]
-    if not found:
-        raise FileNotFoundError(f"none of {', '.join(paths)} exists")  # an Exception, so a status check reports it
-    return max(found, key=os.path.getmtime)
-
-
-def neo4j_session(store):
-    from neo4j import GraphDatabase
-    bolt, paths = NEO4J_STORES[store]
-    values = read_env(newest(paths))
-    uri = bolt or values["NEO4J_URI"]
-    password = values.get("NEO4J_PASSWORD") or values["PASSWORD"]
-    driver = GraphDatabase.driver(uri, auth=(values.get("NEO4J_USERNAME", "neo4j"), password))
-    return driver, driver.session()
-
-
-def databricks():
-    from databricks import sql as dbsql
-    e = read_env(DATABRICKS_ENV)
-    conn = dbsql.connect(server_hostname=e["DATABRICKS_HOST"].replace("https://", ""),
-                         http_path=e["DATABRICKS_HTTP_PATH"], access_token=e["DATABRICKS_TOKEN"])
-    return conn, f"{e['DATABRICKS_CATALOG']}.{e['DATABRICKS_SCHEMA']}"
-
-
-def jena_select(query):
-    request = urllib.request.Request(JENA_QUERY + "?" + urllib.parse.urlencode({"query": query}),
-                                     headers={"Accept": "application/sparql-results+json"})
-    with urllib.request.urlopen(request, timeout=60) as response:
-        return json.load(response)["results"]["bindings"]
-
-
-DEFAULT_GRAPH = "(the default graph)"  # triples outside any named graph: no release graph has this name, so they read as a stray
-
-
-def read_jena():
-    """{graph IRI: triple count} of what Jena holds; triples in the default graph, where nothing should be, count as a
-    graph of their own so the check reports them."""
-    select = jena_select
-    held = {r["g"]["value"]: int(r["n"]["value"])
-            for r in select("SELECT ?g (COUNT(*) AS ?n) WHERE { GRAPH ?g { ?s ?p ?o } } GROUP BY ?g")}
-    in_default = int(select("SELECT (COUNT(*) AS ?n) WHERE { ?s ?p ?o }")[0]["n"]["value"])
-    if in_default:
-        held[DEFAULT_GRAPH] = in_default
-    return held
-
-
-def resource_counts(session):
-    nodes = session.run("MATCH (n:Resource) RETURN count(n) AS n").single()["n"]
-    edges = session.run("MATCH (:Resource)-[r]->(:Resource) RETURN count(r) AS n").single()["n"]
-    return nodes, edges
-
-
-def tech_count(session):
-    return session.run("MATCH (n:Tech) RETURN count(n) AS n").single()["n"]
-
-
-def read_markers_and_counts(stores=STORES):
-    """Each named store's marker and live count; a store not named is not read (check --store, so a validation whose
-    test store is the local Neo4j never touches AuraDB, Jena or Databricks)."""
-    markers, live = {}, {}
-    for store in [s for s in NEO4J_STORES if s in stores]:
-        try:
-            driver, session = neo4j_session(store)
-            with driver, session:
-                rec = session.run("MATCH (m:EpmStoreMarker {store: $s}) RETURN properties(m) AS p", s=store).single()
-                markers[store] = rec["p"] if rec else None
-                live[store] = [*resource_counts(session), tech_count(session)]
-        except Exception as err:  # a store that can't be read (down, or no login file) reads as unreachable, with the reason
-            markers[store], live[store] = None, f"unreachable ({type(err).__name__})"
-    if "jena" in stores:
-        try:
-            markers["jena"], live["jena"] = None, read_jena()
-        except Exception as err:  # as above: a store that can't be read reads as unreachable, with the reason
-            markers["jena"], live["jena"] = None, f"unreachable ({type(err).__name__})"
-    if "databricks" not in stores:
-        return markers, live
-    try:
-        conn, schema = databricks()
-        with conn, conn.cursor() as cur:
-            live["databricks_graphs"] = triples_per_graph(cur, schema)  # judged per graph against the release files
-            live["databricks"] = [sum(live["databricks_graphs"].values())]
-            try:
-                cur.execute(f"SELECT marker FROM {schema}.epm_store_markers WHERE store = 'databricks'")
-                row = cur.fetchone()
-                markers["databricks"] = json.loads(row[0]) if row else None
-            except Exception:
-                markers["databricks"] = None
-    except Exception as err:
-        markers["databricks"], live["databricks"] = None, f"unreachable ({type(err).__name__})"
-    return markers, live
-
-
-def jena_construct(iri):
-    """The triples of one named graph in Jena, as an rdflib Graph."""
-    from rdflib import Graph
-    query = f"CONSTRUCT {{ ?s ?p ?o }} WHERE {{ GRAPH <{iri}> {{ ?s ?p ?o }} }}"
-    request = urllib.request.Request(JENA_QUERY + "?" + urllib.parse.urlencode({"query": query}),
-                                     headers={"Accept": "application/n-triples"})
-    with urllib.request.urlopen(request, timeout=120) as response:
-        return Graph().parse(data=response.read().decode("utf-8"), format="nt")
-
-
-def read_tech_markers(stores=STORES):
-    """Each named store's technical-graph marker: a dict, None when it has none, or "unreachable (<error>)". A marker
-    carries the store's live content fingerprint as "content", from the Tech nodes and edges, Jena's two graphs, or
-    the Delta tables the marker names (or "content_error" when they cannot be read)."""
-    tg = demo_graph()
-    markers = {}
-    for store in stores:
-        try:
-            if store in NEO4J_STORES:
-                driver, session = neo4j_session(store)
-                with driver, session:
-                    rec = session.run(f"MATCH (m:{TECH_MARKER_LABEL}) RETURN properties(m) AS p").single()
-                    markers[store] = dict(rec["p"]) if rec else None
-                    if markers[store]:
-                        markers[store]["content"] = tg.neo4j_fingerprint(list(session.run(tg.NEO4J_NODES)),
-                                                                         list(session.run(tg.NEO4J_EDGES)))
-            elif store == "jena":
-                rows = jena_select(f"SELECT ?d WHERE {{ GRAPH <{TECH_MARKER_GRAPH}> {{ <{TECH_MARKER_GRAPH}> <{TECH_MARKER_DIGEST}> ?d }} }}")
-                markers[store] = {"digest": rows[0]["d"]["value"], "marked_at": "by tech_graph load"} if rows else None
-                if markers[store]:
-                    markers[store]["content"] = tg.jena_fingerprint({iri: jena_construct(iri) for iri in TECH_GRAPHS.values()})
-            else:
-                conn, schema = databricks()
-                with conn, conn.cursor() as cur:
-                    try:
-                        cur.execute(f"SELECT marker FROM {schema}.epm_store_markers WHERE store = '{TECH_MARKER_ROW}'")
-                        row = cur.fetchone()
-                    except Exception:  # no marker table yet
-                        row = None
-                    markers[store] = json.loads(row[0]) if row else None
-                    copy = (markers[store] or {}).get("schema")
-                    if markers[store] and not copy:
-                        markers[store]["content_error"] = "its marker names no Delta tables, so the copy's content cannot be read"
-                    elif markers[store]:
-                        cur.execute(f"SELECT uri, kind, name, properties FROM {copy}.tech_graph_nodes")
-                        nodes = [tuple(r) for r in cur.fetchall()]
-                        cur.execute(f"SELECT source, type, target, target_in_ontology FROM {copy}.tech_graph_edges")
-                        markers[store]["content"] = tg.delta_fingerprint(nodes, [tuple(r) for r in cur.fetchall()])
-        except Exception as err:  # as read_markers_and_counts: a store that can't be read says so, with the reason
-            markers[store] = f"unreachable ({type(err).__name__})"
-    return markers
-
-
-# ---------- marking ----------
+# ---------- markers ----------
 
 def commit():
-    """The checkout's commit, written into each marker; a tree without Git (the share release) says so instead."""
+    """The checkout's commit, for a marker. A tree without Git says so; a caller that knows better (the release's
+    name and its zip's checksum, for example) passes its own text to marker."""
     if not os.path.exists(os.path.join(REPO, ".git")):
         return "unknown (not a Git checkout)"
     return subprocess.run(["git", "-C", REPO, "rev-parse", "--short=8", "HEAD"], capture_output=True, text=True).stdout.strip()
-
-
-def default_ref():
-    """Where check and sync read the newest catalog: origin/main in a checkout; the tree itself where there is no Git."""
-    return "origin/main" if os.path.exists(os.path.join(REPO, ".git")) else "worktree"
 
 
 def now():
@@ -474,10 +261,62 @@ def now():
     return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def marker(want, store, count, commit_text=None, marked_at=None):
+    """A store's marker: MARKER_FIELDS from want (expected), marked_at, commit, store and count. Every store's marker
+    has this shape. Databricks holds it as JSON text in the marker column of epm_store_markers."""
+    return {k: want[k] for k in MARKER_FIELDS} | {"marked_at": marked_at or now(), "commit": commit_text or commit(),
+                                                  "store": store, "count": count}
+
+
+def rows_per_graph(rows):
+    """{graph: row count} from the triple table's (graph, count) rows, one per graph. A row whose graph is NULL is a
+    stray, so it gets a name no release graph has."""
+    return {DEFAULT_GRAPH if graph is None else graph: n for graph, n in rows}
+
+
+def checked_rows(held, want):
+    """The triple table's count for its marker, [total rows], from its {graph: rows} (rows_per_graph). Refused unless
+    the table holds exactly the graphs a current Jena holds, each with the release files' triple count: a load that
+    stopped part way, or one from other files, is not marked."""
+    problem = graphs_differ(held, want.get("jena_graphs") or jena_graphs(want["newest"]))
+    if problem:
+        raise SystemExit(f"databricks: {TRIPLES_TABLE} {problem}")
+    return [sum(held.values())]
+
+
+# ---------- Neo4j ----------
+
+def neo4j_session(uri, user, password, database=None):
+    """(driver, session) on one database; None is the server's default database. Close both: `with driver, session:`."""
+    from neo4j import GraphDatabase
+    driver = GraphDatabase.driver(uri, auth=(user, password))
+    return driver, driver.session(database=database)
+
+
+def neo4j_session_from(values):
+    """neo4j_session from settings; a missing address or password raises Unset before anything connects."""
+    return neo4j_session(need(values, "NEO4J_URI"), values.get("NEO4J_USERNAME", "neo4j"), need(values, "NEO4J_PASSWORD"),
+                         values.get("NEO4J_DATABASE"))
+
+
+def resource_counts(session):
+    """What the projection counts: Resource nodes and the relationships between them."""
+    nodes = session.run("MATCH (n:Resource) RETURN count(n) AS n").single()["n"]
+    edges = session.run("MATCH (:Resource)-[r]->(:Resource) RETURN count(r) AS n").single()["n"]
+    return nodes, edges
+
+
+def read_neo4j(session, store="neo4j"):
+    """(marker or None, [Resource nodes, relationships between them]) of the database the session is on."""
+    rec = session.run("MATCH (m:EpmStoreMarker {store: $s}) RETURN properties(m) AS p", s=store).single()
+    return (dict(rec["p"]) if rec else None), list(resource_counts(session))
+
+
 def neo4j_checked(store, session, want):
-    """A Neo4j store's measured counts, refused unless they match the committed report of the last load, and unless it
-    holds one release record for each newest release."""
-    report = json.load(open(REPORT))
+    """A Neo4j database's measured counts, refused unless they match the committed report of the last load, and unless
+    it holds one release record for each newest release."""
+    with open(REPORT, encoding="utf-8") as f:
+        report = json.load(f)
     nodes, edges = resource_counts(session)
     if (nodes, edges) != (report["nodes"], report["relationships"]):
         raise SystemExit(f"{store}: {nodes} nodes and {edges} relationships, not the last load's {report['nodes']} "
@@ -486,180 +325,95 @@ def neo4j_checked(store, session, want):
     if sorted(records) != want["newest"]:
         raise SystemExit(f"{store}: its {len(records)} release record(s) are not one for each of the "
                          f"{len(want['newest'])} newest releases")
-    return [nodes, edges, tech_count(session)]
+    return [nodes, edges]
 
 
-def databricks_checked(cur, schema, want):
-    """The triple table's row count, refused unless it holds exactly the graphs a current Jena holds (each newest
-    release and its release graphs), each with the release files' triple count: a load that stopped part way, or one
-    from other files, is not marked."""
-    graphs = want.get("jena_graphs") or jena_graphs(want["newest"])
-    held = triples_per_graph(cur, schema)
-    problem = graphs_differ(held, graphs)
-    if problem:
-        raise SystemExit(f"databricks: {TRIPLES_TABLE} {problem}")
-    return [sum(held.values())]
-
-
-def triples_per_graph(cur, schema):
-    """{graph: row count} of the triple table: one GROUP BY on its graph column."""
-    cur.execute(f"SELECT graph, count(*) FROM {schema}.{TRIPLES_TABLE} GROUP BY graph")
-    return {DEFAULT_GRAPH if r[0] is None else r[0]: r[1] for r in cur.fetchall()}  # a row with no graph is a stray
-
-
-def graphs_differ(held, graphs):
-    """Why a store's {graph: triple or row count} is not the expected one (jena_graphs: each newest release, its release
-    graphs and its package graphs, counted from the release files), naming a graph; None when they are equal. mark
-    refuses the triple table on it, and check reads it as changed."""
-    missing, stray = sorted(set(graphs) - set(held)), sorted(set(held) - set(graphs))
-    if missing or stray:
-        return (f"lacks {len(missing)} graph(s) of the newest releases, e.g. {missing[:3]}, "
-                f"and holds {len(stray)} other(s), e.g. {stray[:3]}")
-    moved = sorted(g for g in graphs if held[g] != graphs[g])
-    if moved:
-        return (f"has {len(moved)} graph(s) with another row count than the release files' triples, "
-                f"e.g. {moved[0]}: {held[moved[0]]}, not {graphs[moved[0]]}")
-    return None
-
-
-def mark(stores, want=None):
+def mark_neo4j(session, store="neo4j", want=None):
+    """Checks the database against this tree (neo4j_checked), then writes its marker. Returns the marker."""
     want = want or expected()
-    base = {k: want[k] for k in MARKER_FIELDS} | {"marked_at": now(), "commit": commit()}
-    for store in stores:
-        if store == "jena":  # its graph names are its marker: nothing is written to it
-            status, why = judge_jena(read_jena(), jena_graphs(want["newest"]), tech_graph_counts())
-            if status != "current":
-                raise SystemExit(f"jena: {status}: {why}")
-            print(f"jena: current, {why}")
-            continue
-        if store == "databricks":
-            conn, schema = databricks()
-            with conn, conn.cursor() as cur:
-                marker = base | {"store": store, "count": databricks_checked(cur, schema, want)}
-                cur.execute(f"CREATE TABLE IF NOT EXISTS {schema}.epm_store_markers (store STRING, marker STRING) "
-                            "COMMENT 'Which release set each ontology store was loaded from (sync_stores.py)'")
-                cur.execute(f"DELETE FROM {schema}.epm_store_markers WHERE store = 'databricks'")
-                cur.execute(f"INSERT INTO {schema}.epm_store_markers VALUES ('databricks', ?)", [json.dumps(marker)])
-        else:
-            driver, session = neo4j_session(store)
+    written = marker(want, store, neo4j_checked(store, session, want))
+    session.run("MERGE (m:EpmStoreMarker {store: $s}) SET m = $p", s=store, p=written).consume()
+    return written
+
+
+# ---------- Jena ----------
+
+def jena_select(query_url, query):
+    """A SELECT's bindings from the dataset's SPARQL query URL."""
+    request = urllib.request.Request(query_url + "?" + urllib.parse.urlencode({"query": query}),
+                                     headers={"Accept": "application/sparql-results+json"})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        return json.load(response)["results"]["bindings"]
+
+
+def read_jena(query_url):
+    """{graph IRI: triple count} of what Jena holds. Triples in the default graph, where nothing should be, count as
+    a graph of their own so the check reports them."""
+    held = {r["g"]["value"]: int(r["n"]["value"])
+            for r in jena_select(query_url, "SELECT ?g (COUNT(*) AS ?n) WHERE { GRAPH ?g { ?s ?p ?o } } GROUP BY ?g")}
+    in_default = int(jena_select(query_url, "SELECT (COUNT(*) AS ?n) WHERE { ?s ?p ?o }")[0]["n"]["value"])
+    if in_default:
+        held[DEFAULT_GRAPH] = in_default
+    return held
+
+
+# ---------- the commands ----------
+
+def read_stores(stores, values, name="neo4j"):
+    """(markers, live, logical-model markers) of the named stores, for drift and logical_models.drift. A store not
+    named is not read. A store that cannot be read, or whose setting is missing, reads as unreachable with the reason."""
+    import logical_models as lm  # it imports this module
+    markers, live, models = {}, {}, {}
+    if "neo4j" in stores:
+        try:
+            driver, session = neo4j_session_from(values)
             with driver, session:
-                marker = base | {"store": store, "count": neo4j_checked(store, session, want)}
-                session.run("MERGE (m:EpmStoreMarker {store: $s}) SET m = $p", s=store, p=marker).consume()
-        print(f"{store}: marked, holding {marker['count']}, from {want['catalog_datasets']} catalog datasets")
+                markers["neo4j"], live["neo4j"] = read_neo4j(session, name)
+                models["neo4j"] = lm.read_marker(session)
+        except Exception as err:
+            markers["neo4j"], live["neo4j"], models["neo4j"] = None, reason(err), reason(err)
+    if "jena" in stores:
+        try:
+            markers["jena"], live["jena"] = None, read_jena(need(values, "EPM_JENA_QUERY"))
+        except Exception as err:
+            markers["jena"], live["jena"] = None, reason(err)
+    return markers, live, models
 
 
-# ---------- sync ----------
-
-def plan(behind, cloud, skills, tech_behind=(), models=None):
-    """The commands that reload the stores that are behind, in order. Local stores always; AuraDB and Databricks only
-    with --cloud, through the full driver run, which also reloads the local Neo4j and Jena. A local driver run skips the
-    driver's copy, databricks and rebuild steps, so its Neo4j is loaded from the repository, not back from epm_triples.
-    Jena alone needs only the driver's jena step. A run that loads Neo4j takes its result into this folder.
-    tech_behind names the stores whose technical graph is not current (tech_drift): each gets tech_graph load again,
-    as does every store a reload wiped, and the Delta copy follows with tech_graph sync. AuraDB and Databricks again
-    only with --cloud. models is None when the newest releases hold no package graph; otherwise it names
-    the Neo4j stores whose logical models are not current (logical_models.drift), and logical_models.py load runs on
-    them and on every store a reload wiped, last, so mark reads Jena and Delta with the package graphs."""
-    steps, reloaded = [], []
-    driver_cmd = ["uv", "run", "--no-project", "--with", "rdflib", "python3", "run_projection.py",
-                  "--config", RUN_CONFIG]
-    driver_dir = os.path.join(os.path.expanduser(skills), "ontology-to-lpg", "scripts")
-    cloud_behind = [s for s in ("aura", "databricks") if s in behind]
-    if cloud and cloud_behind:
-        steps.append((driver_dir, driver_cmd))
-        reloaded += ["driver", "jena", "aura", "databricks"]
-    elif "driver" in behind:
-        steps.append((driver_dir, driver_cmd + ["--skip", "copy,databricks,rebuild"]))
-        reloaded += ["driver", "jena"]
-    elif "jena" in behind:
-        steps.append((driver_dir, driver_cmd + ["--only", "jena"]))
-        reloaded.append("jena")
-    if "driver" in reloaded:
-        steps.append((HERE, ["uv", "run", "-q", "--with", "rdflib", "--with", "pyshacl", "python", "pipeline.py",
-                             "record", "--run", DRIVER_OUT]))
-    reachable = [s for s in tech_behind if cloud or s not in ("aura", "databricks")]
-    tech = [s for s in [*reloaded, *(s for s in reachable if s not in reloaded)] if s in NEO4J_STORES or s == "jena"]
-    if tech:  # a reload wipes the technical graph (runbook, Reload, step 5); load writes each store's marker
-        steps.append((DEMO, ["uv", "run", "--group", "graph", "python", "-m", "pricing_demo.tech_graph", "load"]
-                      + [a for s in tech for a in ("--store", s)]))
-    if "databricks" in reloaded or "databricks" in reachable:  # the Delta copy follows Neo4j, and sync marks it
-        steps.append((DEMO, ["uv", "run", "--group", "graph", "python", "-m", "pricing_demo.tech_graph", "sync"]))
-    if models is not None:
-        stale = [s for s in models if cloud or s not in ("aura", "databricks")]
-        lm = [s for s in STORES if s in reloaded or s in stale]
-        if lm:  # a reload wipes the package graphs and the logical models' subgraph too
-            steps.append((HERE, ["uv", "run", "-q", "--no-project", "--with", "rdflib", "--with", "neo4j", "--with", "pyoxigraph",
-                                 *(["--with", "databricks-sql-connector"] if "databricks" in lm else []), "python",
-                                 "logical_models.py", "load", *(a for s in lm for a in ("--store", s)), "--skills", skills]))
-    return steps, reloaded
+def check(stores, ref, values, name="neo4j", out=None):
+    """Prints one line per store, and an lm: line for a Neo4j database when the releases hold logical models. Returns
+    True when every line reads current."""
+    import logical_models as lm
+    markers, live, models = read_stores(stores, values, name)
+    rows = drift(markers, live, expected_for(ref, stores), stores)
+    model_rows = lm.check(models, ref)  # none when the ref's newest releases hold no logical-model module
+    for store, status, why in rows:
+        print(f"{store:<11} {status:<11} {why}", file=out)
+    for store, status, why in model_rows:
+        print(f"{'lm:' + store:<11} {status:<11} {why}", file=out)
+    return all(status == "current" for _, status, _ in rows + model_rows)
 
 
-def expected_for(ref, stores):
-    """What the named stores should hold; the graph counts are read from the release files only when Jena or Databricks
-    is named, since both are judged per graph."""
-    want = expected(ref)
-    return want | {"jena_graphs": jena_graphs(want["newest"], ref), "jena_tech": tech_graph_counts()} \
-        if {"jena", "databricks"} & set(stores) else want
-
-
-def sync(cloud, dry_run, ref, skills):
-    markers, live = read_markers_and_counts()
-    rows = drift(markers, live, expected_for(ref, STORES))
-    behind = [s for s, status, _ in rows if status != "current"]
-    tech_behind = [s for s, status, _ in tech_drift(read_tech_markers(), live, tech_digest(), STORES, tech_content())
-                   if status != "current"]
-    lm = logical_models()
-    models = [s for s, status, _ in lm.check(STORES, ref) if status != "current"] if lm.package_graphs(ref=ref) else None
-    steps, reloaded = plan(behind, cloud, skills, tech_behind, models)
-    skipped = [s for s in behind if s not in reloaded] + [f"{s} (technical graph)" for s in tech_behind
-                                                          if s in ("aura", "databricks") and not cloud] \
-        + [f"{s} (logical models)" for s in models or () if s == "aura" and not cloud]
-    for cwd, cmd in steps:
-        print(f"({os.path.relpath(cwd, REPO) if cwd.startswith(REPO) else cwd}) {' '.join(cmd)}")
-        if not dry_run:
-            subprocess.run(cmd, cwd=cwd, check=True)
-    if skipped:
-        print(f"not reloaded (cloud stores need --cloud): {', '.join(skipped)}")
-    if not dry_run and reloaded:
-        mark(reloaded, expected())
-    if not behind and not tech_behind and not models:
-        print("every store is current, ontology and technical graph" + (", and the logical models" if models is not None else ""))
-
-
-def main():
+def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("command", choices=("expected", "mark", "check", "sync"))
-    ap.add_argument("--ref", default=default_ref(), help="check, sync: the git ref whose catalog is newest (default origin/main "
-                    "in a checkout; worktree, the default without Git, reads this tree)")
-    ap.add_argument("--store", action="append", choices=STORES,
-                    help="mark: these stores; check: read and judge only these stores (default: every store)")
-    ap.add_argument("--cloud", action="store_true", help="sync: also reload AuraDB and Databricks (the full driver run)")
-    ap.add_argument("--dry-run", action="store_true", help="sync: print the commands, run nothing")
-    ap.add_argument("--skills", default=os.environ.get("EPM_SKILLS", "skills"),
-                    help="sync: the folder holding the ontology-to-lpg skill (default $EPM_SKILLS or skills)")
-    args = ap.parse_args()
+    ap.add_argument("command", choices=("expected", "check", "mark"))
+    ap.add_argument("--ref", default=WORKTREE, help="expected, check: a Git ref whose files say what is current "
+                    "(default worktree: this tree's files, which needs no Git)")
+    ap.add_argument("--store", action="append", choices=READ_HERE, help="check: read and judge only these stores (default: both)")
+    ap.add_argument("--name", default="neo4j", help="check, mark: the name the Neo4j marker carries (default neo4j)")
+    args = ap.parse_args(argv)
     if args.command == "expected":
         print(json.dumps(expected(args.ref), indent=2))
-    elif args.command == "mark":
-        if not args.store:
-            raise SystemExit("mark: name the stores with --store")
-        mark(args.store)  # a marker records what the working tree's catalog says the store was loaded from
-    elif args.command == "check":
-        stores = tuple(args.store) if args.store else STORES
-        markers, live = read_markers_and_counts(stores)
-        rows = drift(markers, live, expected_for(args.ref, stores), stores)
-        tech = tech_drift(read_tech_markers(stores), live, tech_digest(), stores, tech_content())
-        models = logical_models().check(stores, args.ref)  # none when the ref's newest releases hold no logical-model module
-        for store, status, why in rows:
-            print(f"{store:<11} {status:<9} {why}")
-        for store, status, why in tech:  # the technical graph, beside the ontology: tech:<store>
-            print(f"{'tech:' + store:<16} {status:<9} {why}")
-        for store, status, why in models:  # a release's logical models, in a Neo4j store: lm:<store>
-            print(f"{'lm:' + store:<16} {status:<9} {why}")
-        sys.exit(0 if all(status == "current" for _, status, _ in rows + tech + models) else 1)
-    else:
-        sync(args.cloud, args.dry_run, args.ref, args.skills)
+        return 0
+    values = settings()
+    if args.command == "check":
+        return 0 if check(tuple(args.store) if args.store else READ_HERE, args.ref, values, args.name) else 1
+    driver, session = neo4j_session_from(values)  # a marker records what this tree's catalog says the store was loaded from
+    with driver, session:
+        written = mark_neo4j(session, args.name)
+    print(f"{args.name}: marked, holding {written['count']}, from {written['catalog_datasets']} catalog datasets")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

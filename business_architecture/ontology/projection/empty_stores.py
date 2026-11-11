@@ -1,14 +1,15 @@
-"""Counts what each ontology store holds and, with --yes, empties it. rebuild_stores.py calls it; it also runs alone.
+"""Counts what a Neo4j database or a Jena dataset holds and, with --yes, empties it before a clean reload.
 
-    python3 empty_stores.py --store driver --store jena          # counts only: changes nothing
-    python3 empty_stores.py --store driver --store jena --yes    # deletes, then counts again
+    python3 empty_stores.py --store neo4j --store jena                                   # counts only: changes nothing
+    python3 empty_stores.py --store neo4j --database <name> --store jena --yes           # deletes, then counts again
 
-Without --yes it writes nothing. It takes the stores from sync_stores.py, so EPM_STORES_JSON names another environment's.
-In Neo4j and AuraDB it deletes every node in the database. In Jena it drops every graph. In Databricks it drops only
-the triple table and the marker table, and leaves the demo's tables and anything else in the schema. Prints one JSON
-line per store, with no login value; a store that cannot be read says "unreachable" and the error's name, and the local
-Neo4j says "no_login" when the output folder holds no login for it yet.
-Needs neo4j for the Neo4j stores and databricks-sql-connector for Databricks (uv run --with ...).
+Without --yes it writes nothing. The addresses and the Neo4j login come from sync_stores.settings.
+In Neo4j, --yes deletes every node of one database, so it also needs --database with that database's name, and
+refuses when the settings name another one. In Jena it drops every graph of the dataset.
+It never touches Databricks: the load that writes the triple table replaces it.
+Prints one JSON line per store, with no login value. A store that cannot be read says "unreachable" and the error's
+name. With --yes, a store that cannot be read fails the command.
+Needs neo4j for Neo4j (uv run --with neo4j ...).
 """
 import argparse
 import json
@@ -33,59 +34,50 @@ def empty_neo4j(session):
             return deleted
 
 
-def jena_update(statement):
-    url = ss.JENA_QUERY.rsplit("/", 1)[0] + "/update"
+def jena_update(query_url, statement):
+    """Sends one SPARQL Update to the dataset whose query URL this is; its update URL sits beside it."""
+    url = query_url.rsplit("/", 1)[0] + "/update"
     body = urllib.parse.urlencode({"update": statement}).encode()
     urllib.request.urlopen(urllib.request.Request(url, data=body, method="POST"), timeout=120).close()
 
 
-def databricks_tables(cur, schema):
-    """The tables of this tool's own in the schema: never the whole schema."""
-    cur.execute(f"SHOW TABLES IN {schema}")
-    return sorted({row[1] for row in cur.fetchall()} & {ss.TRIPLES_TABLE, "epm_store_markers"})
-
-
-def one_store(store, yes):
+def one_store(store, yes, values, database=None):
+    """One store's count and, with yes, its count after emptying, as the JSON line's dict."""
     if store == "jena":
-        held = sum(ss.read_jena().values())
+        query_url = ss.need(values, "EPM_JENA_QUERY")
+        held = sum(ss.read_jena(query_url).values())
         if yes:
-            jena_update("DROP ALL")
-            return {"store": store, "held": held, "after": sum(ss.read_jena().values())}
+            jena_update(query_url, "DROP ALL")
+            return {"store": store, "held": held, "after": sum(ss.read_jena(query_url).values())}
         return {"store": store, "held": held}
-    if store == "databricks":
-        conn, schema = ss.databricks()
-        with conn, conn.cursor() as cur:
-            tables = databricks_tables(cur, schema)
-            if yes:
-                for table in tables:
-                    cur.execute(f"DROP TABLE IF EXISTS {schema}.{table}")
-                return {"store": store, "held": len(tables), "after": len(databricks_tables(cur, schema))}
-            return {"store": store, "held": len(tables)}
-    driver, session = ss.neo4j_session(store)
+    if yes and not database:
+        raise SystemExit("neo4j: --yes deletes every node of one database; name it with --database")
+    if database and values.get("NEO4J_DATABASE") not in (None, database):
+        raise SystemExit(f"neo4j: --database {database} is not the database the settings name; nothing was changed")
+    driver, session = ss.neo4j_session_from(values | ({"NEO4J_DATABASE": database} if database else {}))
     with driver, session:
         held = neo4j_counts(session)
+        named = {"database": database} if database else {}
         if yes:
             empty_neo4j(session)
-            return {"store": store, "held": held, "after": neo4j_counts(session)}
-        return {"store": store, "held": held}
+            return {"store": store, **named, "held": held, "after": neo4j_counts(session)}
+        return {"store": store, **named, "held": held}
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--store", action="append", required=True, choices=ss.STORES)
+    ap.add_argument("--store", action="append", required=True, choices=ss.READ_HERE)
+    ap.add_argument("--database", help="neo4j: the database to count or empty; --yes needs it")
     ap.add_argument("--yes", action="store_true", help="delete; without it, count only")
     args = ap.parse_args(argv)
+    values = ss.settings()
     failed = False
     for store in args.store:
         try:
-            print(json.dumps(one_store(store, args.yes)))
-        except Exception as err:  # the reason, never a value: a driver's message can carry a URI
-            # A local store that is not running has nothing to delete, and the load creates it. A cloud store must answer.
-            failed = failed or (args.yes and store in ("aura", "databricks"))
-            if store == "driver" and isinstance(err, FileNotFoundError):  # sync_stores.newest: no run.env in the output folder
-                print(json.dumps({"store": store, "no_login": "the output folder holds no login yet; the load creates one"}))
-            else:
-                print(json.dumps({"store": store, "unreachable": type(err).__name__}))
+            print(json.dumps(one_store(store, args.yes, values, args.database)))
+        except Exception as err:  # the reason, never a value: a driver's message can carry an address
+            failed = failed or args.yes  # a store that did not answer was not emptied
+            print(json.dumps({"store": store, "unreachable": ss.reason(err)[len("unreachable ("):-1]}))
     return 1 if failed else 0
 
 

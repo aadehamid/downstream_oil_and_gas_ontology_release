@@ -1,5 +1,5 @@
 """Offline tests of logical_models.py (the decision of 2026-11-02, amendment "the stores"): no store is contacted. The package is
-built in a temporary folder from the module's made-up example, the way the share release's cut lays it out."""
+built in a temporary folder from the module's made-up example, the way a release's cut lays it out."""
 import contextlib
 import io
 import json
@@ -15,8 +15,7 @@ from unittest import mock
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import logical_models as lm  # noqa: E402
-import pipeline as pl  # noqa: E402
-import rebuild_stores as rb  # noqa: E402
+import subgraph as sg  # noqa: E402
 import sync_stores as ss  # noqa: E402
 
 EXAMPLE = os.path.join(ss.REPO, "business_architecture", "ontology", "logical-model", "example")
@@ -55,22 +54,27 @@ class Package(unittest.TestCase):
         return lm.graph_rows(lm.models([VERSION_IRI]))
 
 
-class InMain(unittest.TestCase):
-    @unittest.skipIf(pl.SHARE_RELEASE, "the share release holds the logical-model package")
-    def test_main_holds_no_package_graph_so_nothing_loads_and_check_reports_nothing(self):
-        self.assertFalse(lm.held())
-        self.assertEqual((lm.package_graphs(), lm.models(), lm.check(ss.STORES)), ({}, [], []))
+class Held(unittest.TestCase):
+    def test_this_release_holds_the_logical_model_package_and_held_agrees_with_the_catalog(self):
+        self.assertIs(lm.held(), True)
+        graphs = lm.package_graphs()
+        self.assertEqual(lm.held(), bool(graphs))
+        self.assertTrue(all(g.startswith("https://w3id.org/mpc/ontology/modules/logical-model/") for g in graphs), sorted(graphs))
+
+    def test_releases_with_no_package_graph_load_nothing_and_report_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIs(lm.held(os.path.join(tmp, "none")), False)
 
         def touched(*a, **k):
             raise AssertionError("a store was contacted")
         out = io.StringIO()
-        with mock.patch.object(ss, "neo4j_session", touched), mock.patch.object(ss, "databricks", touched), \
-                mock.patch.object(lm, "rdfstore", touched), mock.patch("sys.stdout", out):
-            lm.load(ss.STORES, "~/skills")
+        with mock.patch.object(lm, "newest", lambda ref=None: ["https://w3id.org/mpc/ontology/modules/kpi/1.3.0"]), \
+                mock.patch.object(ss, "neo4j_session_from", touched), mock.patch.object(lm, "rdfstore", touched), \
+                mock.patch("sys.stdout", out):
+            lm.load(("neo4j", "jena"), {})
+            self.assertEqual(lm.check({"neo4j": None}), [])
+            self.assertEqual(lm.package_rows(), {"graphs": {}, "counts": {}, "rows": []})
         self.assertIn("nothing to load", out.getvalue())
-
-    def test_held_and_the_catalog_agree(self):
-        self.assertEqual(lm.held(), bool(lm.package_graphs()))
 
 
 class PackageGraphs(Package):
@@ -162,41 +166,42 @@ class Tx:
 
 class Loading(Package):
     def session(self, tx):
-        class Session(contextlib.nullcontext):
+        class Session:
             def begin_transaction(self):
                 return tx
 
             def run(self, *a, **k):
                 raise AssertionError("a write outside the transaction")
-        return mock.patch.object(ss, "neo4j_session", lambda store: (contextlib.nullcontext(), Session()))
+        return Session()
 
     def test_neo4j_gets_the_subgraph_and_its_marker_in_one_committed_transaction_apart_from_resource(self):
         tx = Tx()
-        with self.session(tx), mock.patch("sys.stdout", io.StringIO()):
-            lm.load_neo4j("driver", lm.models([VERSION_IRI]))
+        with mock.patch("sys.stdout", io.StringIO()):
+            lm.load_neo4j(self.session(tx), lm.models([VERSION_IRI]))
         self.assertEqual(tx.state, "committed")
         queries = [q for q, _ in tx.queries]
-        self.assertIn(f"MATCH (m:{lm.MARKER_LABEL}) DETACH DELETE m", queries)
-        self.assertIn(f"MATCH (n:{lm.LABEL}) DETACH DELETE n", queries)
+        self.assertIn("MATCH (m:LogicalModelMarker) DETACH DELETE m", queries)
+        self.assertIn("MATCH (n:LogicalModel) DETACH DELETE n", queries)
         created = next(p["rows"] for q, p in tx.queries if q.startswith("UNWIND $rows AS row CREATE (n:"))
-        self.assertTrue(all(r["labels"][0] == lm.LABEL and "Resource" not in r["labels"] for r in created))
+        self.assertTrue(all(r["labels"][0] == "LogicalModel" and "Resource" not in r["labels"] for r in created))
         edge_queries = [q for q in queries if "CREATE (a)" in q]
         self.assertEqual(len(edge_queries), 2)
         self.assertTrue(all("SET r = row.p" in q for q in edge_queries))
-        self.assertIn(f"(b:{lm.LABEL} {{uri: row.o}})", edge_queries[0])
+        self.assertIn("(b:LogicalModel {uri: row.o})", edge_queries[0])
         self.assertIn("(b:Resource {uri: row.o})", edge_queries[1])
         marker = tx.queries[-1]
-        self.assertEqual(marker[0], f"CREATE (m:{lm.MARKER_LABEL}) SET m = $p")
-        self.assertEqual((marker[1]["p"]["digest"], marker[1]["p"]["models"]), (lm.digest(lm.models([VERSION_IRI])), [SLUG]))
+        self.assertEqual(marker[0], "CREATE (m:LogicalModelMarker) SET m = $p")
+        self.assertEqual((marker[1]["p"]["digest"], marker[1]["p"]["models"], marker[1]["p"]["store"], marker[1]["p"]["nodes"]),
+                         (lm.digest(lm.models([VERSION_IRI])), [SLUG], "neo4j", 14))
 
     def test_an_edge_with_no_target_rolls_back_and_writes_no_marker(self):
         tx = Tx()
         tx.run = lambda query, **params: (tx.queries.append((query, params)) or
                                           types.SimpleNamespace(consume=lambda: None, single=lambda: {"n": 0}, value=lambda: []))
-        with self.session(tx), self.assertRaisesRegex(SystemExit, "edges found no target"):
-            lm.load_neo4j("driver", lm.models([VERSION_IRI]))
+        with self.assertRaisesRegex(SystemExit, "edges found no target"):
+            lm.load_neo4j(self.session(tx), lm.models([VERSION_IRI]))
         self.assertEqual(tx.state, "rolled back")
-        self.assertFalse(any(q.startswith(f"CREATE (m:{lm.MARKER_LABEL})") for q, _ in tx.queries))
+        self.assertFalse(any(q.startswith("CREATE (m:LogicalModelMarker)") for q, _ in tx.queries))
 
     def fake_rdfstore(self, published):
         class Fuseki:
@@ -206,83 +211,74 @@ class Loading(Package):
             def publish(self, dataset):
                 published.append(("publish", dataset))
         return types.SimpleNamespace(pack=lambda paths, named: sorted(named.values()), FusekiStore=Fuseki,
-                                     to_rows=lambda dataset: [("s", "p", "o", "iri", None, None, g) for g in dataset],
-                                     insert_sql=lambda table, rows: f"INSERT {table} {len(rows)}",
-                                     DatabricksStore=types.SimpleNamespace(BATCH=2000))
+                                     to_rows=lambda dataset: [("s", "p", "o", "iri", None, None, g) for g in dataset])
 
     def test_jena_gets_every_package_graph_in_one_update_under_its_graph_iri(self):
         published = []
         graphs = lm.package_graphs([VERSION_IRI])
         with mock.patch("sys.stdout", io.StringIO()):
-            lm.load_jena(self.fake_rdfstore(published), graphs)
-        base = ss.JENA_QUERY.rsplit("/", 1)[0]
-        self.assertEqual(published, [("store", base + "/data", ss.JENA_QUERY, base + "/update"), ("publish", sorted(graphs))])
+            lm.load_jena(self.fake_rdfstore(published), graphs, "http://jena.example/ds/query")
+        self.assertEqual(published, [("store", "http://jena.example/ds/data", "http://jena.example/ds/query", "http://jena.example/ds/update"),
+                                     ("publish", [f"{VERSION_IRI}/{SLUG}.erstudio", f"{VERSION_IRI}/{SLUG}.layer"])])
 
-    def databricks(self, counts):
-        executed = []
-
-        class Cursor(contextlib.nullcontext):
-            def __enter__(self):
-                return self
-
-            def execute(self, query, params=None):
-                executed.append((query, params))
-
-            def fetchall(self):
-                return list(counts.items())
-
-        class Conn(contextlib.nullcontext):
-            def cursor(self):
-                return Cursor()
-        return executed, mock.patch.object(ss, "databricks", lambda: (Conn(), "c.s"))
-
-    def test_delta_replaces_only_the_package_graphs_rows_and_refuses_a_count_that_differs(self):
+    def test_the_triple_tables_load_gets_the_graphs_their_counts_and_their_rows_with_no_connection(self):
         from rdflib import Graph
-        graphs = lm.package_graphs([VERSION_IRI])
-        counts = {iri: len(Graph().parse(os.path.join(self.root, p))) for iri, p in graphs.items()}
-        executed, patch = self.databricks(counts)
-        with patch, mock.patch("sys.stdout", io.StringIO()):
-            lm.load_databricks(self.fake_rdfstore([]), graphs)
-        self.assertTrue(executed[0][0].startswith(f"DELETE FROM c.s.{ss.TRIPLES_TABLE} WHERE graph IN (?, ?)"))
-        self.assertEqual(sorted(executed[0][1]), sorted(graphs))
-        self.assertTrue(any(q.startswith(f"INSERT c.s.{ss.TRIPLES_TABLE}") for q, _ in executed))
-        executed, patch = self.databricks({**counts, next(iter(counts)): 1})
-        with patch, self.assertRaisesRegex(SystemExit, "rows of the package graphs"):
-            lm.load_databricks(self.fake_rdfstore([]), graphs)
+        found = lm.package_rows(self.fake_rdfstore([]), [VERSION_IRI])
+        export, layer = f"{VERSION_IRI}/{SLUG}.erstudio", f"{VERSION_IRI}/{SLUG}.layer"
+        self.assertEqual(found["graphs"], {export: f"business_architecture/ontology/releases/logical-model/1.0.0/{SLUG}.erstudio.ttl",
+                                           layer: f"business_architecture/ontology/releases/logical-model/1.0.0/{SLUG}.layer.ttl"})
+        self.assertEqual(found["counts"], {export: len(Graph().parse(os.path.join(EXAMPLE, f"{SLUG}.erstudio.ttl"))),
+                                           layer: len(Graph().parse(os.path.join(EXAMPLE, f"{SLUG}.layer.ttl")))})
+        self.assertEqual(found["rows"], [("s", "p", "o", "iri", None, None, export), ("s", "p", "o", "iri", None, None, layer)])
 
-    def test_load_sends_each_store_its_part(self):
+    def test_the_real_row_format_gives_one_row_per_triple_of_each_package_graph(self):
+        try:
+            rs = lm.rdfstore()
+        except ImportError:
+            self.skipTest("pyoxigraph is not installed")
+        found = lm.package_rows(rs, [VERSION_IRI])
+        per_graph = {}
+        for row in found["rows"]:
+            per_graph[row[6]] = per_graph.get(row[6], 0) + 1  # the graph column is the last of rdfstore.COLUMNS
+        self.assertEqual(rs.COLUMNS[6], "graph")
+        self.assertEqual(per_graph, found["counts"])
+
+    def test_load_sends_each_store_its_part_at_the_address_the_settings_name(self):
         calls = []
+        session = contextlib.nullcontext()
         with mock.patch.object(lm, "newest", lambda ref=None: [VERSION_IRI]), mock.patch.object(lm, "rdfstore", lambda skills: "rs"), \
-                mock.patch.object(lm, "load_jena", lambda rs, g: calls.append(("jena", rs, sorted(g)))), \
-                mock.patch.object(lm, "load_databricks", lambda rs, g: calls.append(("databricks", rs, sorted(g)))), \
-                mock.patch.object(lm, "load_neo4j", lambda store, files: calls.append((store, [f[0] for f in files]))):
-            lm.load(ss.STORES, "~/skills")
-        graphs = sorted(lm.package_graphs([VERSION_IRI]))
-        self.assertEqual(calls, [("driver", [SLUG]), ("aura", [SLUG]), ("jena", "rs", graphs), ("databricks", "rs", graphs)])
+                mock.patch.object(lm, "load_jena", lambda rs, g, url: calls.append(("jena", rs, sorted(g), url))), \
+                mock.patch.object(ss, "neo4j_session_from", lambda values: (contextlib.nullcontext(), session)), \
+                mock.patch.object(lm, "load_neo4j", lambda s, files: calls.append(("neo4j", s, [f[0] for f in files]))):
+            lm.load(("neo4j", "jena"), {"EPM_JENA_QUERY": "http://jena.example/ds/query"})
+            with self.assertRaises(ss.Unset):
+                lm.load(("jena",), {})
+        graphs = [f"{VERSION_IRI}/{SLUG}.erstudio", f"{VERSION_IRI}/{SLUG}.layer"]
+        self.assertEqual(calls, [("jena", "rs", graphs, "http://jena.example/ds/query"), ("neo4j", session, [SLUG])])
 
 
 class Drift(Package):
-    def neo4j(self, nodes, edges, marker):
+    def session(self, nodes, edges, marker):
         class Result(list):
             def single(self):
                 return self[0] if self else None
 
-        class Session(contextlib.nullcontext):
+        class Session:
             def run(_, query, **kw):
-                if lm.MARKER_LABEL in query:
+                if "LogicalModelMarker" in query:
                     return Result([{"p": marker}] if marker else [])
-                return Result(nodes if query == lm.NEO4J_NODES else edges)
-        return mock.patch.object(ss, "neo4j_session", lambda store: (contextlib.nullcontext(), Session()))
+                return Result(nodes if query == "MATCH (n:LogicalModel) RETURN labels(n) AS labels, properties(n) AS p" else edges)
+        return Session()
 
     def status(self, nodes, edges, marker):
-        with self.neo4j(nodes, edges, marker), mock.patch.object(lm, "newest", lambda ref=None: [VERSION_IRI]):
-            return lm.check(("driver", "jena"))
+        with mock.patch.object(lm, "newest", lambda ref=None: [VERSION_IRI]):
+            return lm.check({"neo4j": lm.read_marker(self.session(nodes, edges, marker))})
 
     def test_each_status(self):
         nodes, edges = self.rows()
         live = [{"labels": n["labels"], "p": dict(n["props"])} for n in nodes]
         marker = {"digest": lm.digest(lm.models([VERSION_IRI])), "marked_at": "t"}
-        self.assertEqual([r[:2] for r in self.status(live, edges, marker)], [("driver", "current")])  # Jena has no lm: line
+        self.assertEqual([r[:2] for r in self.status(live, edges, marker)], [("neo4j", "current")])
         live[1]["p"]["description"] = "edited by hand"
         self.assertEqual(self.status(live, edges, marker)[0][1], "changed")
         self.assertEqual(self.status(live, edges, {**marker, "digest": "e" * 64})[0][1], "behind")
@@ -307,16 +303,15 @@ class Drift(Package):
         return subprocess.run(["git", "-C", self.root, "rev-parse", "HEAD"], capture_output=True, text=True, env=env).stdout.strip()
 
     def lines(self, ref):
-        with self.neo4j([], [], None):  # a store whose subgraph was wiped: no marker
-            return [r[:2] for r in lm.check(("driver",), ref)]
+        return [r[:2] for r in lm.check({"neo4j": None}, ref)]  # a database whose subgraph was wiped: no marker
 
     def test_the_lm_line_follows_the_ref_that_holds_the_package_not_the_working_tree(self):
         self.git("init", "-q")
         ref = self.commit_catalog(with_package=True)
-        shutil.rmtree(self.folder)  # the working tree has no package; the ref does
+        shutil.rmtree(self.folder)  # the tree has no package; the ref does
         with open(os.path.join(self.root, ss.CATALOG), "w") as f:
             f.write("")
-        self.assertEqual(self.lines(ref), [("driver", "unmarked")])
+        self.assertEqual(self.lines(ref), [("neo4j", "unmarked")])
         self.assertEqual(self.lines("worktree"), [])
 
     def test_the_lm_line_follows_a_ref_that_holds_no_package_though_the_working_tree_does(self):
@@ -325,57 +320,14 @@ class Drift(Package):
         with open(os.path.join(self.root, ss.CATALOG), "w") as f:
             f.write(f"<{VERSION_IRI}/../catalog> <http://www.w3.org/ns/dcat#dataset> <{VERSION_IRI}> .\n")
         self.assertEqual(self.lines(ref), [])
-        self.assertEqual(self.lines("worktree"), [("driver", "unmarked")])
+        self.assertEqual(self.lines("worktree"), [("neo4j", "unmarked")])
 
-    def test_an_unreachable_store_says_so(self):
-        def no_login(store):
-            raise FileNotFoundError(store)
-        with mock.patch.object(ss, "neo4j_session", no_login), mock.patch.object(lm, "newest", lambda ref=None: [VERSION_IRI]):
-            self.assertEqual(lm.check(("driver", "aura")), [("driver", "unreachable", "unreachable (FileNotFoundError)"),
-                                                            ("aura", "unreachable", "unreachable (FileNotFoundError)")])
-
-    def test_check_prints_an_lm_line_and_fails_when_a_logical_model_is_not_current(self):
-        want = {"catalog_datasets": 1, "catalog_digest": "d", "input_fingerprint": "f", "newest": []}
-        marker = {"catalog_datasets": 1, "catalog_digest": "d", "input_fingerprint": "f", "count": [1, 2, 3], "marked_at": "t", "commit": "c"}
-        out = io.StringIO()
-        with mock.patch.object(sys, "argv", ["sync_stores.py", "check", "--store", "driver"]), \
-                mock.patch.object(ss, "read_markers_and_counts", lambda stores: ({"driver": marker}, {"driver": [1, 2, 3]})), \
-                mock.patch.object(ss, "read_tech_markers", lambda stores: {}), \
-                mock.patch.object(ss, "tech_drift", lambda *a: [("driver", "current", "")]), \
-                mock.patch.object(ss, "logical_models", lambda: types.SimpleNamespace(check=lambda stores, ref=None: [("driver", "unmarked", "")])), \
-                mock.patch.object(ss, "expected_for", lambda ref, stores: want), mock.patch("sys.stdout", out):
-            with self.assertRaises(SystemExit) as stop:
-                ss.main()
-        self.assertEqual(stop.exception.code, 1)
-        self.assertEqual({line.split()[0]: line.split()[1] for line in out.getvalue().splitlines()},
-                         {"driver": "current", "tech:driver": "current", "lm:driver": "unmarked"})
-
-
-class Plans(unittest.TestCase):
-    def cmds(self, behind, cloud, tech_behind=(), models=None):
-        return [" ".join(c) for _, c in ss.plan(behind, cloud, "~/skills", tech_behind, models)[0]]
-
-    def test_sync_loads_the_logical_models_last_where_a_reload_wiped_them_or_they_are_not_current(self):
-        self.assertFalse(any("logical_models.py" in c for c in self.cmds(["driver"], False)))  # releases with no package graph
-        cmds = self.cmds(["driver"], False, models=[])
-        self.assertTrue(cmds[-1].endswith("logical_models.py load --store driver --store jena --skills ~/skills"))
-        self.assertEqual(self.cmds([], False, models=[]), [])
-        self.assertEqual(self.cmds([], False, models=["aura"]), [])  # AuraDB only with --cloud
-        self.assertTrue(self.cmds([], True, models=["aura"])[-1].endswith("logical_models.py load --store aura --skills ~/skills"))
-        cmds = self.cmds(["aura"], True, models=[])
-        self.assertIn("--with databricks-sql-connector", cmds[-1])
-        self.assertTrue(cmds[-1].endswith("load --store driver --store aura --store jena --store databricks --skills ~/skills"))
-
-    def test_the_rebuild_loads_the_logical_models_after_the_technical_graph_and_before_mark(self):
-        s = {"EPM_SKILLS": "/skills", "EPM_OUT": "/out", "SOURCE_PG_DSN": "x", "EPM_LINEAGE_WAIT_SECONDS": "0"}
-        stores = ("driver", "jena", "aura", "databricks")
-        self.assertNotIn("model-load", [n for n, _, _ in rb.plan(s, stores, "/c.json", False)])
-        steps = rb.plan(s, stores, "/c.json", False, models=True)
-        names = [n for n, _, _ in steps]
-        self.assertEqual(names[names.index("tech-sync") + 1:], ["model-load", "mark", "check"])
-        cmd = " ".join(dict((n, c) for n, _, c in steps)["model-load"])
-        self.assertIn("--with pyoxigraph", cmd)
-        self.assertTrue(cmd.endswith("logical_models.py load --store driver --store jena --store aura --store databricks --skills /skills"))
+    def test_a_database_that_could_not_be_read_says_so(self):
+        with mock.patch.object(lm, "newest", lambda ref=None: [VERSION_IRI]):
+            self.assertEqual(lm.check({"neo4j": "unreachable (ServiceUnavailable)", "enterprise": None})[0],
+                             ("neo4j", "unreachable", "unreachable (ServiceUnavailable)"))
+            self.assertEqual([r[:2] for r in lm.check({"neo4j": "unreachable (ServiceUnavailable)", "enterprise": None})],
+                             [("neo4j", "unreachable"), ("enterprise", "unmarked")])
 
 
 if __name__ == "__main__":

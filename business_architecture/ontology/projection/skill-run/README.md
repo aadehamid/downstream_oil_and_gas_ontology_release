@@ -6,11 +6,12 @@ The `ontology-to-lpg` skill's `run_projection.py` (version 2.3 of its method, a 
 
 | File | What it is |
 |---|---|
-| `epm-run.json` | The run configuration: releases mode, the inputs from `inputs.py`, each release's `shapes` and `catalog` graphs, Aura as the copy target, the Databricks table `epm_triples`, the saved walks, a rebuild from Databricks, and the local Neo4j and Jena left standing. Outputs go to `~/lpg-out/`, outside the repository. |
+| `epm-run.json` | The run configuration: releases mode, the inputs from `inputs.py`, each release's `shapes` and `catalog` graphs, the saved walks, and one underscore as the separator. Outputs go to `~/lpg-out/`, outside the repository. It names no store address: `environment.example` lists those settings. |
 | `inputs.py` | The one input list. It imports `INPUTS`, `SHAPES` and `PACKAGES` from `../pipeline.py` and prints them as absolute paths (`data`, `shapes`, `releases`). Importing `pipeline.py` runs nothing: its `main()` runs only when the file is run as a script. |
 | `epm-config.json` | The skill's projection configuration for these inputs: Rule 4a, the module namespaces and prefixes, the qualified-relation classes, the package pins (equal to `PACKAGES`) and one release exception: `tg:designedAs` has no range, on purpose (technical-graph 1.0.0, 2026-11-02; the decision of 2026-11-02). |
 | `queries.json` | The 14 saved walks the explore step compares in Neo4j and Jena: one from each kind of node a module holds as instances (technical-graph holds none: its vocabulary has no instances), plus a process across modules, a value stream end to end and a measure back to its processes. |
-| `test_skill_run.py` | Checks that `inputs.py` lists exactly the pipeline's inputs and shapes, that each file exists, that `epm-config.json` pins the same packages, that `epm-run.json` names this folder's files (each must exist) and keeps outputs, ROBOT and the env files under the home folder, which CI cannot check, that every release has its `shapes` and `catalog` files, and that each saved walk is well formed. `scripts/check.sh` runs it. |
+| `test_skill_run.py` | Checks that `inputs.py` lists exactly the pipeline's inputs and shapes, that each file exists, that `epm-config.json` pins the same packages, that `epm-run.json` names this folder's files (each must exist), keeps outputs and ROBOT under the home folder, which CI cannot check, and holds no other key, that every release has its `shapes` and `catalog` files, and that each saved walk is well formed. `scripts/check.sh` runs it. |
+| `environment.example` | The settings `../sync_stores.py`, `../empty_stores.py` and `../logical_models.py` read, each commented out. |
 | `store-tests-2026-10-25.md` | The store tests' results, first with this folder's earlier scripts and then again through the driver. |
 
 ## Running it
