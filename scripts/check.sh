@@ -26,7 +26,8 @@ done
 [ -n "$PYTHON" ] || { echo "no Python 3.11 or later was found: tried python3, python and py" >&2; exit 1; }
 run() { echo "--- $*"; "$@"; }
 run_tests() {  # unittest exits 0 on zero tests; a test command must have run at least one
-  echo "--- $*"; local out; out="$("$@" 2>&1)"; local rc=$?; printf '%s\n' "$out"
+  # "|| rc=$?" keeps a failed command from ending the script before its output is printed.
+  echo "--- $*"; local out rc=0; out="$("$@" 2>&1)" || rc=$?; printf '%s\n' "$out"
   [ "$rc" -eq 0 ] && grep -qE '^Ran [1-9][0-9]* tests? ' <<<"$out"
 }
 with_deps() { uv run -q --no-project --with pytest --with pytest-xdist --with rdflib --with pyshacl --with openpyxl --with jsonschema --with "markdown-it-py>=4,<5" --with pyyaml==6.0.3 --with sqlglot==30.31.0 --with pyoxigraph==0.5.13 --with neo4j "$@"; }

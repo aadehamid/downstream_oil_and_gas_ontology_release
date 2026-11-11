@@ -76,3 +76,27 @@ def test_every_tracked_test_file_is_run():
     text = _commands()
     missing = [f for f in files if f not in text]  # by its full path, in a command, not in a comment
     assert files and not missing, missing
+
+
+def _run_tests_function():
+    """check.sh's run_tests function, as text."""
+    lines = _lines()
+    start = next(i for i, line in enumerate(lines) if line.startswith("run_tests() {"))
+    return "\n".join(lines[start:lines.index("}", start) + 1])
+
+
+def _call_run_tests(command):
+    script = "set -euo pipefail\n" + _run_tests_function() + f"\n(run_tests bash -c '{command}')\necho after\n"
+    return subprocess.run([BASH, "-c", script], capture_output=True, text=True, encoding="utf-8")
+
+
+def test_a_failed_test_command_prints_its_output_and_stops_the_script():
+    """The output was lost: the script ended at the failed command, before the line that prints it."""
+    done = _call_run_tests("echo Ran 3 tests in 1s; echo the reason; exit 4")
+    assert done.returncode == 1 and "the reason" in done.stdout and "after" not in done.stdout
+
+
+def test_a_test_command_that_ran_no_test_fails_and_one_that_ran_some_passes():
+    assert _call_run_tests("echo Ran 0 tests in 0s").returncode == 1
+    done = _call_run_tests("echo Ran 3 tests in 1s")
+    assert done.returncode == 0 and done.stdout.endswith("after\n")

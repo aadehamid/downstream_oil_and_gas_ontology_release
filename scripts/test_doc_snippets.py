@@ -708,6 +708,16 @@ def test_a_block_for_windows_only_is_counted_elsewhere(tmp_path):
     assert result.failures == [] and result.summary() == "1 blocks: 0 run (0 status-only), 0 checked, 1 skipped (windows-only 1)"
 
 
+@pytest.mark.skipif(os.name != "nt", reason="elsewhere the block is counted and not run")
+def test_a_block_for_windows_only_runs_in_a_real_shell_on_windows(tmp_path):
+    text = (fence("powershell run=scratch os=windows", "$env:A = 'seen'; py -c \"import os; print(os.environ['A'])\"")
+            + fence("text expect", "seen")
+            + fence("cmd run=scratch os=windows", "set B=also&& py -c \"import os; print(os.environ['B'])\"")
+            + fence("text expect", "also"))
+    result = check(tmp_path, text)
+    assert result.failures == [] and result.summary() == "4 blocks: 2 run (0 status-only), 2 checked, 0 skipped"
+
+
 def test_a_missing_program_fails_the_line(tmp_path):
     result = check(tmp_path, fence("powershell run=scratch status-only", "no-such-program-here --version"))
     assert result.failures == ["guide.md:1: the program `no-such-program-here` is not installed, so the line cannot "

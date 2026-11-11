@@ -37,6 +37,9 @@ def remove_tree(path):
 
 
 TEMPLATES = os.path.join(HERE, "..", "templates")
+# The bash on PATH. On Windows a program started by the bare name "bash" is looked for in the system folder first,
+# and the bash.exe there starts the Linux subsystem, not Git Bash.
+BASH = shutil.which("bash") or "bash"
 SKELETON = os.path.join(TEMPLATES, "ontology-skeleton.ttl")
 SHAPES = os.path.join(TEMPLATES, "shapes-skeleton.ttl")
 REQUIREMENTS = os.path.join(TEMPLATES, "requirements.yaml")
@@ -996,7 +999,7 @@ class CheckScriptSkeleton(unittest.TestCase):
             f.write(transform(text))
 
     def run_script(self):
-        return subprocess.run(["bash", "scripts/check.sh"], cwd=self.tmp, env=self.env,
+        return subprocess.run([BASH, "scripts/check.sh"], cwd=self.tmp, env=self.env,
                               stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300, encoding="utf-8")
 
     @staticmethod
@@ -1143,12 +1146,12 @@ class CheckScriptWithoutGit(CheckScriptSkeleton):
         self.edit_script(self.drop_todos)
         env = self.without_git()
         self.assertIsNone(shutil.which("git", path=env["PATH"]))
-        result = subprocess.run(["bash", "scripts/check.sh"], cwd=self.tmp, env=env,
+        result = subprocess.run([BASH, "scripts/check.sh"], cwd=self.tmp, env=env,
                                 stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300, encoding="utf-8")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("all checks passed", result.stdout)
         self.inject("echo made > made.txt")
-        result = subprocess.run(["bash", "scripts/check.sh"], cwd=self.tmp, env=env,
+        result = subprocess.run([BASH, "scripts/check.sh"], cwd=self.tmp, env=env,
                                 stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300, encoding="utf-8")
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("the checks changed the working tree", result.stderr)
@@ -1162,7 +1165,7 @@ class CheckScriptWithoutGit(CheckScriptSkeleton):
         with open(fake, "w", encoding="utf-8", newline="\n") as f:
             f.write("#!/bin/sh\necho 'fatal: detected dubious ownership in repository' >&2\nexit 128\n")
         os.chmod(fake, 0o755)
-        result = subprocess.run(["bash", "scripts/check.sh"], cwd=self.tmp, env=env,
+        result = subprocess.run([BASH, "scripts/check.sh"], cwd=self.tmp, env=env,
                                 stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300, encoding="utf-8")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("git rev-parse failed, so the guard cannot tell whether this is a checkout: fatal: detected dubious ownership",
