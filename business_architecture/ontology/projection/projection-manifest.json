@@ -37,7 +37,7 @@
     "step4/scoped-sequence/shapes.ttl": "cd4af065395657bb43821469f2712003c060745e8587ca5f3a84b4151507af8f"
   },
   "versions": {
-    "apoc": "bundled with neo4j:2025.06.2",
+    "apoc": "2025.06.2",
     "method": "ontology-to-lpg 2.3",
     "n10s": "2025.06.1",
     "neo4j": "2025.06.2",

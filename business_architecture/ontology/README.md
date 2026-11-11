@@ -12,7 +12,7 @@ roles, and a fourth to read first if you are new (`epm-ontology-guide.html`, bel
 | The `ontology` skill's guide (`skills/ontology/references/playbook.md`, the skills folder) | **Playbook**: a company-neutral method for building an ontology from scratch | Foundations, Steps 0 to 12, policies (§2), promoting provisional data (§3), standards (§4), soundness checks (§5), working agreements (§6), a worked example in a neutral domain (§7). *2026-10-25:* moved from this folder into the skill, which tests that it names no project's records, companies or paths (the decision of 2026-10-25) |
 | `MODULES.md` | **Module guide**: the released modules and how they connect | What each module holds, the three kinds of content, each link between modules with a real example from the releases, and one walk across modules |
 
-**Want the whole story?** The walkthrough tells it end to end: the business and its value streams, the gaps found in the processes and how each was filled or why it stays open, how the ontology was built from that, the stores, the technical graph, how the measures tie to both graphs, how they stay in step with Git, and the pricing demo, with 36 steps to rebuild it. Read it here as `epm-walkthrough.html`, or as the same page published (private; ask the decision owner for access). When the walkthrough changes, edit this file and publish it again. It sits above the documents here and points to them for depth:
+**Want the whole story?** The walkthrough tells it end to end: the business and its value streams, the gaps found in the processes and how each was filled or why it stays open, how the ontology was built from that, the stores, the technical graph, how the measures tie to both graphs, and how they stay in step with Git. Read it here as `epm-walkthrough.html`, or as the same page published (private; ask the decision owner for access). When the walkthrough changes, edit this file and publish it again. It sits above the documents here and points to them for depth:
 
 | Your question | Read |
 |---|---|
@@ -22,7 +22,7 @@ roles, and a fourth to read first if you are new (`epm-ontology-guide.html`, bel
 | How do you project an ontology into a graph store with nothing lost? | The `ontology-to-lpg` skill's playbook |
 | What must the ontology be able to answer? | `competency-questions.md`, and the guide's list with each status |
 | What does the finished ontology hold, and why these modules? | `epm-ontology-guide.html`, then `MODULES.md` |
-| How do I load it into a store and query it? | `projection/ontology-stores-runbook.html` |
+| How do I load it into a store and query it? | `projection/README.md` |
 | How do I change the ontology, or add a module? | `epm-walkthrough.html`, "How to change the ontology" |
 | How do I add a logical data model, such as an ER Studio export? | `epm-ontology-guide.html`, "Adding a logical model", for the design; `epm-walkthrough.html`, "Add a logical model", for the steps; the `ontology` skill's `references/logical-model.md` for the method |
 | Why is something the way it is? | `../domain/decisions/` |
@@ -120,7 +120,7 @@ including the logical-model module added by the shared release cut: a link not i
 | `build/output/step2-identity-report.md` | Identity normalization summary |
 | `build/output/apqc_crosscheck_results.json` | Raw cross-check scores |
 | `build/step3-skos-taxonomy.py` | Reproducible script: 680 `skos:Concept` taxonomy with URIs, labels, definitions, scope notes, APQC + validator + human-author provenance (`--adoptions`, `--authored`) |
-| `build/output/step3-taxonomy.ttl` | The SKOS taxonomy. Measured on `main` 37ab0a0 (2026-09-30): 14,496 triples, 683 `skos:Concept`, 681 `skos:broader` links, 680 concepts with `skos:definition`. Still carries the provisional `intake:` annotations until the `core` 1.0.0 release |
+| `build/output/step3-taxonomy.ttl` | The SKOS taxonomy. Measured on 2026-09-30: 14,496 triples, 683 `skos:Concept`, 681 `skos:broader` links, 680 concepts with `skos:definition`. Still carries the provisional `intake:` annotations until the `core` 1.0.0 release |
 | `build/output/step3-taxonomy-report.md` | Step 3 build summary |
 | `build/step3b-definition-triangulation.py` | Reproducible script: APQC candidate matching + EIA/web triangulation over the 503 definition gaps |
 | `build/step3b-merge-validations.py` | Merge automated + human validation records into final adoption decisions |
@@ -204,7 +204,7 @@ exceptions (the decision of 2026-10-22). Phase E closed on 2026-10-22.
   and notes point 15's answer (the decision of 2026-10-25, amendment of 2026-10-28).
 - **Open after closure, apart from the ontology:** the store tests are a
   separate, later task: load the ontology into Apache Jena and into a
-  Databricks Delta triple table, project it to a local Neo4j and to Aura, then
+  Databricks Delta triple table, project it to a local Neo4j and copy that graph to a second Neo4j server, then
   rebuild both from the Databricks store and check that no data is lost;
   OntoBricks follows, to link Unity Catalog metric views to the processes
   (the decision of 2026-10-23).

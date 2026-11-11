@@ -308,7 +308,7 @@ class Privacy(unittest.TestCase):
         if os.path.exists(os.path.join(bm.REPO, ".git")):  # a folder, or a file in a worktree
             tracked = subprocess.run(["git", "ls-files", "-z"], cwd=bm.REPO, capture_output=True, check=True).stdout
             paths = {os.path.join(bm.REPO, os.fsdecode(n)) for n in tracked.split(b"\0") if n}
-        else:  # a tree without Git, such as the share release: every file in it
+        else:  # a tree without Git: every file in it
             paths = {os.path.join(r, f) for r, ds, fs in os.walk(bm.REPO) for f in fs
                      if not any(part in (".git", "__pycache__", ".venv") for part in r.split(os.sep))}
         paths |= {p for p in glob.glob(os.path.join(HERE, "*")) if os.path.isfile(p)}

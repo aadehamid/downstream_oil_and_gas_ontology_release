@@ -37,10 +37,8 @@ TEMPLATE = os.path.join(ROOT, "scripts", "docs_template.html")
 GENERATOR = "scripts/build_docs_html.py"
 MARK = f'<meta name="generator" content="{GENERATOR}">'
 
-# The share release (the decision of 2026-10-31) carries no decision records and leaves some documents out: in release mode
-# (EPM_SHARE_RELEASE, or release.json at the tree's root) a page whose source is not here is not built, and nothing
-# links to the decisions page. On main every source must be here, as before.
-SHARE_RELEASE = bool(os.environ.get("EPM_SHARE_RELEASE")) or os.path.isfile(os.path.join(ROOT, "release.json"))
+# A page whose source is not in the tree is not built (pages()). The decisions page is built only when the tree
+# holds decision records under DECISIONS_DIR; without it, nothing links to it (the decision of 2026-10-31).
 
 GUIDE = "business_architecture/ontology/epm-ontology-guide.html"
 ONT = "business_architecture/ontology"
@@ -60,8 +58,8 @@ MODULE_READMES = ["kpi", "lane", "market-data", "organization", "party", "ref-mp
 
 def single(src, lead, scope="EPM ontology"):
     """A page for one Markdown source; its title is the source's own H1, word for word."""
-    # In release mode a source that is not in this tree makes no page: pages() drops it. On main it is read as always.
-    title = None if SHARE_RELEASE and not os.path.exists(os.path.join(ROOT, src)) else source_title(src)
+    # A source that is not in this tree makes no page: pages() drops it.
+    title = source_title(src) if os.path.exists(os.path.join(ROOT, src)) else None
     return {"out": src[:-3] + ".html", "title": title, "scope": scope, "lead": lead, "sources": [src]}
 
 
@@ -153,10 +151,8 @@ def all_pages():
         out.append(single(rel, "A proposed change to the process map. A proposal is not applied until it is accepted.",
                           scope="Process-map proposal"))
     records = sorted(glob.glob(os.path.join(ROOT, DECISIONS_DIR, "DEC-*.md")))
-    if SHARE_RELEASE and not (records and os.path.exists(os.path.join(ROOT, DECISIONS_DIR, "README.md"))):
-        return out  # the share release carries no decision records (the decision of 2026-10-31): no decisions page
-    if not records:
-        raise ValueError(f"no decision records under {DECISIONS_DIR}; the decisions page cannot be built from none")
+    if not (records and os.path.exists(os.path.join(ROOT, DECISIONS_DIR, "README.md"))):
+        return out  # no decision records in the tree: no decisions page
     numbers = [record_id(p) for p in records]
     twice = sorted({n for n in numbers if numbers.count(n) > 1})
     if twice:
@@ -544,7 +540,7 @@ class Page:
                         for lvl, aid, text in self.toc)
         with open(TEMPLATE, encoding="utf-8") as f:
             page = f.read()
-        if not self.decisions_page:  # no decisions page in this run (the share release): no link to it in the navigation
+        if not self.decisions_page:  # no decisions page in this run: no link to it in the navigation
             page = page.replace('    <a href="{{DECISIONS}}">Decisions</a>\n', "")
         values = {
             "{{GENERATOR}}": GENERATOR,
@@ -575,12 +571,8 @@ def generated_map(specs):
 
 
 def pages():
-    """Every page on main. In release mode, all_pages() minus those with a source that is not here: the share release
-    carries no decision records and leaves some documents out (the decision of 2026-10-31)."""
+    """Every page to build: all_pages() and the update guide, minus those with a source that is not in the tree."""
     specs = all_pages()
-    if not SHARE_RELEASE:
-        return specs
-    # The share release's own guide has its page there; on main it is a template in scripts/share_release/.
     if os.path.exists(os.path.join(ROOT, "HOW-TO-UPDATE.md")):
         specs = specs + [single("HOW-TO-UPDATE.md", "How to change what you received: a definition, a concept, a process or a module.", "This release")]
     return [s for s in specs if all(os.path.exists(os.path.join(ROOT, rel)) for rel in s["sources"] + ([s["intro"]] if "intro" in s else []))]
@@ -596,7 +588,7 @@ def build_all():
     if problems:
         raise ValueError("Markdown the renderer does not cover:\n  " + "\n  ".join(problems))
     gen = generated_map(specs)
-    decisions_page = any(s.get("decisions") for s in specs)  # absent in the share release: then nothing links to it
+    decisions_page = any(s.get("decisions") for s in specs)  # when absent, nothing links to it
     return {s["out"]: Page(s, gen, decisions_page).render() for s in specs}
 
 
@@ -605,7 +597,7 @@ def marked_pages(root=ROOT):
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     if os.path.exists(os.path.join(root, ".git")):
         names = subprocess.check_output(["git", "-C", root, "ls-files", "-z", "*.html"], env=env).decode().split("\0")
-    else:  # a tree without Git, such as the share release: every .html file in it
+    else:  # a tree without Git: every .html file in it
         names = [os.path.relpath(os.path.join(r, f), root) for r, ds, fs in os.walk(root) for f in fs
                  if f.endswith(".html") and "__pycache__" not in r]
     marked = []

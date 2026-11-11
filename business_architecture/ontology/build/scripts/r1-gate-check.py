@@ -10,9 +10,11 @@ Usage (paths relative to the repository root):
 
   stage_dir             Repo tree to check (default: the repo root this
                         script lives in).
-  baseline_ttl        The main-branch step3-taxonomy.ttl to diff against
-                        (required). Fetch from main via the GitHub API.
-  baseline_identity_map The main-branch step2-identity-map.json (required).
+  baseline_ttl        The step3-taxonomy.ttl as it stood before the R1 change,
+                        to diff against (required). This tree does not hold
+                        that file; the script is kept as the record of the gate.
+  baseline_identity_map The step2-identity-map.json as it stood before the
+                        R1 change (required).
   workbook            Step 3c workbook (default: the staged
                         build/output/step3c-definition-authoring-workbook.xlsx).
 

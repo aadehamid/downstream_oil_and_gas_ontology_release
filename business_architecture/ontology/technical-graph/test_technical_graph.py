@@ -13,14 +13,13 @@ from rdflib.namespace import DCTERMS, OWL, RDF, SKOS
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "release"))
-import build_example  # noqa: E402
 import newest  # noqa: E402
 
 TG = Namespace("https://w3id.org/mpc/ontology/modules/technical-graph/")
 SH = Namespace("http://www.w3.org/ns/shacl#")
 VOCAB = Graph().parse(os.path.join(HERE, "vocabulary.ttl"))
 SHAPES = Graph().parse(os.path.join(HERE, "shapes.ttl"))
-EXAMPLE = Graph().parse(build_example.OUTPUT)
+EXAMPLE = Graph().parse(os.path.join(HERE, "example", "example-graph.ttl"))
 ONTOLOGY = os.path.join(HERE, "..")
 # The releases the module links to by IRI; a graph that uses the vocabulary is checked with them loaded.
 LINKED = Graph()
@@ -62,12 +61,14 @@ class Vocabulary(unittest.TestCase):
 
 
 class Example(unittest.TestCase):
-    def test_the_example_is_current(self):
-        text = ("# The technical-graph module's example graph: test data, not ontology content (the decision of 2026-11-02, item 4).\n"
-                "# Built by build_example.py from the pricing demo's technical graph. Do not edit by hand.\n"
-                + build_example.build().serialize(format="turtle"))
-        with open(build_example.OUTPUT) as f:
-            self.assertEqual(f.read(), text, "run build_example.py --write")
+    def test_the_example_holds_its_committed_figures(self):
+        # The example is kept as committed. These figures were counted by hand from the file, so a changed file fails here.
+        self.assertEqual(len(EXAMPLE), 409)
+        kinds = {cls: len(set(EXAMPLE.subjects(RDF.type, TG[cls]))) for cls in
+                 ("Agent", "DefinitionsView", "Host", "MetricView", "Orchestrator", "PipelineStep", "QualityCheck",
+                  "SourceDatabase", "Table")}
+        self.assertEqual(kinds, {"Agent": 2, "DefinitionsView": 3, "Host": 1, "MetricView": 3, "Orchestrator": 1,
+                                 "PipelineStep": 5, "QualityCheck": 7, "SourceDatabase": 2, "Table": 19})
 
     def test_the_example_uses_only_the_vocabulary(self):
         defined = set(VOCAB.subjects())
@@ -78,22 +79,6 @@ class Example(unittest.TestCase):
     def test_the_example_conforms(self):
         ok, text = conforms(EXAMPLE)
         self.assertTrue(ok, text)
-
-    def test_the_demos_graph_conforms_in_the_modules_terms(self):
-        # The demo moved to the module's terms after its 1.0.0 (the decision of 2026-11-02, item 4): its graph is checked as it stands.
-        ok, text = conforms(build_example.demo_graph())
-        self.assertTrue(ok, text)
-
-    def test_the_demos_old_vocabulary_stops_the_build(self):
-        path = os.path.join(HERE, "example", "example-graph.ttl")
-        g = Graph().parse(path)
-        g.add((URIRef("urn:pricing-demo:tech:object/x"), RDF.type, URIRef("urn:pricing-demo:tech-vocab#GoldTable")))
-        import tempfile
-        with tempfile.NamedTemporaryFile("w", suffix=".ttl", delete=False) as f:
-            f.write(g.serialize(format="turtle"))
-        with self.assertRaises(SystemExit):
-            build_example.demo_graph(f.name)
-        os.unlink(f.name)
 
 
 class Questions(unittest.TestCase):

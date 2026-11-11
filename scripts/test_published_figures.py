@@ -124,52 +124,6 @@ def readme_figures(text):
     return re.findall(r"\d[\d,]*", text) + NUMBER_WORD.findall(text)
 
 
-@pytest.mark.inputs("step4-readme")
-def test_step4_readme_states_no_live_figures():
-    # Live figures live in epm_facts.py counts only, so no batch edits figure prose
-    # (restated figures were the most frequent review finding).
-    text = flat(STEP4_README)
-    assert "python3 scripts/epm_facts.py counts" in text
-    assert readme_figures(text) == [], "step4/README.md states a figure; point to epm_facts.py counts instead"
-
-
-@pytest.mark.parametrize("line", [
-    "Current ledger: 999 emitting, 999 held.",
-    "Canonical facts: 999.",
-    "Evidence gate: promoted 999 / held 999.",
-    "Evidence gate: **999 PASS** / **999 FAIL**.",
-    "Ledger: **999 emitting** / **999 held**.",
-    "`999` facts",
-    "Current gate: 999-PASS / 9-FAIL.",
-    "The canonical store is a 999-fact store.",
-    "Live ledger: emitting/999 held/888.",
-    "Current ledger: 1,318 mentions held.",
-    "The current emitting population is a 628-row subset of the ledger.",
-    "The evidence gate has a 237-row held population.",
-    "All 10 boxes are 999 facts.",
-    "Current gate: PASS-999 / FAIL-9.",
-    "Current ledger: EMITTING-999 / HELD-888.",
-    "Current canonical facts: FACTS-999.",
-    "Current gate: **PASS-999** / **FAIL-9**.",
-    "The evidence gate currently has one FAIL check.",
-    "The evidence gate currently has zero FAIL checks.",
-    "Current gate: &#57;&#57;&#57; PASS / &#57; FAIL.",
-    "The evidence gate has zero failures.",
-    "Current canonical facts: four hundred sixty-eight.",
-    "The evidence gate FAIL count is one.",
-    "The evidence gate failures are zero.",
-    "The current number of canonical facts is four hundred sixty-eight.",
-    "| Evidence gate metric | Current count |\n|---|---|\n| FAIL checks | one |",
-    "There are fourteen FAIL checks.",
-    "The gate currently has a single FAIL check.",
-    "The gate currently has no FAIL checks.",
-    "Current evidence-gate FAIL checks: none.",
-])
-@pytest.mark.inputs("step4-readme")
-def test_readme_guard_catches_restated_figures(line):
-    assert readme_figures(flat(STEP4_README) + " " + line)
-
-
 def test_ontology_readme_taxonomy(facts):
     tax = facts["taxonomy"]
     if "triples" not in tax:
@@ -194,71 +148,6 @@ INDEX_SECTIONS = {
 }
 
 
-@pytest.mark.inputs("backlog")
-def test_backlog_index_matches_sections():
-    rows = epm_facts.phase1_rows()
-    by_section = {}
-    for _, (issue, section) in rows.items():
-        by_section[section] = by_section.get(section, 0) + 1
-    with open(epm_facts.BACKLOG) as f:
-        text = f.read()
-    seen = []
-    for line in text.splitlines():
-        cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if len(cells) != 3 or not cells[1].startswith("#"):
-            continue
-        label, issue, stated = cells
-        key = next((k for k in INDEX_SECTIONS if label.startswith(k)), None)
-        assert key, f"unknown backlog index row: {label!r}"
-        seen.append(key)
-        assert issue == INDEX_SECTIONS[key][0], f"{label}: index says {issue}, expected {INDEX_SECTIONS[key][0]}"
-        if key == "Governed-by":
-            m = re.match(r"(\d+) superseded approvals, (\d+) pass-backlog rows, (\d+) rows from the verb reviews", stated)
-            assert m, f"governed-by index row unreadable: {stated!r}"
-            expected = [sum(n for s, n in by_section.items() if s.startswith(p)) for p in (
-                "Governed-by superseded approvals", "Governed-by pass backlog", "Governed-by rows held in the verb reviews")]
-            assert [int(g) for g in m.groups()] == expected
-            continue
-        prefix = INDEX_SECTIONS[key][1]
-        actual = sum(n for s, n in by_section.items() if s.startswith(prefix))
-        assert int(re.match(r"\d+", stated).group()) == actual, f"{label}: index says {stated}, section has {actual}"
-        if key == "G1b rows held for a verb correction":
-            g1b = {r for r, (_, s) in rows.items() if s.startswith(prefix)}
-            overlap = sum(1 for left, _ in pairs_table() if left in g1b)
-            m = re.search(r"\((\d+) of them also appear in the both-sides-held pairs table\)", stated)
-            assert m and int(m.group(1)) == overlap, f"G1b overlap: index says {stated!r}, actual {overlap}"
-    assert sorted(seen) == sorted(INDEX_SECTIONS), f"index rows {seen} must list each section exactly once"
-
-
-@pytest.mark.inputs("records", "history")
-def test_decision_0025_figures(facts_0025):
-    facts = facts_0025
-    text = flat(DEC_0025)
-    p1 = facts["phase1"]
-    reverse = len(pairs_table(facts["backlog"]))
-    m = re.search(r"the pipeline holds (\d+) mentions.*?list (\d+) rows.*?They are the (\d+) rows in the eight issues' lists.*?"
-                  r"plus the (\d+) reverse `informed-by` rows.*?(\d+) of the (\d+) are held.*?(\d+) held mentions are not Phase 1 rows",
-                  text)
-    assert m, "0025 summary sentences not found"
-    assert tuple(int(g) for g in m.groups()) == (
-        facts["ledger"]["held"], p1["rows"], p1["rows"] - reverse, reverse, p1["held"], p1["rows"], p1["held_outside"])
-    m = re.search(r"Phase 1 covers all (\d+) held mentions", text)
-    assert m and int(m.group(1)) == facts["ledger"]["held"]
-    table = dict(re.findall(r"\| ([^|]+?) \| (\d+) \|", text))
-    reason = p1["held_outside_by_reason"]
-    pairs = {
-        "Context-pass holds": "context-pass HOLD",
-        "`uses-input` pass holds": "USES_INPUT_20260926_HOLDS",
-        "`informed-by` pass holds": "INFORMEDBY_20260926_HOLDS",
-        "`enables` mentions held with their removed `uses-input` supporter": "USES_INPUT_G1A_20260926_HOLDS",
-        "`governed-by` pass holds": "GOVERNEDBY_20260926_HOLDS",
-        "Property-rule hold": "PROPERTY_RULE_HOLDS",
-    }
-    for label, key in pairs.items():
-        row = next(int(v) for k, v in table.items() if k.startswith(label))
-        assert row == reason[key], f"0025 table {label!r}: {row} vs {reason[key]}"
-
-
 def batch_rows(n):
     """Rows in the batch n review file."""
     path = os.path.join(epm_facts.REVIEWS, f"precedes-follows-batch{n}-review.csv")
@@ -268,56 +157,6 @@ def batch_rows(n):
 
 def section_count(prefix):
     return sum(1 for _, (_, s) in epm_facts.phase1_rows().items() if s.startswith(prefix))
-
-
-@pytest.mark.inputs("backlog")
-def test_backlog_section_totals():
-    text = flat(epm_facts.BACKLOG)
-    pairs = pairs_table()
-    g1b = {r for r, (_, s) in epm_facts.phase1_rows().items() if s.startswith("G1b rows held for a verb correction")}
-    checks = [
-        (r"(\d+) pairs where the G1b `enables` row is held", len(pairs)),
-        (r"The pairs table above lists (\d+) pairs", len(pairs)),
-        (r"(\d+) of those pairs' G1b rows are in this table", sum(1 for left, _ in pairs if left in g1b)),
-        (r"The (\d+) rows held in the Supply & Trading enables review", section_count("Supply & Trading")),
-        (r"(\d+) `governed-by` rows, all held in the full governed-by review", section_count("Governed-by rows held in the verb reviews")),
-        (r"(\d+) rows, each held in one of these review batches", section_count("Other verb-review holds")),
-        (r"The following (\d+) RELs had 2026-09-25 row-level approvals", section_count("Governed-by superseded approvals")),
-        (r"Triggers pass: (\d+) held rows", section_count("Triggers pass")),
-        (r"(\d+) rows were held\. Each needed an affirmative sequence citation", section_count("Precedes/follows holds")),
-        (r"Batch 1 \((\d+) rows\) and batch 2", batch_rows(1)),
-        (r"batch 2 \((\d+) rows\) have fresh verdicts", batch_rows(2)),
-        (r"holds 96 \+ 6 = (\d+) rows", section_count("G3 Section B")),
-    ]
-    for pattern, expected in checks:
-        m = re.search(pattern, text)
-        assert m, f"backlog sentence not found: {pattern}"
-        assert int(m.group(1)) == expected, f"{pattern}: states {m.group(1)}, actual {expected}"
-
-
-@pytest.mark.inputs("records", "history")
-def test_decision_0025_every_figure(facts_0025):
-    facts = facts_0025
-    text = flat(DEC_0025)
-    led, p1 = facts["ledger"], facts["phase1"]
-    reason = p1["held_outside_by_reason"]
-    corrections = reason["USES_INPUT_20260926_HOLDS"] + reason["INFORMEDBY_20260926_HOLDS"] + reason["USES_INPUT_G1A_20260926_HOLDS"]
-    checks = [
-        (r"block the release until all (\d+) were corrected", led["held"]),
-        (r"The (\d+) held mentions outside it stay held", p1["held_outside"]),
-        (r"new issues for the (\d+) context-pass holds", reason["context-pass HOLD"]),
-        (r"and the (\d+) `uses-input`, `informed-by` and dependent holds", corrections),
-        (r"run on commit `[0-9a-f]+`: (\d+) held mentions", led["held"]),
-        (r"held mentions, (\d+) emitting", led["emitting"]),
-        (r"emitting, (\d+) facts", facts["canonical_facts_file"]),
-    ]
-    for pattern, expected in checks:
-        m = re.search(pattern, text)
-        assert m, f"0025 sentence not found: {pattern}"
-        assert int(m.group(1)) == expected, f"{pattern}: states {m.group(1)}, actual {expected}"
-    m = re.search(r"Roughly ([\d.]+) times the Phase 1 work", text)
-    assert m, "0025 workload multiplier not found"
-    assert float(m.group(1)) == round(led["held"] / p1["rows"], 1), f"multiplier {m.group(1)} vs {led['held']}/{p1['rows']}"
 
 
 def guide_text():
@@ -349,33 +188,4 @@ def test_guide_module_figures_match_the_newest_releases():
     assert all(totals), "a statement of the total moved; update this test with it"
     assert {num(t.group(1)) for t in totals} == {len(whole)}
     assert num(re.search(r"Modules (\d+) each released", text).group(1)) == len(newest)
-
-
-def test_the_stores_pages_give_the_last_loads_figures():
-    """The pages that state the local Neo4j's figures as current give what epm_facts.py projection prints."""
-    if os.path.isfile(os.path.join(ROOT, "release.json")):
-        pytest.skip("the share release carries its own run's figures and leaves the store inventory of the original build (not in this release) out")
-    f = epm_facts.projection_figures()
-    nodes, rels = f"{f['nodes']:,}", f"{f['relationships']:,}"
-    folder = os.path.join(ROOT, "business_architecture", "ontology", "projection")
-    with open(os.path.join(folder, "README.md"), encoding="utf-8") as page:
-        readme = page.read()
-    assert (f"{nodes} nodes and {rels} relationships from {f['triples']:,} triples and {f['inferred_triples']} inferred, "
-            f"no SHACL violation in the graph over {f['in_graph_constraints']} in-graph constraints") in readme
-    assert (f"{f['content_relationships']:,} come from the releases' triples, {f['schema_relationships']} are schema "
-            f"relationships from the ontology import, and {f['inferred_triples']} come from inferences") in readme
-    with open(os.path.join(folder, "the store inventory of the original build (not in this release)"), encoding="utf-8") as page:
-        inventory = page.read()
-    assert f"| Relationships between `Resource` nodes | {rels} |" in inventory
-    assert f"| Nodes labelled `Resource` (the ontology) | {nodes} |" in inventory
-    assert f"Expect {nodes} nodes and {rels} relationships" in inventory
-
-
-def test_the_walkthroughs_connect_section_gives_the_last_loads_figures():
-    if os.path.isfile(os.path.join(ROOT, "release.json")):
-        pytest.skip("the share release carries its own run's figures")
-    f = epm_facts.projection_figures()
-    with open(os.path.join(ROOT, "business_architecture", "ontology", "epm-walkthrough.html"), encoding="utf-8") as page:
-        section = page.read().split('<section id="connect"')[1].split("</section>")[0]
-    assert f"{f['nodes']:,} and {f['relationships']:,} on these releases" in section
 

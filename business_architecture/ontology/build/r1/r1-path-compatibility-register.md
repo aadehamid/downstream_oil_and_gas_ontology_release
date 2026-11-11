@@ -9,7 +9,7 @@ rows below are live in the merged taxonomy: 683 concepts, 14,496 triples,
 2026-09-22, the subject matter expert confirmed: no consumers exist yet; the ontology is the foundation everything
 else will connect to later. All 42 dispositions are therefore `No consumer`. This register is
  retained as the migration record (old→new paths) for future consumers.
-Generated 2026-09-22 from the committed TTL on `main` (`f25a93d`, blob `06d99f8`):
+Generated 2026-09-22 from the committed TTL:
 old paths walked via `skos:broader`; new paths computed by the promotion/tombstone rules
 (stable slugs/IRIs; `CM-1-1-4` → Refinery Planning and Optimization, `CM-1-1-7` →
 Refinery Production Planning and Scheduling, tombstone pair re-anchored under `CM-1-1`).

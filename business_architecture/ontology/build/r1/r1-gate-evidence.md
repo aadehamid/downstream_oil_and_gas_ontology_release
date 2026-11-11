@@ -32,8 +32,8 @@ committed regenerated outputs:**
   `CM-1-1-4-6-1` still `intake:status "blocked"` (PTC-001-B hold intact).
 
 **Re-verify:** from the repo root, run the committed regenerated TTL and
-identity map through the checker (baseline TTL + identity map from `main`
-are required arguments):
+identity map through the checker (the TTL and the identity map as they stood
+before the R1 change are required arguments; this tree does not hold them):
 `python3 business_architecture/ontology/build/scripts/r1-gate-check.py . <baseline_ttl> <baseline_identity_map>`.
 
 ## Gate 2 — path compatibility

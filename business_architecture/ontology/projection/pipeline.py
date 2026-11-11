@@ -5,7 +5,7 @@ needs no database:
 
     python3 pipeline.py build                    # check the rules, validate, write projection-manifest.json
     python3 pipeline.py build --verify           # fail unless the manifest matches a fresh build
-    python3 pipeline.py record --run ~/lpg-out/epm   # after a driver run on these inputs: take its inferred.nt and a summary
+    python3 pipeline.py record --run <output folder>   # after a driver run on these inputs: take its inferred.nt and a summary
                                                  # of its report into this folder, then rewrite the manifest
 
 Commit inferred.nt, projection-manifest.json and projection-report.json together. Turtle stays the master copy; Neo4j
@@ -86,7 +86,7 @@ QUALIFIED_RELATIONS = [
 # named here with its fix target; the build fails on any gap not listed, and on a listed gap
 # that no longer occurs, so the list cannot go stale (the decision of 2026-10-13).
 RELEASE_EXCEPTIONS = {}  # every listed gap is closed by integration 2.0.0 (the decision of 2026-10-23)
-VERSIONS = {"neo4j": "2025.06.2", "n10s": "2025.06.1", "apoc": "bundled with neo4j:2025.06.2",
+VERSIONS = {"neo4j": "2025.06.2", "n10s": "2025.06.1", "apoc": "2025.06.2",
             "robot": "1.9.10", "reasoner": "ELK (through ROBOT)", "method": "ontology-to-lpg 2.3"}
 
 

@@ -142,9 +142,9 @@ live, the same queries run on the technical graph.
 
 ## XII. Logical models — how a modelling tool's design links to the ontology (added 2026-11-02, the decision of 2026-11-02)
 The logical-model module's questions, locked by the decision owner (the decision of 2026-11-02, decision 9). Each is
-asked of a logical data model exported from ER Studio Data Architect and its annotation layer. A model's
-export is not ontology content in `main`, so the regression runs them on the module plus a made-up example
-model; the customer model's answers come from the release, which holds it.
+asked of a logical data model exported from ER Studio Data Architect and its annotation layer. The regression
+runs them on the module plus a made-up example model; the customer model's answers come from the release,
+which holds it.
 51. Which logical entities hold data about a party concept?
 52. Which source system does each entity come from, and which entities does each system feed?
 53. Which attributes identify a customer in each system (primary and alternate keys)?

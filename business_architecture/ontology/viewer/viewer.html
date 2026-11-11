@@ -1824,8 +1824,7 @@
       $("view-lifecycle").onclick = () => showOverview("lifecycle");
       $("view-model").onclick = () => showOverview("model");
       $("return-overview").onclick = () => showOverview(overviewReturn);
-      $("release-pin").textContent =
-        data.release + " · source " + data.sourceCommit;
+      $("release-pin").textContent = data.release;
       for (const [k, v] of Object.entries(data.counts))
         $("all-statistics").append(
           element("li", k + ": " + v.toLocaleString()),

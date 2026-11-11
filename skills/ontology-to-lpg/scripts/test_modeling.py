@@ -575,7 +575,7 @@ def leaky_neo4j():
 
 
 class Secrets(unittest.TestCase):
-    """Finding #1 of the 2026-10-25 review: no password or token reaches the output or a report."""
+    """No password or token reaches the output or a report."""
 
     def test_redact_hides_userinfo_tokens_and_fragments(self):
         self.assertEqual(redact(f"neo4j+s://neo4j:{CANARY}@x.io:7687"), "neo4j+s://***@x.io:7687")

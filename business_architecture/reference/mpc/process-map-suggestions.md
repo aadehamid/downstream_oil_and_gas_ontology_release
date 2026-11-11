@@ -12,7 +12,7 @@ MPC's public filings (see `source-register.md`). Each needs the subject matter e
 authoring path — IDs, definitions, then the ontology pipeline — never a direct
 edit from this folder.
 
-Compared against the map on `main` at `1b3105e`.
+Compared against the process map as it stood when these suggestions were written.
 
 MPC-P02 is raised as a proposal: `business_process/proposals/MPC-P02-refining-ids.md` (2026-10-13).
 

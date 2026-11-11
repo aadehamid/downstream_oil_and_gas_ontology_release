@@ -29,7 +29,6 @@ import hashlib
 import json
 import os
 import re
-import subprocess
 import sys
 from collections import Counter
 
@@ -42,11 +41,10 @@ import frozen_sources
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ONTOLOGY = os.path.dirname(HERE)
-REPO = os.path.dirname(os.path.dirname(ONTOLOGY))
 BASE = frozen_sources.package_dir(ONTOLOGY, "core", "2.1.0")
 SOURCE_PATH = "business_architecture/business_process/downstream_process_map.json"
 # The map as 2.0.0 and 2.1.0 were built from it, and the map as 2.2.0 is built from it: the merge of
-# an earlier change, the last change to the map on main before this release. MPC-P10 is a proposal and not applied.
+# an earlier change, the last change to the map before this release. MPC-P10 is a proposal and not applied.
 EARLIER_COMMIT = "b75fd991e243248e60ecc832b3ad2c4f5c91740a"
 SOURCE_COMMIT = "82593547cc1672cbcf35e13d54244830671dd009"
 CHANGELOG = os.path.join(ONTOLOGY, "releases", "core", "CHANGELOG-2.2.0.md")
@@ -110,7 +108,7 @@ def en(text):
 
 def map_nodes(commit):
     """slug -> (node fields without children, parent slug), from the map at a commit."""
-    data = json.loads(frozen_sources.read(commit, SOURCE_PATH, REPO))  # the frozen copy if there is one, else Git
+    data = json.loads(frozen_sources.read(commit, SOURCE_PATH))  # the frozen copy in release/frozen/
     out = {}
 
     def walk(node, parent):

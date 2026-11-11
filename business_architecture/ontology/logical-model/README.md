@@ -49,10 +49,10 @@ ER Studio marks an attribute's link to a business glossary with `:businessTerm`,
 
 ## In the stores
 
-When the newest releases hold this module, as a share release's do, the four ontology stores hold it (the decision of 2026-11-02, amendment "the stores"). The projection loads the module's vocabulary into the local Neo4j and AuraDB like every package's, and `../projection/logical_models.py load` adds the models:
+The newest releases hold this module, so the ontology stores hold it (the decision of 2026-11-02, amendment "the stores"). The projection loads the module's vocabulary into the local Neo4j like every package's, and `../projection/logical_models.py load` adds the models:
 
 - Jena and the Delta table `epm_triples` hold each model's export and layer as named graphs of their own, `<version IRI>/<slug>.erstudio` and `<version IRI>/<slug>.layer`, found from the package's `manifest.json`.
-- The local Neo4j and AuraDB hold each model in full as a subgraph labelled `LogicalModel`, apart from the ontology's `Resource` nodes: a `Model` node, each `Entity` with its name and description, its `Attribute` and `Key` nodes, `RELATES_TO` edges between entities, and `SOURCE_SYSTEM`, `DESCRIBES` and `IMPLEMENTED_BY` edges to the ontology nodes its layer names. The script's docstring lists every property.
+- The Neo4j database the settings name holds each model in full as a subgraph labelled `LogicalModel`, apart from the ontology's `Resource` nodes: a `Model` node, each `Entity` with its name and description, its `Attribute` and `Key` nodes, `RELATES_TO` edges between entities, and `SOURCE_SYSTEM`, `DESCRIBES` and `IMPLEMENTED_BY` edges to the ontology nodes its layer names. The script's docstring lists every property.
 
 The projection's round-trip checks read only `Resource` nodes, so they never read the subgraph. `../projection/sync_stores.py check` counts the named graphs with the release graphs and compares the subgraph with the package's graphs on an `lm:<store>` line, by a marker and a fingerprint of its content. The labels, node shapes and loader are a build choice delegated to the build's agent, under the subject matter expert's decision of 2026-10-12.
 

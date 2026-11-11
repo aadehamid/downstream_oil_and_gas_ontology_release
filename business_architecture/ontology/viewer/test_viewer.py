@@ -98,7 +98,7 @@ def test_embed_is_script_safe_and_needs_no_network(tmp_path):
         ttl=TTL + '\nx:attack rdfs:label ' + json.dumps(label) + ' .',
     )
     out = tmp_path / "viewer/index.html"
-    viewer.build(tmp_path, out, require_pin=False)
+    viewer.build(tmp_path, out, require_clean=False)
     text = out.read_text()
     payload = text.split('<script id="ontology-data" type="application/json">')[
         1
@@ -119,7 +119,7 @@ def test_cut_must_equal_source_packages(tmp_path):
     package(cut, ttl=TTL + "\nx:Changed a owl:Class .")
     out = tmp_path / "index.html"
     with pytest.raises(ValueError, match="differ"):
-        viewer.build(source, out, compare=cut, require_pin=False)
+        viewer.build(source, out, compare=cut, require_clean=False)
     assert not out.exists()
 
 
@@ -131,7 +131,7 @@ def test_cut_emits_the_neutral_source_title_and_actual_file_hashes(tmp_path):
     package(source, ttl=ttl)
     current = package(cut, ttl=ttl.replace(OLD_TITLE, NEW_TITLE))
     output = tmp_path / "index.html"
-    viewer.build(source, output, compare=cut, require_pin=False)
+    viewer.build(source, output, compare=cut, require_clean=False)
     payload = output.read_text().split('<script id="ontology-data" type="application/json">')[1].split("</script>")[0]
     data = json.loads(payload)
     assert OLD_TITLE not in payload
@@ -157,7 +157,7 @@ def test_source_title_permission_rejects_every_other_cut_change(tmp_path, defect
     package(cut, ttl=bad)
     output = tmp_path / "index.html"
     with pytest.raises(ValueError, match="differ"):
-        viewer.build(source, output, compare=cut, require_pin=False)
+        viewer.build(source, output, compare=cut, require_clean=False)
     assert not output.exists()
 
 
@@ -167,7 +167,7 @@ def test_no_package_is_an_error(tmp_path):
         viewer.build_data(tmp_path)
 
 
-def test_source_pin_rejects_another_commit_and_local_package_changes(tmp_path, monkeypatch):
+def test_local_package_changes_are_refused_and_a_tree_without_git_is_not_checked(tmp_path, monkeypatch):
     import os
     import subprocess
 
@@ -176,6 +176,7 @@ def test_source_pin_rejects_another_commit_and_local_package_changes(tmp_path, m
         if key.startswith("GIT_"):
             monkeypatch.delenv(key)
     package(tmp_path)
+    viewer.clean_packages(tmp_path)  # no Git here: nothing to compare with
 
     def git(*args):
         return subprocess.check_output(["git", "-C", str(tmp_path), *args], env=env, text=True).strip()
@@ -183,14 +184,19 @@ def test_source_pin_rejects_another_commit_and_local_package_changes(tmp_path, m
     git("init", "-q")
     git("add", ".")
     git("-c", "user.name=Test fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "Fixture")
-    with pytest.raises(ValueError, match="Expected source release"):
-        viewer.pinned_source(tmp_path)
-    monkeypatch.setattr(viewer, "SOURCE_COMMIT", git("rev-parse", "HEAD"))
-    viewer.pinned_source(tmp_path)
+    viewer.clean_packages(tmp_path)
     manifest = next((tmp_path / viewer.ONTOLOGY / "releases").glob("*/*/manifest.json"))
     manifest.write_text(manifest.read_text() + "\n")
     with pytest.raises(ValueError, match="local changes"):
-        viewer.pinned_source(tmp_path)
+        viewer.clean_packages(tmp_path)
+
+
+def test_the_page_names_this_release(tmp_path):
+    package(tmp_path)
+    data = viewer.build_data(tmp_path)
+    assert data["release"] == "KPI Store 1.1"
+    assert "sourceCommit" not in data
+    assert viewer.build(tmp_path, tmp_path / "index.html", require_clean=False)["release"] == "KPI Store 1.1"
 
 
 def assert_roundtrip(root, data=None):
@@ -228,24 +234,6 @@ def assert_roundtrip(root, data=None):
 def test_payload_preserves_every_rdf_triple(tmp_path):
     package(tmp_path)
     assert_roundtrip(tmp_path)
-
-
-def test_pinned_release_roundtrip_when_supplied(tmp_path):
-    import os
-
-    root = os.environ.get("EPM_VIEWER_RELEASE_SOURCE")
-    if not root:
-        pytest.skip(
-            "Set EPM_VIEWER_RELEASE_SOURCE for the private release acceptance check"
-        )
-    viewer.pinned_source(root)
-    output = tmp_path / "index.html"
-    compared = os.environ.get("EPM_VIEWER_RELEASE_COMPARE")
-    viewer.build(root, output, compare=compared)
-    payload = output.read_text().split('<script id="ontology-data" type="application/json">')[1].split("</script>")[0]
-    assert_roundtrip(Path(compared or root), json.loads(payload))
-    if compared:
-        assert output.read_bytes() == (Path(compared) / "viewer/index.html").read_bytes()
 
 
 @pytest.mark.parametrize("defect", ["identity", "candidate", "escape", "missing-newest"])

@@ -18,15 +18,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import build_value_streams as bv  # noqa: E402
 sys.path.insert(0, os.path.join(HERE, "..", "release"))
-import build_module as bm  # noqa: E402  (release mode, and where a released package sits in either layout)
+import build_module as bm  # noqa: E402  (where a released package sits)
 
 
 def released(tc, module, version, fname):
-    """A file of a released package, in either layout. In the share release a package that did not ship skips the
-    test; on main every package is on disk, so a missing one fails."""
+    """A file of a released package, in releases/ or the history folder. The tree holds each module's newest and
+    previous packages, so a missing one fails."""
     folder = bm.package_folder(module, version)
-    if folder is None and bm.SHARE_RELEASE:
-        tc.skipTest(f"{module} {version} did not ship (the share release holds the newest and previous packages only)")
     tc.assertIsNotNone(folder, f"{module} {version} is not on disk under releases/")
     return os.path.join(folder, fname)
 
@@ -62,9 +60,8 @@ class Vocabulary(unittest.TestCase):
             for p in (VS.produces, VS.consumes):
                 self.assertEqual(set(g.objects(p, RDFS.range)), {SKOS.Concept}, p)
         # A line is a real object of vs:consumes, and both kinds are SKOS concepts in the data-product package the value
-        # stream is built against: the pinned 1.0.0 on main; in the share release, where the pins move to the newest
-        # set and 1.0.0 is not shipped, the newest data-product.
-        version = bm.dependencies("value-stream")["data-product"] if bm.SHARE_RELEASE else "1.0.0"
+        # stream is built against, the newest data-product.
+        version = bm.dependencies("value-stream")["data-product"]
         dp = Graph().parse(released(self, "data-product", version, "data-product.ttl"))
         line = URIRef("https://w3id.org/mpc/ontology/modules/data-product/line/planning-optimization")
         self.assertIn(line, set(STREAMS.objects(None, VS.consumes)))

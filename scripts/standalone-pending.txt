@@ -1,0 +1,15 @@
+# Files that scripts/check_standalone.py does not check yet, each with the reason. One line per file:
+#   <path> :: <reason>
+# A path names one file exactly, with no wildcard, and must be one the check allows (ALLOWED_PENDING): the list
+# can only shrink. The check fails when a line names no file or a clean file, so delete a line as soon as its
+# file is clean. The final cut runs the check with --strict, which ignores this file.
+
+# Documents that wait for their rewrite for this release.
+README.md :: awaits the documents rewrite
+KNOWN-OPEN-ITEMS.md :: awaits the documents rewrite
+HOW-TO-UPDATE.md :: awaits the documents rewrite
+HOW-TO-UPDATE.html :: the page is rebuilt from the Markdown after its rewrite
+business_architecture/ontology/epm-walkthrough.html :: the walkthrough awaits the documents rewrite
+business_architecture/ontology/epm-ontology-guide.html :: the guide awaits the documents rewrite
+viewer/index.html :: the viewer awaits its rebuild for this release
+horoi_viewer/index.html :: the second viewer awaits its rebuild for this release

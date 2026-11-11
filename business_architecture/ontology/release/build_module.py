@@ -46,7 +46,6 @@ MODULES = {
         "parts": ["organization/vocabulary.ttl", "organization/roles.ttl", "organization/assignments.ttl"],
         "shapes": ["organization/shapes.ttl"],
         "depends_on": ["core"],
-        "pins": {"core": "2.3.0"},
         "decisions": ["the decision of 2026-10-13", "the decision of 2026-10-13", "the decision of 2026-10-13", "the decision of 2026-10-18", "the decision of 2026-10-25",
                       "the decision of 2026-10-26"],
     },
@@ -65,11 +64,10 @@ MODULES = {
         "approval": ("(the review comments of a subject matter expert reviewing the documents)",
                      "yes those can be brand values. Others I cannot answer."),
         "parts": ["ref-mpc/ref-mpc.ttl", "ref-mpc/reference-parties.ttl", "ref-mpc/reference-brands.ttl"],
-        # Its own shapes, then the released shapes of the versions it pins, so a later party or organization
-        # release cannot change what this released package is checked against (the decision of 2026-10-23).
+        # Its own shapes, then the released shapes of organization and party (the decision of 2026-10-23). resolve()
+        # reads each from that module's newest package, whatever version the path names.
         "shapes": ["ref-mpc/shapes.ttl", "releases/organization/2.1.0/shapes.ttl", "releases/party/2.0.0/shapes.ttl"],
         "depends_on": ["organization", "party"],
-        "pins": {"organization": "2.1.0", "party": "2.0.0"},
         "decisions": ["the decision of 2026-10-05", "the decision of 2026-10-13", "the decision of 2026-10-21", "the decision of 2026-10-22", "the decision of 2026-10-22",
                       "the decision of 2026-10-27"],
     },
@@ -93,7 +91,6 @@ MODULES = {
         "parts": ["kpi/vocabulary.ttl", "kpi/measures.ttl", "population/vocabulary.ttl", "population/population.ttl"],
         "shapes": ["kpi/shapes.ttl"],
         "depends_on": ["core"],
-        "pins": {"core": "2.3.0"},
         "decisions": ["the decision of 2026-10-18", "the decision of 2026-10-18", "the decision of 2026-10-18", "the decision of 2026-10-19", "the decision of 2026-10-22",
                       "the decision of 2026-10-23", "the decision of 2026-10-23", "the decision of 2026-10-25", "the decision of 2026-10-25", "the decision of 2026-10-25",
                       "the decision of 2026-10-28"],
@@ -131,7 +128,6 @@ MODULES = {
         # (the decision of 2026-10-25; the earlier packages name four of them without requiring system). 1.4.0 names twelve
         # and requires system 1.4.0 (the decision of 2026-10-26). 2.0.0 names twenty and requires system 1.5.0 (the decision of 2026-10-27).
         "depends_on": ["core", "system"],
-        "pins": {"core": "2.4.0", "system": "1.5.0"},
         "decisions": ["the decision of 2026-10-21", "the decision of 2026-10-21", "the decision of 2026-10-21", "the decision of 2026-10-21",
                       "the decision of 2026-10-21", "the decision of 2026-10-21", "the decision of 2026-10-22", "the decision of 2026-10-23", "the decision of 2026-10-23",
                       "the decision of 2026-10-23", "the decision of 2026-10-25", "the decision of 2026-10-25", "the decision of 2026-10-26",
@@ -153,7 +149,6 @@ MODULES = {
         "parts": ["data-product/vocabulary.ttl", "data-product/data-products.ttl", "data-product/pricing.ttl"],
         "shapes": ["data-product/shapes.ttl"],
         "depends_on": ["core", "kpi", "system"],
-        "pins": {"core": "2.3.0", "kpi": "1.2.0", "system": "1.2.0"},
         "decisions": ["the decision of 2026-10-05", "the decision of 2026-10-19", "the decision of 2026-10-19", "the decision of 2026-10-22", "the decision of 2026-10-23",
                       "the decision of 2026-10-23", "the decision of 2026-10-23", "the decision of 2026-10-25", "the decision of 2026-10-25", "the decision of 2026-10-25"],
     },
@@ -170,8 +165,6 @@ MODULES = {
         "parts": ["value-stream/vocabulary.ttl", "value-stream/value-streams.ttl"],
         "shapes": ["value-stream/shapes.ttl"],
         "depends_on": ["core", "data-product", "kpi"],
-        # Every dependency pinned: a later kpi or data-product release must not change this package.
-        "pins": {"core": "2.3.0", "data-product": "1.2.0", "kpi": "1.2.0"},
         "decisions": ["the decision of 2026-10-19", "the decision of 2026-10-22", "the decision of 2026-10-23", "the decision of 2026-10-23", "the decision of 2026-10-23",
                       "the decision of 2026-10-25", "the decision of 2026-10-26"],
     },
@@ -196,7 +189,6 @@ MODULES = {
         "parts": ["system/vocabulary.ttl", "system/systems.ttl"],
         "shapes": ["system/shapes.ttl"],
         "depends_on": ["core"],
-        "pins": {"core": "2.4.0"},
         "decisions": ["the decision of 2026-10-19", "the decision of 2026-10-22", "the decision of 2026-10-25", "the decision of 2026-10-25", "the decision of 2026-10-25",
                       "the decision of 2026-10-26", "the decision of 2026-10-26", "the decision of 2026-10-27"],
     },
@@ -212,7 +204,6 @@ MODULES = {
         "parts": ["lane/vocabulary.ttl", "lane/lanes.ttl"],
         "shapes": ["lane/shapes.ttl"],
         "depends_on": ["core"],
-        "pins": {"core": "2.3.0"},
         "decisions": ["the decision of 2026-10-19", "the decision of 2026-10-22", "the decision of 2026-10-25", "the decision of 2026-10-26"],
     },
     "market-data": {
@@ -226,7 +217,6 @@ MODULES = {
         "parts": ["market-data/vocabulary.ttl", "market-data/market-data.ttl"],
         "shapes": ["market-data/shapes.ttl"],
         "depends_on": ["kpi"],
-        "pins": {"kpi": "1.2.0"},
         "decisions": ["the decision of 2026-10-18", "the decision of 2026-10-19", "the decision of 2026-10-20", "the decision of 2026-10-22", "the decision of 2026-10-25",
                       "the decision of 2026-10-25", "the decision of 2026-10-25"],
     },
@@ -241,7 +231,6 @@ MODULES = {
         "parts": ["technical-graph/vocabulary.ttl"],
         "shapes": ["technical-graph/shapes.ttl"],
         "depends_on": ["data-product", "kpi", "system"],
-        "pins": {"data-product": "1.2.0", "kpi": "1.3.0", "system": "1.5.0"},
         "decisions": ["the decision of 2026-11-02"],
     },
     # The integration package's first release, a major the subject matter expert approved with the release plan
@@ -276,15 +265,12 @@ MODULES = {
         "own_shapes": 3,  # all three shape files are the package's own; the package's shapes.ttl holds them merged
         "depends_on": ["core", "organization", "kpi", "data-product", "value-stream", "system", "lane", "market-data",
                        "party"],
-        "pins": {"core": "2.4.0", "organization": "2.2.0", "kpi": "1.2.0", "data-product": "1.2.0", "value-stream": "1.2.0",
-                 "system": "1.5.0", "lane": "1.1.0", "market-data": "1.1.0", "party": "2.1.0"},
         "decisions": ["the decision of 2026-10-19", "the decision of 2026-10-19", "the decision of 2026-10-19", "the decision of 2026-10-22", "the decision of 2026-10-23",
                       "the decision of 2026-10-23", "the decision of 2026-10-25", "the decision of 2026-10-25", "the decision of 2026-10-25", "the decision of 2026-10-26",
                       "the decision of 2026-10-27"],
     },
-    # Added by the share release's cut from files read from outside the repository (the decision of 2026-11-02): its first
-    # release, a major the subject matter expert approved. Each model's two graphs ship as they are (graphs); augment
-    # lists the outside files with their SHA-256.
+    # Its first release, a major the subject matter expert approved (the decision of 2026-11-02). Each model's two
+    # graphs ship as they are (graphs); augment lists the two files the models were built from, each with its SHA-256.
     "logical-model": {
         "title": "MPC Logical Model Module",
         "description": "Logical data models exported from ER Studio Data Architect, each kept as two graphs: ER Studio's export as it is, in ER Studio's own namespace, and a layer of annotations that links its entities to the party, system and data-product modules. This package holds the module's vocabulary; each model's two graphs ship beside it.",
@@ -300,38 +286,23 @@ MODULES = {
 }
 
 
-RELEASED = {"core": "1.0.0"}  # released modules this builder does not build
-# The share release rebuilds every newest package so that it names only the newest versions (the decision of 2026-10-31,
-# "All links go through the latest release"). With EPM_SHARE_RELEASE set, a module's pins are ignored and core is
-# its newest package on disk; on main nothing changes.
-# A release tree carries release.json at its root (the rebuild writes it), so its readers need no environment variable.
-ROOT = os.path.normpath(os.path.join(ONTOLOGY, "..", ".."))
+# Every newest package names only the newest versions (the decision of 2026-10-31, "All links go through the latest
+# release"): a module is built against the current version of each module it requires, and against core's newest
+# package on disk.
 
 
-def share_release(root=ROOT):
-    """Whether this tree is a share release: EPM_SHARE_RELEASE is set, or release.json sits at the tree's root."""
-    return bool(os.environ.get("EPM_SHARE_RELEASE")) or os.path.isfile(os.path.join(root, "release.json"))
-
-
-SHARE_RELEASE = share_release()
-
-
-def recorded_where(path, release_mode=None):
-    """The path a manifest names for where an approval is recorded, or None to leave the field out. In a share release
-    the build's answers files do not ship and the sources name a subject matter expert's review comments in their place,
-    which is a sentence, not a path: the field then comes out, as it does from the history folder's manifests (the
+def recorded_where(path):
+    """The path a manifest names for where an approval is recorded, or None to leave the field out. Most sources name
+    a subject matter expert's review comments, which is a sentence, not a path: the field then comes out (the
     decision of 2026-10-31, amendment: approval.file comes out). A file that is in the tree is always named."""
-    release_mode = SHARE_RELEASE if release_mode is None else release_mode
-    return path if not release_mode or os.path.isfile(os.path.join(ONTOLOGY, path)) else None
+    return path if os.path.isfile(os.path.join(ONTOLOGY, path)) else None
 
 
 def package_folder(module, version):
-    """The released package's folder, in releases/<module>/<version>/ or, in the share release, in its history
-    folder releases/previous/<module>/<version>/; None when the package did not ship."""
-    folders = [os.path.join(ONTOLOGY, "releases", module, version)]
-    if SHARE_RELEASE:  # the history folder exists only in the share release; on main a package is where it was written
-        folders.append(os.path.join(ONTOLOGY, "releases", "previous", module, version))
-    for folder in folders:
+    """The released package's folder: releases/<module>/<version>/ for a newest package, or the history folder
+    releases/previous/<module>/<version>/ for the one before it. None when the tree does not hold the package."""
+    for folder in (os.path.join(ONTOLOGY, "releases", module, version),
+                   os.path.join(ONTOLOGY, "releases", "previous", module, version)):
         if os.path.isfile(os.path.join(folder, "manifest.json")):
             return folder
     return None
@@ -346,18 +317,16 @@ def label(m):
 
 
 def dependencies(name):
-    """Each dependency with the version this package is built against: a released version, or the
-    dependency's own current candidate, so a candidate never names a release that does not exist."""
-    pins = {} if SHARE_RELEASE else MODULES[name].get("pins", {})
-    released = {"core": newest_on_disk("core")} if SHARE_RELEASE else RELEASED
-    return {d: pins.get(d) or released.get(d) or label(MODULES[d]) for d in MODULES[name]["depends_on"]}
+    """Each dependency with the version this package is built against: core's newest package on disk, and the
+    current version of every other module, so a package never names a release the tree does not hold."""
+    return {d: newest_on_disk("core") if d == "core" else label(MODULES[d]) for d in MODULES[name]["depends_on"]}
 
 
 def resolve(path):
-    """A path under releases/<module>/<version>/ names the newest package instead in release mode, where the
-    pinned version may not have shipped (the share release moves pins to the newest set)."""
+    """A path under releases/<module>/<version>/ names that module's newest package instead: the tree may not
+    hold the version the path was written with."""
     m = re.match(r"releases/([a-z-]+)/(\d+\.\d+\.\d+)/(.*)", path)
-    if SHARE_RELEASE and m and m.group(1) in MODULES:
+    if m and m.group(1) in MODULES:
         return f"releases/{m.group(1)}/{label(MODULES[m.group(1)])}/{m.group(3)}"
     return path
 
@@ -403,19 +372,18 @@ def released_requires(dep, version):
 
 
 def current_requires(dep, version):
-    """What a package of the newest set requires in the share release: the builder's own table, with every pin
-    moved to the newest set (dependencies), and nothing for core, which depends on no module. Read in place of
-    the manifests there, because the export rebuilds the newest packages in some order and a manifest not yet
-    rebuilt still names the old pins (such as system 1.2.0, which the release does not ship)."""
+    """What a package of the newest set requires: the builder's own table (dependencies), and nothing for core,
+    which depends on no module. Read in place of the manifests, because the newest packages are rebuilt in some
+    order and a manifest not yet rebuilt may still name a version the tree does not hold."""
     return dependencies(dep) if dep in MODULES else {}
 
 
 def released_closure(name):
     """Every released package this module's check loads: its dependencies at the versions it names,
-    and theirs (from each selected release's manifest), down to core. Where two paths name different
-    versions of one module, the highest is loaded, so a graph never holds two releases of one module.
-    In the share release the requirements come from the builder's table (current_requires), never a manifest."""
-    return closure(dependencies(name), current_requires if SHARE_RELEASE else released_requires)
+    and theirs, down to core. Where two paths name different versions of one module, the highest is loaded,
+    so a graph never holds two releases of one module. The requirements come from the builder's table
+    (current_requires), never a manifest."""
+    return closure(dependencies(name), current_requires)
 
 
 def closure(depends_on, requires=None):
@@ -452,7 +420,7 @@ def validation_graph(name, g):
 
 def check(name, g):
     """The module's shapes over the module, with the released packages it depends on loaded: core for
-    the concepts a module refers to, the pinned organization release for ref-mpc, and the released
+    the concepts a module refers to, the organization release for ref-mpc, and the released
     data-product and kpi packages for value-stream and market-data."""
     # advanced=True: SHACL-AF targets such as sh:SPARQLTarget run, as in every other check (the decision of 2026-10-23).
     data = validation_graph(name, g)
@@ -510,8 +478,7 @@ def package(name, g):
     with open(os.path.join(ONTOLOGY, "releases", name, "CHANGELOG.md")) as f:
         files["CHANGELOG.md"] = f.read()
     # "graphs": files the package carries as they are, each in its own graph beside <name>.ttl, such as a logical model's
-    # export and its annotation layer (the decision of 2026-11-02). No module in main has any; the share release's cut adds the
-    # logical-model module with them (scripts/share_release/augment.py).
+    # export and its annotation layer (the decision of 2026-11-02). Only the logical-model module has any.
     for path in m.get("graphs", []):
         with open(os.path.join(ONTOLOGY, path), encoding="utf-8") as f:
             files[os.path.basename(path)] = f.read()
@@ -521,9 +488,9 @@ def package(name, g):
         "depends_on": dependencies(name), "decisions": m["decisions"], "triples": len(g),
         "approved_by": None if m["stage"] else {"who": m.get("approver", "The decision owner"),
                                                  **({"recorded_in": where} if (where := recorded_where(m["approval"][0])) else {}),
-                                                 **({"words": m["approval"][1]} if SHARE_RELEASE else {})},
-        # "augment": the files from outside the repository the package was built from, each with its SHA-256 (the cut's
-        # --augment folder, the decision of 2026-11-02); only a module the share release's cut adds has it.
+                                                 "words": m["approval"][1]},
+        # "augment": the files a module's models were built from, each with its SHA-256 (the decision of 2026-11-02);
+        # only the logical-model module has it.
         **({"augment": m["augment"]} if m.get("augment") else {}),
         "files": {n: hashlib.sha256(t.encode()).hexdigest() for n, t in sorted(files.items())}}, indent=2) + "\n"
     return files

@@ -329,7 +329,7 @@ class Secrets(unittest.TestCase):
                 self.assertNotEqual(credentials(canary), [])
 
     def test_prose_and_placeholders_are_not_credentials(self):
-        for text in ("the password is in ~/epm-lpg/run.env", "--password <password>", "NEO4J_PASSWORD=%s",
+        for text in ("the password is in <settings folder>/run.env", "--password <password>", "NEO4J_PASSWORD=%s",
                      "token: see the env file", "a skill-version"):
             with self.subTest(text=text):
                 self.assertEqual(credentials(text), [])
