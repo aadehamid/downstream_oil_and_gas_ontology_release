@@ -63,33 +63,74 @@ def template_text(question: str) -> str:
         return f.read()
 
 
-def code_only(text: str, keep_names: bool = False) -> str:
+def code_only(text: str) -> str:
     """The text with comments, quoted strings, backtick names and placeholders blanked, so a word inside one of
-    them is never read as a clause. `keep_names` leaves the backtick names in."""
-    parts = [r"/\*.*?\*/", r"//[^\n]*", r"'(?:\\.|[^'\\])*'", r'"(?:\\.|[^"\\])*"', r"\{\{.*?\}\}"]
-    if not keep_names:
-        parts.append(r"`(?:``|[^`])*`")
-    return re.sub("|".join(parts), " ", text, flags=re.S)
+    them is never read as a parameter."""
+    pattern = re.compile(r"/\*.*?\*/|//[^\n]*|'(?:\\.|[^'\\])*'|\"(?:\\.|[^\"\\])*\"|`(?:``|[^`])*`|\{\{.*?\}\}",
+                         re.S)
+    return pattern.sub(" ", text)
 
 
-# The two subquery forms the templates use: CALL { ... } and CALL (a, b) { ... }. Nothing else may follow CALL.
-SUBQUERY = re.compile(r"\s*(\(\s*(\*|[A-Za-z_]\w*(\s*,\s*[A-Za-z_]\w*)*)?\s*\)\s*)?\{")
+TOKEN = re.compile(r"""
+      (?P<skip>\s+|/\*.*?\*/|//[^\n]*)                   # white space and comments say nothing
+    | (?P<text>'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*")      # a quoted string
+    | (?P<name>`(?:``|[^`])*`)                           # a name in backticks
+    | (?P<placeholder>\{\{.*?\}\})                       # a role placeholder
+    | (?P<param>\$[A-Za-z0-9_]+)                         # a parameter
+    | (?P<word>[A-Za-z0-9_]+)                            # a keyword, a variable or a number
+    | (?P<mark>.)                                        # any other single character
+""", re.S | re.X)
+
+
+def tokens(text: str) -> list[tuple[str, str]]:
+    """The text as (kind, text) pairs, without white space and comments. A string, a backtick name, a placeholder
+    and a parameter are each one token, so nothing inside one is ever read as a keyword."""
+    return [(match.lastgroup, match.group()) for match in TOKEN.finditer(text) if match.lastgroup != "skip"]
+
+
+def _is_subquery(found: list[tuple[str, str]], at: int) -> bool:
+    """True when the tokens from `at` open a subquery: `{`, or an import list in parentheses and then `{`.
+    The import list is empty, `*`, or variable names with commas between them."""
+    def mark(i, char):
+        return i < len(found) and found[i] == ("mark", char)
+
+    if mark(at, "{"):
+        return True
+    if not mark(at, "("):
+        return False
+    at += 1
+    if mark(at, "*"):
+        at += 1
+    else:
+        while at < len(found) and found[at][0] == "word":
+            at += 1
+            if not mark(at, ","):
+                break
+            if at + 1 >= len(found) or found[at + 1][0] != "word":
+                return False                   # a comma with no name after it
+            at += 1
+    return mark(at, ")") and mark(at + 1, "{")
 
 
 def refuse_writes(text: str) -> None:
-    code = code_only(text)
-    for word in WRITE_WORDS:
-        if re.search(rf"(?<![A-Za-z0-9_$.]){word}(?![A-Za-z0-9_])", code, re.I):
-            raise RenderError(f"refused: the template holds the write clause {word}; questions only read")
-    # An allow list, read with the backtick names still in place: a procedure whose name is written in backticks
-    # must not pass as a subquery.
-    named = code_only(text, keep_names=True)
-    for call in re.finditer(r"(?<![A-Za-z0-9_$.`])CALL(?![A-Za-z0-9_`])", named, re.I):
-        if not SUBQUERY.match(named, call.end()):
+    found = tokens(text)
+    for i, (kind, word) in enumerate(found):
+        # A word after a dot is a property name, such as n.set. Everywhere else a bare word can be a keyword.
+        if kind != "word" or (i and found[i - 1] == ("mark", ".")):
+            continue
+        keyword = word.upper()
+        if keyword in WRITE_WORDS:
+            raise RenderError(f"refused: the template holds the write clause {keyword}; questions only read")
+        # An allow list: after CALL only a subquery may follow. Any other form is a procedure call, and a
+        # procedure can write.
+        if keyword == "CALL" and not _is_subquery(found, i + 1):
             raise RenderError("refused: the template calls a procedure; after CALL only a subquery may follow, "
-                              "as CALL { or CALL (...) {")
-    if re.search(r"\bIN\s+(\w+\s+){0,2}TRANSACTIONS\b", code, re.I):
-        raise RenderError("refused: the template opens its own transactions; a question runs in one read transaction")
+                              "as CALL { or CALL (variables) {")
+        if keyword == "IN":
+            following = [w.upper() for k, w in found[i + 1:i + 4] if k == "word"]
+            if "TRANSACTIONS" in following:
+                raise RenderError("refused: the template opens its own transactions; a question runs in one "
+                                  "read transaction")
 
 
 def _header(text: str):

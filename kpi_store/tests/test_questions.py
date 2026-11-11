@@ -339,8 +339,8 @@ def test_render_refuses_a_required_role_with_no_value():
 
 @pytest.mark.parametrize("clause, named", [
     ("CREATE (:X)", "CREATE"), ("MERGE (:X)", "MERGE"), ("MATCH (n) SET n.x = 1", "SET"),
-    ("MATCH (n) set n.x = 1", "SET"), ("MATCH (n) DELETE n", "DELETE"), ("MATCH (n) DETACH DELETE n", "DELETE"),
-    ("MATCH (n) REMOVE n.x", "REMOVE"), ("DROP DATABASE x", "DROP"), ("FOREACH (x IN [1] | CREATE (:X))", "CREATE"),
+    ("MATCH (n) set n.x = 1", "SET"), ("MATCH (n) DELETE n", "DELETE"), ("MATCH (n) DETACH DELETE n", "DETACH"),
+    ("MATCH (n) REMOVE n.x", "REMOVE"), ("DROP DATABASE x", "DROP"), ("FOREACH (x IN [1] | CREATE (:X))", "FOREACH"),
     ("LOAD CSV FROM 'file:///x' AS row RETURN row", "LOAD"), ("INSERT (:X)", "INSERT"),
     ("CALL db.createLabel('X')", "calls a procedure"), ("CALL apoc.periodic.iterate('a', 'b', {})", "calls a procedure"),
     ("CALL `db.createLabel`('X')", "calls a procedure"), ("CALL `db`.`createLabel`('X')", "calls a procedure"),
@@ -348,6 +348,15 @@ def test_render_refuses_a_required_role_with_no_value():
     ("CALL db.labels() YIELD label RETURN label", "calls a procedure"), ("CALL db.labels", "calls a procedure"),
     ("CALL `p`() { MATCH (n) RETURN n }", "calls a procedure"), ("OPTIONAL CALL db.x()", "calls a procedure"),
     ("CALL (name) db.x()", "calls a procedure"), ("CALL /* a note */ db.x()", "calls a procedure"),
+    ("CALL`dbms`.`components`()", "calls a procedure"), ("CALL`db`.`createLabel`('X')", "calls a procedure"),
+    ("call`db.x`()", "calls a procedure"), ("CALL/**/db.x()", "calls a procedure"),
+    ("CALL/**/`db`.`x`()", "calls a procedure"), ("MATCH (n) WHERE true CALL\tdb.x()", "calls a procedure"),
+    # What sits in the parentheses of a subquery is an import list: nothing, a star, or variable names.
+    ("CALL ('x') { RETURN 1 AS one }", "calls a procedure"), ("CALL (1 + 1) { RETURN 1 AS one }", "calls a procedure"),
+    ("CALL (name.size) { RETURN 1 AS one }", "calls a procedure"), ("CALL (name,) { RETURN 1 AS one }", "calls a procedure"),
+    ("CALL (`name`) { RETURN 1 AS one }", "calls a procedure"), ("CALL (*, name) { RETURN 1 AS one }", "calls a procedure"),
+    ("CALL (name) (name) { RETURN 1 AS one }", "calls a procedure"), ("CALL {{label:table.node}}", "calls a procedure"),
+    ("CALL", "calls a procedure"), ("CALL (name", "calls a procedure"),
     ("CALL () { MATCH (n) RETURN n } IN TRANSACTIONS", "opens its own transactions"),
     ("CALL () { MATCH (n) RETURN n } IN 2 CONCURRENT TRANSACTIONS", "opens its own transactions"),
 ])
@@ -369,9 +378,18 @@ def test_a_write_word_inside_a_comment_a_string_or_a_name_is_not_a_clause():
     "CALL (name) { RETURN size(name) AS found }", "call  \n ( name , name2 )\n{ RETURN 1 AS found }",
     "CALL (*) { RETURN 1 AS found }", "CALL // a note\n () { RETURN 1 AS found }",
     "WITH 'CALL db.x()' AS `CALL db.y()` RETURN 1 AS found",
+    "CALL(){ RETURN 1 AS found }", "CALL(name,name2){ RETURN 1 AS found }", "CALL/**/{ RETURN 1 AS found }",
+    "CALL ( /* none */ ) { RETURN 1 AS found }",
+    # The letters alone are not the keyword: inside a name, as part of a longer word, or as a property.
+    "MATCH (n:`CALL`) RETURN count(n) AS found", "WITH name AS recall, name AS callsign RETURN 1 AS found",
+    "MATCH (n) WHERE n.callsign = 'x' OR n.call = 1 OR n.`CALL` = 2 RETURN count(n) AS found",
+    "WITH $call AS x, $CALL AS y RETURN 1 AS found",
 ])
 def test_the_two_subquery_forms_are_allowed(subquery):
     text = SMALL.replace("RETURN name\n", f"WITH name, name AS name2 {subquery}\nRETURN name\n")
+    if "$call" in subquery:
+        text = text.replace("// param: limit", "// param: call | default 1 | x\n// param: CALL | default 1 | x\n"
+                                              "// param: limit")
     assert T.render_text("small", text, confirmed(), schemas(), {"system": "MIPS"}, GRAPHS).query.count("found") == 1
 
 
