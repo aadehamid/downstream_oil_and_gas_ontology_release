@@ -563,7 +563,7 @@ The loads are done. Keep `C:\kpi-store-local` and the release folder. The releas
 
 ## What the runner does, step by step
 
-The runner is `kpi_store/runner.py`. It runs twelve steps in order and stops at the first one that fails. Each step prints one line and writes its result to the run's folder, under `steps`. You can run the chain by hand, one step at a time, with `--only` and the step's name. A step run that way continues the newest run.
+The runner is `kpi_store/runner.py`. It runs twelve steps in order and stops at the first one that fails. Each step prints one line and writes its result to the run's folder, under `steps`. You can run the chain by hand, one step at a time, with `--only` and the step's name. A step run that way continues the newest run. Its last line names the steps it left out. Only a run of the whole chain says `every step passed`.
 
 The commands below ran after the third run, so each finds its work done.
 
@@ -580,7 +580,7 @@ py -m kpi_store.runner --only cut
 ```text expect
 run <run ID>: cut
 cut: no report waits to be cut
-every step passed
+the steps that ran passed; left out: <the other steps> (not run, so not checked)
 ```
 
 ### `check`
@@ -596,7 +596,7 @@ py -m kpi_store.runner --only check
 ```text expect
 run <run ID>: check
 check: all checks passed
-every step passed
+the steps that ran passed; left out: <the other steps> (not run, so not checked)
 ```
 
 ### `zip`
@@ -612,7 +612,7 @@ py -m kpi_store.runner --only zip
 ```text expect
 run <run ID>: zip
 zip: kpi-store-1.1.zip: <count> files, SHA-256 <checksum>
-every step passed
+the steps that ran passed; left out: <the other steps> (not run, so not checked)
 ```
 
 ### `volume`
@@ -628,7 +628,7 @@ py -m kpi_store.runner --only volume
 ```text expect
 run <run ID>: volume
 volume: <the volume> is there
-every step passed
+the steps that ran passed; left out: <the other steps> (not run, so not checked)
 ```
 
 ### `upload`
@@ -644,7 +644,7 @@ py -m kpi_store.runner --only upload
 ```text expect
 run <run ID>: upload
 upload: kpi-store-1.1.zip and kpi_store.toml are in <the path in the volume>
-every step passed
+the steps that ran passed; left out: <the other steps> (not run, so not checked)
 ```
 
 ### `notebook`
@@ -672,7 +672,7 @@ py -m kpi_store.runner --only notebook
 ```text expect
 run <run ID>: notebook
 notebook: notebook run <number> current: <count> triples in <catalog>.<schema>.epm_triples, hash <hash>
-every step passed
+the steps that ran passed; left out: <the other steps> (not run, so not checked)
 ```
 
 ### `report`
@@ -686,7 +686,7 @@ py -m kpi_store.runner --only report
 ```text expect
 run <run ID>: report
 report: no row blocks; <the marker and the technical graph>
-every step passed
+the steps that ran passed; left out: <the other steps> (not run, so not checked)
 ```
 
 ### `fuseki`
@@ -702,7 +702,7 @@ py -m kpi_store.runner --only fuseki
 ```text expect
 run <run ID>: fuseki
 fuseki: current, <what Fuseki holds>
-every step passed
+the steps that ran passed; left out: <the other steps> (not run, so not checked)
 ```
 
 ### `neo4j`
@@ -718,7 +718,7 @@ py -m kpi_store.runner --only neo4j
 ```text expect
 run <run ID>: neo4j
 neo4j: current, <what the local Neo4j holds>
-every step passed
+the steps that ran passed; left out: <the other steps> (not run, so not checked)
 ```
 
 ### `enterprise`
@@ -734,7 +734,7 @@ py -m kpi_store.runner --only enterprise
 ```text expect
 run <run ID>: enterprise
 enterprise: current, <what Enterprise holds>
-every step passed
+the steps that ran passed; left out: <the other steps> (not run, so not checked)
 ```
 
 ### `sync`
@@ -749,7 +749,7 @@ py -m kpi_store.runner --only sync
 run <run ID>: sync
 ...
 sync: all <count> lines read current
-every step passed
+the steps that ran passed; left out: <the other steps> (not run, so not checked)
 ```
 
 ### `summary`
@@ -765,7 +765,7 @@ run <run ID>: summary
 summary of run <run ID>:
 ...
 summary: the run's files are in <the folder of the run>
-every step passed
+the steps that ran passed; left out: <the other steps> (not run, so not checked)
 ```
 
 ## When a step fails
@@ -774,12 +774,12 @@ Each run ends with one of four exit codes. The last line of the run says which c
 
 | Exit code | Last line | Meaning | What to do |
 |---|---|---|---|
-| 0 | `every step passed` | Every step ran and passed. | Nothing. |
+| 0 | `every step passed`, or `the steps that ran passed` and the steps left out | Every step that ran passed. | Nothing. |
 | 1 | The step's name and `FAILED`, with the reason | A step failed. No later step ran. | Fix what the line names, then go on from that step. |
 | 2 | `runner:` and the reason | A settings file is wrong or missing. Nothing ran. | Correct the file the line names. Run the setup check. |
 | 3 | The step's name and `STOPPED. Next step:` | The run waits for you. | Do what the line says, then run the same command again. |
 
-To go on from the step that failed, name it after `--from`. The run then continues the newest run and repeats nothing before that step. For example, when the Fuseki load failed:
+To go on from the step that failed, name it after `--from`. The run then continues the newest run and repeats nothing before that step. Its last line names the steps before it as left out. For example, when the Fuseki load failed:
 
 ```powershell run=first-run
 py -m kpi_store.runner --from fuseki
@@ -794,7 +794,7 @@ enterprise: current, <what Enterprise holds>
 sync: all <count> lines read current
 summary of run <run ID>:
 ...
-every step passed
+the steps that ran passed; left out: <the other steps> (not run, so not checked)
 ```
 
 The steps, in order, are `cut`, `check`, `zip`, `volume`, `upload`, `notebook`, `report`, `fuseki`, `neo4j`, `enterprise`, `sync` and `summary`. Each step's result is a file in `C:\kpi-store-local\runs`, in the run's folder, under `steps`.

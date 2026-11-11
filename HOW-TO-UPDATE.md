@@ -94,7 +94,7 @@ The steps are the runbook's, from "The first run" to "The sync check". Two thing
    py -m kpi_store.runner --from enterprise --replace-enterprise
    ```
 
-5. Read the last line. Expect `every step passed`.
+5. Read the last line. Expect `the steps that ran passed`, with the steps before `enterprise` named as left out.
 
 The second difference is the version. A second correction to the same module counts up: `1.2.1-correction.2`.
 

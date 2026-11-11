@@ -464,7 +464,7 @@ every step passed</code></pre></li></ol>
 <p>The end of each line names the technical graph, and that part may say <code>loaded</code>. The notebook builds the technical graph again from the workspace on every run. When the workspace's objects, lineage or jobs changed since the last run, the graph differs and each store loads it again. The runs of this guide are themselves jobs in the workspace, so this happened in the test.</p>
 <p>The loads are done. Keep <code>C:\kpi-store-local</code> and the release folder. The release folder now holds the correction, and every later change starts from it.</p>
 <h2 id="what-the-runner-does-step-by-step">What the runner does, step by step<a class="hl" href="#what-the-runner-does-step-by-step" aria-label="Link to this section">#</a></h2>
-<p>The runner is <code>kpi_store/runner.py</code>. It runs twelve steps in order and stops at the first one that fails. Each step prints one line and writes its result to the run's folder, under <code>steps</code>. You can run the chain by hand, one step at a time, with <code>--only</code> and the step's name. A step run that way continues the newest run.</p>
+<p>The runner is <code>kpi_store/runner.py</code>. It runs twelve steps in order and stops at the first one that fails. Each step prints one line and writes its result to the run's folder, under <code>steps</code>. You can run the chain by hand, one step at a time, with <code>--only</code> and the step's name. A step run that way continues the newest run. Its last line names the steps it left out. Only a run of the whole chain says <code>every step passed</code>.</p>
 <p>The commands below ran after the third run, so each finds its work done.</p>
 <h3 id="cut"><code>cut</code><a class="hl" href="#cut" aria-label="Link to this section">#</a></h3>
 <p>It calls the cut tool, <code>kpi_store/cut.py</code>, when a cleared report waits in <code>runs\pending</code>. The cut tool reads the report and your decisions, shows its plan, and asks you to approve. It then changes the tables of the <code>data-product</code> module, rebuilds the module, and writes the correction version of it and of each module that requires it. It works in a temporary copy and changes the release folder only when every step has passed.</p>
@@ -472,35 +472,35 @@ every step passed</code></pre></li></ol>
 <pre><code class="lang-powershell">py -m kpi_store.runner --only cut</code></pre>
 <pre><code class="lang-text">run &lt;run ID&gt;: cut
 cut: no report waits to be cut
-every step passed</code></pre>
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
 <h3 id="check"><code>check</code><a class="hl" href="#check" aria-label="Link to this section">#</a></h3>
 <p>It runs <code>scripts/check.sh</code> with bash. The script rebuilds every package and compares it with the one on disk. It runs the competency questions and every test. It checks that the generated pages equal their sources and that every code block of the documents works.</p>
 <p>It reads the release folder. It writes only <code>check.log</code> in the run's folder. It takes about 10 minutes.</p>
 <pre><code class="lang-powershell">py -m kpi_store.runner --only check</code></pre>
 <pre><code class="lang-text">run &lt;run ID&gt;: check
 check: all checks passed
-every step passed</code></pre>
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
 <h3 id="zip"><code>zip</code><a class="hl" href="#zip" aria-label="Link to this section">#</a></h3>
 <p>It packs the release folder into one zip, in <code>runner.py</code> itself. The same files always give the same zip: the entries are sorted, each has one fixed date, and text files get the same line ends. It then copies your <code>kpi_store.toml</code> and writes the zip's SHA-256 into the copy.</p>
 <p>It reads the release folder and <code>C:\kpi-store-local\kpi_store.toml</code>. It writes the zip and the settings copy to the run's folder, under <code>upload</code>. It stops when a settings file in the release folder holds a password.</p>
 <pre><code class="lang-powershell">py -m kpi_store.runner --only zip</code></pre>
 <pre><code class="lang-text">run &lt;run ID&gt;: zip
 zip: kpi-store-1.1.zip: &lt;count&gt; files, SHA-256 &lt;checksum&gt;
-every step passed</code></pre>
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
 <h3 id="volume"><code>volume</code><a class="hl" href="#volume" aria-label="Link to this section">#</a></h3>
 <p>It asks Databricks, through the Databricks command line, whether the schema and the volume exist. It creates each one that is missing.</p>
 <p>It reads <code>write_catalog</code>, <code>write_schema</code> and <code>volume</code> from <code>kpi_store.toml</code>. It writes nothing when both exist.</p>
 <pre><code class="lang-powershell">py -m kpi_store.runner --only volume</code></pre>
 <pre><code class="lang-text">run &lt;run ID&gt;: volume
 volume: &lt;the volume&gt; is there
-every step passed</code></pre>
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
 <h3 id="upload"><code>upload</code><a class="hl" href="#upload" aria-label="Link to this section">#</a></h3>
 <p>It copies the zip, then the settings copy, into the volume with the Databricks command line. The zip goes first, so the settings never name a zip that is not there.</p>
 <p>It reads the two files of the <code>zip</code> step. It writes them to the volume and replaces the ones of the run before.</p>
 <pre><code class="lang-powershell">py -m kpi_store.runner --only upload</code></pre>
 <pre><code class="lang-text">run &lt;run ID&gt;: upload
 upload: kpi-store-1.1.zip and kpi_store.toml are in &lt;the path in the volume&gt;
-every step passed</code></pre>
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
 <h3 id="notebook"><code>notebook</code><a class="hl" href="#notebook" aria-label="Link to this section">#</a></h3>
 <p>It imports <code>kpi_store/notebook/kpi_store_load.py</code> into the workspace folder as the notebook <code>kpi_store_load</code>. It submits the notebook as a one-time job run on serverless compute, waits for it, and reads its result.</p>
 <p>The notebook has five cells.</p>
@@ -510,41 +510,41 @@ every step passed</code></pre>
 <pre><code class="lang-powershell">py -m kpi_store.runner --only notebook</code></pre>
 <pre><code class="lang-text">run &lt;run ID&gt;: notebook
 notebook: notebook run &lt;number&gt; current: &lt;count&gt; triples in &lt;catalog&gt;.&lt;schema&gt;.epm_triples, hash &lt;hash&gt;
-every step passed</code></pre>
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
 <h3 id="report"><code>report</code><a class="hl" href="#report" aria-label="Link to this section">#</a></h3>
 <p>When the notebook stopped on a report, this step fetches the report from the volume into <code>runs\pending</code>. It prints the rows that block, writes the copy for you to clear, and stops the run. When the notebook loaded, it fetches <code>tech-graph.nq</code> into <code>runs\tech-graph</code> instead, and checks that the file is the one the notebook loaded.</p>
 <pre><code class="lang-powershell">py -m kpi_store.runner --only report</code></pre>
 <pre><code class="lang-text">run &lt;run ID&gt;: report
 report: no row blocks; &lt;the marker and the technical graph&gt;
-every step passed</code></pre>
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
 <h3 id="fuseki"><code>fuseki</code><a class="hl" href="#fuseki" aria-label="Link to this section">#</a></h3>
 <p>It calls <code>kpi_store/load_fuseki.py</code>. That code checks Java and the jar's checksum. It uses the Fuseki that answers at the address of your local settings, or starts one from the jar. It builds the dataset that a current store holds and compares its RDFC-1.0 hash with the store's. When the hashes are equal it writes nothing. Otherwise it drops the graphs of earlier versions, replaces every graph, reads all of it back and compares again. Then it loads the technical graph.</p>
 <p>It reads the release folder and <code>runs\tech-graph\tech-graph.nq</code>. It writes to the Fuseki dataset, which is kept in <code>C:\kpi-store-local\fuseki-db</code>.</p>
 <pre><code class="lang-powershell">py -m kpi_store.runner --only fuseki</code></pre>
 <pre><code class="lang-text">run &lt;run ID&gt;: fuseki
 fuseki: current, &lt;what Fuseki holds&gt;
-every step passed</code></pre>
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
 <h3 id="neo4j"><code>neo4j</code><a class="hl" href="#neo4j" aria-label="Link to this section">#</a></h3>
 <p>It calls <code>kpi_store/load_neo4j.py</code>, which runs the <code>ontology-to-lpg</code> skill's steps. It checks the projection's rules, validates the release with SHACL, and runs the reasoner with ROBOT. <strong>It empties the local database.</strong> It sends the triples in the request, validates the graph with SHACL in the database, and proves each compiled constraint with a failing case. It exports the graph again and compares it with what it loaded. It loads twice and compares the two graph hashes. Last, it loads the logical models and the technical graph, and writes the marker.</p>
 <p>It reads the release folder and <code>robot.jar</code>. It writes to the local database, and its working files and report to <code>C:\kpi-store-local\lpg-out</code>. When the database already holds this release, it writes nothing.</p>
 <pre><code class="lang-powershell">py -m kpi_store.runner --only neo4j</code></pre>
 <pre><code class="lang-text">run &lt;run ID&gt;: neo4j
 neo4j: current, &lt;what the local Neo4j holds&gt;
-every step passed</code></pre>
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
 <h3 id="enterprise"><code>enterprise</code><a class="hl" href="#enterprise" aria-label="Link to this section">#</a></h3>
 <p>It calls <code>kpi_store/copy_enterprise.py</code>. That code checks that the local graph is the one the load verified. It reads the local graph and writes it to <code>businessprocessarchitecturegraph</code> with plain Cypher, because the Enterprise server has no plugin. It then compares the copy's graph hash with the local graph's, checks the counts and each release tag, and writes the marker last.</p>
 <p>It reads the local database and the load's report. It writes only to the one Enterprise database. When that database already holds this release, it writes nothing.</p>
 <pre><code class="lang-powershell">py -m kpi_store.runner --only enterprise</code></pre>
 <pre><code class="lang-text">run &lt;run ID&gt;: enterprise
 enterprise: current, &lt;what Enterprise holds&gt;
-every step passed</code></pre>
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
 <h3 id="sync"><code>sync</code><a class="hl" href="#sync" aria-label="Link to this section">#</a></h3>
 <p>It calls <code>kpi_store/sync_check.py</code>, which "The sync check" above describes. It reads the four stores and writes nothing to them.</p>
 <pre><code class="lang-powershell">py -m kpi_store.runner --only sync</code></pre>
 <pre><code class="lang-text">run &lt;run ID&gt;: sync
 ...
 sync: all &lt;count&gt; lines read current
-every step passed</code></pre>
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
 <h3 id="summary"><code>summary</code><a class="hl" href="#summary" aria-label="Link to this section">#</a></h3>
 <p>It prints each step's result in this run, and writes <code>summary.json</code> in the run's folder.</p>
 <pre><code class="lang-powershell">py -m kpi_store.runner --only summary</code></pre>
@@ -552,11 +552,11 @@ every step passed</code></pre>
 summary of run &lt;run ID&gt;:
 ...
 summary: the run's files are in &lt;the folder of the run&gt;
-every step passed</code></pre>
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
 <h2 id="when-a-step-fails">When a step fails<a class="hl" href="#when-a-step-fails" aria-label="Link to this section">#</a></h2>
 <p>Each run ends with one of four exit codes. The last line of the run says which case you are in.</p>
-<div class="tblwrap"><table><thead><tr><th class="num">Exit code</th><th>Last line</th><th>Meaning</th><th>What to do</th></tr></thead><tbody><tr><td class="num">0</td><td><code>every step passed</code></td><td>Every step ran and passed.</td><td>Nothing.</td></tr><tr><td class="num">1</td><td>The step's name and <code>FAILED</code>, with the reason</td><td>A step failed. No later step ran.</td><td>Fix what the line names, then go on from that step.</td></tr><tr><td class="num">2</td><td><code>runner:</code> and the reason</td><td>A settings file is wrong or missing. Nothing ran.</td><td>Correct the file the line names. Run the setup check.</td></tr><tr><td class="num">3</td><td>The step's name and <code>STOPPED. Next step:</code></td><td>The run waits for you.</td><td>Do what the line says, then run the same command again.</td></tr></tbody></table></div>
-<p>To go on from the step that failed, name it after <code>--from</code>. The run then continues the newest run and repeats nothing before that step. For example, when the Fuseki load failed:</p>
+<div class="tblwrap"><table><thead><tr><th class="num">Exit code</th><th>Last line</th><th>Meaning</th><th>What to do</th></tr></thead><tbody><tr><td class="num">0</td><td><code>every step passed</code>, or <code>the steps that ran passed</code> and the steps left out</td><td>Every step that ran passed.</td><td>Nothing.</td></tr><tr><td class="num">1</td><td>The step's name and <code>FAILED</code>, with the reason</td><td>A step failed. No later step ran.</td><td>Fix what the line names, then go on from that step.</td></tr><tr><td class="num">2</td><td><code>runner:</code> and the reason</td><td>A settings file is wrong or missing. Nothing ran.</td><td>Correct the file the line names. Run the setup check.</td></tr><tr><td class="num">3</td><td>The step's name and <code>STOPPED. Next step:</code></td><td>The run waits for you.</td><td>Do what the line says, then run the same command again.</td></tr></tbody></table></div>
+<p>To go on from the step that failed, name it after <code>--from</code>. The run then continues the newest run and repeats nothing before that step. Its last line names the steps before it as left out. For example, when the Fuseki load failed:</p>
 <pre><code class="lang-powershell">py -m kpi_store.runner --from fuseki</code></pre>
 <pre><code class="lang-text">run &lt;run ID&gt;: fuseki, neo4j, enterprise, sync, summary
 fuseki: current, &lt;what Fuseki holds&gt;
@@ -566,7 +566,7 @@ enterprise: current, &lt;what Enterprise holds&gt;
 sync: all &lt;count&gt; lines read current
 summary of run &lt;run ID&gt;:
 ...
-every step passed</code></pre>
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
 <p>The steps, in order, are <code>cut</code>, <code>check</code>, <code>zip</code>, <code>volume</code>, <code>upload</code>, <code>notebook</code>, <code>report</code>, <code>fuseki</code>, <code>neo4j</code>, <code>enterprise</code>, <code>sync</code> and <code>summary</code>. Each step's result is a file in <code>C:\kpi-store-local\runs</code>, in the run's folder, under <code>steps</code>.</p>
 <div class="tblwrap"><table><thead><tr><th>Step that failed</th><th>Likely cause</th><th>What to do</th></tr></thead><tbody><tr><td><code>cut</code></td><td>You typed another answer, or a row's <code>decided_by</code> is not a role.</td><td>Correct the file if the line says so. Run the same command again.</td></tr><tr><td><code>check</code></td><td>A check of the release failed. The line names <code>check.log</code> in the run's folder.</td><td>Read the end of <code>check.log</code>. See "Not yet run on Windows" for the one case in which you may leave the step out.</td></tr><tr><td><code>zip</code></td><td>A file in the release folder sets a password.</td><td>Move that file out of the release folder. Run <code>py -m kpi_store.runner --from zip</code>.</td></tr><tr><td><code>volume</code>, <code>upload</code></td><td>The sign-in expired, or you may not create the schema.</td><td>Sign in again. If the line prints two SQL statements, run them in a Databricks SQL editor. Then run <code>py -m kpi_store.runner --from volume</code>.</td></tr><tr><td><code>notebook</code></td><td>The notebook run failed, or it still runs after 60 minutes.</td><td>Read the reason in the line. Run <code>py -m kpi_store.runner --from notebook</code>. A run that still runs is waited for again, not started twice.</td></tr><tr><td><code>fuseki</code></td><td>Java or the jar is missing, or the port is in use.</td><td>Run the setup check. Then run <code>py -m kpi_store.runner --from fuseki</code>.</td></tr><tr><td><code>neo4j</code></td><td>The local instance is stopped, or a plugin is missing.</td><td>Start the instance. Run the setup check. Then run <code>py -m kpi_store.runner --from neo4j</code>.</td></tr><tr><td><code>enterprise</code></td><td>The server did not answer, or the database holds nodes.</td><td>Read the line. For KPI Store nodes of another release, see "Replace what Enterprise holds". For any other node, stop and ask whose it is.</td></tr><tr><td><code>sync</code></td><td>A store is not current. The lines above name it.</td><td>Run the runner from the step that loads that store.</td></tr></tbody></table></div>
 <p>A store load never runs after a notebook run that did not load. The run then stops with exit code 3 and says why.</p>
