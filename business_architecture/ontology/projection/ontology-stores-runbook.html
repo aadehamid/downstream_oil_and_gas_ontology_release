@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="scripts/build_docs_html.py">
+<title>KPI Store runbook: the first run on the client sandbox</title>
+<style>
+/* Style: framed-sheet (tasteskill app sheet), screen "report", the same tokens as the stores runbook and the
+   ontology guide so the documents read as one set. Face: the frame tinted blue-grey, the accent teal on
+   links and the current contents entry. Generated from Markdown by scripts/build_docs_html.py: change the
+   Markdown or the template, never a generated page. */
+:root {
+  --ground: #f1f4f6;  --surface: #ffffff;  --raised: #f4f6f8;  --active: #ebedee;
+  --border: #e3e6e9;  --rule: #eef0f2;     --control: #cdced1;
+  --text: #131416;    --muted: #5d5f60;    --faint: #66686a;
+  --accent: #1b6c80;  --accent-soft: #e5f0f3;
+  --notice-bg: #fffbeb; --notice-line: #fde68a; --notice-ink: #92400e;
+  --code-bg: #f4f6f8;
+  --radius-card: 8px; --radius-control: 6px; --radius-sheet: 16px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --fs-title: 24px; --fs-section: 19px; --fs-sub: 16px; --fs-body: 15.5px; --fs-small: 12.5px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0b0c0d; --surface: #141516; --raised: #1b1c1e; --active: #242628;
+    --border: #2a2c2f; --rule: #222426; --control: #44474b;
+    --text: #f2f3f3; --muted: #b4b6b8; --faint: #9a9c9e;
+    --accent: #5fb3c7; --accent-soft: #15292e;
+    --notice-bg: #261d0c; --notice-line: #3b2e14; --notice-ink: #f2cf94;
+    --code-bg: #1b1c1e;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--ground); color: var(--text); font: var(--fs-body)/1.65 var(--font); }
+.bar { height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 20px; border-bottom: 1px solid var(--border); background: var(--ground); position: sticky; top: 0; z-index: 3; }
+.bar .name { font-weight: 600; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar .scope { color: var(--muted); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar nav { margin-left: auto; display: flex; gap: 16px; }
+.bar nav a { color: var(--muted); font-size: 13.5px; text-decoration: none; white-space: nowrap; }
+.bar nav a:hover { color: var(--text); }
+
+.sheet { max-width: 1136px; margin: 24px auto 40px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sheet); padding: 32px 24px 56px; }
+.head { max-width: 1088px; margin: 0 auto; }
+h1 { font-size: var(--fs-title); font-weight: 600; margin: 0; line-height: 1.25; letter-spacing: -.01em; }
+.lead { color: var(--text); font-size: 16px; margin: 8px 0 0; max-width: 76ch; }
+.from-line { color: var(--muted); font-size: var(--fs-small); margin: 8px 0 0; max-width: 100ch; }
+.notice { margin: 18px 0 0; background: var(--notice-bg); border: 1px solid var(--notice-line); color: var(--notice-ink); border-radius: var(--radius-control); padding: 8px 12px; font-size: 13px; max-width: 1088px; }
+.notice code { background: transparent; color: inherit; }
+
+/* contents rail and the text: 248 + 32 + 808 = 1088 */
+.layout { max-width: 1088px; margin: 28px auto 0; display: grid; grid-template-columns: 248px minmax(0, 1fr); gap: 32px; align-items: start; }
+.toc { position: sticky; top: 72px; max-height: calc(100vh - 96px); overflow-y: auto; font-size: 13.5px; padding-right: 4px; }
+.toc p { margin: 0 0 8px; font-weight: 600; font-size: 13.5px; }
+.toc ul { list-style: none; margin: 0; padding: 0; }
+.toc li a { display: block; color: var(--muted); text-decoration: none; padding: 4px 8px; border-radius: var(--radius-control); line-height: 1.4; }
+.toc li.l3 a { padding-left: 20px; font-size: 13px; }
+.toc li a:hover { color: var(--text); background: var(--raised); }
+.toc li a.on { color: var(--text); background: var(--accent-soft); }
+article { min-width: 0; }
+
+h2, h3, h4, h5, h6 { scroll-margin-top: 64px; line-height: 1.35; position: relative; }
+h2 { font-size: var(--fs-section); font-weight: 600; margin: 44px 0 8px; }
+article > h2:first-child, section.src:first-child > h2 { margin-top: 0; }
+h3 { font-size: var(--fs-sub); font-weight: 600; margin: 32px 0 6px; }
+h4, h5, h6 { font-size: 15px; font-weight: 600; margin: 24px 0 4px; }
+.hl { margin-left: 8px; color: var(--faint); text-decoration: none; font-weight: 400; opacity: 0; }
+h2:hover .hl, h3:hover .hl, h4:hover .hl, .hl:focus { opacity: 1; }
+section.src { padding-top: 8px; }
+section.src + section.src { margin-top: 56px; padding-top: 28px; border-top: 1px solid var(--border); }
+.from { color: var(--muted); font-size: var(--fs-small); margin: 0 0 14px; }
+p, li { max-width: 76ch; }
+p { margin: 10px 0; }
+ul, ol { padding-left: 24px; margin: 10px 0; }
+li { margin: 5px 0; }
+li > ul, li > ol { margin: 4px 0; }
+a { color: var(--accent); overflow-wrap: anywhere; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+strong { font-weight: 600; }
+code { font: 13.5px var(--mono); background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+pre { position: relative; background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 14px 16px; overflow-x: auto; margin: 12px 0 16px; max-width: 100%; }
+pre code { background: none; padding: 0; font-size: 13px; line-height: 1.6; white-space: pre; overflow-wrap: normal; }
+.copy { position: absolute; top: 8px; right: 8px; font: 12px var(--font); background: var(--surface); color: var(--muted); border: 1px solid var(--border); border-radius: var(--radius-control); padding: 3px 8px; cursor: pointer; }
+.copy:hover { color: var(--text); }
+.tblwrap { overflow-x: auto; margin: 14px 0 12px; border: 1px solid var(--border); border-radius: var(--radius-card); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+th.num, td.num { text-align: right; }
+th { text-align: left; font-weight: 600; font-size: 13px; color: var(--muted); padding: 9px 12px; border-bottom: 1px solid var(--border); background: var(--raised); vertical-align: bottom; }
+td { padding: 10px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+td p { margin: 0; }
+tr:last-child td { border-bottom: 0; }
+td code, th code { font-size: 12.5px; }
+td:first-child code { white-space: nowrap; overflow-wrap: normal; }
+blockquote { margin: 12px 0; padding: 4px 0 4px 16px; border-left: 3px solid var(--control); color: var(--text); }
+blockquote p { margin: 6px 0; }
+del { color: var(--muted); }
+section.rec { padding-top: 8px; }
+section.rec + section.rec { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border); }
+table.index td:first-child { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.toc li.l3 a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+figure.pic { margin: 16px 0 20px; }
+figure.pic img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: var(--radius-card); background: #ffffff; }
+figure.pic figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
+.end { color: var(--muted); font-size: var(--fs-small); margin-top: 48px; border-top: 1px solid var(--rule); padding-top: 14px; }
+
+@media (max-width: 960px) {
+  .sheet { margin: 0; border-radius: 0; border-width: 0; padding: 20px 16px 40px; }
+  .layout { grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 20px; }
+  .toc { position: static; max-height: none; border: 1px solid var(--border); border-radius: var(--radius-card); padding: 4px 8px; }
+  .toc details summary { cursor: pointer; font-weight: 600; padding: 8px 4px; list-style-position: inside; }
+  .toc ul { padding-bottom: 8px; }
+  .toc details > p { display: none; }
+}
+@media (min-width: 961px) {
+  .toc details > summary { display: none; }
+}
+@media (max-width: 640px) {
+  pre { padding-top: 40px; }
+  /* The records index stacks on a phone: number and decision on one line, status and date under it. */
+  table.index thead { display: none; }
+  table.index tr { display: grid; grid-template-columns: 52px minmax(0, 1fr); border-bottom: 1px solid var(--rule); padding: 8px 0; }
+  table.index td { border: 0; padding: 0 10px; }
+  table.index td:nth-child(3), table.index td:nth-child(4) { grid-column: 2; color: var(--muted); font-size: 13px; text-align: left; white-space: normal; }
+  table.index td:first-child { grid-row: span 3; }
+  .bar .scope { display: none; }
+  .bar nav { gap: 12px; flex: none; }
+  /* A file name in a table's first column wraps on a phone, so the text beside it keeps its width. */
+  td:first-child { min-width: 9em; }
+  td:first-child code { white-space: normal; overflow-wrap: anywhere; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body id="top">
+<header class="bar">
+  <span class="name">KPI Store runbook: the first run on the client sandbox</span>
+  <span class="scope">KPI Store</span>
+  <nav aria-label="Documents">
+    <a href="../epm-ontology-guide.html">Ontology guide</a>
+    <a href="#top">Top</a>
+  </nav>
+</header>
+<div class="sheet">
+  <div class="head">
+    <h1>KPI Store runbook: the first run on the client sandbox</h1>
+    <p class="lead">The first run on the client sandbox, step by step: the setup, the first report, the cut, the loads of the three stores and the sync check.</p>
+    <p class="from-line">Built from <code>ontology-stores-runbook.md</code>.</p>
+  </div>
+  <p class="notice">This page is generated from the Markdown beside it, which is the master copy. A change goes into the Markdown first; then <code>python3 scripts/build_docs_html.py</code> rebuilds this page.</p>
+  <div class="layout">
+    <nav class="toc" aria-label="Contents">
+      <details open>
+        <summary>Contents</summary>
+        <p>Contents</p>
+        <ul>
+<li class="l2"><a href="#before-you-start">Before you start</a></li>
+<li class="l3"><a href="#what-you-need">What you need</a></li>
+<li class="l3"><a href="#the-limits">The limits</a></li>
+<li class="l3"><a href="#what-the-run-writes">What the run writes</a></li>
+<li class="l2"><a href="#set-up-the-windows-machine-once">Set up the Windows machine, once</a></li>
+<li class="l3"><a href="#install-the-programs">Install the programs</a></li>
+<li class="l3"><a href="#unpack-the-release">Unpack the release</a></li>
+<li class="l3"><a href="#make-the-local-folder-and-fetch-three-files">Make the local folder and fetch three files</a></li>
+<li class="l3"><a href="#install-the-python-packages">Install the Python packages</a></li>
+<li class="l3"><a href="#what-windows-itself-needs">What Windows itself needs</a></li>
+<li class="l3"><a href="#set-up-the-local-neo4j">Set up the local Neo4j</a></li>
+<li class="l3"><a href="#write-the-two-settings-files">Write the two settings files</a></li>
+<li class="l3"><a href="#sign-in-to-databricks">Sign in to Databricks</a></li>
+<li class="l3"><a href="#run-the-setup-check">Run the setup check</a></li>
+<li class="l2"><a href="#the-first-run">The first run</a></li>
+<li class="l2"><a href="#the-first-report">The first report</a></li>
+<li class="l3"><a href="#the-rows-to-expect-on-the-sandbox">The rows to expect on the sandbox</a></li>
+<li class="l3"><a href="#when-your-report-differs-from-the-table">When your report differs from the table</a></li>
+<li class="l3"><a href="#clear-the-report">Clear the report</a></li>
+<li class="l2"><a href="#the-second-run-the-cut-and-the-loads">The second run: the cut and the loads</a></li>
+<li class="l3"><a href="#what-each-line-tells-you">What each line tells you</a></li>
+<li class="l3"><a href="#replace-what-enterprise-holds-one-case">Replace what Enterprise holds: one case</a></li>
+<li class="l2"><a href="#the-sync-check">The sync check</a></li>
+<li class="l2"><a href="#run-it-again-nothing-changes">Run it again: nothing changes</a></li>
+<li class="l2"><a href="#what-the-runner-does-step-by-step">What the runner does, step by step</a></li>
+<li class="l3"><a href="#cut">cut</a></li>
+<li class="l3"><a href="#check">check</a></li>
+<li class="l3"><a href="#zip">zip</a></li>
+<li class="l3"><a href="#volume">volume</a></li>
+<li class="l3"><a href="#upload">upload</a></li>
+<li class="l3"><a href="#notebook">notebook</a></li>
+<li class="l3"><a href="#report">report</a></li>
+<li class="l3"><a href="#fuseki">fuseki</a></li>
+<li class="l3"><a href="#neo4j">neo4j</a></li>
+<li class="l3"><a href="#enterprise">enterprise</a></li>
+<li class="l3"><a href="#sync">sync</a></li>
+<li class="l3"><a href="#summary">summary</a></li>
+<li class="l2"><a href="#when-a-step-fails">When a step fails</a></li>
+<li class="l2"><a href="#record-the-load-s-report-in-the-release-folder">Record the load's report in the release folder</a></li>
+<li class="l2"><a href="#how-to-undo">How to undo</a></li>
+<li class="l3"><a href="#the-release-folder">The release folder</a></li>
+<li class="l3"><a href="#databricks">Databricks</a></li>
+<li class="l3"><a href="#fuseki-2">Fuseki</a></li>
+<li class="l3"><a href="#the-local-neo4j">The local Neo4j</a></li>
+<li class="l3"><a href="#neo4j-enterprise">Neo4j Enterprise</a></li>
+<li class="l3"><a href="#the-runs-files">The runs' files</a></li>
+<li class="l2"><a href="#where-you-can-run-it-from">Where you can run it from</a></li>
+<li class="l3"><a href="#a-laptop">A laptop</a></li>
+<li class="l3"><a href="#a-pipeline">A pipeline</a></li>
+<li class="l3"><a href="#inside-databricks">Inside Databricks</a></li>
+<li class="l2"><a href="#what-changes-later">What changes later</a></li>
+<li class="l3"><a href="#with-a-databricks-service-principal">With a Databricks service principal</a></li>
+<li class="l3"><a href="#with-n10s-and-apoc-on-neo4j-enterprise">With n10s and APOC on Neo4j Enterprise</a></li>
+<li class="l2"><a href="#what-ran-where">What ran where</a></li>
+        </ul>
+      </details>
+    </nav>
+    <article>
+<p>This guide takes you from the release zip to three loaded and checked stores: Databricks, Jena Fuseki on your Windows machine, and Neo4j Enterprise. Follow it from top to bottom, one step at a time. Every command in it is run by the document test, except the ones the section "What ran where" lists.</p>
+<p>One command does the work: <code>py -m kpi_store.runner</code>. You run it three times. The first run compares the ontology with the sandbox and stops on a report. You clear the report. The second run cuts a correction version and loads every store. The third run proves that nothing is left to change.</p>
+<p>For every later change, use <code>HOW-TO-UPDATE.md</code> in the release's top folder.</p>
+<h2 id="before-you-start">Before you start<a class="hl" href="#before-you-start" aria-label="Link to this section">#</a></h2>
+<h3 id="what-you-need">What you need<a class="hl" href="#what-you-need" aria-label="Link to this section">#</a></h3>
+<ul><li>A Windows 10 or Windows 11 machine on which you may install programs.</li><li>The release zip, <code>kpi-store-1.1.zip</code>.</li><li>The address of the sandbox workspace, as your browser shows it when you open Databricks.</li><li>The ID of a SQL warehouse you may use in that workspace. The sync check reads through it.</li><li>The address of the Neo4j Enterprise server, your user name there and your password.</li><li>The database <code>businessprocessarchitecturegraph</code> on that server. The copy never creates a database. If it is missing, ask the server's administrator for it before you start.</li></ul>
+<h3 id="the-limits">The limits<a class="hl" href="#the-limits" aria-label="Link to this section">#</a></h3>
+<p>The run keeps three limits. Code enforces each one.</p>
+<div class="tblwrap"><table><thead><tr><th>Limit</th><th>What enforces it</th></tr></thead><tbody><tr><td>The notebook writes only to <code>idp_sbx.kpi_store</code> and <code>idp_sbx.tech_graph</code>.</td><td><code>kpi_store/load_databricks.py</code>, the class <code>Gate</code>. Every SQL statement of the notebook passes <code>Gate.check</code>, which refuses a write outside the two schemas that <code>kpi_store.toml</code> names (<code>write_schemas</code> in <code>kpi_store/settings.py</code>). A refused statement is never sent. <code>kpi_store/tests/test_load_databricks.py</code> tests it.</td></tr><tr><td>The notebook reads only the catalogs in <code>kpi_store.toml</code>.</td><td>The same <code>Gate.check</code>. It refuses a read outside <code>read_catalogs</code>. It also allows three system schemas, which discovery needs: <code>system.information_schema</code>, <code>system.access</code> and <code>system.lakeflow</code>.</td></tr><tr><td>The Neo4j load writes only to <code>businessprocessarchitecturegraph</code>.</td><td><code>kpi_store/copy_enterprise.py</code>. <code>open_target</code> opens every session on that one name, and the server must confirm the name. It refuses the <code>system</code> database, a missing database and an alias. <code>check_statement</code> refuses any statement that creates, alters or drops a database, a user or a role. <code>decide</code> stops when the database holds a node that does not carry the KPI Store's marks, which the paragraph below lists. <code>kpi_store/tests/test_copy_enterprise.py</code> tests it.</td></tr></tbody></table></div>
+<p>The second limit names the catalogs of the sandbox's settings: <code>idp_sbx</code> and <code>synapse_dev</code>.</p>
+<p>The third limit has one condition. The copy judges a node by the marks on it, not by who wrote it. It has no other way: a writer's mark on every node would change the graph hash that proves the copy. <code>OWN_RULES</code> in <code>kpi_store/copy_enterprise.py</code> holds the marks for each label.</p>
+<div class="tblwrap"><table><thead><tr><th>Label</th><th>A node counts as the KPI Store's when</th></tr></thead><tbody><tr><td><code>Resource</code></td><td>It has a <code>uri</code>, its <code>graph</code> starts with the address of one of this release's modules, whatever the version, and its other labels are the projection's own.</td></tr><tr><td><code>ModuleRelease</code></td><td>Its <code>version_iri</code> starts with the address of one of this release's modules.</td></tr><tr><td><code>Module</code></td><td>Its <code>uri</code> starts with the address of one of this release's modules.</td></tr><tr><td><code>LogicalModel</code></td><td>Its <code>uri</code> is under a base that this release's models use, it has only the labels that the load gives, and its slug or its models are this release's.</td></tr><tr><td><code>Tech</code></td><td>Its <code>uri</code> is in the technical graph's own scheme, and its other labels are classes of the <code>technical-graph</code> module.</td></tr><tr><td><code>EpmStoreMarker</code>, <code>LogicalModelMarker</code>, <code>TechGraphMarker</code></td><td>It names this store and holds a digest.</td></tr></tbody></table></div>
+<p>A node that another writer made with all the marks of one row counts as the KPI Store's, and a replace deletes it. So <code>businessprocessarchitecturegraph</code> must be a database into which no other writer puts ontology nodes of this release's shape. Any node without these marks stops the copy.</p>
+<h3 id="what-the-run-writes">What the run writes<a class="hl" href="#what-the-run-writes" aria-label="Link to this section">#</a></h3>
+<div class="tblwrap"><table><thead><tr><th>Where</th><th>What the run writes there</th></tr></thead><tbody><tr><td>Databricks, schema <code>idp_sbx.kpi_store</code></td><td>The schema and the volume <code>releases</code>, when they are missing. In the volume: the zip, a copy of <code>kpi_store.toml</code>, and one <code>reports</code> folder per run. The tables <code>epm_triples</code> and <code>epm_store_markers</code>.</td></tr><tr><td>Databricks, schema <code>idp_sbx.tech_graph</code></td><td>The schema, when it is missing. The tables <code>tech_graph_triples</code> and <code>tech_graph_markers</code>.</td></tr><tr><td>Databricks, the workspace</td><td>One notebook, <code>kpi_store_load</code>, in the folder that your local settings name. One job run per runner run, named <code>KPI Store load</code> and the run's ID.</td></tr><tr><td>Your Windows machine</td><td>The folder <code>C:\kpi-store-local</code>: each run's files, the Fuseki dataset and the Neo4j load's working files.</td></tr><tr><td>The local Neo4j</td><td>The database that your local settings name. <strong>The load empties it first.</strong></td></tr><tr><td>Neo4j Enterprise</td><td>Nodes and relationships in <code>businessprocessarchitecturegraph</code>, and one constraint there, <code>n10s_unique_uri</code>.</td></tr><tr><td>The release folder</td><td>Nothing, except in the cut. The cut writes the correction version and its record.</td></tr></tbody></table></div>
+<p>The run writes to no table of yours and to no other schema, catalog or database. It reads no token and stores none. Databricks access outside the notebook goes through the sign-in of the Databricks command line.</p>
+<h2 id="set-up-the-windows-machine-once">Set up the Windows machine, once<a class="hl" href="#set-up-the-windows-machine-once" aria-label="Link to this section">#</a></h2>
+<p>Do this section once per machine. The setup check at its end tells you what is still missing.</p>
+<h3 id="install-the-programs">Install the programs<a class="hl" href="#install-the-programs" aria-label="Link to this section">#</a></h3>
+<ol><li>Open <code>https://www.python.org/downloads/windows/</code> and download the installer of Python 3.12, 64-bit.</li><li>Start the installer.</li><li>Tick "Add python.exe to PATH". The check script cannot find Python without it.</li><li>Click "Install Now".</li><li>Open <code>https://git-scm.com/download/win</code>, download Git for Windows and install it with its default choices. It brings <code>bash.exe</code>, which the check script needs.</li><li>Open <code>https://adoptium.net/temurin/releases/</code>, choose version 21 for Windows, and install it with its default choices. Fuseki 6.2.0 and ROBOT run on Java 21.</li><li>Open Command Prompt and install the Databricks command line. The command is from Databricks' page "Install or update the Databricks CLI" (last updated 2026-09-11).
+<pre><code class="lang-cmd">winget install Databricks.DatabricksCLI</code></pre>
+<p>It downloads and installs the program. The last line says that the install succeeded.</p></li></ol>
+<ol start="8"><li>Open <code>https://neo4j.com/download/</code>, download Neo4j Desktop and install it.</li><li>Close every terminal window. A new terminal finds the new programs.</li></ol>
+<h3 id="unpack-the-release">Unpack the release<a class="hl" href="#unpack-the-release" aria-label="Link to this section">#</a></h3>
+<ol><li>In File Explorer, right-click <code>kpi-store-1.1.zip</code> and choose "Extract All".</li><li>Type <code>C:\kpi-store-1.1</code> as the folder and click "Extract".</li><li>Check that <code>C:\kpi-store-1.1\README.md</code> exists. If the files lie one folder deeper, use that folder instead.</li></ol>
+<p>This guide calls that folder the release folder. Keep its path short. Do not put it in a folder that a sync program watches.</p>
+<h3 id="make-the-local-folder-and-fetch-three-files">Make the local folder and fetch three files<a class="hl" href="#make-the-local-folder-and-fetch-three-files" aria-label="Link to this section">#</a></h3>
+<p>The local folder holds your settings, with a password, and everything the runs write. It must stay outside the release folder. Every command refuses a settings file inside the release folder.</p>
+<ol><li>In File Explorer, make the folder <code>C:\kpi-store-local</code>.</li><li>Download each file below with your browser and save it in <code>C:\kpi-store-local</code> under the name shown.</li></ol>
+<div class="tblwrap"><table><thead><tr><th>Save as</th><th>Download from</th><th>SHA-256</th></tr></thead><tbody><tr><td><code>jena-fuseki-server-6.2.0.jar</code></td><td><code>https://repo1.maven.org/maven2/org/apache/jena/jena-fuseki-server/6.2.0/jena-fuseki-server-6.2.0.jar</code></td><td><code>2c92c598e65ab69d99820052e05f4277ed1d77980a8845f87545ad35b71a76ee</code></td></tr><tr><td><code>robot.jar</code> (ROBOT 1.9.10)</td><td><code>https://github.com/ontodev/robot/releases/download/v1.9.10/robot.jar</code></td><td><code>16a73c074f3df359a7338a84b4e0788785fe06117f931bb9796e9619ea776105</code></td></tr><tr><td><code>neosemantics-2025.06.1.jar</code> (n10s)</td><td><code>https://github.com/neo4j-labs/neosemantics/releases/download/2025.06.1/neosemantics-2025.06.1.jar</code></td><td><code>4c461087e08405c7cb472ecfefc043e9e8ed93628ed74988e4fda1f1bac54b3e</code></td></tr><tr><td><code>apoc-2025.06.2-core.jar</code> (APOC)</td><td><code>https://github.com/neo4j/apoc/releases/download/2025.06.2/apoc-2025.06.2-core.jar</code></td><td><code>4df40cea7444ea193d08f8a679aa998c498196fe149c8c02badb998f1c9580fb</code></td></tr></tbody></table></div>
+<p>You do not compare the checksums by hand. The setup check does it and fails on a file that differs.</p>
+<h3 id="install-the-python-packages">Install the Python packages<a class="hl" href="#install-the-python-packages" aria-label="Link to this section">#</a></h3>
+<ol><li>Open PowerShell.</li><li>Install the packages at the versions the release was tested with. The list is <code>PACKAGES</code> in <code>kpi_store/setup_check.py</code>, plus <code>uv</code>, which the check script uses.
+<pre><code class="lang-powershell">py -m pip install rdflib==7.6.0 pyshacl==0.40.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 uv</code></pre>
+<p>The last line starts with <code>Successfully installed</code> and names the packages.</p></li></ol>
+<ol start="3"><li>If the machine has more than one Python, tell the <code>py</code> launcher which one to start. <code>py</code> starts the newest Python it finds, and the packages of step 2 must be installed for that one. This command makes <code>py</code> start Python 3.12 in every new terminal.
+<pre><code class="lang-cmd">setx PY_PYTHON 3.12</code></pre>
+<p>It answers <code>SUCCESS: Specified value was saved.</code> Then run step 2 again in a new terminal. With one Python installed, skip this step.</p></li></ol>
+<h3 id="what-windows-itself-needs">What Windows itself needs<a class="hl" href="#what-windows-itself-needs" aria-label="Link to this section">#</a></h3>
+<p>The Windows test job proved each point below on Windows Server 2025 with Python 3.12 and Java 21.</p>
+<div class="tblwrap"><table><thead><tr><th>Topic</th><th>What you need to do</th></tr></thead><tbody><tr><td><code>python3</code></td><td>Nothing. The check script takes the first of <code>python3</code>, <code>python</code> and <code>py</code> that runs and is 3.11 or later.</td></tr><tr><td>Text encoding</td><td>Nothing. The code names UTF-8 in every file it reads or writes. One gap is left: a script that you run by hand, with its output sent to a file, can fail on a character outside the Windows code page. The runner does not do that.</td></tr><tr><td>Where to run the check script</td><td>In Git Bash, or through the runner. In PowerShell or Command Prompt, the plain word <code>bash</code> starts the launcher of the Linux subsystem, not Git Bash. The runner finds Git Bash by itself.</td></tr><tr><td>Java</td><td>Version 21 or later. The setup check fails on an older one.</td></tr><tr><td>Long paths</td><td>Nothing. The longest path in the release has 95 characters, and the check passed under a folder path of 80 characters.</td></tr><tr><td>Rights</td><td>No administrator rights for any command of this guide. The installers may ask for them.</td></tr><tr><td>Fuseki</td><td>Nothing. The runner starts Fuseki detached, so it lives on after the command ends. A server that you start yourself in a console window ends when you close the window.</td></tr><tr><td>The local folder</td><td>Keep <code>C:\kpi-store-local</code> private to your account. The Neo4j load writes a login file into the run's folder, and on Windows that file gets the folder's permissions.</td></tr><tr><td>A Git copy</td><td>Keep the file <code>.gitattributes</code>. Without it, Git for Windows checks text files out with other line ends, and the packages' hashes differ. An unpacked zip is not affected.</td></tr></tbody></table></div>
+<h3 id="set-up-the-local-neo4j">Set up the local Neo4j<a class="hl" href="#set-up-the-local-neo4j" aria-label="Link to this section">#</a></h3>
+<p>The local Neo4j checks the graph before anything goes to Enterprise. It needs two plugins that Enterprise does not have.</p>
+<p><strong>The load empties the local database every time.</strong> Make a new instance for the KPI Store. Do not use one that holds other work.</p>
+<ol><li>Open Neo4j Desktop.</li><li>Create a local instance. Choose version <code>2025.06.2</code>, and choose a password. Note the password.</li><li>On the instance's menu, choose "Open folder", then open the folder <code>plugins</code>. Note its path.</li><li>Copy <code>neosemantics-2025.06.1.jar</code> and <code>apoc-2025.06.2-core.jar</code> from <code>C:\kpi-store-local</code> into that <code>plugins</code> folder.</li><li>On the instance's menu, open <code>neo4j.conf</code>.</li><li>Add this line at the end of the file and save it.
+<pre><code class="lang-text">dbms.security.procedures.unrestricted=apoc.*,n10s.*</code></pre></li></ol>
+<ol start="7"><li>Start the instance. If it was running, stop it and start it again.</li></ol>
+<h3 id="write-the-two-settings-files">Write the two settings files<a class="hl" href="#write-the-two-settings-files" aria-label="Link to this section">#</a></h3>
+<p>The release has an example of each file. Copy both, then change only the lines the steps name.</p>
+<ol><li>In File Explorer, copy <code>C:\kpi-store-1.1\kpi_store\kpi_store.example.toml</code> to <code>C:\kpi-store-local\kpi_store.toml</code>.</li><li>Open <code>C:\kpi-store-local\kpi_store.toml</code> in Notepad.</li><li>Set <code>warehouse_id</code> to the ID of your SQL warehouse. Change nothing else. The file already holds the sandbox's values:
+<pre><code class="lang-toml">[databricks]
+write_catalog = "idp_sbx"
+write_schema = "kpi_store"         # epm_triples and epm_store_markers live here
+tech_graph_schema = "tech_graph"
+volume = "releases"                # the volume &lt;write_catalog&gt;.&lt;write_schema&gt;.&lt;volume&gt;
+read_catalogs = ["idp_sbx", "synapse_dev"]
+warehouse_id = ""                  # used only outside the notebook (the sync check); may stay empty
+
+[names]                            # the ontology's catalog name = this environment's catalog name
+idp_sbx = "idp_sbx"
+synapse_dev = "synapse_dev"
+
+[skip]
+schemas = ["information_schema", "bronze_replica_*", "kpi_store_poc"]
+tables = ["*__ct", "attrep_*"]</code></pre>
+<p>Leave the <code>sha256</code> line of zeros as it is. The runner writes the zip's real checksum into the copy it uploads.</p></li></ol>
+<ol start="4"><li>Save the file and close Notepad.</li><li>In File Explorer, copy <code>C:\kpi-store-1.1\kpi_store\stores.example.toml</code> to <code>C:\kpi-store-local\stores.toml</code>.</li><li>Open <code>C:\kpi-store-local\stores.toml</code> in Notepad and set these lines. Leave every other line as it is.
+<div class="tblwrap"><table><thead><tr><th>Table</th><th>Line</th><th>Set it to</th></tr></thead><tbody><tr><td><code>[neo4j.local]</code></td><td><code>password</code></td><td>The password you chose in Neo4j Desktop.</td></tr><tr><td><code>[neo4j.local]</code></td><td><code>plugins_folder</code></td><td>The path of the <code>plugins</code> folder you noted, with <code>/</code> in place of each backslash.</td></tr><tr><td><code>[neo4j.enterprise]</code></td><td><code>uri</code></td><td>The Enterprise server's address, such as <code>neo4j://</code> and the server's name and <code>:7687</code>.</td></tr><tr><td><code>[neo4j.enterprise]</code></td><td><code>username</code></td><td>Your user name on the Enterprise server.</td></tr><tr><td><code>[neo4j.enterprise]</code></td><td><code>password</code></td><td>Your password on the Enterprise server.</td></tr></tbody></table></div>
+<p>The <code>database</code> line of <code>[neo4j.enterprise]</code> already reads <code>businessprocessarchitecturegraph</code>. Name the database itself there, never an alias. The copy refuses an alias.</p>
+<p>The notebook is imported into <code>/Workspace/Shared/kpi_store</code>. If you may not write there, set <code>workspace_folder</code> to a folder of your own, such as <code>/Workspace/Users/</code> and your sign-in name and <code>/kpi_store</code>.</p></li></ol>
+<ol start="7"><li>Save the file and close Notepad.</li><li>Tell every command where the file is. Then close PowerShell and open it again, because the setting reaches new windows only.
+<pre><code class="lang-cmd">setx KPI_STORE_LOCAL C:\kpi-store-local\stores.toml</code></pre>
+<p>It answers <code>SUCCESS: Specified value was saved.</code> From then on no command of this guide needs the file's path.</p></li></ol>
+<h3 id="sign-in-to-databricks">Sign in to Databricks<a class="hl" href="#sign-in-to-databricks" aria-label="Link to this section">#</a></h3>
+<p>The sign-in is OAuth in your browser. No token is made or stored in a file of the release.</p>
+<ol><li>Run this command with your workspace's address in place of <code>&lt;your workspace URL&gt;</code>.
+<pre><code class="lang-powershell">databricks auth login --host &lt;your workspace URL&gt; --profile DEFAULT</code></pre></li></ol>
+<ol start="2"><li>Sign in on the page that opens in your browser. The terminal then says that the profile <code>DEFAULT</code> was saved.</li></ol>
+<p>When the sign-in expires later, a run fails at its first Databricks step. Run the same command again and repeat the run.</p>
+<h3 id="run-the-setup-check">Run the setup check<a class="hl" href="#run-the-setup-check" aria-label="Link to this section">#</a></h3>
+<ol><li>In PowerShell, go to the release folder. Every later command in this guide starts there.
+<pre><code class="lang-powershell">cd C:\kpi-store-1.1</code></pre></li></ol>
+<ol start="2"><li>Run the setup check. It only reads. It changes nothing on your machine or on any server.
+<pre><code class="lang-powershell">py -m kpi_store.setup_check</code></pre>
+<pre><code class="lang-text">ok   python              Python &lt;version&gt;
+ok   packages            rdflib 7.6.0, pyshacl 0.40.2, pyoxigraph 0.5.13, neo4j 6.4.1, databricks-sdk 0.164.0, sqlglot 30.31.0, pyyaml 6.0.3
+ok   local-settings      &lt;your local settings file&gt;, outside the release folder
+ok   kpi-store-settings  &lt;your settings file with its schema and volume and SQL warehouse&gt;
+ok   java                Java &lt;version and where it is&gt;
+ok   fuseki-jar          &lt;the jar&gt; has the pinned SHA-256
+ok   robot-jar           &lt;the jar&gt; has the pinned SHA-256
+ok   bash                &lt;where bash is&gt;
+ok   uv                  &lt;where uv is&gt;
+ok   check-script-tools  inside bash: &lt;the Python it found&gt; and uv &lt;version&gt;
+ok   databricks-cli      Databricks CLI &lt;version and where it is&gt;
+ok   databricks-auth     signed in through the profile &lt;your profile&gt;
+ok   neo4j-local         Neo4j 2025.06.2, n10s 2025.06.1, APOC 2025.06.2, database &lt;your local database&gt;
+ok   neo4j-plugins       &lt;your plugins folder&gt; holds both pinned plugin jars
+ok   neo4j-enterprise    database businessprocessarchitecturegraph is there and holds 0 node(s)
+15 of 15 checks passed</code></pre></li></ol>
+<ol start="3"><li>Read the last line. If it says <code>15 of 15 checks passed</code>, go to "The first run".</li><li>If a line starts with <code>FAIL</code>, do what its <code>fix:</code> line says, then run the setup check again. The table below adds what the fix line leaves out.</li><li>Read the line <code>neo4j-enterprise</code>. It must say <code>holds 0 node(s)</code> before your first run. If it holds nodes, stop and find out whose they are.</li></ol>
+<div class="tblwrap"><table><thead><tr><th>Check</th><th>When it fails</th></tr></thead><tbody><tr><td><code>python</code></td><td>Install Python 3.11 or later and start the commands with <code>py</code>.</td></tr><tr><td><code>packages</code></td><td>Run the <code>py -m pip install</code> line that the check prints. It names the packages that differ.</td></tr><tr><td><code>local-settings</code></td><td>Open a new PowerShell window, so that <code>KPI_STORE_LOCAL</code> is set. The file must lie outside the release folder.</td></tr><tr><td><code>kpi-store-settings</code></td><td>Correct the line that the check names in <code>C:\kpi-store-local\kpi_store.toml</code>. An empty <code>warehouse_id</code> fails this check.</td></tr><tr><td><code>java</code></td><td>Install Java 21 and open a new terminal. If Java is still not found, name <code>java.exe</code> in <code>[fuseki]</code> <code>java</code>.</td></tr><tr><td><code>fuseki-jar</code>, <code>robot-jar</code></td><td>Download the file again and save it under the name the check prints.</td></tr><tr><td><code>bash</code></td><td>Install Git for Windows, or name <code>bash.exe</code> in <code>[tools]</code> <code>bash</code>.</td></tr><tr><td><code>uv</code></td><td>Run <code>py -m pip install uv</code>.</td></tr><tr><td><code>check-script-tools</code></td><td>Inside Git Bash, no Python 3.11 or later was found, or <code>uv</code> was not found. Run <code>py -m pip install uv</code>. Python's folder and its <code>Scripts</code> folder must be on <code>PATH</code>, which the tick in the installer did. Open a new terminal.</td></tr><tr><td><code>databricks-cli</code></td><td>Install the Databricks command line and open a new terminal. If it is still not found, name <code>databricks.exe</code> in <code>[databricks]</code> <code>cli</code>.</td></tr><tr><td><code>databricks-auth</code></td><td>Sign in again ("Sign in to Databricks").</td></tr><tr><td><code>neo4j-local</code></td><td>Start the instance in Neo4j Desktop. Check the password, and that the two jars and the line in <code>neo4j.conf</code> are there. Restart the instance.</td></tr><tr><td><code>neo4j-plugins</code></td><td>Copy the two jars into the <code>plugins</code> folder again and restart the instance.</td></tr><tr><td><code>neo4j-enterprise</code></td><td>Check the address, user name and password. If the database is missing, ask the server's administrator for it.</td></tr></tbody></table></div>
+<h2 id="the-first-run">The first run<a class="hl" href="#the-first-run" aria-label="Link to this section">#</a></h2>
+<p>The first run changes nothing in the ontology and loads nothing. It checks the release, uploads it, and compares it with the sandbox.</p>
+<ol><li>See what the run will do. This prints each step's commands and runs nothing.
+<pre><code class="lang-powershell">py -m kpi_store.runner --dry-run</code></pre>
+<pre><code class="lang-text">run &lt;run ID&gt; (dry run): cut, check, zip, volume, upload, notebook, report, fuseki, neo4j, enterprise, sync, summary
+cut: no report waits to be cut
+check: would run the check script
+...
+summary: would print the run's summary</code></pre></li></ol>
+<ol start="2"><li>Start the first run. The step <code>check</code> prints nothing until it ends. It took about 10 minutes on the Mac of the test runs, and 21 minutes on a Windows machine with 4 cores. The other steps took about 3 minutes.
+<pre><code class="lang-powershell">py -m kpi_store.runner</code></pre>
+<pre><code class="lang-text">run &lt;run ID&gt;: cut, check, zip, volume, upload, notebook, report, fuseki, neo4j, enterprise, sync, summary
+cut: no report waits to be cut
+check: all checks passed
+zip: kpi-store-1.1.zip: &lt;count&gt; files, SHA-256 &lt;checksum&gt;
+volume: &lt;the volume and what the step created&gt;
+upload: kpi-store-1.1.zip and kpi_store.toml are in &lt;the path in the volume&gt;
+notebook: notebook run &lt;number&gt; stopped on a report: 1 row(s) block
+the notebook stopped: 1 row(s) block the load, of &lt;count&gt; in the report
+  &lt;row&gt; column-renamed &lt;catalog&gt;.gold_commercial_core.mips_mpr_executive_summary_fact: ChangeValue -&gt; Change_Value_Amount; recommended: accept
+report: STOPPED. Next step: clear the report: edit the decision column of &lt;the file to clear&gt; (each holds the recommended decision), write your role or initials in decided_by on every row you decide, save, then run the same command again</code></pre></li></ol>
+<ol start="3"><li>Read the last line. <code>report: STOPPED</code> is the result you want here. The run ended with exit code 3, which means it waits for you.</li></ol>
+<p>On the sandbox, the row that blocks names the catalog <code>idp_sbx</code>.</p>
+<p>If the run ends on another line, go to "When a step fails".</p>
+<h2 id="the-first-report">The first report<a class="hl" href="#the-first-report" aria-label="Link to this section">#</a></h2>
+<p>The run left three files in <code>C:\kpi-store-local\runs\pending</code>:</p>
+<div class="tblwrap"><table><thead><tr><th>File</th><th>What it is</th></tr></thead><tbody><tr><td><code>discovery-report.to-clear.csv</code></td><td>The rows for you to clear. Each row's <code>decision</code> holds the recommended decision.</td></tr><tr><td><code>discovery-report.json</code></td><td>The report as the notebook wrote it. Do not edit it.</td></tr><tr><td><code>discovery-report.csv</code></td><td>The same rows with no decision filled in. Do not edit it.</td></tr></tbody></table></div>
+<h3 id="the-rows-to-expect-on-the-sandbox">The rows to expect on the sandbox<a class="hl" href="#the-rows-to-expect-on-the-sandbox" aria-label="Link to this section">#</a></h3>
+<p>The table lists what the comparison found by hand on the sandbox on 2026-11-10. The row IDs in your report may differ. Read each row by its <code>kind</code>, <code>object</code>, <code>ontology_value</code> and <code>found_value</code>.</p>
+<div class="tblwrap"><table><thead><tr><th>Rows</th><th><code>kind</code></th><th>What the row says</th><th>Decide on the first run</th><th>What the cut does</th></tr></thead><tbody><tr><td>1</td><td><code>column-renamed</code>, the only row that blocks</td><td>On the gold table <code>mips_mpr_executive_summary_fact</code>, the column <code>ChangeValue</code> is now <code>Change_Value_Amount</code>.</td><td>Accept. Write your role in <code>decided_by</code>.</td><td>Applies it in the correction. It is a breaking change, so the cut asks you to type the new name.</td></tr><tr><td>2</td><td><code>column-case</code></td><td>On the same table, <code>assessment_amount</code> is spelled <code>Assessment_Amount</code> and <code>Previous_amount</code> is spelled <code>Previous_Amount</code>.</td><td>Accept both. Write your role in <code>decided_by</code>.</td><td>Applies both in the same correction.</td></tr><tr><td>1</td><td><code>second-source</code></td><td>The executive summary view also serves the measure crack spreads.</td><td>Accept. Write your role in <code>decided_by</code>.</td><td>Applies it in the same correction.</td></tr><tr><td>8</td><td><code>measure-link</code></td><td>A filter of the Genie space links the executive summary view to a measure: crack spread, gasoline basis, gasoline cash, distillate basis, distillate cash, crude, renewable and NGL.</td><td>Leave <code>decided_by</code> empty. The Genie space's creator confirms each filter first.</td><td>Nothing now. A link with its filter needs a minor version of <code>data-product</code>.</td></tr><tr><td>1</td><td><code>question</code></td><td>The benchmark prices view has no measure of its own.</td><td>Leave it. It waits for the owner or the Genie space's creator.</td><td>Nothing. It lists the row as "waits".</td></tr><tr><td>8</td><td><code>migration-pair</code></td><td>A silver or gold table is fed by the <code>synapse_dev</code> table of the same name, which it replaces.</td><td>Leave <code>decided_by</code> empty.</td><td>Nothing now. The pair needs a minor version of <code>technical-graph</code>.</td></tr><tr><td>Several</td><td><code>object-extra</code></td><td>Databricks holds an object that the ontology does not name: the views <code>mpr_mips_crack_spread_price_fact_metricsfromsilver_vw</code> and <code>mpr_mips_crack_spread_price_fact_vw</code>, and the unused silver and gold tables in the same schemas.</td><td>Leave <code>decided_by</code> empty.</td><td>Nothing.</td></tr></tbody></table></div>
+<p>The report may also hold <code>stale-data</code> rows. Each says that a table had no write for 35 days. They need no decision.</p>
+<p>The report also counts what passed. Open <code>discovery-report.json</code> in Notepad and find <code>"passes"</code> near the top. Expect these three numbers:</p>
+<pre><code class="lang-json">{"object_names": 33, "table_edges": 40, "metric_view_sources": 3}</code></pre>
+<p>They mean that all 33 object names of the ontology exist, all 40 table edges are in the lineage, and all 3 metric views read the sources the ontology names.</p>
+<p>A row without your role in <code>decided_by</code> stays undecided, whatever its <code>decision</code> column holds. The next run reports it again. So you lose nothing by leaving a row.</p>
+<p>Three decisions exist. <code>accept</code> applies the row's proposed fix, when a correction can hold it. <code>reject</code> changes nothing and records a standing decision, and the comparison then leaves that finding out for good. <code>environment setting</code> changes nothing in the ontology and tells you what to write in <code>kpi_store.toml</code>. Use <code>reject</code> on an <code>object-extra</code> row only when you are sure that the ontology must never name the object.</p>
+<h3 id="when-your-report-differs-from-the-table">When your report differs from the table<a class="hl" href="#when-your-report-differs-from-the-table" aria-label="Link to this section">#</a></h3>
+<p>Do not clear a row that you do not understand.</p>
+<div class="tblwrap"><table><thead><tr><th>What you see</th><th>What to do</th></tr></thead><tbody><tr><td>More than one row blocks, or another row blocks.</td><td>Stop. Do not run the command again. Report the rows' <code>kind</code>, <code>object</code>, <code>ontology_value</code> and <code>found_value</code> to the person who gave you the release.</td></tr><tr><td>A row of a kind the table does not list, which does not block.</td><td>Leave its <code>decided_by</code> empty and go on. Report it afterwards.</td></tr><tr><td>No <code>measure-link</code>, <code>second-source</code> or <code>question</code> row.</td><td>Go on. The notebook could list no Genie space with your sign-in. Report it afterwards.</td></tr><tr><td>The three numbers under <code>"passes"</code> are lower, and no extra row blocks.</td><td>Go on only when a <code>no-lineage</code> row explains each missing table edge. Otherwise stop and report it.</td></tr><tr><td>A step of this guide does not work as written.</td><td>That is a bug in the guide or in the code. Report the step and what the screen showed.</td></tr></tbody></table></div>
+<h3 id="clear-the-report">Clear the report<a class="hl" href="#clear-the-report" aria-label="Link to this section">#</a></h3>
+<p><strong>Do not delete a row, and do not change any column but <code>decision</code>, <code>decided_by</code> and <code>note</code>.</strong> A file with a missing row stops the next run.</p>
+<ol><li>In File Explorer, open <code>C:\kpi-store-local\runs\pending</code>.</li><li>Open <code>discovery-report.to-clear.csv</code> in Excel.</li><li>Find each row that the table above tells you to accept.</li><li>Check that the row's <code>decision</code> reads <code>accept</code>.</li><li>Type your role or your initials in the row's <code>decided_by</code>, such as <code>the ontology owner</code>. The record of the cut keeps this text, so it takes a role or initials only: letters, digits, spaces, dots, hyphens and apostrophes. It refuses an e-mail address and a number of four digits or more.</li><li>Leave <code>decided_by</code> empty on every other row.</li><li>Choose "File", "Save As", and the file type "CSV UTF-8 (Comma delimited)". Keep the file's name and folder.</li><li>Close Excel. The runner cannot read the file while Excel holds it open.</li></ol>
+<p>The document test cannot open Excel. It does steps 2 to 8 with the block below, which writes the role on the rows of the three kinds that the table accepts. An agent that follows this guide may run it too. If you cleared the file by hand, skip it.</p>
+<pre><code class="lang-python">import csv
+import os
+import tomllib
+from pathlib import Path
+
+settings = Path(os.environ["KPI_STORE_LOCAL"])
+with settings.open("rb") as f:
+    run_folder = Path(tomllib.load(f)["release"]["run_folder"])
+if not run_folder.is_absolute():
+    run_folder = settings.parent / run_folder
+path = run_folder / "pending" / "discovery-report.to-clear.csv"
+with path.open(encoding="utf-8-sig", newline="") as f:
+    rows = list(csv.DictReader(f))
+for row in rows:
+    if row["kind"] in ("column-renamed", "column-case", "second-source") and row["decision"] == "accept":
+        row["decided_by"] = "the ontology owner"
+with path.open("w", encoding="utf-8", newline="") as f:
+    writer = csv.DictWriter(f, fieldnames=list(rows[0]), lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(rows)
+print("decided:", ", ".join(row["kind"] for row in rows if row["decided_by"]))</code></pre>
+<pre><code class="lang-text">decided: &lt;the kind of each row that now has your role&gt;</code></pre>
+<h2 id="the-second-run-the-cut-and-the-loads">The second run: the cut and the loads<a class="hl" href="#the-second-run-the-cut-and-the-loads" aria-label="Link to this section">#</a></h2>
+<p>The second run is the same command. It finds the cleared report and hands it to the cut tool. The cut tool shows its plan and asks you two things. After the cut, the run goes on by itself through every load.</p>
+<p><strong>The cut changes the release folder.</strong> It writes <code>data-product</code> <code>1.2.1-correction.1</code>, and a correction version of each module that requires it: <code>logical-model</code>, <code>technical-graph</code>, <code>value-stream</code> and <code>integration</code>. It works in a temporary copy first. Your folder changes only after every step of the cut has passed.</p>
+<ol><li>Run the same command again. It takes about 40 minutes.
+<pre><code class="lang-powershell">py -m kpi_store.runner</code></pre></li></ol>
+<ol start="2"><li>Read the plan that the cut tool prints. Check that "The cut applies" lists only the rows you accepted.</li><li>At the prompt <code>Type Change_Value_Amount to confirm:</code>, type <code>Change_Value_Amount</code> and press Enter. The prompt names the row and the change before it.</li><li>At the prompt <code>Type yes to cut these versions:</code>, type <code>yes</code> and press Enter.</li><li>Wait for the last line. Expect <code>every step passed</code>.
+<pre><code class="lang-text">...
+The cut applies (&lt;count&gt;):
+...
+Versions the cut writes:
+  data-product 1.2.0 -&gt; 1.2.1-correction.1
+  logical-model 1.0.0 -&gt; 1.0.1-correction.1
+  technical-graph 1.1.0 -&gt; 1.1.1-correction.1
+  value-stream 1.2.0 -&gt; 1.2.1-correction.1
+  integration 2.5.0 -&gt; 2.5.1-correction.1
+...
+cut: cut the cleared report: &lt;count&gt; row(s) decided, &lt;count&gt; left undecided
+check: all checks passed
+zip: kpi-store-1.1.zip: &lt;count&gt; files, SHA-256 &lt;checksum&gt;
+volume: &lt;the volume&gt; is there
+upload: kpi-store-1.1.zip and kpi_store.toml are in &lt;the path in the volume&gt;
+notebook: notebook run &lt;number&gt; loaded: &lt;count&gt; triples in &lt;catalog&gt;.&lt;schema&gt;.epm_triples, hash &lt;hash&gt;
+report: no row blocks; Databricks marker of &lt;time&gt;, &lt;count&gt; rows; technical graph loaded in Databricks, its file fetched
+fuseki: loaded, &lt;count&gt; graphs, &lt;count&gt; triples, RDFC-1.0 hash &lt;hash&gt; equal in the store and the release files (&lt;which server and where it keeps the data&gt;); technical graph loaded, &lt;count&gt; triples
+neo4j: loaded, &lt;count&gt; nodes, &lt;count&gt; relationships, 0 SHACL violations over &lt;count&gt; constraints, round trip lost 0 and added 0, graph hash &lt;hash&gt;; technical graph loaded, &lt;count&gt; nodes
+enterprise: copied, &lt;count&gt; nodes, &lt;count&gt; relationships, graph hash &lt;hash&gt; equal to the local graph's; technical graph loaded, &lt;count&gt; nodes
+...
+sync: all &lt;count&gt; lines read current
+summary of run &lt;run ID&gt;:
+...
+summary: the run's files are in &lt;the folder of the run&gt;
+every step passed</code></pre></li></ol>
+<p>If you type anything else at a prompt, the cut changes nothing and the run stops at <code>cut: FAILED</code>. The report stays in <code>pending</code>. Run the same command again.</p>
+<p>If the run stops after the cut, do not clear the report again. The cut is done. Go to "When a step fails" and go on from the step that failed.</p>
+<h3 id="what-each-line-tells-you">What each line tells you<a class="hl" href="#what-each-line-tells-you" aria-label="Link to this section">#</a></h3>
+<div class="tblwrap"><table><thead><tr><th>Line</th><th>What it proves</th></tr></thead><tbody><tr><td><code>cut</code></td><td>The cut wrote the correction versions and the record <code>business_architecture\ontology\discovery-runs\</code> and the run's ID and <code>.md</code>.</td></tr><tr><td><code>check</code></td><td>The release folder, with the correction, passes every check of the release.</td></tr><tr><td><code>zip</code>, <code>upload</code></td><td>The zip of the corrected release and the settings with its checksum are in the volume.</td></tr><tr><td><code>notebook</code>, with <code>loaded</code></td><td>No row blocks any more. The notebook loaded <code>epm_triples</code>, read it back, and found the same RDFC-1.0 hash as the release files. Then it wrote the marker row.</td></tr><tr><td><code>report</code></td><td>The runner fetched the technical graph's file, which the notebook built from the workspace's real objects.</td></tr><tr><td><code>fuseki</code></td><td>Fuseki holds the release. Its hash equals the release files' hash.</td></tr><tr><td><code>neo4j</code></td><td>The local Neo4j holds the release, and every check passed there: 0 SHACL violations, and a round trip that lost 0 triples and added 0.</td></tr><tr><td><code>enterprise</code></td><td><code>businessprocessarchitecturegraph</code> holds a copy whose graph hash equals the local graph's.</td></tr><tr><td><code>sync</code></td><td>Every store reads <code>current</code>.</td></tr></tbody></table></div>
+<p><code>loaded</code> in the <code>notebook</code> line is the word to look for. <code>current</code> and <code>marked</code> also mean that Databricks holds this release. <code>blocked</code> means that a row still blocks.</p>
+<h3 id="replace-what-enterprise-holds-one-case">Replace what Enterprise holds: one case<a class="hl" href="#replace-what-enterprise-holds-one-case" aria-label="Link to this section">#</a></h3>
+<p>The copy stops when <code>businessprocessarchitecturegraph</code> already holds KPI Store nodes of another release. It then says how many, and changes nothing. This happens after any later change to the ontology, and after a copy that was cut off halfway.</p>
+<p><strong>The replace deletes every node in that database that carries the KPI Store's marks, before it copies.</strong> "The limits" lists the marks. It deletes no node without them. When the database holds such a node, the copy stops whatever you decided.</p>
+<p>One case needs a person. The marks are those of the release you copy. When that release no longer holds a model, a class of the technical graph or a label that the earlier release had, the earlier release's nodes of that kind no longer carry the marks. The copy then stops and names them, also with the replace allowed. Ask the database's administrator to remove those nodes, then run the step again.</p>
+<p>If the <code>enterprise</code> step stops for that reason, run the step again with the replace allowed:</p>
+<pre><code class="lang-powershell">py -m kpi_store.runner --from enterprise --replace-enterprise</code></pre>
+<p>Do not add <code>--replace-enterprise</code> to a first run. An empty database needs no replace, and without the option the copy cannot delete anything.</p>
+<h2 id="the-sync-check">The sync check<a class="hl" href="#the-sync-check" aria-label="Link to this section">#</a></h2>
+<p>The sync check reads the four stores and writes nothing. The runner ran it as its <code>sync</code> step. Run it alone whenever you want to know whether a store is behind.</p>
+<pre><code class="lang-powershell">py -m kpi_store.sync_check</code></pre>
+<pre><code class="lang-text">databricks      current     &lt;why&gt;
+jena            current     &lt;why&gt;
+neo4j           current     &lt;why&gt;
+enterprise      current     &lt;why&gt;
+lm:neo4j        current     &lt;why&gt;
+lm:enterprise   current     &lt;why&gt;
+tech:databricks current     &lt;why&gt;
+tech:jena       current     &lt;why&gt;
+tech:neo4j      current     &lt;why&gt;
+tech:enterprise current     &lt;why&gt;</code></pre>
+<p>Each line names a store, then its status, then the reason.</p>
+<div class="tblwrap"><table><thead><tr><th>Line</th><th>What it compares</th></tr></thead><tbody><tr><td><code>databricks</code></td><td>The marker row and the rows per graph of <code>epm_triples</code> with the release folder.</td></tr><tr><td><code>jena</code></td><td>Each named graph's triple count in Fuseki with the release folder.</td></tr><tr><td><code>neo4j</code>, <code>enterprise</code></td><td>The database's marker, its counts and its graph hash with the release folder.</td></tr><tr><td><code>lm:neo4j</code>, <code>lm:enterprise</code></td><td>The logical models in that database with the release's logical-model package.</td></tr><tr><td><code>tech:</code> and a store</td><td>The technical graph in that store with the file the runner last fetched.</td></tr></tbody></table></div>
+<div class="tblwrap"><table><thead><tr><th>Status</th><th>Meaning</th><th>What to do</th></tr></thead><tbody><tr><td><code>current</code></td><td>The store holds this release.</td><td>Nothing.</td></tr><tr><td><code>behind</code></td><td>The store holds another release.</td><td>Run the runner again.</td></tr><tr><td><code>changed</code></td><td>The store's content changed after its load.</td><td>Run the runner again. Find out what wrote to the store.</td></tr><tr><td><code>unmarked</code></td><td>The store holds data and no marker.</td><td>Run the runner again.</td></tr><tr><td><code>empty</code></td><td>The store holds nothing. Fuseki reads <code>empty</code> when its data folder was deleted.</td><td>Run the runner again.</td></tr><tr><td><code>unreachable</code></td><td>The store did not answer, or a setting is missing. The reason says which.</td><td>Start the store, or correct the setting.</td></tr><tr><td><code>not checked</code></td><td>No technical graph file was fetched yet.</td><td>Run <code>py -m kpi_store.runner --from notebook</code>.</td></tr></tbody></table></div>
+<p>The command ends with exit code 0 only when every line reads <code>current</code>.</p>
+<h2 id="run-it-again-nothing-changes">Run it again: nothing changes<a class="hl" href="#run-it-again-nothing-changes" aria-label="Link to this section">#</a></h2>
+<p>A second run on the same release must change nothing. It proves that the loads are repeatable.</p>
+<ol><li>Run the same command a third time. It takes about 20 minutes.
+<pre><code class="lang-powershell">py -m kpi_store.runner</code></pre>
+<pre><code class="lang-text">run &lt;run ID&gt;: cut, check, zip, volume, upload, notebook, report, fuseki, neo4j, enterprise, sync, summary
+cut: no report waits to be cut
+check: all checks passed
+zip: kpi-store-1.1.zip: &lt;count&gt; files, SHA-256 &lt;checksum&gt;
+volume: &lt;the volume&gt; is there
+upload: kpi-store-1.1.zip and kpi_store.toml are in &lt;the path in the volume&gt;
+notebook: notebook run &lt;number&gt; current: &lt;count&gt; triples in &lt;catalog&gt;.&lt;schema&gt;.epm_triples, hash &lt;hash&gt;
+report: no row blocks; Databricks marker of &lt;time&gt;, &lt;count&gt; rows; technical graph &lt;its status&gt; in Databricks, its file fetched
+fuseki: current, &lt;count&gt; graphs, &lt;count&gt; triples, RDFC-1.0 hash &lt;hash&gt; equal in the store and the release files (&lt;which server and where it keeps the data&gt;); technical graph &lt;its status&gt;, &lt;count&gt; triples
+neo4j: current, &lt;count&gt; nodes, &lt;count&gt; relationships, 0 SHACL violations over &lt;count&gt; constraints, round trip lost 0 and added 0, graph hash &lt;hash&gt;; technical graph &lt;its status&gt;, &lt;count&gt; nodes
+enterprise: current, &lt;count&gt; nodes, &lt;count&gt; relationships, graph hash &lt;hash&gt; equal to the local graph's; technical graph &lt;its status&gt;, &lt;count&gt; nodes
+...
+sync: all &lt;count&gt; lines read current
+summary of run &lt;run ID&gt;:
+...
+every step passed</code></pre></li></ol>
+<ol start="2"><li>Check that the lines <code>notebook</code>, <code>fuseki</code>, <code>neo4j</code> and <code>enterprise</code> each say <code>current</code> right after the step's name. <code>current</code> means the step found this release in the store and wrote nothing.</li></ol>
+<p>The end of each line names the technical graph, and that part may say <code>loaded</code>. The notebook builds the technical graph again from the workspace on every run. When the workspace's objects, lineage or jobs changed since the last run, the graph differs and each store loads it again. The runs of this guide are themselves jobs in the workspace, so this happened in the test.</p>
+<p>The loads are done. Keep <code>C:\kpi-store-local</code> and the release folder. The release folder now holds the correction, and every later change starts from it.</p>
+<h2 id="what-the-runner-does-step-by-step">What the runner does, step by step<a class="hl" href="#what-the-runner-does-step-by-step" aria-label="Link to this section">#</a></h2>
+<p>The runner is <code>kpi_store/runner.py</code>. It runs twelve steps in order and stops at the first one that fails. Each step prints one line and writes its result to the run's folder, under <code>steps</code>. You can run the chain by hand, one step at a time, with <code>--only</code> and the step's name. A step run that way continues the newest run. Its last line names the steps it left out. Only a run of the whole chain says <code>every step passed</code>.</p>
+<p>The commands below ran after the third run, so each finds its work done.</p>
+<h3 id="cut"><code>cut</code><a class="hl" href="#cut" aria-label="Link to this section">#</a></h3>
+<p>It calls the cut tool, <code>kpi_store/cut.py</code>, when a cleared report waits in <code>runs\pending</code>. The cut tool reads the report and your decisions, shows its plan, and asks you to approve. It then changes the tables of the <code>data-product</code> module, rebuilds the module, and writes the correction version of it and of each module that requires it. It works in a temporary copy and changes the release folder only when every step has passed.</p>
+<p>It reads <code>runs\pending\discovery-report.json</code> and <code>discovery-report.to-clear.csv</code>. It writes new packages under <code>business_architecture\ontology\releases</code>, and the record of the cut under <code>business_architecture\ontology\discovery-runs</code>. With no report waiting, it does nothing.</p>
+<pre><code class="lang-powershell">py -m kpi_store.runner --only cut</code></pre>
+<pre><code class="lang-text">run &lt;run ID&gt;: cut
+cut: no report waits to be cut
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
+<h3 id="check"><code>check</code><a class="hl" href="#check" aria-label="Link to this section">#</a></h3>
+<p>It runs <code>scripts/check.sh</code> with bash. The script rebuilds every package and compares it with the one on disk. It runs the competency questions and every test. It checks that the generated pages equal their sources and that every code block of the documents works.</p>
+<p>It reads the release folder. It writes only <code>check.log</code> in the run's folder. It took about 10 minutes on a Mac and 21 minutes on a Windows machine with 4 cores.</p>
+<pre><code class="lang-powershell">py -m kpi_store.runner --only check</code></pre>
+<pre><code class="lang-text">run &lt;run ID&gt;: check
+check: all checks passed
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
+<h3 id="zip"><code>zip</code><a class="hl" href="#zip" aria-label="Link to this section">#</a></h3>
+<p>It packs the release folder into one zip, in <code>runner.py</code> itself. The same files always give the same zip: the entries are sorted, each has one fixed date, and text files get the same line ends. It then copies your <code>kpi_store.toml</code> and writes the zip's SHA-256 into the copy.</p>
+<p>It reads the release folder and <code>C:\kpi-store-local\kpi_store.toml</code>. It writes the zip and the settings copy to the run's folder, under <code>upload</code>. It stops when a settings file in the release folder holds a password.</p>
+<pre><code class="lang-powershell">py -m kpi_store.runner --only zip</code></pre>
+<pre><code class="lang-text">run &lt;run ID&gt;: zip
+zip: kpi-store-1.1.zip: &lt;count&gt; files, SHA-256 &lt;checksum&gt;
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
+<h3 id="volume"><code>volume</code><a class="hl" href="#volume" aria-label="Link to this section">#</a></h3>
+<p>It asks Databricks, through the Databricks command line, whether the schema and the volume exist. It creates each one that is missing.</p>
+<p>It reads <code>write_catalog</code>, <code>write_schema</code> and <code>volume</code> from <code>kpi_store.toml</code>. It writes nothing when both exist.</p>
+<pre><code class="lang-powershell">py -m kpi_store.runner --only volume</code></pre>
+<pre><code class="lang-text">run &lt;run ID&gt;: volume
+volume: &lt;the volume&gt; is there
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
+<h3 id="upload"><code>upload</code><a class="hl" href="#upload" aria-label="Link to this section">#</a></h3>
+<p>It copies the zip, then the settings copy, into the volume with the Databricks command line. The zip goes first, so the settings never name a zip that is not there.</p>
+<p>It reads the two files of the <code>zip</code> step. It writes them to the volume and replaces the ones of the run before.</p>
+<pre><code class="lang-powershell">py -m kpi_store.runner --only upload</code></pre>
+<pre><code class="lang-text">run &lt;run ID&gt;: upload
+upload: kpi-store-1.1.zip and kpi_store.toml are in &lt;the path in the volume&gt;
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
+<h3 id="notebook"><code>notebook</code><a class="hl" href="#notebook" aria-label="Link to this section">#</a></h3>
+<p>It imports <code>kpi_store/notebook/kpi_store_load.py</code> into the workspace folder as the notebook <code>kpi_store_load</code>. It submits the notebook as a one-time job run on serverless compute, waits for it, and reads its result.</p>
+<p>The notebook has five cells.</p>
+<div class="tblwrap"><table><thead><tr><th class="num">Cell</th><th>What it does</th></tr></thead><tbody><tr><td class="num">1</td><td>Text. It says what the notebook does and lists its three parameters: <code>settings_path</code>, <code>mode</code> and <code>stale_after_days</code>.</td></tr><tr><td class="num">2</td><td>Installs five Python packages at pinned versions for this run: <code>databricks-sdk</code>, <code>pyoxigraph</code>, <code>rdflib</code>, <code>sqlglot</code> and <code>pyyaml</code>.</td></tr><tr><td class="num">3</td><td>Restarts Python, so that the run uses the packages of cell 2.</td></tr><tr><td class="num">4</td><td>Defines the work. <code>bootstrap</code> reads <code>kpi_store.toml</code> from the volume, checks the zip's SHA-256 against it, unpacks the zip and validates the settings. <code>main</code> then runs the release's own code from the zip.</td></tr><tr><td class="num">5</td><td>Runs <code>main</code> and ends the run with a summary in JSON, which the runner reads.</td></tr></tbody></table></div>
+<p><code>main</code> calls <code>kpi_store/load_databricks.py</code>. That code reads the workspace (<code>kpi_store/discovery.py</code>): the objects and columns, the metric view definitions, the lineage, the jobs that build the tables and the Genie spaces. It compares them with the ontology (<code>kpi_store/compare.py</code>) and writes the report. If a row blocks, it stops there. Otherwise it writes the release's triples to a staging table, reads them back, and compares their hash with the release files' hash. Only an equal staging table replaces <code>epm_triples</code>. Then it writes the marker row. Last, it builds the technical graph from what it read (<code>kpi_store/tech_graph.py</code>) and loads it the same way.</p>
+<p>The notebook reads the catalogs that <code>kpi_store.toml</code> names and three system schemas. It writes to the two schemas of the limits, and to the volume: the report files and <code>tech-graph.nq</code>, in one <code>reports</code> folder per run.</p>
+<pre><code class="lang-powershell">py -m kpi_store.runner --only notebook</code></pre>
+<pre><code class="lang-text">run &lt;run ID&gt;: notebook
+notebook: notebook run &lt;number&gt; current: &lt;count&gt; triples in &lt;catalog&gt;.&lt;schema&gt;.epm_triples, hash &lt;hash&gt;
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
+<h3 id="report"><code>report</code><a class="hl" href="#report" aria-label="Link to this section">#</a></h3>
+<p>When the notebook stopped on a report, this step fetches the report from the volume into <code>runs\pending</code>. It prints the rows that block, writes the copy for you to clear, and stops the run. When the notebook loaded, it fetches <code>tech-graph.nq</code> into <code>runs\tech-graph</code> instead, and checks that the file is the one the notebook loaded.</p>
+<pre><code class="lang-powershell">py -m kpi_store.runner --only report</code></pre>
+<pre><code class="lang-text">run &lt;run ID&gt;: report
+report: no row blocks; &lt;the marker and the technical graph&gt;
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
+<h3 id="fuseki"><code>fuseki</code><a class="hl" href="#fuseki" aria-label="Link to this section">#</a></h3>
+<p>It calls <code>kpi_store/load_fuseki.py</code>. That code checks Java and the jar's checksum. It uses the Fuseki that answers at the address of your local settings, or starts one from the jar. It builds the dataset that a current store holds and compares its RDFC-1.0 hash with the store's. When the hashes are equal it writes nothing. Otherwise it drops the graphs of earlier versions, replaces every graph, reads all of it back and compares again. Then it loads the technical graph.</p>
+<p>It reads the release folder and <code>runs\tech-graph\tech-graph.nq</code>. It writes to the Fuseki dataset, which is kept in <code>C:\kpi-store-local\fuseki-db</code>.</p>
+<pre><code class="lang-powershell">py -m kpi_store.runner --only fuseki</code></pre>
+<pre><code class="lang-text">run &lt;run ID&gt;: fuseki
+fuseki: current, &lt;what Fuseki holds&gt;
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
+<h3 id="neo4j"><code>neo4j</code><a class="hl" href="#neo4j" aria-label="Link to this section">#</a></h3>
+<p>It calls <code>kpi_store/load_neo4j.py</code>, which runs the <code>ontology-to-lpg</code> skill's steps. It checks the projection's rules, validates the release with SHACL, and runs the reasoner with ROBOT. <strong>It empties the local database.</strong> It sends the triples in the request, validates the graph with SHACL in the database, and proves each compiled constraint with a failing case. It exports the graph again and compares it with what it loaded. It loads twice and compares the two graph hashes. Last, it loads the logical models and the technical graph, and writes the marker.</p>
+<p>It reads the release folder and <code>robot.jar</code>. It writes to the local database, and its working files and report to <code>C:\kpi-store-local\lpg-out</code>. When the database already holds this release, it writes nothing.</p>
+<pre><code class="lang-powershell">py -m kpi_store.runner --only neo4j</code></pre>
+<pre><code class="lang-text">run &lt;run ID&gt;: neo4j
+neo4j: current, &lt;what the local Neo4j holds&gt;
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
+<h3 id="enterprise"><code>enterprise</code><a class="hl" href="#enterprise" aria-label="Link to this section">#</a></h3>
+<p>It calls <code>kpi_store/copy_enterprise.py</code>. That code checks that the local graph is the one the load verified. It reads the local graph and writes it to <code>businessprocessarchitecturegraph</code> with plain Cypher, because the Enterprise server has no plugin. It then compares the copy's graph hash with the local graph's, checks the counts and each release tag, and writes the marker last.</p>
+<p>It reads the local database and the load's report. It writes only to the one Enterprise database. When that database already holds this release, it writes nothing. It tells its own nodes from others by the marks that "The limits" lists, not by who wrote a node. So the database must be one that no other writer fills with ontology nodes of this release's shape.</p>
+<pre><code class="lang-powershell">py -m kpi_store.runner --only enterprise</code></pre>
+<pre><code class="lang-text">run &lt;run ID&gt;: enterprise
+enterprise: current, &lt;what Enterprise holds&gt;
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
+<h3 id="sync"><code>sync</code><a class="hl" href="#sync" aria-label="Link to this section">#</a></h3>
+<p>It calls <code>kpi_store/sync_check.py</code>, which "The sync check" above describes. It reads the four stores and writes nothing to them.</p>
+<pre><code class="lang-powershell">py -m kpi_store.runner --only sync</code></pre>
+<pre><code class="lang-text">run &lt;run ID&gt;: sync
+...
+sync: all &lt;count&gt; lines read current
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
+<h3 id="summary"><code>summary</code><a class="hl" href="#summary" aria-label="Link to this section">#</a></h3>
+<p>It prints each step's result in this run, and writes <code>summary.json</code> in the run's folder.</p>
+<pre><code class="lang-powershell">py -m kpi_store.runner --only summary</code></pre>
+<pre><code class="lang-text">run &lt;run ID&gt;: summary
+summary of run &lt;run ID&gt;:
+...
+summary: the run's files are in &lt;the folder of the run&gt;
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
+<h2 id="when-a-step-fails">When a step fails<a class="hl" href="#when-a-step-fails" aria-label="Link to this section">#</a></h2>
+<p>Each run ends with one of four exit codes. The last line of the run says which case you are in.</p>
+<div class="tblwrap"><table><thead><tr><th class="num">Exit code</th><th>Last line</th><th>Meaning</th><th>What to do</th></tr></thead><tbody><tr><td class="num">0</td><td><code>every step passed</code>, or <code>the steps that ran passed</code> and the steps left out</td><td>Every step that ran passed.</td><td>Nothing.</td></tr><tr><td class="num">1</td><td>The step's name and <code>FAILED</code>, with the reason</td><td>A step failed. No later step ran.</td><td>Fix what the line names, then go on from that step.</td></tr><tr><td class="num">2</td><td><code>runner:</code> and the reason</td><td>A settings file is wrong or missing. Nothing ran.</td><td>Correct the file the line names. Run the setup check.</td></tr><tr><td class="num">3</td><td>The step's name and <code>STOPPED. Next step:</code></td><td>The run waits for you.</td><td>Do what the line says, then run the same command again.</td></tr></tbody></table></div>
+<p>To go on from the step that failed, name it after <code>--from</code>. The run then continues the newest run and repeats nothing before that step. Its last line names the steps before it as left out. For example, when the Fuseki load failed:</p>
+<pre><code class="lang-powershell">py -m kpi_store.runner --from fuseki</code></pre>
+<pre><code class="lang-text">run &lt;run ID&gt;: fuseki, neo4j, enterprise, sync, summary
+fuseki: current, &lt;what Fuseki holds&gt;
+neo4j: current, &lt;what the local Neo4j holds&gt;
+enterprise: current, &lt;what Enterprise holds&gt;
+...
+sync: all &lt;count&gt; lines read current
+summary of run &lt;run ID&gt;:
+...
+the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
+<p>The steps, in order, are <code>cut</code>, <code>check</code>, <code>zip</code>, <code>volume</code>, <code>upload</code>, <code>notebook</code>, <code>report</code>, <code>fuseki</code>, <code>neo4j</code>, <code>enterprise</code>, <code>sync</code> and <code>summary</code>. Each step's result is a file in <code>C:\kpi-store-local\runs</code>, in the run's folder, under <code>steps</code>.</p>
+<div class="tblwrap"><table><thead><tr><th>Step that failed</th><th>Likely cause</th><th>What to do</th></tr></thead><tbody><tr><td><code>cut</code></td><td>You typed another answer, or a row's <code>decided_by</code> is not a role.</td><td>Correct the file if the line says so. Run the same command again.</td></tr><tr><td><code>check</code></td><td>A check of the release failed. The line names <code>check.log</code> in the run's folder.</td><td>Read the end of <code>check.log</code>. See "What ran where" for the one case in which you may leave the step out.</td></tr><tr><td><code>zip</code></td><td>A file in the release folder sets a password.</td><td>Move that file out of the release folder. Run <code>py -m kpi_store.runner --from zip</code>.</td></tr><tr><td><code>volume</code>, <code>upload</code></td><td>The sign-in expired, or you may not create the schema.</td><td>Sign in again. If the line prints two SQL statements, run them in a Databricks SQL editor. Then run <code>py -m kpi_store.runner --from volume</code>.</td></tr><tr><td><code>notebook</code></td><td>The notebook run failed, or it still runs after 60 minutes.</td><td>Read the reason in the line. Run <code>py -m kpi_store.runner --from notebook</code>. A run that still runs is waited for again, not started twice.</td></tr><tr><td><code>fuseki</code></td><td>Java or the jar is missing, or the port is in use.</td><td>Run the setup check. Then run <code>py -m kpi_store.runner --from fuseki</code>.</td></tr><tr><td><code>neo4j</code></td><td>The local instance is stopped, or a plugin is missing.</td><td>Start the instance. Run the setup check. Then run <code>py -m kpi_store.runner --from neo4j</code>.</td></tr><tr><td><code>enterprise</code></td><td>The server did not answer, or the database holds nodes.</td><td>Read the line. For KPI Store nodes of another release, see "Replace what Enterprise holds". For any other node, stop and ask whose it is.</td></tr><tr><td><code>sync</code></td><td>A store is not current. The lines above name it.</td><td>Run the runner from the step that loads that store.</td></tr></tbody></table></div>
+<p>A store load never runs after a notebook run that did not load. The run then stops with exit code 3 and says why.</p>
+<p>To run one store's load by itself, use <code>--only</code> and the step's name, as "What the runner does, step by step" shows. The runner hands each load the technical graph's file. A load module started alone, such as <code>py -m kpi_store.load_fuseki</code>, does not know that file. The Fuseki load then stops, because it finds the technical graph's named graph and cannot tell whose it is.</p>
+<h2 id="record-the-load-s-report-in-the-release-folder">Record the load's report in the release folder<a class="hl" href="#record-the-load-s-report-in-the-release-folder" aria-label="Link to this section">#</a></h2>
+<p>The release folder holds a summary of the last Neo4j load, <code>business_architecture\ontology\projection\projection-report.json</code>. After a cut it describes the release before the cut. The check script then prints a note that the report describes an earlier build. The note does not fail the check. This step replaces the summary with the one of your load.</p>
+<ol><li>Go to the projection's folder.</li><li>Take the load's result into the release folder. Write the folder that <code>[projection]</code> <code>out</code> names in your local settings in place of <code>&lt;your Neo4j load folder&gt;</code>.
+<pre><code class="lang-powershell">cd business_architecture/ontology/projection
+py pipeline.py record --run &lt;your Neo4j load folder&gt;
+cd ../../..</code></pre>
+<pre><code class="lang-text">...
+recorded: &lt;count&gt; nodes, &lt;count&gt; relationships, &lt;count&gt; triples and 2 inferred</code></pre></li></ol>
+<ol start="3"><li>Run the sync check again. Every line must still read <code>current</code>, because the record changes no package.
+<pre><code class="lang-powershell">py -m kpi_store.sync_check</code></pre></li></ol>
+<p>The command refuses a load that read other files than this release folder's, and a load whose report did not pass.</p>
+<h2 id="how-to-undo">How to undo<a class="hl" href="#how-to-undo" aria-label="Link to this section">#</a></h2>
+<p>Each store is a copy of the release folder. You can empty a store and load it again at any time. This section returns each store to its state before your first run.</p>
+<h3 id="the-release-folder">The release folder<a class="hl" href="#the-release-folder" aria-label="Link to this section">#</a></h3>
+<p>The cut is the only step that changed the release folder.</p>
+<ol><li>Rename <code>C:\kpi-store-1.1</code>, for example to <code>C:\kpi-store-1.1-with-correction</code>.</li><li>Unpack <code>kpi-store-1.1.zip</code> again, as in "Unpack the release".</li></ol>
+<p>The stores then read <code>behind</code> until you load them again from that folder.</p>
+<h3 id="databricks">Databricks<a class="hl" href="#databricks" aria-label="Link to this section">#</a></h3>
+<p>Before the first run, the two schemas held no KPI Store table.</p>
+<p><strong>These statements delete the KPI Store's four tables.</strong> They touch no other table.</p>
+<ol><li>Open a SQL editor in the Databricks workspace.</li><li>Run these statements.
+<pre><code class="lang-sql">DROP TABLE IF EXISTS idp_sbx.kpi_store.epm_triples;
+DROP TABLE IF EXISTS idp_sbx.kpi_store.epm_store_markers;
+DROP TABLE IF EXISTS idp_sbx.tech_graph.tech_graph_triples;
+DROP TABLE IF EXISTS idp_sbx.tech_graph.tech_graph_markers;</code></pre></li></ol>
+<ol start="3"><li>To remove the uploaded zip, the settings copy and the reports too, drop the volume. <strong>This deletes every report the runs wrote.</strong>
+<pre><code class="lang-sql">DROP VOLUME IF EXISTS idp_sbx.kpi_store.releases;</code></pre></li></ol>
+<ol start="4"><li>To remove the two schemas, drop them without <code>CASCADE</code>. Databricks then refuses a schema that still holds anything, so nothing of anyone else's can be lost.
+<pre><code class="lang-sql">DROP SCHEMA IF EXISTS idp_sbx.kpi_store;
+DROP SCHEMA IF EXISTS idp_sbx.tech_graph;</code></pre></li></ol>
+<ol start="5"><li>In the workspace browser, delete the notebook <code>kpi_store_load</code> from the folder that your local settings name.</li></ol>
+<h3 id="fuseki-2">Fuseki<a class="hl" href="#fuseki-2" aria-label="Link to this section">#</a></h3>
+<ol><li>Stop the Fuseki that the load started. The command stops only that process.
+<pre><code class="lang-powershell">py -m kpi_store.load_fuseki --stop</code></pre>
+<pre><code class="lang-text">fuseki: stopped process &lt;number&gt;</code></pre></li></ol>
+<ol start="2"><li>In File Explorer, delete the folder <code>C:\kpi-store-local\fuseki-db</code>. The dataset is gone with it.</li></ol>
+<h3 id="the-local-neo4j">The local Neo4j<a class="hl" href="#the-local-neo4j" aria-label="Link to this section">#</a></h3>
+<p>The load emptied the local database before it loaded. What that database held before cannot come back. This is why the setup asks for a new instance.</p>
+<ol><li>To remove the KPI Store's copy, delete the instance in Neo4j Desktop.</li></ol>
+<h3 id="neo4j-enterprise">Neo4j Enterprise<a class="hl" href="#neo4j-enterprise" aria-label="Link to this section">#</a></h3>
+<p>Before the first run, <code>businessprocessarchitecturegraph</code> held no node. The setup check's <code>neo4j-enterprise</code> line showed that.</p>
+<p><strong>The first statement deletes every node in the database you are connected to.</strong> Run it only in <code>businessprocessarchitecturegraph</code>, and only if that database held 0 nodes before your first run.</p>
+<ol><li>Open Neo4j Browser or the Query tool on the Enterprise server.</li><li>Choose the database <code>businessprocessarchitecturegraph</code>.</li><li>Check which database you are in. The answer must be <code>businessprocessarchitecturegraph</code>.
+<pre><code class="lang-cypher">CALL db.info() YIELD name RETURN name</code></pre></li></ol>
+<ol start="4"><li>Delete the nodes, then the one constraint the copy made.
+<pre><code class="lang-cypher">MATCH (n) CALL (n) { DETACH DELETE n } IN TRANSACTIONS OF 10000 ROWS;
+DROP CONSTRAINT n10s_unique_uri IF EXISTS;</code></pre></li></ol>
+<h3 id="the-runs-files">The runs' files<a class="hl" href="#the-runs-files" aria-label="Link to this section">#</a></h3>
+<ol><li>Delete the folder <code>C:\kpi-store-local\runs</code> to remove every run's files and reports from your machine.</li></ol>
+<h2 id="where-you-can-run-it-from">Where you can run it from<a class="hl" href="#where-you-can-run-it-from" aria-label="Link to this section">#</a></h2>
+<h3 id="a-laptop">A laptop<a class="hl" href="#a-laptop" aria-label="Link to this section">#</a></h3>
+<p>This is the design of this release. One person runs the runner on a Windows machine that reaches Databricks, the local stores and the Enterprise server.</p>
+<div class="tblwrap"><table><thead><tr><th>Machine</th><th>State</th></tr></thead><tbody><tr><td>Windows 10 or 11</td><td>The design. The check script, the three store loads and the sync check ran on Windows in the test job. The runner itself has not run there. "What ran where" lists what that leaves open.</td></tr><tr><td>macOS</td><td>Every run of this guide's chain so far happened here. Write <code>python3</code> where this guide writes <code>py</code>. Git Bash and <code>setx</code> are not needed.</td></tr></tbody></table></div>
+<h3 id="a-pipeline">A pipeline<a class="hl" href="#a-pipeline" aria-label="Link to this section">#</a></h3>
+<p>This is not part of this release's tested path. The paragraphs below say what the code does today.</p>
+<p>A run that finds no report to cut asks nothing. The document test runs the third run of this guide with no keyboard attached, and it passes. So a scheduler can start the same command, <code>py -m kpi_store.runner</code>, and read its exit code.</p>
+<p>Two things need a person today.</p>
+<div class="tblwrap"><table><thead><tr><th>What</th><th>Why a pipeline cannot do it</th></tr></thead><tbody><tr><td>Clearing the report</td><td>It is a judgement. A run that finds a blocking row ends with exit code 3 and waits.</td></tr><tr><td>The cut's two answers</td><td>The cut tool reads them from the keyboard. With no keyboard it changes nothing and the run ends with exit code 1.</td></tr></tbody></table></div>
+<p>The sign-in is the third limit. Today it is <code>databricks auth login</code>, which opens a browser, and its session expires. A pipeline has no browser. This release makes and stores no token, so it has no other way in.</p>
+<p>A service principal changes that. Databricks' page "Authorize service principal access with OAuth M2M" (last updated 2026-10-30, <code>https://docs.databricks.com/aws/en/dev-tools/auth/oauth-m2m</code>) describes the sign-in: OAuth for machines, with a client ID and a client secret. The runner passes <code>--profile</code> and the profile's name to every Databricks command. The sync check opens the Databricks SDK with the same profile. So the pipeline needs a profile in the file <code>.databrickscfg</code> in its home folder, with the three fields that the page names:</p>
+<pre><code class="lang-ini">[kpi-store-pipeline]
+host          = &lt;your workspace URL&gt;
+client_id     = &lt;the service principal's client ID&gt;
+client_secret = &lt;the service principal's secret&gt;</code></pre>
+<p>The pipeline writes that file from its secret store when a job starts, and deletes it when the job ends. <code>[databricks]</code> <code>profile</code> in the local settings then names <code>kpi-store-pipeline</code>. No run of this release has used such a profile.</p>
+<h3 id="inside-databricks">Inside Databricks<a class="hl" href="#inside-databricks" aria-label="Link to this section">#</a></h3>
+<p>Part of the chain already runs there. The <code>notebook</code> step is a serverless job run in the workspace. It covers the comparison, the report, the load of <code>epm_triples</code> and the technical graph's tables.</p>
+<div class="tblwrap"><table><thead><tr><th>Part</th><th>Inside Databricks today</th></tr></thead><tbody><tr><td>The comparison, the report and the Databricks load</td><td>Yes. The notebook does them.</td></tr><tr><td>A schedule</td><td>Not built. A Databricks job could run the notebook <code>kpi_store_load</code> on a schedule with the parameter <code>mode</code> set to <code>check</code>, which writes the report and loads nothing. This release ships no job definition.</td></tr><tr><td>The zip and the settings in the volume</td><td>No. The runner uploads them from your machine.</td></tr><tr><td>The cut</td><td>No. It changes the release folder and asks a person.</td></tr><tr><td>The Fuseki load and the two Neo4j loads</td><td>No. They need a network path from Databricks to those servers, and this release assumes none.</td></tr></tbody></table></div>
+<h2 id="what-changes-later">What changes later<a class="hl" href="#what-changes-later" aria-label="Link to this section">#</a></h2>
+<p>Nothing in this section is part of this release's tested path.</p>
+<h3 id="with-a-databricks-service-principal">With a Databricks service principal<a class="hl" href="#with-a-databricks-service-principal" aria-label="Link to this section">#</a></h3>
+<div class="tblwrap"><table><thead><tr><th>Topic</th><th>Today</th><th>With a service principal</th></tr></thead><tbody><tr><td>Who runs the job</td><td>You. The notebook runs with your rights.</td><td>The service principal. It needs the rights the run uses: to create the two schemas and the volume in the write catalog, to read the read catalogs and the three system schemas, to read the Genie spaces, and to write the workspace folder.</td></tr><tr><td>The sign-in</td><td><code>databricks auth login</code> in a browser.</td><td>A profile with a client ID and a secret, as "A pipeline" shows. Nobody signs in.</td></tr><tr><td>The schedule</td><td>You start each run.</td><td>A scheduler starts the runner, or a Databricks job runs the notebook in <code>check</code> mode.</td></tr><tr><td>What stays manual</td><td>Clearing the report and the cut's two answers.</td><td>The same.</td></tr></tbody></table></div>
+<h3 id="with-n10s-and-apoc-on-neo4j-enterprise">With n10s and APOC on Neo4j Enterprise<a class="hl" href="#with-n10s-and-apoc-on-neo4j-enterprise" aria-label="Link to this section">#</a></h3>
+<p>Today the load runs on a local Neo4j that has the two plugins, and a copy in plain Cypher takes the checked graph to Enterprise. That is what the code supports.</p>
+<p>With the plugins on Enterprise, the load and the SHACL checks could run there directly. That is not built. Pointing <code>[neo4j.local]</code> at the Enterprise database is not the way: the load empties the database it is pointed at, every node of it, and the limit of this release is that it deletes KPI Store nodes only. A direct load needs new code that removes only the KPI Store's nodes before it loads, as the copy does today. Until then, keep the local Neo4j and the copy.</p>
+<h2 id="what-ran-where">What ran where<a class="hl" href="#what-ran-where" aria-label="Link to this section">#</a></h2>
+<p>Three places ran parts of this guide. No place ran all of it, and nothing ran on the client's sandbox or the client's Enterprise server.</p>
+<div class="tblwrap"><table><thead><tr><th>Place</th><th>What ran there</th></tr></thead><tbody><tr><td>macOS, with a rehearsal Databricks workspace in the sandbox's shapes, a local Fuseki 6.2.0 and a local Neo4j 2025.06.2 Enterprise with n10s 2025.06.1 and APOC 2025.06.2</td><td>The whole chain of this guide, through the runner: every command that the document test runs.</td></tr><tr><td>The Windows test job (Windows Server 2025, Python 3.12, Java 21)</td><td>The whole check script. The setup check, 13 of its 15 checks. The Fuseki load, a second load that changed nothing, its sync check and <code>--stop</code>. The Neo4j Enterprise load with n10s and APOC and all its checks: 4,242 nodes, 22,331 relationships, 816 of 816 failing cases caught and 0 violations. The copy into <code>businessprocessarchitecturegraph</code> on the same server. The sync check of all three stores.</td></tr><tr><td>The client's sandbox and Enterprise server</td><td>Nothing yet. Your first run is the first.</td></tr></tbody></table></div>
+<p>These points are not proven on Windows. Each is written from the code and from the vendor's documentation.</p>
+<div class="tblwrap"><table><thead><tr><th>What</th><th>Why it is not proven</th><th>If it fails</th></tr></thead><tbody><tr><td>The runner itself, as one command</td><td>The Windows job ran the check script and the loads one by one, not through the runner.</td><td>Run the steps one at a time with <code>--only</code>, and report the step that failed.</td></tr><tr><td>Every Databricks step, and the two Databricks checks of the setup check</td><td>The Windows job has no workspace to sign in to. They ran on macOS.</td><td>Report the line.</td></tr><tr><td>The technical graph in the three stores</td><td>It is built by the notebook, so it needs Databricks. It ran on macOS.</td><td>Report the line.</td></tr><tr><td>Every step of "Install the programs" and "Unpack the release"</td><td>No test installs programs.</td><td>Report the step.</td></tr><tr><td>The steps of "Set up the local Neo4j"</td><td>The Windows job used a Neo4j server, not Neo4j Desktop. The steps follow Neo4j Desktop's documentation ("Instance management"), and menu names may differ in your version.</td><td>Reach the same goal by the menu your version has. The setup check proves the result.</td></tr><tr><td><code>setx KPI_STORE_LOCAL</code> and <code>setx PY_PYTHON</code></td><td>They change your account's settings, so no test runs them.</td><td>Add <code>--stores C:\kpi-store-local\stores.toml</code> to every command of this guide instead.</td></tr><tr><td>Clearing the report in Excel</td><td>The test edits the file with Python. The runner reads the CSV as UTF-8, with or without a byte-order mark, and reads only the columns <code>id</code>, <code>decision</code>, <code>decided_by</code> and <code>note</code>.</td><td>Edit the same three cells in Notepad instead. They are the last three values of each line.</td></tr><tr><td>The SQL of "How to undo"</td><td>It deletes, so no test runs it. The Cypher ran once on a local test server and left 0 nodes and 0 constraints.</td><td>Do not improvise. Report it.</td></tr><tr><td><code>--replace-enterprise</code></td><td>No run needed it.</td><td>Report the line.</td></tr><tr><td>The rows of "The rows to expect on the sandbox"</td><td>They come from a comparison by hand. The rehearsal workspace gave the one blocking row and the two case-only rows. It has no Genie space, so no test produced the Genie rows.</td><td>Follow "When your report differs from the table".</td></tr></tbody></table></div>
+<p>The check script passes on Windows in the test job. Your machine is another machine, with its own antivirus and its own folders, so one fallback stays. If the step <code>check</code> fails, read the end of <code>check.log</code>. If the failing test is about the release's content, stop and report it. If it is about the machine, such as a file that another program holds open, report it and leave the step out of the run:</p>
+<pre><code class="lang-powershell">py -m kpi_store.runner --skip check</code></pre>
+<p>A run with a step left out never says <code>every step passed</code>. Its last line names the step that was left out. On the first run the release folder is the one that was checked before it was zipped. After the cut, the cut tool has already verified each package it wrote against a fresh build and has run the competency questions.</p>
+      <p class="end">Generated from <code>ontology-stores-runbook.md</code> by <code>scripts/build_docs_html.py</code>. Start with the <a href="../epm-ontology-guide.html">ontology guide</a>.</p>
+    </article>
+  </div>
+</div>
+<script>
+(function () {
+  if (navigator.clipboard) {
+    document.querySelectorAll("pre").forEach(function (pre) {
+      var b = document.createElement("button");
+      b.className = "copy"; b.type = "button"; b.textContent = "Copy";
+      b.addEventListener("click", function () {
+        navigator.clipboard.writeText(pre.querySelector("code").innerText).then(function () {
+          b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1500);
+        });
+      });
+      pre.appendChild(b);
+    });
+  }
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute("href").slice(1)] = a; });
+  var heads = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); })
+    .filter(Boolean);
+  if (!("IntersectionObserver" in window) || !heads.length) return;
+  var current = null;
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) {
+        if (current) current.classList.remove("on");
+        current = byId[e.target.id];
+        if (current) current.classList.add("on");
+      }
+    });
+  }, { rootMargin: "-60px 0px -75% 0px" });
+  heads.forEach(function (h) { io.observe(h); });
+  if (window.matchMedia("(max-width: 960px)").matches) {
+    var d = document.querySelector(".toc details");
+    if (d) d.removeAttribute("open");
+  }
+})();
+</script>
+</body>
+</html>

@@ -7,5 +7,3 @@
 # Documents that wait for their rewrite for this release.
 README.md :: awaits the documents rewrite
 KNOWN-OPEN-ITEMS.md :: awaits the documents rewrite
-HOW-TO-UPDATE.md :: awaits the documents rewrite
-HOW-TO-UPDATE.html :: the page is rebuilt from the Markdown after its rewrite

@@ -90,7 +90,10 @@ def test_a_refused_statement_never_reaches_the_session_or_a_transaction():
 
 BASES = ["https://w3id.org/mpc/ontology/modules/data-product/", "https://w3id.org/mpc/ontology/modules/kpi/"]
 PARAMS = {"bases": BASES, "store": "enterprise", "prefixes": ["dp_", "n4sch_", "owl_", "skos_"],
-          "tech_base": "urn:kpi-store:tech:", "tech_classes": ["MetricView", "Table"]}
+          "tech_base": "urn:kpi-store:tech:", "tech_classes": ["MetricView", "Table"],
+          "lm_slugs": ["sample-model"], "lm_bases": ["https://www.erstudio.com/semanticmodel/"],
+          "lm_labels": ["Entity", "LogicalModel", "Model"]}
+LM_MARKS = {"slugs": ["sample-model"], "bases": {"https://www.erstudio.com/semanticmodel/"}, "labels": {"LogicalModel", "Model", "Entity"}}
 TECH = "urn:kpi-store:tech:idp_sbx+synapse_dev:object/"
 KPI_TAG = "https://w3id.org/mpc/ontology/modules/kpi/1.0.0"
 
@@ -103,7 +106,9 @@ def held_target(hash_="hash-1"):
 
 
 def test_the_rules_read_the_module_iris_the_store_name_and_the_projections_label_prefixes():
-    assert ce.own_params(BASES, ["skos", "owl", "dp"], ["Table", "MetricView"]) == PARAMS
+    assert ce.own_params(BASES, ["skos", "owl", "dp"], ["Table", "MetricView"], logical_models=LM_MARKS) == PARAMS
+    # A release with no logical model owns no LogicalModel node at all.
+    assert ce.own_params(BASES, [])["lm_slugs"] == [] and ce.own_params(BASES, [])["lm_bases"] == []
 
 
 def test_the_technical_graphs_class_names_come_from_its_newest_package():
@@ -121,7 +126,7 @@ def test_the_technical_graphs_class_names_come_from_its_newest_package():
 def test_holdings_tell_the_kpi_stores_nodes_from_the_others():
     db = held_target()
     db.add(["Resource", "skos_Concept", "n4sch_Class"], uri="urn:sample:concept", graph=KPI_TAG)   # a projected node's labels
-    db.add(["LogicalModel", "Entity"], 4, uri="urn:sample:entity", models=["sample-model"])
+    db.add(["LogicalModel", "Entity"], 4, uri="https://www.erstudio.com/semanticmodel/SampleEntity", models=["sample-model"])
     db.add(["Tech", "Table"], 3, uri=TECH + "idp_sbx.gold_sample.sample_fact", name="idp_sbx.gold_sample.sample_fact")
     db.add(["TechGraphMarker"], store="enterprise", digest="d1", triples=9)
     assert ce.holdings(db, PARAMS) == {"nodes": 17, "own": {"Resource": 6, "ModuleRelease": 2, "EpmStoreMarker": 1, "LogicalModel": 4,
@@ -144,6 +149,11 @@ def test_holdings_tell_the_kpi_stores_nodes_from_the_others():
     (["Module"], {"uri": "https://other.example/module/1.0.0"}),
     (["EpmStoreMarker"], {"store": "enterprise"}),
     (["LogicalModel"], {"name": "someone else's model"}),
+    # Another writer's logical model: the label, a uri and a slug or models, as the KPI Store's own nodes have.
+    (["LogicalModel"], {"uri": "urn:other:model", "slug": "other-model"}),
+    (["LogicalModel", "Entity"], {"uri": "urn:other:entity", "models": ["sample-model"]}),                       # our slug, another base
+    (["LogicalModel", "Entity"], {"uri": "https://www.erstudio.com/semanticmodel/Thing", "models": ["other-model"]}),   # our base, another slug
+    (["LogicalModel", "Customer"], {"uri": "https://www.erstudio.com/semanticmodel/Thing", "models": ["sample-model"]}),  # a label the load never gives
     (["LogicalModelMarker"], {"store": "enterprise"}),
     # A marker of another store, although it has a marker's fields.
     (["EpmStoreMarker"], {"store": "neo4j", "catalog_digest": "abc"}),

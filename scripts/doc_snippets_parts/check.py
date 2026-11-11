@@ -258,7 +258,7 @@ class Checker:
     # -- run
 
     def _tag_run(self, block, previous):
-        error = self._only(block, attrs=("exit", "os"), flags=("define", "status-only"))
+        error = self._only(block, attrs=("exit", "os", "types"), flags=("define", "status-only"))
         if error:
             return self._fail(block, error)
         if block.lang not in RUN_LANGS:
@@ -285,6 +285,9 @@ class Checker:
         values, error = self._placeholder_values(block, context)
         if error:
             return self._fail(block, error)
+        answers = [answer.strip() for answer in block.attrs.get("types", "").split(",")] if "types" in block.attrs else []
+        if "types" in block.attrs and not all(answers):
+            return self._fail(block, "types= holds what the reader types at each prompt, with commas between the answers")
         if block.lang in ("powershell", "cmd") and wanted_os != "windows":
             # Read the lines now, so a line that needs a shell fails on every machine, also where nothing runs.
             for n, line in command_lines(block.lang, PLACEHOLDER.sub("x", block.body)):
@@ -313,7 +316,7 @@ class Checker:
             return self._fail(block, f"not run: the block at line {instance.failed_at} of the same context failed")
         body = self._fill(block.body, values)
         instance.count += 1
-        status, output, problem = self.runner.execute(block, instance, body, wanted_os)
+        status, output, problem = self.runner.execute(block, instance, body, wanted_os, "".join(a + "\n" for a in answers) or None)
         if problem:
             instance.failed_at = str(block.line)
             return self._fail(block, problem, output)

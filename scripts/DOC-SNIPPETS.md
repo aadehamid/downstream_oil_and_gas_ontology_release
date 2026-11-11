@@ -106,6 +106,25 @@ the report has 1 blocking row
 ```
 ````
 
+When a command asks the reader a question, give the answers in `types=`, with commas between them. The check
+types each answer and a line end at the command's prompts, in that order. In a PowerShell or cmd block the
+answers go to the last line's command. Say in the text around the block what the reader types and why. A
+command that asks and gets no `types=` reads nothing and fails.
+
+````markdown nested
+```python run=scratch types="Change_Value_Amount,yes"
+name = input("Type the new name to confirm: ")
+answer = input("Type yes to cut: ")
+print()
+print("typed", name, "and", answer)
+```
+
+```text expect
+Type the new name to confirm: Type yes to cut:
+typed Change_Value_Amount and yes
+```
+````
+
 ## Commands for Windows
 
 Write a command for Windows in a `powershell` or `cmd` block, with the `py` launcher. The check reads each line
@@ -310,8 +329,16 @@ its commands with that in mind.
 | `release-copy` | A copy of the release as a plain folder. | Always. |
 | `release-git` | A copy of the release in a new Git repository with one commit. | Always. |
 | `slow` | The same as `release-git`, for commands that take minutes. | `DOC_SNIPPETS_SLOW` is set. |
+| `correction` | A Git copy of its own for the update guide's cut of the made-up report, which ends with the whole check. | `DOC_SNIPPETS_SLOW` is set. |
+| `new-module` | A Git copy of its own for the made-up module of the update guide. | `DOC_SNIPPETS_SLOW` is set. |
 | `stores` | A copy of the release beside a local Fuseki and a local Neo4j test server. | `KPI_STORE_TEST_FUSEKI_URL` and `KPI_STORE_TEST_NEO4J_URI` are set. |
 | `databricks-free` | A copy of the release with the rehearsal workspace's profile. It keeps the real home folder. | `KPI_STORE_TEST_DATABRICKS_PROFILE` is set. |
+| `first-run` | A copy of the release as a plain folder, with a prepared local settings file. It keeps the real home folder. | `KPI_STORE_TEST_LOCAL_SETTINGS` and `KPI_STORE_TEST_LPG_OUT` are set. |
+
+The `first-run` context is for the runbook, whose commands find the local settings file through the variable
+`KPI_STORE_LOCAL`. The context gives its blocks that variable, with the value of `KPI_STORE_TEST_LOCAL_SETTINGS`.
+The file must name test stores and a rehearsal workspace, never the client's. `KPI_STORE_TEST_LPG_OUT` is the folder that the file's `[projection]` `out` names. No block of another context gets
+`KPI_STORE_LOCAL`, also when your own terminal has it set.
 
 A context is one chain. When its variable is not set, the check counts every block of the context as skipped and
 prints the count with the variable to set. So keep the quick, independent commands in a context that always

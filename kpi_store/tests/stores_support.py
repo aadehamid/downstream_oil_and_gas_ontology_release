@@ -54,7 +54,10 @@ def owns(labels, props, params):
                 or ("ModuleRelease" in labels and under(props.get("version_iri")))
                 or ("Module" in labels and under(props.get("uri")))
                 or ("EpmStoreMarker" in labels and props.get("store") == params["store"] and props.get("catalog_digest") is not None)
-                or ("LogicalModel" in labels and props.get("uri") is not None and (props.get("models") is not None or props.get("slug") is not None))
+                or ("LogicalModel" in labels and str(props.get("uri") or "").startswith(tuple(params["lm_bases"]) or ("\0",))
+                    and all(label in params["lm_labels"] for label in labels)
+                    and (props.get("slug") in params["lm_slugs"]
+                         or bool(props.get("models")) and all(m in params["lm_slugs"] for m in props["models"])))
                 or ("LogicalModelMarker" in labels and props.get("store") == params["store"] and props.get("digest") is not None)
                 or ("Tech" in labels and str(props.get("uri") or "").startswith(params["tech_base"])
                     and all(label == "Tech" or label in params["tech_classes"] for label in labels))

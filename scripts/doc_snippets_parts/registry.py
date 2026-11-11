@@ -39,6 +39,7 @@ class Context:
     home: str = "temporary"                     # "real" keeps the reader's home, for a signed-in command line
     timeout: int = 120                          # seconds for one block
     placeholders: dict = field(default_factory=dict)
+    set_env: dict = field(default_factory=dict)  # variables a block gets: text, or env:NAME for another variable's value
     about: str = ""
 
     def missing(self, environ) -> list:
@@ -69,7 +70,7 @@ def load_registry(path: Path = REGISTRY) -> Registry:
     contexts = {}
     for name, raw in data.get("contexts", {}).items():
         raw = dict(raw)
-        extra = set(raw) - {"base", "git", "needs_env", "pass_env", "home", "timeout", "placeholders", "about"}
+        extra = set(raw) - {"base", "git", "needs_env", "pass_env", "home", "timeout", "placeholders", "set_env", "about"}
         if extra:
             raise RegistryError(f"{path.name}: context {name} has unknown key {sorted(extra)}")
         if raw.get("base") not in ("empty", "release-copy"):
@@ -79,5 +80,6 @@ def load_registry(path: Path = REGISTRY) -> Registry:
         contexts[name] = Context(name=name, base=raw["base"], git=bool(raw.get("git", False)),
                                  needs_env=tuple(raw.get("needs_env", ())), pass_env=tuple(raw.get("pass_env", ())),
                                  home=raw.get("home", "temporary"), timeout=int(raw.get("timeout", 120)),
-                                 placeholders=dict(raw.get("placeholders", {})), about=raw.get("about", ""))
+                                 placeholders=dict(raw.get("placeholders", {})), set_env=dict(raw.get("set_env", {})),
+                                 about=raw.get("about", ""))
     return Registry(contexts=contexts, reasons=reasons, temporary=temporary)

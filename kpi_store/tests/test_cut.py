@@ -384,8 +384,11 @@ def test_the_change_value_rename_goes_through_the_whole_cut_in_a_plain_folder_an
     # The catalog, the projection manifest and the folders agree, which the load requires.
     from kpi_store import load_databricks as ld
     newest = ld.expected(root)["newest"]
-    assert "https://w3id.org/mpc/ontology/modules/data-product/1.2.1-correction.1" in newest and len(newest) == 13
-    assert len(ld.release_graphs(root)) == 41
+    # A cut adds no module and drops none. The counts are this tree's own before the cut (13 modules and 41 graphs
+    # in the release as shipped), so the test also holds on a copy that has onboarded a module.
+    assert "https://w3id.org/mpc/ontology/modules/data-product/1.2.1-correction.1" in newest
+    assert len(newest) == len(ld.expected(support.ROOT)["newest"])
+    assert len(ld.release_graphs(root)) == len(ld.release_graphs(support.ROOT))
     projection = json.loads((root / ONTOLOGY / "projection" / "projection-manifest.json").read_text(encoding="utf-8"))
     assert "releases/data-product/1.2.1-correction.1/data-product.ttl" in projection["inputs"]
     assert not any("/1.2.0/" in p for p in projection["inputs"] if p.startswith("releases/data-product/"))

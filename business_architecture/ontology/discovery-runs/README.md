@@ -19,11 +19,20 @@ The order is 1.2.0, 1.2.1-correction.1, 1.2.1-correction.2, 1.2.2. One function 
 
 Run the tool from the release's top folder. It needs Python 3.11 or later with `rdflib` and `pyshacl`. It needs no Java, no bash and no Git.
 
-```powershell skip reason="awaits-the-rewrite: the step-by-step guides will run the cut in a test"
-py -m kpi_store.cut --report discovery-report.json --approver "the ontology owner"
+```powershell run=release-copy
+py -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --decisions kpi_store/tests/fixtures/cut/cleared-decisions.csv --approver "the ontology owner" --plan
 ```
 
-- `--report` names the report's JSON file. To use decisions written in the CSV file, add `--decisions discovery-report.csv`, or give the CSV file as `--report` when the JSON file lies beside it.
+```text expect
+Discovery run 20261111T120000Z-0a1b2c3d of KPI Store 1.1: 28 rows.
+The cut applies (4):
+...
+  integration 2.5.0 -> 2.5.1-correction.1
+```
+
+The example names the made-up report and decisions that ship with the tests, and `--plan` changes nothing. For your report, name its two files and leave `--plan` out. `HOW-TO-UPDATE.md`, "See the cut by itself", runs the whole cut on the same report.
+
+- `--report` names the report's JSON file. To use decisions written in a CSV file, add `--decisions` and that file, or give the CSV file as `--report` when the JSON file of the same name lies beside it.
 - `--approver` is optional. Write the role or the initials of the person who cleared the report, such as "the ontology owner". The tool refuses anything else: it takes letters, digits, spaces, dots, hyphens and apostrophes, at most 60 characters, at least one letter, and no number of four digits or more. The same rule holds for the "decided by" of each row in the report. The record is committed, so it must hold no address and no phone number.
 - `--plan` shows what the cut would do and changes nothing.
 
@@ -51,8 +60,13 @@ A plain folder, one with no `.git` folder, needs no Git. The tool writes the sam
 
 After a cut, run the full check before you load any store. On Windows, run it in Git Bash:
 
-```bash skip reason="awaits-the-rewrite: the step-by-step guides will run the check after a cut in a test"
+```bash run=slow
 bash scripts/check.sh
+```
+
+```text expect
+...
+all checks passed
 ```
 
 ## What each decision does

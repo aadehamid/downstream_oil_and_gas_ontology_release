@@ -147,6 +147,9 @@ def all_pages():
                "How the released packages are projected into a Neo4j property graph and checked."),
         single(f"{ONT}/projection/skill-run/README.md",
                "How the ontology-to-lpg skill's driver runs on these releases, with every store and check."),
+        single(f"{ONT}/projection/ontology-stores-runbook.md",
+               "The first run on the client sandbox, step by step: the setup, the first report, the cut, the loads "
+               "of the three stores and the sync check.", scope="KPI Store"),
         single("business_architecture/domain/business-glossary.md",
                "The business terms the ontology and its documents use, each defined once."),
     ]

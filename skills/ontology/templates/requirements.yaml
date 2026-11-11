@@ -1,6 +1,6 @@
 # Copy before Step 0 as the build's intake and requirements file (references/governance.md,
 # "Before modelling"). Fill every field; replace the library example. Check it with:
-#   uv run --with pyyaml python3 <skill>/scripts/check_requirements.py requirements.yaml
+#   uv run --with pyyaml python <skill>/scripts/check_requirements.py requirements.yaml
 #
 # Schema. The check enforces the structure: every field present, each value of the stated type
 # (text is a non-empty string), every value from its list, ids unique, and the record rules.

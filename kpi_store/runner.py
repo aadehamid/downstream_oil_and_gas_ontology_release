@@ -233,6 +233,9 @@ def cleared_report(pending):
             rows = list(csv.DictReader(f))
     except OSError:
         raise Stop(f"the report in {pending} has no {TO_CLEAR}; run the report step again") from None
+    except UnicodeDecodeError:   # a spreadsheet saved the file in the machine's own encoding
+        raise Stop(f"save {path} as UTF-8: in Excel choose File, Save As, and the file type \"CSV UTF-8 (Comma "
+                   "delimited)\"; then run the same command again") from None
     blocks = {row["id"]: row["blocks"] for row in report["rows"]}
     found = [row.get("id") or "" for row in rows]
     missing, unknown = sorted(set(blocks) - set(found)), sorted(set(found) - set(blocks))
@@ -791,12 +794,15 @@ def step_enterprise(ctx):
         return {"status": "dry-run", "line": "would copy the verified graph to the Enterprise database"}
     from . import copy_enterprise
     rules = ctx.hooks["own_rules"] or copy_enterprise.OWN_RULES
+    ctx.run_dir.mkdir(parents=True, exist_ok=True)   # --only enterprise may be the first step of a run
     try:
         with (ctx.run_dir / "enterprise.log").open("a", encoding="utf-8", newline="\n") as log:
             result = copy_enterprise.copy(ctx.local, ctx.release_root, replace=ctx.replace_enterprise,
                                           extra_loads=neo4j_extras(ctx), own_rules=rules, log=log)
     except copy_enterprise.Refused as err:
-        raise StepFailed(str(err)) from None
+        # The copy's own command takes --replace. Here the person runs the runner, whose option has another name.
+        raise StepFailed(re.sub(r"Run the command again with --replace\b", "Run the runner again with --from enterprise "
+                                "--replace-enterprise", str(err))) from None
     except Exception as err:   # only the error's type is printed: a driver error's text can carry an address
         raise StepFailed(f"a Neo4j server did not answer, or a statement failed ({type(err).__name__})") from None
     return {**result, "line": copy_enterprise.line(result).split(": ", 1)[1]}
