@@ -186,8 +186,8 @@ def test_a_pending_file_hides_no_file_with_a_longer_name(tmp_path):
 
 
 def test_a_pending_line_that_matches_no_file_fails(tmp_path):
-    root = tree(tmp_path, {"a.md": "fine\n"}, pending="README.md :: awaits its rewrite\n")
-    assert cs.check(root)[1] == ["scripts/standalone-pending.txt: `README.md` is not a file in this tree; remove the line"]
+    root = tree(tmp_path, {"a.md": "fine\n"}, pending="HOW-TO-UPDATE.md :: awaits its rewrite\n")
+    assert cs.check(root)[1] == ["scripts/standalone-pending.txt: `HOW-TO-UPDATE.md` is not a file in this tree; remove the line"]
     assert cs.main(["--root", root]) == 1
 
 
@@ -198,7 +198,7 @@ def test_a_pending_line_whose_files_are_all_clean_fails(tmp_path):
 
 
 def test_a_finding_outside_the_pending_paths_still_fails(tmp_path):
-    root = tree(tmp_path, {"README.md": "PR 12\n", "docs/b.md": "PR 13\n"}, pending="README.md :: awaits its rewrite\n")
+    root = tree(tmp_path, {"HOW-TO-UPDATE.md": "PR 12\n", "docs/b.md": "PR 13\n"}, pending="HOW-TO-UPDATE.md :: awaits its rewrite\n")
     assert cs.check(root)[0] == ["docs/b.md:1: [pull-request] PR 13"]
 
 
@@ -225,11 +225,9 @@ def test_the_pending_list_cannot_grow(tmp_path, capsys, line):
                                               "docs/new.md:1: [pull-request] PR 12"]
 
 
-def test_the_allowed_pending_lines_are_these_eight_files_and_this_trees_list_holds_no_other():
+def test_the_allowed_pending_lines_are_these_six_files_and_this_trees_list_holds_no_other():
     # Written by hand. A later change may delete a line here and in the list; it may never add or widen one.
     assert cs.ALLOWED_PENDING == (
-        "README.md",
-        "KNOWN-OPEN-ITEMS.md",
         "HOW-TO-UPDATE.md",
         "HOW-TO-UPDATE.html",
         "business_architecture/ontology/epm-walkthrough.html",

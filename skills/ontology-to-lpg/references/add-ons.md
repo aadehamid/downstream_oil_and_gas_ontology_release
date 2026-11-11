@@ -107,10 +107,12 @@ Give the file's JSON to the server's tools: `validate_data_model` (it accepted t
 
 One `:ModuleRelease` node per released module, in the local Neo4j and every copy. It says what the graph holds without bringing the catalog into the graph (`multi-store.md`, "What each store holds"). `run_projection.py` runs it in its `release-record` step and again on the copy target; files mode skips it, because plain files have no `catalog.ttl`.
 
-```bash skip reason="awaits-the-rewrite: the reader's own values stand in angle brackets, and no test supplies them yet"
-uv run --no-project --with rdflib python3 release_record.py records --report projection-report.json --manifest run-manifest.json --output release-records.json <package.ttl>...
-NEO4J_PASSWORD=... uv run --no-project --with rdflib --with neo4j python3 release_record.py write --records release-records.json --uri bolt://127.0.0.1:<port>
-NEO4J_PASSWORD=... uv run --no-project --with rdflib --with neo4j python3 release_record.py check --records release-records.json --uri bolt://127.0.0.1:<port>
+The driver runs the three commands of `release_record.py` in this order. `records` reads the report and the run manifest of a finished load. `write` and `check` read the Neo4j password from `NEO4J_PASSWORD`.
+
+```text skip reason="illustration: the usage pattern of the three commands, which the driver's release-record step runs after a load"
+release_record.py records --report projection-report.json --manifest run-manifest.json --output release-records.json <package.ttl>...
+release_record.py write --records release-records.json --uri bolt://127.0.0.1:<port>
+release_record.py check --records release-records.json --uri bolt://127.0.0.1:<port>
 ```
 
 | Field | Comes from |

@@ -778,7 +778,9 @@ def test_the_contexts_that_run_everywhere_need_no_variable_and_the_others_name_t
         "scratch": (), "release-copy": (), "release-git": (),
         "slow": ("DOC_SNIPPETS_SLOW",),
         "stores": ("KPI_STORE_TEST_FUSEKI_URL", "KPI_STORE_TEST_NEO4J_URI"),
-        "databricks-free": ("KPI_STORE_TEST_DATABRICKS_PROFILE",)}
+        "databricks-free": ("KPI_STORE_TEST_DATABRICKS_PROFILE",),
+        "reasoner": ("KPI_STORE_TEST_ROBOT_JAR",),
+        "empty-fuseki": ("KPI_STORE_TEST_EMPTY_FUSEKI_URL",)}
     assert [name for name, c in contexts.items() if c.home == "real"] == ["databricks-free"]
 
 

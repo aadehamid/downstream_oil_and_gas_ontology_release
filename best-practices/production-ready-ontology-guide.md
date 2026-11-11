@@ -1,6 +1,6 @@
 # Production-ready ontology guide
 
-Teammate practice series. Not a governed EPM artifact.
+Teammate practice series. Not a governed KPI Store artifact.
 
 | Stage | Status | File |
 |---|---|---|

@@ -5,8 +5,6 @@
 # file is clean. The final cut runs the check with --strict, which ignores this file.
 
 # Documents that wait for their rewrite for this release.
-README.md :: awaits the documents rewrite
-KNOWN-OPEN-ITEMS.md :: awaits the documents rewrite
 HOW-TO-UPDATE.md :: awaits the documents rewrite
 HOW-TO-UPDATE.html :: the page is rebuilt from the Markdown after its rewrite
 business_architecture/ontology/epm-walkthrough.html :: the walkthrough awaits the documents rewrite

@@ -13,13 +13,17 @@ This README is for people. Agents read `SKILL.md` and the files it points to.
 1. Install the skill where your agent finds skills, and ask the agent to project your ontology into Neo4j, or to check whether it is ready for a projection.
 2. The agent starts at the design rules and asks you to record the Rule 4 option and its reason in your projection policy. If the ontology is not released yet, it stops there and applies the rules before the first release.
 3. After a release, it fills a copy of `templates/projection-config.json` with you: the Rule 4 option and reason, your namespaces and prefixes, your released packages, your qualified-relation classes. It lists each rule gap in a released module as a release exception, with the release that will close it.
-4. Run the checks the agent runs:
+4. Run the checks the agent runs. The two commands below check the skill's own library example, so you can run them as written, from this release's top folder. For your ontology, name your copy of the configuration, your shapes file and your module's Turtle file instead, and add `--releases <your release folder>` to the first command so that it also checks the packages the configuration pins. The checks need the rdflib and pySHACL packages (`py -m pip install rdflib pyshacl`). On macOS or Linux, write `python3` for `py`.
 
-   ```sh skip reason="awaits-the-rewrite: the reader's own values stand in angle brackets, and no test supplies them yet"
-   uv run --no-project --with rdflib python3 scripts/check_projection_rules.py --config projection-config.json \
-     --shapes <shapes.ttl> --releases <release folder> <module.ttl>
-   uv run --no-project --with rdflib --with pyshacl python3 scripts/validate_data.py --config projection-config.json \
-     --shapes <shapes.ttl> <module.ttl>
+   ```powershell run=release-copy
+   cd skills/ontology-to-lpg
+   py scripts/check_projection_rules.py --config templates/projection-config.json --shapes templates/library-shapes.ttl templates/library-module.ttl
+   py scripts/validate_data.py --config templates/projection-config.json --shapes templates/library-shapes.ttl templates/library-module.ttl
+   ```
+
+   ```text expect
+   all projection rules pass (100 triples, 0 listed release exception(s))
+   the data conforms to every shape and nothing is refused (100 triples)
    ```
 
    Each prints one line per failure and exits 1, or prints a pass line and exits 0.

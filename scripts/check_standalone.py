@@ -38,8 +38,6 @@ EXCEPTIONS = os.path.join("scripts", "standalone-exceptions.txt")
 # The only lines the pending list may hold. A change may delete a line of the list, and then deletes it here too.
 # No line may be added or widened: a new document must be clean when it arrives.
 ALLOWED_PENDING = (
-    "README.md",
-    "KNOWN-OPEN-ITEMS.md",
     "HOW-TO-UPDATE.md",
     "HOW-TO-UPDATE.html",
     "business_architecture/ontology/epm-walkthrough.html",

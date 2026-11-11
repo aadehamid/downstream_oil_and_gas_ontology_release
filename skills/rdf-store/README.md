@@ -9,20 +9,36 @@ This README is for people. Agents read `SKILL.md` and the files it points to.
 ## How to use it
 
 1. Start Fuseki. Download `jena-fuseki-server-6.2.0.jar`, check its SHA-256 (`references/stores.md` gives the value and the command), and run `java -jar jena-fuseki-server-6.2.0.jar --mem --update --localhost --port 3030 /ds`.
-2. Round-trip your releases:
+2. Round-trip your releases. The command below sends the library example of the `ontology-to-lpg` skill, so you can run it as written, from this release's top folder. `<your Fuseki address>` is the dataset's address, `http://127.0.0.1:3030/ds` for the server of step 1. For your releases, name every release file at the end instead. The tool needs the pyoxigraph package (`py -m pip install pyoxigraph`). On macOS or Linux, write `python3` for `py`.
 
-   ```sh skip reason="awaits-the-rewrite: the reader's own values stand in angle brackets, and no test supplies them yet"
-   uv run --no-project --with pyoxigraph python3 scripts/rdfstore.py roundtrip --store fuseki \
-     --gsp http://127.0.0.1:3030/ds/data --query http://127.0.0.1:3030/ds/query \
-     --update http://127.0.0.1:3030/ds/update --report report.json <release>.ttl ...
+   The dataset must hold nothing but what this command loads. The comparison reads everything the store holds, so a graph from another load fails it.
+
+   ```powershell run=empty-fuseki
+   cd skills/rdf-store
+   py scripts/rdfstore.py roundtrip --store fuseki --gsp <your Fuseki address>/data --query <your Fuseki address>/query --update <your Fuseki address>/update --report report.json ../ontology-to-lpg/templates/library-module.ttl
    ```
 
-   On Windows, after `py -m pip install pyoxigraph`, the same command starts `py scripts\rdfstore.py roundtrip` and goes on one line.
+   ```text expect
+   ...
+     "hashes_equal": true,
+     "expected_quads": 100,
+     "actual_quads": 100,
+   ...
+   PASS the store's copy has the same RDFC-1.0 hash
+   ```
 
    It prints `PASS` and exits 0 when the store's copy has the same hash, or prints a diff and exits 1. `--update` publishes everything in one request, which SPARQL 1.1 Update says a store SHOULD apply atomically; any failure ends the run with exit 1, and the store should then be reloaded.
 
 3. For Databricks, run the round trip inside a notebook, where Spark already exists: import `rdfstore.py` and call `roundtrip(SparkStore(spark, "<catalog>.<schema>.<table>"), pack(files))`. The rows go to a staging table first; the live table is replaced only when the staging copy matches. It needs no host name, warehouse or credential (`references/stores.md`).
-4. To get Fuseki's copy back as files, run `rdfstore.py export --store fuseki --gsp <data URL> --query <query URL> --out copy.nq --ttl-dir ttl/`.
+4. To get Fuseki's copy back as files, export it. `copy.nq` must not exist yet, and the `ttl` folder must be empty or absent.
+
+   ```powershell run=empty-fuseki
+   py scripts/rdfstore.py export --store fuseki --gsp <your Fuseki address>/data --query <your Fuseki address>/query --out copy.nq --ttl-dir ttl
+   ```
+
+   ```text expect
+   wrote copy.nq: 100 quads in 1 graphs
+   ```
 
 ## Tested on
 

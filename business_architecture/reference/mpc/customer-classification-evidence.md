@@ -71,7 +71,7 @@ Product-specific customer types stated by MPC (useful sub-facets):
   - Market/trade channel: spot market buyer (C6), export customer (C7)
   - Midstream shipper: MPC's own R&M segment and third-party shippers using MPLX
 
-The three channel groupings are an EPM synthesis. MPC lists the classes but
+The three channel groupings are a KPI Store synthesis. MPC lists the classes but
 doesn't group them this way. MPC's own groupings are its "four distinct
 markets" (wholesale including exports, spot, branded, retail distribution)
 and the two-way volume split in the delivery-tier facet.
@@ -132,7 +132,7 @@ In line with `../../domain/customer_domain_problem_statement_v0.1.md`
   with the codes as `skos:notation` and the MPC wording as `skos:definition`,
   cited with `dcterms:source`.
 - Each facet in §2 becomes its own concept scheme. The §3 groupings go in a
-  separate EPM-owned scheme linked by `skos:broader`.
+  separate KPI Store-owned scheme linked by `skos:broader`.
 - Channel classes are assigned to the **customer account / relationship**, not
   fixed on the legal party. That lets one party be both a C3 wholesale customer
   and a C6 spot buyer.
