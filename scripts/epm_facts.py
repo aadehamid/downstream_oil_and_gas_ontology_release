@@ -1326,7 +1326,13 @@ MODULE_BUILDER = os.path.join(ROOT, "business_architecture", "ontology", "releas
 
 
 def _version_key(version):
-    return tuple(int(x) for x in re.findall(r"\d+", version.split("-")[0]))
+    """The release scripts' order (newest.version_key), which reads a correction version; a folder that is no
+    version sorts first."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("epm_release_newest", os.path.join(ROOT, "business_architecture", "ontology", "release", "newest.py"))
+    newest = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(newest)
+    return newest.version_key(version) or ()
 
 
 def module_sources(builder=MODULE_BUILDER):

@@ -328,7 +328,7 @@ def dependencies(name):
 def resolve(path):
     """A path under releases/<module>/<version>/ names that module's newest package instead: the tree may not
     hold the version the path was written with."""
-    m = re.match(r"releases/([a-z-]+)/(\d+\.\d+\.\d+)/(.*)", path)
+    m = re.match(rf"releases/([a-z-]+)/({newest.VERSION_PATTERN})/(.*)", path)
     if m and m.group(1) in MODULES:
         return f"releases/{m.group(1)}/{label(MODULES[m.group(1)])}/{m.group(3)}"
     return path
@@ -396,8 +396,7 @@ def closure(depends_on, requires=None):
     chosen releases' own requirements (`requires`, each chosen release's manifest unless told otherwise), so a
     release that loses to a higher one adds nothing (the fixed point of the ontology skill's
     check_packages.closure, a change to the skills folder)."""
-    def key(version):
-        return tuple(map(int, version.split(".")))
+    key = newest.version_key
     requires = requires or released_requires  # looked up when called, so a test may stand in for the manifests
     chosen = {}
     for _ in range(1000):

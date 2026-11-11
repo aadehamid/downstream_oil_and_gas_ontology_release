@@ -14,7 +14,6 @@ Needs rdflib, pyoxigraph and sqlglot.
 """
 import base64
 import datetime as dt
-import hashlib
 import importlib.util
 import json
 import re
@@ -137,34 +136,15 @@ def import_sync_stores(release_root):
     return _import(release_root, SYNC_STORES, "kpi_store_sync_stores")
 
 
-def newest_releases(datasets):
-    """Each module's newest version IRI, .../modules/<module>/<version>, by ontology_view.version_key."""
-    # Kept here: sync_stores.newest_releases reads each version part as a number and fails on -correction.N.
-    newest = {}
-    for iri in datasets:
-        module, version = iri.rsplit("/", 2)[-2:]
-        key = ov.version_key(version)
-        if key is None:
-            raise ov.ReleaseError(f"the catalog lists {iri}, whose version this code cannot order")
-        if module not in newest or key > newest[module][0]:
-            newest[module] = (key, iri)
-    return sorted(iri for _, iri in newest.values())
-
-
 def expected(release_root, sync_stores=None):
     """What a current store's marker holds (sync_stores.MARKER_FIELDS), plus "newest": the version IRIs a current
     store holds."""
-    # Kept here: sync_stores.expected calls its own newest_releases, which fails on a correction version. The
-    # catalog's datasets and the two file paths come from sync_stores.
     ss = sync_stores or import_sync_stores(release_root)
     try:
-        datasets = ss.catalog_datasets(ss.repo_file(ss.CATALOG))
-        fingerprint = json.loads(ss.repo_file(ss.MANIFEST))["input_fingerprint"]
+        return ss.expected()
     except (OSError, ValueError, KeyError) as err:
-        raise ov.ReleaseError(f"the release's catalog or projection manifest cannot be read: {type(err).__name__}: {err}") from None
-    return {"catalog_datasets": len(datasets),
-            "catalog_digest": hashlib.sha256("\n".join(datasets).encode()).hexdigest(),
-            "input_fingerprint": fingerprint, "newest": newest_releases(datasets)}
+        raise ov.ReleaseError(f"the release's catalog or projection manifest cannot be read, or lists a version this "
+                              f"code cannot order: {type(err).__name__}: {err}") from None
 
 
 def release_graphs(release_root, sync_stores=None):

@@ -37,6 +37,39 @@ class Newest(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):
                 newest.newest_version("kpi", tmp)
 
+    def test_a_correction_version_is_newer_than_what_it_corrects_and_older_than_the_next_patch(self):
+        # The order, written by hand. It is not SemVer's, where 1.2.1-correction.1 would sort before 1.2.1.
+        order = ["1.2.0", "1.2.1", "1.2.1-correction.1", "1.2.1-correction.2", "1.2.1-correction.10", "1.2.2", "1.10.0", "2.0.0"]
+        self.assertEqual(sorted(reversed(order), key=newest.version_key), order)
+        self.assertEqual(newest.version_key("1.2.1-correction.1"), (1, 2, 1, 1))
+        self.assertEqual(newest.version_key("1.2.1"), (1, 2, 1, 0))
+        for name in ("previous", "1.2", "1.2.1-rc.1", "1.2.1-correction", "1.2.1-correction.x", "v1.2.1", "1.2.1-correction.1.bak", ""):
+            self.assertIsNone(newest.version_key(name), name)
+
+    def test_the_newest_folder_may_be_a_correction(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for version in ("1.2.0", "1.2.1-correction.1", "1.2.1-correction.2"):
+                package(tmp, "data-product", version)
+            os.makedirs(os.path.join(tmp, "releases", "data-product", "1.2.1-correction.3"))  # no manifest: not a package
+            os.makedirs(os.path.join(tmp, "releases", "data-product", "1.9.0-draft"))
+            self.assertEqual(newest.newest_version("data-product", tmp), "1.2.1-correction.2")
+            package(tmp, "data-product", "1.2.2")
+            self.assertEqual(newest.newest_version("data-product", tmp), "1.2.2")
+
+    def test_a_correction_takes_the_next_patch_number_and_a_second_one_counts_up(self):
+        self.assertEqual(newest.correction_version("1.2.0"), "1.2.1-correction.1")
+        self.assertEqual(newest.correction_version("1.2.1-correction.1"), "1.2.1-correction.2")
+        self.assertEqual(newest.correction_version("1.2.1-correction.9"), "1.2.1-correction.10")
+        self.assertEqual(newest.correction_version("2.5.9"), "2.5.10-correction.1")
+        for text in ("1.2", "1.2.0-rc.1", "latest"):
+            with self.assertRaises(ValueError):
+                newest.correction_version(text)
+
+    def test_the_pattern_finds_a_version_inside_a_text(self):
+        import re
+        found = re.findall(rf"^## ({newest.VERSION_PATTERN})", "## 1.2.1-correction.1 (2026-11-11)\n\n## 1.2.0 (2026-10-25)\n", re.M)
+        self.assertEqual(found, ["1.2.1-correction.1", "1.2.0"])
+
     def test_core_file_follows_a_new_release(self):
         with tempfile.TemporaryDirectory() as tmp:
             package(tmp, "core", "2.4.0")

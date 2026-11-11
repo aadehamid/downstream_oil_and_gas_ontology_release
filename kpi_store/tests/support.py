@@ -350,6 +350,11 @@ m:sample-prices a skos:Concept ; skos:prefLabel "Sample Market Pricing"@en ; sko
     # The release's own description of what a current store holds, which the load imports from the release it loads.
     (projection / "sync_stores.py").write_text((ROOT / "business_architecture" / "ontology" / "projection" / "sync_stores.py").read_text(encoding="utf-8"),
                                                encoding="utf-8", newline="\n")
+    # The one version order of the tree, which sync_stores and kpi_store read from the release scripts.
+    release = root / "business_architecture" / "ontology" / "release"
+    release.mkdir(parents=True, exist_ok=True)
+    (release / "newest.py").write_text((ROOT / "business_architecture" / "ontology" / "release" / "newest.py").read_text(encoding="utf-8"),
+                                       encoding="utf-8", newline="\n")
     (projection / "projection-manifest.json").write_text('{"input_fingerprint": "sample-fingerprint"}\n', encoding="utf-8", newline="\n")
     (root / "release.json").write_text('{"release": "KPI Store 1.1"}\n', encoding="utf-8", newline="\n")
     return root

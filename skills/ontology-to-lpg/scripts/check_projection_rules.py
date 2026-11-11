@@ -72,7 +72,8 @@ RDF_DATATYPES = {RDF.langString, RDF.HTML, RDF.XMLLiteral, DIR_LANG_STRING}
 PROPERTY_AXIOMS = (RDFS.domain, RDFS.range, RDFS.subPropertyOf)
 CLASS_OBJECTS = (RDFS.subClassOf, RDFS.domain, RDFS.range, OWL.equivalentClass, OWL.disjointWith)
 CLASS_KINDS = (OWL.Class, RDFS.Class)
-SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
+# A release folder's name: X.Y.Z, or a correction to a release, X.Y.Z-correction.N, which is newer than X.Y.Z.
+SEMVER = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:-correction\.(\d+))?$")
 # A string that ends like a BCP 47 language tag: n10s's keepLangTag stores "text@en", so such a
 # source string cannot be told apart from a tagged one on the way back.
 LANG_TAG_SUFFIX = re.compile(r"@[A-Za-z]{1,8}(-[A-Za-z0-9]{1,8})*$")
@@ -409,7 +410,7 @@ def check_packages(releases, cfg):
             continue
         versions = [v for v in os.listdir(folder) if SEMVER.match(v) and os.path.isdir(os.path.join(folder, v))]
         if versions:
-            newest[module] = max(versions, key=lambda v: tuple(map(int, v.split("."))))
+            newest[module] = max(versions, key=lambda v: tuple(int(n or 0) for n in SEMVER.match(v).groups()))
     for module, version in sorted(newest.items()):
         pin = cfg.packages.get(module)
         if pin is None:

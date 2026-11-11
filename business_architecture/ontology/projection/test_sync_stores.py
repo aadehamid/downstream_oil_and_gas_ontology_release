@@ -71,6 +71,15 @@ class Expected(unittest.TestCase):
         iris = [base + "kpi/1.2.0", base + "kpi/1.10.0", base + "core/2.4.0", base + "core/2.3.0"]
         self.assertEqual(ss.newest_releases(iris), [base + "core/2.4.0", base + "kpi/1.10.0"])
 
+    def test_newest_reads_a_correction_as_newer_than_the_version_it_corrects(self):
+        base = "https://w3id.org/mpc/ontology/modules/"
+        iris = [base + "data-product/1.2.1-correction.1", base + "data-product/1.2.0", base + "kpi/1.3.0",
+                base + "kpi/1.3.1-correction.2", base + "kpi/1.3.1-correction.10", base + "lane/1.1.1-correction.1", base + "lane/1.1.2"]
+        self.assertEqual(ss.newest_releases(iris), [base + "data-product/1.2.1-correction.1", base + "kpi/1.3.1-correction.10",
+                                                    base + "lane/1.1.2"])
+        with self.assertRaises(ValueError):
+            ss.newest_releases([base + "kpi/1.3.0-rc.1"])
+
     def test_one_newest_release_per_module_in_the_catalog(self):
         want = ss.expected()
         modules = [iri.rsplit("/", 2)[-2] for iri in want["newest"]]
