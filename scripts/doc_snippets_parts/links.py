@@ -32,13 +32,17 @@ CODE_SPAN = re.compile(r"(`+)(?:(?!\1).)+?\1")
 # [text](target) or [text](target "title"). The target is in <...> or runs to the first space or closing bracket,
 # and may hold one level of round brackets of its own.
 INLINE = re.compile(r"\]\(\s*(<[^<>\n]*>|(?:[^()\s]|\([^()\s]*\))*)(?:\s+(?:\"[^\"]*\"|'[^']*'))?\s*\)")
+OPEN_END = re.compile(r"\]\(\s*$")   # a line that ends where a target would start
 DEFINITION = re.compile(r"^ {0,3}\[[^\]\n]+\]:\s*(<[^<>\n]*>|\S+)")
 
 
 def markdown_links(text: str) -> list:
     """[(line number, target)] of a Markdown document's links, in the order they stand."""
-    found, fence = [], None
+    found, fence, opened = [], None, None
     for number, line in enumerate(text.split("\n"), 1):
+        # A target may start on the line after "](". The opening line's end is then read with this line, and the
+        # link counts for the line that opens it. A blank line or a code line ends the wait.
+        carried, opened = opened, None
         mark = FENCE.match(line)
         if fence is None and mark:
             fence = mark.group(2)
@@ -51,8 +55,17 @@ def markdown_links(text: str) -> list:
             continue   # an indented code block; a link inside a deeply nested list item is missed, never misread
         plain = CODE_SPAN.sub("", line)
         definition = DEFINITION.match(plain)
-        targets = [definition.group(1)] if definition else INLINE.findall(plain)
-        found += [(number, target.strip("<>")) for target in targets]
+        if definition:
+            found.append((number, definition.group(1).strip("<>")))
+            continue
+        if carried and plain.strip():
+            joined = INLINE.match("](" + plain.lstrip())
+            if joined:
+                found.append((carried, joined.group(1).strip("<>")))
+                plain = plain.lstrip()[joined.end() - 2:]
+        found += [(number, target.strip("<>")) for target in INLINE.findall(plain)]
+        if OPEN_END.search(plain):
+            opened = number
     return found
 
 

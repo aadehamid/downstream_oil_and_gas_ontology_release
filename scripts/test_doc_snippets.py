@@ -1087,6 +1087,14 @@ def test_a_markdown_link_to_a_missing_file_fails_with_its_document_and_line(tmp_
     assert d.broken_links(root) == ["guide.md:3: the link docs/notes.md is not a file or a folder of the tree"]
 
 
+def test_a_link_whose_target_stands_on_the_next_line_is_read():
+    # A target may start on the line after "](". The link belongs to the line that opens it.
+    assert d.markdown_links("see [the guide](\n  not-there.md) and\n[two](a.md) [three](\nb.md \"title\")\n") == [
+        (1, "not-there.md"), (3, "a.md"), (3, "b.md")]
+    # A code line after "](" is not a target.
+    assert d.markdown_links("an open [bracket](\n\n    indented.md)\n") == []
+
+
 def test_links_with_a_scheme_and_anchors_are_not_checked_and_the_path_before_an_anchor_is(tmp_path):
     root = tree(tmp_path, {"a.md": "[site](https://example.org/x.md) [mail](mailto:someone@example.org) [part](#part)\n"
                                    "[other](b.md#part) [gone](c.md#part) [query](b.md?x=1)\n", "b.md": ""})
