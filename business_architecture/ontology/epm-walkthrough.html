@@ -1687,7 +1687,7 @@ release package is current</code></pre></dd>
 <dt>Prerequisites</dt><dd>Modules as they arrive.</dd>
 <dt>Files to open, in this order</dt><dd><ol class="files"><li><code>business_architecture/ontology/validation/README.md</code>: what runs</li><li><code>business_architecture/ontology/validation/controlled-values.ttl</code>: the controlled-value shapes</li><li><code>business_architecture/ontology/validation/test_all_module_shapes.py, test_release_package_shapes.py, test_controlled_values.py</code>: the tests</li></ol></dd>
 <dt>Commands</dt><dd><pre data-snippet="bash run=slow"><code>uv run -q --no-project --with pytest --with rdflib --with pyshacl python -m pytest -q -p no:cacheprovider business_architecture/ontology/validation</code></pre><pre data-snippet="text expect"><code>...
-35 passed, 4 skipped&lt;the rest&gt;</code></pre></dd>
+&lt;a count&gt; passed, 4 skipped&lt;the rest&gt;</code></pre></dd>
 <dt>What you should see</dt><dd>Zero violations. The run takes a few minutes. Step 9 was done on 2026-10-22.</dd>
 <dt>How to check it worked</dt><dd>The validation tests in <code>scripts/check.sh</code>.</dd>
 <dt>What it enables next</dt><dd>Every later release must conform.</dd>
