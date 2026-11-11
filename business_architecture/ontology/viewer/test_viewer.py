@@ -290,6 +290,9 @@ def test_the_committed_page_holds_this_tree_and_names_no_outside_commit():
     assert "business_architecture/ontology/releases/technical-graph/1.1.0/technical-graph.ttl" in [i["path"] for i in data["inputs"]]
     assert not any("technical-graph/1.0.0" in i["path"] for i in data["inputs"])
     assert "EPM 1.0" not in text
+    # The header shows the release name on every view, filled from the data.
+    assert '<span id="release-name"></span> · Definitions and relationships' in text
+    assert '$("release-name").textContent = data.release;' in text
 
 
 def test_a_page_is_stale_once_a_package_changes_and_the_check_writes_nothing(tmp_path, capsys):

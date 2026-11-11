@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 import re
+import sys
 import zipfile
 
 import pytest
@@ -11,6 +12,19 @@ import pytest
 from kpi_store.tests import support
 
 NOTEBOOK = support.ROOT / "kpi_store" / "notebook" / "kpi_store_load.py"
+
+
+@pytest.fixture(autouse=True)
+def the_tree_s_own_package_afterwards():
+    """The notebook imports kpi_store from the unpacked zip, which holds less than the tree's package. A later
+    test in the same process must get the tree's package again, so each test puts the imports back."""
+    modules = {name: module for name, module in sys.modules.items() if name == "kpi_store" or name.startswith("kpi_store.")}
+    path = list(sys.path)
+    yield
+    for name in [n for n in sys.modules if n == "kpi_store" or n.startswith("kpi_store.")]:
+        del sys.modules[name]
+    sys.modules.update(modules)
+    sys.path[:] = path
 
 
 @functools.cache

@@ -6,7 +6,7 @@
 The page is horoi_page.html with the release's data inside it. The data is the full viewer's data (build.py),
 plus what the reference page needs to list the modules: each module's name, title, description and the
 versions it requires, read from the module's own ontology statement. The build record (build.json) names the
-release, the input files with their checksums, the counts and the page's checksum.
+release, the Horoi version, the input files with their checksums, the counts and the page's checksum.
 
 --check writes nothing. It fails when the page or the record differs from a fresh build.
 """
@@ -23,8 +23,10 @@ _spec = importlib.util.spec_from_file_location("viewer_builder", HERE / "build.p
 viewer = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(viewer)
 
-# The public Horoi commit the page's styles were adapted from (horoi_viewer/NOTICE.txt).
-HOROI_COMMIT = "33caa8cc916e7efb767a5c2831216ff1cb11c509"
+# The public Horoi release whose page styles this page adapts, and the commit its tag names
+# (horoi_viewer/NOTICE.txt).
+HOROI_VERSION = "0.2.0"
+HOROI_COMMIT = "e0660af0f795ebfeb6f1354a69b3b0c47ebafba6"
 DCTERMS = "http://purl.org/dc/terms/"
 
 
@@ -63,6 +65,7 @@ def build_data(root):
     data = viewer.build_data(root)
     info = module_info(root, data)
     supporting = set(data["supportingKinds"])
+    data["horoiVersion"] = HOROI_VERSION
     data["horoiCommit"] = HOROI_COMMIT
     data["moduleInfo"] = info
     data["referenceModules"] = [m["name"] for m in info]
@@ -76,6 +79,7 @@ def render(root):
     page = (HERE / "horoi_page.html").read_text(encoding="utf-8").replace("/* EMBEDDED_DATA */", viewer.embed(data))
     record = {
         "release": data["release"],
+        "horoi_version": HOROI_VERSION,
         "horoi_commit": HOROI_COMMIT,
         "modules": [{"name": m["name"], "version": m["version"]} for m in data["moduleInfo"]],
         "inputs": data["inputs"],

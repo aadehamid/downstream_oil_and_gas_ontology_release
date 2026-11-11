@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- Adapted from Horoi styles at 33caa8cc916e7efb767a5c2831216ff1cb11c509.
+<!-- Adapted from Horoi 0.2.0 styles at e0660af0f795ebfeb6f1354a69b3b0c47ebafba6.
 Modified for the KPI Store with new navigation, RDF rendering and relationship views.
 See NOTICE.txt and LICENSE.txt for attribution and licence terms. -->
 <html lang="en">
@@ -250,11 +250,12 @@ footer { display:flex; justify-content:center; flex-wrap:wrap; gap:12px; }
 </header>
 <div class="release-bar"><div id="release-scope">All ontology modules</div> <span>Read-only · Works offline</span></div>
 <main id="content" tabindex="-1"></main>
-<footer><a href="../viewer/index.html">Open the full ontology viewer</a> · <a href="#about">Release and coverage</a> · <a href="NOTICE.txt">Adapted from Horoi · Credits</a></footer>
+<footer><a href="../viewer/index.html">Open the full ontology viewer</a> · <a href="#about">Release and coverage</a> · <a href="NOTICE.txt" id="credits">Adapted from Horoi · Credits</a></footer>
 <script id="ontology-data" type="application/json">/* EMBEDDED_DATA */</script>
 <script>"use strict";
 const data = JSON.parse(document.getElementById("ontology-data").textContent);
 document.getElementById("release-scope").textContent = `${data.release} · All ontology modules`;
+document.getElementById("credits").textContent = `Adapted from Horoi ${data.horoiVersion} · Credits`;
 const explorer = createExplorerIndex(data);
 const nodes = explorer.byId;
 const referenceTerms = new Set(data.referenceTerms);
@@ -365,7 +366,7 @@ function measureCatalogue(mode=null) {
   }
   const {groups,designated,ordered}=cachedMeasureCatalogue;
   return `<section class="section" id="measure-catalogue"><h2>Browse measures by recorded kind</h2><p>The KPI module contains measure definitions, their planning users and the processes they inform. It records definitions, not live results. KPI candidates, operational metrics, indicators and reports keep their recorded classifications.</p>
-    ${ordered.map(kind=>`<details ${kind===designated || (mode && groups.get(kind).some(n=>n.id===explorerState.id))?"open":""}><summary>${e(kind?title(kind):"Kind not recorded")} · ${groups.get(kind).length} entries</summary>${kind && nodes.has(kind)?`<p>${e(definition(nodes.get(kind)))}</p>`:""}<ul class="results">${groups.get(kind).map(n=>`<li ${mode && n.id===explorerState.id?'class="selected-measure"':""}>${mode?exploreLink(mode,n.id):link(n.id)}${mode?"":`<p>${e(definition(n))}</p>`}</li>`).join("")}</ul></details>`).join("") || '<p>No measure definitions are recorded in this release.</p>'}
+    ${ordered.map(kind=>`<details ${kind===designated || (mode && groups.get(kind).some(n=>n.id===explorerState.id))?"open":""}><summary>${e(kind?title(kind):"Kind not recorded")} · ${groups.get(kind).length} ${groups.get(kind).length===1?"entry":"entries"}</summary>${kind && nodes.has(kind)?`<p>${e(definition(nodes.get(kind)))}</p>`:""}<ul class="results">${groups.get(kind).map(n=>`<li ${mode && n.id===explorerState.id?'class="selected-measure"':""}>${mode?exploreLink(mode,n.id):link(n.id)}${mode?"":`<p>${e(definition(n))}</p>`}</li>`).join("")}</ul></details>`).join("") || '<p>No measure definitions are recorded in this release.</p>'}
     <p><a href="${e(pageLink("kpi"))}">Browse all KPI module terms, including its vocabulary</a></p></section>`;
 }
 function dependencies(info) {
