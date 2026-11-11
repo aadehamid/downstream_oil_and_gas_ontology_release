@@ -8,7 +8,7 @@
 
 ## Question
 
-None was asked. The owner gave the instruction in their own words, after approving the build plan on 2026-11-11.
+None was asked. The owner gave the instruction in their own words on 2026-11-11.
 
 ## Context
 
@@ -28,9 +28,10 @@ the decisions the owner delegated. The agent wrote this section.
    Docker stores and the token connector leave with their tests, and no other document names them.
 3. Keep a guard in `scripts/check.sh`: a deny list for references to anything outside this release, and an allow
    list for public sources and licences.
-4. Each change is a pull request into the release branch. Before each push, `scripts/check.sh` passes and one
-   independent reviewer, a different model from the author, reads the change. The owner set this rule in the
-   same instruction; the wording here is the agent's.
+4. Each change is a pull request into the release branch. The owner's recorded words require a review whose
+   findings are fixed or answered before a merge. The agent records the rest of the rule, which the owner gave in
+   words that name tools outside this release, so this record does not quote them: before each push,
+   `scripts/check.sh` passes and one independent reviewer, a different model from the author, reads the change.
 5. Number this release's decision records `KPI-DEC-0001` onward, in this folder. A decision the agent makes under
    the delegation below is recorded as "Decided (delegated under KPI-DEC-0001)" where its question lives.
 6. Record each ontology correction with a discovery-run record in the repo: what changed, why, who cleared it and
@@ -71,8 +72,9 @@ the decisions the owner delegated. The agent wrote this section.
 
 ## The owner's recorded words
 
-Saved in `answers/2026-11-11-kpi-store-1.1.md`: every quote in the Decision section above, word for word. The
-owner can reverse any decision made under this delegation.
+Saved in `answers/2026-11-11-kpi-store-1.1.md`: every quote in the Decision section above, word for word.
+
+The agent's text, not the owner's words: the owner can reverse any decision made under this delegation.
 
 ## Evidence
 
