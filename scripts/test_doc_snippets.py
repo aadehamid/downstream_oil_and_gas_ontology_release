@@ -1033,7 +1033,7 @@ def test_the_hand_written_pages_of_the_tree_are_in_scope_and_the_generated_ones_
     pages = d.html_documents(d.ROOT)
     for known in ("business_architecture/ontology/epm-walkthrough.html",
                   "business_architecture/ontology/epm-ontology-guide.html",
-                  "best-practices/EPM-BP-100-KPIs-production-deployment.html", "viewer/index.html"):
+                  "viewer/index.html"):
         assert known in pages, known
     for built in ("HOW-TO-UPDATE.html", "business_architecture/ontology/MODULES.html",
                   "skills/ontology/references/ontology-build-playbook.html"):

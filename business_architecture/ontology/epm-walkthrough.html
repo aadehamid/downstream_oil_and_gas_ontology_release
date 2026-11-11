@@ -526,6 +526,7 @@ details.fm:not([open])>:not(summary){display:none}
 <section id="how-built" data-ss-id="section-how-built" data-ss-section>
   <h2 class="rise" data-ss-id="how-the-ontology-was-built-from-zero-to-done">How the ontology was built, from zero to done</h2>
   <p class="section-lede rise">It picked up from the process map and ended as 13 modules, each a versioned, checked release. The method came from a gated, twelve-step guide, and every choice that mattered was written down as a decision record.</p>
+  <p class="rise" data-ss-id="the-six-stages">The build can also be read as six stages, each one preparing the next: a controlled vocabulary, metadata standards, a taxonomy, a thesaurus, an ontology and a knowledge graph. The six stages are a way to read the build, and the method it followed is the twelve gated steps below. <a href="../../best-practices/README.md"><code>best-practices/README.md</code></a> says why each stage comes where it does, which public standard it rests on, where this release holds it, and where the build's order differs.</p>
 
   <h3 class="rise" data-ss-id="the-starting-point">The starting point</h3>
   <div class="split rise">
@@ -645,7 +646,7 @@ details.fm:not([open])>:not(summary){display:none}
     <tbody>
       <tr><td>rdflib, pySHACL</td><td>Build, parse, query and validate every module</td><td><code>scripts/check.sh</code> (<code>with_deps</code>), each <code>build_*.py</code></td></tr>
       <tr><td>ROBOT 1.9.10 with ELK</td><td>Reasoning before the projection</td><td>the driver's <code>project</code> step; <code>business_architecture/ontology/projection/README.md</code>, "Run the projection"</td></tr>
-      <tr><td>qSKOS checks</td><td>Label and scheme quality on the releases</td><td><code>skills/ontology/scripts/check_taxonomy.py</code></td></tr>
+      <tr><td>qSKOS checks</td><td>Label and scheme quality on the releases, run by a person</td><td><code>skills/ontology/scripts/check_taxonomy.py</code></td></tr>
       <tr><td>Neo4j 2025.06.2 with n10s and APOC</td><td>The property-graph projection</td><td><code>skills/ontology-to-lpg/references/running.md</code></td></tr>
       <tr><td>Apache Jena Fuseki 6.2.0</td><td>The triple store, and the round trips and walk comparisons in the driver</td><td><code>skills/rdf-store/references/stores.md</code></td></tr>
       <tr><td>Databricks (Delta, Unity Catalog, Genie)</td><td><code>epm_triples</code>, the objects the discovery reads, and the technical graph's table</td><td><code>kpi_store/load_databricks.py</code>, <code>kpi_store/discovery.py</code></td></tr>
@@ -1294,7 +1295,7 @@ WHERE { GRAPH ?g { ?s ?p ?o } FILTER(STRSTARTS(STR(?g), "https://w3id.org/mpc/on
 <tr><td>rdflib</td><td data-k="Its role here">Reads and writes Turtle, and runs SPARQL, in every builder and test</td><td data-k="See it"><code>cd regression &amp;&amp; uv run --with rdflib python ask.py q36-the-crack</code></td></tr>
 <tr><td>pySHACL</td><td data-k="Its role here">Runs SHACL in Python, before any load</td><td data-k="See it">The SHACL row above</td></tr>
 <tr><td>ROBOT with ELK</td><td data-k="Its role here">Reasons once before the load, because Neo4j does no OWL reasoning. It finds 2 inferences today</td><td data-k="See it">The driver's <code>project</code> step: <code>projection/README.md</code>, "Run the projection"</td></tr>
-<tr><td>qSKOS checks</td><td data-k="Its role here">Taxonomy quality, in the <code>ontology</code> skill's <code>check_taxonomy.py</code></td><td data-k="See it"><code>uv run --with rdflib python ../../skills/ontology/scripts/check_taxonomy.py releases/core/2.4.0/core.ttl</code></td></tr>
+<tr><td>qSKOS checks</td><td data-k="Its role here">Taxonomy quality, in the <code>ontology</code> skill's <code>check_taxonomy.py</code>. A person runs it; <code>scripts/check.sh</code> runs the script's own tests and does not run it on the releases</td><td data-k="See it"><code>uv run --with rdflib python ../../skills/ontology/scripts/check_taxonomy.py releases/core/2.4.0/core.ttl</code></td></tr>
 <tr><td>Neo4j</td><td data-k="Its role here">Holds the ontology as a property graph, and the technical graph beside it</td><td data-k="See it"><code>MATCH (n:Resource) RETURN count(n);   // 4,237 at the last recorded load</code></td></tr>
 <tr><td>n10s (neosemantics)</td><td data-k="Its role here">Loads RDF into the local Neo4j, compiles SHACL there, and exports RDF for the round trip. The copy on Neo4j Enterprise needs no n10s</td><td data-k="See it"><code>CALL n10s.validation.shacl.listShapes() YIELD target RETURN count(*);</code></td></tr>
 <tr><td>APOC</td><td data-k="Its role here">Neo4j utilities the local load relies on</td><td data-k="See it"><code>CALL apoc.meta.stats() YIELD labelCount, relTypeCount RETURN labelCount, relTypeCount;</code></td></tr>
@@ -1841,11 +1842,11 @@ release package is current</code></pre></dd>
 <p class="why">Every module ships as a versioned package with a DCAT record; one catalog lists them all (the decision of 2026-10-05, the decision of 2026-10-13, the decision of 2026-10-22).</p>
 <dl class="parts">
 <dt>Prerequisites</dt><dd>The modules above.</dd>
-<dt>Files to open, in this order</dt><dd><ol class="files"><li><code>business_architecture/ontology/release/build_module.py</code>: builds any module&#x27;s package</li><li><code>business_architecture/ontology/release/build_catalog.py</code>: writes releases/catalog.ttl</li><li><code>business_architecture/ontology/releases/catalog.ttl</code>: the catalog</li><li><code>business_architecture/ontology/release/CHANGELOG.md</code>: release notes</li></ol></dd>
+<dt>Files to open, in this order</dt><dd><ol class="files"><li><code>business_architecture/ontology/release/build_module.py</code>: builds a module&#x27;s package; <code>core</code> has a builder of its own, which <code>newest.py</code> names</li><li><code>business_architecture/ontology/release/build_catalog.py</code>: writes releases/catalog.ttl</li><li><code>business_architecture/ontology/releases/catalog.ttl</code>: the catalog</li><li><code>business_architecture/ontology/release/CHANGELOG.md</code>: release notes</li></ol></dd>
 <dt>Commands</dt><dd><pre data-snippet="bash run=slow"><code>(cd business_architecture/ontology/release &amp;&amp; uv run -q --no-project --with rdflib --with pyshacl --with openpyxl python build_catalog.py --verify)</code></pre><pre data-snippet="text expect"><code>catalog: 13 releases from 13 packages
 releases/catalog.ttl is current</code></pre></dd>
 <dt>What you should see</dt><dd>The catalog lists 13 releases, one for each module's newest package.</dd>
-<dt>How to check it worked</dt><dd><code>build_catalog.py --verify</code> and each <code>build_module.py --verify</code>.</dd>
+<dt>How to check it worked</dt><dd><code>build_catalog.py --verify</code>, each <code>build_module.py --verify</code>, and the <code>core</code> builder with <code>--verify</code>.</dd>
 <dt>What it enables next</dt><dd>Versioned inputs the projections read.</dd>
 <dt>Explained in</dt><dd><a href="#machinery">The build and release machinery</a></dd>
 <dt>Files in the File map</dt><dd><a href="#fm-checks">Build and checks</a>, <a href="#fm-modules">Ontology modules and releases</a></dd>
@@ -2290,7 +2291,6 @@ py -m kpi_store.sync_check</code></pre></dd>
 </tbody></table></div>
 <div class="tbl fm-tbl"><table><thead><tr><th>Path</th><th>What it is</th></tr></thead><tbody>
 <tr><td><code>business_architecture/domain/business-glossary.md</code></td><td>purpose not documented</td></tr>
-<tr><td><code>business_architecture/domain/customer_domain_problem_statement_v0.1.md</code></td><td>Customer Domain Problem Statement</td></tr>
 <tr><td><code>business_architecture/domain/data-domain-register.md</code></td><td>Data Domain Register</td></tr>
 <tr><td><code>business_architecture/domain/market-data-and-commercial-risk-draft.md</code></td><td>Market Data and Commercial Risk: draft definitions: the decision of 2026-10-05 leaves the full definitions (scope, owners, entities) to Step 7.</td></tr>
 </tbody></table></div>

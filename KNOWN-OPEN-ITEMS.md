@@ -49,6 +49,16 @@ This page lists what is open in KPI Store 1.1, what has not run yet and what was
 - **Python may leave `__pycache__` folders in the release folder.** The commands that run in their own process do not, and the zip and the checks leave such folders out. In a plain folder they stay on disk.
 - **The questions' mapping file has four soft spots.** Its digest has no key, so a hand edit that also rewrites the digest reads as confirmed. `discover` writes over a mapping that was corrected and not yet confirmed. A path of exactly five steps is accepted and is not proposed. Question 7 returns no rows, with no reason given, when the mapping names a policy's link and neither its name nor a classification.
 
+## Gaps in the ontology's content
+
+These were found by reading the release against the six stages of `best-practices/README.md`. None stops a load. A released package never changes, so each one waits for a new version of its module, made with the steps of `HOW-TO-UPDATE.md`.
+
+- **87 terms have a label and no definition.** 81 are in `data-product` (for example the product lines `finance`, `hr` and `it`), 3 in `core`, 2 in `system` and 1 in `party`. Each definition must come from the business or from a source, so none was written for this release. Fix first: a patch release of `data-product`, then of the other three.
+- **The taxonomy check does not run on the released modules.** `scripts/check.sh` runs the tests of `skills/ontology/scripts/check_taxonomy.py`, and never the script on a package. Run by hand with no options on the newest package of each module, it reports the 87 missing definitions and these other findings: text with no language tag (1,130 in `core`, 940 in `organization`, 275 in `kpi`, 110 in `market-data`, 91 in `party`, 65 in `data-product`, 13 in `value-stream`, 7 in `ref-mpc`), 56 notation findings in `core`, 23 domain or range findings across seven modules, 19 untyped terms in `integration` and `lane`, and 11 property-kind findings in `ref-mpc`. Some of these may be accepted with the script's options; no one has sorted them for this release. Fix second: sort the findings, release what needs a change, then add the script to `scripts/check.sh` so the gaps cannot return.
+- **Only `core` states its rights.** `dcterms:rights` is in the `core` package and in no other. The owner decides what the statement says; it then goes into the next release of each module.
+- **The thesaurus stage is thin.** Eight modules give terms an alternative label. No term has a `skos:related` link. Only `party` and `data-product` link to an outside vocabulary, and the release has no mapping file of its own. Add these when a reader or a tool needs them.
+- **The build did not follow the six stages in every place.** The process hierarchy came before the definitions, and each package's metadata was written at release, after the ontology. `best-practices/README.md`, "Where the order differs", lists each place.
+
 ## Later, not in this release
 
 - **A Databricks service principal for runs with no person.** The owner runs the loads now, with their own sign-in. The service principal waits for IT.

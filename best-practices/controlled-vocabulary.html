@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controlled vocabulary: the language work before an ontology</title>
+<style>
+:root {
+  --bg: #0B131C;
+  --bg-elev: #121C28;
+  --bg-card: #162230;
+  --line: #243344;
+  --text: #E6EEF4;
+  --muted: #93A4B3;
+  --faint: #6B7C8C;
+  --teal: #3DB8A8;
+  --max: 860px;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  font-size: 16.5px;
+  line-height: 1.65;
+}
+.topbar {
+  position: sticky; top: 0; z-index: 20;
+  background: rgba(11,19,28,.94);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+  padding: 10px 24px;
+  font-size: 12.5px;
+  color: var(--teal);
+  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.wrap { max-width: var(--max); margin: 0 auto; padding: 40px 24px 96px; }
+h1 {
+  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  font-size: 1.85rem;
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 0 0 12px;
+}
+.lede { color: var(--muted); font-size: 1.05rem; margin: 0 0 28px; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 36px 0; }
+h2 {
+  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  font-size: 1.28rem;
+  font-weight: 600;
+  color: var(--teal);
+  margin: 40px 0 12px;
+}
+h3 {
+  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 26px 0 8px;
+}
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 16px; padding-left: 1.25em; }
+li { margin: 0 0 6px; }
+strong { font-weight: 600; }
+a { color: var(--teal); }
+code {
+  font-family: ui-monospace, Consolas, "Cascadia Mono", Menlo, monospace;
+  font-size: 0.86em;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+pre {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-family: ui-monospace, Consolas, "Cascadia Mono", Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.45;
+  margin: 0 0 18px;
+}
+pre code { background: none; border: 0; padding: 0; }
+.table-wrap { overflow-x: auto; margin: 12px 0 22px; }
+table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+}
+th, td {
+  text-align: left;
+  vertical-align: top;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+th {
+  color: var(--teal);
+  font-weight: 600;
+  background: var(--bg-elev);
+  font-size: 12px;
+}
+tr:last-child td { border-bottom: 0; }
+.callout {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--teal);
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin: 0 0 18px;
+  color: var(--muted);
+}
+.note { color: var(--faint); font-size: 13px; margin-top: 40px; }
+nav a {
+  color: var(--teal);
+  text-decoration: none;
+  margin-right: 14px;
+  font-size: 13.5px;
+}
+nav { margin: 0 0 28px; line-height: 1.9; }
+</style>
+</head>
+<body>
+<div class="topbar">Controlled vocabulary · the language work before an ontology</div>
+<div class="wrap">
+
+<h1>Controlled vocabulary: the language work before an ontology</h1>
+<p class="lede">This guide says how a team agrees what its words mean before anyone builds an ontology or publishes a number. A controlled vocabulary records each meaning once, with one preferred label, a stable ID, the aliases people already use and a short scope note. It is not a taxonomy, a thesaurus, an ontology or a knowledge graph, and it does not model the business. Do the language work, then stop.</p>
+<p>This guide covers the first of the six stages of the build. <a href="README.md">The folder's README</a> describes all six and says why they come in that order.</p>
+
+<nav>
+  <a href="#meets">KPI Store</a>
+  <a href="#who">1 Who and the problem</a>
+  <a href="#what-cv">2 What it is</a>
+  <a href="#words">Words we use</a>
+  <a href="#purpose">3 Purpose</a>
+  <a href="#hunt">4 Word hunt</a>
+  <a href="#cluster">5 Cluster</a>
+  <a href="#label">6 Preferred label</a>
+  <a href="#scope">7 Scope notes</a>
+  <a href="#term-id">8 term_id</a>
+  <a href="#aliases">9 Aliases</a>
+  <a href="#map">10 Map</a>
+  <a href="#outward">11 Look outside</a>
+  <a href="#gov">12 Governance</a>
+  <a href="#artifacts">13 What to build</a>
+  <a href="#stop">14 When to stop</a>
+  <a href="#start">The steps in short</a>
+</nav>
+
+<p><strong>The example is made up.</strong> One rack lift for a company called Apex runs through every section. The company, the keys (<code>APEX-PAYER</code>, <code>CONS-4412</code>, <code>1000123</code>), the tables, the SQL names and the IRIs are invented for this guide. The KPI Store release holds none of these objects.</p>
+<p><img style="max-width:100%;height:auto;background:#fff;border-radius:8px" alt="The four steps of the method: hunt the existing language, decide each meaning and map it, store the decision, and use the vocabulary in three separate places" src="controlled-vocabulary-end-to-end.png" /></p>
+<h2 id="meets">How this guide meets the KPI Store</h2>
+<p>The KPI Store keeps its own vocabulary in two places.</p>
+<ul>
+<li><strong>The ontology.</strong> It states the values of its code lists as SKOS concepts. A concept has a <code>skos:prefLabel</code>, and can have a <code>skos:definition</code>, a <code>skos:altLabel</code>, a <code>skos:scopeNote</code> and a <code>skos:notation</code>. These hold the preferred label, the aliases, the scope note and a short code. The concept's IRI is its stable ID.</li>
+<li><strong>The business glossary</strong>, <a href="../business_architecture/domain/business-glossary.md"><code>business_architecture/domain/business-glossary.md</code></a>. It gives each term one definition and lists the words to avoid for it.</li>
+</ul>
+<p>The customer roles are in the <code>party</code> module, <a href="../business_architecture/ontology/party/"><code>business_architecture/ontology/party/</code></a>. Its list of party roles in <code>code-lists.ttl</code> includes Sold-To, Payer, Bill-To and Loading-Authorized Party, which are four of the meanings the example separates. The method for the ontology itself is the <code>ontology</code> skill in <code>skills/ontology/</code>.</p>
+<hr />
+<h2 id="who">1. Who this is for, and the problem of one name everywhere</h2>
+<p>You are on a team that must agree what words mean before anyone builds an ontology or publishes a number. This guide is all you need for that work.</p>
+<p>The problem is that people use the same everyday word everywhere, and it has more than one meaning.</p>
+<p><strong>One lift.</strong> A rack lift for Apex can carry, on one bill of lading:</p>
+<ul>
+<li>who the product is sold to</li>
+<li>who settles the invoice</li>
+<li>who receives the invoice</li>
+<li>where it lifts (the terminal)</li>
+<li>who is allowed to lift at the rack</li>
+</ul>
+<p>A screen, a ticket or a warehouse column may call every one of those "customer". Sometimes the same digits show up in two fields. SAP <code>sold_to</code> <code>1000123</code> and SAP <code>bill_to</code> <code>1000123</code> are two roles. Warehouse <code>customer_id</code> <code>1000123</code> does not pick a role.</p>
+<p>If you fold those into one "customer", a later number such as the unbilled amount lands on the wrong object. The vocabulary prevents that.</p>
+<h2 id="what-cv">2. What a controlled vocabulary is</h2>
+<p>A controlled vocabulary is a curated, finite list of approved terms. Each meaning records four things:</p>
+<ol>
+<li><strong>Preferred label.</strong> The one approved wording (Payer, Sold-To, Bill-To, Ship-To, Loading-Authorized Party).</li>
+<li><strong>Aliases.</strong> The everyday variants, misspellings and system codes that map to that wording. They do not compete with it. The word <code>customer</code> can be an alias on two IDs.</li>
+<li><strong>Scope note.</strong> One or two lines that say what the term includes and what it excludes.</li>
+<li><strong><code>term_id</code>.</strong> A stable ID (<code>id:payer</code>, <code>id:sold-to</code> and so on). Systems join on this. You may bind an IRI to it later. The IRI does not replace <code>term_id</code>.</li>
+</ol>
+<p>Light usage rules, such as capitalisation and singular or plural, live next to the list. They are not a fifth label.</p>
+<p>A controlled vocabulary does not hold local keys. <code>APEX-PAYER</code> and <code>CONS-4412</code> are in the map, not on the term row.</p>
+<p>A controlled vocabulary does not hold the rules of the domain model. It does not decide aggregates, bounded contexts, or whether Ship-To is a place in the model. It names the meaning. Domain modeling still does the modeling, and the vocabulary is one of its tools.</p>
+<p>A list of words with no preferred label, aliases, scope note, <code>term_id</code> and method is not a controlled vocabulary.</p>
+<h2 id="words">Words we use</h2>
+<p>Read this once, so that the later tables are clear.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Word</th>
+<th>What we mean</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Meaning</strong></td>
+<td>A distinct idea, not the word on the screen. "Customer" is one word. Sold-To and Loading-Authorized Party are two meanings of that word.</td>
+</tr>
+<tr>
+<td><strong>Word</strong></td>
+<td>The string on a screen, a ticket or a column (<code>customer</code>, <code>RG</code>, <code>APEX-PAYER</code>). One word can point at two meanings.</td>
+</tr>
+<tr>
+<td><strong>Working group</strong></td>
+<td>The people who pick the preferred label for a slice of the business (commercial, credit, rack, invoicing). The data team brings evidence. It does not name the meaning.</td>
+</tr>
+<tr>
+<td><strong>Preferred label</strong></td>
+<td>The one approved wording. People read this.</td>
+</tr>
+<tr>
+<td><strong>Alias</strong></td>
+<td>An everyday word or code that maps to a <code>term_id</code>. It does not compete with the preferred label. The same alias can be on two IDs when the word has two meanings.</td>
+</tr>
+<tr>
+<td><strong><code>term_id</code></strong></td>
+<td>The stable ID. Aliases and the map join on it. If the label changes later, the ID stays.</td>
+</tr>
+<tr>
+<td><strong>Local key</strong></td>
+<td>The value a system holds for a party or a place, such as <code>APEX-PAYER</code> or <code>1000123</code>.</td>
+</tr>
+<tr>
+<td><strong>Map</strong></td>
+<td>One row per system, field and local key. The row names the <code>term_id</code> that the key means in that field, or names none. The number is the party. The column is the role.</td>
+</tr>
+<tr>
+<td><strong>Scope note</strong></td>
+<td>What the meaning includes and excludes. It is not the grain of a KPI and not a formula.</td>
+</tr>
+<tr>
+<td><strong><code>ontology_iri</code></strong></td>
+<td>A second name for the same meaning, in an ontology file. It does not replace <code>term_id</code>.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="purpose">3. Purpose and scope</h2>
+<p>Decide which decisions the vocabulary must support. Name what is out of scope, so that the list does not grow without limit.</p>
+<p><strong>The example supports</strong> an agreed language for Customer in order-to-cash. With it, a later unbilled amount can be grouped on the right roles, and search can say what a word or a code means.</p>
+<p><strong>Out of scope</strong></p>
+<ul>
+<li>Drawing an is-a tree</li>
+<li>Writing triples</li>
+<li>Publishing a certified formula</li>
+<li>Renaming SAP, the lift system or the warehouse in place</li>
+<li>Treating "unbilled" as a class of customer (unbilled is a state of an obligation)</li>
+</ul>
+<p><strong>On the lift.</strong> The purpose is to keep sold-to, payer, bill-to, ship-to and loading-authorized party distinct, so that "unbilled for this customer" is a question with one answer. Renaming the lift system's <code>CONS-4412</code> screen is out of scope.</p>
+<h2 id="hunt">4. Word hunt: tables, columns, values</h2>
+<p>Start where the language already is. Hunt table names, column names and the values in those columns. Also hunt tickets, screens and reports. Treat every hit as evidence of a meaning, not as an answer. Expect noise.</p>
+<p><strong>Free text first.</strong> Read ticket subjects, search logs, screen labels and report titles. People type <code>customer</code>, <code>lift customer</code>, <code>paying party</code>.</p>
+<p><strong>Then structured data.</strong> Read lookup tables, enumerations and dimension values. Extract the distinct values. Count how often each occurs. Read a sample of real rows, so that later choices rest on usage.</p>
+<p><strong>On the lift, the hunt finds:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Where</th>
+<th>Table or screen</th>
+<th>Column</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lift tickets</td>
+<td>ticket row</td>
+<td><code>payer_id</code></td>
+<td><code>APEX-PAYER</code></td>
+</tr>
+<tr>
+<td>Lift tickets</td>
+<td>ticket row</td>
+<td><code>sold_to_id</code></td>
+<td><code>APEX-HOU</code>, <code>APEX-DAL</code></td>
+</tr>
+<tr>
+<td>Lift tickets</td>
+<td>ticket row</td>
+<td><code>bill_to_id</code></td>
+<td><code>APEX-BILL</code></td>
+</tr>
+<tr>
+<td>Lift tickets</td>
+<td>ticket row</td>
+<td><code>terminal_code</code></td>
+<td><code>HSC</code></td>
+</tr>
+<tr>
+<td>Lift system</td>
+<td>lift authorization</td>
+<td><code>lift_customer</code></td>
+<td><code>CONS-4412</code></td>
+</tr>
+<tr>
+<td>SAP</td>
+<td>partner functions</td>
+<td><code>sold_to</code></td>
+<td><code>1000123</code></td>
+</tr>
+<tr>
+<td>SAP</td>
+<td>partner functions</td>
+<td><code>bill_to</code></td>
+<td><code>1000123</code> (same digits, different column)</td>
+</tr>
+<tr>
+<td>Warehouse</td>
+<td><code>dim_customer</code></td>
+<td><code>customer_id</code></td>
+<td><code>1000123</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>The table name <code>dim_customer</code> is evidence. The column <code>customer_id</code> is evidence. The value <code>1000123</code> is evidence. None of them is the preferred label.</p>
+<h2 id="cluster">5. Cluster into meanings</h2>
+<p>Group the hits by meaning, not by the English word.</p>
+<p><strong>On the lift, there are five meanings.</strong> The names are working names until the working group approves the labels.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Meaning</th>
+<th>What the lift points at</th>
+<th>What it is not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sold-To</td>
+<td>Who the product is sold to (<code>APEX-HOU</code>, SAP <code>sold_to</code>)</td>
+<td>Who pays; who may lift</td>
+</tr>
+<tr>
+<td>Payer</td>
+<td>Who settles the invoice (<code>APEX-PAYER</code>)</td>
+<td>Sold-to; bill-to</td>
+</tr>
+<tr>
+<td>Bill-To</td>
+<td>Who receives the invoice (<code>APEX-BILL</code>)</td>
+<td>Who pays (the two can differ)</td>
+</tr>
+<tr>
+<td>Ship-To</td>
+<td>Where it lifts (<code>HSC</code>)</td>
+<td>A party role</td>
+</tr>
+<tr>
+<td>Loading-Authorized Party</td>
+<td>Who may lift at the rack (<code>CONS-4412</code>)</td>
+<td>Sold-to; payer; site; the card or PIN</td>
+</tr>
+</tbody>
+</table></div>
+<p>Warehouse <code>customer_id</code> <code>1000123</code> does not get its own meaning. The key stands for more than one role. Record it as unresolved.</p>
+<p>Do not fold these five into "Customer". That is the problem of one name everywhere.</p>
+<h2 id="label">6. Choose the preferred label</h2>
+<p>The working group picks one preferred term for each meaning. It decides from evidence, not from a count of systems:</p>
+<ul>
+<li><strong>Documents.</strong> Contracts, invoices, deny codes and bills of lading show how the business already writes.</li>
+<li><strong>People.</strong> What they search for and say.</li>
+<li><strong>Company need.</strong> Who is harmed if the wrong word wins. Credit belongs to the payer. A denied lift belongs to the loading-authorized party. The site of an unbilled amount is the terminal.</li>
+</ul>
+<p>The SAP partner-function codes (<code>AG</code> or <code>SP</code>, <code>RG</code> or <code>PY</code>) do not win. <code>dim_customer.customer_id</code> does not win.</p>
+<p><strong>On the lift, the working group approved:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Meaning</th>
+<th>Preferred label</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Who the product is sold to</td>
+<td>Sold-To</td>
+</tr>
+<tr>
+<td>Who settles the invoice</td>
+<td>Payer</td>
+</tr>
+<tr>
+<td>Who receives the invoice</td>
+<td>Bill-To</td>
+</tr>
+<tr>
+<td>Where it lifts</td>
+<td>Ship-To</td>
+</tr>
+<tr>
+<td>Who may lift at the rack</td>
+<td>Loading-Authorized Party</td>
+</tr>
+</tbody>
+</table></div>
+<p>Use the same spelling and hyphens everywhere. Do not adopt one system's wording because it is that system's.</p>
+<h2 id="scope">7. Scope notes</h2>
+<p>Write one or two lines for each preferred label, with what it includes and what it excludes. A later editor and a later model must reach the same decision from the note.</p>
+<p><strong>On the lift</strong> (<code>cv_term.scope_note</code>):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th><code>term_id</code></th>
+<th>Scope note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id:payer</code></td>
+<td>Party that settles the invoice. Not sold-to or bill-to.</td>
+</tr>
+<tr>
+<td><code>id:sold-to</code></td>
+<td>Party the product is sold to. Not the payer and not a lift authorization.</td>
+</tr>
+<tr>
+<td><code>id:bill-to</code></td>
+<td>Party that receives the invoice. Not who settles it, and not who is entitled to lift.</td>
+</tr>
+<tr>
+<td><code>id:ship-to</code></td>
+<td>Delivery site or terminal. Not a party role.</td>
+</tr>
+<tr>
+<td><code>id:loading-authorized-party</code></td>
+<td>Who may lift at the rack. Not a payer, not a sold-to, and not a site.</td>
+</tr>
+</tbody>
+</table></div>
+<p>A scope note does not say which terms a number may be grouped on. In the example, the unbilled amount is grouped on Payer, Sold-To and Ship-To only. Bill-To and Loading-Authorized Party have map rows and still do not group it.</p>
+<h2 id="term-id">8. Assign <code>term_id</code></h2>
+<p>Create a stable ID for each meaning. Aliases and map rows point at it. Do not replace <code>term_id</code> with an IRI. The IRI is a later addition to the same row.</p>
+<p><strong>On the lift, the IDs are:</strong></p>
+<ul>
+<li><code>id:payer</code></li>
+<li><code>id:sold-to</code></li>
+<li><code>id:bill-to</code></li>
+<li><code>id:ship-to</code></li>
+<li><code>id:loading-authorized-party</code></li>
+</ul>
+<p>If the preferred label later changes from "Payer" to "Invoice payer", the ID stays <code>id:payer</code>.</p>
+<h2 id="aliases">9. Aliases</h2>
+<p>Record every variant that people and systems already use. Map each variant to exactly one <code>term_id</code>, unless the same string has two meanings. Then write two alias rows.</p>
+<p><strong>On the lift,</strong> the word <code>customer</code> is an alias on both <code>id:sold-to</code> and <code>id:loading-authorized-party</code>. Search must return both IDs. Never pick one and hide the other.</p>
+<p>The SAP partner-function codes (<code>AG</code>, <code>SP</code>, <code>RG</code>, <code>PY</code>, <code>RE</code>, <code>BP</code>, <code>WE</code>, <code>SH</code>) are aliases, not preferred labels. <code>CONS-4412</code> is an alias of Loading-Authorized Party, and also a local key in the map. <code>site</code> is an alias of Ship-To, not another meaning of Customer.</p>
+<h2 id="map">10. Map local keys</h2>
+<p>The map is the agreement between the vocabulary and the systems. Each system keeps its local key. Nobody renames SAP.</p>
+<p>Each row holds a <code>local_system</code>, a <code>field</code> and a <code>local_key</code>, and the <code>term_id</code> that the key means in that field. The <code>term_id</code> is empty when the key has no meaning the working group approved.</p>
+<p><strong>The same digits in two fields make two rows.</strong> SAP <code>sold_to</code> <code>1000123</code> maps to <code>id:sold-to</code>. SAP <code>bill_to</code> <code>1000123</code> maps to <code>id:bill-to</code>. The number is the party. The column is the role.</p>
+<p><strong>Warehouse <code>customer_id</code> <code>1000123</code> has no map.</strong> Its row has an empty <code>term_id</code> and <code>map_ok = no</code>. The warehouse dimension does not pick a role. Keep the row, because the empty row records the decision.</p>
+<p><strong>On the lift, some of the rows:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>System</th>
+<th>Field</th>
+<th>Local key</th>
+<th><code>term_id</code></th>
+<th>Mapped</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lift tickets</td>
+<td><code>payer_id</code></td>
+<td><code>APEX-PAYER</code></td>
+<td><code>id:payer</code></td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Lift tickets</td>
+<td><code>sold_to_id</code></td>
+<td><code>APEX-HOU</code></td>
+<td><code>id:sold-to</code></td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Lift system</td>
+<td><code>lift_customer</code></td>
+<td><code>CONS-4412</code></td>
+<td><code>id:loading-authorized-party</code></td>
+<td>yes</td>
+</tr>
+<tr>
+<td>SAP</td>
+<td><code>sold_to</code></td>
+<td><code>1000123</code></td>
+<td><code>id:sold-to</code></td>
+<td>yes</td>
+</tr>
+<tr>
+<td>SAP</td>
+<td><code>bill_to</code></td>
+<td><code>1000123</code></td>
+<td><code>id:bill-to</code></td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Warehouse</td>
+<td><code>customer_id</code></td>
+<td><code>1000123</code></td>
+<td>(empty)</td>
+<td>no</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="outward">11. A short look outside</h2>
+<p>Compare your candidate terms with the language that partners already use. Take what makes a meaning clearer. Keep your own phrasing as an alias when people here use it.</p>
+<p><strong>On the lift,</strong> the SAP partner functions (sold-to, bill-to, payer, ship-to) and the header fields of a bill of lading (consignee, bill-to, ship-to) confirm the splits the hunt found. They do not become the preferred labels. Do not download a public "Customer" tree and call the hunt done. A general list has no term for who may lift at the rack.</p>
+<h2 id="gov">12. Light governance</h2>
+<p>Before you treat the list as approved:</p>
+<ul>
+<li><strong>Intake</strong> rests on evidence: frequency, a regulatory need, a company need or a confusion that someone has shown. It does not rest on opinion.</li>
+<li><strong>The working group</strong> approves the preferred labels and scope notes.</li>
+<li><strong>Version and deprecate</strong> terms. Change the label when you must. Keep <code>term_id</code> stable.</li>
+<li><strong>Pilot</strong> in real work. On the lift, search <code>customer</code> and confirm that two IDs come back. Then run the unbilled amount for the Apex payer, and confirm that it is not grouped on <code>CONS-4412</code> or on warehouse <code>customer_id</code>.</li>
+</ul>
+<p>A vocabulary that nobody governs grows without limit again.</p>
+<h2 id="artifacts">13. What to build</h2>
+<p>Two kinds of work stay apart. The working group writes the meaning: the preferred label, the scope note, the <code>term_id</code>, the aliases, and which local keys map. The data team builds the tables and checks them. Neither does the other's part.</p>
+<p>The example uses three tables, one search function and one warehouse table that stays as it is. The names are examples.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Object</th>
+<th>What it holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cv_term</code></td>
+<td><code>term_id</code>, <code>preferred_label</code>, <code>scope_note</code>, <code>ontology_iri</code>. The join key is <code>term_id</code>. On the lift it has five rows.</td>
+</tr>
+<tr>
+<td><code>cv_alias</code></td>
+<td>One row per alias and <code>term_id</code>. <code>customer</code> has two rows, for <code>id:sold-to</code> and <code>id:loading-authorized-party</code>.</td>
+</tr>
+<tr>
+<td><code>cv_map</code></td>
+<td><code>local_system</code>, <code>field</code>, <code>local_key</code>, <code>term_id</code>, <code>map_ok</code>, <code>note</code>. Warehouse <code>customer_id</code> <code>1000123</code> has an empty <code>term_id</code>.</td>
+</tr>
+<tr>
+<td><code>cv_lookup(q)</code></td>
+<td>The search. It matches <code>q</code> against an alias, a preferred label, a <code>term_id</code> or a mapped local key. It does not read <code>dim_customer</code>, returns no amount and rewrites no SQL.</td>
+</tr>
+<tr>
+<td><code>dim_customer</code></td>
+<td>The warehouse table with the key that stands for more than one role. One row: <code>customer_id = 1000123</code>. Nobody changes it.</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>The IRI on <code>cv_term</code>.</strong> When an ontology exists, write each concept's IRI in <code>ontology_iri</code>. The join key stays <code>term_id</code>. These IRIs are made up:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th><code>term_id</code></th>
+<th><code>ontology_iri</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id:payer</code></td>
+<td><code>https://example.org/vocabulary#Payer</code></td>
+</tr>
+<tr>
+<td><code>id:sold-to</code></td>
+<td><code>https://example.org/vocabulary#SoldTo</code></td>
+</tr>
+<tr>
+<td><code>id:bill-to</code></td>
+<td><code>https://example.org/vocabulary#BillTo</code></td>
+</tr>
+<tr>
+<td><code>id:ship-to</code></td>
+<td><code>https://example.org/vocabulary#ShipTo</code></td>
+</tr>
+<tr>
+<td><code>id:loading-authorized-party</code></td>
+<td><code>https://example.org/vocabulary#LoadingAuthorizedParty</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Writing these IRIs does not build an ontology. It links two names for one meaning.</p>
+<p><strong>Why <code>cv_lookup</code> exists.</strong> A person or a search tool can ask "what is customer?", "what is <code>APEX-PAYER</code>?" or "what is <code>CONS-4412</code>?". The answer is a preferred label and a <code>term_id</code>. The search returns no amount and rewrites nobody's SQL.</p>
+<p><strong>Three uses, kept apart</strong></p>
+<ol>
+<li><strong>Source data stays as it is.</strong> <code>SELECT customer_id FROM dim_customer</code> still returns <code>1000123</code>. Nothing renames a source field and nothing intercepts a query.</li>
+<li><strong>A published KPI is grouped on mapped terms only.</strong> The unbilled amount is grouped on keys that map to Payer, Sold-To or Ship-To. <code>CONS-4412</code> is not a payer. Warehouse <code>customer_id</code> is not a dimension of that view.</li>
+<li><strong>Search returns a term, never an amount.</strong> A search for <code>customer</code> returns the two IDs and no unbilled amount.</li>
+</ol>
+<p><strong>How <code>cv_lookup</code> works.</strong> A string that you type can be in one of three places. <code>customer</code> is an alias, on two IDs. <code>Payer</code> is a preferred label. <code>APEX-PAYER</code> is a local key in the map, not an alias. A query on <code>cv_term</code> alone misses most of them. So the function searches all three places, then joins back to <code>cv_term</code> for the label and the scope note. If two meanings match, it returns two rows. A search that hides one of them is wrong.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Source</th>
+<th>What it matches</th>
+<th><code>hit_kind</code></th>
+<th>Example <code>q</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cv_alias</code></td>
+<td><code>alias</code></td>
+<td><code>alias</code></td>
+<td><code>customer</code>, <code>RG</code></td>
+</tr>
+<tr>
+<td><code>cv_term</code></td>
+<td>The preferred label or the <code>term_id</code></td>
+<td><code>label</code></td>
+<td><code>Payer</code>, <code>id:payer</code></td>
+</tr>
+<tr>
+<td><code>cv_map</code></td>
+<td><code>local_key</code>, where <code>term_id</code> is not null</td>
+<td><code>map_key</code></td>
+<td><code>APEX-PAYER</code>, <code>CONS-4412</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>The body of the function, where <code>q</code> is the string to find:</p>
+<pre data-snippet="sql parse"><code>SELECT DISTINCT
+  t.term_id,
+  t.preferred_label,
+  h.hit_kind,
+  h.hit_value,
+  t.scope_note
+FROM (
+  SELECT a.term_id, 'alias' AS hit_kind, a.alias AS hit_value
+  FROM cv_alias a
+  WHERE lower(a.alias) = lower(q)
+  UNION ALL
+  SELECT term.term_id, 'label' AS hit_kind,
+    CASE
+      WHEN lower(term.preferred_label) = lower(q) THEN term.preferred_label
+      ELSE term.term_id
+    END AS hit_value
+  FROM cv_term term
+  WHERE lower(term.preferred_label) = lower(q)
+     OR lower(term.term_id) = lower(q)
+  UNION ALL
+  SELECT m.term_id, 'map_key' AS hit_kind, m.local_key AS hit_value
+  FROM cv_map m
+  WHERE m.term_id IS NOT NULL
+    AND lower(m.local_key) = lower(q)
+) h
+INNER JOIN cv_term t ON t.term_id = h.term_id
+</code></pre>
+<p>The function returns these columns:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Column</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>term_id</code></td>
+<td>The meaning that matched</td>
+</tr>
+<tr>
+<td><code>preferred_label</code></td>
+<td>The approved wording, from <code>cv_term</code></td>
+</tr>
+<tr>
+<td><code>hit_kind</code></td>
+<td>How the string matched: <code>alias</code>, <code>label</code> or <code>map_key</code></td>
+</tr>
+<tr>
+<td><code>hit_value</code></td>
+<td>The string that matched</td>
+</tr>
+<tr>
+<td><code>scope_note</code></td>
+<td>What the meaning includes and excludes, from <code>cv_term</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Keep the search and the KPIs in separate tools.</strong> A tool that answers "what does this word mean?" reads <code>cv_term</code>, <code>cv_alias</code> and <code>cv_map</code> only. It returns a preferred label and a <code>term_id</code>. A tool that answers with amounts reads the certified KPI views only. Do not give the vocabulary tables to the KPI tool, and do not give the KPI views to the search tool.</p>
+<p><strong>Checks.</strong> These queries show what to check after you build the objects. The catalog and schema names (<code>my_catalog.vocabulary</code>, <code>my_catalog.sales</code>) and the metric view <code>unbilled_usd</code> are examples. <code>MEASURE()</code> is the Databricks function that reads a measure of a metric view.</p>
+<pre data-snippet="sql parse"><code>SELECT term_id, preferred_label, ontology_iri
+FROM my_catalog.vocabulary.cv_term
+ORDER BY term_id;
+
+SELECT * FROM my_catalog.vocabulary.cv_lookup('customer');
+-- expect two IDs: id:sold-to and id:loading-authorized-party
+
+SELECT term_id, preferred_label FROM my_catalog.vocabulary.cv_lookup('RG');
+SELECT term_id, preferred_label FROM my_catalog.vocabulary.cv_lookup('APEX-PAYER');
+SELECT term_id, preferred_label FROM my_catalog.vocabulary.cv_lookup('CONS-4412');
+
+SELECT local_system, field, local_key, term_id, map_ok, note
+FROM my_catalog.vocabulary.cv_map
+ORDER BY local_system, field, local_key;
+-- expect the warehouse key 1000123 with no term_id
+
+SELECT payer, MEASURE(unbilled_usd)
+FROM my_catalog.sales.unbilled_usd
+WHERE payer = 'Apex Fuels LLC'
+GROUP BY payer;
+-- expect one row, grouped on the payer
+
+-- The next two must fail: the view has no such dimension.
+SELECT customer_id, MEASURE(unbilled_usd)
+FROM my_catalog.sales.unbilled_usd
+WHERE customer_id = '1000123'
+GROUP BY customer_id;
+
+SELECT loading_authorized_party, MEASURE(unbilled_usd)
+FROM my_catalog.sales.unbilled_usd
+GROUP BY loading_authorized_party;
+
+SELECT customer_id FROM my_catalog.sales.dim_customer;
+-- expect 1000123, unchanged
+</code></pre>
+<h2 id="stop">14. When to stop</h2>
+<p>The vocabulary for a slice of the business is finished when:</p>
+<ul>
+<li>The purpose and what is out of scope are written down</li>
+<li>Each meaning in scope has a preferred label, aliases, a scope note and a <code>term_id</code></li>
+<li>Each local key that matters has a map row, with a <code>term_id</code> or with none</li>
+<li>Search returns both IDs for a word with two meanings</li>
+<li>Published numbers are grouped on mapped terms only</li>
+<li>Intake, approval, versions and deprecation each have an owner</li>
+</ul>
+<p>Then stop.</p>
+<p>Do not draw the is-a tree. Do not write a thesaurus of related terms. Do not declare classes beyond the IRI already on <code>cv_term</code>. Do not build a knowledge graph.</p>
+<p>The later work (metadata standards, taxonomy, thesaurus, ontology, knowledge graph) uses this language. It also inherits every ambiguity you leave in it.</p>
+<p>On the lift, you stop when four things are true. Sold-To, Payer, Bill-To, Ship-To and Loading-Authorized Party are distinct. <code>customer</code> returns two IDs. Warehouse <code>1000123</code> has no map. The unbilled amount for the Apex payer is grouped on the payer.</p>
+<h2 id="start">The steps in short</h2>
+<ol>
+<li>Write the purpose and what is out of scope.</li>
+<li>Hunt table names, column names and values, and also tickets, screens and reports. Treat each hit as evidence.</li>
+<li>Cluster by meaning. Do not fold Sold-To, Payer, Bill-To, Ship-To and Loading-Authorized Party into "Customer".</li>
+<li>Have the working group pick the preferred labels and scope notes. The data does not name the meaning.</li>
+<li>Assign each <code>term_id</code>. Record the aliases. Write the map with one row per system, field and local key. The same digits in two fields make two rows. A warehouse key with no role gets an empty row.</li>
+<li>Build <code>cv_term</code>, <code>cv_alias</code>, <code>cv_map</code> and <code>cv_lookup</code>. Leave <code>dim_customer</code> as it is.</li>
+<li>Keep the three uses apart. Source data stays as it is, published KPIs are grouped on mapped terms only, and search never returns an amount.</li>
+<li>Write <code>ontology_iri</code> when the ontology exists. Do not replace <code>term_id</code>.</li>
+<li>Stop. Do not draw a class tree. Domain modeling does the rest.</li>
+</ol>
+</div>
+</body>
+</html>

@@ -125,7 +125,7 @@ The check against U.S. refining peers' FY2025 Form 10-Ks is in `../industry-view
 
 ## 5. How the ontology will carry it (Step 5, party module — proposal)
 
-In line with `../../domain/customer_domain_problem_statement_v0.1.md`
+In line with the role pattern of the `party` module
 ("Customer" is a contextual role; Party → Customer Account → Party Role):
 
 - C1–C8 and C5.1–C5.4 become a SKOS concept scheme, *MPC Customer Channel*,

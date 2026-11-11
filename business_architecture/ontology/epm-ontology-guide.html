@@ -210,7 +210,7 @@ table td.n, table th.n { text-align: right; padding-right: 24px; white-space: no
   <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle cx="5" cy="6" r="3" fill="none" stroke="var(--accent)" stroke-width="1.6"/><circle cx="17" cy="6" r="3" fill="none" stroke="var(--accent)" stroke-width="1.6"/><circle cx="11" cy="17" r="3" fill="var(--accent)"/><path d="M7.4 7.8 9.6 14.3M14.6 7.8 12.4 14.3M8 6h6" stroke="var(--accent)" stroke-width="1.6"/></svg>
   <span class="name">KPI Store</span><span class="scope">Ontology guide</span>
   <nav aria-label="Sections">
-    <a href="#purpose">Purpose</a><a href="#why-modules">Why modules</a><a href="#map">Module map</a><a href="#thread">The crack spread</a><a href="#modules">Each module</a><a href="#questions">Questions</a><a href="#logical-model">Logical models</a><a href="#stores">Stores</a><a href="#holds">What each holds</a><a href="#sync">In step</a><a href="#where">Where things live</a><a href="#standards">Standards</a><a href="#copy">Copy</a><a href="#tools">Tools</a><a href="#open">Open</a>
+    <a href="#purpose">Purpose</a><a href="#order">Six stages</a><a href="#why-modules">Why modules</a><a href="#map">Module map</a><a href="#thread">The crack spread</a><a href="#modules">Each module</a><a href="#questions">Questions</a><a href="#logical-model">Logical models</a><a href="#stores">Stores</a><a href="#holds">What each holds</a><a href="#sync">In step</a><a href="#where">Where things live</a><a href="#standards">Standards</a><a href="#copy">Copy</a><a href="#tools">Tools</a><a href="#open">Open</a>
   </nav>
 </header>
 
@@ -219,6 +219,7 @@ table td.n, table th.n { text-align: right; padding-right: 24px; white-space: no
 <aside class="toc" aria-label="Contents">
   <p class="toc-h">Contents</p>
   <a href="#purpose">What it is for</a>
+  <a href="#order">The six stages of the build</a>
   <a href="#why-modules">Why modules</a>
   <a href="#map">The module map</a>
   <a href="#thread">One measure, every module</a>
@@ -297,6 +298,22 @@ table td.n, table th.n { text-align: right; padding-right: 24px; white-space: no
       <tr><td>DCAT</td><td>The catalog of every released package, <code>releases/catalog.ttl</code>.<span class="cite"><a href="https://www.w3.org/TR/vocab-dcat-3/">Data Catalog Vocabulary (DCAT) Version 3</a>, W3C Recommendation, 22 August 2024.</span></td></tr>
     </table>
   </div>
+
+
+<h2 id="order">The six stages of the build</h2>
+<p class="lead">The ontology was built in an order, and the order can be read as six stages. Each stage prepares the next one.</p>
+<p>The six stages are a way to read the build. The method the build followed is the <code>ontology</code> skill's gated steps. <a href="../../best-practices/README.md"><code>best-practices/README.md</code></a> gives the reasoning: why each stage comes where it does, what breaks if it is skipped, and where the build's order differs.</p>
+<div class="tblwrap"><table class="stack">
+<thead><tr><th>Stage</th><th>What it adds</th><th>Where this release holds it</th></tr></thead>
+<tbody>
+<tr><td>1. Controlled vocabulary</td><td data-k="What it adds">One meaning for each term, with a preferred label, a definition and a stable ID.</td><td data-k="Where">The <code>skos:prefLabel</code> and <code>skos:definition</code> of each term in the module files, and <code>business_architecture/domain/business-glossary.md</code>.</td></tr>
+<tr><td>2. Metadata standards</td><td data-k="What it adds">A title, a version, a date and a source for each release and each term.</td><td data-k="Where">Each package's Turtle header, <code>catalog.ttl</code> and <code>manifest.json</code>, in Dublin Core terms and DCAT.</td></tr>
+<tr><td>3. Taxonomy</td><td data-k="What it adds">A hierarchy with one parent for each term.</td><td data-k="Where">The process hierarchy in <code>core</code> (<code>skos:broader</code>) and the concept schemes of the other modules.</td></tr>
+<tr><td>4. Thesaurus</td><td data-k="What it adds">Aliases, matches to other vocabularies and related terms.</td><td data-k="Where"><code>skos:altLabel</code> and <code>skos:scopeNote</code>, and the matches to outside vocabularies in <code>party</code> and <code>data-product</code>. The release has no <code>skos:related</code> link. This is the thinnest stage.</td></tr>
+<tr><td>5. Ontology</td><td data-k="What it adds">Classes, properties and rules.</td><td data-k="Where">The thirteen modules, each package's <code>shapes.ttl</code>, and the competency questions with their regression.</td></tr>
+<tr><td>6. Knowledge graph</td><td data-k="What it adds">All of it together, loaded and queried.</td><td data-k="Where">The released packages, and the three stores that hold them: Databricks, Jena Fuseki and Neo4j.</td></tr>
+</tbody></table></div>
+<p class="note">Stages 1 and 3 rest on ANSI/NISO Z39.19-2005 (R2010), <em>Guidelines for the Construction, Format, and Management of Monolingual Controlled Vocabularies</em>. Stage 4 rests on ISO 25964-1:2011 and ISO 25964-2:2013, the standards for thesauri and for mapping between vocabularies. The other stages use the W3C standards in the card above: SKOS, Dublin Core terms and DCAT, OWL and SHACL, and RDF.</p>
 
 
 <h2 id="why-modules">Why modules</h2>
@@ -1100,7 +1117,7 @@ WHERE { GRAPH ?g { ?s ?p ?o } FILTER(STRSTARTS(STR(?g), "https://w3id.org/mpc/on
 <tr><td>rdflib</td><td data-k="Its role here">Reads and writes Turtle, and runs SPARQL, in every builder and test</td><td data-k="See it"><code>cd regression &amp;&amp; uv run --with rdflib python ask.py q36-the-crack</code></td></tr>
 <tr><td>pySHACL</td><td data-k="Its role here">Runs SHACL in Python, before any load</td><td data-k="See it">The SHACL row above</td></tr>
 <tr><td>ROBOT with ELK</td><td data-k="Its role here">Reasons once before the load, because Neo4j does no OWL reasoning. It finds 2 inferences today</td><td data-k="See it">The driver's <code>project</code> step: <code>projection/README.md</code>, "Run the projection"</td></tr>
-<tr><td>qSKOS checks</td><td data-k="Its role here">Taxonomy quality, in the <code>ontology</code> skill's <code>check_taxonomy.py</code></td><td data-k="See it"><code>uv run --with rdflib python ../../skills/ontology/scripts/check_taxonomy.py releases/core/2.4.0/core.ttl</code></td></tr>
+<tr><td>qSKOS checks</td><td data-k="Its role here">Taxonomy quality, in the <code>ontology</code> skill's <code>check_taxonomy.py</code>. A person runs it; <code>scripts/check.sh</code> runs the script's own tests and does not run it on the releases</td><td data-k="See it"><code>uv run --with rdflib python ../../skills/ontology/scripts/check_taxonomy.py releases/core/2.4.0/core.ttl</code></td></tr>
 <tr><td>Neo4j</td><td data-k="Its role here">Holds the ontology as a property graph, and the technical graph beside it</td><td data-k="See it"><code>MATCH (n:Resource) RETURN count(n);   // 4,237 at the last recorded load</code></td></tr>
 <tr><td>n10s (neosemantics)</td><td data-k="Its role here">Loads RDF into the local Neo4j, compiles SHACL there, and exports RDF for the round trip. The copy on Neo4j Enterprise needs no n10s</td><td data-k="See it"><code>CALL n10s.validation.shacl.listShapes() YIELD target RETURN count(*);</code></td></tr>
 <tr><td>APOC</td><td data-k="Its role here">Neo4j utilities the local load relies on</td><td data-k="See it"><code>CALL apoc.meta.stats() YIELD labelCount, relTypeCount RETURN labelCount, relTypeCount;</code></td></tr>

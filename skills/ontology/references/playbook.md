@@ -371,6 +371,62 @@ files, so a loss shows exactly where it happened. The `ontology-to-lpg`
 skill holds the pipeline, the store hops and the checks; the `rdf-store`
 skill holds the triple-store hop.
 
+### The steps as six stages
+
+A reader who knows knowledge organization may know a build as six stages,
+each one preparing the next: a controlled vocabulary, metadata standards, a
+taxonomy, a thesaurus, an ontology and a knowledge graph. The order makes
+sense because each stage uses what the one before it settled. A hierarchy
+arranges terms that already have one meaning each. An alias points to a term
+that already has a place. A class or a rule commits to terms that are
+already clear. A graph only assembles the rest. This method's steps do the
+same work in nearly the same order, and this table says which steps do which
+stage's work and which public standard the stage rests on. `SOURCES.md`
+gives each standard's full title, date and address.
+
+| Stage | What it adds | The standard it rests on | The steps that do it |
+|---|---|---|---|
+| 1. Controlled vocabulary | One meaning for each term, with a preferred label, a definition and a stable ID | ANSI/NISO Z39.19-2005 (R2010); SKOS | Step 0 checks the terms against the sector's reference framework. Step 8 decides which areas are in scope. Step 2 gives each term one identity. Step 3 writes its label and definition |
+| 2. Metadata standards | The facts recorded about each term and each release: source, language, version, licence | DCMI Metadata Terms; DCAT | Step 1 sets the policies. Every later step cites its sources under them. Step 10 writes the ontology header, the package and the catalog |
+| 3. Taxonomy | A hierarchy with one parent for each term | ANSI/NISO Z39.19-2005 (R2010); SKOS | Step 3 |
+| 4. Thesaurus | Aliases, matches to other vocabularies and related terms | ISO 25964-1:2011 and ISO 25964-2:2013; SKOS | No step of its own. Step 3 writes the aliases and scope notes. Step 0 surveys the public vocabularies, and Step 7 records the mappings |
+| 5. Ontology | Classes, properties and rules | OWL 2; SHACL | Step 3 for the classes and properties, then Steps 4, 5, 6 and 7. Step 9 writes the rules as shapes. Step 11 tests the whole against the competency questions |
+| 6. Knowledge graph | All of it together, loaded and queried | RDF; SPARQL | Step 10 releases the packages. Step 12 loads them into a property graph and the other stores |
+
+The rules of stages 1 and 3 were checked against ANSI/NISO Z39.19-2005
+(R2010), and `quality.md` records each difference. The two parts of ISO
+25964 are named as its international counterparts; their text was not read,
+and no rule claims to follow their clauses.
+
+The thesaurus is the one stage with no step of its own. The method keeps
+aliases few, because each one is a search commitment
+(`identity-taxonomy.md`, Step 3, rule 8). It maps to another vocabulary and
+does not import it (`external-ontologies.md`). It states a relation between
+two terms as a typed property in Step 4, where the six stages would use a
+plain "related to" link. A build that follows this method therefore has a
+thin thesaurus stage.
+
+The method's order differs from the six stages in four places:
+
+- **The questions come first.** Step 1 locks the competency questions before
+  any modelling. They test stage 5, and they are written before stage 1 is
+  complete. *Why:* the questions decide which terms the vocabulary needs.
+- **Scope comes early.** Step 8 runs right after Step 0. *Why:* a term that
+  is out of scope needs no label, no definition and no parent.
+- **Taxonomy and classes share a step.** Step 3 builds the hierarchy and
+  declares the classes and properties, which the six stages put two stages
+  apart. *Why:* each term's kind must be decided once, and deciding it
+  twice invites a term that is both a concept and a class.
+- **The release metadata comes late.** Step 1 sets the policies of stage 2,
+  and Step 10 writes the package's own metadata. *Why:* a version, a date
+  and a checksum describe a finished release, and there is none before
+  Step 10.
+
+When the intake brings a hierarchy that already exists, the tree of stage 3
+can also arrive before the definitions of stage 1. The method allows this:
+Step 3 loads the hierarchy, and every definition must still pass its gate
+before Step 4 starts.
+
 ---
 
 ## 2. Policies
