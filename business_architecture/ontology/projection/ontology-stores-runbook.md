@@ -1,6 +1,6 @@
 # KPI Store runbook: the first run on the client sandbox
 
-This guide takes you from the release zip to three loaded and checked stores: Databricks, Jena Fuseki on your Windows machine, and Neo4j Enterprise. Follow it from top to bottom, one step at a time. Every command in it is run by the document test, except the ones the section "Not yet run on Windows" lists.
+This guide takes you from the release zip to three loaded and checked stores: Databricks, Jena Fuseki on your Windows machine, and Neo4j Enterprise. Follow it from top to bottom, one step at a time. Every command in it is run by the document test, except the ones the section "What ran where" lists.
 
 One command does the work: `py -m kpi_store.runner`. You run it three times. The first run compares the ontology with the sandbox and stops on a report. You clear the report. The second run cuts a correction version and loads every store. The third run proves that nothing is left to change.
 
@@ -101,31 +101,29 @@ You do not compare the checksums by hand. The setup check does it and fails on a
 
    The last line starts with `Successfully installed` and names the packages.
 
-3. Give the check script a `python3`. Git Bash on Windows often has `python` and no `python3`, and the check script calls `python3`. This command copies `python.exe` to `python3.exe` beside it, unless that file is already there.
+3. If the machine has more than one Python, tell the `py` launcher which one to start. `py` starts the newest Python it finds, and the packages of step 2 must be installed for that one. This command makes `py` start Python 3.12 in every new terminal.
 
-   ```powershell run=scratch os=windows status-only
-   py -c "import pathlib, shutil, sys; exe = pathlib.Path(sys.executable); new = exe.with_name('python3.exe'); new.exists() or shutil.copyfile(exe, new)"
+   ```cmd skip reason="windows-only: sets a variable of the reader's own account for the Windows Python launcher"
+   setx PY_PYTHON 3.12
    ```
 
-   It prints nothing. A file `python3.exe` now lies beside `python.exe`.
-
-4. Make Python read and write text as UTF-8. The Windows test job runs the check script with this setting.
-
-   ```cmd run=scratch os=windows status-only
-   setx PYTHONUTF8 1
-   ```
-
-   It answers `SUCCESS: Specified value was saved.` The setting reaches new terminal windows only.
+   It answers `SUCCESS: Specified value was saved.` Then run step 2 again in a new terminal. With one Python installed, skip this step.
 
 ### What Windows itself needs
 
-<!-- WINDOWS-FACTS: the lead fills this section from the Windows test job's findings (long paths, encodings, privileges). Keep the heading. -->
+The Windows test job proved each point below on Windows Server 2025 with Python 3.12 and Java 21.
 
-This section waits for the results of the Windows test job. Until it is filled, three settings are known from the code:
-
-- Keep the release folder's path short, as "Unpack the release" says. The longest path inside the release has 95 characters.
-- Set `PYTHONUTF8`, as step 4 above does.
-- You need no administrator rights for any command of this guide. The installers of "Install the programs" may ask for them.
+| Topic | What you need to do |
+|---|---|
+| `python3` | Nothing. The check script takes the first of `python3`, `python` and `py` that runs and is 3.11 or later. |
+| Text encoding | Nothing. The code names UTF-8 in every file it reads or writes. One gap is left: a script that you run by hand, with its output sent to a file, can fail on a character outside the Windows code page. The runner does not do that. |
+| Where to run the check script | In Git Bash, or through the runner. In PowerShell or Command Prompt, the plain word `bash` starts the launcher of the Linux subsystem, not Git Bash. The runner finds Git Bash by itself. |
+| Java | Version 21 or later. The setup check fails on an older one. |
+| Long paths | Nothing. The longest path in the release has 95 characters, and the check passed under a folder path of 80 characters. |
+| Rights | No administrator rights for any command of this guide. The installers may ask for them. |
+| Fuseki | Nothing. The runner starts Fuseki detached, so it lives on after the command ends. A server that you start yourself in a console window ends when you close the window. |
+| The local folder | Keep `C:\kpi-store-local` private to your account. The Neo4j load writes a login file into the run's folder, and on Windows that file gets the folder's permissions. |
+| A Git copy | Keep the file `.gitattributes`. Without it, Git for Windows checks text files out with other line ends, and the packages' hashes differ. An unpacked zip is not affected. |
 
 ### Set up the local Neo4j
 
@@ -237,7 +235,7 @@ When the sign-in expires later, a run fails at its first Databricks step. Run th
    ok   robot-jar           <the jar> has the pinned SHA-256
    ok   bash                <where bash is>
    ok   uv                  <where uv is>
-   ok   check-script-tools  inside bash: python3 <version> and uv <version>
+   ok   check-script-tools  inside bash: <the Python it found> and uv <version>
    ok   databricks-cli      Databricks CLI <version and where it is>
    ok   databricks-auth     signed in through the profile <your profile>
    ok   neo4j-local         Neo4j 2025.06.2, n10s 2025.06.1, APOC 2025.06.2, database <your local database>
@@ -260,7 +258,7 @@ When the sign-in expires later, a run fails at its first Databricks step. Run th
 | `fuseki-jar`, `robot-jar` | Download the file again and save it under the name the check prints. |
 | `bash` | Install Git for Windows, or name `bash.exe` in `[tools]` `bash`. |
 | `uv` | Run `py -m pip install uv`. |
-| `check-script-tools` | Run step 3 of "Install the Python packages" again. Python's folder and its `Scripts` folder must be on `PATH`, which the tick in the installer did. |
+| `check-script-tools` | Inside Git Bash, no Python 3.11 or later was found, or `uv` was not found. Run `py -m pip install uv`. Python's folder and its `Scripts` folder must be on `PATH`, which the tick in the installer did. Open a new terminal. |
 | `databricks-cli` | Install the Databricks command line and open a new terminal. If it is still not found, name `databricks.exe` in `[databricks]` `cli`. |
 | `databricks-auth` | Sign in again ("Sign in to Databricks"). |
 | `neo4j-local` | Start the instance in Neo4j Desktop. Check the password, and that the two jars and the line in `neo4j.conf` are there. Restart the instance. |
@@ -285,7 +283,7 @@ The first run changes nothing in the ontology and loads nothing. It checks the r
    summary: would print the run's summary
    ```
 
-2. Start the first run. It takes about 20 minutes. The step `check` alone takes about 10 minutes and prints nothing until it ends.
+2. Start the first run. The step `check` prints nothing until it ends. It took about 10 minutes on the Mac of the test runs, and 21 minutes on a Windows machine with 4 cores. The other steps took about 3 minutes.
 
    ```powershell run=first-run exit=3
    py -m kpi_store.runner
@@ -587,7 +585,7 @@ the steps that ran passed; left out: <the other steps> (not run, so not checked)
 
 It runs `scripts/check.sh` with bash. The script rebuilds every package and compares it with the one on disk. It runs the competency questions and every test. It checks that the generated pages equal their sources and that every code block of the documents works.
 
-It reads the release folder. It writes only `check.log` in the run's folder. It takes about 10 minutes.
+It reads the release folder. It writes only `check.log` in the run's folder. It took about 10 minutes on a Mac and 21 minutes on a Windows machine with 4 cores.
 
 ```powershell run=first-run
 py -m kpi_store.runner --only check
@@ -802,7 +800,7 @@ The steps, in order, are `cut`, `check`, `zip`, `volume`, `upload`, `notebook`, 
 | Step that failed | Likely cause | What to do |
 |---|---|---|
 | `cut` | You typed another answer, or a row's `decided_by` is not a role. | Correct the file if the line says so. Run the same command again. |
-| `check` | A check of the release failed. The line names `check.log` in the run's folder. | Read the end of `check.log`. See "Not yet run on Windows" for the one case in which you may leave the step out. |
+| `check` | A check of the release failed. The line names `check.log` in the run's folder. | Read the end of `check.log`. See "What ran where" for the one case in which you may leave the step out. |
 | `zip` | A file in the release folder sets a password. | Move that file out of the release folder. Run `py -m kpi_store.runner --from zip`. |
 | `volume`, `upload` | The sign-in expired, or you may not create the schema. | Sign in again. If the line prints two SQL statements, run them in a Databricks SQL editor. Then run `py -m kpi_store.runner --from volume`. |
 | `notebook` | The notebook run failed, or it still runs after 60 minutes. | Read the reason in the line. Run `py -m kpi_store.runner --from notebook`. A run that still runs is waited for again, not started twice. |
@@ -939,8 +937,8 @@ This is the design of this release. One person runs the runner on a Windows mach
 
 | Machine | State |
 |---|---|
-| Windows 10 or 11 | The design. No run has happened on Windows yet. "Not yet run on Windows" lists what that leaves open. |
-| macOS | Every run of this guide's chain so far happened here. Write `python3` where this guide writes `py`. Git Bash, `setx` and the copy of `python3.exe` are not needed. |
+| Windows 10 or 11 | The design. The check script, the three store loads and the sync check ran on Windows in the test job. The runner itself has not run there. "What ran where" lists what that leaves open. |
+| macOS | Every run of this guide's chain so far happened here. Write `python3` where this guide writes `py`. Git Bash and `setx` are not needed. |
 
 ### A pipeline
 
@@ -999,25 +997,34 @@ Today the load runs on a local Neo4j that has the two plugins, and a copy in pla
 
 With the plugins on Enterprise, the load and the SHACL checks could run there directly. That is not built. Pointing `[neo4j.local]` at the Enterprise database is not the way: the load empties the database it is pointed at, every node of it, and the limit of this release is that it deletes KPI Store nodes only. A direct load needs new code that removes only the KPI Store's nodes before it loads, as the copy does today. Until then, keep the local Neo4j and the copy.
 
-## Not yet run on Windows
+## What ran where
 
-The whole chain of this guide ran on macOS against a rehearsal Databricks workspace in the sandbox's shapes, a local Fuseki 6.2.0 and a local Neo4j 2025.06.2 Enterprise with n10s 2025.06.1 and APOC 2025.06.2. It never ran on Windows, and it never ran on the client's sandbox or the client's Enterprise server. Each point below is written from the code and from the vendor's documentation.
+Three places ran parts of this guide. No place ran all of it, and nothing ran on the client's sandbox or the client's Enterprise server.
+
+| Place | What ran there |
+|---|---|
+| macOS, with a rehearsal Databricks workspace in the sandbox's shapes, a local Fuseki 6.2.0 and a local Neo4j 2025.06.2 Enterprise with n10s 2025.06.1 and APOC 2025.06.2 | The whole chain of this guide, through the runner: every command that the document test runs. |
+| The Windows test job (Windows Server 2025, Python 3.12, Java 21) | The whole check script. The setup check, 13 of its 15 checks. The Fuseki load, a second load that changed nothing, its sync check and `--stop`. The Neo4j Enterprise load with n10s and APOC and all its checks: 4,242 nodes, 22,331 relationships, 816 of 816 failing cases caught and 0 violations. The copy into `businessprocessarchitecturegraph` on the same server. The sync check of all three stores. |
+| The client's sandbox and Enterprise server | Nothing yet. Your first run is the first. |
+
+These points are not proven on Windows. Each is written from the code and from the vendor's documentation.
 
 | What | Why it is not proven | If it fails |
 |---|---|---|
-| Every step of "Install the programs" and "Unpack the release" | No Windows machine ran them. | Report the step. |
-| The three commands of "Install the Python packages" | They are marked for Windows, and no Windows test has run yet. | Report the command and its output. |
-| The steps of "Set up the local Neo4j" | They follow Neo4j Desktop's documentation ("Instance management"). Menu names may differ in your version. The goal of each step is in its text. | Reach the same goal by the menu your version has. The setup check proves the result. |
-| `setx KPI_STORE_LOCAL` | It changes your account's settings, so no test runs it. | Add `--stores C:\kpi-store-local\stores.toml` to every command of this guide instead. |
-| The step `check` of the runner, which runs `scripts/check.sh` in Git Bash | The check script has passed on macOS and Linux only. Some of its tests may assume file modes or links that Windows lacks. | See below. |
+| The runner itself, as one command | The Windows job ran the check script and the loads one by one, not through the runner. | Run the steps one at a time with `--only`, and report the step that failed. |
+| Every Databricks step, and the two Databricks checks of the setup check | The Windows job has no workspace to sign in to. They ran on macOS. | Report the line. |
+| The technical graph in the three stores | It is built by the notebook, so it needs Databricks. It ran on macOS. | Report the line. |
+| Every step of "Install the programs" and "Unpack the release" | No test installs programs. | Report the step. |
+| The steps of "Set up the local Neo4j" | The Windows job used a Neo4j server, not Neo4j Desktop. The steps follow Neo4j Desktop's documentation ("Instance management"), and menu names may differ in your version. | Reach the same goal by the menu your version has. The setup check proves the result. |
+| `setx KPI_STORE_LOCAL` and `setx PY_PYTHON` | They change your account's settings, so no test runs them. | Add `--stores C:\kpi-store-local\stores.toml` to every command of this guide instead. |
 | Clearing the report in Excel | The test edits the file with Python. The runner reads the CSV as UTF-8, with or without a byte-order mark, and reads only the columns `id`, `decision`, `decided_by` and `note`. | Edit the same three cells in Notepad instead. They are the last three values of each line. |
-| Starting and stopping Fuseki from the runner | The start uses `java.exe` and the stop reads the process list with PowerShell. Both ran on macOS only. | Run the setup check. Report the line. |
-| The SQL and Cypher of "How to undo" | They delete, so no test runs them against a client server. The Cypher ran once on the local test server. | Do not improvise. Report it. |
+| The SQL of "How to undo" | It deletes, so no test runs it. The Cypher ran once on a local test server and left 0 nodes and 0 constraints. | Do not improvise. Report it. |
+| `--replace-enterprise` | No run needed it. | Report the line. |
 | The rows of "The rows to expect on the sandbox" | They come from a comparison by hand. The rehearsal workspace gave the one blocking row and the two case-only rows. It has no Genie space, so no test produced the Genie rows. | Follow "When your report differs from the table". |
 
-If the step `check` fails on Windows, read the end of `check.log`. If the failing test is about the release's content, stop and report it. If it is about Windows itself, such as a file mode or a link, report it and leave the step out of the run:
+The check script passes on Windows in the test job. Your machine is another machine, with its own antivirus and its own folders, so one fallback stays. If the step `check` fails, read the end of `check.log`. If the failing test is about the release's content, stop and report it. If it is about the machine, such as a file that another program holds open, report it and leave the step out of the run:
 
-```powershell skip reason="windows-only: the fallback for a check script that fails on Windows for a reason of Windows itself"
+```powershell skip reason="windows-only: the fallback for a check script that fails for a reason of the reader's machine"
 py -m kpi_store.runner --skip check
 ```
 

@@ -30,7 +30,7 @@ You need the machine that the runbook set up. The commands start in the release 
    ```
 
 2. Open Git Bash in the release folder. In File Explorer, right-click the folder and choose "Open Git Bash here".
-3. Run the full check. It takes about 10 minutes and must end with `all checks passed`.
+3. Run the full check. It must end with `all checks passed`. It took about 10 minutes on a Mac and 21 minutes on a Windows machine with 4 cores. Run it in Git Bash: in PowerShell, the plain word `bash` starts the launcher of the Linux subsystem.
 
    ```bash run=slow
    bash scripts/check.sh
@@ -47,7 +47,7 @@ The check proves your copy is valid. Every package equals a fresh build of its s
 
 Do not edit files while the check runs. It compares the folder at its start and its end, and a change fails the run.
 
-A Git copy keeps your history, and the cut tool then commits and tags each correction. A plain folder works too. In a Git copy, run `git add -A` before the check, because one test reads which pages Git tracks.
+A Git copy keeps your history, and the cut tool then commits and tags each correction. Keep the file `.gitattributes` in a Git copy: without it, Git for Windows checks text files out with other line ends, and the packages' hashes differ. A plain folder works too. In a Git copy, run `git add -A` before the check, because one test reads which pages Git tracks.
 
 ## Choose the way a change goes
 
