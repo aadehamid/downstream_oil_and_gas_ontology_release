@@ -1842,11 +1842,11 @@ release package is current</code></pre></dd>
 <p class="why">Every module ships as a versioned package with a DCAT record; one catalog lists them all (the decision of 2026-10-05, the decision of 2026-10-13, the decision of 2026-10-22).</p>
 <dl class="parts">
 <dt>Prerequisites</dt><dd>The modules above.</dd>
-<dt>Files to open, in this order</dt><dd><ol class="files"><li><code>business_architecture/ontology/release/build_module.py</code>: builds any module&#x27;s package</li><li><code>business_architecture/ontology/release/build_catalog.py</code>: writes releases/catalog.ttl</li><li><code>business_architecture/ontology/releases/catalog.ttl</code>: the catalog</li><li><code>business_architecture/ontology/release/CHANGELOG.md</code>: release notes</li></ol></dd>
+<dt>Files to open, in this order</dt><dd><ol class="files"><li><code>business_architecture/ontology/release/build_module.py</code>: builds a module&#x27;s package; <code>core</code> has a builder of its own, which <code>newest.py</code> names</li><li><code>business_architecture/ontology/release/build_catalog.py</code>: writes releases/catalog.ttl</li><li><code>business_architecture/ontology/releases/catalog.ttl</code>: the catalog</li><li><code>business_architecture/ontology/release/CHANGELOG.md</code>: release notes</li></ol></dd>
 <dt>Commands</dt><dd><pre data-snippet="bash run=slow"><code>(cd business_architecture/ontology/release &amp;&amp; uv run -q --no-project --with rdflib --with pyshacl --with openpyxl python build_catalog.py --verify)</code></pre><pre data-snippet="text expect"><code>catalog: 13 releases from 13 packages
 releases/catalog.ttl is current</code></pre></dd>
 <dt>What you should see</dt><dd>The catalog lists 13 releases, one for each module's newest package.</dd>
-<dt>How to check it worked</dt><dd><code>build_catalog.py --verify</code> and each <code>build_module.py --verify</code>.</dd>
+<dt>How to check it worked</dt><dd><code>build_catalog.py --verify</code>, each <code>build_module.py --verify</code>, and the <code>core</code> builder with <code>--verify</code>.</dd>
 <dt>What it enables next</dt><dd>Versioned inputs the projections read.</dd>
 <dt>Explained in</dt><dd><a href="#machinery">The build and release machinery</a></dd>
 <dt>Files in the File map</dt><dd><a href="#fm-checks">Build and checks</a>, <a href="#fm-modules">Ontology modules and releases</a></dd>

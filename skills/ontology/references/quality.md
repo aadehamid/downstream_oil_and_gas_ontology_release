@@ -82,7 +82,7 @@ Before you hand a change to the owner, run these checks on what changed, then th
 
 ## The vocabulary standards behind these rules
 
-The definition, label and scope-note rules were checked against ANSI/NISO Z39.19-2005 (R2010), *Guidelines for the Construction, Format, and Management of Monolingual Controlled Vocabularies*, read in full. ISO 25964-1:2011 (*Thesauri for information retrieval*) and ISO 25964-2:2013 (*Interoperability with other vocabularies*) are its international counterparts; their text is paywalled and was not read, so no rule here claims to follow their clauses. Each row below says whether the skill's rule is the same as Z39.19's or differs from it, and every difference is deliberate, with its reason. Section numbers and quotations are Z39.19's.
+The definition, label and scope-note rules were checked against ANSI/NISO Z39.19-2005 (R2010), *Guidelines for the Construction, Format, and Management of Monolingual Controlled Vocabularies*, read in full. ISO 25964-1:2011 (*Information and documentation — Thesauri and interoperability with other vocabularies — Part 1: Thesauri for information retrieval*, published 2011-08) and ISO 25964-2:2013 (*Part 2: Interoperability with other vocabularies*, published 2013-03) are its international counterparts; their text is paywalled and was not read, so no rule here claims to follow their clauses. Each row below says whether the skill's rule is the same as Z39.19's or differs from it, and every difference is deliberate, with its reason. Section numbers and quotations are Z39.19's.
 
 | Z39.19 says | This skill | Same, or why it differs |
 |---|---|---|
