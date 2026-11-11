@@ -115,5 +115,85 @@ class Finish(unittest.TestCase):
             self.assertEqual(read(tmp, "projection/pipeline.py"), PIPELINE)
 
 
+class Cascade(unittest.TestCase):
+    """The made-up tree: kpi is the changed module, and lane stands for a module that depends on it."""
+
+    def package(self, tmp, module, version):
+        os.makedirs(os.path.join(tmp, "releases", module, version))
+        with open(os.path.join(tmp, "releases", module, version, "manifest.json"), "w", encoding="utf-8") as f:
+            f.write("{}")
+
+    def args(self):
+        return argparse.Namespace(module="kpi", date="2026-11-12", why="Takes the new version of what it requires.",
+                                  approver="the ontology owner", where="approvals/a.md", words="Approved as a minor.")
+
+    def test_the_next_patch_of_a_plain_version_and_of_a_correction(self):
+        self.assertEqual(nv.next_patch("1.2.0"), "1.2.1")
+        self.assertEqual(nv.next_patch("1.2.1-correction.2"), "1.2.2")
+        with self.assertRaises(SystemExit):
+            nv.next_patch("1.2")
+
+    def test_each_dependent_gets_the_next_patch_and_every_module_is_finished(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tree(tmp, ["1.3.0", "1.4.0"])          # kpi's new package is written
+            self.package(tmp, "lane", "1.1.0")
+            built = []
+
+            def build(module):
+                built.append((module, nv.current_version(module, tmp)))
+                self.package(tmp, module, nv.current_version(module, tmp))
+            nv.cascade(self.args(), ontology=tmp, order=["kpi", "lane"], build=build)
+            self.assertEqual(built, [("lane", "1.1.1")])
+            self.assertEqual(nv.packages("kpi", tmp), ["1.4.0"])
+            self.assertEqual(nv.packages("lane", tmp), ["1.1.1"])
+            self.assertEqual(sorted(os.listdir(os.path.join(tmp, "releases", "previous"))), ["kpi", "lane"])
+            self.assertEqual(read(tmp, "projection/pipeline.py"), 'PACKAGES = [("core", "2.4.0"), ("kpi", "1.4.0"), ("lane", "1.1.1")]\n')
+            self.assertIn("## 1.1.1 (2026-11-12)\n\nA patch release. Takes the new version of what it requires.", read(tmp, "releases/lane/CHANGELOG.md"))
+
+    def test_it_stops_before_any_change_when_the_changed_modules_package_is_not_written(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tree(tmp, ["1.3.0"])
+            self.package(tmp, "lane", "1.1.0")
+            before = read(tmp, "release/build_module.py")
+            with self.assertRaises(SystemExit) as stopped:
+                nv.cascade(self.args(), ontology=tmp, order=["kpi", "lane"], build=lambda module: self.fail("built"))
+            self.assertIn("write kpi's new package first", str(stopped.exception))
+            self.assertEqual(read(tmp, "release/build_module.py"), before)
+
+    def test_a_second_run_leaves_a_package_that_is_written_and_goes_on(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tree(tmp, ["1.3.0", "1.4.0"])
+            self.package(tmp, "lane", "1.1.0")
+            self.package(tmp, "lane", "1.1.1")     # the first run wrote it and stopped before the finish
+            nv.cascade(self.args(), ontology=tmp, order=["kpi", "lane"], build=lambda module: self.fail("built again"))
+            self.assertEqual(nv.packages("lane", tmp), ["1.1.1"])
+            self.assertEqual(nv.packages("kpi", tmp), ["1.4.0"])
+
+
+class Exceptions(unittest.TestCase):
+    def test_finish_moves_a_packages_stand_alone_exceptions_with_it_and_gives_the_new_package_its_own(self):
+        with tempfile.TemporaryDirectory() as top:
+            tmp = os.path.join(top, "business_architecture", "ontology")
+            tree(tmp, ["1.3.0", "1.3.1"])
+            for version, text in (("1.3.0", "Holds the kept text.\n"), ("1.3.1", "A patch.\n\nHolds the kept text.\n")):
+                with open(os.path.join(tmp, "releases", "kpi", version, "CHANGELOG.md"), "w", encoding="utf-8") as f:
+                    f.write(text)
+            os.makedirs(os.path.join(top, "scripts"))
+            listed = os.path.join(top, "scripts", "standalone-exceptions.txt")
+            kept = "business_architecture/ontology/releases/lane/1.1.0/CHANGELOG.md :: other-release :: kept text :: 1 :: why"
+            with open(listed, "w", encoding="utf-8") as f:
+                f.write("# why\n" + kept + "\n"
+                        "business_architecture/ontology/releases/kpi/1.3.0/CHANGELOG.md :: other-release :: kept text :: 1 :: why\n"
+                        "business_architecture/ontology/releases/kpi/1.3.0/kpi.ttl :: other-release :: gone text :: 2 :: why\n")
+            nv.finish(argparse.Namespace(module="kpi", old="1.3.0"), ontology=tmp)
+            with open(listed, encoding="utf-8") as f:
+                self.assertEqual(f.read().splitlines(), [
+                    "# why", kept,
+                    "business_architecture/ontology/releases/previous/kpi/1.3.0/CHANGELOG.md :: other-release :: kept text :: 1 :: why",
+                    "business_architecture/ontology/releases/kpi/1.3.1/CHANGELOG.md :: other-release :: kept text :: 1 :: why",
+                    # The new package does not hold this text, so it gets no line of its own.
+                    "business_architecture/ontology/releases/previous/kpi/1.3.0/kpi.ttl :: other-release :: gone text :: 2 :: why"])
+
+
 if __name__ == "__main__":
     unittest.main()

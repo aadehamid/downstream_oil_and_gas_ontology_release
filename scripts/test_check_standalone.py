@@ -161,7 +161,13 @@ def test_the_checks_own_files_are_not_read(tmp_path):
     assert cs.check(root)[0] == ["scripts/other.py:1: [pull-request] PR 12"]
 
 
-def test_a_pending_path_is_skipped_and_counted(tmp_path, capsys):
+@pytest.fixture
+def one_allowed(monkeypatch):
+    """The made-up trees below keep one pending file. Its name is allowed here whatever this tree's own list holds."""
+    monkeypatch.setattr(cs, "ALLOWED_PENDING", ("HOW-TO-UPDATE.md", "HOW-TO-UPDATE.html", "README.md"))
+
+
+def test_a_pending_path_is_skipped_and_counted(tmp_path, capsys, one_allowed):
     root = tree(tmp_path, {"HOW-TO-UPDATE.md": "PR 12 and PR 13\n", "b.md": "fine\n"},
                 pending="# why\nHOW-TO-UPDATE.md :: awaits its rewrite\n")
     findings, stale, summary = cs.check(root)
@@ -177,7 +183,7 @@ def test_strict_ignores_the_pending_list(tmp_path):
     assert cs.main(["--root", root, "--strict"]) == 1
 
 
-def test_a_pending_file_hides_no_file_with_a_longer_name(tmp_path):
+def test_a_pending_file_hides_no_file_with_a_longer_name(tmp_path, one_allowed):
     # The pending line names one file. A new file beside it, with a name that starts the same way, is checked.
     root = tree(tmp_path, {"HOW-TO-UPDATE.md": "PR 12\n", "HOW-TO-UPDATE.evasion.md": "PR 13\n"},
                 pending="HOW-TO-UPDATE.md :: awaits its rewrite\n")
@@ -191,7 +197,7 @@ def test_a_pending_line_that_matches_no_file_fails(tmp_path):
     assert cs.main(["--root", root]) == 1
 
 
-def test_a_pending_line_whose_files_are_all_clean_fails(tmp_path):
+def test_a_pending_line_whose_files_are_all_clean_fails(tmp_path, one_allowed):
     root = tree(tmp_path, {"HOW-TO-UPDATE.md": "fine\n"}, pending="HOW-TO-UPDATE.md :: awaits its rewrite\n")
     assert cs.check(root)[1] == ["scripts/standalone-pending.txt: `HOW-TO-UPDATE.md` is clean; remove the line"]
     assert cs.main(["--root", root]) == 1
@@ -216,7 +222,7 @@ def test_a_pending_line_without_a_reason_is_refused(tmp_path, capsys):
     "HOW-TO-UPDATE.* :: awaits the documents rewrite",  # two allowed files as one wildcard
     "docs/new.md :: awaits rewrite",             # a new file
 ])
-def test_the_pending_list_cannot_grow(tmp_path, capsys, line):
+def test_the_pending_list_cannot_grow(tmp_path, capsys, line, one_allowed):
     root = tree(tmp_path, {"docs/new.md": "PR 12\n", "README.md": "PR 13\n", "README.html": "PR 14\n"}, pending=line + "\n")
     with pytest.raises(ValueError, match="standalone-pending.txt:1: .* is not a file the list may hold"):
         cs.check(root)
@@ -225,13 +231,11 @@ def test_the_pending_list_cannot_grow(tmp_path, capsys, line):
                                               "docs/new.md:1: [pull-request] PR 12"]
 
 
-def test_the_allowed_pending_lines_are_these_eight_files_and_this_trees_list_holds_no_other():
+def test_the_allowed_pending_lines_are_these_six_files_and_this_trees_list_holds_no_other():
     # Written by hand. A later change may delete a line here and in the list; it may never add or widen one.
     assert cs.ALLOWED_PENDING == (
         "README.md",
         "KNOWN-OPEN-ITEMS.md",
-        "HOW-TO-UPDATE.md",
-        "HOW-TO-UPDATE.html",
         "business_architecture/ontology/epm-walkthrough.html",
         "business_architecture/ontology/epm-ontology-guide.html",
         "viewer/index.html",

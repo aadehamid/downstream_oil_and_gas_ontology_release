@@ -112,6 +112,7 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   business_architecture/ontology/release/test_frozen_sources.py \
   business_architecture/ontology/release/test_newest.py \
   business_architecture/ontology/release/test_next_version.py \
+  business_architecture/ontology/release/test_onboard_example.py \
   business_architecture/ontology/system/test_systems.py \
   business_architecture/ontology/technical-graph/test_technical_graph.py \
   business_architecture/ontology/validation/test_all_module_shapes.py \

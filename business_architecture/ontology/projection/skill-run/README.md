@@ -27,12 +27,11 @@ The `ontology-to-lpg` skill's `run_projection.py` (version 2.3 of its method) ru
 | `explore_fuseki`, `triplestore_fuseki` | A Fuseki dataset of its own for the walks, and one for the triple-store counts |
 | `rebuild` | `{"source": "jena" or "repo", "out": <folder>}`, to prove the graph can be rebuilt from the store's copy |
 
-With the skill folder in `$SKILLS`:
+On the client platform you do not write that copy by hand. The runner's `neo4j` step (`kpi_store/load_neo4j.py`) writes it into the run's folder from your local settings and calls the driver. The runbook, `../ontology-stores-runbook.md`, gives the steps. To see the inputs the driver reads, list them from this folder:
 
-```bash skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
-cd "$SKILLS/ontology-to-lpg/scripts"
-uv run --no-project --with rdflib python3 run_projection.py --config <your copy of epm-run.json> --plan
-uv run --no-project --with rdflib python3 run_projection.py --config <your copy of epm-run.json>
+```powershell run=release-copy status-only
+cd business_architecture/ontology/projection/skill-run
+py inputs.py releases
 ```
 
 `--plan` lists the steps and why any is skipped, and runs nothing. The run needs uv, Java 11 or later and ROBOT 1.9.10 at the path `robot_jar` names. It starts and stops no server: the Neo4j servers and the Fuseki datasets the copy names must already run. The skill's `references/running.md`, rule 5, says how to prepare the local Neo4j, and the `rdf-store` skill's `references/stores.md` says how to start Fuseki from the Apache jar. The driver reads no password: it passes each env file to the skill's scripts by path (`load_verify.py --env`, `copy_graph.py --source-env` and `--target-env`).

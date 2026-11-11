@@ -6,16 +6,23 @@
     python3 build_module.py <module> --write
     python3 next_version.py finish <module> <old version>
     python3 next_version.py current <module>
+    python3 next_version.py cascade <module> --approver "<who>" --where "<where>" --words "<the sentence>"
 
 `start` sets the entry in build_module.py's MODULES (version, issued, approver, approval) and adds a section at the top of
 the module's CHANGELOG.md, carrying forward its open gaps. `finish` moves the old package to releases/previous/ and
 changes the version in projection/pipeline.py and projection/skill-run/epm-config.json. `current` prints the version the entry holds. You may do any of this by hand.
+
+`cascade` does the rest of a release once the changed module's own new package is written. It gives each module that
+depends on the changed one the next patch version (start), writes its package (build_module.py --write), and then
+finishes every module, the changed one first. Run again after a failure, it leaves a module whose new package is
+already written as it is and goes on with the next.
 """
 import argparse
 import datetime
 import os
 import re
 import shutil
+import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -93,6 +100,30 @@ def start(a, ontology=ONTOLOGY):
     print(f"{a.module} is set to {a.version}. Now run: python3 build_module.py {a.module} --write")
 
 
+def carry_exceptions(ontology, module, old, new):
+    """The stand-alone check lists, by path, text that a released package holds and may keep
+    (scripts/standalone-exceptions.txt). finish moves the old package and the new one holds the same changelog, so
+    each such line follows its package to releases/previous/, and the new package gets a line when it holds the same
+    text as often. The cut tool does the same for a correction. A tree with no such list is left alone."""
+    path = os.path.join(ontology, "..", "..", "scripts", "standalone-exceptions.txt")
+    if not os.path.isfile(path):
+        return
+    here = "business_architecture/ontology/releases"
+    prefix, out = f"{here}/{module}/{old}/", []
+    for line in read(path).splitlines():
+        parts = [part.strip() for part in line.split(" :: ")]
+        if len(parts) != 5 or line.startswith("#") or not parts[0].startswith(prefix):
+            out.append(line)
+            continue
+        name = parts[0][len(prefix):]
+        out.append(" :: ".join([f"{here}/previous/{module}/{old}/{name}", *parts[1:]]))
+        fresh = os.path.join(ontology, "releases", module, new, name)
+        if os.path.isfile(fresh) and str(read(fresh).count(parts[2])) == parts[3]:
+            out.append(" :: ".join([f"{here}/{module}/{new}/{name}", *parts[1:]]))
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(out) + "\n")
+
+
 def finish(a, ontology=ONTOLOGY):
     newest = [v for v in os.listdir(os.path.join(ontology, "releases", a.module)) if newest_on_disk.version_key(v)]
     new = max(newest, key=newest_on_disk.version_key)
@@ -113,18 +144,77 @@ def finish(a, ontology=ONTOLOGY):
     shutil.move(source, target)
     os.replace(pipeline + ".new", pipeline)
     os.replace(config + ".new", config)
+    carry_exceptions(ontology, a.module, a.old, new)
     print(f"{a.module} {a.old} moved to releases/previous/; the projection's lists name {new}")
 
 
-def current(a, ontology=ONTOLOGY):
+def current_version(module, ontology=ONTOLOGY):
     text = read(os.path.join(ontology, "release", "build_module.py"))
-    start_at = text.find(f'    "{a.module}": {{\n')
+    start_at = text.find(f'    "{module}": {{\n')
     if start_at < 0:
-        raise SystemExit(f"{a.module} has no entry in MODULES")
+        raise SystemExit(f"{module} has no entry in MODULES")
     found = re.search(r'"version": "([^"]+)"', text[start_at:text.index("\n    },\n", start_at)])
     if not found:
-        raise SystemExit(f"{a.module}'s entry has no version")
-    print(found.group(1))
+        raise SystemExit(f"{module}'s entry has no version")
+    return found.group(1)
+
+
+def current(a, ontology=ONTOLOGY):
+    print(current_version(a.module, ontology))
+
+
+def next_patch(version):
+    """The next ordinary patch. 1.2.0 gives 1.2.1. A correction version gives the patch after it: 1.2.1-correction.2
+    gives 1.2.2, because no plain 1.2.1 is released beside the corrections."""
+    key = newest_on_disk.version_key(version)
+    if key is None:
+        raise SystemExit(f"{version!r} is not a version")
+    return f"{key[0]}.{key[1]}.{key[2] + 1}"
+
+
+def packages(module, ontology=ONTOLOGY):
+    """The versions of a module's packages in releases/<module>/, oldest first."""
+    folder = os.path.join(ontology, "releases", module)
+    found = [v for v in os.listdir(folder) if newest_on_disk.version_key(v)] if os.path.isdir(folder) else []
+    return sorted(found, key=newest_on_disk.version_key)
+
+
+def run_script(args, ontology=ONTOLOGY):
+    """Runs one of the release scripts with this Python, from the release folder, and returns what it printed. Each
+    run is a new process, so it reads build_module.py as start has just left it."""
+    done = subprocess.run([sys.executable, "-B", *args], cwd=os.path.join(ontology, "release"), capture_output=True,
+                          text=True, encoding="utf-8")
+    if done.returncode != 0:
+        raise SystemExit(f"{' '.join(args)} failed:\n{(done.stdout + done.stderr).strip()}")
+    return done.stdout
+
+
+def cascade(a, ontology=ONTOLOGY, order=None, build=None):
+    """The rest of a release, after the changed module's own new package is written."""
+    order = order if order is not None else run_script(["dependents.py", a.module], ontology).split()
+    build = build or (lambda module: run_script(["build_module.py", module, "--write"], ontology))
+    moved = []
+    if a.module != "core":   # core is released by hand first, and its list holds only the modules that depend on it
+        held = packages(a.module, ontology)
+        if len(held) != 2:
+            raise SystemExit(f"write {a.module}'s new package first: releases/{a.module}/ must hold the old package and "
+                             f"the new one, and it holds {', '.join(held) or 'none'}")
+        moved.append((a.module, held[0]))
+        order = [m for m in order if m != a.module]
+    for module in order:
+        held = packages(module, ontology)
+        if len(held) == 2:   # written by an earlier run of this command that stopped later
+            print(f"{module} {held[1]} is written already")
+            moved.append((module, held[0]))
+            continue
+        old = current_version(module, ontology)
+        start(argparse.Namespace(module=module, version=next_patch(old), kind="patch", date=a.date, why=a.why,
+                                 approver=a.approver, where=a.where, words=a.words), ontology)
+        build(module)
+        moved.append((module, old))
+    for module, old in moved:
+        finish(argparse.Namespace(module=module, old=old), ontology)
+    print(f"{len(moved)} modules released. Now rebuild the catalog and the projection manifest, and run the check.")
 
 
 def main(argv=None):
@@ -139,8 +229,13 @@ def main(argv=None):
     f.add_argument("module"); f.add_argument("old")
     c = sub.add_parser("current")
     c.add_argument("module")
+    k = sub.add_parser("cascade")
+    k.add_argument("module"); k.add_argument("--approver", required=True)
+    k.add_argument("--where", required=True); k.add_argument("--words", required=True)
+    k.add_argument("--why", default="Takes the new version of what it requires; nothing else changes.")
+    k.add_argument("--date", default=datetime.date.today().isoformat())
     a = ap.parse_args(argv)
-    {"start": start, "finish": finish, "current": current}[a.cmd](a)
+    {"start": start, "finish": finish, "current": current, "cascade": cascade}[a.cmd](a)
 
 
 if __name__ == "__main__":

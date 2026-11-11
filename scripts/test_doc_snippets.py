@@ -52,6 +52,13 @@ timeout = 1
 [contexts.signed-in]
 base = "empty"
 home = "real"
+
+[contexts.settings]
+base = "empty"
+needs_env = ["DOC_TEST_SETTINGS_FILE"]
+[contexts.settings.set_env]
+DOC_TEST_LOCAL = "env:DOC_TEST_SETTINGS_FILE"
+DOC_TEST_FIXED = "fixed text"
 """
 
 
@@ -160,14 +167,31 @@ def test_a_run_block_may_expect_another_exit_status(tmp_path):
     assert bad.failures == ["guide.md:1: the block ended with exit status 0, not 2 (context scratch)\n    | (no output)"]
 
 
+def test_a_run_block_may_say_what_the_reader_types_at_its_prompts(tmp_path):
+    ask = ['name = input("Type the new name to confirm: ")', 'answer = input("Type yes to cut: ")', "print()",
+           "print('typed', name, 'and', answer)"]
+    shown = fence("text expect", "Type the new name to confirm: Type yes to cut:", "typed Change_Value_Amount and yes")
+    text = (fence('python run=scratch types="Change_Value_Amount,yes"', *ask) + shown
+            + fence('powershell run=copy types="Change_Value_Amount,yes"', "py -c \"print('first line')\"", "py ask.py")
+            + fence("text expect", "first line", "Type the new name to confirm: Type yes to cut:",
+                    "typed Change_Value_Amount and yes"))
+    result = check(tmp_path, text, files={"ask.py": "\n".join(ask) + "\n"})
+    assert result.failures == [] and result.summary() == "4 blocks: 2 run (0 status-only), 2 checked, 0 skipped"
+    # With no types= a prompt gets no answer, as before: the block fails where it asks.
+    silent = check(tmp_path, fence("python run=scratch status-only", *ask))
+    assert len(silent.failures) == 1 and "EOFError" in silent.failures[0]
+    empty = check(tmp_path, fence('python run=scratch status-only types="yes,,no"', "pass"))
+    assert empty.failures == ["guide.md:1: types= holds what the reader types at each prompt, with commas between the answers"]
+
+
 def test_a_run_block_needs_a_known_context_and_a_language_that_runs(tmp_path):
     text = (fence("python run status-only", "pass") + fence("python run=nowhere status-only", "pass")
             + fence("json run=scratch status-only", "{}"))
     result = check(tmp_path, text)
     assert result.failures == [
-        "guide.md:1: a run block names its context: `run=<context>` (one of copy, gated, other, quick, repo, scratch, signed-in)",
+        "guide.md:1: a run block names its context: `run=<context>` (one of copy, gated, other, quick, repo, scratch, settings, signed-in)",
         "guide.md:4: no context named `nowhere` in doc_snippets.toml: use one of copy, gated, other, quick, repo, "
-        "scratch, signed-in",
+        "scratch, settings, signed-in",
         "guide.md:7: a `json` block cannot run: `run` takes bash, sh, python, powershell, cmd"]
 
 
@@ -250,6 +274,15 @@ def test_a_block_does_not_see_the_variables_of_another_context(tmp_path):
     text = fence("python run=scratch", "import os", "print('gate:', os.environ.get('DOC_TEST_GATE'))") \
         + fence("text expect", "gate: None")
     assert check(tmp_path, text, environ={"DOC_TEST_GATE": "secret"}).failures == []
+
+
+def test_a_context_sets_variables_for_its_blocks_and_no_other_context_gets_them(tmp_path):
+    show = "import os; print(os.environ.get('DOC_TEST_LOCAL'), os.environ.get('DOC_TEST_FIXED'))"
+    text = (fence("python run=settings", show) + fence("text expect", "prepared.toml fixed text")
+            + fence("python run=scratch", show) + fence("text expect", "None None"))
+    # The reader's own value of the variable must not reach a block of another context.
+    result = check(tmp_path, text, environ={"DOC_TEST_SETTINGS_FILE": "prepared.toml", "DOC_TEST_LOCAL": "the-readers-own.toml"})
+    assert result.failures == [] and result.ran == 2 and result.checked == 2
 
 
 def test_a_check_started_by_a_block_runs_no_block_and_says_so(tmp_path):
@@ -725,7 +758,11 @@ def test_a_nested_block_must_hold_a_block(tmp_path):
 # -- the command
 
 
-def test_the_command_prints_each_failure_and_the_count_and_exits_1(tmp_path, capsys):
+def test_the_command_prints_each_failure_and_the_count_and_exits_1(tmp_path, capsys, monkeypatch):
+    # The command reads the real environment. When a block of a running check started these tests, as the full
+    # check in a guide does, that environment says so, and the command would run no block.
+    monkeypatch.delenv(d.NESTED, raising=False)
+    monkeypatch.delenv(d.NESTED_FILE, raising=False)
     (tmp_path / "guide.md").write_text(fence("json parse", "{}") + fence("text", "no tag"), encoding="utf-8")
     assert d.main(["--root", str(tmp_path), "check"]) == 1
     assert capsys.readouterr().out == ("FAIL guide.md:4: the block has no tag after its language `text`\n"
@@ -777,9 +814,15 @@ def test_the_contexts_that_run_everywhere_need_no_variable_and_the_others_name_t
     assert {name: c.needs_env for name, c in contexts.items()} == {
         "scratch": (), "release-copy": (), "release-git": (),
         "slow": ("DOC_SNIPPETS_SLOW",),
+        "correction": ("DOC_SNIPPETS_SLOW",),
+        "new-module": ("DOC_SNIPPETS_SLOW",),
         "stores": ("KPI_STORE_TEST_FUSEKI_URL", "KPI_STORE_TEST_NEO4J_URI"),
-        "databricks-free": ("KPI_STORE_TEST_DATABRICKS_PROFILE",)}
-    assert [name for name, c in contexts.items() if c.home == "real"] == ["databricks-free"]
+        "databricks-free": ("KPI_STORE_TEST_DATABRICKS_PROFILE",),
+        "first-run": ("KPI_STORE_TEST_LOCAL_SETTINGS", "KPI_STORE_TEST_LPG_OUT")}
+    assert [name for name, c in contexts.items() if c.home == "real"] == ["databricks-free", "first-run"]
+    # The runbook's commands read KPI_STORE_LOCAL. Only its own context may give that variable to a block.
+    assert {name: c.set_env for name, c in contexts.items() if c.set_env} == {
+        "first-run": {"KPI_STORE_LOCAL": "env:KPI_STORE_TEST_LOCAL_SETTINGS"}}
 
 
 def test_every_markdown_document_of_the_tree_is_in_scope():

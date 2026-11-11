@@ -43,48 +43,42 @@ Each module package has three graphs: `<module>.ttl` (the content), `shapes.ttl`
 
 ## Run the projection
 
-Run it after any input or shape changes. You need [uv](https://docs.astral.sh/uv/), Java 11 or later ([ROBOT's Getting Started](https://robot.obolibrary.org/): "make sure you have Java 11 or later installed"), and a local Neo4j 2025.06.2 that already runs with the n10s and APOC Core jars in its `plugins` folder. The driver starts and stops no server. It is in the `ontology-to-lpg` skill, in the `scripts/` folder of `$SKILLS/ontology-to-lpg`; the skill's `references/running.md`, rule 5, says how to prepare the Neo4j server, and the `rdf-store` skill's `references/stores.md` says how to start Fuseki from the Apache jar.
+On the client platform one command runs the projection and every load: the runner, `py -m kpi_store.runner`. Its `neo4j` step calls `kpi_store/load_neo4j.py`, which runs the driver on this folder's inputs against the local Neo4j, and its `enterprise` step copies the checked graph to the named database. `ontology-stores-runbook.md` in this folder gives every step, from the setup of the machine to the sync check, and says what each step of the runner does.
 
-1. Download ROBOT 1.9.10 (it runs the ELK reasoner), and check its SHA-256. Run these commands in a folder outside the repository; the jar never goes into this tree. If the checksum differs, stop: the driver refuses another file. On Windows, check it with `certutil -hashfile robot.jar SHA256`.
+Two commands of this folder need no database. Run them from this folder after any input or shape changes.
 
-   ```bash skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
-   cd <a folder outside the repository>
-   curl -L -o robot.jar https://github.com/ontodev/robot/releases/download/v1.9.10/robot.jar
-   shasum -a 256 robot.jar
-   # expect 16a73c074f3df359a7338a84b4e0788785fe06117f931bb9796e9619ea776105
+1. Check the rules, validate, and compare the manifest with a fresh build. It fails unless the manifest is current. To write a new manifest, run `py pipeline.py build`.
+
+   ```powershell run=release-copy
+   cd business_architecture/ontology/projection
+   py pipeline.py build --verify
    ```
 
-2. Copy `skill-run/epm-run.json` to a folder outside the repository, set `robot_jar` to the jar's path and `out` to your output folder, and add the keys that name your stores (`skill-run/README.md` lists them). Then run the driver with the copy. It checks, reasons, empties and loads the local Neo4j, writes the release records, and runs each further step whose key the copy holds: the copy to the named database, the Jena round trip, the walks and the rebuild. `--plan` lists the steps first and runs nothing.
-
-   ```bash skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
-   cd "$SKILLS/ontology-to-lpg/scripts"
-   uv run --no-project --with rdflib python3 run_projection.py --config <your copy of epm-run.json> --plan
-   uv run --no-project --with rdflib python3 run_projection.py --config <your copy of epm-run.json>
+   ```text expect
+   Step 1 passed; loadable.nt <count> triples, inferred.nt 2
+   projection-manifest.json is current
    ```
 
-3. Take the result into this folder, from this folder. It refuses a run that read other inputs than this tree's, or whose report did not pass. Commit `inferred.nt`, the manifest and the report together.
+2. After a Neo4j load, take the load's result into this folder: `inferred.nt`, a summary of its report, and the manifest. The runbook's section "Record the load's report in the release folder" runs the command, `py pipeline.py record`, on a real load. It refuses a load that read other inputs than this tree's, or whose report did not pass.
 
-   ```bash skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
-   uv run --with rdflib --with pyshacl python pipeline.py record --run <your output folder>
-   ```
-
-4. Load the logical models, then write the Neo4j marker. `mark` checks the database against this tree first and stops, writing nothing, when it does not match.
-
-   ```bash skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
-   uv run --with rdflib --with neo4j --with pyoxigraph python logical_models.py load
-   uv run --with rdflib --with neo4j python sync_stores.py mark
-   ```
-
-The Databricks table is not loaded from here. A notebook loads `epm_triples` with the `rdf-store` skill's `rdfstore.py` and writes the table's marker row in `epm_store_markers`.
+The Databricks table is not loaded from here. The runner's `notebook` step loads `epm_triples` with the `rdf-store` skill's `rdfstore.py` and writes the table's marker row in `epm_store_markers`.
 
 ## Check the stores
 
-```bash skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
-uv run --with rdflib python sync_stores.py expected
-uv run --with rdflib --with neo4j python sync_stores.py check
+`py -m kpi_store.sync_check` reads the four stores of the client platform and says whether each is current. The runbook's section "The sync check" shows it and how to read each line. It takes what a current store holds from `sync_stores.py` in this folder:
+
+```powershell run=release-copy
+py sync_stores.py expected
 ```
 
-`expected` prints what a current store's marker holds: the number of catalog datasets, their digest, the input fingerprint and the newest release IRIs. `check` reads the Neo4j database and the Jena dataset the settings name and says whether each is current; `--store` limits it to one. `empty_stores.py` counts what a store holds and, with `--yes`, empties it before a clean reload.
+```text expect
+{
+  "catalog_datasets": 13,
+...
+}
+```
+
+`expected` prints what a current store's marker holds: the number of catalog datasets, their digest, the input fingerprint and the newest release IRIs. `empty_stores.py` counts what a store holds and, with `--yes`, empties it before a clean reload.
 
 ## The committed figures
 

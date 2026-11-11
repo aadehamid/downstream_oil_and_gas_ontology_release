@@ -465,6 +465,30 @@ def test_a_report_that_is_not_cleared_stops_the_run_before_the_cut(setup):
     assert called == [] and setup.pending.is_dir()
 
 
+def test_a_csv_that_a_spreadsheet_saved_in_another_encoding_stops_with_how_to_save_it(setup):
+    pending_report(setup, {"R001": {"decided_by": "the owner"}})
+    path = setup.pending / runner.TO_CLEAR
+    path.write_bytes(path.read_bytes().replace(b"the owner", "the owner".encode() + b" \x96 pricing"))   # a cp1252 dash
+    called = []
+    with pytest.raises(runner.Stop) as stop:
+        runner.step_cut(setup.make(hooks={"cut": lambda *a: called.append(a)}))
+    assert str(stop.value) == (f"save {path} as UTF-8: in Excel choose File, Save As, and the file type \"CSV UTF-8 (Comma "
+                               "delimited)\"; then run the same command again")
+    assert called == [] and setup.pending.is_dir()
+
+
+def test_a_refused_copy_names_the_runners_own_option_for_the_replace(setup, monkeypatch):
+    from kpi_store import copy_enterprise
+
+    def refuse(local, root, **options):
+        raise copy_enterprise.Refused("the database holds 12 node(s) that carry the KPI Store's own marks. Nothing was changed. "
+                                      "Run the command again with --replace to replace them.")
+    monkeypatch.setattr(copy_enterprise, "copy", refuse)
+    assert runner.run_steps(setup.make(), ["enterprise"]) == 1
+    assert setup.lines[-1] == ("enterprise: FAILED. the database holds 12 node(s) that carry the KPI Store's own marks. Nothing was "
+                               "changed. Run the runner again with --from enterprise --replace-enterprise to replace them.")
+
+
 @pytest.mark.parametrize("name", ["a.person@example.org", "x" * 61, "the owner; drop", "name/with/slash"])
 def test_decided_by_must_be_a_role_or_initials_as_the_cut_tool_requires(setup, name):
     pending_report(setup, {"R001": {"decided_by": name}})

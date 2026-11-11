@@ -40,8 +40,6 @@ EXCEPTIONS = os.path.join("scripts", "standalone-exceptions.txt")
 ALLOWED_PENDING = (
     "README.md",
     "KNOWN-OPEN-ITEMS.md",
-    "HOW-TO-UPDATE.md",
-    "HOW-TO-UPDATE.html",
     "business_architecture/ontology/epm-walkthrough.html",
     "business_architecture/ontology/epm-ontology-guide.html",
     "viewer/index.html",
