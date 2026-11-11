@@ -1,0 +1,37 @@
+// A made-up slice of the KPI Store graph, with the labels, relationship types and property keys the
+// property-graph projection writes: one measure, its chain through a metric view, a gold table and two silver
+// tables to the replicas of two systems, and one quality check from the technical graph. A third silver table
+// has no replica here; the technical graph says which Synapse table it replaces.
+// Every node carries madeUp: true, which is how the builder knows it may replace them.
+CREATE (replica:Resource:skos_Concept {uri: 'https://w3id.org/mpc/ontology/modules/data-product/layer/replica', skos_notation: 'replica', skos_prefLabel: 'Replica@en', madeUp: true})
+CREATE (silver:Resource:skos_Concept {uri: 'https://w3id.org/mpc/ontology/modules/data-product/layer/silver', skos_notation: 'silver', skos_prefLabel: 'Silver@en', madeUp: true})
+CREATE (gold:Resource:skos_Concept {uri: 'https://w3id.org/mpc/ontology/modules/data-product/layer/gold', skos_notation: 'gold', skos_prefLabel: 'Gold@en', madeUp: true})
+CREATE (view:Resource:skos_Concept {uri: 'https://w3id.org/mpc/ontology/modules/data-product/layer/metric-view', skos_notation: 'metric-view', skos_prefLabel: 'Metric view@en', madeUp: true})
+CREATE (mips:Resource:skos_Concept:sys_System {uri: 'https://w3id.org/mpc/ontology/modules/system/system/mips', skos_notation: 'mips', skos_prefLabel: 'MIPS@en', madeUp: true})
+CREATE (mpr:Resource:skos_Concept:sys_System {uri: 'https://w3id.org/mpc/ontology/modules/system/system/mpr', skos_notation: 'mpr', skos_prefLabel: 'MPR@en', madeUp: true})
+CREATE (aps:Resource:skos_Concept:sys_System {uri: 'https://w3id.org/mpc/ontology/modules/system/system/aps', skos_notation: 'aps', skos_prefLabel: 'Aspen Petroleum Scheduler@en', madeUp: true})
+CREATE (m:Resource:skos_Concept:kpi_MeasureDefinition {uri: 'https://w3id.org/mpc/ontology/modules/kpi/measure/crude-prices', skos_notation: 'crude-prices', skos_prefLabel: 'Crude Market Pricing@en', madeUp: true})
+CREATE (product:Resource:skos_Concept:dp_DataProduct {uri: 'https://w3id.org/mpc/ontology/modules/data-product/product/master-pricing', skos_notation: 'dp-master-pricing', skos_prefLabel: 'Master Pricing@en', madeUp: true})
+CREATE (r1:Resource:skos_Concept:dp_PlatformTable {uri: 'https://w3id.org/mpc/ontology/modules/data-product/table/replica-mips-priceassessment', skos_notation: 'replica-mips-priceassessment', dp_fullName: 'synapse_dev.replica_mips.mips_priceassessment', dp_sandbox: true, madeUp: true})
+CREATE (r2:Resource:skos_Concept:dp_PlatformTable {uri: 'https://w3id.org/mpc/ontology/modules/data-product/table/replica-mpr-pricemaster', skos_notation: 'replica-mpr-pricemaster', dp_fullName: 'synapse_dev.replica_mpr.pricemaster', dp_sandbox: true, madeUp: true})
+CREATE (s1:Resource:skos_Concept:dp_PlatformTable:dp_PlatformDataProduct {uri: 'https://w3id.org/mpc/ontology/modules/data-product/table/silver-mips-price-assessment-fact', skos_notation: 'silver-mips-price-assessment-fact', dp_fullName: 'idp_sbx.silver_udm_core.mips_price_assessment_fact', dp_sandbox: true, madeUp: true})
+CREATE (s2:Resource:skos_Concept:dp_PlatformTable:dp_PlatformDataProduct {uri: 'https://w3id.org/mpc/ontology/modules/data-product/table/silver-mpr-price-master-dim', skos_notation: 'silver-mpr-price-master-dim', dp_fullName: 'idp_sbx.silver_mdm_core.mpr_price_master_dim', dp_sandbox: true, madeUp: true})
+CREATE (s3:Resource:skos_Concept:dp_PlatformTable:dp_PlatformDataProduct {uri: 'https://w3id.org/mpc/ontology/modules/data-product/table/silver-mips-price-batch-dim', skos_notation: 'silver-mips-price-batch-dim', dp_fullName: 'idp_sbx.silver_mdm_core.mips_price_batch_dim', dp_sandbox: true, madeUp: true})
+CREATE (g1:Resource:skos_Concept:dp_PlatformTable:dp_PlatformDataProduct {uri: 'https://w3id.org/mpc/ontology/modules/data-product/table/gold-mips-mpr-executive-summary-fact', skos_notation: 'gold-mips-mpr-executive-summary-fact', dp_fullName: 'idp_sbx.gold_commercial_core.mips_mpr_executive_summary_fact', dp_sandbox: true, madeUp: true})
+CREATE (v1:Resource:skos_Concept:dp_PlatformTable:dp_PlatformDataProduct {uri: 'https://w3id.org/mpc/ontology/modules/data-product/table/view-mips-mpr-executive-summary-fact-vw', skos_notation: 'view-mips-mpr-executive-summary-fact-vw', dp_fullName: 'idp_sbx.semantic_sem_commercial.mips_mpr_executive_summary_fact_vw', dp_sandbox: true, madeUp: true})
+CREATE (r1)-[:dp_layer]->(replica), (r2)-[:dp_layer]->(replica)
+CREATE (s1)-[:dp_layer]->(silver), (s2)-[:dp_layer]->(silver), (s3)-[:dp_layer]->(silver)
+CREATE (g1)-[:dp_layer]->(gold), (v1)-[:dp_layer]->(view)
+CREATE (r1)-[:dp_copiesSystem]->(mips), (r2)-[:dp_copiesSystem]->(mpr)
+CREATE (s1)-[:prov_wasDerivedFrom]->(r1), (s2)-[:prov_wasDerivedFrom]->(r2)
+CREATE (g1)-[:prov_wasDerivedFrom]->(s1), (g1)-[:prov_wasDerivedFrom]->(s2), (g1)-[:prov_wasDerivedFrom]->(s3)
+CREATE (v1)-[:prov_wasDerivedFrom]->(g1)
+CREATE (v1)-[:dp_servesMeasure]->(m)
+CREATE (v1)-[:dp_dependsOnSystem]->(mips), (v1)-[:dp_dependsOnSystem]->(mpr)
+CREATE (s1)-[:dcterms_isPartOf]->(product), (s2)-[:dcterms_isPartOf]->(product), (s3)-[:dcterms_isPartOf]->(product)
+CREATE (g1)-[:dcterms_isPartOf]->(product), (v1)-[:dcterms_isPartOf]->(product)
+CREATE (tg1:Tech:Table {uri: 'urn:made-up:tech:gold-executive-summary', name: 'idp_sbx.gold_commercial_core.mips_mpr_executive_summary_fact', layer: 'gold', madeUp: true})-[:DESIGNED_AS]->(g1)
+CREATE (ts3:Tech:Table {uri: 'urn:made-up:tech:silver-price-batch', name: 'idp_sbx.silver_mdm_core.mips_price_batch_dim', layer: 'silver', madeUp: true})-[:DESIGNED_AS]->(s3)
+CREATE (old:Tech:Table {uri: 'urn:made-up:tech:synapse-price-batch', name: 'synapse_dev.MIPS.PriceBatch', madeUp: true})
+CREATE (ts3)-[:REPLACES]->(old)
+CREATE (:Tech:QualityCheck {uri: 'urn:made-up:tech:check-gold-rows', name: 'gold table has rows', result: 'pass', checkedAt: '2026-11-01T06:00:00Z', detail: '1200 rows', madeUp: true})-[:CHECKS]->(tg1);

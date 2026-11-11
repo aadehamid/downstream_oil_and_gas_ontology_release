@@ -1,0 +1,378 @@
+{
+  "confirmed": true,
+  "confirmed_at": "2026-11-11T00:00:00Z",
+  "digest": "58cca52c6855b6b2648f7c78ba1daf6bd12a5a82976ab9f20321825bf3655808",
+  "format": 1,
+  "roles": {
+    "data_product.code": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "property",
+      "meaning": "The data product's code.",
+      "required": true,
+      "value": "skos_notation"
+    },
+    "data_product.name": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "property",
+      "meaning": "The data product's name.",
+      "required": true,
+      "value": "skos_prefLabel"
+    },
+    "data_product.node": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "label",
+      "meaning": "A data product of the portfolio.",
+      "required": true,
+      "value": "dp_DataProduct"
+    },
+    "layer.code": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "property",
+      "meaning": "The layer's code.",
+      "required": true,
+      "value": "skos_notation"
+    },
+    "layer.node": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "label",
+      "meaning": "A value of the layer code list: replica, silver, gold or metric view.",
+      "required": true,
+      "value": "skos_Concept"
+    },
+    "measure.code": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "property",
+      "meaning": "The measure's code.",
+      "required": true,
+      "value": "skos_notation"
+    },
+    "measure.name": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "property",
+      "meaning": "The measure's name.",
+      "required": true,
+      "value": "skos_prefLabel"
+    },
+    "measure.node": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "label",
+      "meaning": "A measure definition of the kpi module. A KPI is one of these.",
+      "required": true,
+      "value": "kpi_MeasureDefinition"
+    },
+    "ontology_system.code": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "property",
+      "meaning": "The system's code, in lower case.",
+      "required": true,
+      "value": "skos_notation"
+    },
+    "ontology_system.name": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "property",
+      "meaning": "The system's name.",
+      "required": true,
+      "value": "skos_prefLabel"
+    },
+    "ontology_system.node": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "label",
+      "meaning": "A system of the system module.",
+      "required": true,
+      "value": "sys_System"
+    },
+    "platform_table.copies_system": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "relationship",
+      "meaning": "From a replica table to the system whose records it copies.",
+      "required": true,
+      "value": "dp_copiesSystem"
+    },
+    "platform_table.derived_from": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "relationship",
+      "meaning": "From a table or view to a table it is built from.",
+      "required": true,
+      "value": "prov_wasDerivedFrom"
+    },
+    "platform_table.full_name": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "property",
+      "meaning": "Catalog, schema and name.",
+      "required": true,
+      "value": "dp_fullName"
+    },
+    "platform_table.in_layer": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "relationship",
+      "meaning": "From a table or view to its layer.",
+      "required": true,
+      "value": "dp_layer"
+    },
+    "platform_table.node": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "label",
+      "meaning": "A table or view on the data platform, as designed.",
+      "required": true,
+      "value": "dp_PlatformTable"
+    },
+    "platform_table.part_of": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "relationship",
+      "meaning": "From a table or view to the data product it is part of.",
+      "required": true,
+      "value": "dcterms_isPartOf"
+    },
+    "platform_table.serves_measure": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "relationship",
+      "meaning": "From a metric view to a measure whose values it gives.",
+      "required": true,
+      "value": "dp_servesMeasure"
+    },
+    "policy.applies_to": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "governance",
+      "kind": "relationship",
+      "meaning": "From a policy to a system or a table it covers.",
+      "required": false,
+      "value": "APPLIES_TO"
+    },
+    "policy.name": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "governance",
+      "kind": "property",
+      "meaning": "The policy's name.",
+      "required": false,
+      "value": "name"
+    },
+    "policy.node": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "governance",
+      "kind": "label",
+      "meaning": "A node that stands for one policy, such as a SOX or confidentiality rule.",
+      "required": false,
+      "value": "Policy"
+    },
+    "replaces": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "relationship",
+      "meaning": "From a Databricks table to the Synapse table it replaces.",
+      "required": false,
+      "value": "REPLACES"
+    },
+    "system.classification": {
+      "alternatives": [
+        "ingestionMethod",
+        "madeUp",
+        "name",
+        "refreshFrequency",
+        "systemId"
+      ],
+      "confidence": 0.0,
+      "graph": "governance",
+      "kind": "property",
+      "meaning": "The system's sensitivity class, where it has one.",
+      "required": false,
+      "value": null
+    },
+    "system.code": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "governance",
+      "kind": "property",
+      "meaning": "The system's short code. It equals a KPI Store system's code when case is ignored.",
+      "required": true,
+      "value": "name"
+    },
+    "system.node": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "governance",
+      "kind": "label",
+      "meaning": "A node that stands for one source system.",
+      "required": true,
+      "value": "DataSystem"
+    },
+    "system_to_table": {
+      "alternatives": [
+        {
+          "max_hops": 2,
+          "types": [
+            "CONTAINS",
+            "DERIVED_FROM"
+          ]
+        }
+      ],
+      "confidence": 1.0,
+      "graph": "governance",
+      "kind": "path",
+      "meaning": "The relationship types that lead from a system to the tables it holds, in at most a few steps.",
+      "required": true,
+      "value": {
+        "max_hops": 2,
+        "types": [
+          "CONTAINS"
+        ]
+      }
+    },
+    "table.classification": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "governance",
+      "kind": "property",
+      "meaning": "The table's sensitivity class, where it has one.",
+      "required": false,
+      "value": "classification"
+    },
+    "table.derived_from": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "governance",
+      "kind": "relationship",
+      "meaning": "From a table to a table it is built from.",
+      "required": false,
+      "value": "DERIVED_FROM"
+    },
+    "table.layer": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "governance",
+      "kind": "property",
+      "meaning": "The layer the table is in, as the governance graph names it.",
+      "required": false,
+      "value": "layer"
+    },
+    "table.node": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "governance",
+      "kind": "label",
+      "meaning": "A node that stands for one table.",
+      "required": true,
+      "value": "Table"
+    },
+    "table.qualified_name": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "governance",
+      "kind": "property",
+      "meaning": "The table's name with its schema: schema.table.",
+      "required": true,
+      "value": "qualifiedName"
+    },
+    "tech.check": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "label",
+      "meaning": "A quality check, as last run.",
+      "required": false,
+      "value": "QualityCheck"
+    },
+    "tech.check_at": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "property",
+      "meaning": "When the check last ran.",
+      "required": false,
+      "value": "checkedAt"
+    },
+    "tech.check_name": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "property",
+      "meaning": "The check's name.",
+      "required": false,
+      "value": "name"
+    },
+    "tech.check_result": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "property",
+      "meaning": "What the check found: pass, fail or differs.",
+      "required": false,
+      "value": "result"
+    },
+    "tech.checks": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "relationship",
+      "meaning": "From a quality check to a thing it tests.",
+      "required": false,
+      "value": "CHECKS"
+    },
+    "tech.designed_as": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "relationship",
+      "meaning": "From a built table or view to its design.",
+      "required": false,
+      "value": "DESIGNED_AS"
+    },
+    "tech.name": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "property",
+      "meaning": "The built thing's name on its platform.",
+      "required": false,
+      "value": "name"
+    },
+    "tech.object": {
+      "alternatives": [],
+      "confidence": 1.0,
+      "graph": "bpa",
+      "kind": "label",
+      "meaning": "A thing the technical graph records as built.",
+      "required": false,
+      "value": "Tech"
+    }
+  }
+}
