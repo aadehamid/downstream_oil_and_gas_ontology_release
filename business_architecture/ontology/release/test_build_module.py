@@ -69,8 +69,9 @@ APPROVALS["integration"] = DELEGATED  # integration 2.5.0, the decision of 2026-
 APPROVALS["kpi"] = DELEGATED  # kpi 1.3.0, the KPI and OPM identifiers, the decision of 2026-10-28
 # technical-graph 1.0.0, the follow-up release's new module, a major the subject matter expert approved (the decision of 2026-11-02,
 # amendment of 2026-11-02, later).
-APPROVALS["technical-graph"] = ("(the review comments of a subject matter expert reviewing the documents)",
-                                "1. approve 1.0.0")
+# technical-graph 1.1.0 is a minor release made under the delegation recorded in KPI-DEC-0001, which the release names.
+APPROVALS["technical-graph"] = ("../domain/kpi-store-decisions/KPI-DEC-0001.md",
+                                "Decide anything inside the plan yourself and log it.")
 APPROVALS["logical-model"] = ("(the review comments of a subject matter expert reviewing the documents)", "I approve logical-model 1.0.0,")
 
 

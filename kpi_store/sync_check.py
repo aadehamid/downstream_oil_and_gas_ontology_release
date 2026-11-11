@@ -20,6 +20,11 @@ For a Neo4j database, equal counts are not enough: a property can change while t
 computes the database's graph hash, as the load does, and compares it with the hash its marker holds. A database
 whose hash differs reads changed. --quick leaves the hash out, and each Neo4j line then says "counts only".
 
+The technical graph gets a tech: line per store when its file is known: --tech-graph <tech-graph.nq>, or the
+file the runner fetched into <run folder>/tech-graph/. Each line is the technical graph's own judgement
+(kpi_store.tech_graph), which reads the store's copy back and compares its content with the file. Without a file
+the technical graph is not checked, and the last line says so.
+
 This command only reads. Exit 0 when every line reads current, 1 otherwise, 2 on bad settings.
 Needs rdflib; databricks-sdk for databricks; neo4j for the two Neo4j databases.
 """
@@ -37,6 +42,7 @@ from . import local_settings as ls
 from . import settings as settings_module
 
 STORES = ("databricks", "jena", "neo4j", "enterprise")
+TECH_FOLDER = "tech-graph"   # in the run folder: the technical graph's file as the runner last fetched it
 NEO4J_STORES = ("neo4j", "enterprise")
 WORKTREE = "worktree"
 STATEMENT_WAIT_SECONDS = 300
@@ -173,17 +179,66 @@ def read_stores(stores, local, newest, code, connect=local_load.connect, client_
     return markers, live, models, hashes
 
 
-def check(local, release_root, stores=STORES, ref=WORKTREE, extra_graphs=(), code=None, quick=False, **readers):
-    """[(line name, status, why)] for the named stores, then the lm: rows. Reads only."""
+def check(local, release_root, stores=STORES, ref=WORKTREE, extra_graphs=(), code=None, quick=False, tech_graph_files=None,
+          **readers):
+    """[(line name, status, why)] for the named stores, then the lm: rows, then the tech: rows when the technical
+    graph's files are given. Reads only."""
     code = code or local_load.release_code(release_root)
+    if tech_graph_files:   # its named graphs are no part of the release, so the ontology's own check leaves them out
+        from . import tech_graph
+        extra_graphs = tuple(extra_graphs) + tuple(tech_graph.jena_apart(tech_graph_files))
     want = expected(release_root, code.ss, ref, extra_graphs)
     markers, live, models, hashes = read_stores(stores, local, want["newest"], code, quick=quick, **readers)
     rows = judge_hashes(code.ss.drift(markers, live, want, stores), markers, hashes, quick)
-    return rows + [("lm:" + store, status, why) for store, status, why in models]
+    rows += [("lm:" + store, status, why) for store, status, why in models]
+    if tech_graph_files:
+        rows += tech_rows(stores, local, tech_graph_files, release_root, code, **readers)
+    return rows
+
+
+def tech_graph_file(local, argument=None):
+    """The technical graph's file: the one named, else the one the runner last fetched. None when there is none."""
+    from . import tech_graph
+    if argument:
+        path = Path(argument)
+        if not path.is_file():
+            raise ls.LocalSettingsError(f"the technical graph file {path} is missing")
+        return path
+    path = local.run_folder / TECH_FOLDER / tech_graph.GRAPH_FILE if local.run_folder else None
+    return path if path is not None and path.is_file() else None
+
+
+def tech_rows(stores, local, graph_files, release_root, code, connect=local_load.connect, client_for=workspace_client):
+    """[("tech:<store>", status, why)] of the technical graph in each named store, judged by kpi_store.tech_graph
+    against the graph files. A store that cannot be read reads as unreachable."""
+    from . import tech_graph
+    rows = []
+    for store in stores:
+        try:
+            if store == "databricks":
+                settings = settings_module.load(local.need("settings"))
+                if not settings.warehouse_id:
+                    raise ls.LocalSettingsError("set [databricks] warehouse_id in kpi_store.toml to read the technical graph table")
+                gate = ldb.Gate(settings, statement_runner(client_for(local.need("databricks").profile), settings.warehouse_id))
+                status, why = tech_graph.status_delta(gate, settings, graph_files, release_root)
+            elif store == "jena":
+                status, why = tech_graph.status_jena(local.need("fuseki").query_url, graph_files, release_root)
+            elif store == "neo4j":
+                neo4j = local.need("neo4j_local")
+                with connect(neo4j) as driver, driver.session(database=neo4j.database) as session:
+                    status, why = tech_graph.status_neo4j(session, graph_files, release_root)
+            else:
+                neo4j = local.need("neo4j_enterprise")
+                with connect(neo4j) as driver, copy_enterprise.open_target(driver, neo4j.database) as session:
+                    status, why = tech_graph.status_neo4j(session, graph_files, release_root)
+        except Exception as err:
+            status, why = "unreachable", _why(err, code.ss)
+        rows.append(("tech:" + store, status, why))
+    return rows
 
 
 def lines(rows):
-    return [f"{store:<13} {status:<11} {why}" for store, status, why in rows]
+    return [f"{store:<15} {status:<11} {why}" for store, status, why in rows]
 
 
 def all_current(rows):
@@ -198,6 +253,8 @@ def main(argv=None):
     ap.add_argument("--ref", default=WORKTREE, help="whose files say what is current: worktree (the default; needs "
                     "no Git) or a Git ref")
     ap.add_argument("--extra-graphs", help="the JSON file of graphs outside the release that the Fuseki load was given")
+    ap.add_argument("--tech-graph", help="the technical graph's file, tech-graph.nq (default: the one the runner "
+                    "last fetched into the run folder)")
     ap.add_argument("--quick", action="store_true",
                     help="compare a Neo4j database's counts only, not its graph hash; each such line says so")
     ap.add_argument("--json", action="store_true", help="print the rows as JSON")
@@ -205,7 +262,9 @@ def main(argv=None):
     try:
         local = ls.load(ls.locate(args.stores), release_root=Path(args.release))
         extra = load_fuseki.read_extra_graphs(args.extra_graphs) if args.extra_graphs else {}
-        rows = check(local, Path(args.release), tuple(args.store or STORES), args.ref, tuple(extra), quick=args.quick)
+        tech = tech_graph_file(local, args.tech_graph)
+        rows = check(local, Path(args.release), tuple(args.store or STORES), args.ref, tuple(extra), quick=args.quick,
+                     tech_graph_files=[tech] if tech else None)
     except (ls.LocalSettingsError, load_fuseki.FusekiError) as err:
         print(f"sync check: {err}", file=sys.stderr)
         return 2
@@ -216,6 +275,8 @@ def main(argv=None):
         print(json.dumps([{"store": s, "status": status, "why": why} for s, status, why in rows], indent=2))
     else:
         print("\n".join(lines(rows)))
+        if not tech:
+            print("the technical graph was not checked: no tech-graph.nq was named or fetched")
     return 0 if all_current(rows) else 1
 
 

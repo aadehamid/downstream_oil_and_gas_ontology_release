@@ -216,6 +216,54 @@ def test_a_marker_without_a_graph_hash_cannot_read_current(tmp_path, monkeypatch
     assert rows["enterprise"] == ("changed", "its marker holds no graph hash, so its content cannot be compared; load it again")
 
 
+def test_the_technical_graph_gets_a_line_per_store_judged_by_its_own_module(tmp_path, monkeypatch):
+    from kpi_store import tech_graph
+    files, seen = ["tech-graph.nq"], {}
+    monkeypatch.setattr(tech_graph, "jena_apart", lambda graph_files: ["urn:kpi-store:tech:sample:graph"] if graph_files == files else [])
+    monkeypatch.setattr(tech_graph, "status_jena", lambda url, graph_files, root: seen.update(jena=(url, graph_files)) or ("current", "1 graph(s), 269 triples"))
+    monkeypatch.setattr(tech_graph, "status_delta", lambda gate, settings, graph_files, root: seen.update(delta=settings.tech_graph_schema) or ("behind", "marked from other graph files"))
+    def status_neo4j(session, graph_files, root):
+        seen.setdefault("neo4j", []).append(getattr(session, "database", session.name))
+        if session.name == TARGET:
+            return "changed", "its technical graph differs from the graph files although its marker matches"
+        raise ConnectionError("bolt://127.0.0.1:7687 refused")
+    monkeypatch.setattr(tech_graph, "status_neo4j", status_neo4j)
+    wanted = {}
+    monkeypatch.setattr(sc, "expected", lambda root, ss, ref="worktree", extra=(): wanted.update(apart=extra) or dict(WANT))
+    local = stores_support.local_settings(tmp_path)
+    (tmp_path / "kpi_store.toml").write_text(support.SETTINGS_TEXT.replace('warehouse_id = ""', 'warehouse_id = "wh123"'), encoding="utf-8")
+    ss = SimpleNamespace(**{k: getattr(REAL.ss, k) for k in dir(REAL.ss) if not k.startswith("__")})
+    ss.read_jena = lambda url: dict(GRAPHS)
+    code = SimpleNamespace(ss=ss, lm=SimpleNamespace(models=lambda newest: []), lv=SimpleNamespace(hash_graph=lambda s: (s.graph_hash, 0, 0, 0)))
+    monkeypatch.setattr(sc, "statement_runner", lambda client, warehouse_id: workspace()[0])
+    drivers = {"bolt://127.0.0.1:7687": stores_support.FakeDriver({"neo4j": graph()}),
+               local.neo4j_enterprise.uri: stores_support.FakeDriver({TARGET: marked_target()})}
+    rows = sc.check(local, support.ROOT, code=code, connect=lambda neo4j: drivers[neo4j.uri], client_for=lambda profile: "client",
+                    tech_graph_files=files)
+    assert wanted["apart"] == ("urn:kpi-store:tech:sample:graph",)   # the ontology's own check leaves its graphs out
+    assert rows[-4:] == [("tech:databricks", "behind", "marked from other graph files"),
+                         ("tech:jena", "current", "1 graph(s), 269 triples"),
+                         ("tech:neo4j", "unreachable", "unreachable (ConnectionError)"),
+                         ("tech:enterprise", "changed", "its technical graph differs from the graph files although its marker matches")]
+    assert seen["jena"] == ("http://127.0.0.1:3030/ds/query", files) and seen["delta"] == "tech_graph"
+    assert seen["neo4j"] == ["neo4j", TARGET] and not sc.all_current(rows)
+    without = sc.check(local, support.ROOT, code=code, connect=lambda neo4j: drivers[neo4j.uri], client_for=lambda profile: "client")
+    assert not any(store.startswith("tech:") for store, _, _ in without)
+
+
+def test_the_technical_graphs_file_is_the_one_named_or_the_one_the_runner_fetched(tmp_path):
+    local = stores_support.local_settings(tmp_path)
+    assert sc.tech_graph_file(local) is None
+    fetched = tmp_path / "runs" / "tech-graph" / "tech-graph.nq"
+    fetched.parent.mkdir(parents=True)
+    fetched.write_text("", encoding="utf-8")
+    assert sc.tech_graph_file(local) == fetched
+    (tmp_path / "other.nq").write_text("", encoding="utf-8")
+    assert sc.tech_graph_file(local, str(tmp_path / "other.nq")) == tmp_path / "other.nq"
+    with pytest.raises(sc.ls.LocalSettingsError, match="the technical graph file .* is missing"):
+        sc.tech_graph_file(local, str(tmp_path / "gone.nq"))
+
+
 def renamed(db):
     db.name = TARGET
     return db
@@ -233,7 +281,7 @@ def test_a_store_that_cannot_be_read_says_why_without_an_address(tmp_path, monke
 
 def test_the_lines_and_the_exit_code(tmp_path, capsys):
     rows = [("jena", "current", "2 graphs"), ("lm:enterprise", "behind", "other files")]
-    assert sc.lines(rows) == ["jena          current     2 graphs", "lm:enterprise behind      other files"]
+    assert sc.lines(rows) == ["jena            current     2 graphs", "lm:enterprise   behind      other files"]
     assert sc.all_current(rows[:1]) and not sc.all_current(rows)
     assert sc.main(["--stores", str(tmp_path / "missing.toml")]) == 2
     assert "cannot read the local settings file" in capsys.readouterr().err

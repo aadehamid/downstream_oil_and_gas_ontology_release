@@ -22,7 +22,9 @@ What it does, in order:
    request, reads everything back and compares the hashes again (the rdf-store skill's round trip).
 
 A graph that is neither part of the dataset nor an earlier version of one of its modules is not the KPI Store's.
-The load then stops and names it; --drop-unknown drops it.
+The load then stops and names it; --drop-unknown drops it. The technical graph's named graphs are the exception:
+they are the KPI Store's, loaded and checked by kpi_store.tech_graph, so this load leaves them alone and out
+of its hash.
 
 Needs rdflib and pyoxigraph. Exit 0 when the hashes are equal, 1 when the load or a check fails, 2 on bad settings.
 """
@@ -270,8 +272,18 @@ def default_graph_triples(store):
     return int(json.loads(data)["results"]["bindings"][0]["n"]["value"])
 
 
-def load(store, dataset, rdfstore, bases, drop_unknown=False):
-    """Makes the store hold exactly the dataset. Returns a dict whose "status" is one of:
+def held_dataset(store, rdfstore, apart=()):
+    """What the store holds, without the graphs named apart."""
+    data = store.export()
+    if not apart:
+        return data
+    skip = {rdfstore.ox.NamedNode(graph) for graph in apart}
+    return rdfstore.ox.Dataset(quad for quad in data if quad.graph_name not in skip)
+
+
+def load(store, dataset, rdfstore, bases, drop_unknown=False, apart=()):
+    """Makes the store hold exactly the dataset, beside the graphs named apart, which belong to another load and
+    are neither read into the hash nor dropped. Returns a dict whose "status" is one of:
 
     current    the store's hash already equals the dataset's; nothing was written
     loaded     the graphs were replaced, read back, and the hashes are equal
@@ -281,10 +293,10 @@ def load(store, dataset, rdfstore, bases, drop_unknown=False):
     module's text) and drop_unknown is false."""
     want_hash = rdfstore.dataset_hash(dataset)
     wanted = set(rdfstore.named_graphs(dataset))
-    held = set(store.graphs())
+    held = set(store.graphs()) - set(apart)
     in_default = default_graph_triples(store)
     result = {"dataset_hash": want_hash, "graphs": len(wanted), "triples": len(dataset)}
-    if held == wanted and not in_default and rdfstore.dataset_hash(store.export()) == want_hash:
+    if held == wanted and not in_default and rdfstore.dataset_hash(held_dataset(store, rdfstore, apart)) == want_hash:
         return {**result, "status": "current", "store_hash": want_hash, "dropped": []}
     stale = sorted(held - wanted)
     earlier = [g for g in stale if g.startswith(tuple(bases))]
@@ -297,15 +309,23 @@ def load(store, dataset, rdfstore, bases, drop_unknown=False):
         drops.append("DROP SILENT DEFAULT")
     if drops:
         _update(store, " ;\n".join(drops))
-    passed, comparison = rdfstore.roundtrip(store, dataset)
+    # The rdf-store skill's round trip, with the store's copy read without the graphs apart.
+    for quad in dataset:
+        rdfstore.check_term(quad)
+    if rdfstore.shared_blank_nodes(dataset):
+        raise FusekiError("a blank node occurs in more than one graph of the release, which a Fuseki dataset cannot hold")
+    store.publish(dataset)
+    passed, comparison = rdfstore.compare(dataset, held_dataset(store, rdfstore, apart))
     result |= {"store_hash": comparison["actual_hash"], "dropped": stale if drop_unknown else earlier}
     if not passed:
         return {**result, "status": "mismatch", "comparison": {k: comparison[k] for k in ("expected_quads", "actual_quads", "diff") if k in comparison}}
     return {**result, "status": "loaded"}
 
 
-def run(local, release_root, state_folder=None, extra_graphs=None, drop_unknown=False, start_server=True, environ=None):
-    """The whole step: the server, the dataset, the load. Returns load()'s dict with "server" and "url" added."""
+def run(local, release_root, state_folder=None, extra_graphs=None, drop_unknown=False, start_server=True, environ=None,
+        tech_graph_files=None):
+    """The whole step: the server, the dataset, the load, and then the technical graph when its files are given.
+    Returns load()'s dict with "server" and "url" added, and the technical graph's result under "tech_graph"."""
     fuseki = local.need("fuseki")
     state_folder = Path(state_folder) if state_folder else local.need("run_folder") / "fuseki"
     if start_server:
@@ -317,8 +337,17 @@ def run(local, release_root, state_folder=None, extra_graphs=None, drop_unknown=
     rdfstore, ss = ldb.import_rdfstore(release_root), ldb.import_sync_stores(release_root)
     dataset = pack(rdfstore, store_graphs(release_root, ss, extra_graphs))
     store = rdfstore.FusekiStore(fuseki.data_url, fuseki.query_url, fuseki.update_url)
-    result = load(store, dataset, rdfstore, module_bases(ss), drop_unknown)
-    return {**result, "server": server, "pid": pid, "url": fuseki.url,
+    apart, tech = (), None
+    if tech_graph_files:
+        from . import tech_graph
+        apart = tech_graph.jena_apart(tech_graph_files)
+    result = load(store, dataset, rdfstore, module_bases(ss), drop_unknown, apart)
+    if tech_graph_files and result["status"] != "mismatch":
+        try:
+            tech = tech_graph.load_jena(tech_graph_files, fuseki.query_url, release_root, rdfstore)
+        except tech_graph.TechGraphError as err:
+            raise FusekiError(str(err)) from None
+    return {**result, "server": server, "pid": pid, "url": fuseki.url, "tech_graph": tech,
             "persistent": bool(fuseki.data_folder), "extra_graphs": sorted(extra_graphs or {})}
 
 
@@ -328,7 +357,10 @@ def line(result):
     head = f"fuseki: {result['status']}, {result['graphs']} graphs, {result['triples']} triples"
     if result["status"] == "mismatch":
         return f"{head}; the store's hash {result['store_hash']} is not the release's {result['dataset_hash']}"
-    return f"{head}, RDFC-1.0 hash {result['dataset_hash']} equal in the store and the release files ({result['server']} server, {kept})"
+    tech = result.get("tech_graph")
+    said = f"; technical graph {tech['status']}, {sum(tech['graphs'].values())} triples" if tech else ""
+    return (f"{head}, RDFC-1.0 hash {result['dataset_hash']} equal in the store and the release files "
+            f"({result['server']} server, {kept}){said}")
 
 
 def main(argv=None):
@@ -336,6 +368,7 @@ def main(argv=None):
     ap.add_argument("--stores", help=f"the local settings file (default: the one {ls.ENV_VAR} names)")
     ap.add_argument("--release", default=str(ls.ROOT), help="the release folder (default: the one this code is in)")
     ap.add_argument("--extra-graphs", help="a JSON file that maps graph IRIs to files outside the release")
+    ap.add_argument("--tech-graph", help="the technical graph's file, tech-graph.nq, to load after the release")
     ap.add_argument("--drop-unknown", action="store_true", help="drop graphs that are not the KPI Store's")
     ap.add_argument("--no-start", action="store_true", help="do not start Fuseki; fail when none answers")
     ap.add_argument("--stop", action="store_true", help="stop the Fuseki this command started, and do nothing else")
@@ -352,7 +385,7 @@ def main(argv=None):
             return 0
         extra = read_extra_graphs(args.extra_graphs) if args.extra_graphs else None
         result = run(local, Path(args.release), extra_graphs=extra, drop_unknown=args.drop_unknown,
-                     start_server=not args.no_start)
+                     start_server=not args.no_start, tech_graph_files=[Path(args.tech_graph)] if args.tech_graph else None)
     except ls.LocalSettingsError as err:
         print(f"fuseki: {err}", file=sys.stderr)
         return 2

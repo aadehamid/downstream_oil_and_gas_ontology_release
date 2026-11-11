@@ -58,6 +58,10 @@ STORE = "enterprise"   # the name the target database's marker carries
 #   EpmStoreMarker      this copy's own marker: its store name, and the catalog digest
 #   LogicalModel        logical_models.py: a uri, and the model's slug or the models the node belongs to
 #   LogicalModelMarker  this copy's own marker: its store name, and the digest of the model files
+#   Tech                tech_graph.py writes no mark of its own on a node, so the rule is its shape: a uri in the
+#                       technical graph's own urn: scheme, and no label but Tech and the names of the
+#                       technical-graph module's classes ($tech_classes)
+#   TechGraphMarker     this copy's own marker: its store name, and the digest of the graph files
 OWN_RULES = {
     "Resource": ("n.uri IS NOT NULL AND any(b IN $bases WHERE toStringOrNull(n.graph) STARTS WITH b) "
                  "AND all(l IN labels(n) WHERE l = 'Resource' OR any(p IN $prefixes WHERE l STARTS WITH p))"),
@@ -66,6 +70,9 @@ OWN_RULES = {
     "EpmStoreMarker": "n.store = $store AND n.catalog_digest IS NOT NULL",
     "LogicalModel": "n.uri IS NOT NULL AND (n.models IS NOT NULL OR n.slug IS NOT NULL)",
     "LogicalModelMarker": "n.store = $store AND n.digest IS NOT NULL",
+    "Tech": ("toStringOrNull(n.uri) STARTS WITH $tech_base "
+             "AND all(l IN labels(n) WHERE l = 'Tech' OR l IN $tech_classes)"),
+    "TechGraphMarker": "n.store = $store AND n.digest IS NOT NULL",
 }
 SCHEMA_PREFIX = "n4sch"   # the ontology import's own labels: n4sch_Class and the like
 OWN_LABELS = tuple(OWN_RULES)
@@ -158,10 +165,31 @@ def own_predicate(rules=OWN_RULES):
     return "coalesce(" + " OR ".join(f"(n:{label} AND {condition})" for label, condition in rules.items()) + ", false)"
 
 
-def own_params(bases, label_prefixes, store=STORE):
+def own_params(bases, label_prefixes, tech_classes=(), store=STORE):
     """The parameters the conditions of OWN_RULES read. label_prefixes are the projection's prefixes, without the
-    underscore: a projected node's labels are Resource and <prefix>_<name>."""
-    return {"bases": list(bases), "store": store, "prefixes": sorted({f"{p}_" for p in (*label_prefixes, SCHEMA_PREFIX)})}
+    underscore: a projected node's labels are Resource and <prefix>_<name>. tech_classes are the names of the
+    technical-graph module's classes: a technical-graph node's labels are Tech and such names."""
+    from . import tech_graph
+    return {"bases": list(bases), "store": store, "prefixes": sorted({f"{p}_" for p in (*label_prefixes, SCHEMA_PREFIX)}),
+            "tech_base": tech_graph.BASE, "tech_classes": sorted(tech_classes)}
+
+
+def tech_class_names(release_root, newest):
+    """The local names of the classes the newest technical-graph release declares; none when the release holds no
+    such module. They are read from the package file, so a new version's classes are known without a code change."""
+    from rdflib import Graph
+    from rdflib.namespace import OWL, RDF
+    from . import tech_graph
+    iri = next((i for i in newest if i.rsplit("/", 2)[-2] == "technical-graph"), None)
+    if iri is None:
+        return []
+    version = iri.rsplit("/", 1)[-1]
+    path = Path(release_root) / ov.RELEASES / "technical-graph" / version / "technical-graph.ttl"
+    try:
+        graph = Graph().parse(str(path), format="turtle")
+    except (OSError, ValueError) as err:
+        raise Refused(f"the technical-graph package {path} cannot be read ({type(err).__name__})") from None
+    return sorted(str(c)[len(tech_graph.TG):] for c in graph.subjects(RDF.type, OWL.Class) if str(c).startswith(tech_graph.TG))
 
 
 def holdings(session, params, rules=OWN_RULES):
@@ -292,12 +320,19 @@ def copy(local, release_root, replace=False, confirm=None, code=None, connect=lo
             raise Refused("the local graph is not the graph the load report verified; nothing was changed on "
                           "Enterprise. Run the local Neo4j load again")
         prefixes = code.build.load_config(cfg_doc["projection_config"]).prefixes
-        params = own_params(load_fuseki.module_bases(code.ss), prefixes)
+        params = own_params(load_fuseki.module_bases(code.ss), prefixes, tech_class_names(release_root, want["newest"]))
         held = holdings(target, params, own_rules)
         if held["nodes"] and not held["foreign_nodes"] and local_load.is_current(target, STORE, want, report, code, sep) \
                 and local_load.models_status(target, STORE, want["newest"], code)[1] in ("current", "none"):
+            # The ontology's copy is current. A subgraph beside it may still be behind, so its load runs; it
+            # leaves a current subgraph alone.
+            try:
+                extras = [extra(target, STORE) for extra in extra_loads]
+            except local_load.LoadError as err:
+                raise Refused(str(err)) from None
             return {**result, "status": "current", "nodes": report["nodes"], "relationships": report["relationships"],
-                    "graph_hash": source_hash, "held_before": held, "marker": code.ss.read_neo4j(target, STORE)[0]}
+                    "graph_hash": source_hash, "held_before": held, "extra_loads": extras,
+                    "marker": code.ss.read_neo4j(target, STORE)[0]}
         action = decide(held, database, replace, confirm)
         if action == "replace":
             remove_own(target, params, own_rules)
@@ -312,8 +347,8 @@ def copy(local, release_root, replace=False, confirm=None, code=None, connect=lo
             models = local_load.load_models(target, STORE, want["newest"], code, log if log is not None else io.StringIO())
         except local_load.LoadError as err:
             raise Refused(str(err)) from None
-        extras = [extra(target, STORE) for extra in extra_loads]
         try:
+            extras = [extra(target, STORE) for extra in extra_loads]
             marker = local_load.mark(target, STORE, want, report, code.ss, local_load.release_label(release_root, code.ss))
         except local_load.LoadError as err:
             raise Refused(str(err)) from None
@@ -325,7 +360,8 @@ def copy(local, release_root, replace=False, confirm=None, code=None, connect=lo
 
 def line(result):
     return (f"neo4j (enterprise, database {result['database']}): {result['status']}, {result['nodes']} nodes, "
-            f"{result['relationships']} relationships, graph hash {result['graph_hash']} equal to the local graph's")
+            f"{result['relationships']} relationships, graph hash {result['graph_hash']} equal to the local graph's"
+            + local_load.extras_text(result))
 
 
 def ask(text):
@@ -336,6 +372,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="kpi_store.copy_enterprise", description=__doc__.split("\n\n")[0])
     ap.add_argument("--stores", help=f"the local settings file (default: the one {ls.ENV_VAR} names)")
     ap.add_argument("--release", default=str(ls.ROOT), help="the release folder (default: the one this code is in)")
+    ap.add_argument("--tech-graph", help="the technical graph's file, tech-graph.nq, to load beside the ontology")
     ap.add_argument("--replace", action="store_true",
                     help="replace the KPI Store's nodes the target database already holds; never anyone else's")
     ap.add_argument("--json", action="store_true", help="print the result as JSON instead of one line")
@@ -343,7 +380,8 @@ def main(argv=None):
     try:
         local = ls.load(ls.locate(args.stores), release_root=Path(args.release))
         confirm = ask if sys.stdin is not None and sys.stdin.isatty() else None
-        result = copy(local, Path(args.release), replace=args.replace, confirm=confirm)
+        extras = (local_load.tech_graph_loader([Path(args.tech_graph)], Path(args.release)),) if args.tech_graph else ()
+        result = copy(local, Path(args.release), replace=args.replace, confirm=confirm, extra_loads=extras)
     except ls.LocalSettingsError as err:
         print(f"neo4j (enterprise): {err}", file=sys.stderr)
         return 2

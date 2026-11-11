@@ -251,6 +251,32 @@ def test_a_second_load_on_the_same_release_changes_nothing(tmp_path, local):
     assert forced["status"] == "loaded" and calls[1][0] == "steps"
 
 
+def test_an_extra_load_also_runs_when_the_ontology_is_current(tmp_path, local):
+    calls, db, seen = [], graph(), []
+    (tmp_path / "lpg-out").mkdir()
+    (tmp_path / "lpg-out" / "projection-report.json").write_text(json.dumps(REPORT), encoding="utf-8")
+    def technical_graph(session, store):
+        seen.append(store)
+        return {"name": "technical graph", "status": "loaded", "nodes": 53}
+    result = ln.load(local, support.ROOT, tmp_path / "run", code=stub_code(calls), connect=connect_to(db), extra_loads=(technical_graph,))
+    assert result["status"] == "current" and calls == [] and seen == ["neo4j"]
+    assert ln.line(result).endswith("graph hash hash-1; technical graph loaded, 53 nodes")
+
+
+def test_the_technical_graphs_loader_passes_the_files_on_and_words_a_refusal(monkeypatch):
+    from kpi_store import tech_graph
+    seen = []
+    monkeypatch.setattr(tech_graph, "load_neo4j", lambda session, files, store, root: seen.append((session, files, store, root)) or {"status": "loaded", "nodes": 53})
+    loader = ln.tech_graph_loader(["tech-graph.nq"], "release")
+    assert loader("a session", "enterprise") == {"name": "technical graph", "status": "loaded", "nodes": 53}
+    assert seen == [("a session", ["tech-graph.nq"], "enterprise", "release")]
+    def refuse(*a):
+        raise SystemExit("enterprise: 2 ontology edges found no target; nothing was changed")
+    monkeypatch.setattr(tech_graph, "load_neo4j", refuse)
+    with pytest.raises(ln.LoadError, match="the technical graph was not loaded: enterprise: 2 ontology edges found no target"):
+        loader("a session", "enterprise")
+
+
 def test_a_database_that_moved_is_loaded_again(tmp_path, local):
     calls, db = [], graph(hash_="hash-2")
     (tmp_path / "lpg-out").mkdir()

@@ -297,7 +297,8 @@ def load(local, release_root, run_dir=None, force=False, code=None, connect=conn
     LoadError when a step or a check fails.
 
     extra_loads are functions (session, store name) -> dict that load a subgraph of their own, apart from the
-    ontology's Resource nodes, after the logical models and before the marker. The technical graph joins here."""
+    ontology's Resource nodes, after the logical models and before the marker. They also run when the ontology is
+    current, so each must leave a current subgraph alone. The technical graph joins here (tech_graph_loader)."""
     code = code or release_code(release_root)
     neo4j, out = local.need("neo4j_local"), local.need("projection_out")
     run_dir = Path(run_dir) if run_dir else local.need("run_folder") / "neo4j"
@@ -314,7 +315,11 @@ def load(local, release_root, run_dir=None, force=False, code=None, connect=conn
             with connect(neo4j) as driver, driver.session(database=neo4j.database) as session:
                 if is_current(session, STORE, want, report, code, sep) and \
                         models_status(session, STORE, want["newest"], code)[1] in ("current", "none"):
-                    return {**result, "status": "current", **summary(report), "marker": code.ss.read_neo4j(session, STORE)[0]}
+                    # The ontology is current. A subgraph beside it may still be behind, so its load runs; it
+                    # leaves a current subgraph alone.
+                    extras = [extra(session, STORE) for extra in extra_loads]
+                    return {**result, "status": "current", **summary(report), "extra_loads": extras,
+                            "marker": code.ss.read_neo4j(session, STORE)[0]}
         except LoadError:
             pass   # a report that did not pass is replaced by the load below
 
@@ -341,6 +346,18 @@ def load(local, release_root, run_dir=None, force=False, code=None, connect=conn
     return {**result, "status": "loaded", **summary(report), "logical_models": models, "extra_loads": extras, "marker": marker}
 
 
+def tech_graph_loader(graph_files, release_root):
+    """The extra load that puts the technical graph beside the ontology (kpi_store.tech_graph.load_neo4j): plain
+    Cypher, in one transaction, and nothing when the database already holds these files."""
+    def load_tech_graph(session, store):
+        from . import tech_graph
+        try:
+            return {"name": "technical graph", **tech_graph.load_neo4j(session, graph_files, store, release_root)}
+        except (tech_graph.TechGraphError, SystemExit) as err:   # the loader's own refusal, with its reason
+            raise LoadError(f"the technical graph was not loaded: {err}") from None
+    return load_tech_graph
+
+
 def summary(report):
     """The figures of a load report that a person reads."""
     cases = report.get("fail_cases", [])
@@ -356,19 +373,27 @@ def line(result):
     return (f"neo4j (local, database {result['database']}): {result['status']}, {result['nodes']} nodes, "
             f"{result['relationships']} relationships, {result['shacl_violations_in_graph']} SHACL violations over "
             f"{result['in_graph_constraints']} constraints, round trip lost {result['roundtrip_lost']} and added "
-            f"{result['roundtrip_added']}, graph hash {result['graph_hash']}")
+            f"{result['roundtrip_added']}, graph hash {result['graph_hash']}" + extras_text(result))
+
+
+def extras_text(result):
+    """What the extra loads did, for the one line: "; technical graph loaded, 61 nodes"."""
+    return "".join(f"; {e['name']} {e['status']}, {e['nodes']} nodes" for e in result.get("extra_loads") or ()
+                   if isinstance(e, dict) and {"name", "status", "nodes"} <= set(e))
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="kpi_store.load_neo4j", description=__doc__.split("\n\n")[0])
     ap.add_argument("--stores", help=f"the local settings file (default: the one {ls.ENV_VAR} names)")
     ap.add_argument("--release", default=str(ls.ROOT), help="the release folder (default: the one this code is in)")
+    ap.add_argument("--tech-graph", help="the technical graph's file, tech-graph.nq, to load beside the ontology")
     ap.add_argument("--force", action="store_true", help="empty the local database and load again, even when it is current")
     ap.add_argument("--json", action="store_true", help="print the result as JSON instead of one line")
     args = ap.parse_args(argv)
     try:
         local = ls.load(ls.locate(args.stores), release_root=Path(args.release))
-        result = load(local, Path(args.release), force=args.force)
+        extras = (tech_graph_loader([Path(args.tech_graph)], Path(args.release)),) if args.tech_graph else ()
+        result = load(local, Path(args.release), force=args.force, extra_loads=extras)
     except ls.LocalSettingsError as err:
         print(f"neo4j (local): {err}", file=sys.stderr)
         return 2

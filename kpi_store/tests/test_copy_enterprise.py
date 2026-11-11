@@ -89,7 +89,9 @@ def test_a_refused_statement_never_reaches_the_session_or_a_transaction():
 # ---- what the target holds, and the decision -------------------------------------------------------
 
 BASES = ["https://w3id.org/mpc/ontology/modules/data-product/", "https://w3id.org/mpc/ontology/modules/kpi/"]
-PARAMS = {"bases": BASES, "store": "enterprise", "prefixes": ["dp_", "n4sch_", "owl_", "skos_"]}
+PARAMS = {"bases": BASES, "store": "enterprise", "prefixes": ["dp_", "n4sch_", "owl_", "skos_"],
+          "tech_base": "urn:kpi-store:tech:", "tech_classes": ["MetricView", "Table"]}
+TECH = "urn:kpi-store:tech:idp_sbx+synapse_dev:object/"
 KPI_TAG = "https://w3id.org/mpc/ontology/modules/kpi/1.0.0"
 
 
@@ -101,20 +103,33 @@ def held_target(hash_="hash-1"):
 
 
 def test_the_rules_read_the_module_iris_the_store_name_and_the_projections_label_prefixes():
-    assert ce.own_params(BASES, ["skos", "owl", "dp"]) == PARAMS
+    assert ce.own_params(BASES, ["skos", "owl", "dp"], ["Table", "MetricView"]) == PARAMS
+
+
+def test_the_technical_graphs_class_names_come_from_its_newest_package():
+    newest = ["https://w3id.org/mpc/ontology/modules/kpi/1.3.0", "https://w3id.org/mpc/ontology/modules/technical-graph/1.1.0"]
+    assert ce.tech_class_names(support.ROOT, newest) == [
+        "Agent", "Builder", "DataObject", "DefinitionsView", "Host", "Job", "MetricView", "Orchestrator", "Pipeline",
+        "PipelineStep", "QualityCheck", "SourceDatabase", "Table", "TechnicalObject", "View"]
+    assert ce.tech_class_names(support.ROOT, newest[:1]) == []
+    with pytest.raises(ce.Refused, match="technical-graph package .* cannot be read"):
+        ce.tech_class_names(support.ROOT, ["https://w3id.org/mpc/ontology/modules/technical-graph/9.9.9"])
 
 
 def test_holdings_tell_the_kpi_stores_nodes_from_the_others():
     db = held_target()
     db.add(["Resource", "skos_Concept", "n4sch_Class"], uri="urn:sample:concept", graph=KPI_TAG)   # a projected node's labels
     db.add(["LogicalModel", "Entity"], 4, uri="urn:sample:entity", models=["sample-model"])
-    assert ce.holdings(db, PARAMS) == {"nodes": 13, "own": {"Resource": 6, "ModuleRelease": 2, "EpmStoreMarker": 1, "LogicalModel": 4},
+    db.add(["Tech", "Table"], 3, uri=TECH + "idp_sbx.gold_sample.sample_fact", name="idp_sbx.gold_sample.sample_fact")
+    db.add(["TechGraphMarker"], store="enterprise", digest="d1", triples=9)
+    assert ce.holdings(db, PARAMS) == {"nodes": 17, "own": {"Resource": 6, "ModuleRelease": 2, "EpmStoreMarker": 1, "LogicalModel": 4,
+                                                           "Tech": 3, "TechGraphMarker": 1},
                                       "foreign": {}, "foreign_nodes": 0, "foreign_examples": []}
     db.add(["Invoice"], 2)
     db.add(["Invoice", "Paid"])
     db.add([])
     held = ce.holdings(db, PARAMS)
-    assert (held["nodes"], held["foreign_nodes"]) == (17, 4)
+    assert (held["nodes"], held["foreign_nodes"]) == (21, 4)
     assert held["foreign"] == {"Invoice": 3, "Paid": 1, "(no label)": 1}
 
 
@@ -134,6 +149,11 @@ def test_holdings_tell_the_kpi_stores_nodes_from_the_others():
     # The release's own tag and a uri, on a node with a label the projection never gives.
     (["Resource", "Customer"], {"uri": "urn:external:item", "graph": KPI_TAG}),
     (["Resource", "skos_Concept", "Customer"], {"uri": "urn:external:item", "graph": KPI_TAG}),
+    # The technical graph's label on a node that is not of its shape.
+    (["Tech", "Table"], {"uri": "https://other.example/table"}),          # not in the technical graph's urn: scheme
+    (["Tech", "Customer"], {"uri": TECH + "x"}),                          # a label that is no class of the module
+    (["Tech"], {"name": "no uri"}),
+    (["TechGraphMarker"], {"store": "neo4j", "digest": "abc"}),            # another store's marker
 ])
 def test_a_node_that_only_shares_a_label_with_the_kpi_store_is_foreign_and_survives_a_replace(labels, props):
     db = held_target()

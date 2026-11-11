@@ -11,6 +11,9 @@ import pytest
 from kpi_store.tests import support
 
 NOTEBOOK = support.ROOT / "kpi_store" / "notebook" / "kpi_store_load.py"
+# The small workspace's technical graph, counted by hand: 3 objects with a type, a name, a layer and a design (12),
+# 2 reads-from links, 2 built-by links, 2 last-refresh times, and the job with its type and name.
+TECH_TRIPLES = 20
 
 
 @functools.cache
@@ -75,12 +78,43 @@ def test_the_notebook_loads_from_a_zip_in_the_volume_and_a_second_run_changes_no
     folder, workspace = volume(tmp_path, top_folder=top_folder), support.small_workspace()
     summary, dbutils = run_main(folder, workspace)
     assert dbutils.widgets.defaults == {"settings_path": "/Volumes/idp_sbx/kpi_store/releases/kpi_store.toml", "mode": "load", "stale_after_days": "35"}
-    assert summary["status"] == "loaded" and summary["count"] == 32 and workspace.rewrites == 1
+    assert summary["status"] == "loaded" and summary["count"] == 32
+    # The technical graph follows the load: built from the run's discovery.json, saved beside the report, and loaded
+    # into the tech_graph schema. Each of the two loads replaced its table once.
+    tech = summary["tech_graph"]
+    run_dir = folder / "reports" / summary["run"]
+    assert tech["status"] == "loaded" and tech["table"] == "idp_sbx.tech_graph.tech_graph_triples" and workspace.rewrites == 2
+    assert tech["file"] == str(run_dir / "tech-graph.nq") and (run_dir / "tech-graph.nq").is_file()
+    assert tech["count"] == len(workspace.store["idp_sbx.tech_graph.tech_graph_triples"]) == TECH_TRIPLES
+    assert '<urn:kpi-store:tech:idp_sbx+synapse_dev:object/idp_sbx.gold_sample.sample_fact>' in (run_dir / "tech-graph.nq").read_text(encoding="utf-8")
     marker = json.loads(workspace.store["idp_sbx.kpi_store.epm_store_markers"][0]["marker"])
     assert marker["commit"] == "KPI Store 1.1 (zip sha256 " + hashlib.sha256((folder / "kpi-store-1.1.zip").read_bytes()).hexdigest() + ")"
     assert (folder / "discovery-report.json").is_file()
     again, _ = run_main(folder, workspace, stale_after_days="")
-    assert again["status"] == "current" and workspace.rewrites == 1
+    assert again["status"] == "current" and again["tech_graph"]["status"] == "current" and workspace.rewrites == 2
+
+
+def test_a_technical_graph_table_that_differs_fails_the_run(tmp_path):
+    folder, workspace = volume(tmp_path), support.small_workspace()
+    real = workspace.run_sql
+    def lossy(statement):   # a store that drops the technical graph's rows as they are written
+        if statement.lstrip().startswith("INSERT INTO idp_sbx.tech_graph.tech_graph_triples__staging"):
+            workspace.statements.append(statement)
+            return []
+        return real(statement)
+    workspace.run_sql = lossy
+    with pytest.raises(RuntimeError, match="the technical graph's load stopped: staging-mismatch"):
+        run_main(folder, workspace)
+    assert "idp_sbx.tech_graph.tech_graph_triples" not in workspace.store
+    assert len(workspace.store["idp_sbx.kpi_store.epm_triples"]) == 32   # the ontology's own load stands
+
+
+def test_a_run_that_stops_on_a_report_builds_no_technical_graph(tmp_path):
+    folder, workspace = volume(tmp_path), support.small_workspace()
+    workspace.columns["idp_sbx.gold_sample.sample_fact"] = ["Amount_Renamed"]
+    summary, _ = run_main(folder, workspace)
+    assert summary["status"] == "blocked" and "tech_graph" not in summary
+    assert not any(name.startswith("idp_sbx.tech_graph.") for name in workspace.store)
 
 
 def test_check_mode_is_a_notebook_parameter(tmp_path):

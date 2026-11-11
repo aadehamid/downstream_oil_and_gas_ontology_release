@@ -286,8 +286,13 @@ def test_the_upload_copies_the_zip_then_the_settings(setup):
 
 # ---- the notebook ----------------------------------------------------------------------------------
 
+TECH_NQ = b"<urn:kpi-store:tech:sample:object/a> <urn:sample:p> <urn:sample:o> <urn:kpi-store:tech:sample:graph> .\n"
+REPORTS = "/Volumes/idp_sbx/kpi_store/releases/reports/20261111T120300Z-0a1b2c3d"
 LOADED = {"status": "loaded", "count": 58250, "table": "idp_sbx.kpi_store.epm_triples", "dataset_hash": "ab12",
-          "marker": {"marked_at": "2026-11-11T12:05:00Z", "count": [58250]}}
+          "marker": {"marked_at": "2026-11-11T12:05:00Z", "count": [58250]},
+          # The digest is the technical graph's rule, written out: the file's name, a zero byte, its bytes, a zero byte.
+          "tech_graph": {"status": "loaded", "count": 1, "file": REPORTS + "/tech-graph.nq",
+                         "digest": hashlib.sha256(b"tech-graph.nq\0" + TECH_NQ + b"\0").hexdigest()}}
 BLOCKED = {"status": "blocked", "blocking_rows": ["R001"], "report_json": "/Volumes/idp_sbx/kpi_store/releases/reports/20261111T120300Z-0a1b2c3d/discovery-report.json",
            "report_csv": "/Volumes/idp_sbx/kpi_store/releases/reports/20261111T120300Z-0a1b2c3d/discovery-report.csv"}
 
@@ -393,7 +398,7 @@ def test_a_blocked_run_fetches_the_report_prefills_a_copy_and_stops(setup):
                          [CLI, "fs", "cp", "dbfs:" + BLOCKED["report_csv"], str(setup.pending / "discovery-report.csv"), "--overwrite", *PROFILE]]
     to_clear = setup.pending / "discovery-report.to-clear.csv"
     assert str(stop.value) == (f"clear the report: edit the decision column of {to_clear} (each holds the recommended decision), write "
-                               "your name in decided_by on every row you decide, save, then run the same command again")
+                               "your role or initials in decided_by on every row you decide, save, then run the same command again")
     with to_clear.open(encoding="utf-8", newline="") as f:
         rows = list(csv.DictReader(f))
     assert [(r["id"], r["decision"], r["decided_by"]) for r in rows] == [("R001", "accept", ""), ("R002", "accept", ""), ("R003", "", "")]
@@ -404,10 +409,30 @@ def test_a_blocked_run_fetches_the_report_prefills_a_copy_and_stops(setup):
 def test_a_run_that_did_not_block_has_no_report_to_clear(setup):
     with pytest.raises(runner.StepFailed, match="run the notebook step first"):
         runner.step_report(setup.make())
-    run = Recorder()
+    def fetch(cmd):
+        Path(cmd[4]).write_bytes(TECH_NQ)
+    run = Recorder(fetch)
     result = runner.step_report(with_notebook(setup, LOADED, run))
-    assert run.calls == [] and result["status"] == "no report to clear"
-    assert result["line"] == "no row blocks; Databricks marker of 2026-11-11T12:05:00Z, [58250] rows"
+    kept = setup.tmp / "local" / "runs" / "tech-graph" / "tech-graph.nq"
+    assert run.calls == [[CLI, "fs", "cp", "dbfs:" + REPORTS + "/tech-graph.nq", str(kept), "--overwrite", *PROFILE]]
+    assert result["status"] == "no report to clear" and kept.read_bytes() == TECH_NQ
+    assert result["tech_graph"] == {"status": "loaded", "digest": LOADED["tech_graph"]["digest"], "count": 1, "file": str(kept)}
+    assert result["line"] == ("no row blocks; Databricks marker of 2026-11-11T12:05:00Z, [58250] rows; technical graph loaded in "
+                              "Databricks, its file fetched")
+    assert runner.tech_graph_files(setup.make()) == [kept]
+
+
+def test_a_technical_graph_file_that_is_not_the_one_loaded_is_not_kept(setup):
+    def other(cmd):
+        Path(cmd[4]).write_bytes(TECH_NQ + b"<urn:a> <urn:b> <urn:c> <urn:g> .\n")
+    with pytest.raises(runner.StepFailed, match="is not the one the notebook loaded; nothing was kept"):
+        runner.step_report(with_notebook(setup, LOADED, Recorder(other)))
+    assert runner.tech_graph_files(setup.make()) is None
+    with pytest.raises(runner.StepFailed, match=r"could not be fetched from the volume \(Error: not found\)"):
+        runner.step_report(with_notebook(setup, LOADED, Recorder(lambda cmd: (1, "", "Error: not found"))))
+    older = {k: v for k, v in LOADED.items() if k != "tech_graph"}   # a notebook that built no technical graph
+    result = runner.step_report(with_notebook(setup, older, Recorder()))
+    assert result["tech_graph"] is None and result["line"].endswith("; no technical graph in this run")
 
 
 # ---- cut -------------------------------------------------------------------------------------------
@@ -436,6 +461,19 @@ def test_a_report_that_is_not_cleared_stops_the_run_before_the_cut(setup):
     with pytest.raises(runner.Stop, match=r"give a decision and your name in decided_by for the row\(s\) that block \(R001\)"):
         runner.step_cut(setup.make(hooks={"cut": lambda *a: called.append(a)}))
     assert called == [] and setup.pending.is_dir()
+
+
+@pytest.mark.parametrize("name", ["a.person@example.org", "x" * 61, "the owner; drop", "name/with/slash"])
+def test_decided_by_must_be_a_role_or_initials_as_the_cut_tool_requires(setup, name):
+    pending_report(setup, {"R001": {"decided_by": name}})
+    with pytest.raises(runner.Stop, match="decided_by of row R001 must be a short role or initials"):
+        runner.step_cut(setup.make(hooks={"cut": lambda *a: pytest.fail("the cut ran")}))
+
+
+@pytest.mark.parametrize("name", ["the owner", "H.A.", "data-platform lead", "O'Neil 2"])
+def test_a_role_or_initials_passes(setup, name):
+    pending_report(setup, {"R001": {"decided_by": name}})
+    assert runner.step_cut(setup.make(hooks={"cut": lambda *a: {"status": "cut"}}))["status"] == "cut"
 
 
 def edit_csv(setup, change):
@@ -475,11 +513,16 @@ def test_the_report_itself_is_checked_after_the_csv_is_applied(setup, monkeypatc
 def test_a_cleared_report_is_cut_once_and_unconfirmed_rows_stay_undecided(setup):
     pending_report(setup, {"R001": {"decided_by": "the owner"}})
     seen = []
-    def cut(report_json, release_root, run_dir):
-        seen.append((json.loads(Path(report_json).read_text(encoding="utf-8")), release_root, run_dir))
+    def cut(report_json, release_root, run_dir, decisions):
+        with Path(decisions).open(encoding="utf-8", newline="") as f:
+            handed = [(r["id"], r["decision"], r["decided_by"]) for r in csv.DictReader(f)]
+        seen.append((json.loads(Path(report_json).read_text(encoding="utf-8")), release_root, run_dir, decisions, handed))
         return {"status": "cut", "version": "1.2.1-correction.1"}
     result = runner.step_cut(setup.make(hooks={"cut": cut}))
-    report, root, run_dir = seen[0]
+    report, root, run_dir, decisions, handed = seen[0]
+    # The cut gets the cleared report and the confirmed decisions as CSV, both in the run's folder.
+    assert decisions == setup.run_dir / "confirmed.csv" and decisions.is_file()
+    assert handed == [("R001", "accept", "the owner"), ("R002", "", ""), ("R003", "", "")]
     assert [(r["id"], r["decision"], r["decided_by"]) for r in report["rows"]] == [
         ("R001", "accept", "the owner"), ("R002", "", ""), ("R003", "", "")]
     assert (root, run_dir) == (setup.root.resolve(), setup.run_dir)
@@ -501,12 +544,33 @@ def test_a_wrong_decision_or_a_failed_cut_keeps_the_report_pending(setup):
 
 def test_the_cut_tool_is_called_as_a_module_with_the_report_and_the_release(setup):
     run = Recorder()
-    assert runner.cut_with_tool("cleared.json", setup.root, setup.run_dir, run) == {"status": "failed", "why": "this release has no cut tool (kpi_store/cut.py)"}
+    assert runner.cut_with_tool("cleared.json", setup.root, setup.run_dir, "confirmed.csv", run) == {
+        "status": "failed", "why": "this release has no cut tool (kpi_store/cut.py)"}
     (setup.root / "kpi_store" / "cut.py").write_text("", encoding="utf-8")
-    assert runner.cut_with_tool("cleared.json", setup.root, setup.run_dir, run) == {"status": "cut"}
-    assert run.calls == [[sys.executable, "-m", "kpi_store.cut", "--report", "cleared.json", "--release", str(setup.root)]]
-    assert "capture_output" not in run.options[0]   # the tool asks for approval in this terminal
-    assert runner.cut_with_tool("cleared.json", setup.root, setup.run_dir, Recorder(lambda cmd: (1, "", "")))["why"] == "the cut tool exited 1"
+    assert runner.cut_with_tool("cleared.json", setup.root, setup.run_dir, "confirmed.csv", run) == {"status": "cut"}
+    assert run.calls == [[sys.executable, "-m", "kpi_store.cut", "--report", "cleared.json", "--decisions", "confirmed.csv",
+                          "--release", str(setup.root)]]
+    assert run.options[0] == {"cwd": str(setup.root)}   # nothing captured or redirected: the tool asks in this terminal
+    refused = runner.cut_with_tool("cleared.json", setup.root, setup.run_dir, "confirmed.csv", Recorder(lambda cmd: (1, "", "")))
+    assert refused == {"status": "failed", "why": "the cut tool exited 1: it refused or failed, and changed nothing"}
+    assert runner.cut_command("cleared.json", "release") == [sys.executable, "-m", "kpi_store.cut", "--report", "cleared.json", "--release", "release"]
+
+
+def test_the_zip_after_a_cut_is_built_from_the_tree_the_cut_left(setup):
+    pending_report(setup, {"R001": {"decided_by": "the owner"}})
+    before, _ = runner.build_zip(setup.root, setup.tmp / "before.zip")
+    def cut(report_json, release_root, run_dir, decisions):   # the cut writes a correction version into the release
+        package = Path(release_root) / "releases" / "data-product" / "1.2.1-correction.1" / "data-product.ttl"
+        package.parent.mkdir(parents=True)
+        package.write_text("<urn:a> a <urn:Corrected> .\n", encoding="utf-8")
+        return {"status": "cut"}
+    ctx = setup.make(hooks={"cut": cut})
+    assert runner.run_steps(ctx, ["cut", "zip"]) == 0
+    built = json.loads(ctx.step_file("zip").read_text(encoding="utf-8"))
+    assert built["sha256"] != before and built["files"] == 9
+    with zipfile.ZipFile(built["zip"]) as z:
+        assert z.read("releases/data-product/1.2.1-correction.1/data-product.ttl") == b"<urn:a> a <urn:Corrected> .\n"
+    assert f'sha256 = "{built["sha256"]}"' in Path(built["settings"]).read_text(encoding="utf-8")
 
 
 # ---- the chain -------------------------------------------------------------------------------------
@@ -520,7 +584,9 @@ def test_a_dry_run_prints_every_command_and_runs_and_writes_nothing(setup):
     assert [c[1:3] for c in printed if c[0] == CLI] == [
         ["schemas", "get"], ["schemas", "create"], ["volumes", "read"], ["volumes", "create"], ["fs", "cp"], ["fs", "cp"],
         ["workspace", "mkdirs"], ["workspace", "import"], ["jobs", "submit"], ["jobs", "get-run"], ["jobs", "get-run-output"],
-        ["fs", "cp"], ["fs", "cp"]]
+        ["fs", "cp"], ["fs", "cp"], ["fs", "cp"]]
+    assert printed[-1][3:5] == ["dbfs:/Volumes/idp_sbx/kpi_store/releases/reports/<report run>/tech-graph.nq",
+                                str(setup.tmp / "local" / "runs" / "tech-graph" / "tech-graph.nq")]
     assert ["/sample/bash", "scripts/check.sh"] in printed
     assert all(c[-2:] == PROFILE for c in printed if c[0] == CLI)
 
@@ -604,26 +670,34 @@ def test_the_local_steps_pass_the_hooks_on_and_the_summary_lists_the_run(setup, 
     from kpi_store import copy_enterprise, load_fuseki, load_neo4j, sync_check
     seen = {}
     extra = {"urn:sample:tech-graph": "objects.ttl"}
-    monkeypatch.setattr(load_fuseki, "run", lambda local, root, extra_graphs=None: seen.update(fuseki=extra_graphs) or {
+    tech_file = setup.tmp / "local" / "runs" / "tech-graph" / "tech-graph.nq"   # as the report step fetched it
+    tech_file.parent.mkdir(parents=True)
+    tech_file.write_bytes(TECH_NQ)
+    monkeypatch.setattr(load_neo4j, "tech_graph_loader", lambda files, root: ("the technical graph's loader", files, root))
+    monkeypatch.setattr(load_fuseki, "run", lambda local, root, extra_graphs=None, tech_graph_files=None: seen.update(fuseki=extra_graphs, fuseki_tech=tech_graph_files) or {
         "status": "loaded", "graphs": 8, "triples": 33, "dataset_hash": "ab12", "store_hash": "ab12", "server": "reused", "persistent": True})
     monkeypatch.setattr(load_neo4j, "load", lambda local, root, run_dir=None, extra_loads=(): seen.update(neo4j=extra_loads) or {
         "status": "loaded", "database": "neo4j", "nodes": 5, "relationships": 7, "shacl_violations_in_graph": 0,
         "in_graph_constraints": 3, "roundtrip_lost": 0, "roundtrip_added": 0, "graph_hash": "hash-1"})
     monkeypatch.setattr(copy_enterprise, "copy", lambda local, root, **options: seen.update(enterprise=options) or {
         "status": "copied", "database": "businessprocessarchitecturegraph", "nodes": 5, "relationships": 7, "graph_hash": "hash-1"})
-    monkeypatch.setattr(sync_check, "check", lambda local, root, extra_graphs=(): seen.update(sync=extra_graphs) or [
+    monkeypatch.setattr(sync_check, "check", lambda local, root, extra_graphs=(), tech_graph_files=None: seen.update(sync=extra_graphs, sync_tech=tech_graph_files) or [
         ("jena", "current", "8 graphs"), ("neo4j", "current", "marked")])
     loader = lambda session, store: {}   # noqa: E731
     rules = {"Resource": "n.uri IS NOT NULL", "TechObject": "n.tech_graph IS NOT NULL"}
     ctx = setup.make(replace_enterprise=True, hooks={"extra_graphs": lambda root, run_dir: extra, "neo4j_extra_loads": (loader,),
                                                      "own_rules": rules})
     assert runner.run_steps(ctx, ["fuseki", "neo4j", "enterprise", "sync", "summary"]) == 0
-    assert seen["fuseki"] == extra and seen["neo4j"] == (loader,) and seen["sync"] == ("urn:sample:tech-graph",)
+    tech_loader = ("the technical graph's loader", [tech_file], setup.root.resolve())
+    assert seen["fuseki"] == extra and seen["sync"] == ("urn:sample:tech-graph",)
+    assert seen["fuseki_tech"] == seen["sync_tech"] == [tech_file]
+    # In both Neo4j databases the technical graph follows the ontology, before any load a hook adds.
+    assert seen["neo4j"] == (tech_loader, loader) and seen["enterprise"]["extra_loads"] == (tech_loader, loader)
     assert seen["enterprise"]["replace"] is True and seen["enterprise"]["own_rules"] == rules
     assert setup.lines[0].startswith("fuseki: loaded, 8 graphs, 33 triples") and "sync: all 2 lines read current" in setup.lines
     summary = json.loads((setup.run_dir / "summary.json").read_text(encoding="utf-8"))
     assert {k: v["status"] for k, v in summary["steps"].items() if v} == {"fuseki": "loaded", "neo4j": "loaded", "enterprise": "copied", "sync": "current"}
-    monkeypatch.setattr(sync_check, "check", lambda local, root, extra_graphs=(): [("jena", "behind", "1 graph missing")])
+    monkeypatch.setattr(sync_check, "check", lambda local, root, extra_graphs=(), tech_graph_files=None: [("jena", "behind", "1 graph missing")])
     assert runner.run_steps(ctx, ["sync"]) == 1 and setup.lines[-1] == "sync: FAILED. not current: jena"
     assert json.loads((setup.run_dir / "steps" / "11-sync.json").read_text(encoding="utf-8"))["rows"][0]["status"] == "behind"
 

@@ -55,7 +55,10 @@ def owns(labels, props, params):
                 or ("Module" in labels and under(props.get("uri")))
                 or ("EpmStoreMarker" in labels and props.get("store") == params["store"] and props.get("catalog_digest") is not None)
                 or ("LogicalModel" in labels and props.get("uri") is not None and (props.get("models") is not None or props.get("slug") is not None))
-                or ("LogicalModelMarker" in labels and props.get("store") == params["store"] and props.get("digest") is not None))
+                or ("LogicalModelMarker" in labels and props.get("store") == params["store"] and props.get("digest") is not None)
+                or ("Tech" in labels and str(props.get("uri") or "").startswith(params["tech_base"])
+                    and all(label == "Tech" or label in params["tech_classes"] for label in labels))
+                or ("TechGraphMarker" in labels and props.get("store") == params["store"] and props.get("digest") is not None))
 
 
 class FakeNeo4j:

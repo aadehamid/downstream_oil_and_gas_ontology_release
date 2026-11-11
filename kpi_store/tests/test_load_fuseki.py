@@ -275,6 +275,20 @@ def test_a_graph_that_is_not_the_kpi_stores_stops_the_load_before_any_write(tmp_
     assert result["status"] == "loaded" and store.graphs() == GRAPHS and len(store.dataset) == 32
 
 
+def test_the_technical_graphs_graphs_are_left_alone_and_out_of_the_hash(tmp_path):
+    _, _, dataset = release(tmp_path)
+    apart = ["urn:kpi-store:tech:idp_sbx+synapse_dev:graph"]
+    store = stores_support.FakeFuseki(RDFSTORE)
+    store.add(apart[0], 5)
+    with pytest.raises(lf.FusekiError, match="that are not the KPI Store's"):   # unknown unless it is named apart
+        lf.load(store, dataset, RDFSTORE, BASES)
+    first = lf.load(store, dataset, RDFSTORE, BASES, apart=apart)
+    assert first["status"] == "loaded" and first["store_hash"] == first["dataset_hash"] and first["dropped"] == []
+    assert store.graphs() == sorted(GRAPHS + apart) and len(store.dataset) == 37   # its five triples are still there
+    assert lf.load(store, dataset, RDFSTORE, BASES, apart=apart)["status"] == "current" and store.writes == ["publish"]
+    assert len(lf.held_dataset(store, RDFSTORE, apart)) == 32 and len(lf.held_dataset(store, RDFSTORE)) == 37
+
+
 def test_a_store_that_alters_a_triple_reads_as_a_mismatch(tmp_path):
     _, _, dataset = release(tmp_path)
     result = lf.load(stores_support.FakeFuseki(RDFSTORE, alter=True), dataset, RDFSTORE, BASES)
@@ -296,6 +310,8 @@ def test_the_line_says_whether_a_restart_keeps_the_dataset():
     assert lf.line({**result, "persistent": True}) == ("fuseki: loaded, 7 graphs, 32 triples, RDFC-1.0 hash ab12 equal in "
                                                       "the store and the release files (started server, kept on disk)")
     assert "in memory: a restart empties it" in lf.line({**result, "persistent": False})
+    tech = {"status": "loaded", "graphs": {"urn:kpi-store:tech:sample:graph": 269}}
+    assert lf.line({**result, "persistent": True, "tech_graph": tech}).endswith("kept on disk); technical graph loaded, 269 triples")
 
 
 def test_the_command_refuses_bad_settings_before_anything_else(tmp_path, capsys):

@@ -17,11 +17,12 @@ The steps, in order:
   upload      copy the zip and the settings to the volume
   notebook    import the notebook, submit it as a serverless run, wait, and read its result
   report      when the notebook stopped on a report: fetch it, print the rows that block, write a copy with the
-              recommended decisions filled in, and stop
-  fuseki      load the local Fuseki and compare the hashes
-  neo4j       load the local Neo4j and run every check there
-  enterprise  copy the verified graph to the one database on Neo4j Enterprise
-  sync        the sync check of all four stores
+              recommended decisions filled in, and stop. When it loaded: fetch the technical graph's file, which
+              the notebook built from the workspace, into <run folder>/tech-graph
+  fuseki      load the local Fuseki and compare the hashes; then the technical graph
+  neo4j       load the local Neo4j and run every check there; then the technical graph
+  enterprise  copy the verified graph to the one database on Neo4j Enterprise; then the technical graph
+  sync        the sync check of all four stores, with the technical graph's lines
   summary     one summary of the run
 
 Every Databricks call is the Databricks CLI with the profile of the local settings (OAuth sign-in, no token).
@@ -30,8 +31,11 @@ release folder.
 
 Clearing a report stays a person's job. When the run stops on a report, open
 <run folder>/pending/discovery-report.to-clear.csv. Each row's decision holds the recommended one. Change it where
-you disagree, write your name in decided_by on every row you decide, save, and run the same command again. A
-row that blocks needs a decision and a name. A row that does not block and has no name stays undecided.
+you disagree, write your role or initials in decided_by on every row you decide, save, and run the same command
+again. A row that blocks needs a decision and a decided_by. A row that does not block and has no decided_by stays
+undecided. decided_by is a short role or initials: letters, digits, spaces, dots, hyphens and apostrophes, at
+most 60 characters, and no e-mail address. The next run hands the report to the cut tool, which shows its plan
+and asks you to approve it in the terminal.
 
 A store load never runs after a notebook run that did not load this release: the run then stops, with exit 3.
 --skip leaves a step out on purpose; the last line and the summary then name the steps left out, and the run
@@ -62,7 +66,8 @@ STEPS = ("cut", "check", "zip", "volume", "upload", "notebook", "report", "fusek
 NOTEBOOK = Path("kpi_store") / "notebook" / "kpi_store_load.py"
 NOTEBOOK_NAME = "kpi_store_load"
 SETTINGS_NAME = "kpi_store.toml"
-PENDING, TO_CLEAR = "pending", "discovery-report.to-clear.csv"
+PENDING, TO_CLEAR, CONFIRMED = "pending", "discovery-report.to-clear.csv", "confirmed.csv"
+DECIDED_BY = re.compile(r"^[A-Za-z0-9 .'\-]{1,60}$")   # the cut tool's rule for who decided: a role or initials
 CHECK_PASSED = "all checks passed"
 # Never in the zip: Git's folder, caches, and anything that could be a settings file with a password.
 SKIP_FOLDERS = (".git", "__pycache__", ".pytest_cache", ".venv", ".mypy_cache", ".ruff_cache")
@@ -157,14 +162,24 @@ def last_lines(text, n=3):
 
 # ---- cut ------------------------------------------------------------------------------------------------
 
-def cut_with_tool(report_json, release_root, run_dir, run=subprocess.run):
+def cut_command(report_json, release_root, decisions=None):
+    """The cut tool's command line: the cleared report, the confirmed decisions as CSV, and the release folder."""
+    cmd = [sys.executable, "-m", "kpi_store.cut", "--report", str(report_json)]
+    if decisions is not None:
+        cmd += ["--decisions", str(decisions)]
+    return cmd + ["--release", str(release_root)]
+
+
+def cut_with_tool(report_json, release_root, run_dir, decisions=None, run=subprocess.run):
     """Calls the cut tool on a cleared report and returns {"status": "cut"} or {"status": "failed", ...}. The
-    tool asks the person who runs it to approve, so it gets this terminal."""
+    tool shows its plan and asks the person who runs it to approve, so it gets this terminal: nothing is captured.
+    Its exit 0 means cut, recorded or already cut; 1 means refused or failed, with the release folder unchanged."""
     if not (Path(release_root) / "kpi_store" / "cut.py").is_file():
         return {"status": "failed", "why": "this release has no cut tool (kpi_store/cut.py)"}
-    done = run([sys.executable, "-m", "kpi_store.cut", "--report", str(report_json), "--release", str(release_root)],
-               cwd=str(release_root))
-    return {"status": "cut"} if done.returncode == 0 else {"status": "failed", "why": f"the cut tool exited {done.returncode}"}
+    done = run(cut_command(report_json, release_root, decisions), cwd=str(release_root))
+    if done.returncode == 0:
+        return {"status": "cut"}
+    return {"status": "failed", "why": f"the cut tool exited {done.returncode}: it refused or failed, and changed nothing"}
 
 
 def cleared_report(pending):
@@ -191,6 +206,10 @@ def cleared_report(pending):
     open_rows, undecided = [], []
     for row in rows:
         decision, name = (row.get("decision") or "").strip(), (row.get("decided_by") or "").strip()
+        if name and not DECIDED_BY.match(name):
+            raise Stop(f"correct {path}: decided_by of row {row['id']} must be a short role or initials (letters, digits, "
+                       "spaces, dots, hyphens and apostrophes; at most 60 characters; no e-mail address). Then run the "
+                       "same command again")
         if blocks.get(row.get("id")) and not (decision and name):
             open_rows.append(row["id"])
         elif decision and not name:
@@ -199,7 +218,7 @@ def cleared_report(pending):
     if open_rows:
         raise Stop(f"clear the report: in {path} give a decision and your name in decided_by for the row(s) that block "
                    f"({', '.join(open_rows)}), save, then run the same command again")
-    confirmed = pending / "confirmed.csv"
+    confirmed = pending / CONFIRMED
     with confirmed.open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=rep.ROW_FIELDS, extrasaction="ignore", lineterminator="\n")
         writer.writeheader()
@@ -227,7 +246,9 @@ def step_cut(ctx):
         raise StepFailed(f"the pending report cannot be read: {err}") from None
     cleared = ctx.run_dir / "cleared-report.json"
     write_text(cleared, rep.to_json(report))
-    result = ctx.hooks["cut"](cleared, ctx.release_root, ctx.run_dir)
+    decisions = ctx.run_dir / CONFIRMED   # a copy: the pending folder moves when the cut is done
+    shutil.copyfile(ctx.pending / CONFIRMED, decisions)
+    result = ctx.hooks["cut"](cleared, ctx.release_root, ctx.run_dir, decisions)
     if result.get("status") != "cut":
         raise StepFailed(f"the cut did not finish: {result.get('why', result.get('status'))}. The report stays in {ctx.pending}")
     # A report is cut once: its files leave the pending folder and stay with the run that cut them.
@@ -535,10 +556,39 @@ def blocking_lines(report):
             f"recommended: {row['recommended'] or 'none'}" for row in report["rows"] if row["blocks"]]
 
 
+def tech_graph_files(ctx):
+    """The technical graph's files as the runner last fetched them, for the store loads; None when there are none."""
+    from . import sync_check
+    path = sync_check.tech_graph_file(ctx.local)
+    return [path] if path else None
+
+
+def fetch_tech_graph(ctx, summary):
+    """Fetches the technical graph's file, which the notebook wrote beside its report, into <run folder>/tech-graph,
+    and checks it is the file the notebook loaded. Returns the notebook's result for it, or None when the notebook
+    built none."""
+    tech = summary.get("tech_graph")
+    if not tech or not tech.get("file"):
+        return None
+    from . import sync_check, tech_graph
+    target = ctx.run_root / sync_check.TECH_FOLDER / tech_graph.GRAPH_FILE
+    target.parent.mkdir(parents=True, exist_ok=True)
+    code, _, err = ctx.call(ctx.cli("fs", "cp", "dbfs:" + tech["file"], str(target), "--overwrite"))
+    if code != 0:
+        raise StepFailed(f"the technical graph's file could not be fetched from the volume ({last_lines(err, 1)})")
+    if tech_graph.digest([target]) != tech.get("digest"):
+        target.unlink()
+        raise StepFailed("the technical graph's file in the volume is not the one the notebook loaded; nothing was kept. "
+                         "Run the same command with --from notebook")
+    return {"status": tech.get("status"), "digest": tech.get("digest"), "count": tech.get("count"), "file": str(target)}
+
+
 def step_report(ctx):
     if ctx.dry_run:
         for name in (rep.JSON_NAME, rep.CSV_NAME):
             ctx.call(ctx.cli("fs", "cp", f"dbfs:{ctx.volume_path}/reports/<report run>/{name}", str(ctx.pending / name), "--overwrite"))
+        ctx.call(ctx.cli("fs", "cp", f"dbfs:{ctx.volume_path}/reports/<report run>/tech-graph.nq",
+                         str(ctx.run_root / "tech-graph" / "tech-graph.nq"), "--overwrite"))
         return {"status": "dry-run", "line": "would fetch the report when the notebook stopped on one"}
     notebook = ctx.earlier("notebook")
     if not notebook or "summary" not in notebook:
@@ -546,8 +596,10 @@ def step_report(ctx):
     summary = notebook["summary"]
     if summary.get("status") != "blocked":
         marker = summary.get("marker") or {}
-        return {"status": "no report to clear", "marker": marker,
-                "line": "no row blocks" + (f"; Databricks marker of {marker.get('marked_at')}, {marker.get('count')} rows" if marker else "")}
+        tech = fetch_tech_graph(ctx, summary)
+        return {"status": "no report to clear", "marker": marker, "tech_graph": tech,
+                "line": "no row blocks" + (f"; Databricks marker of {marker.get('marked_at')}, {marker.get('count')} rows" if marker else "")
+                        + (f"; technical graph {tech['status']} in Databricks, its file fetched" if tech else "; no technical graph in this run")}
     ctx.pending.mkdir(parents=True, exist_ok=True)
     for key, name in (("report_json", rep.JSON_NAME), ("report_csv", rep.CSV_NAME)):
         code, _, err = ctx.call(ctx.cli("fs", "cp", "dbfs:" + summary[key], str(ctx.pending / name), "--overwrite"))
@@ -566,7 +618,7 @@ def step_report(ctx):
     write_text(ctx.step_file("report"), json.dumps({"status": "report to clear", "to_clear": str(to_clear),
                                                     "blocking_rows": [r["id"] for r in report["rows"] if r["blocks"]]}, indent=2) + "\n")
     raise Stop(f"clear the report: edit the decision column of {to_clear} (each holds the recommended decision), write "
-               "your name in decided_by on every row you decide, save, then run the same command again")
+               "your role or initials in decided_by on every row you decide, save, then run the same command again")
 
 
 # ---- the local stores -----------------------------------------------------------------------------------
@@ -594,7 +646,7 @@ def step_fuseki(ctx):
     from . import load_fuseki
     extra = ctx.hooks["extra_graphs"](ctx.release_root, ctx.run_dir) if ctx.hooks["extra_graphs"] else None
     try:
-        result = load_fuseki.run(ctx.local, ctx.release_root, extra_graphs=extra)
+        result = load_fuseki.run(ctx.local, ctx.release_root, extra_graphs=extra, tech_graph_files=tech_graph_files(ctx))
     except (load_fuseki.FusekiError, OSError) as err:
         raise StepFailed(str(err) if isinstance(err, load_fuseki.FusekiError) else f"Fuseki did not answer ({type(err).__name__})") from None
     if result["status"] == "mismatch":
@@ -602,13 +654,20 @@ def step_fuseki(ctx):
     return {**result, "line": load_fuseki.line(result).split(": ", 1)[1]}
 
 
+def neo4j_extras(ctx):
+    """The loads that follow the ontology in a Neo4j database: the technical graph when its file was fetched, then
+    any the hooks add."""
+    from . import load_neo4j
+    files = tech_graph_files(ctx)
+    return ((load_neo4j.tech_graph_loader(files, ctx.release_root),) if files else ()) + tuple(ctx.hooks["neo4j_extra_loads"])
+
+
 def step_neo4j(ctx):
     if ctx.dry_run:
         return {"status": "dry-run", "line": "would load the local Neo4j and run every check there"}
     from . import load_neo4j
     try:
-        result = load_neo4j.load(ctx.local, ctx.release_root, run_dir=ctx.run_dir / "neo4j",
-                                 extra_loads=ctx.hooks["neo4j_extra_loads"])
+        result = load_neo4j.load(ctx.local, ctx.release_root, run_dir=ctx.run_dir / "neo4j", extra_loads=neo4j_extras(ctx))
     except load_neo4j.LoadError as err:
         raise StepFailed(str(err)) from None
     except Exception as err:   # a driver error's text can carry an address
@@ -624,7 +683,7 @@ def step_enterprise(ctx):
     try:
         with (ctx.run_dir / "enterprise.log").open("a", encoding="utf-8", newline="\n") as log:
             result = copy_enterprise.copy(ctx.local, ctx.release_root, replace=ctx.replace_enterprise,
-                                          extra_loads=ctx.hooks["neo4j_extra_loads"], own_rules=rules, log=log)
+                                          extra_loads=neo4j_extras(ctx), own_rules=rules, log=log)
     except copy_enterprise.Refused as err:
         raise StepFailed(str(err)) from None
     except Exception as err:
@@ -637,7 +696,7 @@ def step_sync(ctx):
         return {"status": "dry-run", "line": "would read the four stores and judge each"}
     from . import sync_check
     extra = ctx.hooks["extra_graphs"](ctx.release_root, ctx.run_dir) if ctx.hooks["extra_graphs"] else {}
-    rows = sync_check.check(ctx.local, ctx.release_root, extra_graphs=tuple(extra or ()))
+    rows = sync_check.check(ctx.local, ctx.release_root, extra_graphs=tuple(extra or ()), tech_graph_files=tech_graph_files(ctx))
     for text in sync_check.lines(rows):
         ctx.out("  " + text)
     result = {"rows": [{"store": s, "status": status, "why": why} for s, status, why in rows]}
