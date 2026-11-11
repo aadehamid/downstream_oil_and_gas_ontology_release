@@ -9,7 +9,3 @@ README.md :: awaits the documents rewrite
 KNOWN-OPEN-ITEMS.md :: awaits the documents rewrite
 HOW-TO-UPDATE.md :: awaits the documents rewrite
 HOW-TO-UPDATE.html :: the page is rebuilt from the Markdown after its rewrite
-business_architecture/ontology/epm-walkthrough.html :: the walkthrough awaits the documents rewrite
-business_architecture/ontology/epm-ontology-guide.html :: the guide awaits the documents rewrite
-viewer/index.html :: the viewer awaits its rebuild for this release
-horoi_viewer/index.html :: the second viewer awaits its rebuild for this release

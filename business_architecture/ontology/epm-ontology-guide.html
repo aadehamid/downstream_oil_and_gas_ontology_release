@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>EPM ontology guide</title>
+<title>KPI Store ontology guide</title>
 <style>
 /* Style: framed-sheet (tasteskill app sheet, seed 1033140616), screen "report", the same as
    the stores runbook's (projection/ontology-stores-runbook.html) so the two read as one set. System fonts only: this file is
@@ -208,9 +208,9 @@ table td.n, table th.n { text-align: right; padding-right: 24px; white-space: no
 <body>
 <header class="bar">
   <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle cx="5" cy="6" r="3" fill="none" stroke="var(--accent)" stroke-width="1.6"/><circle cx="17" cy="6" r="3" fill="none" stroke="var(--accent)" stroke-width="1.6"/><circle cx="11" cy="17" r="3" fill="var(--accent)"/><path d="M7.4 7.8 9.6 14.3M14.6 7.8 12.4 14.3M8 6h6" stroke="var(--accent)" stroke-width="1.6"/></svg>
-  <span class="name">EPM</span><span class="scope">Ontology guide</span>
+  <span class="name">KPI Store</span><span class="scope">Ontology guide</span>
   <nav aria-label="Sections">
-    <a href="#purpose">Purpose</a><a href="#why-modules">Why modules</a><a href="#map">Module map</a><a href="#thread">The crack spread</a><a href="#modules">Each module</a><a href="#questions">Questions</a><a href="#logical-model">Logical models</a><a href="#stores">Stores</a><a href="#holds">What each holds</a><a href="#graphs">Graphs</a><a href="#sync">In sync</a><a href="#where">Where things live</a><a href="#standards">Standards</a><a href="#copy">Copy</a><a href="#tools">Tools</a><a href="#open">Open</a>
+    <a href="#purpose">Purpose</a><a href="#why-modules">Why modules</a><a href="#map">Module map</a><a href="#thread">The crack spread</a><a href="#modules">Each module</a><a href="#questions">Questions</a><a href="#logical-model">Logical models</a><a href="#stores">Stores</a><a href="#holds">What each holds</a><a href="#sync">In step</a><a href="#where">Where things live</a><a href="#standards">Standards</a><a href="#copy">Copy</a><a href="#tools">Tools</a><a href="#open">Open</a>
   </nav>
 </header>
 
@@ -237,9 +237,8 @@ table td.n, table th.n { text-align: right; padding-right: 24px; white-space: no
   <a href="#questions">The competency questions</a>
   <a href="#logical-model">Adding a logical model</a>
   <a href="#stores">How it reaches the stores</a>
-  <a href="#graphs">Git, the two graphs and the measures</a>
-  <a href="#every-copy">Keeping every copy in step</a>
-  <a href="#sync">The in-sync strategy</a>
+  <a href="#graphs">Projecting without loss</a>
+  <a href="#sync">Keeping every store in step</a>
   <a href="#where">Where everything lives</a>
   <a href="#standards">The standards and tools</a>
   <a href="#copy">Copy the ontology</a>
@@ -252,19 +251,19 @@ table td.n, table th.n { text-align: right; padding-right: 24px; white-space: no
 
 <div class="title-row">
   <div>
-    <h1>The EPM ontology</h1>
+    <h1>The KPI Store ontology</h1>
     <p class="sub">A guide to the ontology of Marathon Petroleum's downstream business: what it is for, why it is split into thirteen modules, what each module holds and how the modules connect. One pricing measure, the crack spread, runs through every section to show the modules working together.</p>
   </div>
   <a class="btn" href="#copy">Copy the ontology</a>
 </div>
 
-<p class="notice">This guide covers the finished ontology. For the story behind it, from the business processes and their gaps through the build to the demo, read the walkthrough: <code>business_architecture/ontology/epm-walkthrough.html</code>, or the same page published (private; ask the decision owner for access). For how the process definitions were decided, read <code>business_architecture/ontology/business-process-architecture-playbook.md</code>. For the method, read the <code>ontology</code> skill's guide and, for the projection, the <code>ontology-to-lpg</code> skill's playbook.</p>
+<p class="notice">This guide covers the finished ontology. For the story behind it, from the business processes and their gaps through the build to the loaded stores, read the walkthrough: <code>business_architecture/ontology/epm-walkthrough.html</code>. For how the process definitions were decided, read <code>business_architecture/ontology/business-process-architecture-playbook.md</code>. For the method, read the <code>ontology</code> skill's guide and, for the projection, the <code>ontology-to-lpg</code> skill's playbook.</p>
 
-<p class="notice">A snapshot: every figure is from the newest release of each module at commit <code>40b3082</code>, on the branch that releases kpi 1.3.0 (2026-10-28, the decision of 2026-10-28), which follows party 2.1.0 and integration 2.5.0 (the decision of 2026-10-25), organization 2.2.0 (the decision of 2026-10-18) and the releases of 2026-10-27 that bring in the subject matter expert's customer inputs of that day (the decision of 2026-10-27). <em>2026-11-02:</em> the module counts, triple totals, module map, module cards and newest-versions table also count technical-graph 1.0.0, the twelfth module, which the subject matter expert approved (the decision of 2026-11-02); the store figures are still those of the last load, of the eleven earlier modules. The module and triple counts on this page also count <code>logical-model</code> 1.0.0, added in this release, which the module map does not draw; the copy section's and the catalog's figures are those of this release's own <code>releases/</code> folder. Each new release changes them. For current figures, run <code>uv run --with rdflib python scripts/epm_facts.py modules</code>.</p>
+<p class="notice">A snapshot of KPI Store 1.1: every figure is from the newest release of each module in this release, with <code>technical-graph</code> 1.1.0, released on 2026-11-11. A test compares the module figures on this page with the release files. Each new release changes them. For current figures, run <code>uv run --with rdflib python scripts/epm_facts.py modules</code>.</p>
 
 <div class="stats">
   <div class="stat"><div class="k">Modules</div><div class="v">13</div><div class="d">each released and versioned on its own</div></div>
-  <div class="stat"><div class="k">Triples</div><div class="v">37,206</div><div class="d">in the thirteen newest releases together</div></div>
+  <div class="stat"><div class="k">Triples</div><div class="v">37,233</div><div class="d">in the thirteen newest releases together</div></div>
   <div class="stat"><div class="k">Processes</div><div class="v">463</div><div class="d">in <code>core</code>, with 640 evidenced relationships</div></div>
   <div class="stat"><div class="k">Measures</div><div class="v">41</div><div class="d">defined in <code>kpi</code>; values stay in the systems</div></div>
 </div>
@@ -317,7 +316,7 @@ table td.n, table th.n { text-align: right; padding-right: 24px; white-space: no
   <div>
     <p>Two rules keep the split sound. The module policy (the skill's <code>foundations.md</code>, policy 8) says modules depend one way, with no cycles, and use each other's terms by IRI, never by redefining them. A cycle would make a module impossible to release on its own.</p>
     <p>Some splits follow the business's own lines. Market Data is a domain separate from commercial pricing, so its benchmark recipes have their own module (the decision of 2026-10-05). The cross-module rules (what certifies, which source wins, what an agent may answer) sit in one <code>integration</code> package above the rest.</p>
-    <p>The split has a cost. A module's pin can lag: <code>data-product</code> 1.2.0 requires <code>core</code> 2.3.0 and <code>system</code> 1.2.0, though those modules are now at 2.4.0 and 1.5.0. That is why the closure rule, the whole-graph gate and each changelog's list of required versions exist.</p>
+    <p>The split has a cost. Each module pins the versions it requires, and a pin can lag behind a newer release of the module it names. That is why the closure rule, the whole-graph gate and each changelog's list of required versions exist. In this release every pin names the newest release.</p>
   </div>
 </div>
 
@@ -392,7 +391,7 @@ table td.n, table th.n { text-align: right; padding-right: 24px; white-space: no
   </g>
 </svg>
 </div>
-<figcaption>Teal marks <code>kpi</code>, where the crack-spread measure is defined; a teal outline marks the modules on the path to its value: market-data, data-product, system and core. A later module-dependency snapshot, including the logical-model module added by the shared release cut, is in Eraser: EPM ontology: modules and how they connect (2026-11-03). <code>logical-model</code> 1.0.0, added in this release, is not drawn; it requires party 2.1.0, system 1.5.0, data-product 1.2.0.</figcaption>
+<figcaption>Teal marks <code>kpi</code>, where the crack-spread measure is defined; a teal outline marks the modules on the path to its value: market-data, data-product, system and core. <code>logical-model</code> 1.0.0 is not drawn; it requires party 2.1.0, system 1.5.0 and data-product 1.2.0.</figcaption>
 <p class="swipe note">Swipe the diagram sideways to see all of it.</p>
 </figure>
 
@@ -448,8 +447,9 @@ table td.n, table th.n { text-align: right; padding-right: 24px; white-space: no
 </figure>
 
 <h3>The walk, as one query</h3>
-<p>This SPARQL query walks the measure's neighbourhood across seven modules: kpi, core, market-data, data-product, system, value-stream and organization. It runs over the thirteen newest releases loaded together, 37,206 triples since logical-model 1.0.0, in this release (37,176 since technical-graph 1.0.0, 2026-11-02; 36,951 since kpi 1.3.0 before it); the output below is what it returned on 2026-10-27, over 36,901 triples, after that day's releases. The releases of 2026-10-28 (organization 2.2.0, party 2.1.0, integration 2.5.0, kpi 1.3.0) and technical-graph 1.0.0 change no statement the query reads.</p>
-<pre><code>PREFIX skos: &lt;http://www.w3.org/2004/02/skos/core#&gt;
+<p>This SPARQL query walks the measure's neighbourhood across seven modules: kpi, core, market-data, data-product, system, value-stream and organization. It runs over the thirteen newest releases loaded together, 37,233 triples since technical-graph 1.1.0. This command saves it as <code>crack.rq</code>, in the release's top folder:</p>
+<pre data-snippet="bash run=release-copy status-only"><code>cat &gt; crack.rq &lt;&lt;'RQ'
+PREFIX skos: &lt;http://www.w3.org/2004/02/skos/core#&gt;
 PREFIX dcterms: &lt;http://purl.org/dc/terms/&gt;
 PREFIX kpi: &lt;https://w3id.org/mpc/ontology/modules/kpi/&gt;
 PREFIX mkt: &lt;https://w3id.org/mpc/ontology/modules/market-data/&gt;
@@ -480,10 +480,10 @@ SELECT ?hop ?label WHERE {
           ?a orgm:forProcess ?p ; orgm:assignedRole/skos:prefLabel ?role ; orgm:raciLevel/skos:prefLabel ?lvl .
           BIND("RACI on a process MPR supports (organization)" AS ?hop) BIND(CONCAT(?pl, ": ", ?lvl, " ", ?role) AS ?label) }
 }
-ORDER BY ?hop ?label</code></pre>
-<p><strong>This query is SPARQL, so it does not run in Neo4j or AuraDB.</strong> Run it on the Turtle releases with this script, which prints 37,206 triples and 14 rows in this release (37,176 before logical-model 1.0.0; 36,951 before technical-graph 1.0.0, 2026-11-02):</p>
-<pre><code># Save the query above as crack.rq and this as run_rq.py. From the repository root:
-# uv run --no-project --with rdflib python run_rq.py crack.rq
+ORDER BY ?hop ?label
+RQ</code></pre>
+<p><strong>This query is SPARQL, so it does not run in Neo4j.</strong> Run it on the Turtle releases with this script, which prints 37,233 triples and 14 rows:</p>
+<pre data-snippet="bash run=release-copy"><code>uv run -q --no-project --with rdflib python - crack.rq &lt;&lt;'EOF'
 import glob, os, re, sys
 from rdflib import Graph
 g, q = Graph(), open(sys.argv[1]).read()
@@ -494,9 +494,16 @@ for d in glob.glob("business_architecture/ontology/releases/*/"):
         g.parse(os.path.join(d, v, os.path.basename(d.rstrip("/")) + ".ttl"))
 print(len(g), "triples")
 for row in g.query(q):
-    print(row.hop, "|", row.label)</code></pre>
-<p>In Neo4j or AuraDB, this Cypher gives the same measure's kind, process, view, systems and product. It stops there, and leaves out the series, value-stream steps and RACI, which the SPARQL includes:</p>
-<pre><code>MATCH (m:kpi_MeasureDefinition {dcterms_identifier: 'KPI-0001'})
+    print(row.hop, "|", row.label)
+EOF</code></pre>
+<pre data-snippet="text expect"><code>37233 triples
+RACI on a process MPR supports (organization) | Receive actual data product prices: Accountable Continual Commercial Improvement Director
+...
+view reads system (system) | KittyHawk
+view reads system (system) | MIPS
+view reads system (system) | MPR</code></pre>
+<p>In Neo4j, this Cypher gives the same measure's kind, process, view, systems and product. It stops there, and leaves out the series, value-stream steps and RACI, which the SPARQL includes:</p>
+<pre data-snippet="cypher parse"><code>MATCH (m:kpi_MeasureDefinition {dcterms_identifier: 'KPI-0001'})
 OPTIONAL MATCH (m)-[:kpi_measureKind]-&gt;(k)
 OPTIONAL MATCH (m)-[:kpi_informsProcess]-&gt;(p)
 OPTIONAL MATCH (v)-[:dp_servesMeasure]-&gt;(m)
@@ -717,15 +724,15 @@ RETURN m.skos_prefLabel AS measure,
 </section>
 
 <section class="mod" id="m-technical-graph">
-<h3>technical-graph <span class="pill">1.0.0</span> <span class="pill">225 triples</span></h3>
+<h3>technical-graph <span class="pill">1.1.0</span> <span class="pill">252 triples</span></h3>
 <div class="two">
 <div>
-<p><strong>Holds</strong> the vocabulary of what was built on the data platform: 12 classes, such as host, source database, table, metric view, pipeline step, quality check and agent; the check-result code list (pass, fail, differs); and 22 properties. Definitions only: the technical graph's nodes, row counts, refresh times and check results stay in the technical graph, never in the ontology (the decision of 2026-11-02).</p>
-<p><strong>Why:</strong> the other modules say what was designed; this one names what was built, so a question such as "where does this number come from" or "is it built as designed" can be asked of the platform itself. It answers competency questions 45 to 50.</p>
+<p><strong>Holds</strong> the vocabulary of what was built on the data platform: 15 classes, such as host, source database, table, metric view, pipeline step, quality check, agent, and the job or pipeline that builds an object; the check-result code list (pass, fail, differs); and 24 properties. Release 1.1.0 added the builders and the link from an object to the one it replaces on an earlier platform. Definitions only: the technical graph's nodes, row counts, refresh times and check results stay in the technical graph, never in the ontology (the decision of 2026-11-02).</p>
+<p><strong>Why:</strong> the other modules say what was designed; this one names what was built, so a question such as "where does this number come from" or "is it built as designed" can be asked of the platform itself. It answers competency questions 45 to 50, and since 1.1.0 questions 56 and 57.</p>
 </div>
 <div class="card story">
 <p class="story-h">In the crack spread's story</p>
-<p>In a technical graph, the metric view <code>semantic_sem_commercial.mpr_mips_crack_spread_price_fact_metrics_vw</code> is a <code>tg:MetricView</code> that <code>tg:implements</code> <code>measure:crack-spreads</code> and is <code>tg:designedAs</code> the view data-product defines. The module's example graph, test data cut from the pricing demo and kept out of the package, holds that record.</p>
+<p>In a technical graph, the metric view <code>semantic_sem_commercial.mpr_mips_crack_spread_price_fact_metrics_vw</code> is a <code>tg:MetricView</code> that <code>tg:implements</code> <code>measure:crack-spreads</code> and is <code>tg:designedAs</code> the view data-product defines. The module's example graph, test data kept out of the package, holds that record. A live technical graph is built from the workspace's real objects by <code>kpi_store/tech_graph.py</code>.</p>
 </div>
 </div>
 <p class="note">Links: <code>tg:implements</code> to kpi's measures, <code>tg:standsFor</code> to system's systems, <code>tg:designedAs</code> and <code>tg:layer</code> to data-product's designs and layers. Requires data-product 1.2.0, kpi 1.3.0 and system 1.5.0.</p>
@@ -743,11 +750,15 @@ RETURN m.skos_prefLabel AS measure,
 </section>
 
 <h2 id="questions">The competency questions</h2>
-<p class="lead">These 55 questions are the ontology's acceptance test: if the model cannot answer one, the model is incomplete, and not the question. The decision owner locked the first 44 on 2026-09-18, before modelling, questions 45 to 50, the technical-graph module's, on 2026-11-02 (the decision of 2026-11-02), and questions 51 to 55, the logical-model module's, the same day (the decision of 2026-11-02). 54 are answerable today, questions 45 to 50 on the technical-graph module's example graph and 51 to 55 on the logical-model module's made-up example model, and one, question 17 (who owns each concept's meaning), is parked until the ontology is first shared with business consumers (the decision of 2026-10-23). <em>2026-11-02:</em> the follow-up release may be cut and shared with it still open, listed in <code>OPEN-ITEMS.md</code> (the decision of 2026-10-23, amendment).</p>
-<p>Each answerable question has queries in <code>regression/queries/</code>, and <code>scripts/check.sh</code> runs them on every push. To ask one yourself, run this from <code>business_architecture/ontology/regression</code>:</p>
-<pre><code># from business_architecture/ontology/regression
-uv run --with rdflib python ask.py                   # list the 80 queries, each named for its question
-uv run --with rdflib python ask.py q36-the-crack     # ask one</code></pre>
+<p class="lead">These 57 questions are the ontology's acceptance test: if the model cannot answer one, the model is incomplete, and not the question. The decision owner locked the first 44 on 2026-09-18, before modelling, and questions 45 to 55 on 2026-11-02. Questions 56 and 57 came with technical-graph 1.1.0 on 2026-11-11. 56 are answerable today: questions 45 to 50, 56 and 57 on the technical-graph module's example graph, and 51 to 55 on the logical-model module's made-up example model. One, question 17 (who owns each concept's meaning), is parked until the ontology is first shared with business consumers.</p>
+<p>Each answerable question has queries in <code>regression/queries/</code>, and <code>scripts/check.sh</code> runs them. To ask one yourself, run this from the release's top folder:</p>
+<pre data-snippet="bash run=release-copy"><code>(cd business_architecture/ontology/regression &amp;&amp; uv run -q --no-project --with rdflib python ask.py q36-the-crack)</code></pre>
+<pre data-snippet="text expect"><code>Q36 If an assistant asks for "the crack", which measure is official, and which nearby ones are not it?
+3 row(s)
+  Crack Spreads Pricing | Margin Capture
+  Crack Spreads Pricing | R&amp;M Margin Indicator
+  Crack Spreads Pricing | R&amp;M Margin per Barrel</code></pre>
+<p>With no query name, <code>ask.py</code> lists the 83 queries, each named for its question.</p>
 <h3>I. Process structure &amp; navigation</h3>
 <div class="tblwrap"><table class="stack"><thead><tr><th>Question</th><th>Asks</th><th>Status</th></tr></thead><tbody>
 <tr><td>1</td><td data-k="Asks">What are the child processes of X, and what is the full root-to-leaf path of process P?</td><td data-k="Status">Answerable</td></tr>
@@ -839,15 +850,28 @@ uv run --with rdflib python ask.py q36-the-crack     # ask one</code></pre>
 <tr><td>54</td><td data-k="Asks">Which attributes stand for a business term, and which have none?</td><td data-k="Status">Answerable, on the module's made-up example model</td></tr>
 <tr><td>55</td><td data-k="Asks">Which data product or platform table implements each entity, and which have none?</td><td data-k="Status">Answerable, on the module's made-up example model</td></tr>
 </tbody></table></div>
+<h3>XIII. The technical graph — what it replaces, and what builds it</h3>
+<div class="tblwrap"><table class="stack"><thead><tr><th>Question</th><th>Asks</th><th>Status</th></tr></thead><tbody>
+<tr><td>56</td><td data-k="Asks">Which data object on an earlier platform does this data object replace?</td><td data-k="Status">Answerable, on the module's example graph</td></tr>
+<tr><td>57</td><td data-k="Asks">Which job or pipeline builds this data object?</td><td data-k="Status">Answerable, on the module's example graph</td></tr>
+</tbody></table></div>
 <p class="note">The list comes from <code>competency-questions.md</code>, which holds the wording and sources, and each status from <code>regression/expected.csv</code>.</p>
 
-<h3>Three business questions, across both graphs</h3><p>The technical graph holds these links and facts. The first and third walks end on an ontology node for the meaning, and the second reads the checks on a technical node. These run on the local Neo4j or AuraDB, and each answer below was read from AuraDB on 2026-10-31. Row counts, dates and check results come from the graph's last load.</p><p><strong>Where does this number come from?</strong> The crack spread: Crack Spreads Pricing, then its metric view, then gold <code>mpr_mips_crack_spread_price_fact</code>, then source databases <code>price_assessment</code> and <code>price_reference</code>, which stand for MIPS and MPR.</p><pre><code>MATCH (v:Tech:MetricView {name: 'semantic_sem_commercial.mpr_mips_crack_spread_price_fact_metrics_vw'})-[:IMPLEMENTS]-&gt;(m:kpi_MeasureDefinition {dcterms_identifier: 'KPI-0001'})
-MATCH (v)-[:READS_FROM]-&gt;(g:Table {layer: 'gold'})
-OPTIONAL MATCH (g)-[:READS_FROM]-&gt;(:Table {layer: 'silver'})-[:READS_FROM]-&gt;(:Table {layer: 'replica'})-[:COPIES]-&gt;(db:SourceDatabase)
-OPTIONAL MATCH (db)-[:STANDS_FOR]-&gt;(sys:Resource)
-RETURN m.skos_prefLabel AS measure, g.name AS gold, collect(DISTINCT db.name) AS sources, collect(DISTINCT sys.skos_prefLabel) AS systems;</code></pre><p><strong>Can I trust it today?</strong> 569,976 rows, refreshed on 2026-10-29. <code>built-objects-hold-rows</code> and <code>rows-labelled</code> pass. <code>designed-vs-observed-lineage</code> says differs: the demo is simpler than the design.</p><pre><code>MATCH (c:QualityCheck)-[:CHECKS]-&gt;(g:Table {name: 'gold_commercial_core.mpr_mips_crack_spread_price_fact', layer: 'gold'})
-RETURN g.rows AS rows, g.lastRefresh AS refreshed, collect(c.name + ': ' + c.result) AS checks;</code></pre><p><strong>What is affected if this source changes?</strong> For <code>price_reference</code>, six measures: Additional Market Prices, Crack Spreads Pricing, Crude Market Pricing, Distillate Market Pricing, Gasoline Market Pricing and Price Comparison.</p><pre><code>MATCH (db:SourceDatabase {name: 'price_reference'})&lt;-[:COPIES]-(:Table {layer: 'replica'})&lt;-[:READS_FROM*1..3]-(:MetricView)-[:IMPLEMENTS]-&gt;(m)
-RETURN DISTINCT m.skos_prefLabel AS measure ORDER BY measure;</code></pre>
+<h3>Four questions across two graphs</h3>
+<p>Some questions need a second graph: the governance graph that the client keeps beside the KPI Store graph, as two members of one Neo4j composite database. A query cannot follow a relationship from one member to the other, so each question joins on values: a system code, or a table's qualified name. <code>kpi_store/questions/</code> holds four query templates:</p>
+<div class="tblwrap"><table class="stack"><thead><tr><th>Template</th><th>What it asks</th></tr></thead><tbody>
+<tr><td><code>q6</code></td><td data-k="What it asks">From a KPI to its source systems: the full chain, with the quality result where one is recorded</td></tr>
+<tr><td><code>q4</code></td><td data-k="What it asks">The impact of a late source system: the tables, data products and KPIs that depend on it, on both graphs</td></tr>
+<tr><td><code>q1</code></td><td data-k="What it asks">Migration progress by system and layer: how many of each system's tables have a Databricks counterpart</td></tr>
+<tr><td><code>q7</code></td><td data-k="What it asks">KPIs that rest on SOX-relevant or confidential systems</td></tr>
+</tbody></table></div>
+<p>The governance graph belongs to its owner, and its labels can change. So no template names a label, a property or a relationship type: it names roles. <code>discover</code> reads both graphs' schemas and proposes which name plays each role. A person corrects the proposal and confirms it once. Every later run checks the confirmed mapping against the live schemas before it asks anything. Every query runs in a read transaction.</p>
+<pre data-snippet="powershell skip reason=&quot;needs-client-server: reads the client's Neo4j composite database&quot;"><code>py -m kpi_store.questions.run discover --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
+py -m kpi_store.questions.run confirm  --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
+py -m kpi_store.questions.run check    --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
+py -m kpi_store.questions.run ask q6   --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt; --param kpi=crude-prices --out &lt;a folder&gt;</code></pre>
+<p>The settings file and the mapping file describe one environment, so both stay outside the release. <code>kpi_store/questions/connection.py</code> lists the settings.</p>
+
 <h2 id="logical-model">Adding a logical model</h2>
 <p class="lead">A logical data model joins the ontology as two views of one model. The modelling tool's export stays exactly as the tool wrote it, and a small layer of annotations links each of its entities to the modules that already hold the systems, the party concepts and the platform tables. This section is the pattern for every logical model added from now on. The made-up example in <code>logical-model/example/</code> shows it working, and the module's own <code>README.md</code> gives the detail.</p>
 
@@ -865,7 +889,7 @@ RETURN DISTINCT m.skos_prefLabel AS measure ORDER BY measure;</code></pre>
 <div class="card story">
 <p class="story-h">In the made-up example</p>
 <p>The example export holds three invented entities. Its links file asserts the links of two and marks the third doubtful. From those, the builder writes the layer. The account entity gets four links:</p>
-<pre><code>er:example_core_Example_Account_Dim
+<pre data-snippet="turtle skip reason=&quot;illustration: one entity's annotations, with the model's IRI shortened&quot;"><code>er:example_core_Example_Account_Dim
     lm:inModel        &lt;…/logical-model/model/example-logical-model&gt; ;
     lm:sourceSystem   system:profisee ;
     lm:describes      party:CustomerAccount ;
@@ -887,12 +911,15 @@ RETURN DISTINCT m.skos_prefLabel AS measure ORDER BY measure;</code></pre>
 <p>The layer's input is a CSV file kept beside the export, one row per entity, with the model, the entity's identifier, its source system, the concept it describes, what implements it, a status and the evidence. The build's agent drafts the rows from each entity's name and description. A link is <code>asserted</code> only when the name, the description or the tool's own metadata makes it clear; every other row is <code>doubtful</code>. Only asserted rows become triples. The builder prints each doubtful row with its evidence, and the list goes on the one page the decision owner approves the module's release from. A doubtful row becomes asserted, or loses a link, only on the decision owner's recorded answer, since nothing is decided without the decision owner's recorded decision. the decision of 2026-11-02, decision 8, sets the drafting and the list.</p>
 
 <h3>The questions it answers</h3>
-<p>Competency questions 51 to 55 belong to this module: which entities hold data about a party concept, which source system each entity comes from, which attributes identify a customer in each system, which attributes stand for a business term, and which data product or platform table implements each entity. In <code>main</code> they run on the made-up example, which <code>scripts/check.sh</code> rebuilds and verifies on every push. To ask one, run this from <code>business_architecture/ontology/regression</code>:</p>
-<pre><code># from business_architecture/ontology/regression
-uv run --with rdflib python ask.py q51-entities-about-party</code></pre>
+<p>Competency questions 51 to 55 belong to this module: which entities hold data about a party concept, which source system each entity comes from, which attributes identify a customer in each system, which attributes stand for a business term, and which data product or platform table implements each entity. They run on the made-up example, which <code>scripts/check.sh</code> rebuilds and verifies. To ask one, run this from the release's top folder:</p>
+<pre data-snippet="bash run=release-copy"><code>(cd business_architecture/ontology/regression &amp;&amp; uv run -q --no-project --with rdflib python ask.py q51-entities-about-party)</code></pre>
+<pre data-snippet="text expect"><code>Q51 Which logical entities hold data about a party concept: each annotated entity of a logical model, with the party concept or class it describes.
+2 row(s)
+  An example logical model | Example_Account_Dim | Example_Account_Dim | customer account
+  An example logical model | Example_Contact_Dim | Example_Contact_Dim | contact point</code></pre>
 
-<h3>A confidential export, read from outside the repository</h3>
-<p>A model's export and links file can sit in a folder that Git ignores, such as <code>release-cut/augment/logical-model/</code>, and the builder writes the model's two graphs beside them. The release build reads that folder and builds the package. The builder takes the export's location as an input, so the same build runs with the files inside the repository (the decision of 2026-11-02, decisions 2 and 6). <code>HOW-TO-UPDATE.md</code>, "Inputs from outside the repository", gives the two ways to work with such files.</p>
+<h3>An export kept outside the release</h3>
+<p>A model's export and links file can sit in a folder of your own, outside the release, and the builder writes the model's two graphs where the package build reads them. The builder takes the export's location as an input, so the same build runs with the files inside the release. <code>HOW-TO-UPDATE.md</code>, "Inputs from outside the repository", gives the two ways to work with such files.</p>
 
 <h3>Cleaning an export that passed through email or a word processor</h3>
 <p>The first export arrived inside an RTF document sent by email, and a mail filter had rewritten its namespace IRIs into tracking links (the decision of 2026-11-02, "Context"). A rewritten link still parses as an IRI, so a parse alone does not catch it. Before you use such an export:</p>
@@ -905,23 +932,22 @@ uv run --with rdflib python ask.py q51-entities-about-party</code></pre>
 </ol>
 
 <h3>Approval and release</h3>
-<p>The module's first release, <code>logical-model 1.0.0</code>, needed the subject matter expert's approval, given from one page that also listed every doubtful link. the subject matter expert approved it on 2026-11-02 (the decision of 2026-11-02, amendment), and the cut refuses <code>--augment</code> unless it names that recorded approval. A later model joins the same module as another named model, not a new module, and ships as a minor release. A re-export that drops or renames an entity removes an IRI that consumers may rely on, so it gets the meaning-change test before release and may be a major.</p>
+<p>The module's first release, <code>logical-model 1.0.0</code>, needed the subject matter expert's approval, given from one page that also listed every doubtful link. The owner approved it on 2026-11-02. A later model joins the same module as another named model, not a new module, and ships as a minor release. A re-export that drops or renames an entity removes an IRI that consumers may rely on, so it gets the meaning-change test before release and may be a major.</p>
 <p class="note">The method is the <code>ontology</code> skill's <code>references/logical-model.md</code>, in 14 rules. The decision is the decision of 2026-11-02. The walkthrough's "Add a logical model" gives the commands, step by step.</p>
 
 <h2 id="stores">How it reaches the stores</h2>
 <div class="two">
 <div>
-<p>The releases are the master copy, as Turtle: thirteen modules since logical-model 1.0.0, in this release (twelve since technical-graph 1.0.0, 2026-11-02), and the stores hold the eleven earlier ones until the next load. From them, one loader, the <code>ontology-to-lpg</code> skill's driver, builds a Neo4j property graph in the local Neo4j and copies it to AuraDB. It writes all three graphs of each package to Jena and to the Databricks table <code>workspace.epm_ontology.epm_triples</code>, and it rebuilds the graph from that table to prove it holds the whole ontology. In CI, <code>pipeline.py build --verify</code> checks the same inputs with no database.</p>
-<p class="notice"><em>2026-10-28:</em> the four ontology stores were reloaded, as the first step of Part 2, from that day's releases with <code>kpi</code> 1.3.0; every count and hash check passed (the runbook's Stores section gives the figures). <em>2026-10-27:</em> the four ontology stores are empty. With the subject matter expert's approval, "Yes, purge those four (Recommended)", both local Neo4j stores, AuraDB and the Databricks table were purged that day. The decision owner then chose "Wait, reload at Part 2 (Recommended)": the stores stay empty, and the reload is the first step of Part 2, after the close-out answers ship, with the counts and hash checks (<code>(the review comments of a subject matter expert reviewing the documents)</code>). The runbook's Reload section gives the commands. <em>2026-11-01:</em> the standard is now one local Neo4j plus a standing Jena, which the next reload applies.</p>
-<p><em>2026-10-29:</em> each of the four ontology stores now records the release set it was loaded from: the catalog's datasets and the projection's input fingerprint, written only after the store is checked against the repository. <code>projection/sync_stores.py</code> reports which stores are behind main's newest catalog and reloads them with the driver, AuraDB and Databricks only when asked. A workflow on each release tag runs the driver for AuraDB and Databricks once the decision owner adds its logins as repository secrets; until then it does nothing. The runbook's "Keeping the stores in step" gives the commands.</p>
-<p>The next step was to link the metric views in Unity Catalog to the ontology's measures by KPI identifier, so that an agent working in Databricks can reach a measure's full context. <em>2026-10-29:</em> built in the pricing demo's E3. Each metric-view measure that implements a <code>kpi</code> measure carries its KPI or OPM identifier in its comment, display name and synonyms; the others, such as row counts, say in their comment that they have none. Each view has a tag listing its identifiers. Definitions views in the schema <code>ontology_definitions</code> read, from <code>epm_triples</code>, the definition, grain and basis of each measure that has an identifier. The Genie agents that read those views come in a later change. <em>2026-10-29, later:</em> they landed in E4. Each of the four Genie agents binds its subject area's definitions view, and an orchestrator routes questions between them with descriptions built from <code>epm_triples</code>. Free Edition refused the Agent Bricks Supervisor Agent, so the orchestrator is Databricks' documented multi-agent pattern, run from the laptop. <em>2026-10-29, later still:</em> E6 adds real outside events from Parallel's Decisions API beside the demo's synthetic data: a monthly scan of each MPC refining region, a diagnosis of each decision in the decision log, and a three-month forward look. Each answer links by IRI to <code>ref-mpc</code> refineries and a <code>market-data</code> crack series; scan answers also to <code>party</code> products and <code>kpi</code> measures, and forward answers to the products and measures their question names. Each is labelled observed, inferred or unknown. A forward signal is matched to past decisions through those refineries and measures, and any suggested action waits for a person. The demo's README, "The outside context (E6)", gives the run and its limits. <em>2026-10-29, E7:</em> each of the demo's 21 use cases now has an acceptance test. It passes when the orchestrator calls the agents the use case names, the answer holds the figures a SQL check computes, and the answer uses the ontology's identifiers, definitions or labels. On the first two live runs 3 and then 4 passed as first judged; judged again after review, with stricter checks and each test requiring exactly the agents its use case names, 2 passed on each. Most failures missed an agent, and the agents seldom read their definitions views, so the ontology's terms mostly did not reach the answers. The demo's README, "The acceptance tests (E7)", gives each result.</p>
+<p>The releases are the master copy, as Turtle: thirteen modules. The release loads them into three stores, in this order. A notebook loads the Databricks table <code>epm_triples</code>, with no token, and proves by a hash that the table holds every triple. The plain Apache jar serves a Jena Fuseki dataset that holds the same graphs. The <code>ontology-to-lpg</code> skill's driver builds a property graph in a local Neo4j that has n10s and APOC, and the checked graph is then copied to a named database on Neo4j Enterprise, which needs no plugin. <code>pipeline.py build --verify</code> checks the same inputs with no database.</p>
+<p>Before the Databricks load, the notebook compares the ontology with the workspace. If an object, a column or a table edge that the ontology names is missing or renamed, the load stops and writes a report. A person clears the report, <code>py -m kpi_store.cut</code> turns it into a correction version, and the next run loads that version.</p>
+<p>A technical graph, built from the workspace's real objects, is loaded into all three stores beside the ontology. <code>py -m kpi_store.sync_check</code> then says whether each store is current or behind.</p>
 </div>
 <div class="card">
 <h3>Where to read more</h3>
 <ul>
-<li><a href="projection/ontology-stores-runbook.html">Stores runbook</a>: every store, and how to check, stop, start, purge, reload and keep it in step. <code>projection/the stores runbook is its short index.</li>
-<li>EPM ontology, projections and the pricing demo (2026-11-03), the architecture diagram in Eraser.</li>
-<li>EPM ontology and the pricing demo: data flow (2026-11-03), in Eraser: the ontology, the stores and the demo end to end, with Parallel Decisions and SPARQL Anything. Both snapshots predate the completed viewer release; their viewer labels describe work pending on that date.</li>
+<li><a href="projection/ontology-stores-runbook.html">Stores runbook</a>: the first run, from the zip to three loaded and checked stores.</li>
+<li><code>projection/README.md</code>: what each store holds, and the projection's committed figures.</li>
+<li>The walkthrough, "Load the three stores": what each part of the load does.</li>
 <li><code>MODULES.md</code>: each link between modules, with a triple quoted from the releases.</li>
 <li><code>business-closeout.md</code>: the points only the business can settle.</li>
 </ul>
@@ -929,10 +955,10 @@ uv run --with rdflib python ask.py q51-entities-about-party</code></pre>
 </div>
 
 <h2 id="holds">What each store holds</h2>
-<p class="lead">Each module package has three Turtle files. <code>&lt;module&gt;.ttl</code> is the content. <code>shapes.ttl</code> is the rules. <code>catalog.ttl</code> is the DCAT release record: the dataset, its version, its issue date and its distributions.</p>
-<p>The table gives each module's purpose and the source files its <code>&lt;module&gt;.ttl</code> is built from, relative to <code>business_architecture/ontology/</code>.</p>
-<div class="tblwrap"><table class="stack"><thead><tr><th>Module</th><th>Purpose</th><th>Built from</th></tr></thead><tbody>
-<tr><td><code>core</code></td><td data-k="Purpose">the process map</td><td data-k="Built from"><code>business_architecture/business_process/downstream_process_map.json</code> at a pinned commit, and core's previous release, through <code>release/build_core*.py</code></td></tr>
+  <p class="lead">Each module package has three Turtle files. <code>&lt;module&gt;.ttl</code> is the content. <code>shapes.ttl</code> is the rules. <code>catalog.ttl</code> is the DCAT release record: the dataset, its version, its issue date and its distributions.</p>
+  <p>The table gives each module's purpose and the source files its <code>&lt;module&gt;.ttl</code> is built from, relative to <code>business_architecture/ontology/</code>.</p>
+  <div class="tblwrap"><table class="stack"><thead><tr><th>Module</th><th>Purpose</th><th>Built from</th></tr></thead><tbody>
+<tr><td><code>core</code></td><td data-k="Purpose">the process map</td><td data-k="Built from"><code>business_architecture/business_process/downstream_process_map.json</code> and core's previous release, through <code>release/build_core_2_4.py</code></td></tr>
 <tr><td><code>organization</code></td><td data-k="Purpose">who does what</td><td data-k="Built from"><code>organization/vocabulary.ttl</code>, <code>roles.ttl</code>, <code>assignments.ttl</code></td></tr>
 <tr><td><code>ref-mpc</code></td><td data-k="Purpose">the company facts</td><td data-k="Built from"><code>ref-mpc/ref-mpc.ttl</code>, <code>reference-parties.ttl</code>, <code>reference-brands.ttl</code></td></tr>
 <tr><td><code>party</code></td><td data-k="Purpose">the customer domain</td><td data-k="Built from"><code>party/vocabulary.ttl</code>, <code>code-lists.ttl</code>, <code>systems.ttl</code>, <code>lifecycle.ttl</code></td></tr>
@@ -943,256 +969,156 @@ uv run --with rdflib python ask.py q51-entities-about-party</code></pre>
 <tr><td><code>system</code></td><td data-k="Purpose">what each process uses</td><td data-k="Built from"><code>system/vocabulary.ttl</code>, <code>systems.ttl</code></td></tr>
 <tr><td><code>lane</code></td><td data-k="Purpose">where a trading process sits</td><td data-k="Built from"><code>lane/vocabulary.ttl</code>, <code>lanes.ttl</code></td></tr>
 <tr><td><code>integration</code></td><td data-k="Purpose">rules that apply across modules</td><td data-k="Built from"><code>placement/vocabulary.ttl</code>, <code>authority/vocabulary.ttl</code>, <code>authority/source-tiers.ttl</code>, <code>consumer/vocabulary.ttl</code></td></tr>
+<tr><td><code>technical-graph</code></td><td data-k="Purpose">what was built on the data platform</td><td data-k="Built from"><code>technical-graph/vocabulary.ttl</code></td></tr>
+<tr><td><code>logical-model</code></td><td data-k="Purpose">logical data models and their links to the ontology</td><td data-k="Built from"><code>logical-model/vocabulary.ttl</code>; each model's two graphs ship beside it as they are</td></tr>
 </tbody></table></div>
-<h3>The stores and the three files</h3>
-<div class="tblwrap"><table class="stack"><thead><tr><th>Store</th><th>Content, <code>&lt;module&gt;.ttl</code></th><th>Rules, <code>shapes.ttl</code></th><th>Release record, <code>catalog.ttl</code></th></tr></thead><tbody>
-<tr><td>Jena and Databricks <code>epm_triples</code></td><td data-k="Content">All, one named graph</td><td data-k="Rules">All, one named graph</td><td data-k="Release record">All, one named graph</td></tr>
-<tr><td>Local Neo4j and AuraDB</td><td data-k="Content">All, with no selective projection</td><td data-k="Rules">Not nodes. They validate the release: pySHACL before the load, n10s in the graph at the load</td><td data-k="Release record">Not in full: one <code>ModuleRelease</code> node per module</td></tr>
+  <h3>The stores and the three files</h3>
+  <div class="tblwrap"><table class="stack"><thead><tr><th>Store</th><th>Content, <code>&lt;module&gt;.ttl</code></th><th>Rules, <code>shapes.ttl</code></th><th>Release record, <code>catalog.ttl</code></th></tr></thead><tbody>
+<tr><td>Jena, one Fuseki dataset</td><td data-k="Content">All, one named graph</td><td data-k="Rules">All, one named graph</td><td data-k="Release record">All, one named graph</td></tr>
+<tr><td>Databricks, the Delta table <code>epm_triples</code></td><td data-k="Content">All, one named graph</td><td data-k="Rules">All, one named graph</td><td data-k="Release record">All, one named graph</td></tr>
+<tr><td>Neo4j, the local database and its copy in a named database</td><td data-k="Content">All, with no selective projection</td><td data-k="Rules">Not nodes. They validate the release: pySHACL before the load, n10s in the graph at the load</td><td data-k="Release record">Not in full: one <code>ModuleRelease</code> node per module</td></tr>
 </tbody></table></div>
-<p>Neo4j holds all the content so that the round trip keeps proving 0 lost and 0 added. A selective projection would lose that proof.</p>
-<p>A package may also carry graphs of its own beside the three files. Only the <code>logical-model</code> module does (the decision of 2026-11-02, amendment "the stores"). When the newest releases hold the module, as a share release's do, <code>projection/logical_models.py load</code> puts each model's ER Studio export and annotation layer into Jena and <code>epm_triples</code> as named graphs of their own, <code>&lt;version IRI&gt;/&lt;slug&gt;.erstudio</code> and <code>&lt;version IRI&gt;/&lt;slug&gt;.layer</code>, and each model in full into the local Neo4j and AuraDB as a subgraph labelled <code>LogicalModel</code>, never <code>Resource</code>: its entities with their names and descriptions, their attributes and keys, the relationships between them, and an edge from each entity to each ontology node its layer names. The projection loads the module's vocabulary like every package's.</p>
-<p>A <code>ModuleRelease</code> node holds <code>module</code>, <code>version</code>, <code>version_iri</code>, <code>ontology</code>, <code>download_url</code>, <code>conforms</code>, <code>in_graph_constraints</code>, <code>violations</code>, <code>shapes_sha256</code>, <code>projection_version</code> and <code>loaded_at</code>. <code>conforms</code>, <code>in_graph_constraints</code> and <code>violations</code> describe the whole load, because the shapes run over every module together. A <code>DESCRIBES</code> relationship links the node to its module's <code>owl_Ontology</code> node. The node has no <code>Resource</code> label, so the hash, the counts, the module tags and the round trip do not read it, and no field enters a hash. To read the records:</p>
-<pre><code>MATCH (r:ModuleRelease)-[:DESCRIBES]-&gt;(o) RETURN r.module, r.version, r.conforms, r.violations, r.loaded_at, o.uri ORDER BY r.module</code></pre>
-<p>Two labels on a class do not mean two nodes. A class is one node with <code>owl_Class</code>, from its own triple, and <code>n4sch_Class</code>, from n10s's ontology import. 46 classes carry both. Count classes with one of them.</p>
-<h3>One local Neo4j plus Jena</h3>
-<p>The standard is one local Neo4j plus a standing Jena (the decision of 2026-11-01). AuraDB copies the local Neo4j's form, and its graph hash must equal the local graph's. One run of the <code>ontology-to-lpg</code> skill's driver loads them all. Jena's dataset is in memory, so a restart empties it; <code>sync_stores.py check</code> then reads <code>empty</code>, and <code>sync_stores.py sync</code> reloads it with the driver's <code>jena</code> step alone.</p>
+  <p>Neo4j holds all the content so that the round trip keeps proving 0 lost and 0 added. A selective projection would lose that proof.</p>
+  <p>A package may also carry graphs of its own beside the three files, which its <code>manifest.json</code> lists. Only the <code>logical-model</code> module does. <code>projection/logical_models.py load</code> puts each model's ER Studio export and annotation layer into Jena as named graphs of their own, <code>&lt;version IRI&gt;/&lt;slug&gt;.erstudio</code> and <code>&lt;version IRI&gt;/&lt;slug&gt;.layer</code>, and each model in full into the Neo4j database as a subgraph labelled <code>LogicalModel</code>, never <code>Resource</code>, with a <code>LogicalModelMarker</code>. The same named graphs go into <code>epm_triples</code> with the load that writes the table. So a current Jena dataset or triple table holds 41 named graphs: three for each of the 13 packages, and the customer logical model's two.</p>
+  <p>A <code>ModuleRelease</code> node holds <code>module</code>, <code>version</code>, <code>version_iri</code>, <code>ontology</code>, <code>download_url</code>, <code>conforms</code>, <code>in_graph_constraints</code>, <code>violations</code>, <code>shapes_sha256</code>, <code>projection_version</code> and <code>loaded_at</code>. <code>conforms</code>, <code>in_graph_constraints</code> and <code>violations</code> describe the whole load, because the shapes run over every module together. A <code>DESCRIBES</code> relationship links the node to its module's <code>owl_Ontology</code> node. The node has no <code>Resource</code> label, so the hash, the counts, the module tags and the round trip do not read it, and no field enters a hash. To read the records:</p>
+<pre data-snippet="cypher parse"><code>MATCH (r:ModuleRelease)-[:DESCRIBES]-&gt;(o) RETURN r.module, r.version, r.conforms, r.violations, r.loaded_at, o.uri ORDER BY r.module</code></pre>
+  <p>Two labels on a class do not mean two nodes. A class is one node with <code>owl_Class</code>, from its own triple, and <code>n4sch_Class</code>, from n10s's ontology import. 46 classes carry both. Count classes with one of them.</p>
+  <h3>One form, one local database</h3>
+  <p>The local Neo4j is loaded and checked first, because the load and its checks in the graph need n10s and APOC. The copy then takes the checked graph over the driver to a server that needs no plugin, and its graph hash must equal the local one. Every node and relationship carries a <code>graph</code> property that gives its release's version IRI (<code>projection/README.md</code>, "What each store holds").</p>
 
-<h2 id="graphs">Git, the two graphs and the measures</h2>
-<p class="lead">Git holds the truth, and each store's copy of the ontology can be rebuilt from it. Checks prove those copies lost none of the ontology, and measure identifiers tie the business meaning to the tables that compute it. The walkthrough (<code>epm-walkthrough.html</code>) tells this story with the steps to rebuild it, the stores runbook gives the running commands, and the <code>ontology-to-lpg</code> skill's playbook gives the method.</p>
+<h2 id="graphs">Projecting without loss</h2>
 
-<h3>The source of truth is Git</h3>
-<p>The master copy is the versioned Turtle in <code>business_architecture/ontology/releases/</code>. A change reaches it only through a change and a release. Neo4j, AuraDB and <code>epm_triples</code> are projections. The decision owner: "The pattern is the sourse of truth is the ontology serialized in turtle. This is then projected to consuming application. In this case Neo4J, AuraDB, and databricsk and those must be kept in sync with the source, which we plan to save in git." (the decision of 2026-10-28, decision 3; <code>(the review comments of a subject matter expert reviewing the documents)</code>).</p>
+  <p>Each check below must pass, or the load reports failure. The method is the <code>ontology-to-lpg</code> skill's (<code>references/multi-store.md</code>). The results are those of the last recorded load (<code>projection/README.md</code>, "The committed figures").</p>
+  <div class="tblwrap"><table class="stack">
+    <thead><tr><th>Check</th><th>What it proves</th><th>Last recorded result</th></tr></thead>
+    <tbody>
+      <tr><td>Rules and shapes, before the load</td><td>Data the projection cannot map, or that the shapes reject, stops the build</td><td><code>pipeline.py build</code> passes</td></tr>
+      <tr><td>Round trip: export the graph as RDF and compare it with the input</td><td>Nothing lost, nothing added</td><td>0 lost, 0 added</td></tr>
+      <tr><td>Two loads, one sorted and one shuffled</td><td>The load does not depend on order</td><td>The same graph hash</td></tr>
+      <tr><td>SHACL inside the graph, with a broken copy as a test</td><td>The shapes hold in Neo4j, and the check can fail</td><td>806 constraints, 0 violations; the broken copy is caught</td></tr>
+      <tr><td>Copy to the named database</td><td>The copy equals the local graph</td><td>The copy's graph hash must equal the local one</td></tr>
+      <tr><td>Hash of <code>epm_triples</code></td><td>The Delta table holds every release triple</td><td>The load compares the table's RDFC-1.0 hash with the release files' before it writes the marker</td></tr>
+    </tbody>
+  </table></div>
+  <p>Two things to read correctly. Neo4j does no OWL reasoning, so the axioms stay in the Turtle, and a reasoner's inferences load as data (2 today). And of the 22,312 relationships, 21,883 come from the releases' triples, 427 are schema relationships from n10s's ontology import, and 2 come from the inferences.</p>
 
-<h3>Projecting without loss</h3>
-<div class="tblwrap"><table class="stack"><thead><tr><th>Check</th><th>What it proves</th><th>Last result</th></tr></thead><tbody>
-<tr><td>Rules and shapes, before the load</td><td data-k="Proves">Data the projection cannot map, or that the shapes reject, stops the build</td><td data-k="Result"><code>pipeline.py build</code> passes</td></tr>
-<tr><td>Round trip: export the graph as RDF and compare it with the input</td><td data-k="Proves">Nothing lost, nothing added</td><td data-k="Result">0 lost, 0 added, over 36,951 triples</td></tr>
-<tr><td>Two loads, one sorted and one shuffled</td><td data-k="Proves">The load does not depend on order</td><td data-k="Result">The same graph hash</td></tr>
-<tr><td>SHACL inside the graph, with a broken copy as a test</td><td data-k="Proves">The shapes hold in Neo4j, and the check can fail</td><td data-k="Result">762 constraints, 0 violations; the broken copy is caught</td></tr>
-<tr><td>Copy to AuraDB</td><td data-k="Proves">The cloud copy equals the local graph</td><td data-k="Result">The same graph hash; 4,193 nodes, 22,142 relationships</td></tr>
-<tr><td>Hash of <code>epm_triples</code></td><td data-k="Proves">The Delta table holds every release triple</td><td data-k="Result">40,169 quads in 33 graphs, the same RDFC-1.0 hash as the releases</td></tr>
-<tr><td>Rebuild Neo4j from <code>epm_triples</code></td><td data-k="Proves">The table alone can restore the graph</td><td data-k="Result">The same counts as the first load</td></tr>
-<tr><td>Saved walks in Neo4j and in Apache Jena</td><td data-k="Proves">A property graph and a triple store answer alike</td><td data-k="Result">All 14 walks equal</td></tr>
+<h2 id="sync">Keeping every store in step</h2>
+  <p class="lead">The release's files hold the truth, and each store is a copy of them. The goal is that no store can fall behind without someone seeing it. Each store shows whether it is current, and a reload repairs it. Nothing runs the check by itself: a person runs it at the end of each load.</p>
+  <h3>The principles</h3>
+  <div class="tblwrap"><table class="stack"><thead><tr><th>Principle</th><th>What it means</th></tr></thead><tbody>
+<tr><td>The release's files are the only place a change starts.</td><td data-k="What it means">Nobody edits a store to fix the ontology. A change is a new version of a module, as "How to change the ontology" says.</td></tr>
+<tr><td>Data flows one way.</td><td data-k="What it means">From the files to the stores, never back.</td></tr>
+<tr><td>Every store can be thrown away.</td><td data-k="What it means">Each can be emptied and loaded again from the files, so the repair for any drift is a reload.</td></tr>
+<tr><td>A store proves itself before it is marked.</td><td data-k="What it means"><code>sync_stores.py mark</code> checks the Neo4j database against the release first and writes nothing when it does not match. The Databricks load writes its marker only after the table's hash equals the release files'.</td></tr>
+<tr><td>Drift must be visible.</td><td data-k="What it means">A check that nobody runs protects nothing, so each load ends with the sync check, and a load is done only when every store reads current.</td></tr>
 </tbody></table></div>
-<p class="note">Results: <code>projection/projection-report.json</code>, which <code>scripts/epm_facts.py projection</code> prints, and the stores runbook's "Stores" table. Neo4j does no OWL reasoning, so the axioms stay in the Turtle. Of the 22,142 relationships, 21,767 come from the releases' triples, 373 are schema relationships from n10s's ontology import, and 2 come from the reasoner's inferences.</p>
-
-<h3>The technical graph</h3>
-<p>The ontology does not model the demo's pipeline, so a technical graph does, beside it (the decision of 2026-10-28, decision 6). <code>demos/downstream-pricing-databricks-free/pricing_demo/tech_graph.py</code> reads the demo's databases and Databricks for live facts, then runs SPARQL Anything queries over the SQL files, the run commands, those facts and the ontology's CSV tables. That writes <code>graph/tech-graph.ttl</code> and <code>graph/decision-trail.ttl</code>, which load into Neo4j and AuraDB as 142 nodes labelled <code>Tech</code>, and copy to Delta.</p>
-
-<h3>How the two graphs link</h3>
-<p>They share IRIs, and the link runs one way. A technical node never has the label <code>Resource</code>, and every edge starts at a technical node, so the ontology's counts, hash and round trip cannot see it. Of the graph's 540 edges, 133 reach an ontology node.</p>
-<div class="tblwrap"><table class="stack"><thead><tr><th>Technical node</th><th>Link</th><th>Ontology module</th><th>Comes from</th></tr></thead><tbody>
-<tr><td>Metric view</td><td data-k="Link"><code>IMPLEMENTS</code></td><td data-k="Module"><code>kpi</code> measure</td><td data-k="From">The view's tag as deployed, joined in <code>measure-identifiers.csv</code></td></tr>
-<tr><td>Table, Genie agent</td><td data-k="Link">Link to the design</td><td data-k="Module"><code>data-product</code> table or product</td><td data-k="From">24 tables and 2 agents</td></tr>
-<tr><td>Source database</td><td data-k="Link">Link to the system</td><td data-k="Module"><code>system</code> entry</td><td data-k="From">MIPS, MPR, KittyHawk, RightAngle</td></tr>
-<tr><td>Decision</td><td data-k="Link">Owner, refinery, measure</td><td data-k="Module"><code>organization</code>, <code>ref-mpc</code>, <code>kpi</code></td><td data-k="From">Decision trail, as PROV-O</td></tr>
+  <h3>What each store's check reads</h3>
+  <div class="tblwrap"><table class="stack"><thead><tr><th>Copy</th><th>How the store says what it holds</th><th>What the check compares</th></tr></thead><tbody>
+<tr><td>The ontology in Databricks</td><td data-k="How it says">A row of <code>epm_store_markers</code>, beside <code>epm_triples</code>: the catalog's datasets, a digest of their IRIs and the projection's input fingerprint</td><td data-k="What the check compares">The marker with what this release's files give. The load compared the table's hash before it wrote the marker</td></tr>
+<tr><td>The ontology in Jena</td><td data-k="How it says">No marker. Its named graphs are version IRIs</td><td data-k="What the check compares">The graph names and each graph's triple count with the newest release files</td></tr>
+<tr><td>The ontology in Neo4j</td><td data-k="How it says">A node labelled <code>EpmStoreMarker</code>, never <code>Resource</code></td><td data-k="What the check compares">The marker with what this release's files give</td></tr>
+<tr><td>The logical models in Neo4j</td><td data-k="How it says">A <code>LogicalModelMarker</code> node, a digest of the model graph files</td><td data-k="What the check compares">The marker and a fingerprint of the <code>LogicalModel</code> subgraph with the package's graphs, on an <code>lm:neo4j</code> line</td></tr>
+<tr><td>The technical graph, in each store</td><td data-k="How it says">Its own marker in Databricks and in Neo4j. None in Jena</td><td data-k="What the check compares">A hash of the store's copy with the graph files of the last build</td></tr>
 </tbody></table></div>
-
-<h3>The Databricks measures, tied to both graphs</h3>
-<p>The KPI or OPM identifier is the join key, such as <code>KPI-0001</code> for Crack Spreads Pricing.</p>
-<div class="tblwrap"><table class="stack"><thead><tr><th>Where</th><th>How</th><th>What guards it</th></tr></thead><tbody>
-<tr><td>In Databricks</td><td data-k="How">Each metric-view measure carries its KPI or OPM identifier in its comment, display name and synonyms. Each view has an <code>epm_measure_identifiers</code> tag listing them.</td><td data-k="Guard">A demo test compares them with <code>kpi/measure-identifiers.csv</code>; a live check reads the tags</td></tr>
-<tr><td>To the projected ontology</td><td data-k="How">Definitions views in <code>ontology_definitions</code> read <code>epm_triples</code> directly: identifier, label, definition, grain, basis and the measures not to confuse it with. Each Genie agent binds its subject's view.</td><td data-k="Guard">The definition has one home; Databricks holds no second copy</td></tr>
-<tr><td>To the technical graph</td><td data-k="How"><code>tech_graph build</code> joins each deployed tag to the measure's IRI, which gives the view its <code>IMPLEMENTS</code> edge to the <code>:Resource</code> node. <code>tech_graph sync</code> copies the graph to <code>tech_graph_nodes</code> and <code>tech_graph_edges</code>.</td><td data-k="Guard"><code>tech_graph load</code> stops if an edge finds no ontology node</td></tr>
+  <p><code>sync_stores.py</code>, in <code>business_architecture/ontology/projection/</code>, judges the Neo4j database and the Jena dataset. It does not connect to Databricks: the load that writes the triple table also writes its marker. <code>py -m kpi_store.sync_check</code> reads all three stores and reports each as current or behind.</p>
+  <h3>What to do, and when</h3>
+  <div class="tblwrap"><table class="stack"><thead><tr><th>When</th><th>Do this</th></tr></thead><tbody>
+<tr><td>You loaded a store</td><td data-k="Do this">Run the sync check. The load is done only when every store reads current</td></tr>
+<tr><td>You cut a correction or released a module</td><td data-k="Do this">Load all three stores again, then run the sync check. Until then it reads behind</td></tr>
+<tr><td>Before you rely on a store</td><td data-k="Do this">Run the sync check</td></tr>
+<tr><td>The check says a store differs</td><td data-k="Do this">Load that store again. Do not fix a store by hand</td></tr>
+<tr><td>Fuseki restarted with a dataset kept in memory</td><td data-k="Do this">Load it again: such a dataset is empty after a restart</td></tr>
 </tbody></table></div>
-<p class="note">No Genie agent binds the <code>tech_graph</code> tables yet, and the agents seldom read their definitions views.</p>
+  <h3>What the check does not catch</h3>
+  <ul>
+    <li>Nothing runs it on a schedule. A new version leaves the stores behind until someone loads them.</li>
+    <li>For the ontology in Neo4j and Jena, the check compares markers, graph names and counts. A hand edit that keeps every count would read as current. The load's own checks, which compare hashes, catch it at the next load.</li>
+    <li>A change in the workspace after the last discovery reading. The comparison at the next load finds it.</li>
+  </ul>
 
-<h2 id="every-copy">Keeping every copy in step with Git</h2>
-<p class="lead">Git holds the released Turtle, and every store holds a copy of it. Three kinds of copy can fall behind Git, and each has its own check: the ontology's triples in the stores, the graphs loaded beside them from other files, and the files a release reads from outside Git. This section says which check covers which kind. "The in-sync strategy", next, holds the cases, the guards and the plan.</p>
-<h3>The ontology's triples in the four stores</h3>
-<p>The local Neo4j, AuraDB, Jena and the Delta table <code>epm_triples</code> each hold the newest releases. The two Neo4j stores and the Delta table hold a marker naming the release set they were loaded from. Jena holds none, because its named graphs are the version IRIs. <code>sync_stores.py check</code> compares each store with Git's newest releases and reads it as current, behind, changed, unmarked or unreachable (Jena, with no marker, reads empty after a restart); for Jena and Databricks it also compares the triples in each named graph with the release files. <code>sync_stores.py sync</code> reloads only what is not current, and each release ends with <code>check</code>. The detail is in the drift rows from "A store holds an older release" to "Jena restarted", and in the row "You cut a release".</p>
-<h3>Graphs kept outside the ontology's triples</h3>
-<p>The technical graph is loaded from the demo's graph files, not from the releases, so the release set cannot say whether it is current. Its nodes carry the label <code>Tech</code> and never <code>:Resource</code>, so the projection's counts and hash do not see them. Each store holds the graph's own marker, a digest of the graph files it was loaded from. The store's <code>tech:</code> line in <code>check</code> compares that marker, and a fingerprint of the content the store holds, with the graph files. <code>tech_graph load</code> and <code>sync_stores.py sync</code> reload it, and <code>tech_graph sync</code> refreshes the Delta copy only from a Neo4j store whose content matches the files. When the newest releases hold the <code>logical-model</code> module, Jena and <code>epm_triples</code> hold each model's two graphs as named graphs, counted on the ontology's line, and each Neo4j store holds each model as a subgraph of its own. The store's <code>lm:</code> line compares that subgraph's marker and fingerprint with the package's graphs. The detail is in the rows on the technical graph and the logical models, under "What can drift" and "The guards that exist today".</p>
-<h3>Files read from outside Git</h3>
-<p>A logical model's export and links file can sit in an augment folder that Git ignores, such as <code>release-cut/augment/logical-model/</code>. <code>cut.sh --augment</code> reads the folder and builds the module inside the release. The release records each file by its path relative to the folder and its SHA-256, under <code>augment</code> in <code>release.json</code> and in the package's <code>manifest.json</code>, and never records the folder's own path. <code>validate.py compare --augment</code> and <code>clonecheck.py --augment</code> fail when a file in the folder is changed, missing or extra against that record. The cut runs both, and either runs again later on the release with the same folder. "Adding a logical model" above gives the detail, and <code>HOW-TO-UPDATE.md</code>, "Inputs from outside the repository", the two ways to work with such files.</p>
-
-<h2 id="sync">The in-sync strategy</h2><p class="lead">Git holds the truth, and each store is a copy of it. The goal is that no store or graph can fall behind Git without someone seeing it. The stores and the technical graph show drift, and one command repairs most of it. Nothing runs that check by itself: <code>sync_stores.py check</code> is a written step of each release instead.</p><h3>The principles</h3><div class="tblwrap"><table class="stack"><thead><tr><th>Principle</th><th>What it means</th></tr></thead><tbody>
-<tr><td>Git is the only place a change starts.</td><td data-k="What it means">Nobody edits a store to fix the ontology. A change is a new release, as "How to change the ontology" says.</td></tr>
-<tr><td>Data flows one way.</td><td data-k="What it means">Git to the stores, never back. <code>epm_triples</code> can rebuild Neo4j, but only to prove it holds everything.</td></tr>
-<tr><td>Every store can be thrown away.</td><td data-k="What it means">Each can be emptied and rebuilt from Git, so the repair for any drift is a reload.</td></tr>
-<tr><td>A store proves itself before it is marked.</td><td data-k="What it means"><code>sync_stores.py mark</code> refuses a store that fails its check.</td></tr>
-<tr><td>Drift must be visible.</td><td data-k="What it means">A check that nobody runs protects nothing, so each release ends with <code>sync_stores.py check</code>, and it is not done until every store reads current.</td></tr>
-</tbody></table></div><h3>What can drift, and what catches it today</h3><div class="tblwrap"><table class="stack"><thead><tr><th>What can drift</th><th>How it happens</th><th>Caught today?</th><th>The repair</th></tr></thead><tbody>
-<tr><td>A store holds an older release</td><td data-k="How it happens">A new release, with no reload</td><td data-k="Caught today?">Yes: <code>check</code> says <code>behind</code></td><td data-k="The repair"><code>sync_stores.py sync</code>; add <code>--cloud</code> for AuraDB and Databricks</td></tr>
-<tr><td>A store's counts changed</td><td data-k="How it happens">A partial load, or a hand edit</td><td data-k="Caught today?">Yes: <code>check</code> says <code>changed</code></td><td data-k="The repair">The same</td></tr>
-<tr><td>A store has no marker</td><td data-k="How it happens">A reload by hand removes the Neo4j marker</td><td data-k="Caught today?">Yes: <code>check</code> says <code>unmarked</code></td><td data-k="The repair"><code>sync_stores.py mark --store &lt;store&gt;</code></td></tr>
-<tr><td>Jena restarted</td><td data-k="How it happens">A restart or a reboot empties its in-memory dataset</td><td data-k="Caught today?">Yes: <code>check</code> reads <code>empty</code></td><td data-k="The repair"><code>sync</code> reloads it with the driver's <code>jena</code> step</td></tr>
-<tr><td>A store's content changed, with the same counts</td><td data-k="How it happens">A hand edit</td><td data-k="Caught today?">For the technical graph, yes: each store's <code>tech:</code> line compares a fingerprint of the content it holds with the graph files' and says <code>changed</code>. For the ontology, <strong>no</strong>: <code>check</code> reads none of its content, only counts: Jena's and Databricks' per named graph, so a graph that is missing, extra or of another size reads <code>changed</code> even when the total holds. <code>mark</code> refuses a partial Databricks load: each graph's row count must equal its triples in the release files</td><td data-k="The repair">A full driver run proves it. Planned: compare hashes</td></tr>
-<tr><td>The technical graph is missing from a store</td><td data-k="How it happens">A reload empties the store</td><td data-k="Caught today?">Yes: the store's <code>tech:</code> line in <code>check</code> says <code>unmarked</code>, because a reload removes the marker too, or <code>changed</code> when the <code>Tech</code> nodes went and the marker stayed</td><td data-k="The repair"><code>sync_stores.py sync</code>, or <code>tech_graph load</code>. A load that fails part way leaves the previous graph and marker</td></tr>
-<tr><td>The technical graph is older than the demo's files</td><td data-k="How it happens">A change to the SQL or run commands</td><td data-k="Caught today?">Partly. Once the graph files are rebuilt, the <code>tech:</code> line of each store that holds the older files says <code>behind</code>, because its marker holds their digest. A change with no rebuild is not caught</td><td data-k="The repair"><code>tech_graph collect</code> and <code>build --to-repo</code>, commit <code>graph/*.ttl</code>, then <code>sync_stores.py sync --cloud</code>. Planned: CI rebuild</td></tr>
-<tr><td>The Delta copy of the technical graph is behind Neo4j</td><td data-k="How it happens">A demo build empties it, or a load with no <code>tech_graph sync</code> after it</td><td data-k="Caught today?">Yes. <code>tech_graph sync</code> marks the copy with the digest of the Neo4j store it read, and <code>tech:databricks</code> says <code>unmarked</code> or <code>behind</code>. A demo build empties the tables and leaves the marker; <code>check</code> compares the copy's content, so it says <code>changed</code>. Run <code>tech_graph sync</code> after each build, as <code>rebuild_stores.py</code> does</td><td data-k="The repair"><code>sync_stores.py sync --cloud</code>, or <code>tech_graph sync</code></td></tr>
-<tr><td>A release's logical models are missing from a store, or edited</td><td data-k="How it happens">A reload empties the store, or a hand edit</td><td data-k="Caught today?">Yes, when the newest releases hold the <code>logical-model</code> module: Jena's and Databricks' lines count the models' named graphs with the release graphs, and each Neo4j store's <code>lm:</code> line compares its marker and a fingerprint of its <code>LogicalModel</code> subgraph with the package's graphs.</td><td data-k="The repair"><code>sync_stores.py sync</code>, or <code>logical_models.py load</code></td></tr>
-<tr><td>A metric view's tag no longer matches <code>kpi</code></td><td data-k="How it happens">An identifier changes in a <code>kpi</code> release</td><td data-k="Caught today?">Yes: the demo's tests compare the SQL with <code>measure-identifiers.csv</code>, and <code>tech_graph collect</code> checks that deployed views carry a tag. A deployed tag identifier that makes no <code>IMPLEMENTS</code> edge stops <code>tech_graph build</code> before it writes, and names the view and the identifier; <code>collect</code> drafts it for <code>kpi</code> in <code>out/tech/proposals.json</code></td><td data-k="The repair"><code>pricing_demo.databricks build</code>, then the technical graph commands</td></tr>
-<tr><td>A document's figure no longer matches the releases</td><td data-k="How it happens">A new release</td><td data-k="Caught today?">Partly: <code>test_published_figures.py</code> and <code>test_modules_guide.py</code> cover the pinned figures</td><td data-k="The repair">Update the document; <code>epm_facts.py sweep main</code> finds other copies</td></tr>
-</tbody></table></div><h3>What to do, and when</h3><div class="tblwrap"><table class="stack"><thead><tr><th>When</th><th>Do this</th></tr></thead><tbody>
-<tr><td>You cut a release</td><td data-k="Do this">Tag <code>&lt;module&gt;-v&lt;version&gt;</code>; <code>sync_stores.py sync --cloud</code>; <code>sync_stores.py check</code>. The release is done only when every store reads <code>current</code>, on its ontology line and its <code>tech:</code> line, and on its <code>lm:</code> line when the releases hold the <code>logical-model</code> module</td></tr>
-<tr><td>You change the demo's SQL or run commands</td><td data-k="Do this"><code>pricing_demo.databricks build</code>; <code>tech_graph collect</code>, <code>build</code>, <code>load</code>, <code>sync</code>; commit <code>graph/*.ttl</code></td></tr>
-<tr><td>You reload a store by hand</td><td data-k="Do this"><code>tech_graph load</code>; <code>logical_models.py load</code>, when the releases hold the <code>logical-model</code> module; <code>sync_stores.py mark --store &lt;store&gt;</code>; <code>sync_stores.py check</code></td></tr>
-<tr><td>Before you rely on a store</td><td data-k="Do this"><code>sync_stores.py check</code>, or <code>sync --dry-run</code> to see what it would reload</td></tr>
-<tr><td>A check says a store differs</td><td data-k="Do this"><code>sync_stores.py sync</code>. Do not fix the store by hand</td></tr>
-</tbody></table></div><p><code>sync_stores.py</code> is in <code>business_architecture/ontology/projection</code>, and <code>tech_graph</code> and <code>databricks</code> run from the demo's folder. <code>check</code> read all four ontology stores as current on 2026-10-31, and <code>sync --dry-run</code> said every store is current.</p><h3>Lineage from Databricks itself</h3>
-<p>Since 2026-11-02 Unity Catalog confirms and extends the graph, and it has not yet run against a live workspace. <em>2026-11-03:</em> it has: a live <code>collect</code> on a test catalog confirmed 26 edges three ways, found 5 designed edges Unity Catalog had not observed and none observed only, and the source-systems check passed; <code>graph/tech-graph.ttl</code> is rebuilt from that run. <code>tech_graph lineage</code> sets each edge beside the sources that hold it: the design, the SQL files and Unity Catalog's lineage. An edge not in all three fails unless <code>graph/lineage-known.json</code> states it. A metric view made in the workspace reaches the graph at the next <code>collect</code> and <code>build</code>, from its identifier tag and its observed lineage. Each replica schema whose system the <code>system</code> module holds (four of the seven) carries an <code>epm_source_system</code> tag for what Databricks cannot see, with the demo README's map as the fallback. Databricks writes to the technical graph and never to the ontology: anything with no ontology match goes to <code>out/tech/proposals.json</code> as a proposal for <code>kpi</code> or <code>data-product</code>, which the decision owner approves.</p>
-<h3>The guards that exist today</h3>
-<div class="tblwrap"><table class="stack"><thead><tr><th>Guard</th><th>What it does</th><th>When</th><th>State</th></tr></thead><tbody>
-<tr><td><code>pipeline.py build --verify</code></td><td data-k="Does">The manifest no longer matches a fresh build</td><td data-k="When">In <code>scripts/check.sh</code>, so on every change</td><td data-k="State">On</td></tr>
-<tr><td><code>sync_stores.py mark</code></td><td data-k="Does">Refuses to mark a store that fails its check: the local Neo4j and AuraDB by counts and one release record per newest release, Jena by its graph names and triple counts, Databricks by each graph's row count against the release files</td><td data-k="When">After each load</td><td data-k="State">By hand, or by <code>sync</code></td></tr>
-<tr><td><code>sync_stores.py check</code></td><td data-k="Does">A store that is behind, changed, unmarked or unreachable, for the ontology and, on its <code>tech:</code> line, for the technical graph, whose content it compares with the graph files; it exits non-zero</td><td data-k="When">At the end of each release, and when someone runs it</td><td data-k="State">By hand, as a written release step. On 2026-10-31, all four stores read current</td></tr>
-<tr><td><code>sync_stores.py sync</code></td><td data-k="Does">Reloads what is behind. Loads the technical graph into each store it reloaded and each whose <code>tech:</code> line is not current, then copies it to Delta when Databricks was reloaded or its copy is not current</td><td data-k="When">When someone runs it</td><td data-k="State">By hand; the cloud stores only with <code>--cloud</code></td></tr>
-<tr><td><code>tech_graph load</code></td><td data-k="Does">The ontology's <code>:Resource</code> counts moved, or an edge found no target: it stops and leaves the previous graph, since each Neo4j load is one transaction and Jena's is one update request. It writes the store's marker only with a complete load</td><td data-k="When">Each technical-graph load</td><td data-k="State">On</td></tr>
-<tr><td><code>tech_graph build</code></td><td data-k="Does">A metric view's tag identifier that makes no <code>IMPLEMENTS</code> edge: it stops before it writes, and names it</td><td data-k="When">Each technical-graph build</td><td data-k="State">On</td></tr>
-<tr><td><code>tech_graph sync</code></td><td data-k="Does">Refuses a Neo4j store with no technical-graph marker, or whose content differs from the graph files; marks the Delta copy only after a complete copy</td><td data-k="When">Each copy to Delta</td><td data-k="State">On</td></tr>
-<tr><td><code>logical_models.py load</code></td><td data-k="Does">When the newest releases hold the <code>logical-model</code> module: the models' graphs into Jena and <code>epm_triples</code>, and each model as a <code>LogicalModel</code> subgraph into each Neo4j store with its marker, in one transaction that stops, as <code>tech_graph load</code> does, when the <code>:Resource</code> counts move or an edge finds no target</td><td data-k="When">After each reload, before <code>mark</code></td><td data-k="State">On; not yet run on a live store</td></tr>
-<tr><td><code>.github/workflows/sync-stores.yml</code></td><td data-k="Does">Reloads AuraDB and Databricks, loads the technical graph into AuraDB and Delta, and a release's logical models when the releases hold the module, marks both and runs <code>check</code> on them</td><td data-k="When">On a release tag, or started by hand</td><td data-k="State"><strong>Off</strong> until its secrets exist; never run with them</td></tr>
-</tbody></table></div>
-<p><strong>This does not yet guarantee "never out of sync".</strong> The stores can show that they have drifted, and one command repairs them, but nothing stops or repairs drift by itself. Nothing runs the drift check by itself: a subject matter expert reviewing the documents chose to make it a written step of each release, with no schedule (the decision of 2026-11-02, amendment of 2026-11-02 (later), item 3), and the release-tag workflow is off until its secrets exist. A new release leaves the stores behind until someone runs <code>sync</code>. The technical graph's marker is a digest of its graph files, so a change to the demo's SQL or run commands shows only once those files are rebuilt. A demo build empties the Delta copy of the technical graph and leaves its marker; <code>check</code> compares the copy's content, so it reads <code>changed</code> until <code>tech_graph sync</code> runs again. For the ontology, the drift check compares each store's marker with Git's release set and its live counts with the marked ones, and Jena's and Databricks' triples per named graph with the release files', and reads no content, so a change that keeps each graph's count would read as current. <code>mark</code> reads no hash, and the full hash and walk comparisons run only in a full driver run. an earlier change holds the work and the options.</p>
-
-<h3>The plan to close it</h3>
-<p>This is how the stores and the technical graph stay in step with Git. Each row says what runs now and what is left.</p>
-<div class="tblwrap"><table class="stack"><thead><tr><th>Step</th><th>What changes</th><th>What it catches</th><th>Issue</th></tr></thead><tbody>
-<tr><td>Turn on the release-tag workflow</td><td data-k="Change">Built: after the driver, <code>sync-stores.yml</code> runs <code>tech_graph load --store aura</code>, since a driver run empties the technical graph, and <code>tech_graph sync --store aura</code>, then <code>mark</code> and <code>check</code> on AuraDB and Databricks. Left: add the seven secrets, and run the workflow once by hand to test it</td><td data-k="Catches">AuraDB and Databricks reload on each release</td><td data-k="Issue">an earlier change</td></tr>
-<tr><td>Check on a schedule</td><td data-k="Change">Not built, by the decision owner's choice (the decision of 2026-11-02, amendment of 2026-11-02 (later), item 3): a scheduled run would use paid Actions minutes, so <code>check</code> is a written step of each release instead (the last row)</td><td data-k="Catches">A store left behind shows within a day</td><td data-k="Issue">an earlier change</td></tr>
-<tr><td>Compare content, not only counts</td><td data-k="Change">Built for the technical graph: <code>check</code> compares a fingerprint of the <code>Tech</code> nodes and edges, Jena's two graphs and the Delta tables with the graph files', and <code>tech_graph sync</code> refuses a source whose content differs. Not built for the ontology: <code>mark</code> and <code>check</code> compare a graph hash on the local Neo4j and AuraDB, and the RDFC-1.0 hash on <code>epm_triples</code>; a test supplies wrong content with unchanged counts. <code>mark</code> already compares each graph's row count in <code>epm_triples</code> with the release files</td><td data-k="Catches">A change that keeps the counts reads as changed</td><td data-k="Issue">an earlier change</td></tr>
-<tr><td>Mark the technical graph</td><td data-k="Change">Built: <code>tech_graph load</code> writes a marker holding a digest of the graph files it loaded, a <code>TechGraphMarker</code> node in each Neo4j store and a named graph in Jena, and <code>tech_graph sync</code> writes one for the Delta copy in <code>epm_store_markers</code>. <code>check</code> reads each on the store's <code>tech:</code> line</td><td data-k="Catches">A missing or stale <code>Tech</code> graph shows</td><td data-k="Issue">an earlier change</td></tr>
-<tr><td>Sync it too</td><td data-k="Change">Built: <code>sync</code> reloads the <code>Tech</code> nodes in each store whose marker differs, and runs <code>tech_graph sync</code> when the Delta copy's marker differs or it reloads Databricks; the cloud stores need <code>--cloud</code></td><td data-k="Catches">Neo4j and Delta hold the same technical graph</td><td data-k="Issue">an earlier change</td></tr>
-<tr><td>Check the graph against the demo's files</td><td data-k="Change">Not built: commit the live facts, and have CI rebuild <code>graph/*.ttl</code> from them with no logins, failing on any difference</td><td data-k="Catches">A change to the demo's SQL or run commands that skips the graph fails its check</td><td data-k="Issue">an earlier change</td></tr>
-<tr><td>Make it part of each release</td><td data-k="Change">Built as a written step: the release steps ("What to do, and when" above, the walkthrough's "How to change the ontology", <code>scripts/share_release/README.md</code> and the release's <code>HOW-TO-UPDATE.md</code>) end with <code>sync_stores.py check</code>, and a release is done only when every store reads current, ontology and technical graph, and each logical model's <code>lm:</code> line when the releases hold the module. The local Neo4j and Jena need a person, because CI cannot reach them</td><td data-k="Catches">No release finishes with a store behind</td><td data-k="Issue">an earlier change</td></tr>
-</tbody></table></div>
-<p>Done when a new release, or a change to the demo's files, cannot leave a store or the technical graph behind without a failed check that someone sees.</p>
-
-
-<h2 id="where">Where everything lives, and what connects to what</h2><p class="lead">Whichever system you open, this says what is there, how it got there and what connects to it.</p><h3>Start here</h3><div class="tblwrap"><table class="stack"><thead><tr><th>You want to know</th><th>In Databricks</th><th>In Neo4j</th></tr></thead><tbody>
-<tr><td>What does this measure mean?</td><td data-k="In Databricks"><code>idp_sbx.ontology_definitions.measure_definitions_vw</code></td><td data-k="In Neo4j"><code>(:kpi_MeasureDefinition {dcterms_identifier: 'KPI-0001'})</code></td></tr>
-<tr><td>What is its value?</td><td data-k="In Databricks">The metric view for its subject, in <code>semantic_sem_commercial</code></td><td data-k="In Neo4j">Not in Neo4j: the graph holds no values</td></tr>
-<tr><td>Which view computes it, and which agent answers?</td><td data-k="In Databricks"><code>tech_graph_edges</code> where <code>type = 'IMPLEMENTS'</code></td><td data-k="In Neo4j"><code>IMPLEMENTS</code>, then <code>BINDS</code></td></tr>
-<tr><td>Where does this table's data come from?</td><td data-k="In Databricks"><code>tech_graph_edges</code> where <code>type = 'READS_FROM'</code>; Unity Catalog's lineage for what was observed</td><td data-k="In Neo4j"><code>READS_FROM</code>, then <code>COPIES</code></td></tr>
-<tr><td>Which step makes this table, and did its checks pass?</td><td data-k="In Databricks"><code>tech_graph_nodes</code> and <code>tech_graph_edges</code></td><td data-k="In Neo4j"><code>PRODUCED_BY</code>; <code>CHECKS</code>, and the check's <code>result</code></td></tr>
+<h2 id="where">Where everything lives, and what connects to what</h2>
+  <p class="lead">Whichever system you open, this says what is there, how it got there and what connects to it. The Databricks names are the example settings'; yours come from <code>kpi_store.toml</code>.</p>
+  <h3>Start here</h3>
+  <div class="tblwrap"><table class="stack"><thead><tr><th>You want to know</th><th>In Databricks</th><th>In Neo4j</th></tr></thead><tbody>
+<tr><td>What does this measure mean?</td><td data-k="In Databricks">Its triples in <code>epm_triples</code></td><td data-k="In Neo4j"><code>(:kpi_MeasureDefinition {dcterms_identifier: 'KPI-0001'})</code></td></tr>
+<tr><td>What is its value?</td><td data-k="In Databricks">The metric view that computes it</td><td data-k="In Neo4j">Not in Neo4j: the graph holds no values</td></tr>
+<tr><td>Which view computes it, and which Genie space answers?</td><td data-k="In Databricks">The technical graph's triples in <code>tech_graph_triples</code></td><td data-k="In Neo4j"><code>IMPLEMENTS</code>, then <code>BINDS</code></td></tr>
+<tr><td>Where does this table's data come from?</td><td data-k="In Databricks">Unity Catalog's lineage; the same edges in <code>tech_graph_triples</code></td><td data-k="In Neo4j"><code>READS_FROM</code></td></tr>
+<tr><td>Which job or pipeline builds this table?</td><td data-k="In Databricks"><code>tech_graph_triples</code></td><td data-k="In Neo4j"><code>BUILT_BY</code></td></tr>
 <tr><td>Who is accountable for this process?</td><td data-k="In Databricks"><code>epm_triples</code></td><td data-k="In Neo4j"><code>(:orgm_ResponsibilityAssignment)</code></td></tr>
-<tr><td>Which release set does this store hold?</td><td data-k="In Databricks"><code>epm_store_markers</code></td><td data-k="In Neo4j"><code>(:EpmStoreMarker)</code></td></tr>
-<tr><td>Which technical graph does this store hold?</td><td data-k="In Databricks"><code>epm_store_markers</code>, the row <code>tech_graph</code></td><td data-k="In Neo4j"><code>(:TechGraphMarker)</code></td></tr>
-</tbody></table></div><h3>Databricks: the ontology</h3><div class="tblwrap"><table class="stack"><thead><tr><th>Object</th><th>What it is</th><th>Holds</th><th>Made by</th><th>Connects to</th></tr></thead><tbody>
-<tr><td><code>workspace.epm_ontology.epm_triples</code></td><td data-k="What it is">The ontology, as a Delta table: one row per quad. Columns: <code>subject</code>, <code>predicate</code>, <code>object</code>, <code>object_kind</code>, <code>datatype</code>, <code>lang</code>, <code>graph</code></td><td data-k="Holds">40,169 rows in 33 named graphs; the same RDFC-1.0 hash as the releases</td><td data-k="Made by">The driver's <code>databricks</code> step, from the newest release of each module</td><td data-k="Connects to">Definitions views read it. <code>tech_graph_edges.target</code> matches its <code>subject</code></td></tr>
-<tr><td><code>workspace.epm_ontology.epm_store_markers</code></td><td data-k="What it is">Which release set the table was loaded from, and which graph files the Delta copy of the technical graph came from. Columns: <code>store</code>, <code>marker</code></td><td data-k="Holds">The row <code>databricks</code>, and the row <code>tech_graph</code> once <code>tech_graph sync</code> has run</td><td data-k="Made by"><code>sync_stores.py mark</code>; <code>tech_graph sync</code> for <code>tech_graph</code></td><td data-k="Connects to"><code>sync_stores.py check</code> compares it with Git</td></tr>
-</tbody></table></div><h3>Databricks: the demo, in medallion order</h3><div class="tblwrap"><table class="stack"><thead><tr><th>Layer</th><th>Where</th><th>Holds</th><th>Made by</th><th>Connects to</th></tr></thead><tbody>
-<tr><td>Source</td><td data-k="Where">Postgres databases, outside Databricks</td><td data-k="Holds">8, one hidden (<code>decision_truth</code>)</td><td data-k="Made by"><code>pricing_demo.load_postgres</code></td><td data-k="Connects to">Copied to the volume, except <code>decision_truth</code></td></tr>
-<tr><td>Landing</td><td data-k="Where"><code>idp_sbx.replica_landing</code>, volume <code>raw</code></td><td data-k="Holds">28 Parquet files</td><td data-k="Made by"><code>pricing_demo.replicate</code>, <code>databricks upload</code></td><td data-k="Connects to">Each file feeds one replica table</td></tr>
-<tr><td>Replica (the medallion's bronze)</td><td data-k="Where"><code>idp_sbx.replica_*</code>, one schema per source</td><td data-k="Holds">28 tables</td><td data-k="Made by"><code>sql/02_replica.sql</code></td><td data-k="Connects to">Each copies its source; silver reads them</td></tr>
-<tr><td>Silver</td><td data-k="Where"><code>idp_sbx.silver_mdm_core</code> (dimensions), <code>idp_sbx.silver_udm_core</code> (facts)</td><td data-k="Holds">10 and 12 tables</td><td data-k="Made by"><code>sql/03_silver.sql</code></td><td data-k="Connects to">Read replicas; gold reads them</td></tr>
-<tr><td>Gold</td><td data-k="Where"><code>idp_sbx.gold_commercial_core</code></td><td data-k="Holds">6 tables</td><td data-k="Made by"><code>sql/04_gold.sql</code></td><td data-k="Connects to">Read silver and each other; metric views read them</td></tr>
-<tr><td>Metric views</td><td data-k="Where"><code>idp_sbx.semantic_sem_commercial</code></td><td data-k="Holds">6 views</td><td data-k="Made by"><code>sql/05_metric_views.sql</code></td><td data-k="Connects to">Hold each measure's KPI or OPM identifier and the <code>epm_measure_identifiers</code> tag; Genie agents bind them</td></tr>
-<tr><td>Definitions views</td><td data-k="Where"><code>idp_sbx.ontology_definitions</code></td><td data-k="Holds">5 views</td><td data-k="Made by"><code>sql/06_definitions.sql</code></td><td data-k="Connects to"><code>measure_definitions_vw</code> reads <code>epm_triples</code>; the four subject views read it; Genie agents bind them</td></tr>
-<tr><td>Technical graph</td><td data-k="Where"><code>idp_sbx.tech_graph.tech_graph_nodes</code> (<code>uri</code>, <code>kind</code>, <code>name</code>, <code>properties</code>, <code>synced_at</code>), <code>tech_graph_edges</code> (<code>source</code>, <code>type</code>, <code>target</code>, <code>target_in_ontology</code>, <code>synced_at</code>)</td><td data-k="Holds">142 and 540 rows</td><td data-k="Made by"><code>sql/07_tech_graph.sql</code> creates them empty; <code>tech_graph sync</code> fills them</td><td data-k="Connects to">A copy from the local Neo4j. No Genie agent binds them yet</td></tr>
-<tr><td>Genie agents</td><td data-k="Where">Four Genie spaces, in <code>genie/*.md</code></td><td data-k="Holds">4</td><td data-k="Made by"><code>pricing_demo.genie</code></td><td data-k="Connects to">Bind the views below; <code>pricing_demo/supervisor.py</code> routes questions to them, from this machine</td></tr>
-<tr><td>Secret scope</td><td data-k="Where"><code>epm-neo4j</code></td><td data-k="Holds">1</td><td data-k="Made by"><code>pricing_demo.aura_test</code></td><td data-k="Connects to">The AuraDB login for the Databricks-to-AuraDB test</td></tr>
-</tbody></table></div><h3>From gold to the agents</h3><p>Each row is one path from a table to an answer. A measure's identifier sits on the metric view, and its meaning comes from the definitions view, which reads <code>epm_triples</code>. The Refinery Operations agent also binds gold <code>decision_evidence_detail_fact</code> and <code>refinery_plan_backcast_fact</code>, and silver outside-context and EIA facts; the Pricing agent also binds silver <code>freight_rate_fact</code>.</p><div class="tblwrap"><table class="stack"><thead><tr><th>Metric view</th><th>Reads</th><th>Measures it implements</th><th>Genie agent</th><th>Definitions view</th></tr></thead><tbody>
-<tr><td><code>mpr_mips_crack_spread_price_fact_metrics_vw</code></td><td data-k="Reads"><code>mpr_mips_crack_spread_price_fact</code></td><td data-k="Measures it implements">1</td><td data-k="Genie agent">Crack Spread Price Analytics</td><td data-k="Definitions view"><code>crack_spread_definitions_vw</code></td></tr>
-<tr><td><code>mips_mpr_executive_summary_fact_vw</code></td><td data-k="Reads"><code>mips_mpr_executive_summary_fact</code></td><td data-k="Measures it implements">6</td><td data-k="Genie agent">Executive Summary KPIs Analytics</td><td data-k="Definitions view"><code>executive_summary_definitions_vw</code></td></tr>
-<tr><td><code>mips_mpr_benchmark_prices_fact_vw</code></td><td data-k="Reads">Silver: <code>mpr_price_detail_fact</code>, <code>mpr_price_master_dim</code></td><td data-k="Measures it implements">1</td><td data-k="Genie agent">Executive Summary KPIs Analytics</td><td data-k="Definitions view"><code>executive_summary_definitions_vw</code></td></tr>
-<tr><td><code>pricing_market_margin_metrics_vw</code></td><td data-k="Reads"><code>mips_mpr_executive_summary_fact</code>; silver <code>mips_price_assessment_group_dim</code></td><td data-k="Measures it implements">5</td><td data-k="Genie agent">Pricing and Market Margin Analytics</td><td data-k="Definitions view"><code>pricing_market_margin_definitions_vw</code></td></tr>
-<tr><td><code>refinery_operations_metrics_vw</code></td><td data-k="Reads"><code>refinery_operations_daily_fact</code></td><td data-k="Measures it implements">6</td><td data-k="Genie agent">Refinery Operations Analytics</td><td data-k="Definitions view"><code>refinery_operations_definitions_vw</code></td></tr>
-<tr><td><code>refinery_unit_operations_metrics_vw</code></td><td data-k="Reads"><code>refinery_unit_operations_daily_fact</code></td><td data-k="Measures it implements">1</td><td data-k="Genie agent">Refinery Operations Analytics</td><td data-k="Definitions view"><code>refinery_operations_definitions_vw</code></td></tr>
-</tbody></table></div><h3>What each gold table reads</h3><div class="tblwrap"><table class="stack"><thead><tr><th>Gold table</th><th>Reads</th></tr></thead><tbody>
-<tr><td><code>mpr_mips_crack_spread_price_fact</code></td><td data-k="Reads"><code>silver_udm_core.mpr_price_detail_fact</code>; <code>silver_mdm_core</code>: <code>mpr_price_master_dim</code>, <code>mips_price_assessment_group_dim</code>, <code>mips_price_group_dim</code>, <code>mips_price_sheet_dim</code></td></tr>
-<tr><td><code>mips_mpr_executive_summary_fact</code></td><td data-k="Reads"><code>silver_udm_core.mips_price_assessment_fact</code>; <code>silver_mdm_core</code>: <code>mips_price_batch_dim</code>, <code>mips_price_assessment_group_dim</code>, <code>mips_price_group_dim</code>, <code>mpr_price_master_dim</code>, <code>mips_price_sheet_dim</code></td></tr>
-<tr><td><code>refinery_operations_daily_fact</code></td><td data-k="Reads"><code>silver_udm_core</code>: <code>refinery_production_daily_fact</code>, <code>refinery_plan_target_fact</code>; <code>silver_mdm_core.refinery_dim</code>; gold <code>mpr_mips_crack_spread_price_fact</code></td></tr>
-<tr><td><code>refinery_unit_operations_daily_fact</code></td><td data-k="Reads"><code>silver_udm_core.refinery_unit_daily_fact</code>; <code>silver_mdm_core.refinery_dim</code></td></tr>
-<tr><td><code>refinery_plan_backcast_fact</code></td><td data-k="Reads"><code>silver_udm_core.refinery_plan_version_fact</code>; gold <code>refinery_operations_daily_fact</code></td></tr>
-<tr><td><code>decision_evidence_detail_fact</code></td><td data-k="Reads"><code>silver_udm_core.decision_evidence_fact</code>; <code>silver_mdm_core.decision_dim</code></td></tr>
-</tbody></table></div><p>Each silver table reads its replica tables, such as <code>silver_udm_core.mpr_price_detail_fact</code> from <code>replica_price_reference.pricedetail</code>. Unity Catalog's <code>system.access.table_lineage</code> records what ran. <code>tech_graph collect</code> compares it with the <code>data-product</code> module's designed lineage: 26 edges match and 5 are designed only.</p><pre><code>-- Each metric view and the measures it implements, joining both Delta tables
-SELECT e.source, t.object AS measure
-FROM idp_sbx.tech_graph.tech_graph_edges e
-JOIN workspace.epm_ontology.epm_triples t
-  ON e.target = t.subject
- AND t.predicate = 'http://www.w3.org/2004/02/skos/core#prefLabel'
-WHERE e.type = 'IMPLEMENTS'
-ORDER BY e.source;</code></pre><h3>Neo4j, AuraDB and Jena: the three stores</h3><div class="tblwrap"><table class="stack"><thead><tr><th>Store</th><th>Where</th><th>Login file</th><th>Loaded by</th><th>Holds</th></tr></thead><tbody>
-<tr><td>Local Neo4j</td><td data-k="Where">Container <code>lpg-local-neo4j-1</code>; Bolt <code>localhost:17711</code>; no browser port</td><td data-k="Login file"><code>~/lpg-out/epm-rebuild/neo4j-run/run.env</code></td><td data-k="Loaded by">The skill's driver, method version 2.3, rebuilt from <code>epm_triples</code></td><td data-k="Holds">4,193 <code>Resource</code> nodes; 22,142 relationships between them; 142 <code>Tech</code>; 11 <code>Module</code> and 11 <code>ModuleRelease</code> nodes; the <code>n4sch__*</code> schema nodes</td></tr>
-<tr><td>Neo4j AuraDB</td><td data-k="Where">Neo4j's cloud, one database</td><td data-k="Login file"><code>~/.config/neo4j/aura.env</code></td><td data-k="Loaded by">A copy of the local Neo4j, with the same graph hash</td><td data-k="Holds">The same as the local Neo4j, without the n10s configuration nodes</td></tr>
-<tr><td>Jena</td><td data-k="Where">Container <code>epm-jena-fuseki-1</code>; <code>http://127.0.0.1:13031/ds</code></td><td data-k="Login file">None</td><td data-k="Loaded by">The driver's <code>jena</code> step, which leaves it running</td><td data-k="Holds">33 named graphs, three per module, 40,169 quads; empty after a restart</td></tr>
-</tbody></table></div><h3>Neo4j and AuraDB: what is inside</h3><p>Every name in a store follows one rule. A property or relationship is <code>prefix_name</code>, such as <code>skos_prefLabel</code> or <code>orgm_forProcess</code>, and each node's IRI is in <code>uri</code>. Language-tagged text keeps its tag, so a label reads <code>Crack Spreads Pricing@en</code>. An exact match needs the tag: <code>{skos_prefLabel: 'Crack Spreads Pricing'}</code> returns no records, and <code>'Crack Spreads Pricing@en'</code> returns one. Identifiers such as <code>KPI-0001</code> carry no tag, so match on those where you can. A technical table's <code>name</code> includes its schema. Technical nodes hold <code>uri</code>, <code>name</code> and <code>types</code>, plus <code>rows</code>, <code>lastRefresh</code>, <code>layer</code> and <code>definedIn</code> on tables, and <code>result</code>, <code>checkedAt</code> and <code>detail</code> on checks.</p><div class="tblwrap"><table class="stack"><thead><tr><th>Label</th><th>What it is</th><th>Nodes</th></tr></thead><tbody>
-<tr><td><code>Resource</code></td><td data-k="What it is">Every ontology node. Counts, hashes and the round trip read only these</td><td data-k="Nodes">4,193</td></tr>
-<tr><td><code>prefix_Class</code>, such as <code>kpi_MeasureDefinition</code>, <code>skos_Concept</code>, <code>orgm_ResponsibilityAssignment</code>, <code>core_CanonicalFact</code></td><td data-k="What it is">The RDF types of a <code>Resource</code>. The prefix names the module or standard</td><td data-k="Nodes">41, 1,281, 940, 640</td></tr>
-<tr><td><code>Tech</code>, with a kind label</td><td data-k="What it is">The technical graph (below). Never <code>Resource</code></td><td data-k="Nodes">142</td></tr>
-<tr><td><code>EpmStoreMarker</code></td><td data-k="What it is">Which release set the store was loaded from</td><td data-k="Nodes">1</td></tr>
-<tr><td><code>Module</code>; <code>n4sch_Class</code>, <code>n4sch_Relationship</code>, <code>n4sch_Property</code></td><td data-k="What it is">Driver and AuraDB only: module tags, and the class and property schema</td><td data-k="Nodes">11; 46, 126, 63</td></tr>
-<tr><td><code>_GraphConfig</code>, <code>_NsPrefDef</code>, <code>_n10sValidatorConfig</code></td><td data-k="What it is">The n10s plugin's configuration; not in AuraDB</td><td data-k="Nodes">1 each</td></tr>
-</tbody></table></div><p>The ontology's own relationships are its predicates: most often <code>rdf_type</code>, <code>dcterms_source</code>, <code>skos_inScheme</code> and <code>skos_broader</code>. A RACI assignment is a node, with <code>orgm_forProcess</code>, <code>orgm_raciLevel</code> and <code>orgm_assignedRole</code>.</p><pre><code>// What the crack spread means, in the ontology
+<tr><td>Which release does this store hold?</td><td data-k="In Databricks"><code>epm_store_markers</code></td><td data-k="In Neo4j"><code>(:EpmStoreMarker)</code></td></tr>
+<tr><td>Which technical graph does this store hold?</td><td data-k="In Databricks"><code>tech_graph_markers</code></td><td data-k="In Neo4j"><code>(:TechGraphMarker)</code></td></tr>
+</tbody></table></div>
+  <h3>Databricks</h3>
+  <div class="tblwrap"><table class="stack"><thead><tr><th>Object</th><th>What it is</th><th>Made by</th></tr></thead><tbody>
+<tr><td><code>idp_sbx.kpi_store.epm_triples</code></td><td data-k="What it is">The ontology, as a Delta table: one row per quad. Columns: <code>subject</code>, <code>predicate</code>, <code>object</code>, <code>object_kind</code>, <code>datatype</code>, <code>lang</code>, <code>graph</code>. It holds 41 named graphs</td><td data-k="Made by">The notebook, from the newest release of each module</td></tr>
+<tr><td><code>idp_sbx.kpi_store.epm_store_markers</code></td><td data-k="What it is">Which release the table was loaded from. Columns: <code>store</code>, <code>marker</code></td><td data-k="Made by">The same load, after the table's hash equals the release files'</td></tr>
+<tr><td>The volume <code>idp_sbx.kpi_store.releases</code></td><td data-k="What it is">The release zip, <code>kpi_store.toml</code>, and the discovery report of each run</td><td data-k="Made by">You upload the zip and the settings; the notebook writes the report</td></tr>
+<tr><td><code>idp_sbx.tech_graph.tech_graph_triples</code>, <code>tech_graph_markers</code></td><td data-k="What it is">The technical graph of this environment, as triples, and its marker</td><td data-k="Made by"><code>kpi_store/tech_graph.py</code></td></tr>
+</tbody></table></div>
+  <p>This counts the rows and the named graphs of the triple table:</p>
+<pre data-snippet="sql parse"><code>SELECT count(*) AS triples, count(DISTINCT graph) AS graphs FROM idp_sbx.kpi_store.epm_triples;</code></pre>
+  <h3>Neo4j: what is inside</h3>
+  <p>Every name in the graph follows one rule. A property or relationship is <code>prefix_name</code>, such as <code>skos_prefLabel</code> or <code>orgm_forProcess</code>, and each node's IRI is in <code>uri</code>. Language-tagged text keeps its tag, so a label reads <code>Crack Spreads Pricing@en</code>. An exact match needs the tag: <code>{skos_prefLabel: 'Crack Spreads Pricing'}</code> returns no records, and <code>'Crack Spreads Pricing@en'</code> returns one. Identifiers such as <code>KPI-0001</code> carry no tag, so match on those where you can.</p>
+  <div class="tblwrap"><table class="stack"><thead><tr><th>Label</th><th>What it is</th></tr></thead><tbody>
+<tr><td><code>Resource</code></td><td data-k="What it is">Every ontology node: 4,237 at the last recorded load. Counts, hashes and the round trip read only these</td></tr>
+<tr><td><code>prefix_Class</code>, such as <code>kpi_MeasureDefinition</code>, <code>skos_Concept</code>, <code>orgm_ResponsibilityAssignment</code>, <code>core_CanonicalFact</code></td><td data-k="What it is">The RDF types of a <code>Resource</code>. The prefix names the module or standard</td></tr>
+<tr><td><code>ModuleRelease</code></td><td data-k="What it is">One release record per module, linked to the module's <code>owl_Ontology</code> node by <code>DESCRIBES</code></td></tr>
+<tr><td><code>EpmStoreMarker</code></td><td data-k="What it is">Which release the database was loaded from</td></tr>
+<tr><td><code>LogicalModel</code>, <code>LogicalModelMarker</code></td><td data-k="What it is">Each logical model as a subgraph of its own, and its marker</td></tr>
+<tr><td><code>Tech</code>, with a kind label; <code>TechGraphMarker</code></td><td data-k="What it is">The technical graph and its marker. Never <code>Resource</code></td></tr>
+<tr><td><code>n4sch_Class</code>, <code>n4sch_Relationship</code>, <code>n4sch_Property</code></td><td data-k="What it is">The class and property schema that the ontology import writes</td></tr>
+</tbody></table></div>
+  <p>The ontology's own relationships are its predicates: most often <code>rdf_type</code>, <code>dcterms_source</code>, <code>skos_inScheme</code> and <code>skos_broader</code>. A RACI assignment is a node, with <code>orgm_forProcess</code>, <code>orgm_raciLevel</code> and <code>orgm_assignedRole</code>.</p>
+<pre data-snippet="cypher parse"><code>// What the crack spread means, in the ontology
 MATCH (m:kpi_MeasureDefinition {dcterms_identifier: 'KPI-0001'})
 RETURN m.skos_prefLabel, m.skos_definition;
 
-// Which metric views compute it, and which agents answer
-MATCH (v:Tech:MetricView)-[:IMPLEMENTS]-&gt;(m:kpi_MeasureDefinition {dcterms_identifier: 'KPI-0001'})
-OPTIONAL MATCH (a:Tech:Agent)-[:BINDS]-&gt;(v)
-RETURN v.name, collect(a.name);</code></pre><h3>The technical graph: its nodes</h3><p>Since 2026-11-02 the technical graph uses the technical-graph module&#x27;s terms (the decision of 2026-11-02, item 4), so its labels are the module&#x27;s classes. A replica, silver or gold table is a <code>Table</code> with a <code>layer</code> property; until then the demo&#x27;s own labels <code>ReplicaTable</code>, <code>SilverTable</code>, <code>GoldTable</code>, <code>TechGraphTable</code>, <code>TripleTable</code> and <code>GenieAgent</code> named them. The counts are the same. The queries on this page use the new labels; the answers below were read with the old ones.</p><div class="tblwrap"><table class="stack"><thead><tr><th>Kind (with label <code>Tech</code>)</th><th>Nodes</th><th>What it is</th><th>Built from</th></tr></thead><tbody>
-<tr><td><code>SourceDatabase</code></td><td data-k="Nodes">8</td><td data-k="What it is">A Postgres source</td><td data-k="Built from"><code>sparql/runtime.rq</code>, live facts</td></tr>
-<tr><td><code>Host</code></td><td data-k="Nodes">1</td><td data-k="What it is">The machine holding the sources</td><td data-k="Built from"><code>runtime.rq</code>, live facts</td></tr>
-<tr><td><code>Table</code>, layer <code>replica</code></td><td data-k="Nodes">28</td><td data-k="What it is">The medallion's bronze; with rows and last refresh</td><td data-k="Built from"><code>sparql/objects.rq</code> over the SQL files, live facts</td></tr>
-<tr><td><code>Table</code>, layer <code>silver</code></td><td data-k="Nodes">22</td><td data-k="What it is">A dimension or fact</td><td data-k="Built from"><code>objects.rq</code>, live facts</td></tr>
-<tr><td><code>Table</code>, layer <code>gold</code></td><td data-k="Nodes">6</td><td data-k="What it is">A gold table</td><td data-k="Built from"><code>objects.rq</code>, live facts</td></tr>
-<tr><td><code>MetricView</code></td><td data-k="Nodes">6</td><td data-k="What it is">A metric view</td><td data-k="Built from"><code>objects.rq</code>, live facts</td></tr>
-<tr><td><code>DefinitionsView</code></td><td data-k="Nodes">5</td><td data-k="What it is">A definitions view</td><td data-k="Built from"><code>objects.rq</code>, live facts</td></tr>
-<tr><td><code>Table</code>, no layer</td><td data-k="Nodes">1</td><td data-k="What it is"><code>epm_triples</code></td><td data-k="Built from"><code>runtime.rq</code></td></tr>
-<tr><td><code>Table</code>, no layer</td><td data-k="Nodes">2</td><td data-k="What it is">The Delta copy of this graph</td><td data-k="Built from"><code>objects.rq</code></td></tr>
-<tr><td><code>Agent</code>, <code>Orchestrator</code></td><td data-k="Nodes">4, 1</td><td data-k="What it is">The agents, and what routes to them</td><td data-k="Built from"><code>runtime.rq</code></td></tr>
-<tr><td><code>PipelineStep</code></td><td data-k="Nodes">19</td><td data-k="What it is">A step of the demo's run commands, in order</td><td data-k="Built from"><code>sparql/steps.rq</code> over the README</td></tr>
-<tr><td><code>QualityCheck</code></td><td data-k="Nodes">7</td><td data-k="What it is">A check, with its last result and time</td><td data-k="Built from"><code>tech_graph collect</code>, <code>runtime.rq</code></td></tr>
-<tr><td><code>Decision</code>, <code>EvidenceItem</code></td><td data-k="Nodes">10, 22</td><td data-k="What it is">The decision trail, as PROV-O</td><td data-k="Built from"><code>sparql/decisions.rq</code></td></tr>
-</tbody></table></div><h3>The technical graph: its relationships</h3><p>There are 540 edges: 407 between technical nodes and 133 to the ontology. The same edges are in <code>tech_graph_edges</code>, with <code>target_in_ontology</code> marking the 133.</p><div class="tblwrap"><table class="stack"><thead><tr><th>Relationship</th><th>From and to</th><th>Edges</th><th>What it says</th></tr></thead><tbody>
-<tr><td><code>COPIES</code></td><td data-k="From and to">Replica table to SourceDatabase</td><td data-k="Edges">28</td><td data-k="What it says">Lineage: the table copies this source</td></tr>
-<tr><td><code>READS_FROM</code></td><td data-k="From and to">Silver to replica (28); gold to silver (19) and gold (2); metric view to gold (5) and silver (3); definitions view to definitions view (4) and <code>epm_triples</code> (1)</td><td data-k="Edges">62</td><td data-k="What it says">The medallion's lineage, read from the SQL files</td></tr>
-<tr><td><code>HOSTED_ON</code></td><td data-k="From and to">SourceDatabase to Host</td><td data-k="Edges">8</td><td data-k="What it says">Where the source runs</td></tr>
-<tr><td><code>PRODUCED_BY</code></td><td data-k="From and to">Each table, view, agent, check and database to a PipelineStep</td><td data-k="Edges">89</td><td data-k="What it says">Which step makes or fills it</td></tr>
-<tr><td><code>NEXT</code></td><td data-k="From and to">PipelineStep to PipelineStep</td><td data-k="Edges">18</td><td data-k="What it says">The order of the run</td></tr>
-<tr><td><code>CHECKS</code></td><td data-k="From and to">QualityCheck to silver (51), replica (40), metric view (15), gold (14), definitions view (5), <code>epm_triples</code> (1), source (1)</td><td data-k="Edges">127</td><td data-k="What it says">What each check covers</td></tr>
-<tr><td><code>BINDS</code></td><td data-k="From and to">Agent to metric view (6), silver (5), definitions view (4), gold (2)</td><td data-k="Edges">17</td><td data-k="What it says">What an agent can read</td></tr>
-<tr><td><code>ROUTES_TO</code></td><td data-k="From and to">Orchestrator to Agent</td><td data-k="Edges">4</td><td data-k="What it says">Where a question can go</td></tr>
-<tr><td><code>RECORDED_IN</code></td><td data-k="From and to">Decision (10) and EvidenceItem (22) to a replica table</td><td data-k="Edges">32</td><td data-k="What it says">Where the trail's row lives</td></tr>
-<tr><td><code>USED</code>, <code>WAS_GENERATED_BY</code></td><td data-k="From and to">Decision to EvidenceItem; EvidenceItem to Decision</td><td data-k="Edges">18, 4</td><td data-k="What it says">Evidence written before or after the decision</td></tr>
-<tr><td><code>IMPLEMENTS</code></td><td data-k="From and to">MetricView to a <code>kpi</code> measure</td><td data-k="Edges">20</td><td data-k="What it says"><strong>To the ontology.</strong> The view computes this measure</td></tr>
-<tr><td><code>DESIGNED_AS</code></td><td data-k="From and to">Replica (12), silver (7), metric view (3), gold (2) and agent (2) to their <code>data-product</code> designs</td><td data-k="Edges">26</td><td data-k="What it says"><strong>To the ontology.</strong> The design this object builds</td></tr>
-<tr><td><code>STANDS_FOR</code></td><td data-k="From and to">SourceDatabase to a <code>system</code> entry</td><td data-k="Edges">4</td><td data-k="What it says"><strong>To the ontology.</strong> MIPS, MPR, KittyHawk and RightAngle</td></tr>
-<tr><td><code>AFFECTS</code></td><td data-k="From and to">Decision to a <code>ref-mpc</code> refinery</td><td data-k="Edges">25</td><td data-k="What it says"><strong>To the ontology.</strong></td></tr>
-<tr><td><code>CONCERNS</code></td><td data-k="From and to">Decision to a <code>kpi</code> measure</td><td data-k="Edges">17</td><td data-k="What it says"><strong>To the ontology.</strong></td></tr>
-<tr><td><code>WAS_ASSOCIATED_WITH</code>, <code>WAS_ATTRIBUTED_TO</code></td><td data-k="From and to">Decision and EvidenceItem to an <code>organization</code> role</td><td data-k="Edges">19, 22</td><td data-k="What it says"><strong>To the ontology.</strong> Who owned or wrote it</td></tr>
-</tbody></table></div><p>Read from the live stores on 2026-10-31, at the release set of commit <code>4d1e675b</code>, and checked against the store inventory of the original build (not in this release) and the demo's <code>DATA.md</code>. These are snapshots: a new release or build changes the figures.</p>
-<h2 id="standards">The standards and tools, and where to see each</h2><p class="lead">Each row says what the standard or tool does in this build, and gives a command to see it. Commands run from <code>business_architecture/ontology</code>, or from the folder they change to, and each was run on 2026-10-31, except where a note says it writes or uses a limit.</p><h3>W3C and related standards</h3><div class="tblwrap"><table class="stack"><thead><tr><th>Standard</th><th>Its role here</th><th>Where</th><th>See it</th></tr></thead><tbody>
-<tr><td>RDF, in Turtle</td><td data-k="Its role here">The grammar: every fact is a triple. The Turtle in Git is the master copy</td><td data-k="Where">Every <code>releases/&lt;module&gt;/&lt;version&gt;/*.ttl</code></td><td data-k="See it"><code>grep -A3 'measure:crack-spreads a' releases/kpi/1.3.0/kpi.ttl</code></td></tr>
+// The release record of each module
+MATCH (r:ModuleRelease)-[:DESCRIBES]-&gt;(o)
+RETURN r.module, r.version, r.conforms, r.violations, r.loaded_at, o.uri ORDER BY r.module;</code></pre>
+  <h3>Jena</h3>
+  <p>One Fuseki dataset holds 41 named graphs. A package's content is the graph named by its version IRI, such as <code>https://w3id.org/mpc/ontology/modules/kpi/1.3.0</code>. Its shapes and its release record are the graphs <code>&lt;version IRI&gt;/shapes</code> and <code>&lt;version IRI&gt;/catalog</code>. This query counts them, in the dataset's query page or over its SPARQL address:</p>
+<pre data-snippet="sparql parse"><code>SELECT (COUNT(DISTINCT ?g) AS ?graphs) (COUNT(*) AS ?triples)
+WHERE { GRAPH ?g { ?s ?p ?o } FILTER(STRSTARTS(STR(?g), "https://w3id.org/mpc/ontology/modules/")) }</code></pre>
+
+<h2 id="standards">The standards and tools, and where to see each</h2><p class="lead">Each row says what the standard or tool does in this build, and gives a command to see it. Shell commands run from <code>business_architecture/ontology</code>, or from the folder they change to, and each was run on this release on 2026-11-11. The Cypher statements need a loaded Neo4j and were not run for this page.</p><h3>W3C and related standards</h3><div class="tblwrap"><table class="stack"><thead><tr><th>Standard</th><th>Its role here</th><th>Where</th><th>See it</th></tr></thead><tbody>
+<tr><td>RDF, in Turtle</td><td data-k="Its role here">The grammar: every fact is a triple. The Turtle in the release's files is the master copy</td><td data-k="Where">Every <code>releases/&lt;module&gt;/&lt;version&gt;/*.ttl</code></td><td data-k="See it"><code>grep -A3 'measure:crack-spreads a' releases/kpi/1.3.0/kpi.ttl</code></td></tr>
 <tr><td>RDFS</td><td data-k="Its role here">Labels, domains and ranges of properties, and subclasses, such as a kind of party</td><td data-k="Where">Each module's vocabulary</td><td data-k="See it"><code>grep -c 'rdfs:domain' releases/kpi/1.3.0/kpi.ttl   # 16</code></td></tr>
 <tr><td>OWL</td><td data-k="Its role here">The schema layer, used sparingly: classes, object and datatype properties, and <code>owl:deprecated</code>. No <code>owl:imports</code>; public ontologies are mapped</td><td data-k="Where">Each module's vocabulary</td><td data-k="See it"><code>grep -c 'owl:imports' releases/core/2.4.0/core.ttl   # 0</code></td></tr>
 <tr><td>SKOS</td><td data-k="Its role here">The taxonomy: one concept per process, with labels, definitions, scope notes and <code>skos:broader</code>; also mappings to public ontologies</td><td data-k="Where"><code>core</code>, code lists, <code>party</code></td><td data-k="See it"><code>grep -m1 'skos:broader' releases/core/2.4.0/core.ttl</code></td></tr>
 <tr><td>SHACL</td><td data-k="Its role here">The checks: what valid data must look like. Runs on each module, on the whole graph, and in Neo4j</td><td data-k="Where">Each package's <code>shapes.ttl</code></td><td data-k="See it"><code>uv run --with rdflib --with pyshacl python -m pyshacl -s releases/lane/1.1.0/shapes.ttl releases/lane/1.1.0/lane.ttl   # Conforms: True</code></td></tr>
-<tr><td>SPARQL</td><td data-k="Its role here">The tests: the competency questions as queries, run on every check</td><td data-k="Where"><code>regression/queries/</code></td><td data-k="See it"><code>cd regression && uv run --with rdflib python run.py   # 43 answerable, 1 parked (49 since 2026-11-02)</code></td></tr>
-<tr><td>PROV-O</td><td data-k="Its role here">What happened and who vouches for it: a run links to its plan; the demo's decision trail</td><td data-k="Where"><code>provenance/run-shapes.ttl</code>; the demo's <code>graph/decision-trail.ttl</code></td><td data-k="See it"><code>grep -m1 'a prov:Activity' ../../demos/downstream-pricing-databricks-free/graph/decision-trail.ttl</code></td></tr>
+<tr><td>SPARQL</td><td data-k="Its role here">The tests: the competency questions as queries, run on every check</td><td data-k="Where"><code>regression/queries/</code></td><td data-k="See it"><code>cd regression &amp;&amp; uv run --with rdflib python run.py   # 56 answerable, 1 parked</code></td></tr>
+<tr><td>PROV-O</td><td data-k="Its role here">What happened and who vouches for it: a run links to the process definition it followed</td><td data-k="Where"><code>provenance/run-shapes.ttl</code></td><td data-k="See it"><code>grep -m1 'prov:hadPlan' provenance/run-shapes.ttl</code></td></tr>
 <tr><td>W3C ORG</td><td data-k="Its role here">Roles, so that RACI assignments name a role and never a person</td><td data-k="Where"><code>organization</code>, <code>ref-mpc</code></td><td data-k="See it"><code>grep -m1 'a org:Role' releases/organization/2.2.0/organization.ttl</code></td></tr>
 <tr><td>DCAT</td><td data-k="Its role here">Publishing: each release is a dataset in one catalog</td><td data-k="Where"><code>releases/catalog.ttl</code>, each package's <code>catalog.ttl</code></td><td data-k="See it"><code>grep -m1 'dcat:dataset' releases/kpi/1.3.0/catalog.ttl</code></td></tr>
-<tr><td>Dublin Core Terms</td><td data-k="Its role here">Describes sources and identifiers: <code>dcterms:source</code>, <code>dcterms:identifier</code> (KPI-0001)</td><td data-k="Where">Every module</td><td data-k="See it"><code>grep -m1 'dcterms:source' releases/core/2.4.0/core.ttl</code></td></tr>
+<tr><td>Dublin Core Terms</td><td data-k="Its role here">Describes sources and identifiers: <code>dcterms:source</code>, <code>dcterms:identifier</code> (<code>KPI-0001</code>)</td><td data-k="Where">Every module</td><td data-k="See it"><code>grep -m1 'dcterms:source' releases/core/2.4.0/core.ttl</code></td></tr>
 <tr><td>JSON-LD</td><td data-k="Its role here">The same release, for tools that read JSON</td><td data-k="Where">Each package's <code>.jsonld</code></td><td data-k="See it"><code>python3 -c "import json; print(len(json.load(open('releases/lane/1.1.0/lane.jsonld'))))"   # 16</code></td></tr>
-<tr><td>RDFC-1.0</td><td data-k="Its role here">A hash of the graph's meaning, so two copies can be proved equal</td><td data-k="Where">The <code>rdf-store</code> skill, in the driver's Jena and Databricks hops</td><td data-k="See it">Not a command of its own: a full driver run prints PASS the store's copy has the same RDFC-1.0 hash</td></tr>
+<tr><td>RDFC-1.0</td><td data-k="Its role here">A hash of the graph's meaning, so two copies can be proved equal</td><td data-k="Where">The <code>rdf-store</code> skill, in the Databricks and Fuseki loads</td><td data-k="See it">Not a command of its own: each load compares the store's hash with the release files'</td></tr>
 </tbody></table></div><h3>Tools</h3><div class="tblwrap"><table class="stack"><thead><tr><th>Tool</th><th>Its role here</th><th>See it</th></tr></thead><tbody>
 <tr><td>rdflib</td><td data-k="Its role here">Reads and writes Turtle, and runs SPARQL, in every builder and test</td><td data-k="See it"><code>cd regression &amp;&amp; uv run --with rdflib python ask.py q36-the-crack</code></td></tr>
 <tr><td>pySHACL</td><td data-k="Its role here">Runs SHACL in Python, before any load</td><td data-k="See it">The SHACL row above</td></tr>
-<tr><td>ROBOT with ELK</td><td data-k="Its role here">Reasons once before the load, because Neo4j does no OWL reasoning. It finds 2 inferences today</td><td data-k="See it"><code>cd $SKILLS/ontology-to-lpg/scripts &amp;&amp; uv run --no-project --with rdflib python3 run_projection.py --config &lt;repo&gt;/business_architecture/ontology/projection/skill-run/epm-run.json --only project   # writes inferred.nt in ~/lpg-out/epm</code></td></tr>
-<tr><td>qSKOS checks</td><td data-k="Its role here">Taxonomy quality, in the <code>ontology</code> skill's <code>check_taxonomy.py</code>. A plain run on <code>core</code> lists 1,192 findings, most of them code values read as untagged text, which <code>--code-property</code> exempts. the decision of 2026-10-25 and the decision of 2026-10-26 record how the findings were settled</td><td data-k="See it"><code>uv run --with rdflib python &lt;skills&gt;/data/ontology/scripts/check_taxonomy.py releases/core/2.4.0/core.ttl</code></td></tr>
-<tr><td>Neo4j</td><td data-k="Its role here">Holds the ontology as a property graph, and the technical graph beside it</td><td data-k="See it"><code>MATCH (n:Resource) RETURN count(n);   // 4193</code></td></tr>
-<tr><td>n10s (neosemantics)</td><td data-k="Its role here">Loads RDF into Neo4j, compiles SHACL there, and exports RDF for the round trip</td><td data-k="See it"><code>CALL n10s.validation.shacl.listShapes() YIELD target RETURN count(*);   // local Neo4j: 762; AuraDB has no n10s</code></td></tr>
-<tr><td>APOC</td><td data-k="Its role here">Neo4j utilities the load relies on; run this on the local Neo4j or AuraDB</td><td data-k="See it"><code>CALL apoc.meta.stats() YIELD labelCount, relTypeCount RETURN labelCount, relTypeCount;</code></td></tr>
-<tr><td>Apache Jena Fuseki</td><td data-k="Its role here">The standing triple store, which holds all three graphs of each module. The driver also starts transient Fuseki stores for its checks, one of which proves the walks match Neo4j's, and removes them</td><td data-k="See it">A driver run: <code>run_projection.py</code>, step <code>jena</code>; <code>sync_stores.py check --store jena</code></td></tr>
-<tr><td>Delta and Unity Catalog</td><td data-k="Its role here">Delta holds <code>epm_triples</code> and the demo's tables. Unity Catalog names them, carries tags and records lineage</td><td data-k="See it"><code>SELECT tag_value FROM system.information_schema.table_tags WHERE schema_name = 'semantic_sem_commercial' AND tag_name = 'epm_measure_identifiers';</code></td></tr>
-<tr><td>Metric views</td><td data-k="Its role here">Define each measure once over a table</td><td data-k="See it"><code>SELECT Effective_Month, MEASURE(Avg_Crack_Spread) FROM idp_sbx.semantic_sem_commercial.mpr_mips_crack_spread_price_fact_metrics_vw GROUP BY Effective_Month;</code></td></tr>
-<tr><td>Genie and the orchestrator</td><td data-k="Its role here">Answer questions over the bound views; the orchestrator picks the agents</td><td data-k="See it"><code>cd ../../demos/downstream-pricing-databricks-free &amp;&amp; uv run python -m pricing_demo.supervisor ask "..."   # uses Databricks' daily limit</code></td></tr>
-<tr><td>SPARQL Anything</td><td data-k="Its role here">Turns SQL files, run commands, JSON and CSV into the technical graph</td><td data-k="See it"><code>cd ../../demos/downstream-pricing-databricks-free &amp;&amp; uv run --group graph python -m pricing_demo.tech_graph build   # rewrites graph/*.ttl</code></td></tr>
-<tr><td>DuckDB, PostgreSQL</td><td data-k="Its role here">The demo's source databases, and their copy to Parquet</td><td data-k="See it"><code>cd ../../demos/downstream-pricing-databricks-free &amp;&amp; uv run python -m pricing_demo.replicate</code></td></tr>
-<tr><td>Parallel Decisions API</td><td data-k="Its role here">Outside events for the demo, kept in a cache so a rerun sends nothing</td><td data-k="See it"><code>cd ../../demos/downstream-pricing-databricks-free &amp;&amp; uv run --group outside python -m pricing_demo.outside plan   # 0 to send</code></td></tr>
-<tr><td><code>scripts/check.sh</code>, <code>epm_facts.py</code></td><td data-k="Its role here">Every check before a push; figures, sweeps and finds</td><td data-k="See it"><code>python3 ../../scripts/epm_facts.py counts</code></td></tr>
+<tr><td>ROBOT with ELK</td><td data-k="Its role here">Reasons once before the load, because Neo4j does no OWL reasoning. It finds 2 inferences today</td><td data-k="See it">The driver's <code>project</code> step: <code>projection/README.md</code>, "Run the projection"</td></tr>
+<tr><td>qSKOS checks</td><td data-k="Its role here">Taxonomy quality, in the <code>ontology</code> skill's <code>check_taxonomy.py</code></td><td data-k="See it"><code>uv run --with rdflib python ../../skills/ontology/scripts/check_taxonomy.py releases/core/2.4.0/core.ttl</code></td></tr>
+<tr><td>Neo4j</td><td data-k="Its role here">Holds the ontology as a property graph, and the technical graph beside it</td><td data-k="See it"><code>MATCH (n:Resource) RETURN count(n);   // 4,237 at the last recorded load</code></td></tr>
+<tr><td>n10s (neosemantics)</td><td data-k="Its role here">Loads RDF into the local Neo4j, compiles SHACL there, and exports RDF for the round trip. The copy on Neo4j Enterprise needs no n10s</td><td data-k="See it"><code>CALL n10s.validation.shacl.listShapes() YIELD target RETURN count(*);</code></td></tr>
+<tr><td>APOC</td><td data-k="Its role here">Neo4j utilities the local load relies on</td><td data-k="See it"><code>CALL apoc.meta.stats() YIELD labelCount, relTypeCount RETURN labelCount, relTypeCount;</code></td></tr>
+<tr><td>Apache Jena Fuseki</td><td data-k="Its role here">The triple store, which holds all three graphs of each module. The driver also uses Fuseki datasets for its checks, one of which proves the saved walks match Neo4j's</td><td data-k="See it">The SPARQL count in "Where everything lives"</td></tr>
+<tr><td>Delta and Unity Catalog</td><td data-k="Its role here">Delta holds <code>epm_triples</code> and the technical graph's table. Unity Catalog names the objects and records lineage, which the discovery reads</td><td data-k="See it">The SQL count in "Where everything lives"</td></tr>
+<tr><td>Metric views</td><td data-k="Its role here">Define each measure once over a table. The discovery reads each one's definition</td><td data-k="See it"><code>DESCRIBE TABLE EXTENDED &lt;view&gt; AS JSON</code></td></tr>
+<tr><td>Genie</td><td data-k="Its role here">Answers questions over the tables a space is bound to. The discovery reads each space's tables</td><td data-k="See it">The <code>measure-link</code> rows of a discovery report</td></tr>
+<tr><td><code>scripts/check.sh</code>, <code>epm_facts.py</code></td><td data-k="Its role here">Every check, and the figures the documents quote</td><td data-k="See it"><code>uv run --with rdflib python ../../scripts/epm_facts.py counts</code></td></tr>
 </tbody></table></div>
+
 <h2 id="copy">Copy the ontology</h2>
-<p class="lead">To give a teammate 100% of the ontology and everything they need to understand and use it, copy the three groups below, keeping each repository path as it is. Every group is required. No scripts are needed: the ontology is the release files, and every document to read is an HTML page. In all: 210 files and three links. That is 169 release files, 34 pages and data files to understand it, and 7 files for using it.</p>
+<p class="lead">To give a teammate the ontology and everything they need to understand and use it, copy the three groups below, keeping each path as it is. The whole release is the simplest copy; these groups are the least that works. No scripts are needed to read it: the ontology is the release files, and every document to read is an HTML page.</p>
 
 <figure>
 <div class="diagram wide" role="img" aria-label="The package to share has three groups: the releases folder with thirteen modules, the HTML documents, and the files for using it in a graph and the method.">
 <svg viewBox="0 0 1040 380" xmlns="http://www.w3.org/2000/svg">
-  <rect class="lane" x="20" y="14" width="1000" height="50" rx="8"/><text class="t" x="40" y="44">What you send: three groups, each at its repository path</text>
+  <rect class="lane" x="20" y="14" width="1000" height="50" rx="8"/><text class="t" x="40" y="44">What you send: three groups, each at its path in the release</text>
   <rect class="lane" x="20" y="80" width="320" height="286" rx="8"/><text class="lane-l" x="36" y="104">1. The ontology itself</text>
-  <rect class="node store" x="36" y="118" width="288" height="44" rx="6"/><text class="t" x="50" y="137">releases/</text><text class="m" x="50" y="154">13 modules · 24 versions · 169 files</text>
+  <rect class="node store" x="36" y="118" width="288" height="44" rx="6"/><text class="t" x="50" y="137">releases/</text><text class="m" x="50" y="154">13 modules · 26 versions · 175 files</text>
   <rect class="node" x="56" y="172" width="268" height="44" rx="6"/><text class="t" x="70" y="191">&lt;module&gt;/&lt;version&gt;/</text><text class="m" x="70" y="208">.ttl .jsonld shapes manifest …</text>
   <rect class="node" x="56" y="226" width="268" height="40" rx="6"/><text class="t" x="70" y="250">&lt;module&gt;/CHANGELOG.md</text>
   <rect class="node" x="56" y="276" width="268" height="40" rx="6"/><text class="t" x="70" y="300">releases/catalog.ttl</text>
@@ -1201,29 +1127,28 @@ RETURN v.name, collect(a.name);</code></pre><h3>The technical graph: its nodes</
   <rect class="node key" x="376" y="118" width="288" height="44" rx="6"/><text class="t" x="390" y="137">epm-ontology-guide.html</text><text class="s" x="390" y="154">this page: start here</text>
   <rect class="node" x="376" y="172" width="288" height="40" rx="6"/><text class="t" x="390" y="196">README, MODULES, close-out .html</text>
   <rect class="node" x="376" y="222" width="288" height="40" rx="6"/><text class="t" x="390" y="246">13 ontology READMEs .html</text>
-  <rect class="node" x="376" y="272" width="288" height="40" rx="6"/><text class="t" x="390" y="296">decisions, glossary, proposals .html</text>
+  <rect class="node" x="376" y="272" width="288" height="40" rx="6"/><text class="t" x="390" y="296">glossary, proposals .html</text>
   <text class="s" x="376" y="346">Plus the process-map .json it is built from</text>
   <rect class="lane" x="700" y="80" width="320" height="286" rx="8"/><text class="lane-l" x="716" y="104">3. Using it, and the method</text>
-  <rect class="node" x="716" y="118" width="288" height="44" rx="6"/><text class="t" x="730" y="137">projection/ pages</text><text class="s" x="730" y="154">stores runbook, README, LOCAL-STORES</text>
+  <rect class="node" x="716" y="118" width="288" height="44" rx="6"/><text class="t" x="730" y="137">projection/ pages</text><text class="s" x="730" y="154">stores runbook, README</text>
   <rect class="node" x="716" y="172" width="288" height="40" rx="6"/><text class="t" x="730" y="196">skill-run/queries.json</text>
-  <rect class="node" x="716" y="222" width="288" height="40" rx="6"/><text class="t" x="730" y="246">two playbooks (skills repo)</text>
-  <rect class="node" x="716" y="272" width="288" height="40" rx="6"/><text class="t" x="730" y="296">Eraser diagram links</text>
+  <rect class="node" x="716" y="222" width="288" height="40" rx="6"/><text class="t" x="730" y="246">two playbooks, in skills/</text>
+  <rect class="node" x="716" y="272" width="288" height="40" rx="6"/>
   <text class="s" x="716" y="346">So the teammate can load and query it</text>
 </svg>
 </div>
 <div class="diagram tall" role="img" aria-label="The three groups to copy, as a list.">
 <svg viewBox="0 0 360 470" xmlns="http://www.w3.org/2000/svg">
   <rect class="lane" x="10" y="10" width="340" height="140" rx="8"/><text class="lane-l" x="24" y="34">1. The ontology itself</text>
-  <rect class="node store" x="24" y="46" width="312" height="44" rx="6"/><text class="t" x="38" y="65">releases/</text><text class="m" x="38" y="82">13 modules · 24 versions · 169 files</text>
+  <rect class="node store" x="24" y="46" width="312" height="44" rx="6"/><text class="t" x="38" y="65">releases/</text><text class="m" x="38" y="82">13 modules · 26 versions · 175 files</text>
   <text class="s" x="24" y="112">version folders, module changelogs,</text><text class="s" x="24" y="130">catalog.ttl; check with shasum</text>
   <rect class="lane" x="10" y="162" width="340" height="140" rx="8"/><text class="lane-l" x="24" y="186">2. The documents to understand it</text>
   <rect class="node key" x="24" y="198" width="312" height="44" rx="6"/><text class="t" x="38" y="217">epm-ontology-guide.html</text><text class="s" x="38" y="234">this page: start here</text>
-  <text class="s" x="24" y="264">README, MODULES, ontology READMEs,</text><text class="s" x="24" y="282">decisions, glossary, proposals; process map</text>
+  <text class="s" x="24" y="264">README, MODULES, ontology READMEs,</text><text class="s" x="24" y="282">glossary, proposals; process map</text>
   <rect class="lane" x="10" y="314" width="340" height="146" rx="8"/><text class="lane-l" x="24" y="338">3. Using it, and the method</text>
   <text class="s" x="24" y="364">stores runbook and projection pages</text>
   <text class="s" x="24" y="384">skill-run/queries.json</text>
   <text class="s" x="24" y="404">ontology and Neo4j playbooks</text>
-  <text class="s" x="24" y="424">Eraser diagram links</text>
 </svg>
 </div>
 <figcaption>Copy each group with its folders as they are, so every link between the pages still works.</figcaption>
@@ -1231,7 +1156,7 @@ RETURN v.name, collect(a.name);</code></pre><h3>The technical graph: its nodes</
 </figure>
 
 <h3>1. The ontology itself</h3>
-<p>Copy the whole folder <code>business_architecture/ontology/releases/</code>: 13 modules, 24 version folders and 169 files, about 20 MB, in this release (12 modules, 51 version folders and 336 files on main since technical-graph 1.0.0, 2026-11-02). Copy every version, not only the newest: a module requires named versions of others (ref-mpc 1.2.0 requires organization 2.0.0 and party 1.0.0, for example), and each manifest points at them.</p>
+<p>Copy the whole folder <code>business_architecture/ontology/releases/</code>: 13 modules, 26 version folders and 175 files. It holds each module's newest package and, in <code>previous/</code>, the one before it.</p>
 <div class="tblwrap"><table class="stack">
 <thead><tr><th>Path</th><th>What it is, and why it is needed</th></tr></thead>
 <tbody>
@@ -1239,33 +1164,34 @@ RETURN v.name, collect(a.name);</code></pre><h3>The technical graph: its nodes</
 <tr><td><code>releases/&lt;module&gt;/&lt;version&gt;/&lt;module&gt;.jsonld</code></td><td data-k="Why">The same content in JSON-LD, for tools that read JSON.</td></tr>
 <tr><td><code>releases/&lt;module&gt;/&lt;version&gt;/shapes.ttl</code></td><td data-k="Why">The SHACL shapes: what valid data in the module looks like. Run them to check the content after any change.</td></tr>
 <tr><td><code>releases/&lt;module&gt;/&lt;version&gt;/catalog.ttl</code></td><td data-k="Why">The release's DCAT record: its title, version, issue date, and its files as distributions with their media types.</td></tr>
-<tr><td><code>releases/&lt;module&gt;/&lt;version&gt;/manifest.json</code></td><td data-k="Why">The release's facts in one file: <code>version</code>, <code>depends_on</code> (the versions it requires), <code>decisions</code> (the records behind it), who approved it (<code>approved_by</code>; core 2.0.0 to 2.4.0 call it <code>approval</code>, and core 1.0.0's manifest predates these fields), the triple count (core keeps its counts in <code>counts.json</code>), and a SHA-256 hash for every other file in the folder.</td></tr>
+<tr><td><code>releases/&lt;module&gt;/&lt;version&gt;/manifest.json</code></td><td data-k="Why">The release's facts in one file: <code>version</code>, <code>depends_on</code> (the versions it requires), <code>decisions</code> (the decisions behind it), who approved it (<code>approved_by</code>; core 2.0.0 to 2.4.0 call it <code>approval</code>, and core 1.0.0's manifest predates these fields), the triple count (core keeps its counts in <code>counts.json</code>), and a SHA-256 hash for every other file in the folder.</td></tr>
 <tr><td><code>releases/&lt;module&gt;/&lt;version&gt;/CHANGELOG.md</code></td><td data-k="Why">What this version changed, who approved it, and its known gaps.</td></tr>
-<tr><td><code>releases/core/&lt;version&gt;/canonical-facts.csv</code>, <code>counts.json</code></td><td data-k="Why">Core's extras: the evidence row behind each approved process relationship, and the release's counts. Core 1.0.0 also holds <code>conservation.csv</code> and <code>label-dispositions.csv</code>, the ledger of how every source row was handled.</td></tr>
+<tr><td><code>releases/core/&lt;version&gt;/canonical-facts.csv</code>, <code>counts.json</code></td><td data-k="Why">Core's extras: the evidence row behind each approved process relationship, and the release's counts.</td></tr>
 <tr><td><code>releases/&lt;module&gt;/CHANGELOG.md</code></td><td data-k="Why">Each module's whole history in one file (every module but core; core's is <code>business_architecture/ontology/release/CHANGELOG.md</code>, listed in group 2 as HTML).</td></tr>
-<tr><td><code>releases/catalog.ttl</code></td><td data-k="Why">The DCAT catalog of all 13 released packages in this release: the one file that lists what exists.</td></tr>
+<tr><td><code>releases/catalog.ttl</code></td><td data-k="Why">The DCAT catalog of the 13 newest packages: the one file that lists what exists.</td></tr>
 </tbody></table></div>
 
-<p>The newest version of each module, from its manifest. Load these together for the whole ontology (37,206 triples):</p>
+<p>The newest version of each module, from its manifest. Load these together for the whole ontology (37,233 triples):</p>
 <div class="tblwrap"><table class="stack">
 <thead><tr><th>Module</th><th class="n">Newest</th><th>Requires</th></tr></thead>
 <tbody>
 <tr><td>core</td><td class="n" data-k="Newest">2.4.0</td><td data-k="Requires">nothing</td></tr>
-<tr><td>organization</td><td class="n" data-k="Newest">2.2.0</td><td data-k="Requires">core 2.3.0</td></tr>
-<tr><td>ref-mpc</td><td class="n" data-k="Newest">1.3.0</td><td data-k="Requires">organization 2.1.0, party 2.0.0</td></tr>
-<tr><td>kpi</td><td class="n" data-k="Newest">1.3.0</td><td data-k="Requires">core 2.3.0</td></tr>
+<tr><td>organization</td><td class="n" data-k="Newest">2.2.0</td><td data-k="Requires">core 2.4.0</td></tr>
+<tr><td>ref-mpc</td><td class="n" data-k="Newest">1.3.0</td><td data-k="Requires">organization 2.2.0, party 2.1.0</td></tr>
+<tr><td>kpi</td><td class="n" data-k="Newest">1.3.0</td><td data-k="Requires">core 2.4.0</td></tr>
 <tr><td>party</td><td class="n" data-k="Newest">2.1.0</td><td data-k="Requires">core 2.4.0, system 1.5.0</td></tr>
-<tr><td>data-product</td><td class="n" data-k="Newest">1.2.0</td><td data-k="Requires">core 2.3.0, kpi 1.2.0, system 1.2.0</td></tr>
-<tr><td>value-stream</td><td class="n" data-k="Newest">1.2.0</td><td data-k="Requires">core 2.3.0, data-product 1.2.0, kpi 1.2.0</td></tr>
+<tr><td>data-product</td><td class="n" data-k="Newest">1.2.0</td><td data-k="Requires">core 2.4.0, kpi 1.3.0, system 1.5.0</td></tr>
+<tr><td>value-stream</td><td class="n" data-k="Newest">1.2.0</td><td data-k="Requires">core 2.4.0, data-product 1.2.0, kpi 1.3.0</td></tr>
 <tr><td>system</td><td class="n" data-k="Newest">1.5.0</td><td data-k="Requires">core 2.4.0</td></tr>
-<tr><td>lane</td><td class="n" data-k="Newest">1.1.0</td><td data-k="Requires">core 2.3.0</td></tr>
-<tr><td>market-data</td><td class="n" data-k="Newest">1.1.0</td><td data-k="Requires">kpi 1.2.0</td></tr>
-<tr><td>integration</td><td class="n" data-k="Newest">2.5.0</td><td data-k="Requires">core 2.4.0, organization 2.2.0, kpi 1.2.0, data-product 1.2.0, value-stream 1.2.0, system 1.5.0, lane 1.1.0, market-data 1.1.0, party 2.1.0</td></tr>
-<tr><td>technical-graph</td><td class="n" data-k="Newest">1.0.0</td><td data-k="Requires">data-product 1.2.0, kpi 1.3.0, system 1.5.0</td></tr>
+<tr><td>lane</td><td class="n" data-k="Newest">1.1.0</td><td data-k="Requires">core 2.4.0</td></tr>
+<tr><td>market-data</td><td class="n" data-k="Newest">1.1.0</td><td data-k="Requires">kpi 1.3.0</td></tr>
+<tr><td>integration</td><td class="n" data-k="Newest">2.5.0</td><td data-k="Requires">core 2.4.0, organization 2.2.0, kpi 1.3.0, data-product 1.2.0, value-stream 1.2.0, system 1.5.0, lane 1.1.0, market-data 1.1.0, party 2.1.0</td></tr>
+<tr><td>technical-graph</td><td class="n" data-k="Newest">1.1.0</td><td data-k="Requires">data-product 1.2.0, kpi 1.3.0, system 1.5.0</td></tr>
 <tr><td>logical-model</td><td class="n" data-k="Newest">1.0.0</td><td data-k="Requires">party 2.1.0, system 1.5.0, data-product 1.2.0</td></tr>
 </tbody></table></div>
 <p>To check that a copied version folder is complete and unchanged, the teammate hashes its files and compares each hash with the <code>files</code> entry in that folder's <code>manifest.json</code>. For kpi 1.2.0, for example:</p>
-<pre><code>cd business_architecture/ontology/releases/previous/kpi/1.2.0 &amp;&amp; shasum -a 256 kpi.ttl kpi.jsonld shapes.ttl catalog.ttl CHANGELOG.md</code></pre>
+<pre data-snippet="bash run=release-copy"><code>(cd business_architecture/ontology/releases/kpi/1.3.0 &amp;&amp; python3 -c "import hashlib, json; m = json.load(open('manifest.json')); print(all(hashlib.sha256(open(f, 'rb').read()).hexdigest() == h for f, h in m['files'].items()))")</code></pre>
+<pre data-snippet="text expect"><code>True</code></pre>
 <p class="note">On 2026-10-26 this printed <code>01cacca9…</code> for <code>kpi.ttl</code> and <code>0041493b…</code> for <code>CHANGELOG.md</code>, the hashes kpi 1.2.0's manifest records.</p>
 
 <h3>2. The documents to understand it</h3>
@@ -1293,7 +1219,6 @@ RETURN v.name, collect(a.name);</code></pre><h3>The technical graph: its nodes</
 <tr><td><code>business_architecture/ontology/authority/README.html</code></td><td data-k="Why">Integration's evidence tiers: which source wins.</td></tr>
 <tr><td><code>business_architecture/ontology/consumer/README.html</code></td><td data-k="Why">Integration's consumer rules: what an agent may answer and must refuse.</td></tr>
 <tr><td><code>business_architecture/domain/business-glossary.html</code></td><td data-k="Why">The business terms, one meaning each, that the labels and definitions use.</td></tr>
-<tr><td><code>business_architecture/domain/decisions/decisions.html</code></td><td data-k="Why">Every decision record: the "why" behind each modelling choice, with the words of a subject matter expert reviewing the documents.</td></tr>
 <tr><td><code>business_architecture/business_process/proposals/MPC-P02-refining-ids.html</code>, <code>MPC-P03-transfer-coverage-gaps.html</code>, <code>MPC-P04-renewables-traceability.html</code>, <code>MPC-P10-customer-lifecycle.html</code>, <code>MPC-P11-customer-process-systems.html</code>, <code>MPC-P12-shared-process-names.html</code></td><td data-k="Why">The process-map proposals: changes to the map suggested by the build, each with its status.</td></tr>
 </tbody></table></div>
 <p>The modules are built from the process-map authority files. They are data, so they stay as files:</p>
@@ -1311,16 +1236,15 @@ RETURN v.name, collect(a.name);</code></pre><h3>The technical graph: its nodes</
 <div class="tblwrap"><table class="stack">
 <thead><tr><th>Path</th><th>Why it is needed</th></tr></thead>
 <tbody>
-<tr><td><code>business_architecture/ontology/projection/ontology-stores-runbook.html</code></td><td data-k="Why">How the ontology reaches Neo4j, AuraDB and Databricks, and how to check, stop, start, purge, reload and keep in step each store.</td></tr>
+<tr><td><code>business_architecture/ontology/projection/ontology-stores-runbook.html</code></td><td data-k="Why">The first run: how the ontology reaches Databricks, Fuseki and Neo4j, step by step, and how to check each store.</td></tr>
 <tr><td><code>business_architecture/ontology/projection/README.html</code></td><td data-k="Why">The projection into a property graph: its rules, inputs and last run.</td></tr>
 <tr><td><code>business_architecture/ontology/projection/skill-run/README.html</code></td><td data-k="Why">How to run the <code>ontology-to-lpg</code> skill's driver on these releases.</td></tr>
 <tr><td><code>business_architecture/ontology/projection/skill-run/queries.json</code></td><td data-k="Why">The 14 saved walks across the graph, the starting points for exploring it.</td></tr>
-<tr><td><code>skills/ontology/references/ontology-build-playbook.html</code> (the skills folder)</td><td data-k="Why">The ontology method: why and how each step is done, and, in section 5, the testing and validation every change passes.</td></tr>
-<tr><td><code>skills/ontology-to-lpg/references/ontology-to-neo4j-playbook.html</code> (the skills folder)</td><td data-k="Why">The projection method: how the ontology becomes a property graph.</td></tr>
-<tr><td>EPM ontology: modules and how they connect (2026-11-03), EPM ontology, projections and the pricing demo (2026-11-03), EPM ontology and the pricing demo: data flow (2026-11-03)</td><td data-k="Why">The module, architecture and data-flow snapshots dated 2026-11-03, in Eraser. The architecture and data-flow snapshots describe the viewer as work pending; both predate the completed viewer release. Send the links; the teammate needs access to the folder.</td></tr>
+<tr><td><code>skills/ontology/references/ontology-build-playbook.html</code></td><td data-k="Why">The ontology method: why and how each step is done, and, in section 5, the testing and validation every change passes.</td></tr>
+<tr><td><code>skills/ontology-to-lpg/references/ontology-to-neo4j-playbook.html</code></td><td data-k="Why">The projection method: how the ontology becomes a property graph.</td></tr>
 </tbody></table></div>
 
-<p class="notice">Every path above is in this repository, except the two playbook pages, which are in the the skills folder repository. The <code>.html</code> pages beside a Markdown file are generated from it by <code>scripts/build_docs_html.py</code>; copy the <code>.html</code>, and keep the Markdown if your teammate will edit the documents.</p>
+<p class="notice">Every path above is in this release. The <code>.html</code> pages beside a Markdown file are generated from it by <code>scripts/build_docs_html.py</code>; copy the <code>.html</code>, and keep the Markdown if your teammate will edit the documents.</p>
 
 <h3>What you do not need</h3>
 <div class="tblwrap"><table class="stack">
@@ -1328,58 +1252,36 @@ RETURN v.name, collect(a.name);</code></pre><h3>The technical graph: its nodes</
 <tbody>
 <tr><td>Builders and tests (<code>.py</code>)</td><td data-k="Why">They make and check the releases; a teammate who reads or loads the ontology does not run them.</td></tr>
 <tr><td>The source CSVs and working <code>.ttl</code> files in the module folders</td><td data-k="Why">The releases hold their content, built, checked and hashed.</td></tr>
-<tr><td><code>business_architecture/ontology/step4/review-evidence/</code></td><td data-k="Why">The review evidence behind past decisions; <code>decisions.html</code> carries what each decided.</td></tr>
-<tr><td>The <code>step3c-*</code> work files in <code>business_architecture/ontology/</code></td><td data-k="Why">Working notes of the naming pass, finished long before the releases.</td></tr>
-<tr><td><code>business_architecture/ontology/trials/</code></td><td data-k="Why">Trial runs, not part of any release.</td></tr>
 </tbody></table></div>
 
 <h2 id="tools">The tools behind it</h2>
-<p class="lead">Every tool used to build the ontology and the demo, with the version a file in this repository records, what it does here and where, and its licence or cost. "Not pinned" means the machine's version was used; "not versioned" means a hosted service or a part of this work with no version of its own.</p>
-<h3>Building the ontology</h3>
+<p class="lead">Every tool this release uses, with the version a file in the release records, what it does here and where, and its licence. "Not pinned" means the machine's version is used.</p>
 <div class="tblwrap"><table class="stack">
-<thead><tr><th>Tool</th><th>Version</th><th>Role here, and where</th><th>Licence or cost</th></tr></thead>
+<thead><tr><th>Tool</th><th>Version</th><th>Role here, and where</th><th>Licence</th></tr></thead>
 <tbody>
-<tr><td>Python</td><td data-k="Version">3.12 (<code>.github/workflows/checks.yml</code>)</td><td data-k="Role here, and where">The language of every builder, test and script</td><td data-k="Licence or cost">See python.org</td></tr>
-<tr><td>uv</td><td data-k="Version">Version not pinned</td><td data-k="Role here, and where">Runs each script with its dependencies (<code>scripts/check.sh</code>, the demo's <code>pyproject.toml</code>)</td><td data-k="Licence or cost">Apache-2.0</td></tr>
-<tr><td>rdflib</td><td data-k="Version">7.1.4 in the demo; not pinned in <code>check.sh</code></td><td data-k="Role here, and where">Reads and writes the Turtle; runs SPARQL in the builders and tests</td><td data-k="Licence or cost">BSD-3-Clause</td></tr>
-<tr><td>pySHACL</td><td data-k="Version">Not pinned (<code>check.sh</code>)</td><td data-k="Role here, and where">Validates every module against its SHACL shapes</td><td data-k="Licence or cost">Apache-2.0</td></tr>
-<tr><td>ROBOT, with the ELK reasoner</td><td data-k="Version">1.9.10 (<code>projection/README.md</code>, checksum given)</td><td data-k="Role here, and where">The reasoning step of the projection: what the ontology entails</td><td data-k="Licence or cost">ROBOT: BSD-3-Clause; ELK: Apache-2.0</td></tr>
-<tr><td>qSKOS checks</td><td data-k="Version">Not versioned (the <code>ontology</code> skill's <code>check_taxonomy.py</code>, a change to the skills folder)</td><td data-k="Role here, and where">Taxonomy quality issues an offline build can check (the decision of 2026-10-25)</td><td data-k="Licence or cost">Part of the skill</td></tr>
-<tr><td>The <code>ontology</code> skill</td><td data-k="Version">Not versioned (its playbook in the skills folder)</td><td data-k="Role here, and where">The gated method every module was built with: Steps 1 to 12, the evidence gate, releases</td><td data-k="Licence or cost">The decision owner's skills repository</td></tr>
-<tr><td><code>scripts/check.sh</code> and <code>scripts/epm_facts.py</code></td><td data-k="Version">Not versioned (this repository)</td><td data-k="Role here, and where">The checks before every push: the Step 4 gate, every test, counts, decision records, quotes, names, citations; figures, sweeps and finds</td><td data-k="Licence or cost">This repository</td></tr>
-<tr><td>GitHub and GitHub Actions</td><td data-k="Version">Not versioned (workflows <code>checks.yml</code> and <code>links.yml</code>)</td><td data-k="Role here, and where">Every change goes through a change; CI runs <code>check.sh</code> and a link check</td><td data-k="Licence or cost">The decision owner's account</td></tr>
+<tr><td>Python</td><td data-k="Version">3.11 or later</td><td data-k="Role">The language of every builder, test and script</td><td data-k="Licence">See python.org</td></tr>
+<tr><td>uv</td><td data-k="Version">Not pinned</td><td data-k="Role">Runs each script with its dependencies (<code>scripts/check.sh</code>)</td><td data-k="Licence">Apache-2.0</td></tr>
+<tr><td>rdflib</td><td data-k="Version">Not pinned in <code>check.sh</code>; 7.6.0 in the notebook</td><td data-k="Role">Reads and writes the Turtle; runs SPARQL in the builders and tests</td><td data-k="Licence">BSD-3-Clause</td></tr>
+<tr><td>pySHACL</td><td data-k="Version">Not pinned (<code>check.sh</code>)</td><td data-k="Role">Validates every module against its SHACL shapes</td><td data-k="Licence">Apache-2.0</td></tr>
+<tr><td>pyoxigraph</td><td data-k="Version">0.5.13 (<code>check.sh</code>, the notebook)</td><td data-k="Role">The RDFC-1.0 hash that proves a store's copy</td><td data-k="Licence">Apache-2.0 or MIT</td></tr>
+<tr><td>sqlglot, PyYAML</td><td data-k="Version">30.31.0, 6.0.3 (<code>check.sh</code>, the notebook)</td><td data-k="Role">Read a metric view's definition and the table names inside its SQL</td><td data-k="Licence">MIT</td></tr>
+<tr><td>ROBOT, with the ELK reasoner</td><td data-k="Version">1.9.10 (<code>projection/README.md</code>, checksum given)</td><td data-k="Role">The reasoning step of the projection: what the ontology entails</td><td data-k="Licence">ROBOT: BSD-3-Clause; ELK: Apache-2.0</td></tr>
+<tr><td>Neo4j, with APOC</td><td data-k="Version">2025.06.2 (<code>projection/README.md</code>)</td><td data-k="Role">The local property-graph store, and the Enterprise database that holds its copy</td><td data-k="Licence">Neo4j's own licences; APOC: Apache-2.0</td></tr>
+<tr><td>neosemantics (n10s)</td><td data-k="Version">2025.06.1 (<code>projection/README.md</code>)</td><td data-k="Role">Loads the Turtle into the local Neo4j and exports it back for the round trip</td><td data-k="Licence">Apache-2.0</td></tr>
+<tr><td>Apache Jena Fuseki</td><td data-k="Version">6.2.0 (the <code>rdf-store</code> skill's <code>references/stores.md</code>)</td><td data-k="Role">The triple store, served by the plain Apache jar</td><td data-k="Licence">Apache-2.0</td></tr>
+<tr><td>Databricks</td><td data-k="Version">A hosted service; databricks-sdk 0.164.0 in the notebook</td><td data-k="Role">Unity Catalog, the table <code>epm_triples</code>, the objects the discovery reads, Genie spaces</td><td data-k="Licence">The client's account</td></tr>
+<tr><td>The <code>ontology</code>, <code>ontology-to-lpg</code> and <code>rdf-store</code> skills</td><td data-k="Version">In the release's <code>skills/</code> folder</td><td data-k="Role">The gated build method, the projection driver, and the store round trip</td><td data-k="Licence">Part of the release</td></tr>
+<tr><td><code>scripts/check.sh</code> and <code>scripts/epm_facts.py</code></td><td data-k="Version">Part of the release</td><td data-k="Role">Every check, and the figures the documents quote</td><td data-k="Licence">Part of the release</td></tr>
 </tbody></table></div>
-<h3>The demo and the stores</h3>
-<div class="tblwrap"><table class="stack">
-<thead><tr><th>Tool</th><th>Version</th><th>Role here, and where</th><th>Licence or cost</th></tr></thead>
-<tbody>
-<tr><td>Docker</td><td data-k="Version">Version not pinned</td><td data-k="Role here, and where">Runs the local Postgres and Neo4j containers</td><td data-k="Licence or cost">Docker Desktop</td></tr>
-<tr><td>PostgreSQL</td><td data-k="Version">16.10 (<code>docker/docker-compose.yml</code>)</td><td data-k="Role here, and where">The demo's seven source databases and the hidden <code>decision_truth</code>, locally and on a remote host</td><td data-k="Licence or cost">PostgreSQL License (postgresql.org/about/licence)</td></tr>
-<tr><td>a remote host</td><td data-k="Version">Not versioned (host <code>source-postgres-host</code>, reached through an SSH tunnel)</td><td data-k="Role here, and where">A second home for the source databases (demo README, "Run it")</td><td data-k="Licence or cost">The decision owner's account</td></tr>
-<tr><td>DuckDB</td><td data-k="Version">1.4.1 (<code>pyproject.toml</code>)</td><td data-k="Role here, and where">Replicates each source table to Parquet with a manifest</td><td data-k="Licence or cost">MIT</td></tr>
-<tr><td>psycopg, PyArrow</td><td data-k="Version">3.3.4, 21.0.0 (<code>pyproject.toml</code>)</td><td data-k="Role here, and where">Postgres access; the Parquet files</td><td data-k="Licence or cost">LGPL-3.0; Apache-2.0</td></tr>
-<tr><td>Databricks Free Edition</td><td data-k="Version">Not versioned (a hosted service; one serverless SQL warehouse, <code>store-tests-2026-10-25.md</code>)</td><td data-k="Role here, and where">Unity Catalog, the replica, silver and gold layers, metric views, definitions views, <code>epm_triples</code>, Genie agents, a serverless job</td><td data-k="Licence or cost">Free Edition</td></tr>
-<tr><td>Databricks SDK and SQL connector</td><td data-k="Version">0.128.0 and 4.4.0 (<code>pyproject.toml</code>)</td><td data-k="Role here, and where">Every call the demo makes to Databricks</td><td data-k="Licence or cost">Apache-2.0</td></tr>
-<tr><td>Databricks Foundation Model API</td><td data-k="Version"><code>databricks-qwen35-122b-a10b</code> (<code>supervisor.py</code>; <em>2026-10-30, Plan 1 step 6:</em> it replaced <code>databricks-meta-llama-3-3-70b-instruct</code>)</td><td data-k="Role here, and where">The orchestrator's model, which routes a question to the Genie agents</td><td data-k="Licence or cost">Free Edition</td></tr>
-<tr><td>Neo4j, with APOC</td><td data-k="Version">2025.06.2 (the skill's <code>docker/compose.yaml</code>)</td><td data-k="Role here, and where">The local property-graph store</td><td data-k="Licence or cost">Neo4j Community: GPL-3.0; APOC: Apache-2.0</td></tr>
-<tr><td>neosemantics (n10s)</td><td data-k="Version">2025.06.1 (<code>projection/README.md</code>, checksum given)</td><td data-k="Role here, and where">Loads the Turtle into Neo4j and exports it back for the round trip</td><td data-k="Licence or cost">Apache-2.0</td></tr>
-<tr><td>Neo4j AuraDB</td><td data-k="Version">Not versioned (the Aura Free tier, <code>store-tests-2026-10-25.md</code>)</td><td data-k="Role here, and where">The cloud copy of the local graph</td><td data-k="Licence or cost">Aura Free</td></tr>
-<tr><td>Neo4j Python driver</td><td data-k="Version">5.28.1 (<code>pyproject.toml</code>, group <code>graph</code>)</td><td data-k="Role here, and where">The demo's technical graph loads and walks</td><td data-k="Licence or cost">Apache-2.0</td></tr>
-<tr><td>Apache Jena Fuseki</td><td data-k="Version">6.2.0 (<code>store-tests-2026-10-25.md</code>)</td><td data-k="Role here, and where">The standing triple store, plus the transient stores the driver loads for its checks and removes</td><td data-k="Licence or cost">Apache-2.0</td></tr>
-<tr><td>SPARQL Anything</td><td data-k="Version">1.3.0, through pysparql-anything 1.3.0.0, on Java 24 (demo README, E5)</td><td data-k="Role here, and where">Builds the technical graph and the decision trail from the demo's own files</td><td data-k="Licence or cost">Apache-2.0</td></tr>
-<tr><td>Parallel Decisions API</td><td data-k="Version">Through parallel-web 1.3.7 (<code>pyproject.toml</code>, group <code>outside</code>)</td><td data-k="Role here, and where">The outside context: event scan, decision diagnosis, forward look</td><td data-k="Licence or cost">137 calls cost $0.13 (demo README, E6); the SDK is MIT</td></tr>
-<tr><td>parallel-cli</td><td data-k="Version">Version not recorded in the repository</td><td data-k="Role here, and where">Reads the account balance before and after a run (demo README, E6)</td><td data-k="Licence or cost">Comes with the Parallel account</td></tr>
-<tr><td>Eraser</td><td data-k="Version">Not versioned (a hosted service; the decision owner's folder)</td><td data-k="Role here, and where">The architecture and data-flow diagrams ("Where to read more" above)</td><td data-k="Licence or cost">The decision owner's account</td></tr>
-</tbody></table></div>
-<p class="note">Licences are as each project's GitHub repository records them (read 2026-10-29); Python's repository records no standard licence identifier, so see python.org; ELK and APOC are named beside the tools they ship with.</p>
+<p class="note">Licences are as each project's own repository records them (read 2026-10-29); Python's repository records no standard licence identifier, so see python.org.</p>
 
 <h2 id="open">What is still open</h2>
-<p class="notice"><code>business_architecture/ontology/OPEN-ITEMS.md</code> is the current list of what is open on the ontology and what we need from the business. To change the ontology or add a module, follow the walkthrough's "How to change the ontology". The table below is this guide's dated summary.</p>
+<p class="notice"><code>business_architecture/ontology/OPEN-ITEMS.md</code> is the current list of what is open on the ontology and what we need from the business. To change the ontology or add a module, follow <code>HOW-TO-UPDATE.md</code>. The table below is this guide's dated summary.</p>
 <p class="lead">The ontology is done (the decision of 2026-10-26, 2026-10-26): MPC-P11 and MPC-P12 are accepted and released, and the deferred qSKOS fixes are released. the subject matter expert's customer inputs of 2026-10-27 then brought <code>party</code> 2.0.0 and three minor releases, and two gaps that stay open with the business (the decision of 2026-10-27). What stays open is below. the decision of 2026-10-26 lists four kinds: the business's close-out points, which the decision owner worked through on 2026-10-28 (the decision of 2026-10-23), with points 1 and 2 kept open by the decision owner's choice; the next releases' small fixes; the items parked for other reasons; and usage and integration, a separate, later task. The table also carries the gaps the releases' changelogs record. Since 2026-10-31 it also carries the four deferred process areas, from the APQC scope review.</p>
 <div class="tblwrap"><table class="stack">
 <thead><tr><th>Item</th><th>What it needs</th><th>Record</th></tr></thead>
 <tbody>
-<tr><td>Four process areas ruled in scope on 2026-09-17 with no process in the map: product recalls and regulatory audits, human capital, data and analytics governance, remediation</td><td data-k="Needs">Deferred by the subject matter expert on 2026-10-31. Bringing one in takes a new decision</td><td data-k="Record">an earlier change</td></tr>
+<tr><td>Four process areas ruled in scope on 2026-09-17 with no process in the map: product recalls and regulatory audits, human capital, data and analytics governance, remediation</td><td data-k="Needs">Deferred by the owner on 2026-10-31. Bringing one in takes a new decision</td><td data-k="Record"><code>OPEN-ITEMS.md</code></td></tr>
 <tr><td>Who owns each concept's meaning</td><td data-k="Needs">An owner for each module or scheme, from the business (competency question 17).</td><td data-k="Record">the decision of 2026-10-23; close-out point 1</td></tr>
 <tr><td>Market Data accountability</td><td data-k="Needs">Confirm the Risk Group's mandate, or name the accountable group.</td><td data-k="Record">the decision of 2026-10-18; point 2</td></tr>
 <tr><td>Customer systems and PIDX families</td><td data-k="Needs">Federal Health and what MPC sends the four systems, from the customer-data owner; the PIDX family letters, confirmed with PIDX. Points 3 and 4 closed and the product list closed on 2026-10-28.</td><td data-k="Record">Points 5 and 11</td></tr>
@@ -1400,7 +1302,7 @@ RETURN v.name, collect(a.name);</code></pre><h3>The technical graph: its nodes</
 </tbody></table></div>
 
 <div class="src" id="sources">
-<p><strong>Sources.</strong> The newest release of each module under <code>business_architecture/ontology/releases/</code> (its <code>.ttl</code>, <code>manifest.json</code> and <code>CHANGELOG.md</code>); <code>scripts/epm_facts.py modules</code> and <code>counts</code> at commit <code>40b3082</code>; <code>MODULES.md</code>; <code>business-closeout.md</code>; the decision records the decision of 2026-10-05, the decision of 2026-10-05, the decision of 2026-10-05, the decision of 2026-10-13, the decision of 2026-10-13, the decision of 2026-10-18, the decision of 2026-10-18, the decision of 2026-10-18, the decision of 2026-10-18, the decision of 2026-10-18, the decision of 2026-10-19 to the decision of 2026-10-19, the decision of 2026-10-19, the decision of 2026-10-19, the decision of 2026-10-19, the decision of 2026-10-19, the decision of 2026-10-19, the decision of 2026-10-20, the decision of 2026-10-21 to the decision of 2026-10-21, the decision of 2026-10-23, the decision of 2026-10-25 to the decision of 2026-10-25 and the decision of 2026-10-26 to the decision of 2026-10-28 in <code>business_architecture/domain/decisions/</code>; and the <code>ontology</code> skill's <code>references/playbook.md</code>, "Why split an ontology into modules", and <code>references/foundations.md</code>, policy 8. Counts of classes and concepts were taken by loading each release with rdflib.</p>
+<p><strong>Sources.</strong> The newest release of each module under <code>business_architecture/ontology/releases/</code> (its <code>.ttl</code>, <code>manifest.json</code> and <code>CHANGELOG.md</code>); <code>scripts/epm_facts.py modules</code>, <code>coverage</code> and <code>projection</code>; <code>MODULES.md</code>; <code>business-closeout.md</code>; <code>business_architecture/ontology/projection/README.md</code>; the docstrings of <code>kpi_store/</code>; and the decisions of the original build, cited by date.</p>
 </div>
 
 </div>

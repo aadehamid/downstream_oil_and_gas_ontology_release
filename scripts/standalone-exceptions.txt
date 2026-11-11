@@ -29,6 +29,8 @@ business_architecture/ontology/releases/ref-mpc/1.3.0/CHANGELOG.md :: other-rele
 business_architecture/ontology/releases/ref-mpc/CHANGELOG.md :: other-release :: Share release :: 1 :: the changelog a released package holds a copy of; the two must stay equal
 business_architecture/ontology/releases/value-stream/1.2.0/CHANGELOG.md :: other-release :: Share release :: 1 :: a released package never changes; its changelog names the release this one was cut from
 business_architecture/ontology/releases/value-stream/CHANGELOG.md :: other-release :: Share release :: 1 :: the changelog a released package holds a copy of; the two must stay equal
+horoi_viewer/index.html :: reference-number :: #31 :: 2 :: the page embeds the released core package's text, which never changes; the intake note names an earlier change by its number
+viewer/index.html :: reference-number :: #31 :: 2 :: the page embeds the released core package's text, which never changes; the intake note names an earlier change by its number
 business_architecture/ontology/step4/baseline/step3-taxonomy.ttl :: reference-number :: #31 :: 2 :: ontology content, changed only through a cut; the intake note names an earlier change by its number
 skills/ontology-to-lpg/scripts/test_engine_gate.py :: removed-docker :: docker :: 2 :: the test names the word to prove the skill no longer holds it
 skills/ontology-to-lpg/scripts/test_projection.py :: removed-aura :: aura :: 1 :: the test names the word to prove the skill no longer holds it
