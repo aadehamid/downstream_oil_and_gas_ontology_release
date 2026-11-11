@@ -198,6 +198,32 @@ class Cascade(unittest.TestCase):
             self.assertEqual(nv.current_version("lane", tmp), "1.1.1")
             self.assertFalse(os.path.exists(os.path.join(tmp, "release", nv.CASCADE_PLAN)))
 
+    def test_a_finish_that_stopped_after_the_move_gets_its_lists_on_the_next_run(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.tree(tmp)
+            real = lambda module, old: nv.finish(argparse.Namespace(module=module, old=old), tmp)   # noqa: E731
+
+            def stop_after_the_move(module, old):
+                if module != "lane":
+                    return real(module, old)
+                import shutil
+                os.makedirs(os.path.join(tmp, "releases", "previous", "lane"))
+                shutil.move(os.path.join(tmp, "releases", "lane", old), os.path.join(tmp, "releases", "previous", "lane", old))
+                raise SystemExit("stopped after the move, before the lists")
+            with self.assertRaises(SystemExit):
+                self.run_cascade(tmp, finish_one=stop_after_the_move)
+            # The old package is moved, and the two lists still name the old version.
+            self.assertEqual(nv.packages("lane", tmp), ["1.1.1"])
+            self.assertEqual(read(tmp, "projection/pipeline.py"), 'PACKAGES = [("core", "2.4.0"), ("kpi", "1.4.0"), ("lane", "1.1.0")]\n')
+            self.run_cascade(tmp)
+            self.assertEqual(read(tmp, "projection/pipeline.py"), 'PACKAGES = [("core", "2.4.0"), ("kpi", "1.4.0"), ("lane", "1.1.1")]\n')
+            self.assertEqual(read(tmp, "projection/skill-run/epm-config.json"), '{"packages": {"core": "2.4.0", "kpi": "1.4.0", "lane": "1.1.1"}}\n')
+            self.assertFalse(os.path.exists(os.path.join(tmp, "release", nv.CASCADE_PLAN)))
+            # A third run finds nothing to do and changes nothing.
+            before = read(tmp, "projection/pipeline.py")
+            nv.settle(tmp, "lane", "1.1.0", "1.1.1")
+            self.assertEqual(read(tmp, "projection/pipeline.py"), before)
+
     def test_a_folder_that_a_failed_build_left_is_not_taken_for_a_package(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.tree(tmp)
