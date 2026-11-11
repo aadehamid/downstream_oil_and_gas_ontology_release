@@ -616,7 +616,7 @@
         </svg>
         <div>
           <h1>MPC Business Process and Architecture Ontology</h1>
-          <span class="muted">Definitions and relationships</span>
+          <span class="muted"><span id="release-name"></span> · Definitions and relationships</span>
         </div>
       </div>
       <div class="header-actions">
@@ -1825,6 +1825,7 @@
       $("view-model").onclick = () => showOverview("model");
       $("return-overview").onclick = () => showOverview(overviewReturn);
       $("release-pin").textContent = data.release;
+      $("release-name").textContent = data.release;
       for (const [k, v] of Object.entries(data.counts))
         $("all-statistics").append(
           element("li", k + ": " + v.toLocaleString()),
