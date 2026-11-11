@@ -5,6 +5,7 @@
     python3 scripts/doc_snippets.py list [DOC ...]     count the blocks of each document by tag
     python3 scripts/doc_snippets.py contexts           the contexts, and which ones can run here
     python3 scripts/doc_snippets.py html               the HTML pages with no Markdown source, and their blocks
+    python3 scripts/doc_snippets.py links [DOC ...]    check that every relative link points at a file of the tree
 
 A document that shows a command which no longer works misleads its reader. So every fenced code block carries a
 tag after its language, and a <pre> block of a hand-written page carries the same tag in a data-snippet
@@ -26,6 +27,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from doc_snippets_parts.check import Checker, Result  # noqa: E402,F401
+from doc_snippets_parts.links import broken_links, html_links, link_path, markdown_links  # noqa: E402,F401
 from doc_snippets_parts.extract import SKIP_DIRS, documents, extract, tree_entries, tree_files  # noqa: E402,F401
 from doc_snippets_parts.pages import extract_html, html_documents  # noqa: E402,F401
 from doc_snippets_parts.match import has_fixed_text, normalise, output_matches  # noqa: E402,F401

@@ -426,3 +426,22 @@ blocks that ran with no `expect` block:
 ```
 
 `py scripts/doc_snippets.py html` lists the HTML pages written by hand, with the number of `<pre>` blocks in each.
+
+## The links of the documents
+
+A second command reads every Markdown document and every HTML page of the tree, the generated pages too, and
+checks that each relative link points at a file or a folder of the tree:
+
+```powershell run=release-copy
+py scripts/doc_snippets.py links
+```
+
+```text expect
+every relative link points at a file or a folder of the tree
+```
+
+A broken link is one `FAIL` line with the document, the line and the link, and the command then ends with exit 1.
+`scripts/check.sh` runs it. The command does not check a link with a scheme, such as `https:`, a link that is
+only an anchor, or whether an anchor exists in the page it names. It compares names letter for letter, so a link
+that differs from the file's name only in case fails. Two page templates are left out, because a builder fills
+them in: `scripts/docs_template.html` and `business_architecture/ontology/viewer/horoi_page.html`.
