@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .extract import Block, documents, extract
 from .match import has_fixed_text, normalise, output_matches
+from .pages import extract_html, html_documents, is_page
 from .parsers import PARSERS
 from .registry import (NESTED, NESTED_FILE, PARSE_LANGS, PLACEHOLDER, REGISTRY, ROOT, RUN_LANGS, SAFE_VALUE, Registry,
                        load_registry)
@@ -67,7 +68,7 @@ class Checker:
     def check(self, docs=None) -> Result:
         if not self._started_by_a_block():
             return self.result
-        docs = documents(self.root) if not docs else list(docs)
+        docs = documents(self.root) + html_documents(self.root) if not docs else list(docs)
         with tempfile.TemporaryDirectory(prefix="doc-snippets-") as tmp:
             self.runner = Runner(self.root, self.registry, self.environ, Path(tmp).resolve())
             for doc in docs:
@@ -98,7 +99,8 @@ class Checker:
         if not path.is_file():
             self._fail(None, f"{doc}: no such document")
             return
-        blocks, problems = extract(doc, path.read_text(encoding="utf-8"))
+        read = extract_html if is_page(doc) else extract
+        blocks, problems = read(doc, path.read_text(encoding="utf-8"))
         tally = self.result.by_document.setdefault(doc, Counter())
         for problem in problems:
             self.result.failures.append(problem)

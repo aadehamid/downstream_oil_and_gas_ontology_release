@@ -225,15 +225,13 @@ def test_the_pending_list_cannot_grow(tmp_path, capsys, line):
                                               "docs/new.md:1: [pull-request] PR 12"]
 
 
-def test_the_allowed_pending_lines_are_these_six_files_and_this_trees_list_holds_no_other():
+def test_the_allowed_pending_lines_are_these_four_files_and_this_trees_list_holds_no_other():
     # Written by hand. A later change may delete a line here and in the list; it may never add or widen one.
     assert cs.ALLOWED_PENDING == (
         "README.md",
         "KNOWN-OPEN-ITEMS.md",
         "HOW-TO-UPDATE.md",
         "HOW-TO-UPDATE.html",
-        "business_architecture/ontology/epm-walkthrough.html",
-        "business_architecture/ontology/epm-ontology-guide.html",
     )
     assert not any(c in path for path in cs.ALLOWED_PENDING for c in "*?[")
     assert [path for path, _ in cs.read_pending()] == list(cs.ALLOWED_PENDING)
