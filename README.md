@@ -14,7 +14,9 @@ KPI Store loads the released ontology packages of this folder into three stores.
 | Apache Jena Fuseki | One dataset, with one named graph for each release file | A command on Windows, with Java and the plain Apache jar |
 | Neo4j | A property graph in a local database that has the n10s and APOC plugins, and a copy of it in one database on Neo4j Enterprise | One command on Windows loads and checks the local database. A second command copies the checked graph to Enterprise, which needs no plugin |
 
-Before the Databricks load, the notebook compares the ontology with the workspace. It reads the tables, columns, metric views, lineage and Genie spaces that the workspace reports. When an object, a column or a table edge that the ontology names is missing or renamed in Databricks, the load stops. The notebook then writes a report, `discovery-report.json`, with the same rows in `discovery-report.csv`. A person clears the report by writing a decision on each row that blocks. The cut tool turns the cleared report into a correction version of the ontology, such as `1.2.1-correction.1`. The next run loads that version.
+Before the Databricks load, the notebook compares the ontology with the workspace. It reads the tables, columns, metric views, lineage and Genie spaces that the workspace reports. When an object, a column or a table edge that the ontology names is missing or renamed in Databricks, the load stops. The notebook then writes a report, `discovery-report.json`, with the same rows in `discovery-report.csv`. A person clears the report by writing a decision on each row that blocks. The cut tool turns the cleared report into a correction version of the ontology, such as `1.2.1-correction.1`.
+
+The notebook loads the zip in the volume, so a correction reaches Databricks only in a new zip. After you clear the report, run the same runner command again. Its `cut` step runs the cut tool. Its `zip` step builds a new zip from the corrected folder and writes the zip's checksum into a copy of the settings. Its `upload` step copies both to the volume, and its `notebook` step loads that zip. A cut that you run by hand with `py -m kpi_store.cut` changes this folder only. Run the runner's `zip` and `upload` steps afterwards, or the notebook still reads the earlier zip.
 
 Each load proves that the store holds the release. Databricks and Fuseki compare a hash of what the store holds with a hash of the release files. Neo4j runs the validation shapes in the graph and reads the graph back as triples, which must equal the triples that went in.
 
@@ -64,7 +66,7 @@ The loads run on a Windows machine. Set these up once. The runbook gives the ste
 
 | What you need | Why |
 |---|---|
-| Python 3.11 or later, with the `py` launcher | Every command here is Python. The commands in the documents start with `py` |
+| Python 3.11 or later, with the `py` launcher | The KPI Store commands are Python modules, and the documents start them with `py`. The check is a bash script, and the sign-in is the Databricks command line; both have their own rows below |
 | Java 21 | Fuseki 6.2.0 and ROBOT, the reasoner, run on Java. This release was tested with Java 21 |
 | Git for Windows, for Git Bash, and [uv](https://docs.astral.sh/uv/) | The full check, `scripts/check.sh`, is a bash script. It runs each check through uv, which fetches the test packages. The script calls `python3`, so Git Bash must find a `python3` command |
 | The Databricks command line, signed in with OAuth (`databricks auth login`) | The commands on Windows upload the release and start the notebook with this sign-in |
@@ -84,11 +86,11 @@ The runbook says when to run each command and what it prints. This table says on
 | `py -m kpi_store.setup_check` | Checks the one-time setup of the machine and prints the fix for each failure |
 | `py -m kpi_store.runner` | Runs the whole chain, from a cleared report to the sync check |
 | `py -m kpi_store.cut` | Turns a cleared report into a correction version of the ontology |
-| `py -m kpi_store.load_fuseki` | Loads the release into the local Fuseki and compares the hashes |
-| `py -m kpi_store.load_neo4j` | Loads the release into the local Neo4j and runs every check there |
-| `py -m kpi_store.copy_enterprise` | Copies the checked graph to the database on Neo4j Enterprise |
-| `py -m kpi_store.sync_check` | Says whether each store holds the release in this folder |
-| `py -m kpi_store.questions.run` | Asks one of the four cross-graph questions |
+| `py -m kpi_store.load_fuseki` | Loads the release into the local Fuseki and proves by a hash that the store holds exactly the release |
+| `py -m kpi_store.load_neo4j` | Empties the local Neo4j database, loads the release into it and runs every check there |
+| `py -m kpi_store.copy_enterprise` | Copies the checked graph from the local Neo4j to the one named database on Neo4j Enterprise, and checks the copy |
+| `py -m kpi_store.sync_check` | Says whether each store holds the release in this folder: current, or behind |
+| `py -m kpi_store.questions.run ask <question> --settings <file> --mapping <file> --out <folder>` | Asks one of the four cross-graph questions (`q1`, `q4`, `q6`, `q7`) and writes its rows. The other subcommands are `discover`, `confirm` and `check`, which make and check the mapping file that `ask` needs. `py -m kpi_store.questions.run --help` lists them |
 | `bash scripts/check.sh` | Proves that this copy of the release is valid |
 
 ## Run the checks

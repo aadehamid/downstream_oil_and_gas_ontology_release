@@ -35,7 +35,7 @@ The checks of these rules, numbered V1 to V12 in the order they run, are mapped 
 
 4. **Reason once, upstream, with ELK through ROBOT, over the merged released data:**
 
-   The commands below reason over the skill's library template, so they run as written from the skill's folder. For a project, name every released data file in place of the template. `<your ROBOT jar>` is the path of `robot.jar`. On Windows `py` starts Python; on macOS or Linux write `python3`.
+   The commands below reason over the skill's library template, so they run as written from the skill's folder. For a project, name every released data file in place of the template. `<your ROBOT jar>` is the path of `robot.jar`. Keep the quotes around it, so that a path with a space stays one argument. On Windows `py` starts Python; on macOS or Linux write `python3`.
 
    ```powershell run=reasoner
    cd skills/ontology-to-lpg
@@ -47,7 +47,7 @@ The checks of these rules, numbered V1 to V12 in the order they run, are mapped 
    ```
 
    ```powershell run=reasoner status-only
-   java -jar <your ROBOT jar> reason --reasoner ELK --input merged.ttl --axiom-generators "SubClass ClassAssertion" --include-indirect true --output reasoned.ttl
+   java -jar "<your ROBOT jar>" reason --reasoner ELK --input merged.ttl --axiom-generators "SubClass ClassAssertion" --include-indirect true --output reasoned.ttl
    ```
 
    Check `robot.jar` against its SHA-256 first (`running.md`, rule 2).
