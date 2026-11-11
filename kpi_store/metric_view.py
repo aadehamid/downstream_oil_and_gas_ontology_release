@@ -45,18 +45,41 @@ def qualify(name, catalog=None, schema=None):
     return ".".join(parts).lower()
 
 
+def cte_references(tree):
+    """The table nodes of a parsed statement that name a WITH clause's query and not a table, as a set of id().
+
+    A bare name is such a reference only where the WITH clause that defines it is in scope. The same bare name
+    outside that scope is a real table, which Databricks would look up in the session's schema. Names compare
+    without case, as Databricks compares them. A statement whose scopes cannot be built gives an empty set, so
+    every bare name in it counts as a table."""
+    from sqlglot import exp
+    from sqlglot.errors import SqlglotError
+    from sqlglot.optimizer.scope import traverse_scope
+    queries = [tree] if isinstance(tree, exp.Query) else [q for q in tree.find_all(exp.Query) if not q.find_ancestor(exp.Query)]
+    found = set()
+    try:
+        for query in queries:
+            for scope in traverse_scope(query):
+                in_scope = {name.lower() for name in scope.cte_sources}
+                found |= {id(t) for t in scope.tables if not t.db and t.name.lower() in in_scope}
+    except SqlglotError:
+        return set()
+    return found
+
+
 def tables_in_sql(sql, catalog=None, schema=None):
-    """The tables a SQL query reads, sorted, as full names in lower case. A name a WITH clause defines is not a table."""
+    """The tables a SQL query reads, sorted, as full names in lower case. A name a WITH clause defines is not a table
+    where that clause is in scope (cte_references)."""
     import sqlglot
     from sqlglot import exp
     try:
         tree = sqlglot.parse_one(sql, read="databricks")
     except sqlglot.errors.SqlglotError as err:
         raise MetricViewError(f"cannot parse the SQL: {str(err).splitlines()[0]}") from None
-    defined = {cte.alias_or_name.lower() for cte in tree.find_all(exp.CTE)}
+    defined = cte_references(tree)
     found = set()
     for table in tree.find_all(exp.Table):
-        if not table.name or (not table.db and table.name.lower() in defined):
+        if not table.name or id(table) in defined:
             continue
         found.add(qualify(".".join(p for p in (table.catalog, table.db, table.name) if p), catalog, schema))
     return sorted(found)

@@ -71,6 +71,12 @@ def test_tables_and_columns_in_sql():
     assert mv.tables_in_sql(sql, "cat", "sch") == ["a.b.c", "cat.g.h", "d.e.f"]
     with pytest.raises(mv.MetricViewError, match="cannot give"):
         mv.tables_in_sql("SELECT * FROM lonely")
+    # An inner WITH clause that takes the name of a real table hides it only inside its own query.
+    scoped = "SELECT * FROM fact f JOIN (WITH fact AS (SELECT * FROM a.b.dim) SELECT * FROM fact) q ON f.id = q.id"
+    assert mv.tables_in_sql(scoped, "cat", "sch") == ["a.b.dim", "cat.sch.fact"]
+    nested = "WITH a AS (SELECT * FROM c.s.t), b AS (WITH inner_c AS (SELECT * FROM A) SELECT * FROM inner_c) SELECT * FROM b JOIN a USING (id)"
+    assert mv.tables_in_sql(nested) == ["c.s.t"]
+    assert mv.tables_in_sql("WITH t AS (SELECT * FROM c.s.t) SELECT * FROM t JOIN c.s.t USING (id)") == ["c.s.t"]
     assert mv.columns_in_sql("v.Sample_Sheet_Name IN ('a', 'b') AND TRIM(Sample_Label) = 'c'") == [("", "sample_label"), ("v", "sample_sheet_name")]
     assert mv.columns_in_sql("not ( sql") == []
 

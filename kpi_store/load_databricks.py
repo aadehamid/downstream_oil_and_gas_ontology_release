@@ -23,6 +23,7 @@ from pathlib import Path
 
 from . import compare as cmp
 from . import discovery as disc
+from . import metric_view as mv
 from . import ontology_view as ov
 from . import report as rep
 from .settings import SYSTEM_SCHEMAS
@@ -103,10 +104,11 @@ class Gate:
                 raise GateRefusal(f"refused: a write outside the KPI Store's schemas: {written}")
         elif not isinstance(tree, (exp.Select, exp.Describe)):
             raise GateRefusal(f"refused: {type(tree).__name__} is not a statement the KPI Store runs")
-        defined = {cte.alias_or_name.lower() for cte in tree.find_all(exp.CTE)}
+        # Only a reference to a WITH clause's query, in that clause's scope, may go without three parts.
+        defined = mv.cte_references(tree)
         touched = [name_of(target)] if target is not None else []
         for table in tree.find_all(exp.Table):
-            if table is target or (not table.db and table.name.lower() in defined):
+            if table is target or id(table) in defined:
                 continue
             name = name_of(table)
             if not self._may_read(name):

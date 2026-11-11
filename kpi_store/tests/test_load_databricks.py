@@ -28,6 +28,8 @@ def gate(run_sql=None):
     "SELECT a FROM system.access.table_lineage JOIN system.lakeflow.jobs USING (id)",
     "SELECT * FROM IDP_SBX.gold_commercial_core.some_fact f JOIN synapse_dev.replica_mpr.pricedetail d ON f.id = d.id",
     "WITH x AS (SELECT * FROM idp_sbx.a.b) SELECT * FROM x",
+    "WITH a AS (SELECT * FROM idp_sbx.s.t), b AS (WITH inner_c AS (SELECT * FROM a) SELECT * FROM inner_c) SELECT * FROM b JOIN A USING (id)",
+    "WITH t AS (SELECT * FROM idp_sbx.s.t) SELECT * FROM t JOIN idp_sbx.s.t USING (id)",
     "DESCRIBE TABLE EXTENDED `idp_sbx`.`semantic_sem_commercial`.`some_vw` AS JSON",
     "SELECT marker FROM idp_sbx.kpi_store.epm_store_markers WHERE store = 'databricks'",
 ])
@@ -76,6 +78,13 @@ def test_the_gate_passes_writes_inside_the_two_schemas(statement):
     ("SELECT * FROM epm_triples", "a read outside"),
     ("CREATE OR REPLACE TABLE idp_sbx.kpi_store.copy AS SELECT * FROM fourth_catalog.a.b", "a read outside"),
     ("INSERT INTO idp_sbx.kpi_store.epm_triples SELECT * FROM (SELECT * FROM other_catalog.a.b)", "a read outside"),
+    # A bare name outside the scope of the WITH clause that defines it is a table of the session's default schema.
+    ("SELECT count(*) FROM (WITH x AS (SELECT 1 AS v) SELECT * FROM x) q JOIN x ON q.v = x.id", "a read outside .*: x"),
+    ("SELECT * FROM idp_sbx.a.b WHERE id IN (WITH x AS (SELECT 1 AS id) SELECT id FROM x) AND EXISTS (SELECT 1 FROM x)", "a read outside .*: x"),
+    ("SELECT * FROM (SELECT 1 UNION ALL (WITH y AS (SELECT 2) SELECT * FROM y) UNION ALL SELECT * FROM y) u", "a read outside .*: y"),
+    ("CREATE OR REPLACE TABLE idp_sbx.kpi_store.copy AS SELECT * FROM (WITH x AS (SELECT 1) SELECT * FROM x) q JOIN x ON TRUE", "a read outside .*: x"),
+    # A WITH clause that takes a real table's name does not make another catalog's table of that name a CTE.
+    ("WITH t AS (SELECT * FROM idp_sbx.s.t) SELECT * FROM t JOIN other_catalog.s.t USING (id)", "a read outside .*: other_catalog.s.t"),
     ("SELECT 1; DROP TABLE idp_sbx.kpi_store.epm_triples", "one statement at a time"),
 ])
 def test_the_gate_refuses_everything_else_and_sends_nothing(statement, message):
