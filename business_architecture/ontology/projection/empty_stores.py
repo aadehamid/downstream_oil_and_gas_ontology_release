@@ -10,6 +10,10 @@ It never touches Databricks: the load that writes the triple table replaces it.
 Prints one JSON line per store, with no login value. A store that cannot be read says "unreachable" and the error's
 name. With --yes, a store that cannot be read fails the command.
 Needs neo4j for Neo4j (uv run --with neo4j ...).
+
+No step of the KPI Store runner calls this file: each store load replaces what it loaded before. It is a tool to run
+by hand, for a store that must start empty. The stores are handled in the order the --store options name them, and
+one store's deletion is not undone when a later store fails or is refused.
 """
 import argparse
 import json
@@ -25,7 +29,8 @@ def neo4j_counts(session):
 
 
 def empty_neo4j(session):
-    """Deletes in batches, so a store of any size fits one transaction per batch. Returns the nodes deleted."""
+    """Deletes in batches, so a store of any size fits one transaction per batch. Returns the nodes deleted.
+    It deletes every node, whatever its label: the ontology, each subgraph beside it and every marker."""
     deleted = 0
     while True:
         n = session.run("MATCH (n) WITH n LIMIT 5000 DETACH DELETE n RETURN count(*) AS c").single()["c"]
@@ -42,7 +47,11 @@ def jena_update(query_url, statement):
 
 
 def one_store(store, yes, values, database=None):
-    """One store's count and, with yes, its count after emptying, as the JSON line's dict."""
+    """One store's count and, with yes, its count after emptying, as the JSON line's dict.
+
+    For Neo4j the two refusals come before the connection is opened. The settings may name no database, and the
+    server's default could then be any database, so --yes must name the one to empty. A --database that differs from
+    the one the settings name is refused, so a mistyped name cannot empty another database on the same server."""
     if store == "jena":
         query_url = ss.need(values, "EPM_JENA_QUERY")
         held = sum(ss.read_jena(query_url).values())

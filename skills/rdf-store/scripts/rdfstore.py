@@ -52,6 +52,12 @@ the comparison ran (passed true or false, with the diff); a failed request leave
 
 Exit 0 on a pass, 1 when the round trip or a store request failed, 2 on bad input. Bad input is
 found before any store is touched.
+
+As a library: the KPI Store loads import this file and run no command of it. The Databricks load
+(kpi_store/load_databricks.py) uses pack, dataset_hash, SparkStore and roundtrip; the Fuseki load
+(kpi_store/load_fuseki.py) uses pack, FusekiStore, dataset_hash and compare; the technical graph
+(kpi_store/tech_graph.py) uses the same calls for its own graph. So every store is proven with the one
+hash described above.
 """
 import base64
 import hashlib
@@ -225,6 +231,8 @@ def lines_hash(lines):
 
 
 def dataset_hash(dataset):
+    """The dataset's hash: the SHA-256 of its sorted canonical N-Quads. Two datasets with the same
+    quads give the same hash whatever order they were read in and whatever their blank nodes are called."""
     return lines_hash(canonical_lines(dataset))
 
 
@@ -340,6 +348,9 @@ def term_text(node):
 
 
 def to_rows(dataset):
+    """The dataset as rows in COLUMNS order, sorted, so the same dataset always gives the same rows.
+    A literal with a language tag gets no datatype: the tag implies rdf:langString, and from_rows
+    builds the literal from the tag alone."""
     rows = []
     for q in dataset:
         check_term(q)
@@ -358,6 +369,8 @@ def to_rows(dataset):
 
 
 def from_rows(rows):
+    """The dataset a table's rows hold: the reverse of to_rows. A literal with no datatype and no
+    language tag is read as xsd:string. An object_kind other than iri, bnode or literal is a ValueError."""
     def node(text):
         return ox.BlankNode(text[2:]) if text.startswith("_:") else ox.NamedNode(text)
     out = ox.Dataset()
@@ -398,7 +411,7 @@ class SparkStore:
     Databricks notebook already has. Spark is the only Databricks path, so no host, warehouse or
     credential is read here. The session needs one method, sql(statement), whose result has collect()."""
 
-    BATCH = 2000
+    BATCH = 2000   # rows per INSERT statement: each row travels as text inside the statement (insert_sql)
     NAME = re.compile(r"[A-Za-z0-9_]+(\.[A-Za-z0-9_]+){0,2}")
 
     def __init__(self, spark, table):
@@ -415,11 +428,15 @@ class SparkStore:
         return from_rows(tuple(r) for r in rows)
 
     def stage(self, rows):
+        """Creates this run's staging table and inserts the rows in batches. The live table is not touched."""
         self.spark.sql(create_sql(self.staging))
         for start in range(0, len(rows), self.BATCH):
             self.spark.sql(insert_sql(self.staging, rows[start:start + self.BATCH]))
 
     def promote(self):
+        """Replaces the live table with the staging table's rows in one statement, so a failure before
+        it leaves the live table as it was. roundtrip calls it only after the staging table's hash
+        equals the dataset's."""
         self.spark.sql(f"CREATE OR REPLACE TABLE {self.table} AS SELECT * FROM {self.staging}")
 
     def drop_staging(self):
@@ -432,7 +449,14 @@ class SparkStore:
 # ---- the round trip ----------------------------------------------------------------------
 
 def roundtrip(store, dataset):
-    """(passed, report). Validates the whole dataset before the store is touched."""
+    """(passed, report). Validates the whole dataset before the store is touched.
+
+    A SparkStore is checked twice. The rows go to the staging table, which is read back and compared.
+    When the hashes differ, the function returns with "published": False and the live table as it was.
+    When they are equal, the staging table replaces the live table, and the live table is read back and
+    compared again. The staging table is dropped on every way out, a failure included.
+    Any other store has no staging step: the dataset is published, then exported and compared, so a
+    False result there means the store already holds the copy that differs."""
     started = time.time()
     report = {}
     if isinstance(store, SparkStore):

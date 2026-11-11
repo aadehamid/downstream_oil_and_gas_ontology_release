@@ -2,6 +2,17 @@
 
 The data-product package names every table, view and metric view as a dp:PlatformTable. The comparison with the
 workspace needs only the facts below, so this module reduces the package to them. Needs rdflib.
+
+Where it sits: this is the ontology's side of the comparison. kpi_store.load_databricks.run calls read here and
+discover in kpi_store.discovery, and kpi_store.compare sets the two side by side. The store loads, the cut tool
+and the technical graph use this module too, for the release's name and each module's newest package.
+
+It reads the release folder only: release.json, the package folders under
+business_architecture/ontology/releases/<module>/<version>/, and the release scripts' newest.py. It writes
+nothing, not even a cache folder, and has no command.
+
+"Newest" always means newest by the release scripts' version order, in which a correction version such as
+1.2.1-correction.1 comes after 1.2.1 and before 1.2.2. Sorting the folder names as text would get that wrong.
 """
 import functools
 import json
@@ -9,7 +20,9 @@ import types
 from dataclasses import dataclass, field
 from pathlib import Path
 
-RELEASES = Path("business_architecture") / "ontology" / "releases"
+RELEASES = Path("business_architecture") / "ontology" / "releases"   # one folder per module, one per version in it
+# The IRIs this module looks for. They are the data-product module's own terms, plus PROV for "derived from" and
+# SKOS for a measure's labels.
 DP = "https://w3id.org/mpc/ontology/modules/data-product/"
 PROV_DERIVED = "http://www.w3.org/ns/prov#wasDerivedFrom"
 SKOS = "http://www.w3.org/2004/02/skos/core#"
@@ -27,7 +40,7 @@ def release_scripts_newest(release_root=None):
     return _load_newest(Path(release_root or Path(__file__).resolve().parents[1]) / NEWEST)
 
 
-@functools.lru_cache(maxsize=None)
+@functools.lru_cache(maxsize=None)   # once per path: the version order is asked for many times in one run
 def _load_newest(path):
     if not path.is_file():
         raise ReleaseError(f"{path} is missing")
@@ -57,7 +70,7 @@ def newest_versions(releases):
     """{module: newest version} for every module folder under releases/ that holds a released package."""
     out = {}
     for folder in sorted(Path(releases).iterdir()):
-        if folder.is_dir() and folder.name != "previous":
+        if folder.is_dir() and folder.name != "previous":   # "previous" holds older packages and is no module
             try:
                 out[folder.name] = newest_version(folder.name, releases)
             except ReleaseError:
@@ -67,6 +80,7 @@ def newest_versions(releases):
 
 @dataclass(frozen=True)
 class PlatformObject:
+    """One table, view or metric view the ontology names (a dp:PlatformTable)."""
     iri: str
     full_name: str        # catalog.schema.name, as the ontology spells it
     layer: str            # replica, silver, gold or metric-view
@@ -75,6 +89,7 @@ class PlatformObject:
 
 @dataclass(frozen=True)
 class PlatformColumn:
+    """One column the ontology names (a dp:PlatformColumn), with the columns it is derived from."""
     iri: str
     table: str            # the table's full name, as the ontology spells it
     name: str             # the column's name, as the ontology spells it
@@ -83,6 +98,7 @@ class PlatformColumn:
 
 @dataclass(frozen=True)
 class Measure:
+    """A business measure that an object serves. Its labels are what a Genie filter's title is matched against."""
     iri: str
     notation: str
     label: str
@@ -91,6 +107,7 @@ class Measure:
 
 @dataclass
 class OntologyView:
+    """What the comparison needs from the release, and nothing more."""
     versions: dict = field(default_factory=dict)   # {module: version} of the packages read
     objects: dict = field(default_factory=dict)    # {full name, lower case: PlatformObject}
     columns: list = field(default_factory=list)    # [PlatformColumn]
@@ -98,10 +115,12 @@ class OntologyView:
     measures: dict = field(default_factory=dict)   # {notation: Measure}, only those an object serves
 
     def upstream(self, name):
+        """The objects the ontology says this one is derived from, in lower case."""
         return {up for down, up in self.edges if down == name.lower()}
 
 
 def _package_file(folder, module):
+    """A package's main file, <module>.ttl, or ReleaseError when the folder lacks it."""
     path = Path(folder) / f"{module}.ttl"
     if not path.is_file():
         raise ReleaseError(f"{path} is missing")
@@ -113,6 +132,7 @@ def read_packages(data_product, kpi=None):
     from rdflib import Graph, URIRef
 
     def tail(iri):
+        """The last part of an IRI: a layer's name, or a measure's notation."""
         return str(iri).rstrip("/").rsplit("/", 1)[-1]
 
     g = Graph().parse(_package_file(data_product, "data-product"), format="turtle")

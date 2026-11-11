@@ -3,6 +3,10 @@
 The ontology's nodes carry the label Resource. A subgraph has its own label on every node (LogicalModel, for example)
 and one marker node that says which files it was loaded from. The projection's counts, hash and round trip read
 Resource nodes only, so a subgraph never moves them. logical_models.py loads the logical models through this module.
+The KPI Store's technical graph (kpi_store/tech_graph.py) is loaded the same way, under its own label and marker.
+
+This module is a library with no command. It reads and writes only through the transaction it is given, and only
+nodes that carry the subgraph's label or its marker's label. It never creates, changes or deletes a Resource node.
 
 Needs only the standard library. The session or transaction comes from the caller.
 """
@@ -60,8 +64,13 @@ def replace_subgraph(tx, store, label, marker_label, nodes, edges, marker, kind,
     created. Each of `edges` ({"s", "t", "o", "ontology"}, with "p" for its properties when edge_props) starts at a
     node of the subgraph. It ends at another node of the subgraph (a `kind` edge) or at an ontology node.
     Raises SystemExit, before anything commits, when an edge finds no target or the ontology's counts move.
-    Returns ({kind: edges made, "ontology": edges made}, the ontology's counts)."""
-    before = ontology_counts(tx)
+    Returns ({kind: edges made, "ontology": edges made}, the ontology's counts).
+
+    Nothing here commits. The caller commits after this returns and rolls back when it raises, so the old subgraph
+    and its marker stay until the new one is whole. The marker is created last for the same reason: a marker never
+    describes a subgraph that failed a check. Edges are created by MATCH on both ends, so an edge whose end is
+    missing creates nothing; the count of edges made against the rows sent is what finds it."""
+    before = ontology_counts(tx)   # compared with the counts at the end: the proof that no ontology node or edge moved
     tx.run(f"MATCH (m:{marker_label}) DETACH DELETE m").consume()
     tx.run(f"MATCH (n:{label}) DETACH DELETE n").consume()
     tx.run("UNWIND $rows AS row CREATE (n:$(row.labels)) SET n = row.props", rows=nodes).consume()
@@ -88,7 +97,10 @@ def fingerprint(nodes, edges):
     """A subgraph's content as one SHA-256, the same from the rows to load and from the rows a store returns.
 
     Nodes are {"labels", "p"} (what node_query returns) or {"labels", "props"} (the rows to load). Edges are
-    {"s", "t", "o", "ontology"}, with "p" for an edge's properties, which count when it has any."""
+    {"s", "t", "o", "ontology"}, with "p" for an edge's properties, which count when it has any.
+
+    Each node and edge becomes one line of JSON with sorted keys, and the lines are sorted before they are hashed.
+    So the order the rows arrive in, which a database does not promise, never changes the result."""
     lines = [json.dumps({"labels": sorted(n["labels"]), "p": n.get("p", n.get("props"))}, sort_keys=True, default=str)
              for n in nodes]
     lines += [json.dumps([e["s"], e["t"], e["o"], bool(e["ontology"])] + ([e["p"]] if e.get("p") else []),

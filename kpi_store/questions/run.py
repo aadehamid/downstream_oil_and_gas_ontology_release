@@ -10,6 +10,17 @@ discovery guessed wrong, and runs `confirm`. `check` compares the confirmed mapp
 `ask` runs that check first, then one question, and writes the rows as JSON and CSV.
 
 Every query runs in a read transaction, so the server refuses a write even if one reached it.
+
+Run it after the stores are loaded and the KPI Store graph is copied to Neo4j Enterprise (the runner's
+`enterprise` step). The runner does not call it. Do `discover` and `confirm` once per environment, and again
+when `check` says the governance graph's schema changed. On Windows, write `py` where the lines above say
+`python`.
+
+It reads the connection settings, the mapping file and both graphs. It writes the mapping file (`discover`,
+`confirm`) and, for `ask`, <question>.json and <question>.csv in the --out folder. All of these must be outside
+the release folder, and the command stops when one is inside. It writes nothing to either graph.
+
+Exit 0 when the command did its work, 1 when it stopped. The last line it prints says why.
 """
 from __future__ import annotations
 
@@ -27,6 +38,8 @@ from . import mapping as M
 from . import render as T
 from . import roles as R
 
+# A language tag at the end of a text, such as @en or @en-GB. The KPI Store graph keeps the tag of a label in
+# the text itself, and an answer shows the label without it.
 LANGUAGE_TAG = re.compile(r"@[A-Za-z]{2,3}(-[A-Za-z0-9]+)*$")
 
 
@@ -41,6 +54,7 @@ class Reader:
         self.last_columns: list[str] = []
 
     def read(self, query: str, params: dict | None = None) -> list[dict]:
+        """Runs one query in a read transaction on the composite database and returns its rows as dicts."""
         from neo4j import READ_ACCESS
         with self.driver.session(database=self.connection.composite, default_access_mode=READ_ACCESS) as session:
             def work(tx):
@@ -55,7 +69,8 @@ class Reader:
 
 
 def read_schemas(reader, graphs: dict[str, str]) -> dict[str, D.Schema]:
-    """Both graphs' schemas, each read through the composite database."""
+    """Both graphs' schemas, each read through the composite database. The graph's name travels as a parameter,
+    in front of each of discover.py's schema queries."""
     return {graph: D.read_schema(lambda query, name=name: reader.read("USE graph.byName($graph) " + query,
                                                                        {"graph": name}))
             for graph, name in graphs.items()}
@@ -76,6 +91,8 @@ def ask(reader, question: str, mapping: dict, graphs: dict[str, str], params: di
         now: dt.datetime | None = None) -> dict:
     """One question's answer. Stops before the query when the mapping is unconfirmed or has drifted."""
     M.require_confirmed(mapping)
+    # The schemas are read again for every question, not kept from an earlier run: the governance graph belongs
+    # to its owner and can change between two questions.
     schemas = read_schemas(reader, graphs)
     problems = M.drift(mapping, schemas)
     if problems:
@@ -86,6 +103,7 @@ def ask(reader, question: str, mapping: dict, graphs: dict[str, str], params: di
         for column in rendered.language_tagged:
             if isinstance(row.get(column), str):
                 row[column] = LANGUAGE_TAG.sub("", row[column])
+    # The answer file names the question's own parameters. The two graph names belong to the environment.
     shown = {name: value for name, value in rendered.params.items() if name not in T.GRAPH_PARAMS.values()}
     now = now or dt.datetime.now(dt.timezone.utc)
     return {"question": question, "title": rendered.title, "params": shown,
@@ -94,6 +112,8 @@ def ask(reader, question: str, mapping: dict, graphs: dict[str, str], params: di
 
 
 def write_answer(answer: dict, folder: Path) -> tuple[Path, Path]:
+    """Writes one answer as <question>.json (everything) and <question>.csv (the rows, for a spreadsheet), both
+    with LF line ends, and returns the two paths. A second answer to the same question replaces the first."""
     folder.mkdir(parents=True, exist_ok=True)
     json_path, csv_path = folder / f"{answer['question']}.json", folder / f"{answer['question']}.csv"
     with json_path.open("w", encoding="utf-8", newline="\n") as f:
@@ -111,6 +131,8 @@ def write_answer(answer: dict, folder: Path) -> tuple[Path, Path]:
 
 
 def parse_params(pairs) -> dict:
+    """The --param name=value pairs as a dict. A value that reads as JSON is taken as JSON, so a number stays a
+    number and a list a list."""
     params = {}
     for pair in pairs or []:
         name, sep, text = pair.partition("=")
@@ -124,6 +146,8 @@ def parse_params(pairs) -> dict:
 
 
 def show(mapping: dict, out) -> None:
+    """Prints the mapping one role per line, for the person who corrects and confirms it. A required role with
+    no value is marked, because confirm will refuse the mapping until it has one."""
     for name, entry in mapping["roles"].items():
         value = entry["value"]
         if isinstance(value, dict):
@@ -135,6 +159,7 @@ def show(mapping: dict, out) -> None:
 
 
 def main(argv=None, out=sys.stdout, reader_factory=Reader, confirm_input=input) -> int:
+    """The command line. The tests replace `out`, the reader and the typed answer."""
     parser = argparse.ArgumentParser(prog="python -m kpi_store.questions.run",
                                      description="KPI Store cross-graph questions.")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -156,12 +181,15 @@ def main(argv=None, out=sys.stdout, reader_factory=Reader, confirm_input=input) 
     args = parser.parse_args(argv)
     reader = None
     try:
+        # The paths are checked before the settings are read and before any connection is opened, so a path
+        # inside the release folder stops the command with nothing read and nothing written.
         mapping_path = C.outside_release(args.mapping, "the mapping file")
         if args.command == "ask":
             args.out = C.outside_release(args.out, "the folder for the answers (--out)")
         connection = C.read(args.settings)
         reader = reader_factory(connection)
         if args.command == "discover":
+            # A confirmed mapping holds a person's corrections, and a new proposal would overwrite them.
             if mapping_path.exists() and M.is_confirmed(M.load(mapping_path)) and not args.replace:
                 raise M.MappingError(f"{mapping_path} is confirmed: pass --replace to write a new proposal over it")
             proposal = D.propose(read_schemas(reader, connection.graphs))
@@ -172,6 +200,7 @@ def main(argv=None, out=sys.stdout, reader_factory=Reader, confirm_input=input) 
             mapping = M.load(mapping_path)
             confirmed = M.confirm(mapping, read_schemas(reader, connection.graphs))
             show(confirmed, out)
+            # The file is saved only after the typed yes, so a "no" leaves the mapping unconfirmed on disk.
             if not args.yes and confirm_input("Type yes to confirm this mapping: ").strip().lower() != "yes":
                 print("not confirmed", file=out)
                 return 1

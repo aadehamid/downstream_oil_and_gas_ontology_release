@@ -38,6 +38,11 @@ on the target first (in batches). After the copy it hashes the target exactly as
 does and fails unless it equals the source hash. Every printed value is shell-quoted.
 
 Exit 0 when the hashes match, 1 when a copy or check fails, 2 on bad input.
+
+In the KPI Store load, the copy to Neo4j Enterprise (kpi_store/copy_enterprise.py) does not run this command. It
+imports this file and calls database_identity, graph_hash and copy on its own two sessions, because it guards the
+target more closely than main does: it stops when the target holds a node that is not the KPI Store's, and its
+replace deletes only the KPI Store's own nodes, where --replace here deletes every node of the target.
 """
 import os
 import sys
@@ -120,6 +125,8 @@ def database_identity(session):
 
 
 def batches(session, query, size):
+    """The query's rows, one page of `size` at a time, so no request holds the whole graph. The query must take
+    $skip and $limit and return its rows in one fixed order, or a page could repeat or miss a row."""
     skip = 0
     while True:
         rows = session.run(query, skip=skip, limit=size).data()
@@ -130,6 +137,8 @@ def batches(session, query, size):
 
 
 def graph_hash(session):
+    """The hash of the :Resource graph a session reads, computed as load_verify.py computes the report's two hashes,
+    so the source, the report and the target are compared on one measure."""
     return lv.hash_graph(session)[0]
 
 
@@ -138,10 +147,19 @@ def count_nodes(session):
 
 
 def empty_target(session, size):
+    """Deletes every node of the target, whatever its label, in transactions of `size` rows, so a large graph does
+    not need one transaction that holds all of it. main reaches this only with --replace."""
     session.run(f"MATCH (n) CALL (n) {{ DETACH DELETE n }} IN TRANSACTIONS OF {int(size)} ROWS").consume()
 
 
 def copy(source, target, size):
+    """Copies every :Resource node, then every relationship between two of them, in batches of `size`. Returns the
+    counts copied. It deletes nothing and does not check the result: the caller empties the target before and
+    compares the hashes after.
+
+    The constraint comes first. It gives the target the index on :Resource(uri) that each relationship's two
+    lookups use, and it makes a second copy into a target that still holds the nodes fail instead of doubling them.
+    The nodes come before the relationships because a relationship is created by matching both of its ends."""
     copied = {"nodes": 0, "relationships": 0}
     # Plain Cypher only: the constraint keeps n10s's name, but the target needs no n10s to hold it.
     target.run("CREATE CONSTRAINT n10s_unique_uri IF NOT EXISTS FOR (r:Resource) REQUIRE r.uri IS UNIQUE").consume()

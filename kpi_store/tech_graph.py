@@ -21,6 +21,17 @@ files'.
 The same discovery reading always gives the same bytes: the lines are sorted, every IRI comes from a name, and
 the only times in the file are the ones the platform reported.
 
+Where it sits in the run. This module has no command of its own; other steps call it:
+  the notebook             after the release is loaded into Databricks, it calls build_from_files(), write() and
+                           load_delta(), and leaves tech-graph.nq beside its report in the volume
+  the runner's report step fetches that file into <run folder>/tech-graph/ and checks its digest
+  fuseki, neo4j, enterprise  each loads the fetched file after the ontology (load_jena, load_neo4j)
+  sync                     asks each store's status function
+
+What the loads write: in Databricks, two tables in <write_catalog>.<tech_graph_schema>; in Fuseki, the graph
+file's named graphs; in Neo4j, the nodes labelled Tech and one TechGraphMarker node. They never write to the
+ontology's own triples, graphs or Resource nodes, and never to a release package.
+
 build() and write() need nothing but Python. The loads need rdflib; load_delta and load_jena also need
 pyoxigraph, and load_neo4j needs the neo4j driver.
 """
@@ -34,10 +45,12 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
-TG = "https://w3id.org/mpc/ontology/modules/technical-graph/"
-LAYER = "https://w3id.org/mpc/ontology/modules/data-product/layer/"
+TG = "https://w3id.org/mpc/ontology/modules/technical-graph/"         # the module's classes and properties
+LAYER = "https://w3id.org/mpc/ontology/modules/data-product/layer/"   # the layer code list, kept in data-product
 RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
 XSD = "http://www.w3.org/2001/XMLSchema#"
+# Every IRI this module makes starts here: urn:kpi-store:tech:<environment>:<kind>/<name>. The urn: scheme keeps
+# these IRIs apart from the ontology's https: ones, and the Enterprise copy knows a technical-graph node by it.
 BASE = "urn:kpi-store:tech:"
 GRAPH_FILE = "tech-graph.nq"
 SUMMARY_FILE = "tech-graph-summary.json"
@@ -51,12 +64,14 @@ CODE_LINKS = (TG + "layer", TG + "result")
 # The Neo4j subgraph: every node carries LABEL, never Resource, which is the ontology's.
 LABEL = "Tech"
 MARKER_LABEL = "TechGraphMarker"
-KIND = "tech"
+KIND = "tech"   # the name subgraph.replace_subgraph gives the edges between two nodes of this subgraph
 # The Databricks tables, in <write_catalog>.<tech_graph_schema>.
 TRIPLES_TABLE = "tech_graph_triples"
 MARKERS_TABLE = "tech_graph_markers"
-DELTA_STORE = "databricks"
+DELTA_STORE = "databricks"   # the value of the marker row's store column
 
+# Two files of the release that the loads call. Their folders are not packages, so they are loaded by path
+# (_module), from the release folder a caller names or else the one this code is in.
 RELEASE_ROOT = Path(__file__).resolve().parents[1]
 RDFSTORE = Path("skills") / "rdf-store" / "scripts" / "rdfstore.py"
 SUBGRAPH = Path("business_architecture") / "ontology" / "projection" / "subgraph.py"
@@ -99,6 +114,8 @@ class TechGraph:
 
 
 def _iri(value):
+    """An IRI in N-Triples form. An object of a triple is kept in this form, so a leading < tells an IRI from a
+    literal."""
     return f"<{value}>"
 
 
@@ -132,11 +149,13 @@ def environment(settings):
 
 
 def graph_iri(settings):
+    """The named graph that holds this environment's technical graph."""
     return f"{BASE}{environment(settings)}:graph"
 
 
 def schema_layer(schema):
     """The layer the naming rule gives a schema, as a code of the layer code list, or None."""
+    # A schema with no underscore is one word, not a layer word followed by a name, so the rule does not apply.
     return SCHEMA_LAYERS.get(schema.lower().split("_", 1)[0]) if "_" in schema else None
 
 
@@ -169,9 +188,13 @@ def build(discovery, view, settings, every_object=False):
     metric_views = found.get("metric_views") or {}
 
     # What each object reads: the lineage the platform observed, and the tables a metric view's definition names.
+    # reads {object: its sources}; written {object: its newest write}; unread {object: a write time that is no
+    # date}; writers {object: the IDs of what wrote it}.
     reads, written, unread, writers = {}, {}, {}, {}
     for edge in found.get("table_edges") or []:
         source, target = edge["source"].lower(), edge["target"].lower()
+        # Lineage keeps history, so an edge can name an object that is gone. Only an edge whose two ends exist
+        # today is kept, and an object that reads itself says nothing.
         if source == target or source not in tables or target not in tables:
             continue
         reads.setdefault(target, set()).add(source)
@@ -191,6 +214,8 @@ def build(discovery, view, settings, every_object=False):
     pairs = sorted({(s.lower(), t.lower()) for s, t in found.get("migration_pairs") or []
                     if s.lower() in tables and t.lower() in tables and s.lower() != t.lower()})
 
+    # designs {this environment's name: the ontology object it builds}. The settings' [names] table turns the
+    # ontology's catalog names into this environment's.
     by_name = {o.full_name: o for o in view.objects.values()}
     designs = {name: by_name[full_name] for name, full_name in settings.one_name_each(by_name).items() if name in tables}
     spaces = sorted(found.get("genie_spaces") or [], key=lambda s: str(s.get("space_id")))
@@ -202,6 +227,8 @@ def build(discovery, view, settings, every_object=False):
         seeds = {name for name in tables if name.rsplit(".", 1)[0] in schemas}
         seeds |= {t.lower() for space in spaces for t in space.get("tables") or [] if t.lower() in tables}
         seeds |= {name for pair in pairs for name in pair}
+        # From the seeds the scope follows lineage both ways: down to every source, and up to everything built
+        # from them. So the graph holds whole chains and leaves out the workspace's unrelated objects.
         read_by = {}
         for target, sources in reads.items():
             for source in sources:
@@ -213,8 +240,11 @@ def build(discovery, view, settings, every_object=False):
         return f"{BASE}{env}:{kind}/{prefix}{_key(key, exact=bool(prefix))}"
 
     def add(subject, name, value):
+        """One triple. name is a tg: property's local name, or "a" for the type."""
         g.triples.add((subject, RDF_TYPE if name == "a" else TG + name, value))
 
+    # The objects. A metric view counts as one only when the ontology names a measure it computes; any other
+    # view, metric or not, is a View, and everything else is a Table.
     for name in sorted(scope):
         info, subject, design = tables[name], node("object", name), designs.get(name)
         kind = str(info.get("table_type") or "").upper()
@@ -243,6 +273,7 @@ def build(discovery, view, settings, every_object=False):
             if source in scope:
                 add(subject, "readsFrom", _iri(node("object", source)))
 
+    # The jobs and pipelines that build the objects, each joined to what it wrote.
     builders = {str(i): b for i, b in (found.get("builders") or {}).items()}
     for name in sorted(scope):
         for entity in sorted(writers.get(name, ())):
@@ -255,6 +286,7 @@ def build(discovery, view, settings, every_object=False):
             add(subject, "name", _text(builder.get("name") or entity))
             add(node("object", name), "builtBy", _iri(subject))
 
+    # The Genie spaces, each bound to its tables.
     for space in spaces:
         subject = node("agent", space["space_id"], prefix="genie-")
         add(subject, "a", _iri(TG + "Agent"))
@@ -265,10 +297,11 @@ def build(discovery, view, settings, every_object=False):
             else:
                 g.notes.append(f"Genie space {space['space_id']} is bound to {table}, which the discovery did not read")
 
+    # The migration pairs: the new table replaces the earlier platform's.
     for source, target in pairs:
         if source in scope and target in scope:
             add(node("object", target), "replaces", _iri(node("object", source)))
-    g.notes = sorted(set(g.notes))
+    g.notes = sorted(set(g.notes))   # sorted and without repeats, so the summary is the same on every run
     return g
 
 
@@ -303,7 +336,8 @@ def write(graph, folder):
 # ---- what the files hold ----------------------------------------------------------------------------
 
 def digest(graph_files):
-    """The SHA-256 of the graph files, each file's name and bytes in name order. Every marker records it."""
+    """The SHA-256 of the graph files, each file's name and bytes in name order. Every marker records it. The
+    zero byte after each name and each file keeps two different sets of files from giving the same input."""
     h = hashlib.sha256()
     for path in sorted(Path(p) for p in graph_files):
         h.update(path.name.encode("utf-8") + b"\0" + path.read_bytes() + b"\0")
@@ -311,6 +345,7 @@ def digest(graph_files):
 
 
 def _quads(graph_files):
+    """The graph files parsed into one rdflib dataset."""
     from rdflib import Dataset
     data = Dataset()
     for path in sorted(Path(p) for p in graph_files):
@@ -388,6 +423,7 @@ def content(nodes, edges, release_root=None):
 
 
 def _now(now=None):
+    """The time a marker carries, in UTC to the second. A test passes its own time."""
     return (now or dt.datetime.now(dt.timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -401,6 +437,8 @@ def marker(graph_files, store, now=None):
 def _judge(held, graph_files, differs=None):
     """(status, why) from a store's marker and whether its content differs from the files."""
     want = digest(graph_files)
+    # The order is from the weakest evidence to the strongest: no marker, a marker of other files, a marker of
+    # these files over other content. Only a store that passes all three reads current.
     if not held:
         return "unmarked", "no technical-graph marker: load the technical graph"
     if held.get("digest") != want:
@@ -448,6 +486,8 @@ def load_neo4j(session, graph_files, store="neo4j", release_root=None, now=None)
     if held and held.get("digest") == result["digest"] and held.get("content") == sg.fingerprint(nodes, edges):
         return {**result, "status": "current", "marker": {k: v for k, v in held.items() if k != "content"}}
     written = marker(graph_files, store, now) | {"nodes": len(nodes), "edges": len(edges)}
+    # One transaction holds the delete, the new nodes and edges and the marker. replace_subgraph raises before
+    # the commit when a check fails, and the rollback below then leaves the earlier technical graph in place.
     tx = session.begin_transaction()
     try:
         made, after = sg.replace_subgraph(tx, store, LABEL, MARKER_LABEL, nodes, edges, written, KIND)
@@ -462,14 +502,17 @@ def load_neo4j(session, graph_files, store="neo4j", release_root=None, now=None)
 # ---- Jena ------------------------------------------------------------------------------------------
 
 def _rdfstore(release_root=None, rdfstore=None):
+    """The rdf-store skill's module: the caller's when it already imported one, else loaded from the release."""
     return rdfstore or _module(release_root, RDFSTORE, "kpi_store_rdfstore")
 
 
 def _dataset(rs, graph_files):
+    """The graph files as one pyoxigraph dataset, for the hash and the load."""
     return rs.pack([str(p) for p in sorted(Path(p) for p in graph_files)])
 
 
 def _jena_urls(query_url):
+    """(data URL, update URL) of the dataset whose query URL this is: Fuseki serves the three side by side."""
     base = query_url.rsplit("/", 1)[0]
     return base + "/data", base + "/update"
 
@@ -485,7 +528,7 @@ def read_jena(rs, query_url, graphs):
             with urllib.request.urlopen(request, timeout=300) as response:
                 body = response.read()
         except urllib.error.HTTPError as err:
-            if err.code == 404:
+            if err.code == 404:   # Fuseki's answer for a graph it does not hold
                 continue
             raise
         for t in rs.ox.parse(body, format=rs.ox.RdfFormat.N_TRIPLES):
@@ -537,6 +580,8 @@ def delta_tables(settings):
 
 
 def _own_tables(gate, settings):
+    """The lower-case names of the tables in the tech_graph schema. A caller asks this before it reads a table,
+    because a SELECT on a missing table is an error, not an empty answer."""
     found = gate.run("SELECT table_name FROM system.information_schema.tables "
                      f"WHERE lower(table_catalog) = '{settings.write_catalog.lower()}' "
                      f"AND lower(table_schema) = '{settings.tech_graph_schema.lower()}'")
@@ -589,7 +634,7 @@ def load_delta(gate, settings, graph_files, release_root=None, now=None, rdfstor
     dataset = _dataset(rs, graph_files)
     table, markers = delta_tables(settings)
     want = marker(graph_files, DELTA_STORE, now) | {"dataset_hash": rs.dataset_hash(dataset)}
-    stable = {k: v for k, v in want.items() if k != "marked_at"}
+    stable = {k: v for k, v in want.items() if k != "marked_at"}   # marked_at differs on every run; the rest must not
     result = {"table": table, "digest": want["digest"], "dataset_hash": want["dataset_hash"], "count": len(dataset)}
     gate.run(f"CREATE SCHEMA IF NOT EXISTS {settings.write_catalog}.{settings.tech_graph_schema}")
     store = rs.SparkStore(lb.GatedSpark(gate), table)
@@ -597,12 +642,15 @@ def load_delta(gate, settings, graph_files, release_root=None, now=None, rdfstor
         store.BATCH = batch
 
     def mark():
+        """Replaces the marker row. The JSON travels as base64, so no character of it can end the SQL string."""
         text = "decode(unbase64('" + _b64(json.dumps(want, sort_keys=True)) + "'), 'UTF-8')"
         gate.run(f"CREATE TABLE IF NOT EXISTS {markers} (store STRING, marker STRING) USING DELTA "
                  "COMMENT 'Which graph files the technical graph table was loaded from'")
         gate.run(f"DELETE FROM {markers} WHERE store = '{DELTA_STORE}'")
         gate.run(f"INSERT INTO {markers} (store, marker) SELECT '{DELTA_STORE}', {text}")
 
+    # The table already holds exactly these triples: write nothing to it. Only the marker is written, and only
+    # when it is missing or names other files.
     if TRIPLES_TABLE in _own_tables(gate, settings) and rs.dataset_hash(store.export()) == want["dataset_hash"]:
         held = read_delta(gate, settings) or {}
         if all(held.get(k) == v for k, v in stable.items()):
