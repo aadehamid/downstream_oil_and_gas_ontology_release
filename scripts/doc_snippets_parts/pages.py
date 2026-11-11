@@ -27,18 +27,42 @@ def is_page(doc: str) -> bool:
     return doc.lower().endswith((".html", ".htm"))
 
 
+# The two builders that write a page from Markdown, as each names itself in its page's generator line. A page built
+# by one of them is tested through its Markdown, and the builder's own --check fails when the page is stale.
+BUILDERS = ("scripts/build_docs_html.py", "scripts/build_playbook_html.py")
+
+
+class _Generator(HTMLParser):
+    """Reads which tool a page says built it: the content of a real <meta name="generator"> element. Text that
+    only looks like one, in a comment or a script, is not read as one."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.content = None
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "meta" and self.content is None:
+            given = {name.lower(): (value or "") for name, value in attrs}
+            if given.get("name", "").lower() == "generator":
+                self.content = given.get("content", "").strip()
+
+
+def built_by(text: str):
+    """The builder a page names in its generator line, or None when it names none of the two."""
+    reader = _Generator()
+    reader.feed(text)
+    return reader.content if reader.content in BUILDERS else None
+
+
 def html_documents(root) -> list:
-    """Every HTML page of the tree that no Markdown file is the source of: no Markdown file has its name, and it
-    does not say which tool built it. None is left out: a page with no block passes, and one that gains a block
-    must tag it."""
-    files = set(tree_files(root))
+    """Every HTML page of the tree that was written by hand: it does not carry the generator line of one of the two
+    builders. A page with the same name as a Markdown file is still read when no builder made it. None is left
+    out: a page with no block passes, and one that gains a block must tag it."""
     out = []
-    for page in sorted(p for p in files if is_page(p)):
-        if page.rsplit(".", 1)[0] + ".md" in files:
-            continue
+    for page in sorted(p for p in tree_files(root) if is_page(p)):
         with (root / page).open(encoding="utf-8", errors="replace") as f:
             head = f.read(20000)
-        if 'name="generator"' not in head:
+        if built_by(head) is None:
             out.append(page)
     return out
 

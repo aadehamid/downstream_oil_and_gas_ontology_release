@@ -379,7 +379,7 @@ nav { margin: 0 0 28px; line-height: 1.9; }
 <tr><td><code>cv_map</code></td><td><code>local_key</code> where <code>term_id</code> is not null</td><td><code>map_key</code></td><td><code>APEX-PAYER</code>, <code>CONS-4412</code></td></tr>
 </tbody>
 </table></div>
-<pre><code>SELECT DISTINCT
+<pre data-snippet="sql parse"><code>SELECT DISTINCT
   t.term_id,
   t.preferred_label,
   h.hit_kind,
@@ -426,7 +426,7 @@ INNER JOIN cv_term t ON t.term_id = h.term_id</code></pre>
 </table></div>
 <p>Do not attach <code>cv_*</code> to the certified agent. Do not attach Metric Views to the search agent.</p>
 <p><strong>Paste-ready checks</strong> (<code>workspace.o2c_unbilled</code>):</p>
-<pre><code>SELECT term_id, preferred_label, ontology_iri
+<pre data-snippet="sql parse"><code>SELECT term_id, preferred_label, ontology_iri
 FROM workspace.o2c_unbilled.cv_term
 ORDER BY term_id;
 

@@ -848,10 +848,26 @@ def test_only_a_pre_or_a_tagged_element_is_a_block_of_a_page(tmp_path):
     assert result.summary() == "3 blocks: 0 run (0 status-only), 2 checked, 0 skipped, 1 failed"
 
 
+def test_a_page_is_left_out_only_when_one_of_the_two_builders_made_it(tmp_path):
+    # Text that looks like a generator line, another tool's line, and a Markdown file of the same name do not take
+    # a hand-written page out of the check.
+    (tmp_path / "comment.html").write_text('<!-- <meta name="generator" content="scripts/build_docs_html.py"> --><pre>x</pre>',
+                                           encoding="utf-8")
+    (tmp_path / "script.html").write_text("<script>var m = '<meta name=\"generator\" content=\"scripts/build_docs_html.py\">';</script>"
+                                          "<pre>x</pre>", encoding="utf-8")
+    (tmp_path / "other-tool.html").write_text('<meta name="generator" content="some other tool"><pre>x</pre>', encoding="utf-8")
+    (tmp_path / "twin.md").write_text("# Twin\n", encoding="utf-8")
+    (tmp_path / "twin.html").write_text("<pre>written by hand beside twin.md</pre>", encoding="utf-8")
+    (tmp_path / "built.html").write_text("<meta content='scripts/build_docs_html.py' name='GENERATOR'><pre>x</pre>", encoding="utf-8")
+    assert d.html_documents(tmp_path) == ["comment.html", "other-tool.html", "script.html", "twin.html"]
+
+
 def test_the_pages_in_scope_are_those_no_markdown_file_is_the_source_of(tmp_path, capsys):
     (tmp_path / "a.md").write_text("# A\n\n" + fence("json parse", "{}"), encoding="utf-8")
-    (tmp_path / "a.html").write_text("<pre>built from a.md</pre>", encoding="utf-8")
-    (tmp_path / "built.html").write_text('<meta name="generator" content="x"><pre>built</pre>', encoding="utf-8")
+    (tmp_path / "a.html").write_text('<META NAME=generator CONTENT=\'scripts/build_docs_html.py\'><pre>built from a.md</pre>',
+                                     encoding="utf-8")
+    (tmp_path / "built.html").write_text('<meta name="generator" content="scripts/build_playbook_html.py"><pre>built</pre>',
+                                         encoding="utf-8")
     (tmp_path / "hand.html").write_text(page("<pre>no tag</pre>", '<pre data-snippet="json parse">{}</pre>'),
                                         encoding="utf-8")
     (tmp_path / "plain.html").write_text(page("<p>No block.</p>"), encoding="utf-8")
