@@ -48,10 +48,25 @@ class Connection:
                 R.BPA: f"{self.composite}.{self.bpa_alias}"}
 
 
+def _inside_release(resolved: Path) -> bool:
+    chain = [resolved, *resolved.parents]
+    root = os.path.normcase(str(RELEASE_ROOT))
+    if any(os.path.normcase(str(folder)) == root for folder in chain):
+        return True
+    # Spelling is not enough: a file system that ignores case, or a link, gives one folder two names.
+    for folder in chain:
+        try:
+            if folder.exists() and os.path.samefile(folder, RELEASE_ROOT):
+                return True
+        except OSError:
+            continue
+    return False
+
+
 def outside_release(path: Path, what: str) -> Path:
     """The path, refused when it is inside the release folder: an environment's own files never ship."""
     resolved = Path(path).expanduser().resolve()
-    if resolved == RELEASE_ROOT or RELEASE_ROOT in resolved.parents:
+    if _inside_release(resolved):
         raise SettingsError(f"{what} must be outside the release folder {RELEASE_ROOT}")
     return resolved
 

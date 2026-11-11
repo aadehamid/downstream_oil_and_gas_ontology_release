@@ -7,6 +7,7 @@ import csv
 import datetime as dt
 import io
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -342,6 +343,11 @@ def test_render_refuses_a_required_role_with_no_value():
     ("MATCH (n) REMOVE n.x", "REMOVE"), ("DROP DATABASE x", "DROP"), ("FOREACH (x IN [1] | CREATE (:X))", "CREATE"),
     ("LOAD CSV FROM 'file:///x' AS row RETURN row", "LOAD"), ("INSERT (:X)", "INSERT"),
     ("CALL db.createLabel('X')", "calls a procedure"), ("CALL apoc.periodic.iterate('a', 'b', {})", "calls a procedure"),
+    ("CALL `db.createLabel`('X')", "calls a procedure"), ("CALL `db`.`createLabel`('X')", "calls a procedure"),
+    ("CALL db.x()", "calls a procedure"), ("call  \n db.x()", "calls a procedure"),
+    ("CALL db.labels() YIELD label RETURN label", "calls a procedure"), ("CALL db.labels", "calls a procedure"),
+    ("CALL `p`() { MATCH (n) RETURN n }", "calls a procedure"), ("OPTIONAL CALL db.x()", "calls a procedure"),
+    ("CALL (name) db.x()", "calls a procedure"), ("CALL /* a note */ db.x()", "calls a procedure"),
     ("CALL () { MATCH (n) RETURN n } IN TRANSACTIONS", "opens its own transactions"),
     ("CALL () { MATCH (n) RETURN n } IN 2 CONCURRENT TRANSACTIONS", "opens its own transactions"),
 ])
@@ -356,6 +362,17 @@ def test_a_write_word_inside_a_comment_a_string_or_a_name_is_not_a_clause():
                          "WITH name, 'SET' AS word, $system AS start_value, 1 AS `MERGE`\n"
                          "WHERE name STARTS WITH 'M' OR name ENDS WITH \"DROP\"\nRETURN name\n")
     assert "STARTS WITH" in T.render_text("small", text, confirmed(), schemas(), {"system": "MIPS"}, GRAPHS).query
+
+
+@pytest.mark.parametrize("subquery", [
+    "CALL { MATCH (n) RETURN count(n) AS found }", "CALL () { MATCH (n) RETURN count(n) AS found }",
+    "CALL (name) { RETURN size(name) AS found }", "call  \n ( name , name2 )\n{ RETURN 1 AS found }",
+    "CALL (*) { RETURN 1 AS found }", "CALL // a note\n () { RETURN 1 AS found }",
+    "WITH 'CALL db.x()' AS `CALL db.y()` RETURN 1 AS found",
+])
+def test_the_two_subquery_forms_are_allowed(subquery):
+    text = SMALL.replace("RETURN name\n", f"WITH name, name AS name2 {subquery}\nRETURN name\n")
+    assert T.render_text("small", text, confirmed(), schemas(), {"system": "MIPS"}, GRAPHS).query.count("found") == 1
 
 
 # ---------- the four questions ----------
@@ -444,6 +461,35 @@ def test_settings_that_are_missing_or_wrong_stop(tmp_path):
         C.outside_release(FIXTURES / "mapping.json", "the mapping file")
 
 
+def test_a_differently_cased_spelling_of_the_release_folder_is_refused():
+    respelled = Path(str(C.RELEASE_ROOT).swapcase())
+    if str(respelled) == str(C.RELEASE_ROOT) or not respelled.exists():
+        pytest.skip("this file system tells upper case from lower case, so the other spelling is another folder")
+    for inside in (respelled / "mapping.json", respelled / "kpi_store" / "no-such-folder" / "mapping.json", respelled):
+        with pytest.raises(C.SettingsError, match="must be outside the release folder"):
+            C.outside_release(inside, "the mapping file")
+
+
+def test_a_relative_path_into_the_release_folder_is_refused(tmp_path, monkeypatch):
+    monkeypatch.chdir(C.RELEASE_ROOT / "kpi_store")
+    for inside in (Path("mapping.json"), Path("../answers/q1.json"), Path("."), Path("..")):
+        with pytest.raises(C.SettingsError, match="must be outside the release folder"):
+            C.outside_release(inside, "the mapping file")
+    monkeypatch.chdir(tmp_path)
+    assert C.outside_release(Path("mapping.json"), "the mapping file") == (tmp_path / "mapping.json").resolve()
+
+
+def test_a_link_into_the_release_folder_is_refused(tmp_path):
+    link = tmp_path / "elsewhere"
+    try:
+        os.symlink(C.RELEASE_ROOT, link, target_is_directory=True)
+    except (OSError, NotImplementedError) as error:
+        pytest.skip(f"this account cannot make a link: {type(error).__name__}")
+    for inside in (link / "mapping.json", link / "kpi_store" / "tests" / "mapping.json", link):
+        with pytest.raises(C.SettingsError, match="must be outside the release folder"):
+            C.outside_release(inside, "the mapping file")
+
+
 # ---------- asking and the command line ----------
 
 def test_ask_stops_on_drift_before_the_question_runs():
@@ -499,14 +545,14 @@ def command(tmp_path, *argv, reader=None, typed="yes"):
 def test_the_command_line_from_discover_to_ask(tmp_path, monkeypatch):
     for key in C.KEYS:
         monkeypatch.delenv("KPI_STORE_NEO4J_" + key.upper(), raising=False)
-    code, text = command(tmp_path, "ask", "q1")
+    code, text = command(tmp_path, "ask", "q1", "--out", str(tmp_path / "answers"))
     assert code == 1 and "STOPPED: no mapping file at" in text and "run discover first" in text
     code, text = command(tmp_path, "discover")
     assert code == 0 and "system.node                      DataSystem  confidence 1.0" in text
     assert "system.classification            -  confidence 0.0  (optional, absent)" in text
     code, text = command(tmp_path, "check")
     assert code == 1 and "STOPPED: the role mapping is not confirmed" in text
-    code, text = command(tmp_path, "ask", "q1")
+    code, text = command(tmp_path, "ask", "q1", "--out", str(tmp_path / "answers"))
     assert code == 1 and "STOPPED: the role mapping is not confirmed" in text
     code, text = command(tmp_path, "confirm", typed="no")
     assert code == 1 and "not confirmed" in text and not M.is_confirmed(M.load(tmp_path / "mapping.json"))
@@ -537,3 +583,17 @@ def test_the_command_line_never_prints_the_password_and_keeps_files_out_of_the_r
                     out=out, reader_factory=lambda connection: FakeReader())
     assert code == 1 and "the mapping file must be outside the release folder" in out.getvalue()
     assert not (FIXTURES / "new.json").exists()
+
+
+def test_answers_are_never_written_inside_the_release(tmp_path, monkeypatch):
+    for key in C.KEYS:
+        monkeypatch.delenv("KPI_STORE_NEO4J_" + key.upper(), raising=False)
+    assert command(tmp_path, "discover")[0] == 0 and command(tmp_path, "confirm", "--yes")[0] == 0
+    monkeypatch.chdir(C.RELEASE_ROOT)
+    for out_args in ([], ["--out", "."], ["--out", str(FIXTURES / "answers")]):      # no --out means this folder
+        reader = FakeReader(answer=[{"system": "MIPS"}], columns=["system"])
+        code, text = command(tmp_path, "ask", "q1", *out_args, reader=reader)
+        assert code == 1 and "the folder for the answers (--out) must be outside the release folder" in text
+        assert reader.asked == []                                                    # stopped before any query
+    assert not (C.RELEASE_ROOT / "q1.json").exists() and not (C.RELEASE_ROOT / "q1.csv").exists()
+    assert not (FIXTURES / "answers").exists()

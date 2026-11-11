@@ -157,6 +157,8 @@ def main(argv=None, out=sys.stdout, reader_factory=Reader, confirm_input=input) 
     reader = None
     try:
         mapping_path = C.outside_release(args.mapping, "the mapping file")
+        if args.command == "ask":
+            args.out = C.outside_release(args.out, "the folder for the answers (--out)")
         connection = C.read(args.settings)
         reader = reader_factory(connection)
         if args.command == "discover":

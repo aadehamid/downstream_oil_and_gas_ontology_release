@@ -63,12 +63,17 @@ def template_text(question: str) -> str:
         return f.read()
 
 
-def code_only(text: str) -> str:
+def code_only(text: str, keep_names: bool = False) -> str:
     """The text with comments, quoted strings, backtick names and placeholders blanked, so a word inside one of
-    them is never read as a clause."""
-    pattern = re.compile(r"/\*.*?\*/|//[^\n]*|'(?:\\.|[^'\\])*'|\"(?:\\.|[^\"\\])*\"|`(?:``|[^`])*`|\{\{.*?\}\}",
-                         re.S)
-    return pattern.sub(" ", text)
+    them is never read as a clause. `keep_names` leaves the backtick names in."""
+    parts = [r"/\*.*?\*/", r"//[^\n]*", r"'(?:\\.|[^'\\])*'", r'"(?:\\.|[^"\\])*"', r"\{\{.*?\}\}"]
+    if not keep_names:
+        parts.append(r"`(?:``|[^`])*`")
+    return re.sub("|".join(parts), " ", text, flags=re.S)
+
+
+# The two subquery forms the templates use: CALL { ... } and CALL (a, b) { ... }. Nothing else may follow CALL.
+SUBQUERY = re.compile(r"\s*(\(\s*(\*|[A-Za-z_]\w*(\s*,\s*[A-Za-z_]\w*)*)?\s*\)\s*)?\{")
 
 
 def refuse_writes(text: str) -> None:
@@ -76,8 +81,13 @@ def refuse_writes(text: str) -> None:
     for word in WRITE_WORDS:
         if re.search(rf"(?<![A-Za-z0-9_$.]){word}(?![A-Za-z0-9_])", code, re.I):
             raise RenderError(f"refused: the template holds the write clause {word}; questions only read")
-    if re.search(r"\bCALL\s+[A-Za-z_]", code, re.I):
-        raise RenderError("refused: the template calls a procedure; questions only read with plain clauses")
+    # An allow list, read with the backtick names still in place: a procedure whose name is written in backticks
+    # must not pass as a subquery.
+    named = code_only(text, keep_names=True)
+    for call in re.finditer(r"(?<![A-Za-z0-9_$.`])CALL(?![A-Za-z0-9_`])", named, re.I):
+        if not SUBQUERY.match(named, call.end()):
+            raise RenderError("refused: the template calls a procedure; after CALL only a subquery may follow, "
+                              "as CALL { or CALL (...) {")
     if re.search(r"\bIN\s+(\w+\s+){0,2}TRANSACTIONS\b", code, re.I):
         raise RenderError("refused: the template opens its own transactions; a question runs in one read transaction")
 
