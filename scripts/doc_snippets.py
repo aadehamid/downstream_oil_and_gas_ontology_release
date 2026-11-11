@@ -40,6 +40,10 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# The Cypher check imports the questions' tokenizer from the tree. Python must not leave its cache folder there:
+# this tool only reads the tree.
+sys.dont_write_bytecode = True
+
 ROOT = Path(__file__).resolve().parent.parent
 REGISTRY = Path(__file__).resolve().parent / "doc_snippets.toml"
 

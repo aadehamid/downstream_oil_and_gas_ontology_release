@@ -269,6 +269,26 @@ def test_a_block_writes_to_its_copy_and_its_own_home_never_to_the_tree_or_the_re
     assert not (Path.home() / marker).exists()
 
 
+def test_the_tool_leaves_no_python_cache_in_the_tree(tmp_path):
+    """The Cypher check imports the tokenizer from the tree. Run as a command, with nothing set to stop it, Python
+    would write a cache folder beside that module."""
+    import shutil
+    import subprocess
+    tree = tmp_path / "tree"
+    shutil.copytree(d.ROOT / "kpi_store" / "questions", tree / "kpi_store" / "questions",
+                    ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copy(d.ROOT / "kpi_store" / "__init__.py", tree / "kpi_store" / "__init__.py")
+    (tree / "scripts").mkdir()
+    for name in ("doc_snippets.py", "doc_snippets.toml"):
+        shutil.copy(d.ROOT / "scripts" / name, tree / "scripts" / name)
+    (tree / "guide.md").write_text(fence("cypher parse", "MATCH (n) RETURN n"), encoding="utf-8")
+    env = {k: v for k, v in os.environ.items() if k not in ("PYTHONDONTWRITEBYTECODE", d.NESTED)}
+    r = subprocess.run([sys.executable, str(tree / "scripts" / "doc_snippets.py"), "check"], cwd=tree, env=env,
+                       capture_output=True, text=True)
+    assert r.stdout == "1 blocks: 0 run, 1 checked, 0 skipped\n", r.stdout + r.stderr
+    assert [p.as_posix() for p in tree.rglob("__pycache__")] == []
+
+
 # -- expect
 
 
