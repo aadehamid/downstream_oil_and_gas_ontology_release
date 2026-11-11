@@ -8,10 +8,11 @@ compared without regard to case, as Windows compares them.
 The file's path comes from --stores, or from the environment variable KPI_STORE_LOCAL. kpi_store/stores.example.toml
 is the example to copy. A password is held as a Secret, whose text form is ***, so no message can print it.
 
-Every command that runs on this machine reads this file first: the runner, the setup check, the Fuseki and Neo4j
-loads, the copy to Enterprise and the sync check. It is not the same file as kpi_store.toml, which describes the
-Databricks environment, travels to the volume and holds no password (kpi_store.settings). This file never leaves
-the machine. This module only reads: it opens no connection and writes nothing.
+Six commands read this file first: the runner, the setup check, the Fuseki and Neo4j loads, the copy to
+Enterprise and the sync check. The cut tool and the questions do not read it. It is not the same file as
+kpi_store.toml, which describes the Databricks environment, travels to the volume and holds no password
+(kpi_store.settings). No command copies or uploads this file. This module only reads: it opens no connection
+and writes nothing.
 
 Each table of the file is optional, so a machine that runs only one command needs only that command's tables. A
 command asks for a part with LocalSettings.need, which stops with the name of the missing table.
@@ -109,13 +110,13 @@ class Fuseki:
 
     @property
     def is_local(self):
-        """True when the URL names this machine. Only then may a command start the server itself."""
+        """True when the URL names this machine. The Fuseki load starts a server itself only then."""
         return urlsplit(self.url).hostname in ("127.0.0.1", "localhost", "::1")
 
 
 @dataclass(frozen=True)
 class Databricks:
-    """How this machine reaches Databricks, from [databricks]: a CLI profile that is signed in, and no secret."""
+    """How this machine reaches Databricks, from [databricks]: the name of a CLI profile. No secret is kept here."""
     profile: str
     workspace_folder: str     # the workspace folder the notebook is imported into
     cli: Path | None          # the CLI's path when it is not on PATH

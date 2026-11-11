@@ -55,9 +55,10 @@ found before any store is touched.
 
 As a library: the KPI Store loads import this file and run no command of it. The Databricks load
 (kpi_store/load_databricks.py) uses pack, dataset_hash, SparkStore and roundtrip; the Fuseki load
-(kpi_store/load_fuseki.py) uses pack, FusekiStore, dataset_hash and compare; the technical graph
-(kpi_store/tech_graph.py) uses the same calls for its own graph. So every store is proven with the one
-hash described above.
+(kpi_store/load_fuseki.py) uses pack, FusekiStore, dataset_hash and compare, with check_term and
+shared_blank_nodes before it publishes; the technical graph (kpi_store/tech_graph.py) uses the same
+calls for its own graph. So the Databricks table and the Fuseki dataset are both proven with the one
+hash described above. A Neo4j database is proven another way, by the ontology-to-lpg skill's graph hash.
 """
 import base64
 import hashlib
@@ -454,7 +455,10 @@ def roundtrip(store, dataset):
     A SparkStore is checked twice. The rows go to the staging table, which is read back and compared.
     When the hashes differ, the function returns with "published": False and the live table as it was.
     When they are equal, the staging table replaces the live table, and the live table is read back and
-    compared again. The staging table is dropped on every way out, a failure included.
+    compared again. The drop of the staging table is tried on every way out, a failure included. A
+    process that is stopped before the drop, or a drop that fails, leaves the staging table, under
+    the name of its own that each run gives it. A drop that fails after the replace also ends the
+    function before the live table is compared.
     Any other store has no staging step: the dataset is published, then exported and compared, so a
     False result there means the store already holds the copy that differs."""
     started = time.time()

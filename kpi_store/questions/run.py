@@ -9,7 +9,8 @@
 discovery guessed wrong, and runs `confirm`. `check` compares the confirmed mapping with the live schemas.
 `ask` runs that check first, then one question, and writes the rows as JSON and CSV.
 
-Every query runs in a read transaction, so the server refuses a write even if one reached it.
+Every query is sent in a read transaction (READ_ACCESS, execute_read). The server is relied on to refuse a write
+in such a transaction, should one get past the renderer's write guard.
 
 Run it after the stores are loaded and the KPI Store graph is copied to Neo4j Enterprise (the runner's
 `enterprise` step). The runner does not call it. Do `discover` and `confirm` once per environment, and again
@@ -18,7 +19,8 @@ when `check` says the governance graph's schema changed. On Windows, write `py` 
 
 It reads the connection settings, the mapping file and both graphs. It writes the mapping file (`discover`,
 `confirm`) and, for `ask`, <question>.json and <question>.csv in the --out folder. All of these must be outside
-the release folder, and the command stops when one is inside. It writes nothing to either graph.
+the release folder, and the command stops when one is inside. It sends no write to either graph: the schema
+queries are fixed read queries, and a question passes the renderer's write guard and runs in a read transaction.
 
 Exit 0 when the command did its work, 1 when it stopped. The last line it prints says why.
 """
@@ -89,7 +91,8 @@ def plain(value):
 
 def ask(reader, question: str, mapping: dict, graphs: dict[str, str], params: dict | None = None,
         now: dt.datetime | None = None) -> dict:
-    """One question's answer. Stops before the query when the mapping is unconfirmed or has drifted."""
+    """One question's answer. Stops before the question's query when the mapping is unconfirmed or has drifted.
+    The schema queries of the drift check have run by then."""
     M.require_confirmed(mapping)
     # The schemas are read again for every question, not kept from an earlier run: the governance graph belongs
     # to its owner and can change between two questions.
@@ -182,14 +185,15 @@ def main(argv=None, out=sys.stdout, reader_factory=Reader, confirm_input=input) 
     reader = None
     try:
         # The paths are checked before the settings are read and before any connection is opened, so a path
-        # inside the release folder stops the command with nothing read and nothing written.
+        # inside the release folder stops the command before it reads a file or a graph and before it writes.
         mapping_path = C.outside_release(args.mapping, "the mapping file")
         if args.command == "ask":
             args.out = C.outside_release(args.out, "the folder for the answers (--out)")
         connection = C.read(args.settings)
         reader = reader_factory(connection)
         if args.command == "discover":
-            # A confirmed mapping holds a person's corrections, and a new proposal would overwrite them.
+            # A confirmed mapping holds a person's corrections, and a new proposal would overwrite them. A mapping
+            # that was corrected and not yet confirmed has no such guard: the proposal is written over it.
             if mapping_path.exists() and M.is_confirmed(M.load(mapping_path)) and not args.replace:
                 raise M.MappingError(f"{mapping_path} is confirmed: pass --replace to write a new proposal over it")
             proposal = D.propose(read_schemas(reader, connection.graphs))
@@ -200,7 +204,8 @@ def main(argv=None, out=sys.stdout, reader_factory=Reader, confirm_input=input) 
             mapping = M.load(mapping_path)
             confirmed = M.confirm(mapping, read_schemas(reader, connection.graphs))
             show(confirmed, out)
-            # The file is saved only after the typed yes, so a "no" leaves the mapping unconfirmed on disk.
+            # The file is saved only after the typed yes, or at once with --yes. Any other answer leaves the file
+            # on disk as it was.
             if not args.yes and confirm_input("Type yes to confirm this mapping: ").strip().lower() != "yes":
                 print("not confirmed", file=out)
                 return 1

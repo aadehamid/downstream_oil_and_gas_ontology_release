@@ -83,8 +83,9 @@ report's hash and a copy still compares equal.
 
 In the KPI Store load this is the "load" step of the local Neo4j load (kpi_store/load_neo4j.py), which
 runs it through run_projection.py after the "project" step has written merged.ttl, loadable.nt and
-inferred.nt. The copy to Neo4j Enterprise and the sync check import this file for hash_graph and
-Timed only. It writes to the one database it is given and to the report's path, and nowhere else.
+inferred.nt. The copy to Neo4j Enterprise and the sync check import this file for hash_graph, Timed
+and the separator's default only. As a command it writes to the one database it is given and to the
+report's path, through a temporary file beside it, and to nothing else.
 """
 import json
 import os
@@ -602,8 +603,9 @@ def read_manual_cases(path):
 
 def wipe(session):
     """Empties the database: every node, then every constraint. Reads both counts back and raises Failed
-    unless both are zero, so a load never starts on what an earlier load left. The constraints go
-    too, so the load script creates its own on a database that is as a new one."""
+    unless both are zero, so a load does not start on nodes or constraints an earlier load left. The
+    constraints go too, so the load script creates its own. An index that belongs to no constraint is
+    not looked for and stays."""
     session.run("MATCH (n) DETACH DELETE n").consume()
     for name in session.run("SHOW CONSTRAINTS YIELD name RETURN name").value():
         session.run(f"DROP CONSTRAINT `{name}`").consume()

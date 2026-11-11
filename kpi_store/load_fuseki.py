@@ -8,7 +8,9 @@ notebook loaded the release, and before the local Neo4j load. The sync check rea
 
 It reads the release folder (the catalog and the release packages) and the local settings. It writes to the one
 Fuseki dataset [fuseki] url names, and to <run folder>/fuseki/ (fuseki.log and fuseki.pid, only when it starts the
-server). It never writes into the release folder, and it never starts or stops a Fuseki on another machine.
+server). A server it starts with [fuseki] data_folder keeps the dataset in that folder. It writes no file of the
+release, and it never starts or stops a Fuseki on another machine. Python may leave __pycache__ folders beside the
+release code it imports; the runner's zip leaves those out.
 
 --stop never signals a process on its number alone, because after a restart of the machine the saved number can
 belong to another program. The start gives Java a random token (-Dkpi_store.fuseki=<token>) and saves it with the
@@ -185,7 +187,7 @@ def start(java, fuseki, state_folder, popen=subprocess.Popen, answers=answers, s
     with (state_folder / LOG_FILE).open("ab") as log:
         process = popen(start_command(java, fuseki, token), stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
                         cwd=str(state_folder), **apart)
-    # Saved before the wait, so --stop can find the process even when the start fails or is interrupted.
+    # Saved before the wait, so --stop can find the process even when the wait fails or is interrupted.
     (state_folder / PID_FILE).write_text(json.dumps({"pid": process.pid, "token": token}) + "\n", encoding="utf-8", newline="\n")
     waited = 0
     while not answers(fuseki):
@@ -334,6 +336,7 @@ def load(store, dataset, rdfstore, bases, drop_unknown=False, apart=()):
         _update(store, " ;\n".join(drops))
     # The rdf-store skill's round trip, with the store's copy read without the graphs apart. Both checks below run
     # before publish, so a dataset the store cannot hold exactly is refused before any of its graphs is replaced.
+    # They run after the drops above, though: a refusal here leaves the store without the graphs just dropped.
     for quad in dataset:
         rdfstore.check_term(quad)
     if rdfstore.shared_blank_nodes(dataset):

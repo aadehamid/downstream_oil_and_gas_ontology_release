@@ -48,9 +48,10 @@ imports this file, builds a Driver from the release's run configuration with its
 runs five steps: project, load, review, tags and release-record. Its run function swaps the uv prefixes
 (PY and RS below) for the Python that is already running, so the load needs no uv on that machine.
 
-This script itself writes the run manifest into the run configuration's out folder, and empties a
-Fuseki dataset before the step that loads it. Every other write, to a file, a database or a store, is
-made by the script a step starts, each named above.
+This script itself makes the run configuration's out folder, writes the run manifest into it, deletes
+an earlier load's release-records file there before a load, clears and remakes the rebuild's export
+folder, and empties a Fuseki dataset before the step that loads it. The other writes, to a file, a
+database or a store, are made by the scripts the steps start, each named above.
 """
 import csv
 import hashlib
@@ -530,7 +531,9 @@ class Driver:
 
     Each step is a method named step_<name>. A step starts the skill's other scripts as separate
     commands, in the order their checks depend on, and raises Failed at the first one that does not
-    exit 0. So a later script never reads a file an earlier, failed script left behind."""
+    exit 0. So within one run no script starts after one that failed. The files a failed script left
+    stay in the out folder: a later run that starts at a later step checks only that the files it
+    needs exist (need), not which run wrote them."""
 
     def __init__(self, cfg, run=run_command, ready=http_ready, update=http_update, log=print, inputs=None):
         self.cfg, self.run, self.ready, self.update, self.log = cfg, run, ready, update, log

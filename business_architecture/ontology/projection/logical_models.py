@@ -325,9 +325,9 @@ def load_jena(rs, graphs, query_url):
 def load_neo4j(session, files, store="neo4j"):
     """Replaces the subgraph and its marker in the database the session is on, in one transaction.
 
-    The commit comes only after subgraph.replace_subgraph returns, which it does only when every edge found its
-    target and the ontology's counts did not move. On any error the transaction is rolled back, so the database
-    keeps the subgraph and the marker it had."""
+    The commit comes only after subgraph.replace_subgraph returns, which it does only when the count of edges
+    made equals the count sent and the ontology's counts did not move. When it raises, or the commit itself is
+    not reached, the transaction is rolled back, so the database keeps the subgraph and the marker it had."""
     nodes, edges = graph_rows(files)
     marker = {"store": store, "digest": digest(files), "models": [slug for slug, _, _ in files], "nodes": len(nodes),
               "edges": len(edges), "marked_at": ss.now()}

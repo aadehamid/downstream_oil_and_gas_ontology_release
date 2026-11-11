@@ -20,8 +20,9 @@ Where the KPI Store uses this file:
   shape files that belong to no package.
 - sync_stores.py reads the manifest's input_fingerprint: it is one of the three facts a store's marker must match.
 
-build reads the packages' Turtle, the shape files and inferred.nt, and writes only projection-manifest.json. record
-also writes inferred.nt and projection-report.json. Neither opens a database.
+build reads the packages' Turtle, the shape files and inferred.nt. It writes projection-manifest.json and no other
+file, and with --verify it writes nothing. record also writes inferred.nt and projection-report.json. Neither opens
+a database.
 """
 import argparse
 import hashlib
@@ -214,11 +215,13 @@ def check(data, shapes):
 
 def build():
     """Checks the inputs and returns (loadable triples, inferred triples, the manifest's text). It writes nothing:
-    main writes the manifest, or with --verify compares it. It exits before it returns when a check fails, so a
-    manifest never describes inputs that did not pass.
+    main writes the manifest, or with --verify compares it. It exits before it returns when a check fails, so main
+    and record write no manifest for inputs that did not pass.
 
-    The input fingerprint is the SHA-256 of the sorted loadable triples followed by the inferred triples. It depends
-    on the triples only, so a package rewritten with the same triples in another order keeps its fingerprint."""
+    The input fingerprint is the SHA-256 of the loadable triples followed by the inferred triples. The loadable
+    triples are sorted first, so a package rewritten with the same triples in another order keeps its fingerprint.
+    The inferred triples are hashed as the text of inferred.nt, in the file's own order: the same inferred triples
+    in another order give another fingerprint."""
     data, shapes = graph(INPUTS), graph(SHAPES)
     inferred = open(INFERRED).read() if os.path.exists(INFERRED) else ""
     # Step 1 checks every triple that is loaded: the asserted data and the inferred triples.
@@ -267,9 +270,12 @@ def record(run):
     """Takes a driver run's result into this folder, once its inputs are proven to be this tree's: every file its
     run-manifest.json lists has the SHA-256 of the file this tree projects, and it loaded the same triples.
 
-    The three tests come before the first write, so a run on other inputs, or one whose report did not pass, leaves
-    this folder as it was. inferred.nt is written first because build reads it from disk: the manifest and the
-    report must describe the run's inferred triples, not the ones this folder held before."""
+    Three tests come before the first write: the run's inputs are this tree's, its report passed, and it loaded
+    this tree's triples. A run that fails one of them leaves this folder as it was. inferred.nt is then written
+    first, because build reads it from disk: the manifest and the report must describe the run's inferred triples,
+    not the ones this folder held before. build can still stop after that write, on a rule or a SHACL failure of
+    the data with the new inferred triples. The folder then holds the new inferred.nt beside the earlier manifest
+    and report, and build stops on the same failure, with or without --verify, until inferred.nt is put right."""
     with open(os.path.join(run, "run-manifest.json")) as f:
         ran = json.load(f)
     with open(os.path.join(run, "projection-report.json")) as f:

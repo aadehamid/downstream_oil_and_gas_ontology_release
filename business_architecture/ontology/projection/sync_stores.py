@@ -21,11 +21,14 @@ writes the triple table also writes its marker (marker), and a caller that has r
 them to drift. Every expectation comes from this tree's files. --ref reads them at a Git ref instead.
 
 In the KPI Store load this file is a library, not a step of the runner. Each store load under kpi_store/ (Databricks,
-Fuseki, the local Neo4j, the copy to Enterprise) and the sync check import it from the release folder and ask it the
-same things: what a current store holds (expected, jena_graphs), what a marker looks like (marker) and how a store
-compares (drift). So the loads and the sync check cannot disagree on what "current" means. Those callers bring their
-own settings and connections. The three commands above, with the settings below, are for a run by hand.
-The only writes here are mark's: one marker node in Neo4j. Nothing here writes a file, Jena or Databricks.
+Fuseki, the local Neo4j, the copy to Enterprise) and the sync check import it from the release folder. They all take
+from it what a current store holds (expected, and the graphs and package graphs of a release) and what a marker looks
+like (marker). So the loads and the sync check start from one statement of what a store should hold. Each then applies
+its own test on top: a load compares a dataset hash or a graph hash before it calls a store current, and only the
+sync check calls drift, which compares markers and counts. Those callers bring their own settings and connections. The
+three commands above, with the settings below, are for a run by hand.
+The only write this file makes is mark's: one marker node in Neo4j. It writes no file, and nothing to Jena or
+Databricks.
 
 The settings come from one place (settings): the file EPM_STORES_ENV names, kept outside the repository, and the
 process environment, which wins. No password is printed.
@@ -147,8 +150,9 @@ def expected(ref=None):
     """What a current store's marker holds (MARKER_FIELDS), and the newest release IRIs.
 
     The two kinds of field catch two kinds of change. The catalog's count and digest move when a release is added to
-    or taken out of the catalog. The input fingerprint moves when the triples the projection loads change. A store is
-    current only when its marker equals all three."""
+    or taken out of the catalog. The input fingerprint moves when the triples the projection loads change. A store
+    with a marker (Neo4j, Databricks) can read current only when its marker equals all three; drift then also
+    compares its count. Jena has no marker and is judged by its graphs."""
     datasets = catalog_datasets(repo_file(CATALOG, ref))
     return {"catalog_datasets": len(datasets),
             "catalog_digest": hashlib.sha256("\n".join(datasets).encode()).hexdigest(),
@@ -350,8 +354,9 @@ def neo4j_checked(store, session, want):
 def mark_neo4j(session, store="neo4j", want=None):
     """Checks the database against this tree (neo4j_checked), then writes its marker. Returns the marker.
 
-    The check runs first and stops the command, so a database that does not hold this tree's load is never marked
-    current. MERGE on the store's name means a second mark replaces the first and leaves one marker per name."""
+    The check runs first and stops the command, so a database whose counts or release records differ from this
+    tree's last load is not marked. The check compares the two counts and the release records, not the graph's
+    content. MERGE on the store's name means a second mark replaces the first and leaves one marker per name."""
     want = want or expected()
     written = marker(want, store, neo4j_checked(store, session, want))
     session.run("MERGE (m:EpmStoreMarker {store: $s}) SET m = $p", s=store, p=written).consume()
@@ -384,7 +389,7 @@ def read_jena(query_url):
 def read_stores(stores, values, name="neo4j"):
     """(markers, live, logical-model markers) of the named stores, for drift and logical_models.drift. A store not
     named is not read. A store that cannot be read, or whose setting is missing, reads as unreachable with the reason.
-    Every error is caught per store, so one store that is down still leaves a line for the other."""
+    An error is caught per store, so one store that is down still leaves a line for the other."""
     import logical_models as lm  # it imports this module
     markers, live, models = {}, {}, {}
     if "neo4j" in stores:

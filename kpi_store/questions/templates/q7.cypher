@@ -8,7 +8,9 @@
 // gives every KPI whose chain reaches a replica of such a system. One row per KPI, metric view and system.
 //
 // Part 1, governance graph. Each system with its tables, then the reasons that make it sensitive. Each of the
-// three sources of a reason is kept only when the governance graph has it, and the header asks for at least one.
+// three sources of a reason is kept only when the mapping names its roles. The header asks that one of three roles
+// has a value. That is not quite one whole source: a policy relationship with no policy name role passes the header
+// and gives no reason.
 CALL () {
   USE graph.byName($governance_graph)
   MATCH (g:{{label:system.node}})
@@ -52,8 +54,8 @@ CALL () {
                   reasons: reasons}) AS sensitive
 }
 // Part 2, KPI Store graph. For each sensitive system, the system with the same code in lower case, and every KPI
-// served by a metric view whose lineage reaches a replica of it. 0 steps covers a view that reads a replica
-// directly, and 6 bounds the search.
+// served by a metric view whose lineage reaches a replica of it. 0 steps covers a view that itself copies the
+// system. 6 bounds the search, so a replica more than 6 steps below the view is not found.
 CALL (sensitive) {
   USE graph.byName($bpa_graph)
   UNWIND sensitive AS found

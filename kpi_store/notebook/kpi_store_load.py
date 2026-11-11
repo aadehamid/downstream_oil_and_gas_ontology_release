@@ -6,7 +6,8 @@
 # MAGIC It needs no token: it uses the notebook's own session.
 # MAGIC
 # MAGIC 1. It reads `kpi_store.toml` from the volume and checks the release zip beside it against the SHA-256 the
-# MAGIC    settings name. A missing or wrong settings file, or a zip that differs, stops the run before anything else.
+# MAGIC    settings name. A missing or wrong settings file, or a zip that differs, stops the run before it reads or
+# MAGIC    writes anything in the workspace's data.
 # MAGIC 2. It compares the ontology with the workspace and writes `discovery-report.json` and `discovery-report.csv`
 # MAGIC    to the volume.
 # MAGIC 3. If a row of the report blocks, it stops there. Otherwise it loads `epm_triples` through a staging table
@@ -30,25 +31,32 @@
 # MAGIC |---|---|
 # MAGIC | `blocked` | A row of the report blocks. Nothing was loaded. Clear the report, cut, and run again. |
 # MAGIC | `checked` | `mode` was `check` and no row blocks. Nothing was loaded. |
-# MAGIC | `current` | `epm_triples` and its marker already hold this release. Nothing was written. |
-# MAGIC | `marked` | `epm_triples` already held this release. Only the marker row was written. |
+# MAGIC | `current` | `epm_triples` and its marker already hold this release. Both were left as they are. |
+# MAGIC | `marked` | `epm_triples` already held this release and was left as it is. The marker row was written. |
 # MAGIC | `loaded` | `epm_triples` was replaced through the staging table, read back, and marked. |
 # MAGIC
-# MAGIC What the notebook may touch: it writes only to the two KPI Store schemas the settings name, and to the
-# MAGIC volume. It reads only the read catalogs the settings name and three system schemas. The release's code
-# MAGIC checks every SQL statement against this rule before it runs.
+# MAGIC Every run that gets as far as the comparison writes its report files and `discovery.json` to the volume,
+# MAGIC whatever its status. A run that
+# MAGIC ends `current`, `marked` or `loaded` also writes the technical graph's file there and loads it.
+# MAGIC
+# MAGIC What the notebook may touch in the workspace's data: it writes to the two KPI Store schemas the settings
+# MAGIC name and to files in the volume, and nowhere else. It reads the read catalogs the settings name, the two
+# MAGIC KPI Store schemas (to read its own tables back), and three system schemas. The release's code checks the
+# MAGIC table names of every SQL statement against this rule before it runs the statement. Outside the workspace's
+# MAGIC data, the notebook installs packages into its own Python session and unpacks the zip into a temporary
+# MAGIC folder on the compute's local disk.
 # MAGIC
 # MAGIC The cells, in order:
 # MAGIC
-# MAGIC 1. Install the packages at the versions the release was tested with. A pinned version gives the same
-# MAGIC    result on every run.
+# MAGIC 1. Install five packages, each at the version the release was tested with, so every run installs the same
+# MAGIC    versions of these five.
 # MAGIC 2. Restart Python, so the cells after it use the packages that were just installed.
 # MAGIC 3. Define the two functions that do the work: `bootstrap` checks the zip and unpacks it, and `main` runs
-# MAGIC    the comparison and the load. This cell runs nothing.
+# MAGIC    the comparison and the load. This cell only defines them.
 # MAGIC 4. Run `main` and hand its summary to the caller. The runner on the Windows machine reads this summary.
 # MAGIC
 # MAGIC The notebook holds little code of its own. The comparison and the load live in the release zip, in the
-# MAGIC `kpi_store` package, so the code that runs is the code whose checksum the settings name.
+# MAGIC `kpi_store` package, so the code that runs comes from the zip that the checksum in the settings accepts.
 
 # COMMAND ----------
 
@@ -100,8 +108,11 @@ def bootstrap(settings_path, work_dir=None):
     zip_path = path.parent / zip_name
     if not zip_path.is_file():
         raise Stop(f"the release zip {zip_name} is not beside the settings file")
-    # The checksum comes first, and the zip is opened only when it matches: a zip that differs is never
-    # unpacked, so none of its code can run. It is read in 1 MB pieces to keep a large zip out of memory.
+    # The checksum comes first: the file is read once, in 1 MB pieces to keep a large zip out of memory, and a
+    # file whose checksum differs is not unpacked. The unpack below opens the file a second time. So the check
+    # covers the bytes that were hashed, and it holds for the code that runs only while nobody replaces the zip
+    # in the volume between the two reads. The release's own check_zip, further down, hashes the file a third
+    # time, but by then code from the unpacked zip is already running.
     digest = hashlib.sha256()
     with zip_path.open("rb") as f:
         for piece in iter(lambda: f.read(1 << 20), b""):
@@ -120,7 +131,7 @@ def bootstrap(settings_path, work_dir=None):
         raise Stop("the release zip holds no kpi_store package")
     root = roots[0]
     # A notebook session can run this twice. Drop the kpi_store modules and the import paths of an earlier
-    # unzip, so this run uses this zip's code and no other.
+    # unzip into a temporary folder, so this run imports kpi_store from this zip.
     for name in [m for m in sys.modules if m == "kpi_store" or m.startswith("kpi_store.")]:
         del sys.modules[name]   # a second run in one session must import the new zip's code
     sys.path[:] = [p for p in sys.path if not p.startswith(str(target.parent / "kpi_store_"))]

@@ -4,9 +4,17 @@ The file lives outside the release folder, because it describes one environment'
 compares it with the live schema and names every role whose label, property or relationship type is gone.
 
 The file's life: `discover` writes a proposal (`discover.propose`), a person corrects it, and `confirm` marks it
-as confirmed and stores a digest of its values. After that the file is only read. `render.py` refuses a mapping
-that is not confirmed, and `run.py` runs `drift` before every question, so a question never runs on a graph whose
-schema changed since the confirmation. This module reads and writes the mapping file and nothing else.
+as confirmed and stores a digest of its values. After that `check` and `ask` only read it; a new `confirm`, or
+`discover --replace`, writes it again. `render.py` refuses a mapping that is not confirmed, and `run.py` runs
+`drift` before every question.
+
+What `drift` proves is narrow. Each mapped label still exists, each mapped property is still on its label, each
+mapped relationship type still runs between its labels, and each mapped path still connects. So a question does
+not run when a name it uses is gone. `drift` does not see any other change of the schema: a new label, a new
+property, or a mapped name that now means something else. The schema is read just before the question, in its
+own transaction, so a change between the two is not seen either.
+
+This module reads and writes the mapping file and nothing else.
 """
 from __future__ import annotations
 
@@ -59,6 +67,7 @@ def digest(mapping: dict) -> str:
 
 def is_confirmed(mapping: dict) -> bool:
     # The digest ties the confirmation to the values the person saw. An edit after it needs a new confirmation.
+    # It is a plain checksum with no key: it catches an edit, not a person who also rewrites the digest.
     return mapping.get("confirmed") is True and mapping.get("digest") == digest(mapping)
 
 

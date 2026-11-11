@@ -154,8 +154,8 @@ def empty_target(session, size):
 
 def copy(source, target, size):
     """Copies every :Resource node, then every relationship between two of them, in batches of `size`. Returns the
-    counts copied. It deletes nothing and does not check the result: the caller empties the target before and
-    compares the hashes after.
+    counts copied. It deletes nothing and does not check the result: the caller clears the target of :Resource
+    nodes before and compares the hashes after.
 
     The constraint comes first. It gives the target the index on :Resource(uri) that each relationship's two
     lookups use, and it makes a second copy into a target that still holds the nodes fail instead of doubling them.

@@ -50,8 +50,9 @@ def one_store(store, yes, values, database=None):
     """One store's count and, with yes, its count after emptying, as the JSON line's dict.
 
     For Neo4j the two refusals come before the connection is opened. The settings may name no database, and the
-    server's default could then be any database, so --yes must name the one to empty. A --database that differs from
-    the one the settings name is refused, so a mistyped name cannot empty another database on the same server."""
+    server's default could then be any database, so --yes must name the one to empty. When the settings do name a
+    database, a --database that differs from it is refused, so a mistyped name does not empty another database on
+    the same server. When the settings name none, --database is the only check: the database it names is emptied."""
     if store == "jena":
         query_url = ss.need(values, "EPM_JENA_QUERY")
         held = sum(ss.read_jena(query_url).values())

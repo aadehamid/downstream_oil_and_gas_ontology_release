@@ -7,7 +7,7 @@ that blocks has one.
 Where it sits: the report is the one file that passes between the three parts of the loop. The notebook writes it
 to the volume (kpi_store.load_databricks.run). The runner fetches it, and a person clears it. The cut tool reads
 the cleared report and turns the accepted rows into a correction version. This module holds the format for all
-three, so they cannot disagree on it. It has no command.
+three, so they share one definition of it. It has no command.
 
 A row's decision is one of DECISIONS. "accept" applies the row's proposed fix. "reject" changes nothing and
 becomes a standing decision, so the next comparison leaves the row out. "environment setting" means the
@@ -23,8 +23,9 @@ from pathlib import Path
 FORMAT = 1   # the format's number; read refuses a report with another
 JSON_NAME = "discovery-report.json"
 CSV_NAME = "discovery-report.csv"
-# Every kind a row may have. A row blocks exactly when its kind is one of BLOCKING_KINDS, and validate holds
-# every report to that, so a hand-edited file cannot turn a blocking row into one that does not block.
+# Every kind a row may have. A row blocks exactly when its kind is one of BLOCKING_KINDS. validate refuses a
+# report in which a row's blocks does not follow from its kind, so a hand edit of blocks alone is caught. It does
+# not catch a hand edit of the kind itself: a blocking kind rewritten as another kind passes.
 BLOCKING_KINDS = ("object-missing", "object-renamed", "column-missing", "column-renamed", "edge-missing")
 OTHER_KINDS = ("column-case", "object-extra", "measure-link", "second-source", "no-lineage", "stale-data",
                "migration-pair", "question")
@@ -43,8 +44,9 @@ class ReportError(Exception):
 
 
 def new_run(now, settings_sha256, zip_sha256):
-    """The report's run record. The ID is the UTC time and eight random hexadecimal digits, so two runs in the
-    same second still get a folder each. The two checksums say which settings and which zip the run read."""
+    """The report's run record. The ID is the UTC time and eight random hexadecimal digits, which keep two runs
+    in the same second apart unless the digits repeat. The two checksums say which settings and which zip the
+    run read."""
     return {"id": f"{now.strftime('%Y%m%dT%H%M%SZ')}-{secrets.token_hex(4)}", "at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "settings_sha256": settings_sha256, "zip_sha256": zip_sha256}
 
@@ -164,7 +166,8 @@ def read(path):
 def standing_key(row):
     """What makes two findings the same one: the kind, the object, the ontology's value and the found value, case
     ignored. It is a SHA-256, so the standing decisions never hold a found value as text."""
-    # The unit separator (\x1f) cannot occur in a name, so two different rows never join into the same text.
+    # The parts are joined with the unit separator (\x1f), a character names do not use, so the parts of one row
+    # do not run together into the text of another.
     parts = (row["kind"], row["object"].lower(), row["ontology_value"].lower(), row["found_value"].lower())
     return hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
 

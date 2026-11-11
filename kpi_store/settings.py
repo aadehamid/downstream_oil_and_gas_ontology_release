@@ -9,8 +9,10 @@ which Genie spaces to read. It holds no password. kpi_store/kpi_store.example.to
 
 Two places read it. On the machine that runs the loads, the runner reads the copy the local settings name, and
 its zip step writes the zip's SHA-256 into the copy it uploads. In Databricks, the notebook reads the uploaded
-copy and checks the zip against it (check_zip) before it opens the zip. This module only reads and checks; it
-needs the standard library only.
+copy twice. First its own bootstrap, which uses the standard library only, reads the zip's name and checksum
+from it and hashes the zip before it unpacks it. Then, with the code from the unpacked zip, it validates the
+whole file here (load) and hashes the zip again (check_zip). So check_zip runs after the unpack, not before it.
+This module reads and checks; it writes nothing and needs the standard library only.
 
 Every name the file gives is checked against a strict pattern here, because the load builds SQL statements and
 file paths from these names.
@@ -22,8 +24,8 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-# The forms a value may take. Each leaves out quotes, spaces, dots and slashes, so a value can go into a SQL
-# statement or a path and stay one name.
+# The forms a value may take. Each leaves out quotes, spaces and slashes, so a value can go into a SQL statement
+# or a path and stay one name. All but ZIP_NAME leave out dots too; a zip's name may hold them, as a file name does.
 IDENTIFIER = re.compile(r"^[A-Za-z0-9_]+$")          # a catalog, schema, volume or warehouse name
 PATTERN = re.compile(r"^[A-Za-z0-9_*?]+$")           # a skip rule: a name that may hold the wildcards * and ?
 SHA256 = re.compile(r"^[0-9a-f]{64}$")               # lower case only, as hashlib writes it, so two texts compare equal
@@ -43,7 +45,7 @@ LAYOUT = {
     "skip": {"schemas": list, "tables": list},
     "genie": {"spaces": list},
 }
-# The notebook needs no SQL warehouse. Only the sync check, outside the notebook, reads Databricks through one.
+# The notebook needs no SQL warehouse. The sync check, which runs outside the notebook, reads Databricks through one.
 OPTIONAL = {("databricks", "warehouse_id")}
 
 
@@ -53,7 +55,7 @@ class SettingsError(Exception):
 
 @dataclass(frozen=True)
 class Settings:
-    """The validated file. The properties build the full names the load uses, so no other module spells them."""
+    """The validated file. The properties build the full names of the schema, the two tables and the zip."""
     zip_name: str
     zip_sha256: str
     write_catalog: str
@@ -221,7 +223,7 @@ def file_sha256(path):
 
 def check_zip(settings):
     """The zip's checksum, after checking it equals the one the settings name. Raises SettingsError otherwise.
-    This is what ties a load to one release: the settings name the checksum, and a zip with any other is refused."""
+    The notebook calls it after it has unpacked the zip, as a second check; its own first check comes before."""
     if not settings.zip_path.is_file():
         raise SettingsError(f"the release zip {settings.zip_name} is not beside the settings file")
     found = file_sha256(settings.zip_path)

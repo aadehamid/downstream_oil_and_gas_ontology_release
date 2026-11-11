@@ -6,9 +6,9 @@
 // system and everything built from them. The governance graph gives the tables the system holds and, where it
 // records lineage, the tables built from those.
 //
-// Part 1, KPI Store graph. The replica tables that copy the system, everything built from them through at most
-// 6 steps of lineage, and the data products and KPIs those tables serve. A system the ontology does not hold
-// gives an empty list here, and the governance graph still answers.
+// Part 1, KPI Store graph. The replica tables that copy the system, the tables built from them through at most
+// 6 steps of lineage, and the data products and KPIs the built tables serve. A table more than 6 steps away is
+// not found. A system the ontology does not hold gives an empty list here, and the governance graph still answers.
 CALL () {
   USE graph.byName($bpa_graph)
   OPTIONAL MATCH (s:{{label:ontology_system.node}})
@@ -19,7 +19,7 @@ CALL () {
   OPTIONAL MATCH (built)-[:{{relationship:platform_table.part_of}}]->(p:{{label:data_product.node}})
   OPTIONAL MATCH (built)-[:{{relationship:platform_table.serves_measure}}]->(m:{{label:measure.node}})
   // Four lists in one shape (kind, name, label, layer), so the rows of both graphs fit one table. An entry with
-  // no name comes from an optional match that found nothing. The RETURN drops it.
+  // no name comes from an optional match that found nothing, or from a node with no name. The RETURN drops it.
   WITH collect(DISTINCT {kind: 'replica table', name: replica.{{property:platform_table.full_name}},
                          label: null, layer: 'replica'})
      + collect(DISTINCT {kind: CASE l.{{property:layer.code}} WHEN 'metric-view' THEN 'metric view'

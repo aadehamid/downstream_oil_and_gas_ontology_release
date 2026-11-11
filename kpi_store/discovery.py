@@ -17,9 +17,9 @@ kpi_store.compare, and saves it as discovery.json beside the report. The technic
 file. This module only reads. Every statement it sends is a SELECT or a DESCRIBE, and in the notebook each one
 passes the Gate of kpi_store.load_databricks first. It has no command of its own.
 
-The reading is narrow on purpose. All tables of the read catalogs are listed, because the comparison must see
-what exists. Columns, metric view definitions and column lineage are read only for the schemas that hold the
-ontology's objects or a Genie space's tables.
+The reading is narrow on purpose. All tables of the read catalogs are listed, and those a skip rule covers are
+then dropped, because the comparison must see what exists. Columns, metric view definitions and column lineage
+are read only for the schemas that hold the ontology's objects or a Genie space's tables.
 """
 import datetime as dt
 import json
@@ -257,7 +257,7 @@ def discover(settings, run_sql, genie=None, schemas=()):
                 found.columns.setdefault(table, []).append((int(row.get("ordinal_position") or 0), str(row["column_name"])))
         found.columns = {t: [name for _, name in sorted(cols)] for t, cols in found.columns.items()}
 
-    # 4. Each metric view's definition. information_schema does not hold it, so each view is described on its own.
+    # 4. Each metric view's definition, read with one DESCRIBE statement per view.
     for key, info in sorted(found.tables.items()):
         if info.table_type.upper() == "METRIC_VIEW" and key.rsplit(".", 1)[0] in scope:
             try:

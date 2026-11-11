@@ -40,8 +40,8 @@ PYTHON_MINIMUM = (3, 11)   # the first Python with tomllib, which reads both set
 # The versions the release was tested with. The notebook installs the same ones where it needs them.
 PACKAGES = {"rdflib": "7.6.0", "pyshacl": "0.40.2", "pyoxigraph": "0.5.13", "neo4j": "6.4.1",
             "databricks-sdk": "0.164.0", "sqlglot": "30.31.0", "pyyaml": "6.0.3"}
-# A jar is accepted by its checksum, not by its file name: a jar of another version would still start, and could
-# give a graph the release was not tested with.
+# A jar is accepted by its checksum, not by its file name: a jar of another version may still start, and may
+# behave differently from the one the release was tested with.
 ROBOT_SHA256 = "16a73c074f3df359a7338a84b4e0788785fe06117f931bb9796e9619ea776105"   # ROBOT 1.9.10
 # The local Neo4j and its two plugins, at the versions the load and its checks were tested with. The check
 # accepts no other: n10s imports the ontology, and its result must be the one the checks expect.
@@ -258,7 +258,8 @@ def check_script_tools(ctx):
 
 
 def databricks_cli(ctx):
-    """The Databricks CLI is found and starts. Every Databricks step of the runner goes through it."""
+    """The Databricks CLI is found and starts. The runner's volume, upload, notebook and report steps go through
+    it. The sync check reads Databricks through the SDK instead, with the same profile."""
     found = find_databricks(ctx.local, ctx.which)
     fix = ("Install the Databricks CLI as its documentation says (\"Install or update the Databricks CLI\", "
            "https://docs.databricks.com/aws/en/dev-tools/cli/install), open a new terminal, and if it is still not "
@@ -296,7 +297,7 @@ def _connect(ctx, neo4j):
 
 @needs_settings
 def neo4j_local(ctx):
-    """The local Neo4j answers, and it, n10s and APOC are at the pinned versions. Three read-only queries."""
+    """The local Neo4j answers, and it, n10s and APOC are at the pinned versions. Two read-only queries."""
     neo4j = ctx.local.need("neo4j_local")
     try:
         with _connect(ctx, neo4j) as driver, driver.session(database=neo4j.database) as session:
@@ -344,7 +345,8 @@ def neo4j_plugins(ctx):
 @needs_settings
 def neo4j_enterprise(ctx):
     """The Enterprise server answers and has the database the settings name. The check opens it the way the copy
-    does (copy_enterprise.open_target), so a database the copy would refuse fails here first. It only counts nodes."""
+    does (copy_enterprise.open_target), so a database that the copy could not open fails here first. The copy's
+    other refusals, such as nodes that are not the KPI Store's, are not tested here. The check only counts nodes."""
     from . import copy_enterprise
     neo4j = ctx.local.need("neo4j_enterprise")
     try:

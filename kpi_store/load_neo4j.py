@@ -7,8 +7,9 @@ before the copy to Neo4j Enterprise (kpi_store.copy_enterprise), which takes onl
 
 It reads the release folder and the local settings. It writes to the one database [neo4j.local] names, to the
 projection's output folder ([projection] out: the load report and the files the copy reads), and to
-<run folder>/neo4j/ (the log and the two configuration copies). It never writes into the release folder and
-never touches the Enterprise server.
+<run folder>/neo4j/ (the log, the two configuration copies and, for the length of the load, the login file). It
+writes no file of the release and never touches the Enterprise server. Python may leave __pycache__ folders beside
+the release code this process imports; the steps it starts as separate commands are told to write none.
 
 The local Neo4j is Neo4j Desktop on the machine that runs the loads. THE LOAD EMPTIES THE DATABASE that
 [neo4j.local] names, then builds the graph again from the release files. The steps and their checks are the
@@ -54,7 +55,7 @@ from . import local_settings as ls
 from . import ontology_view as ov
 
 STORE = "neo4j"   # the name the local database's marker carries
-# The skill's steps this load runs, in this order: each reads what the one before it wrote.
+# The skill's steps this load runs, in this order: a step reads files or graph content that earlier steps wrote.
 STEPS = ("project", "load", "review", "tags", "release-record")
 SKILL_SCRIPTS = Path("skills") / "ontology-to-lpg" / "scripts"
 PROJECTION = Path("business_architecture") / "ontology" / "projection"
@@ -219,8 +220,8 @@ def step_runner(prefixes, log_path, java=None, run=subprocess.run):
     """The run(cmd, cwd, env, capture) function the skill's driver calls. Each command's output goes to the log file,
     so the load prints one line and the detail stays in the run folder."""
     def run_step(cmd, cwd=None, env=None, capture=False):
-        # No .pyc files appear in the release folder, and each script reads and prints UTF-8, which is not the
-        # default on Windows.
+        # The step's Python writes no .pyc files into the release folder, and each script reads and prints UTF-8,
+        # which is not the default on Windows.
         env = dict(os.environ if env is None else env) | {"PYTHONDONTWRITEBYTECODE": "1", "PYTHONUTF8": "1"}
         with Path(log_path).open("a", encoding="utf-8", newline="\n") as log:
             log.write("--- " + " ".join(str(c) for c in cmd[-6:]) + "\n")   # the command's end names the script
@@ -314,8 +315,8 @@ def is_current(session, store, want, report, code, sep):
 
 def load(local, release_root, run_dir=None, force=False, code=None, connect=connect, run=subprocess.run,
          extra_loads=()):
-    """The whole step. Returns a dict whose "status" is "current" (nothing was changed) or "loaded". Raises
-    LoadError when a step or a check fails.
+    """The whole step. Returns a dict whose "status" is "current" (the ontology's graph was not changed; an extra
+    load may still have replaced its own subgraph) or "loaded". Raises LoadError when a step or a check fails.
 
     extra_loads are functions (session, store name) -> dict that load a subgraph of their own, apart from the
     ontology's Resource nodes, after the logical models and before the marker. They also run when the ontology is
@@ -330,8 +331,9 @@ def load(local, release_root, run_dir=None, force=False, code=None, connect=conn
     sep = cfg_doc.get("separator", code.lv.N10S_SEP)
     result = {"store": STORE, "database": neo4j.database, "out": str(out), "log": str(run_dir / LOG_FILE)}
 
-    # First, the way out that changes nothing: an earlier load's report is of this release and passed, and the
-    # database still holds the graph that report verified.
+    # First, the way out that leaves the ontology's graph as it is: an earlier load's report is of this release
+    # and passed, and the database still holds the graph that report verified. The extra loads still run on this
+    # path, so the technical graph is replaced when it is behind.
     if not force and (out / REPORT).is_file():
         try:
             report = read_report(out, code, want)
@@ -362,8 +364,10 @@ def load(local, release_root, run_dir=None, force=False, code=None, connect=conn
                 raise LoadError(f"the local load stopped: {err}. The detail is in {run_dir / LOG_FILE}") from None
             except (OSError, ValueError) as err:
                 raise LoadError(f"the local load stopped ({type(err).__name__}): {err if isinstance(err, ValueError) else ''}") from None
-            # The marker comes last, after the report passed and every subgraph loaded. A load that stops earlier
-            # leaves the database unmarked, and the sync check then reads it as not current.
+            # The marker comes last, after the report passed and every subgraph loaded. The skill's load step
+            # empties the database, marker included. So a load that stops after that point leaves the database
+            # unmarked, and the sync check reads it as not current. A load that stops before it, in the project
+            # step, leaves the earlier graph and its marker as they were.
             report = read_report(out, code, want)
             with connect(neo4j) as driver, driver.session(database=neo4j.database) as session:
                 models = load_models(session, STORE, want["newest"], code, log)

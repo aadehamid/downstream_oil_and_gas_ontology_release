@@ -8,8 +8,10 @@ the load report's.
 
 Where it sits in the run: this is the runner's enterprise step (kpi_store.runner). It runs after the local Neo4j
 load and before the sync check. It reads the local database, the load's output folder ([projection] out) and the
-release folder. It writes to the one Enterprise database, and to nothing else: no file, and never the local
-database.
+release folder. It writes to the one Enterprise database and never to the local database. It writes one file only
+when a caller gives it a log: the runner opens <run>/enterprise.log and passes it, and the printed lines of the
+logical models' load go there. Run alone, the command writes no file of its own. Python may still leave
+__pycache__ folders beside the release code it imports; the runner's zip leaves those out.
 
 What this command may touch on Enterprise, enforced in code:
 - It writes to ONE database: the one [neo4j.enterprise] database names (businessprocessarchitecturegraph). Every
@@ -81,8 +83,8 @@ OWN_RULES = {
 }
 SCHEMA_PREFIX = "n4sch"   # the ontology import's own labels: n4sch_Class and the like
 OWN_LABELS = tuple(OWN_RULES)
-# Nodes and relationships per request of the copy, and nodes per transaction of a replace's delete. A batch keeps
-# each request and each transaction small enough for the server's memory, whatever the graph's size.
+# Nodes and relationships per request of the copy, and nodes per transaction of a replace's delete. With a batch,
+# the size of one request or one transaction does not grow with the graph.
 BATCH = 1000
 # Seconds the server gives one statement before it ends it with an error. The graph hash reads the whole graph
 # and is the slowest statement; without a limit a stuck query would hang the run.
@@ -312,8 +314,9 @@ def write_records(target, out, code):
 
 def copy(local, release_root, replace=False, confirm=None, code=None, connect=local_load.connect, extra_loads=(),
          own_rules=OWN_RULES, log=None):
-    """The whole step. Returns a dict whose "status" is "current" (nothing was changed) or "copied". Raises
-    Refused when the copy is refused or a check fails.
+    """The whole step. Returns a dict whose "status" is "current" (the ontology's copy was not changed; an extra
+    load may still have replaced its own subgraph) or "copied". Raises Refused when the copy is refused or a check
+    fails.
 
     extra_loads are functions (session, store name) -> dict that load a subgraph of their own after the logical
     models and before the marker; own_rules must then also hold that subgraph's labels, each with the condition
@@ -330,8 +333,9 @@ def copy(local, release_root, replace=False, confirm=None, code=None, connect=lo
     cfg_doc = local_load.run_config(release_root, local, "")
     sep = cfg_doc.get("separator", code.lv.N10S_SEP)
     result = {"store": STORE, "database": database}
-    # Everything up to decide() only reads. The order of the refusals matters: each one below leaves the target
-    # as it was found.
+    # Up to decide(), the ontology's copy on the target is only read, and each refusal below leaves the target as
+    # it was found. There is one write before decide(): when the ontology's copy is already current, the extra
+    # loads run (the technical graph), and an extra load replaces its own subgraph when that subgraph is behind.
     with connect(source_cfg) as source_driver, connect(target_cfg) as target_driver, \
             source_driver.session(database=source_cfg.database) as raw_source, \
             open_target(target_driver, database) as guarded:
@@ -361,8 +365,10 @@ def copy(local, release_root, replace=False, confirm=None, code=None, connect=lo
                     "graph_hash": source_hash, "held_before": held, "extra_loads": extras,
                     "marker": code.ss.read_neo4j(target, STORE)[0]}
         action = decide(held, database, replace, confirm)
-        # From here the target changes. The marker is written last, after every check passed, so a copy that
-        # stops part-way leaves a database with no current marker, and the sync check reads it as not current.
+        # From here the ontology's copy on the target changes. Its marker is written last, after every check
+        # passed. A copy that stops part-way leaves no marker, or, when a replace's delete stopped between two of
+        # its batches, an earlier marker beside counts that no longer equal it. The sync check reads neither as
+        # current. The copy is not one transaction: what was written before the stop stays in the database.
         if action == "replace":
             remove_own(target, params, own_rules)
         copied = code.cg.copy(source, target, BATCH)

@@ -8,8 +8,9 @@ discover in kpi_store.discovery, and kpi_store.compare sets the two side by side
 and the technical graph use this module too, for the release's name and each module's newest package.
 
 It reads the release folder only: release.json, the package folders under
-business_architecture/ontology/releases/<module>/<version>/, and the release scripts' newest.py. It writes
-nothing, not even a cache folder, and has no command.
+business_architecture/ontology/releases/<module>/<version>/, and the release scripts' newest.py. It writes no
+file and has no command. It loads newest.py without importing it, so Python leaves no cache folder beside that
+script.
 
 "Newest" always means newest by the release scripts' version order, in which a correction version such as
 1.2.1-correction.1 comes after 1.2.1 and before 1.2.2. Sorting the folder names as text would get that wrong.

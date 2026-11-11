@@ -100,7 +100,8 @@ def _paths(schema: Schema, start: str, end: str):
 
 
 def _entry(role: R.Role, value, confidence, alternatives):
-    """One role's entry in the mapping file. Only `value` is used later; the rest helps the person who confirms."""
+    """One role's entry in the mapping file. Only `value` reaches a query or the drift check. `run.show` prints
+    the rest for the person who confirms."""
     return {"graph": role.graph, "kind": role.kind, "required": role.required, "meaning": role.meaning,
             "value": value, "confidence": confidence, "alternatives": alternatives}
 

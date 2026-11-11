@@ -5,8 +5,11 @@ and one marker node that says which files it was loaded from. The projection's c
 Resource nodes only, so a subgraph never moves them. logical_models.py loads the logical models through this module.
 The KPI Store's technical graph (kpi_store/tech_graph.py) is loaded the same way, under its own label and marker.
 
-This module is a library with no command. It reads and writes only through the transaction it is given, and only
-nodes that carry the subgraph's label or its marker's label. It never creates, changes or deletes a Resource node.
+This module is a library with no command. It reads and writes only through the session or transaction it is given.
+It creates and deletes only nodes that carry the subgraph's label or its marker's label, and the relationships that
+start at a subgraph node. Such a relationship may end at a Resource node. It also reads Resource nodes: it counts
+them and the relationships between them, and matches them as the ends of those relationships. It creates, changes
+and deletes no Resource node and no relationship between two Resource nodes.
 
 Needs only the standard library. The session or transaction comes from the caller.
 """
@@ -66,11 +69,14 @@ def replace_subgraph(tx, store, label, marker_label, nodes, edges, marker, kind,
     Raises SystemExit, before anything commits, when an edge finds no target or the ontology's counts move.
     Returns ({kind: edges made, "ontology": edges made}, the ontology's counts).
 
-    Nothing here commits. The caller commits after this returns and rolls back when it raises, so the old subgraph
-    and its marker stay until the new one is whole. The marker is created last for the same reason: a marker never
-    describes a subgraph that failed a check. Edges are created by MATCH on both ends, so an edge whose end is
-    missing creates nothing; the count of edges made against the rows sent is what finds it."""
-    before = ontology_counts(tx)   # compared with the counts at the end: the proof that no ontology node or edge moved
+    Nothing here commits. The function relies on its caller to commit after it returns and to roll back when it
+    raises; both callers in this release do. The old subgraph and its marker then stay until the new one passed its
+    checks, and the words "nothing was changed" in the messages below are true. The marker is created last, so
+    inside the transaction no marker exists for a subgraph that failed a check. Edges are created by MATCH on both
+    ends, so an edge whose end is missing creates nothing. The check is a count: edges made against rows sent. It
+    assumes one node per uri, and it does not see an edge whose "ontology" value is neither true nor false, which
+    belongs to neither pass."""
+    before = ontology_counts(tx)   # compared with the counts at the end: a check by count, not by content
     tx.run(f"MATCH (m:{marker_label}) DETACH DELETE m").consume()
     tx.run(f"MATCH (n:{label}) DETACH DELETE n").consume()
     tx.run("UNWIND $rows AS row CREATE (n:$(row.labels)) SET n = row.props", rows=nodes).consume()

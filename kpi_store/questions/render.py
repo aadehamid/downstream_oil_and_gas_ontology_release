@@ -21,7 +21,7 @@ for the reader. It stays in the query text and the server ignores it.
 
 `run.py` calls `render` once per question, after the drift check. This module reads the template files and
 writes nothing. The order inside `render_text` matters: it refuses an unconfirmed mapping, then a template that
-could write, and only then builds the text.
+the write guard (`refuse_writes`) does not pass, and only then builds the text.
 """
 from __future__ import annotations
 
@@ -44,8 +44,10 @@ GRAPH_PARAMS = {R.GOVERNANCE: "governance_graph", R.BPA: "bpa_graph"}
 # A role placeholder: two braces, the kind, a colon, the role's name, two braces. Group 1 is the kind, group 2 the name.
 PLACEHOLDER = re.compile(r"\{\{\s*([a-z]+)\s*:\s*([A-Za-z0-9_.]+)\s*\}\}")
 
-# Every clause that can change a graph, a database or the server. A procedure call is refused too, because a
-# procedure can write: the templates need none.
+# The words the write guard refuses: the clauses and commands known to change a graph, a database or the server.
+# A procedure call is refused too, because a procedure can write: the templates need none. The guard works by
+# word, so it is not proof that a text cannot write. A function that writes would pass it. The read transaction
+# in run.py is the guard for that case.
 WRITE_WORDS = ("CREATE", "MERGE", "SET", "DELETE", "DETACH", "REMOVE", "DROP", "FOREACH", "LOAD", "ALTER",
                "INSERT", "GRANT", "DENY", "REVOKE", "RENAME", "START", "STOP", "TERMINATE", "ENABLE", "DEALLOCATE",
                "REALLOCATE", "DRYRUN")
@@ -128,9 +130,10 @@ def _is_subquery(found: list[tuple[str, str]], at: int) -> bool:
 
 
 def refuse_writes(text: str) -> None:
-    """Raises RenderError when the template holds a clause that could change anything. The questions are also
-    run in a read transaction (run.py), so this is the first of two guards. It stops a bad template before it
-    reaches the server, with a message that names the clause."""
+    """Raises RenderError when the template holds one of WRITE_WORDS as a bare word, a procedure call, or
+    IN TRANSACTIONS. The questions are also run in a read transaction (run.py), so this is the first of two
+    guards. It stops such a template before it reaches the server, with a message that names the clause. It also
+    refuses a harmless template that uses one of the words as a variable or a map key."""
     found = tokens(text)
     for i, (kind, word) in enumerate(found):
         # A word after a dot is a property name, such as n.set. Everywhere else a bare word can be a keyword.
@@ -209,16 +212,18 @@ def _conditionals(text: str, mapping: dict) -> str:
 
 
 def quote(name: str) -> str:
-    """The name in backticks, with a backtick inside it doubled, so the server reads any label or property name
-    as one name and never as query text."""
+    """The name in backticks, with a backtick inside it doubled, so a name that holds a backtick, a space or a
+    quote is still read as one name. One case is not handled: a name that holds the text of a Unicode escape (a
+    backslash, u and four hexadecimal digits). A Cypher parser that reads such escapes before the quotes would
+    turn one into a character, a backtick included."""
     if not isinstance(name, str) or not name or "\x00" in name:
         raise RenderError(f"not a usable name: {name!r}")
     return "`" + name.replace("`", "``") + "`"
 
 
 def _identifier(kind: str, role_name: str, mapping: dict, schemas: dict[str, Schema]) -> str:
-    """The text that replaces one placeholder: the role's confirmed value, quoted. The value must be in the live
-    schema, so a name reaches a query only when the graph holds it now. A path becomes its types joined with
+    """The text that replaces one placeholder: the role's confirmed value, quoted. The value must be in the
+    schemas given, which run.py reads just before each question. A path becomes its types joined with
     bars and its length, such as :`HOSTS`|`CONTAINS`*1..2, for use inside a relationship's square brackets."""
     try:
         role = R.role(role_name)

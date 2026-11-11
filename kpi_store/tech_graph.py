@@ -28,9 +28,11 @@ Where it sits in the run. This module has no command of its own; other steps cal
   fuseki, neo4j, enterprise  each loads the fetched file after the ontology (load_jena, load_neo4j)
   sync                     asks each store's status function
 
-What the loads write: in Databricks, two tables in <write_catalog>.<tech_graph_schema>; in Fuseki, the graph
-file's named graphs; in Neo4j, the nodes labelled Tech and one TechGraphMarker node. They never write to the
-ontology's own triples, graphs or Resource nodes, and never to a release package.
+What the loads write: in Databricks, two tables in <write_catalog>.<tech_graph_schema>, and a staging table there
+for the length of the load; in Fuseki, the graph file's named graphs; in Neo4j, the nodes labelled Tech, their
+relationships and one TechGraphMarker node. A relationship may end at one of the ontology's Resource nodes (a
+design or a measure). The loads create, change and delete no Resource node, no relationship between two Resource
+nodes, none of the ontology's triples or graphs, and no file of a release package.
 
 build() and write() need nothing but Python. The loads need rdflib; load_delta and load_jena also need
 pyoxigraph, and load_neo4j needs the neo4j driver.
@@ -49,8 +51,9 @@ TG = "https://w3id.org/mpc/ontology/modules/technical-graph/"         # the modu
 LAYER = "https://w3id.org/mpc/ontology/modules/data-product/layer/"   # the layer code list, kept in data-product
 RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
 XSD = "http://www.w3.org/2001/XMLSchema#"
-# Every IRI this module makes starts here: urn:kpi-store:tech:<environment>:<kind>/<name>. The urn: scheme keeps
-# these IRIs apart from the ontology's https: ones, and the Enterprise copy knows a technical-graph node by it.
+# Every IRI this module makes for a thing on the platform, and for the graph itself, starts here:
+# urn:kpi-store:tech:<environment>:<kind>/<name>. The urn: scheme keeps these IRIs apart from the ontology's
+# https: ones, and the Enterprise copy knows a technical-graph node by it.
 BASE = "urn:kpi-store:tech:"
 GRAPH_FILE = "tech-graph.nq"
 SUMMARY_FILE = "tech-graph-summary.json"
@@ -227,8 +230,8 @@ def build(discovery, view, settings, every_object=False):
         seeds = {name for name in tables if name.rsplit(".", 1)[0] in schemas}
         seeds |= {t.lower() for space in spaces for t in space.get("tables") or [] if t.lower() in tables}
         seeds |= {name for pair in pairs for name in pair}
-        # From the seeds the scope follows lineage both ways: down to every source, and up to everything built
-        # from them. So the graph holds whole chains and leaves out the workspace's unrelated objects.
+        # From the seeds the scope follows lineage both ways: down to every source of a seed, and up to everything
+        # built from a seed. So the graph holds the seeds' whole chains and leaves out the workspace's other objects.
         read_by = {}
         for target, sources in reads.items():
             for source in sources:
@@ -336,8 +339,9 @@ def write(graph, folder):
 # ---- what the files hold ----------------------------------------------------------------------------
 
 def digest(graph_files):
-    """The SHA-256 of the graph files, each file's name and bytes in name order. Every marker records it. The
-    zero byte after each name and each file keeps two different sets of files from giving the same input."""
+    """The SHA-256 of the graph files, each file's name and bytes in name order. The Neo4j and Databricks markers
+    record it; Jena keeps no marker. The zero byte after each name and each file keeps two different sets of files
+    from giving the same input."""
     h = hashlib.sha256()
     for path in sorted(Path(p) for p in graph_files):
         h.update(path.name.encode("utf-8") + b"\0" + path.read_bytes() + b"\0")
@@ -650,7 +654,7 @@ def load_delta(gate, settings, graph_files, release_root=None, now=None, rdfstor
         gate.run(f"INSERT INTO {markers} (store, marker) SELECT '{DELTA_STORE}', {text}")
 
     # The table already holds exactly these triples: write nothing to it. Only the marker is written, and only
-    # when it is missing or names other files.
+    # when it is missing or differs from this load's in a field other than its time.
     if TRIPLES_TABLE in _own_tables(gate, settings) and rs.dataset_hash(store.export()) == want["dataset_hash"]:
         held = read_delta(gate, settings) or {}
         if all(held.get(k) == v for k, v in stable.items()):

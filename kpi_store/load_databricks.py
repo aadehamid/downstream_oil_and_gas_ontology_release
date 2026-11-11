@@ -1,13 +1,17 @@
 """Loads the release into the Delta table epm_triples, and proves by a hash that nothing was lost.
 
-Every SQL statement goes through one Gate. The Gate refuses a write outside the two KPI Store schemas and a read
-outside the read catalogs and the three system schemas, so a mistake in this code cannot touch another table.
+Every SQL statement goes through one Gate. The Gate refuses a write outside the two KPI Store schemas, and a read
+outside the read catalogs, the two KPI Store schemas and the three system schemas. So a mistake in this code that
+names another table is refused before the statement is sent. The Gate judges the table names in a statement; it
+does not judge a read that names no table, such as a function that reads files.
 
 The load is the rdf-store skill's round trip (rdfstore.py, which ships in the release): it writes a staging
 table of its own, reads it back and compares its RDFC-1.0 dataset hash with the hash of the release files. Only
-an equal staging table replaces epm_triples, in one statement. The staging table is always dropped. The main
+an equal staging table replaces epm_triples, in one statement. The staging table is dropped when the round trip
+ends, whether it passed or failed; a run that is killed, or a drop that fails, can leave it behind. The main
 table is then read back and compared again, and only then does the marker row say which release the table
-holds. A second run on the same release finds the same hash and the same marker, and writes nothing.
+holds. A second run on the same release finds the same hash and the same marker, and leaves the table and the
+marker as they are. It still writes its report files to the volume.
 
 What a current store holds, and the marker's shape, come from the release's sync_stores.py.
 Needs rdflib, pyoxigraph and sqlglot.
@@ -19,7 +23,8 @@ technical graph's load (kpi_store.tech_graph) and the sync check use the same Ga
 
 What it writes: the tables epm_triples and epm_store_markers in the write schema, a staging table there for the
 length of the load, and the report files in the volume. It creates the two KPI Store schemas and the volume when
-they are missing. It never writes to a read catalog's own tables. It has no command: it runs inside the notebook.
+they are missing. Its table writes all go to those two schemas, also when the write catalog is one of the read
+catalogs. It has no command: it runs inside the notebook.
 """
 import base64
 import datetime as dt
@@ -77,7 +82,8 @@ class Gate:
     def check(self, statement):
         """("read" or "write", the names the statement touches). Raises GateRefusal for anything else."""
         # The check works on the parsed statement, not on its text: it finds the one target a statement writes
-        # and every table it reads, wherever they stand, in a subquery too. Anything it cannot parse is refused.
+        # and every table name it reads, wherever they stand, in a subquery too. Anything it cannot parse is
+        # refused. A read that names no table, such as a function that reads files, has no name to judge.
         import sqlglot
         from sqlglot import exp
         volume = CREATE_VOLUME.match(statement)
@@ -97,8 +103,8 @@ class Gate:
         def name_of(table):
             return ".".join(p for p in (table.catalog, table.db, table.name) if p).lower()
 
-        # The only writes: create a table or a schema, insert, delete, and drop a table. A schema is never
-        # dropped, and a view or a function is never created.
+        # The writes that pass: create a table or a schema, insert, delete, drop a table, and the CREATE VOLUME
+        # above. A statement that drops a schema, or creates a view or a function, is refused.
         target = None
         if isinstance(tree, (exp.Create, exp.Insert, exp.Delete, exp.Drop)):
             kind = (tree.args.get("kind") or "TABLE").upper()
@@ -205,7 +211,7 @@ def build_dataset(release_root, rdfstore, sync_stores=None):
 # ---- the load ----------------------------------------------------------------------------------
 
 # The table's row format, the hash and the staging round trip are the rdf-store skill's, so the Delta table
-# holds exactly the rows any other user of that skill would write. This block adds the Gate and the marker.
+# has the row format of every other table that skill writes. This block adds the Gate and the marker.
 
 class GatedSpark:
     """The Spark session that rdfstore.SparkStore asks for, with every statement sent through the Gate. SparkStore
@@ -245,8 +251,9 @@ def read_marker(gate, settings):
 
 
 def _write_marker(gate, settings, marker):
-    """Replaces this store's row in the marker table. Called only after a hash comparison passed, so the marker
-    never names a release the table does not hold."""
+    """Replaces this store's row in the marker table. load calls it only after a hash comparison of the table
+    passed. The row is deleted and then inserted, in two statements: a run stopped between them leaves the store
+    with no marker row, and a later run writes it again."""
     gate.run(f"CREATE TABLE IF NOT EXISTS {settings.markers_table} (store STRING, marker STRING) USING DELTA "
              "COMMENT 'Which release each KPI Store table was loaded from'")
     gate.run(f"DELETE FROM {settings.markers_table} WHERE store = '{STORE}'")
@@ -282,7 +289,7 @@ def load(gate, settings, release_root, commit, now=None, rdfstore=None, batch=BA
     store.BATCH = batch
 
     # First read what the table holds now. When its hash already equals the release's, nothing is loaded: at most
-    # the marker is written. This is what makes a second run change nothing.
+    # the marker is written. This is what makes a second run leave the table as it is.
     if ss.TRIPLES_TABLE in _own_tables(gate, settings) and rdfstore.dataset_hash(store.export()) == want_hash:
         held = read_marker(gate, settings) or {}
         if all(held.get(k) == v for k, v in stable.items()):
@@ -328,13 +335,14 @@ def run(settings, release_root, run_sql, genie=None, zip_sha256="", mode="load",
     view = ov.read(release_root)
     release_graphs(release_root)   # a release whose catalog and folders disagree stops here, before Databricks is touched
     gate = Gate(settings, run_sql)
-    # The only objects this run creates outside its tables: the two KPI Store schemas and the volume.
+    # Besides its tables and its files in the volume, the run creates these when they are missing: the two KPI
+    # Store schemas and the volume.
     for schema in (settings.write_schema, settings.tech_graph_schema):
         gate.run(f"CREATE SCHEMA IF NOT EXISTS {settings.write_catalog}.{schema}")
     gate.run(f"CREATE VOLUME IF NOT EXISTS {settings.store_schema}.{settings.volume}")
 
-    # Read the workspace, compare, and write the report: in the run's own folder, and at the top of the volume,
-    # where the newest report always is. discovery.json keeps the whole reading for the technical graph.
+    # Read the workspace, compare, and write the report: in the run's own folder, and then at the top of the
+    # volume, over the report of the run before. discovery.json keeps the whole reading for the technical graph.
     schemas = {settings.environment_name(o.full_name).rsplit(".", 1)[0] for o in view.objects.values()}
     found = disc.discover(settings, gate.run, genie, schemas)
     comparison = cmp.compare(view, found, settings, now, stale_after_days, rep.read_standing(release_root))

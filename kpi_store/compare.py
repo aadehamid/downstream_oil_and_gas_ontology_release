@@ -9,12 +9,13 @@ All name comparisons ignore case. The ontology's catalog names are translated by
 
 Where it sits: kpi_store.load_databricks.run calls compare with the ontology's side (kpi_store.ontology_view) and
 the workspace's side (kpi_store.discovery), and gives the rows to kpi_store.report. When a row blocks, the
-notebook stops before the load. This module reads the two views it is given and nothing else: it sends nothing
-to Databricks, writes no file and has no command.
+notebook stops before the load. This module works on what it is given, the two views, the settings and the
+standing decisions: it sends nothing to Databricks, writes no file and has no command.
 
-Each row carries a proposed fix and, where the evidence is clear, a recommended decision. A person still decides
-every row: the cut tool applies only the rows a person accepted. A guess is made only when exactly one candidate
-fits. Two candidates give no guess, and the row says the object or column is missing.
+Each row carries a proposed fix and, where the evidence is clear, a recommended decision. The decision stays a
+person's: the cut tool applies only the rows a person accepted. A rename is guessed by two tests in turn, and a
+test gives a guess only when exactly one candidate passes it. When neither test does, the row says the object or
+column is missing.
 """
 import datetime as dt
 import re
@@ -46,7 +47,7 @@ class Comparison:
 
 def _row(kind, obj, ontology_value="", found_value="", evidence="", fix=None, recommended="", note=""):
     """One report row, without its ID. Whether it blocks follows from its kind alone. The decision and decided_by
-    start empty: only a person fills them."""
+    start empty. The runner later proposes the recommended decision in the CSV, and a person confirms it."""
     return {"kind": kind, "blocks": kind in BLOCKING, "object": obj, "ontology_value": ontology_value,
             "found_value": found_value, "evidence": evidence, "proposed_fix": fix or {"action": "none"},
             "recommended": recommended, "decision": "", "decided_by": "", "note": note}

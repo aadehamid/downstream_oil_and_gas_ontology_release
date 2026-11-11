@@ -13,12 +13,13 @@
 // The query has five parts. Three read the KPI Store graph, one reads the governance graph, and the last joins
 // their results on values, because no relationship runs from one graph to the other.
 //
-// Part 1, KPI Store graph. Every replica table with its system's code, its table name and the layers of the
-// tables built from it, as one list (by_name) that the last part searches.
+// Part 1, KPI Store graph. Each table that copies a system, with the system's code, the table's name and the
+// layers of the tables built from it, as one list (by_name) that the last part searches.
 CALL () {
   USE graph.byName($bpa_graph)
   OPTIONAL MATCH (replica:{{label:platform_table.node}})-[:{{relationship:platform_table.copies_system}}]->(s:{{label:ontology_system.node}})
-  // Everything built from the replica, through at most 6 steps of lineage. The bound keeps the search finite.
+  // The tables built from the replica, through at most 6 steps of lineage. The bound keeps the search finite; a
+  // table more than 6 steps away is not found.
   OPTIONAL MATCH (built:{{label:platform_table.node}})-[:{{relationship:platform_table.derived_from}}*1..6]->(replica)
   OPTIONAL MATCH (built)-[:{{relationship:platform_table.in_layer}}]->(l:{{label:layer.node}})
   WITH replica, toLower(s.{{property:ontology_system.code}}) AS code,
@@ -41,7 +42,7 @@ CALL () {
   RETURN collect(DISTINCT toLower(s.{{property:ontology_system.code}})) AS ontology_codes
 }
 //#if replaces tech.object tech.name tech.designed_as
-// Part 3, KPI Store graph, kept only when the technical graph is loaded. Each link from a Databricks table to
+// Part 3, KPI Store graph, kept only when the mapping names the technical graph's roles. Each link from a Databricks table to
 // the Synapse table it replaces, with the layer of the Databricks table's design, as one list (by_link).
 CALL () {
   USE graph.byName($bpa_graph)
@@ -54,7 +55,7 @@ CALL () {
                       ELSE {key: parts[-2] + '.' + parts[-1], layer: layer} END) AS by_link
 }
 //#else
-// No technical graph, so no table is found by a link. The names alone answer.
+// The mapping names no technical graph roles, so no table is found by a link. The names alone answer.
 WITH by_name, ontology_codes, [] AS by_link
 //#endif
 // Part 4, governance graph. Each system, or the one asked for, with the qualified names of the tables it holds.

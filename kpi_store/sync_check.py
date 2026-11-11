@@ -56,7 +56,8 @@ NO_FILE = ("no tech-graph.nq was named or fetched, so its content was not compar
            "or let the runner's report step fetch it")
 NEO4J_STORES = ("neo4j", "enterprise")
 WORKTREE = "worktree"   # the --ref that reads the folder's files as they are
-# The longest one SQL statement may take. A warehouse that was stopped may have to start first.
+# How long a statement is polled after the first call's own 30 seconds. A warehouse that was stopped may have to
+# start first. When the time is over the check gives up on the statement; it does not cancel it.
 STATEMENT_WAIT_SECONDS = 300
 
 
@@ -189,11 +190,12 @@ def read_stores(stores, local, newest, code, connect=local_load.connect, client_
             else:
                 neo4j = local.need("neo4j_enterprise")
                 # Enterprise is read through the copy's guarded session: the same one database, confirmed by the
-                # server, and no statement that could change the server.
+                # server, and the copy's guard on every statement. The guard refuses server administration and
+                # DROP, not every write; it is this check's own queries that only read.
                 with connect(neo4j) as driver, copy_enterprise.open_target(driver, neo4j.database) as session:
                     markers[store], live[store], hashes[store], row = read_neo4j(session, store, newest, code, quick)
                 models += [row] if row else []
-        except Exception as err:   # any failure is this store's line, never the end of the whole check
+        except Exception as err:   # an error becomes this store's line; an exit (SystemExit) is not caught here
             markers[store], live[store] = None, _why(err, ss)
     return markers, live, models, hashes
 

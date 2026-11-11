@@ -2,7 +2,8 @@
 
 `run.py` calls `read` first, before any query. This module opens no connection: it returns the settings, and
 `run.py` gives them to the driver. It also holds the rule that keeps an environment's own files (these settings,
-the mapping file, the answers) outside the release folder, so they are never zipped and uploaded with it.
+the mapping file, the answers) outside the release folder this code sits in, which is the folder the runner zips
+and uploads. The rule tests that one folder. It does not see another copy of the release.
 
 The settings file is TOML:
 
@@ -45,7 +46,7 @@ class Connection:
     composite: str
     governance_alias: str
     bpa_alias: str
-    password: str = field(repr=False)     # kept out of every printed form of the settings
+    password: str = field(repr=False)     # left out of the settings' repr; the field itself is plain text
 
     @property
     def graphs(self) -> dict[str, str]:

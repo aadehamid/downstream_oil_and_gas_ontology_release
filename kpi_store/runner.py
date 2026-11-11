@@ -26,8 +26,10 @@ The steps, in order:
   summary     one summary of the run
 
 Every Databricks call is the Databricks CLI with the profile of the local settings (OAuth sign-in, no token).
-Each step prints one line and writes its result to <run folder>/<run ID>/steps/. The runner itself writes nothing
-into the release folder. Only the cut tool, which the cut step calls, changes it: it adds the correction version.
+Each step prints one line and writes its result to <run folder>/<run ID>/steps/. The runner's own files all go
+to the run folder, which must lie outside the release folder. One step changes the release folder: the cut step
+calls the cut tool, which writes the correction version there. Python may also leave __pycache__ folders beside
+the code it runs; the zip leaves them out.
 
 What the runner reads: the local settings file (--stores, read by kpi_store.local_settings), this environment's
 kpi_store.toml (read by kpi_store.settings), the release folder, and the results of earlier steps in the same run.
@@ -47,7 +49,8 @@ undecided. decided_by is a role or initials, such as "the ontology owner"; the c
 (kpi_store.cut.is_role), and a name with an e-mail address or a long number is refused. The next run hands the
 report to the cut tool, which shows its plan and asks you to approve it in the terminal.
 
-A store load never runs after a notebook run that did not load this release: the run then stops, with exit 3.
+A store load does not run when the notebook step of the same run did not load this release: the run then stops,
+with exit 3. A run that has no notebook step of its own (--only or --from on a new run ID) is not held back.
 --skip, --only, --from and --mode check each leave steps out; the last line and the summary then name the steps
 left out, and the run does not say that every step passed. Only a run of the whole chain says that.
 
@@ -82,7 +85,7 @@ SETTINGS_NAME = "kpi_store.toml"
 # run that cuts it is a later run than the one that fetched it. TO_CLEAR is the CSV the person edits. CONFIRMED is
 # the decisions as the runner read them back, which is the file the cut tool gets.
 PENDING, TO_CLEAR, CONFIRMED = "pending", "discovery-report.to-clear.csv", "confirmed.csv"
-# The last line scripts/check.sh prints, and only after every check ran. The check step accepts no other last line.
+# The line scripts/check.sh prints at its end, when no check stopped it. The check step accepts no other last line.
 CHECK_PASSED = "all checks passed"
 # Never in the zip: Git's folder, caches, and anything that could be a settings file with a password.
 SKIP_FOLDERS = (".git", "__pycache__", ".pytest_cache", ".venv", ".mypy_cache", ".ruff_cache")
@@ -96,15 +99,16 @@ SKIP_SUFFIXES = (".pyc", ".pyo")           # compiled Python: a cache, rebuilt w
 # Text files travel with LF line ends, so a checkout that turned them into CRLF still gives the same zip.
 TEXT_SUFFIXES = (".py", ".md", ".ttl", ".rq", ".json", ".csv", ".html", ".jsonld", ".yaml", ".yml", ".cypher", ".txt",
                  ".sh", ".nt", ".toml", ".tsv", ".mjs", ".example", ".excalidraw", ".eraser", ".gitattributes", ".gitkeep")
-# Every zip entry gets this date, the earliest a zip can hold. The zip's bytes, and so its SHA-256, then depend on
-# the files' content and never on when a file was written or checked out.
+# Every zip entry gets this date, the earliest a zip can hold. The zip's bytes, and so its SHA-256, then do not
+# depend on when a file was written or checked out.
 ZIP_DATE = (1980, 1, 1, 0, 0, 0)
 # The sha256 line of kpi_store.toml. Group 1 is the text before the value, kept as it is when the value is replaced.
 SHA_LINE = re.compile(r'(?m)^(\s*sha256\s*=\s*)"[0-9a-fA-F]{64}"')
 POLL_SECONDS = 15   # the wait between two looks at the notebook run
 DONE_STATES = ("TERMINATED", "SKIPPED", "INTERNAL_ERROR")   # the life-cycle states of a Databricks run that has ended
 # The notebook's statuses that mean Databricks holds this release: loaded in this run, already current, or already
-# held with only the marker written (kpi_store.load_databricks.load). Only after one of them may a store be loaded.
+# held with only the marker written (kpi_store.load_databricks.load). When this run's notebook step ended with any
+# other status, the store loads are stopped (not_loaded_reason).
 LOADED = ("loaded", "current", "marked")
 
 
@@ -204,7 +208,10 @@ def cut_command(report_json, release_root, decisions=None):
 def cut_with_tool(report_json, release_root, run_dir, decisions=None, run=subprocess.run):
     """Calls the cut tool on a cleared report and returns {"status": "cut"} or {"status": "failed", ...}. The
     tool shows its plan and asks the person who runs it to approve, so it gets this terminal: nothing is captured.
-    Its exit 0 means cut, recorded or already cut; 1 means refused or failed, with the release folder unchanged."""
+    Its exit 0 means cut, recorded or already cut. Its exit 1 means refused or failed. The release folder is then
+    unchanged in all but two cases, which the tool's own message names: the cut was committed and Git could not
+    tag it, or a write failed and a file could not be put back. This function cannot tell those cases apart: it
+    sees only the exit code, so its "why" text does not mention them."""
     if not (Path(release_root) / "kpi_store" / "cut.py").is_file():
         return {"status": "failed", "why": "this release has no cut tool (kpi_store/cut.py)"}
     done = run(cut_command(report_json, release_root, decisions), cwd=str(release_root))
@@ -327,9 +334,12 @@ def step_check(ctx):
 
 
 # ---- zip ------------------------------------------------------------------------------------------------
-# Step 3. The zip is what Databricks loads. Two rules shape this block. The zip leaves this machine, so no file
-# in it may hold a password. And the notebook accepts a zip only by its SHA-256, so the same files must always
-# give the same bytes.
+# Step 3. The zip is what Databricks loads. Two aims shape this block. The zip leaves this machine, so the step
+# refuses to zip a settings-like file that gives a secret a value. The test is by file suffix and by the words of
+# a setting's name (release_files, secret_keys); a secret in any other kind of file, or under another name, is not
+# found. And the zip is built to give the same bytes from the same files: sorted entries, one date, one mode, LF
+# line ends. Another version of Python's zlib may still compress differently. That changes the checksum but not
+# the check, because the settings copy gets the checksum of the zip this step just built.
 
 def is_secret_key(key):
     """True when a setting's name says its value is a secret: one of its words is password, passwd, pwd, secret
@@ -436,8 +446,8 @@ def build_zip(root, target, run=subprocess.run):
             data = path.read_bytes()
             if path.suffix.lower() in TEXT_SUFFIXES or path.name in TEXT_SUFFIXES:
                 data = data.replace(b"\r\n", b"\n")
-            # A fixed date, the Unix system code (3) and one file mode (0o644) for every entry: none of them may
-            # carry over from the machine that built the zip, or the checksum would differ between machines.
+            # A fixed date, the Unix system code (3) and one file mode (0o644) for every entry. Taken from the
+            # machine that builds the zip, any of them would make the checksum differ between machines.
             info = zipfile.ZipInfo(name, ZIP_DATE)
             info.compress_type, info.create_system, info.external_attr = zipfile.ZIP_DEFLATED, 3, 0o644 << 16
             z.writestr(info, data, compresslevel=9)
@@ -503,8 +513,10 @@ def step_volume(ctx):
 
 
 def step_upload(ctx):
-    """Step 5. Copies the zip and then the settings copy into the volume, over what is there. It sends the files
-    the zip step of this run wrote, so the uploaded settings always name the uploaded zip."""
+    """Step 5. Copies the zip and then the settings copy into the volume, over what is there. It sends the two
+    files the zip step of this run wrote, so after both copies the settings in the volume name the zip in the
+    volume. The two copies are separate calls. When the second fails, the volume holds the new zip beside the
+    older settings, which name another checksum: the notebook then refuses the zip until the upload is run again."""
     built = ctx.earlier("zip")
     if not ctx.dry_run and (not built or not Path(built["zip"]).is_file()):
         raise StepFailed("there is no zip in this run; run the zip step first")
@@ -559,9 +571,13 @@ def step_notebook(ctx):
     """Step 6. Imports the notebook into the workspace folder, submits it as a one-time serverless run, waits for
     it, and reads the JSON summary the notebook ends with.
 
-    The step never submits a second run while one is waited for. As soon as Databricks gives a run ID, the step's
-    file records it with the status "waiting". A later call that finds that record waits for the same run. When
-    the run has ended, the record changes to "ended", and the next call submits a new run."""
+    A call that follows an unfinished wait does not submit a second run. As soon as Databricks gives a run ID,
+    the step's file records it with the status "waiting". A later call that finds that record waits for the same
+    run. When the run has ended, the record changes to "ended", and the next call submits a new run.
+
+    This covers one command after another. It does not cover two commands on the same run at the same time, or
+    a command that is stopped between the submit and the write of the record: each of those can submit a second
+    run, because nothing locks the step and Databricks is given no key that marks a repeat."""
     folder = ctx.local.need("databricks").workspace_folder
     request_file = ctx.run_dir / "submit.json"
     waiting = (ctx.earlier("notebook") or {}) if not ctx.dry_run else {}
@@ -695,7 +711,7 @@ def step_report(ctx):
     ctx.out(f"the notebook stopped: {len(shown)} row(s) block the load, of {len(report['rows'])} in the report")
     for text in shown:
         ctx.out(text)
-    # The step's file is written here: run_steps writes one only for a step that returns, and this one stops.
+    # The step's file is written here: run_steps writes none for a step that raises Stop.
     write_text(ctx.step_file("report"), json.dumps({"status": "report to clear", "to_clear": str(to_clear),
                                                     "blocking_rows": [r["id"] for r in report["rows"] if r["blocks"]]}, indent=2) + "\n")
     raise Stop(f"clear the report: edit the decision column of {to_clear} (each holds the recommended decision), write "
@@ -704,7 +720,8 @@ def step_report(ctx):
 
 # ---- the local stores -----------------------------------------------------------------------------------
 # Steps 8 to 10. Databricks comes first on purpose: its comparison with the workspace decides whether this
-# release may be loaded anywhere. So each store load first asks not_loaded_reason. The order of the three loads
+# release may be loaded anywhere. So before each store load run_steps asks not_loaded_reason, which looks at the
+# notebook step of this run only; a run without one is let through. The order of the three loads
 # matters too: the local Neo4j has the plugins the checks need, and Neo4j Enterprise gets a copy of the graph
 # those checks passed.
 
@@ -833,8 +850,8 @@ def step_summary(ctx):
 STEP_FUNCTIONS = {"cut": step_cut, "check": step_check, "zip": step_zip, "volume": step_volume, "upload": step_upload,
                   "notebook": step_notebook, "report": step_report, "fuseki": step_fuseki, "neo4j": step_neo4j,
                   "enterprise": step_enterprise, "sync": step_sync, "summary": step_summary}
-# The steps that need Databricks to hold this release first. run_steps asks not_loaded_reason before each, and
-# --mode check leaves them out.
+# The steps that are stopped when this run's notebook step did not load the release (not_loaded_reason). --mode
+# check leaves them out.
 LOCAL_LOADS = ("fuseki", "neo4j", "enterprise", "sync")
 
 
@@ -923,8 +940,8 @@ def main(argv=None, **context_options):
     try:
         local = ls.load(ls.locate(args.stores), release_root=Path(args.release))
         run_root = local.need("run_folder")
-        # --from and --only go on in the newest run, because they need that run's earlier results: the zip, the
-        # notebook's summary. A plain command starts a new run.
+        # --from and --only go on in the newest run when there is one, because they need that run's earlier
+        # results: the zip, the notebook's summary. A plain command starts a new run.
         run_id = args.run_id or ((args.start or args.only) and newest_run(run_root)) or new_run_id()
         ctx = Context(local, args.release, run_id, mode=args.mode, dry_run=args.dry_run,
                       replace_enterprise=args.replace_enterprise, **context_options)
