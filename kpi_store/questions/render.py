@@ -213,11 +213,13 @@ def _conditionals(text: str, mapping: dict) -> str:
 
 def quote(name: str) -> str:
     """The name in backticks, with a backtick inside it doubled, so a name that holds a backtick, a space or a
-    quote is still read as one name. One case is not handled: a name that holds the text of a Unicode escape (a
-    backslash, u and four hexadecimal digits). A Cypher parser that reads such escapes before the quotes would
-    turn one into a character, a backtick included."""
+    quote is still read as one name. A name that holds a backslash is refused: a Cypher parser that reads Unicode
+    escapes (a backslash, u and four hexadecimal digits) before the quotes would turn one into a character, a
+    backtick included."""
     if not isinstance(name, str) or not name or "\x00" in name:
         raise RenderError(f"not a usable name: {name!r}")
+    if "\\" in name:
+        raise RenderError(f"not a usable name: {name!r} holds a backslash, which could be read as the start of an escape")
     return "`" + name.replace("`", "``") + "`"
 
 

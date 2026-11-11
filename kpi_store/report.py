@@ -17,6 +17,7 @@ import csv
 import hashlib
 import io
 import json
+import re
 import secrets
 from pathlib import Path
 
@@ -34,6 +35,8 @@ DECISIONS = ("accept", "reject", "environment setting")
 PASSES = ("object_names", "table_edges", "metric_view_sources")   # the three counts of what agreed
 ROW_FIELDS = ("id", "kind", "blocks", "object", "ontology_value", "found_value", "evidence", "proposed_fix",
               "recommended", "decision", "decided_by", "note")
+# A row's ID as build writes it. The cut tool copies the ID into files it commits, so no other text may stand there.
+ROW_ID = re.compile(r"R[0-9]{3,}")
 RUN_FIELDS = ("id", "at", "settings_sha256", "zip_sha256")
 # The rows a person rejected in a cleared report. The cut tool writes the file and the comparison reads it.
 STANDING_DECISIONS = Path("business_architecture") / "ontology" / "discovery-runs" / "standing-decisions.json"
@@ -90,6 +93,8 @@ def problems(report):
         where = f"row {row['id']}"
         if not isinstance(row["id"], str) or not row["id"] or row["id"] in seen:
             found.append(f"{where}: the ID is empty or used twice")
+        elif not ROW_ID.fullmatch(row["id"]):
+            found.append(f"{where}: the ID must be R and three or more digits, such as R001")
         seen.add(row["id"])
         if row["kind"] not in KINDS:
             found.append(f"{where}: unknown kind {row['kind']!r}")

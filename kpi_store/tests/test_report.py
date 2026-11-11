@@ -98,3 +98,11 @@ def test_a_report_is_cleared_when_every_blocking_row_has_a_decision(tmp_path):
     csv_path.write_text("\n".join(lines), encoding="utf-8", newline="\n")
     with pytest.raises(report.ReportError, match="R009"):
         report.apply_csv_decisions(r, csv_path)
+
+
+@pytest.mark.parametrize("row_id", ["R1", "row-1", "R001 | see the note", "R001\nR002", "r001", " R001"])
+def test_a_row_id_that_is_not_an_r_and_digits_is_refused(row_id):
+    r = build([row(), row("object-extra")])
+    r["rows"][0]["id"] = row_id
+    assert report.problems(r) == [f"row {row_id}: the ID must be R and three or more digits, such as R001"]
+    assert report.problems(build([row()] * 1000)) == []   # R1000 is an ID too
