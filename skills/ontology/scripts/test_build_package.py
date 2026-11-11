@@ -1,7 +1,7 @@
 """Tests for build_package.py.
 
 Run from this folder:
-  uv run --no-project --with rdflib --with pyyaml --with pyshacl python3 -m unittest test_build_package
+  uv run --no-project --with rdflib --with pyyaml --with pyshacl python -m unittest test_build_package
 
 The library skeleton is packaged from templates/package-answers.yaml; each one-break test changes one answer
 or one file and expects the named refusal. The git tests make throwaway repositories (no git, local git, and

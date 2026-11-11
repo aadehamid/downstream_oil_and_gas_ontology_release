@@ -1,7 +1,7 @@
 """Tests for check_sssom.py.
 
 Run from this folder:
-  uv run --no-project --with pyyaml python3 -m unittest test_sssom
+  uv run --no-project --with pyyaml python -m unittest test_sssom
 
 The template mapping set passes; each one-break test changes it in one way and asserts that exactly the named
 check fires, so a check that passes vacuously, or fires for the wrong reason, fails here.

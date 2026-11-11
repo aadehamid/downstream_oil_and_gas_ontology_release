@@ -1,7 +1,7 @@
 """Tests for check_projection_rules.py and in_graph_shapes.py, on the library templates.
 
 Run from this folder:
-  uv run --no-project --with rdflib --with pyshacl python3 -m unittest test_projection
+  uv run --no-project --with rdflib --with pyshacl python -m unittest test_projection
 
 Each one-break test breaks a template in one way and asserts that exactly the named check fires
 with its message, so a check that passes vacuously, or fires for the wrong reason, fails here.

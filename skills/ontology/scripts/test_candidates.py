@@ -1,7 +1,7 @@
 """Tests for check_candidates.py.
 
 Run from this folder:
-  uv run --no-project --with pyyaml python3 -m unittest test_candidates
+  uv run --no-project --with pyyaml python -m unittest test_candidates
 
 The worked example in templates/intake/ passes; each one-break test changes it in one way and asserts that exactly
 the named check fires.

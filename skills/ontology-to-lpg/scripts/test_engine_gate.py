@@ -2,7 +2,7 @@
 triple store). No test needs Neo4j, a triple store or Java: the engine's answers are given as rows.
 
 Run from this folder:
-  uv run --no-project --with rdflib --with pyshacl python3 -m unittest test_engine_gate
+  uv run --no-project --with rdflib --with pyshacl python -m unittest test_engine_gate
 """
 import contextlib
 import io

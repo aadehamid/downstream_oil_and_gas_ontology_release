@@ -1,7 +1,7 @@
 """Tests for check_docs.py and build_docs.py.
 
 Run from this folder:
-  uv run --no-project python3 -m unittest test_docs
+  uv run --no-project python -m unittest test_docs
 The build test runs Widoco and needs Java; it runs only when WIDOCO_JAR names a Widoco jar, for example
   WIDOCO_JAR=/path/to/widoco-1.4.25-jar-with-dependencies_JDK-17.jar python3 -m unittest test_docs
 

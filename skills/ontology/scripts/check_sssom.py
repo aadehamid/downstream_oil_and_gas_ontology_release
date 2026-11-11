@@ -2,7 +2,7 @@
 """Step 7 and every external mapping: a mapping set in SSSOM/TSV is well formed (references/external-ontologies.md,
 "Record mappings as SSSOM").
 
-Run: uv run --no-project --with pyyaml python3 check_sssom.py <set.sssom.tsv>... [--allow-predicate=<CURIE>]...
+Run: uv run --no-project --with pyyaml python check_sssom.py <set.sssom.tsv>... [--allow-predicate=<CURIE>]...
 
 The file is SSSOM/TSV with its metadata block embedded: YAML lines starting with "#" at the top, then a
 tab-separated mappings block whose first line names the columns (SSSOM 1.0, and 1.1 where the set says

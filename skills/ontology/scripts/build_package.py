@@ -2,7 +2,7 @@
 """Step 10: build one module's release package from an answers file (references/release.md, rules 8 to 18;
 the interview that fills the answers file: references/packaging-walkthrough.md).
 
-Run (uv run --no-project --with rdflib --with pyyaml --with pyshacl python3 build_package.py ...):
+Run (uv run --no-project --with rdflib --with pyyaml --with pyshacl python build_package.py ...):
   build_package.py build  <answers.yaml> --releases <dir>   write <dir>/<module>/<version>/, then check it
   build_package.py verify <answers.yaml> --releases <dir>   fail unless the written package equals a fresh
                                                              build (and, in git, its tag's copy)

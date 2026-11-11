@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Prepare the shapes file n10s 2025.06.1 imports, and predict what it will compile (advisory).
 
-Run: uv run --no-project --with rdflib python3 in_graph_shapes.py --output <shapes-in-graph.ttl> <shapes.ttl>...
+Run: uv run --no-project --with rdflib python in_graph_shapes.py --output <shapes-in-graph.ttl> <shapes.ttl>...
 
 This script gates nothing. What n10s compiled is read back from the engine by load_verify.py
 (n10s.validation.shacl.listShapes()), and that readback is the gate.

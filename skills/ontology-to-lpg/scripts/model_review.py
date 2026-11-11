@@ -5,9 +5,9 @@ its "Output Format": ERROR is a correctness failure, WARNING a performance or ex
 a style or convention point).
 
 Run after step 6 (or after a copy, add-on I), against any Neo4j:
-    NEO4J_PASSWORD=... uv run --no-project --with rdflib --with neo4j python3 model_review.py \
+    NEO4J_PASSWORD=... uv run --no-project --with rdflib --with neo4j python model_review.py \
         --uri bolt://127.0.0.1:<port> [--report model-review.json] [--separator _] [options]
-    uv run --no-project --with rdflib --with neo4j python3 model_review.py --env <target.env> [...]
+    uv run --no-project --with rdflib --with neo4j python model_review.py --env <target.env> [...]
 
 --env names a file of NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD and optionally NEO4J_DATABASE (the
 format copy_graph.py reads). An error prints a fixed context and the exception's type, never its

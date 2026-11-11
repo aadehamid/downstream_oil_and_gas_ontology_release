@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The design-rule checks a property-graph projection runs before it loads anything.
 
-Run: uv run --no-project --with rdflib python3 check_projection_rules.py --config <config.json>
+Run: uv run --no-project --with rdflib python check_projection_rules.py --config <config.json>
          [--shapes <shapes.ttl>]... [--releases <folder>] <data.ttl>...
 
 Give it the released data files (each package's module Turtle) and every shape file. The

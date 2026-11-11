@@ -1,7 +1,7 @@
 """Tests for build_catalog.py.
 
 Run from this folder:
-  uv run --no-project --with rdflib --with pyyaml --with pyshacl python3 -m unittest test_build_catalog
+  uv run --no-project --with rdflib --with pyyaml --with pyshacl python -m unittest test_build_catalog
 
 Two packages are built with build_package.py from the library skeleton; the catalog is built from them, and
 each one-break test changes one thing (a package added, a hand edit, a second catalog IRI, a distribution

@@ -36,7 +36,7 @@ How it gets the numbers:
 
 Standard library only, except taxonomy triple counts, which use rdflib when it
 is installed, the quotes command, which needs markdown-it-py, and the
-modules (for core's triple count) and coverage commands, which need rdflib (`uv run --with rdflib python3 scripts/epm_facts.py counts`).
+modules (for core's triple count) and coverage commands, which need rdflib (`uv run --with rdflib python scripts/epm_facts.py counts`).
 """
 import argparse
 import collections

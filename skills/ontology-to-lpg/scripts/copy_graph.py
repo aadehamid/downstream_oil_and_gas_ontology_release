@@ -6,7 +6,7 @@ The target needs no plugin. n10s and APOC run only where the projection is built
 (load_verify.py); this script copies the result with plain Cypher over the Python driver, and calls
 neither n10s nor APOC on either server.
 
-Run: uv run --no-project --with rdflib --with neo4j python3 copy_graph.py \
+Run: uv run --no-project --with rdflib --with neo4j python copy_graph.py \
          (--source-env <file> | --source bolt://<host>:<port>) [--source-database <name>] \
          --target-env <file> [--target-database <name>] --report <projection-report.json> \
          [--batch 1000] [--replace] [--query-timeout <seconds>]

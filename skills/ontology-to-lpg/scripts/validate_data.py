@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The check step's validation: every shape over the data, plus the round-trip refusals.
 
-Run: uv run --no-project --with rdflib --with pyshacl python3 validate_data.py --config <config.json>
+Run: uv run --no-project --with rdflib --with pyshacl python validate_data.py --config <config.json>
          --shapes <shapes.ttl>... <data.ttl or .nt>...
 
 Before serialising, give it the released data files. After serialising, and after build.py

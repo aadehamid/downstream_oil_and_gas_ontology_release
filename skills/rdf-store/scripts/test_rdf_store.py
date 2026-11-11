@@ -7,7 +7,7 @@ row list per table. Each planted fault must fail the round trip, with the diff i
 The live test runs only when asked: RDF_STORE_LIVE_FUSEKI=<base URL of a Fuseki dataset, such as
 http://127.0.0.1:3030/ds>.
 
-Run: uv run --no-project --with pyoxigraph python3 -m unittest test_rdf_store
+Run: uv run --no-project --with pyoxigraph python -m unittest test_rdf_store
 """
 import base64
 import http.server
