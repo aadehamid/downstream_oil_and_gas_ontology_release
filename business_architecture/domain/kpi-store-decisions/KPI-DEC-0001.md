@@ -28,9 +28,9 @@ the decisions the owner delegated. The agent wrote this section.
    Docker stores and the token connector leave with their tests, and no other document names them.
 3. Keep a guard in `scripts/check.sh`: a deny list for references to anything outside this release, and an allow
    list for public sources and licences.
-4. Each change is a pull request into the release branch. The owner's recorded words require a review whose
-   findings are fixed or answered before a merge. The agent records the rest of the rule, which the owner gave in
-   words that name tools outside this release, so this record does not quote them: before each push,
+4. Each change is a pull request into the release branch. The owner's recorded words set the merge rule: a pull
+   request merges when `check.sh` and CI pass and every review finding is fixed or answered. The agent adds how it
+   meets that rule; this part is the agent's text, with no recorded words behind it: before each push,
    `scripts/check.sh` passes and one independent reviewer, a different model from the author, reads the change.
 5. Number this release's decision records `KPI-DEC-0001` onward, in this folder. A decision the agent makes under
    the delegation below is recorded as "Decided (delegated under KPI-DEC-0001)" where its question lives.
