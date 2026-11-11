@@ -2,6 +2,8 @@
 
 This guide says how a team agrees what its words mean before anyone builds an ontology or publishes a number. A controlled vocabulary records each meaning once, with one preferred label, a stable ID, the aliases people already use and a short scope note. It is not a taxonomy, a thesaurus, an ontology or a knowledge graph, and it does not model the business. Do the language work, then stop.
 
+This guide covers the first of the six stages of the build. [The folder's README](README.md) describes all six and says why they come in that order.
+
 **The example is made up.** One rack lift for a company called Apex runs through every section. The company, the keys (`APEX-PAYER`, `CONS-4412`, `1000123`), the tables, the SQL names and the IRIs are invented for this guide. The KPI Store release holds none of these objects.
 
 ![The four steps of the method: hunt the existing language, decide each meaning and map it, store the decision, and use the vocabulary in three separate places](controlled-vocabulary-end-to-end.png)
