@@ -1,0 +1,19 @@
+version: 1.1
+comment: Made-up executive summary metric view with a table source.
+source: idp_sbx.gold_commercial_core.mips_mpr_executive_summary_fact
+dimensions:
+  - name: Sample_Sheet_Name
+    expr: Sample_Sheet_Name
+  - name: Sample_Display_Name
+    expr: TRIM(Sample_Display_Name)
+measures:
+  - name: Assessment_Amount
+    expr: SUM(Assessment_Amount)
+    display_name: Assessment amount
+    synonyms: [assessment, current value]
+    format:
+      type: number
+  - name: Previous_Amount
+    expr: SUM(Previous_Amount)
+  - name: Change_Value_Amount
+    expr: SUM(Change_Value_Amount)

@@ -1,0 +1,17 @@
+version: 1.1
+source: idp_sbx.gold_commercial_core.MPR_MIPS_Crack_Spread_Price_Fact
+filter: Sample_Active_Flag = 'Y'
+dimensions:
+  - name: Sample_Date
+    expr: Sample_Date
+measures:
+  - name: Avg_Spread
+    expr: AVG(Crack_Spread_Price_Amount)
+  - name: Max_Spread
+    expr: MAX(Crack_Spread_Price_Amount)
+  - name: Min_Spread
+    expr: MIN(Crack_Spread_Price_Amount)
+  - name: Sample_Range
+    expr: MEASURE(Max_Spread) - MEASURE(Min_Spread)
+  - name: Row_Count
+    expr: COUNT(1)

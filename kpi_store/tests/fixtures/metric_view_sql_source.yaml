@@ -1,0 +1,19 @@
+version: 1.1
+source: |-
+  WITH assessments AS (
+    SELECT a.Sample_Batch_ID, a.Assessment_Amount, g.Sample_Group_Name
+    FROM idp_sbx.silver_udm_core.mips_price_assessment_fact a
+    JOIN idp_sbx.silver_mdm_core.mips_price_group_dim g ON a.Sample_Group_ID = g.Sample_Group_ID
+  ),
+  settles AS (
+    SELECT d.Sample_Master_ID, d.Settle_Price_Amount
+    FROM silver_udm_core.mpr_price_detail_fact d
+  )
+  SELECT 'SAMPLE KPI' AS Sample_ID, assessments.Sample_Group_Name, settles.Settle_Price_Amount
+  FROM assessments CROSS JOIN settles
+dimensions:
+  - name: Sample_ID
+    expr: Sample_ID
+measures:
+  - name: Avg_Spread
+    expr: AVG(Settle_Price_Amount)

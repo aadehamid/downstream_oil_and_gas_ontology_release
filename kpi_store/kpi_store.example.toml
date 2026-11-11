@@ -1,0 +1,25 @@
+# KPI Store settings. Copy this file to kpi_store.toml, fill it in, and put it in the volume beside the release
+# zip. It never goes inside the zip. The notebook stops before any read or write when this file is missing or wrong.
+
+[release]
+zip = "kpi-store-1.1.zip"          # file name in the volume, beside this file
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"  # the zip's SHA-256; the notebook refuses a zip that differs
+
+[databricks]
+write_catalog = "idp_sbx"
+write_schema = "kpi_store"         # epm_triples and epm_store_markers live here
+tech_graph_schema = "tech_graph"
+volume = "releases"                # the volume <write_catalog>.<write_schema>.<volume>
+read_catalogs = ["idp_sbx", "synapse_dev"]
+warehouse_id = ""                  # used only outside the notebook (the sync check); may stay empty
+
+[names]                            # the ontology's catalog name = this environment's catalog name
+idp_sbx = "idp_sbx"
+synapse_dev = "synapse_dev"
+
+[skip]
+schemas = ["information_schema", "bronze_replica_*", "kpi_store_poc"]
+tables = ["*__ct", "attrep_*"]
+
+[genie]
+spaces = []                        # space IDs to read; empty means every space the person who runs it can list
