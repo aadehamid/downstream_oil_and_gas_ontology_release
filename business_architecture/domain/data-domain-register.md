@@ -3,7 +3,7 @@
 **ID:** EPM-BA-DOM-001
 **Version:** 0.2
 **Status:** Draft
-**Owner:** Enterprise Performance Model initiative
+**Owner:** The ontology owner
 **Last updated:** 2026-10-18
 **Scope:** Downstream Oil & Gas data domains, anchored on Marathon Petroleum Corporation (MPC) public filings
 **Review trigger:** Each new domain proposal; Step 5 (party / organization modules) design
@@ -32,7 +32,7 @@ Generic frameworks never decide a boundary on their own.
 
 | Domain | Status | Owns | Classification / key concepts | Evidence |
 |---|---|---|---|---|
-| **Customer** | Classification adopted (2026-09-29). Domain model: Draft (`customer_domain_problem_statement_v0.1.md`) | Parties in a customer role, customer accounts, roles, channel classification | C1 Brand jobber · C2 Direct dealer · C3 Wholesale marketing customer · C4 Independent retailer · C5 Unbranded customer (C5.1–C5.4) · C6 Spot market buyer · C7 Export / international customer · C8 Crude oil customer; facets: brand status, contract type, product line, segment, geography, delivery tier | `../reference/mpc/customer-classification-evidence.md` |
+| **Customer** | Classification adopted (2026-09-29). Domain model: the `party` module | Parties in a customer role, customer accounts, roles, channel classification | C1 Brand jobber · C2 Direct dealer · C3 Wholesale marketing customer · C4 Independent retailer · C5 Unbranded customer (C5.1–C5.4) · C6 Spot market buyer · C7 Export / international customer · C8 Crude oil customer; facets: brand status, contract type, product line, segment, geography, delivery tier | `../reference/mpc/customer-classification-evidence.md` |
 | **Commercial Pricing & Price Realization** | Decided as a domain, with its name and scope split (D1 to D4, the decisions of 2026-10-05 to 2026-10-05, 2026-10-05). Domain model not yet written | Proposed scope: the price MPC offers or contracts, how it is applied and adjusted, and what is realized | P3 realized price · P4 feedstock and purchased-product pricing · P5 regional / location differentials · P6 product and quality · P7 customer and contract · P8 logistics and tariff · P9 incentives, promotions and rebates · P11 (price-list governance) | `../reference/mpc/pricing-domain-evidence.md` |
 | **Market Data** | Decided as a separate domain (D1, the decision of 2026-10-05). Defined 2026-10-18 (the decision of 2026-10-18). Owner: the Risk Group, provisionally, pending confirmation of its mandate; operational stewardship, licensing controls and independent validation recorded separately | Externally sourced market observations and shared market-data products, including benchmark identifiers, source provenance, licensing restrictions, timestamps, assessment conventions, approved curve-construction metadata; vendor-supplied volatility observations | P1 market benchmark pricing · P11 (benchmark methodology and publication) | `../reference/industry-view/pricing-market-data-risk-evidence.md` |
 | **Commercial Risk** | Decided as the owner of P10 (D2, the decision of 2026-10-05). Defined 2026-10-18 (the decision of 2026-10-18). Owner: the Risk Group | Commercial exposure, risk measures, limits, risk-model methodologies and parameters (including volatilities and correlations as risk-model parameters), trading-counterparty credit assessment and exposure (CM 1.2.2.1). Not customer AR credit. Trade confirmations (CM 1.2.2.2) stay with trade operations and feed the domain | P10 price risk and hedging; process map CM 1.2.2 Confirmations & Risk Management | `../reference/industry-view/pricing-market-data-risk-evidence.md` |
@@ -74,7 +74,7 @@ The pricing split above (D1 to D4) was decided on 2026-10-05
   citations. *2026-10-21:* for C1 to C8 the `party` module carries the codes
   on its own customer classes instead (the decision of 2026-10-21, item 8).
 - Customer classes are assigned at the customer account / relationship level,
-  following the role pattern in `customer_domain_problem_statement_v0.1.md`.
+  following the role pattern of the `party` module (Party, Customer Account, Party Role).
 - Domain boundaries map onto the ontology modules (`party`, `organization`,
   `kpi`, and any new module), each introduced by its own decision.
 

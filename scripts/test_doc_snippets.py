@@ -1008,6 +1008,8 @@ def test_the_contexts_that_run_everywhere_need_no_variable_and_the_others_name_t
         "new-module": ("DOC_SNIPPETS_SLOW",),
         "stores": ("KPI_STORE_TEST_FUSEKI_URL", "KPI_STORE_TEST_NEO4J_URI"),
         "databricks-free": ("KPI_STORE_TEST_DATABRICKS_PROFILE",),
+        "reasoner": ("KPI_STORE_TEST_ROBOT_JAR",),
+        "empty-fuseki": ("KPI_STORE_TEST_EMPTY_FUSEKI_URL",),
         "first-run": ("KPI_STORE_TEST_LOCAL_SETTINGS", "KPI_STORE_TEST_LPG_OUT")}
     assert [name for name, c in contexts.items() if c.home == "real"] == ["databricks-free", "first-run"]
     # The runbook's commands read KPI_STORE_LOCAL. Only its own context may give that variable to a block.
@@ -1031,7 +1033,7 @@ def test_the_hand_written_pages_of_the_tree_are_in_scope_and_the_generated_ones_
     pages = d.html_documents(d.ROOT)
     for known in ("business_architecture/ontology/epm-walkthrough.html",
                   "business_architecture/ontology/epm-ontology-guide.html",
-                  "best-practices/EPM-BP-100-KPIs-production-deployment.html", "viewer/index.html"):
+                  "viewer/index.html"):
         assert known in pages, known
     for built in ("HOW-TO-UPDATE.html", "business_architecture/ontology/MODULES.html",
                   "skills/ontology/references/ontology-build-playbook.html"):

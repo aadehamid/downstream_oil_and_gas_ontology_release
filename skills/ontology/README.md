@@ -38,11 +38,17 @@ To add a module to an ontology that already has releases, start at `references/n
 1. Install the skill where your agent finds skills, and ask the agent to start an ontology for your domain.
 2. The agent fills `templates/requirements.yaml` with you: purpose, users, scope, draft competency questions, and the inputs you have. Where an input is missing, it stops and asks.
 3. It then works through Steps 0 to 12 in `SKILL.md`. Each step names the reference to read, the template to fill and the "Done when" gate. Expect a question from the agent at every decision; answer "not yet" when you are unsure, and the agent marks the item as assumed and keeps it reversible.
-4. From Step 3, run the checks the agent runs:
+4. From Step 3, run the checks the agent runs. The two commands below check the skill's own templates, so you can run them as written, from this release's top folder. For your ontology, name your requirements file and your module's Turtle file instead. The checks need the PyYAML and rdflib packages (`py -m pip install pyyaml rdflib`). On macOS or Linux, write `python3` for `py`.
 
-   ```sh skip reason="awaits-the-rewrite: the reader's own values stand in angle brackets, and no test supplies them yet"
-   uv run --with pyyaml python scripts/check_requirements.py requirements.yaml
-   uv run --with rdflib python scripts/check_taxonomy.py <your module>.ttl
+   ```powershell run=release-copy
+   cd skills/ontology
+   py scripts/check_requirements.py templates/requirements.yaml
+   py scripts/check_taxonomy.py templates/ontology-skeleton.ttl
+   ```
+
+   ```text expect
+   requirements pass
+   all checks pass (94 triples)
    ```
 
    Each prints one line per failure and exits 1, or prints a pass line and exits 0.

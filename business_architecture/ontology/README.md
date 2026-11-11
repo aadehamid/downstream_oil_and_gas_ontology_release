@@ -28,7 +28,7 @@ roles, and a fourth to read first if you are new (`epm-ontology-guide.html`, bel
 | Why is something the way it is? | `../domain/decisions/` |
 | What is still open on the ontology, and what do we need from the business? | `OPEN-ITEMS.md`, with the full wording in `business-closeout.md` |
 
-The two skill playbooks stay company-neutral, so they name each other and the kinds of document a project keeps, and not these EPM files.
+The two skill playbooks stay company-neutral, so they name each other and the kinds of document a project keeps, and not these KPI Store files.
 
 **New to the ontology?** Open `epm-ontology-guide.html` in a browser. It explains what the ontology is for, why it is split into modules, what each module holds and why, and follows one pricing measure, the crack spread, through every module, with diagrams and a query you can run. Its figures are a dated snapshot; `MODULES.md` and `scripts/epm_facts.py` stay the current reference.
 

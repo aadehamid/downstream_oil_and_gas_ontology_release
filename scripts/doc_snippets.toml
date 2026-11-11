@@ -76,6 +76,24 @@ about = "A copy of the release, with the rehearsal workspace's command-line prof
 [contexts.databricks-free.placeholders]
 "your profile" = "env:KPI_STORE_TEST_DATABRICKS_PROFILE"
 
+[contexts.reasoner]
+base = "release-copy"
+needs_env = ["KPI_STORE_TEST_ROBOT_JAR"]
+timeout = 300
+about = "A copy of the release, with Java on the PATH and the ROBOT 1.9.10 jar named by the variable."
+
+[contexts.reasoner.placeholders]
+"your ROBOT jar" = "env:KPI_STORE_TEST_ROBOT_JAR"
+
+[contexts.empty-fuseki]
+base = "release-copy"
+needs_env = ["KPI_STORE_TEST_EMPTY_FUSEKI_URL"]
+timeout = 300
+about = "A copy of the release beside a second local Fuseki dataset that no other document loads, named by the variable."
+
+[contexts.empty-fuseki.placeholders]
+"your Fuseki address" = "env:KPI_STORE_TEST_EMPTY_FUSEKI_URL"
+
 [contexts.first-run]
 base = "release-copy"
 needs_env = ["KPI_STORE_TEST_LOCAL_SETTINGS", "KPI_STORE_TEST_LPG_OUT"]

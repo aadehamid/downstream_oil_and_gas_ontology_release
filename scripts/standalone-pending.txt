@@ -4,6 +4,4 @@
 # can only shrink. The check fails when a line names no file or a clean file, so delete a line as soon as its
 # file is clean. The final cut runs the check with --strict, which ignores this file.
 
-# Documents that wait for their rewrite for this release.
-README.md :: awaits the documents rewrite
-KNOWN-OPEN-ITEMS.md :: awaits the documents rewrite
+# No document waits: the list is empty, and the check allows no line in it.

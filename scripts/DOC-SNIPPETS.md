@@ -333,6 +333,8 @@ its commands with that in mind.
 | `new-module` | A Git copy of its own for the made-up module of the update guide. | `DOC_SNIPPETS_SLOW` is set. |
 | `stores` | A copy of the release beside a local Fuseki and a local Neo4j test server. | `KPI_STORE_TEST_FUSEKI_URL` and `KPI_STORE_TEST_NEO4J_URI` are set. |
 | `databricks-free` | A copy of the release with the rehearsal workspace's profile. It keeps the real home folder. | `KPI_STORE_TEST_DATABRICKS_PROFILE` is set. |
+| `reasoner` | A copy of the release, for a command that runs the ROBOT jar with Java. | `KPI_STORE_TEST_ROBOT_JAR` names the jar. |
+| `empty-fuseki` | A copy of the release beside a second local Fuseki dataset that no other document loads. | `KPI_STORE_TEST_EMPTY_FUSEKI_URL` is set. |
 | `first-run` | A copy of the release as a plain folder, with a prepared local settings file. It keeps the real home folder. | `KPI_STORE_TEST_LOCAL_SETTINGS` and `KPI_STORE_TEST_LPG_OUT` are set. |
 
 The `first-run` context is for the runbook, whose commands find the local settings file through the variable
