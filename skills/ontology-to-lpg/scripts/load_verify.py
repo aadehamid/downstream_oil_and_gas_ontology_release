@@ -80,6 +80,12 @@ encoded as UTF-8 and hashed with SHA-256. Schema nodes from onto.import are :Res
 included: they come from the same files on both loads. The reserved property MODULE_TAG (`graph`, add-on
 F) is left out: module_tags.py sets it after step 6 and checks it on its own, so tagging keeps the
 report's hash and a copy still compares equal.
+
+In the KPI Store load this is the "load" step of the local Neo4j load (kpi_store/load_neo4j.py), which
+runs it through run_projection.py after the "project" step has written merged.ttl, loadable.nt and
+inferred.nt. The copy to Neo4j Enterprise and the sync check import this file for hash_graph, Timed
+and the separator's default only. As a command it writes to the one database it is given and to the
+report's path, through a temporary file beside it, and to nothing else.
 """
 import json
 import os
@@ -596,6 +602,10 @@ def read_manual_cases(path):
 # ---------- the database ----------
 
 def wipe(session):
+    """Empties the database: every node, then every constraint. Reads both counts back and raises Failed
+    unless both are zero, so a load does not start on nodes or constraints an earlier load left. The
+    constraints go too, so the load script creates its own. An index that belongs to no constraint is
+    not looked for and stays."""
     session.run("MATCH (n) DETACH DELETE n").consume()
     for name in session.run("SHOW CONSTRAINTS YIELD name RETURN name").value():
         session.run(f"DROP CONSTRAINT `{name}`").consume()
@@ -698,6 +708,9 @@ N10S_SEP = build.SEPARATOR   # what n10s writes between a prefix and a local nam
 
 
 def hash_graph(session, sep=N10S_SEP):
+    """(graph hash, nodes, relationships, schema relationships) of the :Resource graph a session reads.
+    The hash is graph_hash's, described at the top of this file. sep only decides which relationships
+    count as schema ones (those of the n4sch prefix); it does not change the hash. Only reads."""
     nodes = session.run("MATCH (n:Resource) RETURN n.uri AS uri, labels(n) AS labels, properties(n) AS props").data()
     edges = session.run("MATCH (a:Resource)-[r]->(b:Resource) RETURN a.uri AS s, type(r) AS t, b.uri AS o, "
                         "r.uri AS u, properties(r) AS props").data()
@@ -918,6 +931,12 @@ def read_text(path):
 
 def run(driver, cfg, data_paths, shape_paths, merged, loadable, inferred, plugins_dir=None, manual=(),
         timeout=DEFAULT_QUERY_TIMEOUT, sep=N10S_SEP, database=None):
+    """Steps 1 to 9 of the list at the top of this file, on one session. Returns the report as a dict,
+    with "passed" set; main writes it. Raises Failed when a step cannot go on.
+
+    The database is emptied twice: before the first load, and again before the second load of the same
+    lines in another order. The graph that stays is the second load's. Its hash must equal the first
+    load's for the report to pass, so the kept graph is one the report describes."""
     sep = build.separator({"--separator": sep})   # the one rule, for a caller that skips main()
     data, shapes = build.parse(data_paths), build.parse(shape_paths)
     safe, left_out = igs.subset(shapes)

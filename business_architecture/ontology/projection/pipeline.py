@@ -10,6 +10,19 @@ needs no database:
 
 Commit inferred.nt, projection-manifest.json and projection-report.json together. Turtle stays the master copy; Neo4j
 is a projection that can be rebuilt from these files at any time.
+
+Where the KPI Store uses this file:
+- The cut tool (kpi_store/cut.py) runs `pipeline.py build` after it writes a correction version, so the manifest
+  names the new package. PACKAGES below is the list of packages the projection reads. release/next_version.py
+  rewrites a module's entry there by matching its text, so keep each entry in the form it has.
+- scripts/check.sh runs `pipeline.py build --verify`, so a manifest that no longer matches the packages fails the check.
+- The local Neo4j load (kpi_store/load_neo4j.py) reads PACKAGES and SHAPES for the order of the modules and the
+  shape files that belong to no package.
+- sync_stores.py reads the manifest's input_fingerprint: it is one of the three facts a store's marker must match.
+
+build reads the packages' Turtle, the shape files and inferred.nt. It writes projection-manifest.json and no other
+file, and with --verify it writes nothing. record also writes inferred.nt and projection-report.json. Neither opens
+a database.
 """
 import argparse
 import hashlib
@@ -104,6 +117,7 @@ def sorted_nt(g):
 
 
 def sha(*texts):
+    """One SHA-256 over the texts in the order given. The order is part of the hash."""
     h = hashlib.sha256()
     for t in texts:
         h.update(t.encode())
@@ -184,6 +198,8 @@ def check_rules(data, shapes):
 
 
 def check(data, shapes):
+    """Every reason the data may not be loaded: the rule violations (less the listed release exceptions) and the
+    SHACL result. An empty list means the build may go on."""
     found = check_rules(data, shapes)
     problems = [p for p in found if p not in RELEASE_EXCEPTIONS]
     problems += [f"listed release exception no longer occurs: {e}" for e in RELEASE_EXCEPTIONS if e not in found]
@@ -198,6 +214,14 @@ def check(data, shapes):
 # ---------- Steps 1 and 3 ----------
 
 def build():
+    """Checks the inputs and returns (loadable triples, inferred triples, the manifest's text). It writes nothing:
+    main writes the manifest, or with --verify compares it. It exits before it returns when a check fails, so main
+    and record write no manifest for inputs that did not pass.
+
+    The input fingerprint is the SHA-256 of the loadable triples followed by the inferred triples. The loadable
+    triples are sorted first, so a package rewritten with the same triples in another order keeps its fingerprint.
+    The inferred triples are hashed as the text of inferred.nt, in the file's own order: the same inferred triples
+    in another order give another fingerprint."""
     data, shapes = graph(INPUTS), graph(SHAPES)
     inferred = open(INFERRED, encoding="utf-8").read() if os.path.exists(INFERRED) else ""
     # Step 1 checks every triple that is loaded: the asserted data and the inferred triples.
@@ -244,7 +268,14 @@ def report_problems(report):
 
 def record(run):
     """Takes a driver run's result into this folder, once its inputs are proven to be this tree's: every file its
-    run-manifest.json lists has the SHA-256 of the file this tree projects, and it loaded the same triples."""
+    run-manifest.json lists has the SHA-256 of the file this tree projects, and it loaded the same triples.
+
+    Three tests come before the first write: the run's inputs are this tree's, its report passed, and it loaded
+    this tree's triples. A run that fails one of them leaves this folder as it was. inferred.nt is then written
+    first, because build reads it from disk: the manifest and the report must describe the run's inferred triples,
+    not the ones this folder held before. build can still stop after that write, on a rule or a SHACL failure of
+    the data with the new inferred triples. The folder then holds the new inferred.nt beside the earlier manifest
+    and report, and build stops on the same failure, with or without --verify, until inferred.nt is put right."""
     with open(os.path.join(run, "run-manifest.json"), encoding="utf-8") as f:
         ran = json.load(f)
     with open(os.path.join(run, "projection-report.json"), encoding="utf-8") as f:

@@ -5,14 +5,21 @@
 //
 // One row per chain from the measure to a replica table. The KPI Store graph gives the chain. The governance
 // graph gives the system under the same code, how many tables it holds, and the table the replica copies.
+//
+// Part 1, KPI Store graph. The measure, by its code or by its name. A name ends in a language tag such as @en,
+// so the text before the first @ is compared.
 CALL () {
   USE graph.byName($bpa_graph)
   MATCH (m:{{label:measure.node}})
   WHERE toLower(m.{{property:measure.code}}) = toLower($kpi)
      OR toLower(split(m.{{property:measure.name}}, '@')[0]) = toLower($kpi)
+  // The metric view that serves the measure, then each chain of lineage from it down to a replica table and the
+  // system the replica copies. 0 steps covers a view that itself copies a system. 6 bounds the search, so a
+  // replica more than 6 steps below the view is not found.
   MATCH (mv:{{label:platform_table.node}})-[:{{relationship:platform_table.serves_measure}}]->(m)
   MATCH chain = (mv)-[:{{relationship:platform_table.derived_from}}*0..6]->(replica:{{label:platform_table.node}})
         -[:{{relationship:platform_table.copies_system}}]->(s:{{label:ontology_system.node}})
+  // The chain's tables, each with its layer. The chain's last node is the system, so it is left out.
   WITH m, mv, replica, s,
        [n IN nodes(chain)[..-1] | {
          name: n.{{property:platform_table.full_name}},
@@ -23,6 +30,8 @@ CALL () {
        [o IN objects WHERE o.layer = 'silver' | o.name] AS silver,
        [o IN objects | o.name] AS names
 //#if tech.check tech.check_name tech.check_result tech.checks tech.object tech.designed_as
+  // Kept only when the mapping names the technical graph's roles. The quality checks on any table of the chain: a check tests a
+  // built object, and the built object points to its design. Sorting before collect fixes the list's order.
   OPTIONAL MATCH (qc:{{label:tech.check}})-[:{{relationship:tech.checks}}]->(:{{label:tech.object}})
                  -[:{{relationship:tech.designed_as}}]->(checked:{{label:platform_table.node}})
   WHERE checked.{{property:platform_table.full_name}} IN names
@@ -39,8 +48,10 @@ CALL () {
          checked_at: null
 //#endif
        }) AS checks
+  // A chain with no check gives one entry of nulls from the optional match. It is removed here, as is a check with no name.
   WITH m, mv, replica, s, gold, silver, [c IN checks WHERE c.check IS NOT NULL] AS quality
 //#else
+  // The mapping names no technical graph roles, so the quality list is empty.
   WITH m, mv, replica, s, gold, silver, [] AS quality
 //#endif
   WITH m, mv, replica, s, gold, silver, quality,
@@ -59,6 +70,8 @@ CALL () {
           code + '.' + CASE WHEN table_name STARTS WITH code + '_'
                             THEN substring(table_name, size(code) + 1) ELSE table_name END] AS table_keys
 }
+// Part 2, governance graph, once per row of part 1. The system with the same code, how many tables it holds, a
+// sample of their names, and the table the replica copies, found by the keys built above.
 CALL (system_code, table_keys) {
   USE graph.byName($governance_graph)
   OPTIONAL MATCH (g:{{label:system.node}})

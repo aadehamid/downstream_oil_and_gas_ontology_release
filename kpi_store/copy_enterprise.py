@@ -6,6 +6,13 @@ The Enterprise server has no plugin, so the copy is plain Cypher over the driver
 copy_graph.py). Run the local load first (kpi_store.load_neo4j): the copy takes only the graph whose hash equals
 the load report's.
 
+Where it sits in the run: this is the runner's enterprise step (kpi_store.runner). It runs after the local Neo4j
+load and before the sync check. It reads the local database, the load's output folder ([projection] out) and the
+release folder. It writes to the one Enterprise database and never to the local database. It writes one file only
+when a caller gives it a log: the runner opens <run>/enterprise.log and passes it, and the printed lines of the
+logical models' load go there. Run alone, the command writes no file of its own. Python may still leave
+__pycache__ folders beside the release code it imports; the runner's zip leaves those out.
+
 What this command may touch on Enterprise, enforced in code:
 - It writes to ONE database: the one [neo4j.enterprise] database names (businessprocessarchitecturegraph). Every
   session is opened on that name, and the server must answer that this is the database it opened. The system
@@ -76,9 +83,18 @@ OWN_RULES = {
 }
 SCHEMA_PREFIX = "n4sch"   # the ontology import's own labels: n4sch_Class and the like
 OWN_LABELS = tuple(OWN_RULES)
+# Nodes and relationships per request of the copy, and nodes per transaction of a replace's delete. With a batch,
+# the size of one request or one transaction does not grow with the graph.
 BATCH = 1000
+# Seconds the server gives one statement before it ends it with an error. The graph hash reads the whole graph
+# and is the slowest statement; without a limit a stuck query would hang the run.
 QUERY_TIMEOUT = 600
-# Administration of the server, a change of database inside a statement, and any DROP.
+# Administration of the server, a change of database inside a statement, and any DROP. The first two lines match
+# an administration verb followed, in the same statement, by the kind of thing it administers, so CREATE DATABASE
+# and ALTER USER are refused while CREATE CONSTRAINT and CREATE (n) pass. The match is on words, so it also
+# refuses a harmless statement that holds both, such as a CREATE with the text 'user' in it: the guard errs
+# towards refusing. USE is matched only as a statement's first word, where it would send the statement to
+# another database. DROP and TERMINATE are refused wherever they stand.
 FORBIDDEN = re.compile(
     r"\b(CREATE|ALTER|START|STOP|RENAME|GRANT|DENY|REVOKE|ENABLE|DEALLOCATE|REALLOCATE)\b[^;]*?"
     r"\b(DATABASE|ALIAS|SERVER|USER|ROLE|PRIVILEGE)S?\b|^\s*USE\b|\bDROP\b|\bTERMINATE\b", re.IGNORECASE)
@@ -114,6 +130,7 @@ class _Guarded:
 
     def run(self, query, parameters=None, **kwargs):
         check_statement(query)
+        # Parameters go on as the caller gave them, as a dict or as keywords: the driver takes both forms.
         return self._inner.run(query, **kwargs) if parameters is None else self._inner.run(query, parameters, **kwargs)
 
     def __getattr__(self, name):
@@ -129,6 +146,7 @@ class TargetSession(_Guarded):
         self.database = database
 
     def begin_transaction(self, *args, **kwargs):
+        # A transaction has its own run(), which would bypass the session's guard, so it is wrapped too.
         return _Guarded(self._inner.begin_transaction(*args, **kwargs))
 
     def __enter__(self):
@@ -144,6 +162,7 @@ def open_target(driver, name):
     name = checked_name(name)
     session = driver.session(database=name)
     try:
+        # db.info() is the server's own answer to "which database is this session on".
         opened = session.run("CALL db.info() YIELD name RETURN name").single()["name"]
     except Exception as err:
         session.close()
@@ -161,7 +180,9 @@ def open_target(driver, name):
 # ---- what the target holds, and the decision to replace it ----------------------------------------
 
 def own_predicate(rules=OWN_RULES):
-    """The Cypher condition that is true for a node `n` of the KPI Store. holdings and remove_own both use it."""
+    """The Cypher condition that is true for a node `n` of the KPI Store. holdings and remove_own both use it.
+    coalesce(..., false) matters: a condition on a missing property gives null, and NOT null is null, so without
+    it a node that fails every rule by a missing property would count as neither own nor foreign."""
     return "coalesce(" + " OR ".join(f"(n:{label} AND {condition})" for label, condition in rules.items()) + ", false)"
 
 
@@ -203,6 +224,7 @@ def holdings(session, params, rules=OWN_RULES):
         labels, n = row["labels"], row["n"]
         held["nodes"] += n
         if row["own"]:
+            # An own node is counted once, under the first of the rules' labels it carries.
             first = next(label for label in rules if label in labels)
             held["own"][first] = held["own"].get(first, 0) + n
         else:
@@ -217,6 +239,7 @@ def holdings(session, params, rules=OWN_RULES):
 
 
 def describe(counts):
+    """The counts as text for a message: "12 ModuleRelease, 4810 Resource"."""
     return ", ".join(f"{n} {label}" for label, n in sorted(counts.items())) or "nothing"
 
 
@@ -226,6 +249,7 @@ def decide(held, database, replace=False, confirm=None):
     what they typed."""
     if not held["nodes"]:
         return "empty"
+    # Foreign nodes are checked before the decision is read, so --replace cannot get past them.
     if held["foreign_nodes"]:
         raise Refused(f"the database {database} holds {held['foreign_nodes']} node(s) that are not the KPI Store's, "
                       f"by label: {describe(held['foreign'])}; for example {', '.join(held.get('foreign_examples') or ['(none read)'])}. "
@@ -265,6 +289,7 @@ def check_tags(target, out, cfg_doc, code):
     failed = sorted(kind for kind, items in problems.items() if items)
     if failed:
         raise Refused(f"the copy's release tags differ from the packages' ({', '.join(failed)}); no marker was written")
+    # The module graph is written only after the tags passed: it is built from the same packages.
     modules, requirements = code.mt.module_rows(packages)
     run(code.mt.CLEAR_MODULES)
     run(code.mt.MODULES, mods=modules)
@@ -289,8 +314,9 @@ def write_records(target, out, code):
 
 def copy(local, release_root, replace=False, confirm=None, code=None, connect=local_load.connect, extra_loads=(),
          own_rules=OWN_RULES, log=None):
-    """The whole step. Returns a dict whose "status" is "current" (nothing was changed) or "copied". Raises
-    Refused when the copy is refused or a check fails.
+    """The whole step. Returns a dict whose "status" is "current" (the ontology's copy was not changed; an extra
+    load may still have replaced its own subgraph) or "copied". Raises Refused when the copy is refused or a check
+    fails.
 
     extra_loads are functions (session, store name) -> dict that load a subgraph of their own after the logical
     models and before the marker; own_rules must then also hold that subgraph's labels, each with the condition
@@ -307,6 +333,9 @@ def copy(local, release_root, replace=False, confirm=None, code=None, connect=lo
     cfg_doc = local_load.run_config(release_root, local, "")
     sep = cfg_doc.get("separator", code.lv.N10S_SEP)
     result = {"store": STORE, "database": database}
+    # Up to decide(), the ontology's copy on the target is only read, and each refusal below leaves the target as
+    # it was found. There is one write before decide(): when the ontology's copy is already current, the extra
+    # loads run (the technical graph), and an extra load replaces its own subgraph when that subgraph is behind.
     with connect(source_cfg) as source_driver, connect(target_cfg) as target_driver, \
             source_driver.session(database=source_cfg.database) as raw_source, \
             open_target(target_driver, database) as guarded:
@@ -315,6 +344,8 @@ def copy(local, release_root, replace=False, confirm=None, code=None, connect=lo
         if code.cg.database_identity(source) == code.cg.database_identity(target):
             raise Refused("the target is the local database itself; nothing was changed. [neo4j.enterprise] must "
                           "name another database than [neo4j.local]")
+        # The local graph is hashed again now. It may have changed since the load report was written, and only
+        # the graph the report verified may be copied.
         source_hash = code.cg.graph_hash(source)
         if source_hash != report["determinism_hash_sorted"]:
             raise Refused("the local graph is not the graph the load report verified; nothing was changed on "
@@ -334,6 +365,10 @@ def copy(local, release_root, replace=False, confirm=None, code=None, connect=lo
                     "graph_hash": source_hash, "held_before": held, "extra_loads": extras,
                     "marker": code.ss.read_neo4j(target, STORE)[0]}
         action = decide(held, database, replace, confirm)
+        # From here the ontology's copy on the target changes. Its marker is written last, after every check
+        # passed. A copy that stops part-way leaves no marker, or, when a replace's delete stopped between two of
+        # its batches, an earlier marker beside counts that no longer equal it. The sync check reads neither as
+        # current. The copy is not one transaction: what was written before the stop stays in the database.
         if action == "replace":
             remove_own(target, params, own_rules)
         copied = code.cg.copy(source, target, BATCH)
@@ -359,12 +394,14 @@ def copy(local, release_root, replace=False, confirm=None, code=None, connect=lo
 
 
 def line(result):
+    """The one line a person reads."""
     return (f"neo4j (enterprise, database {result['database']}): {result['status']}, {result['nodes']} nodes, "
             f"{result['relationships']} relationships, graph hash {result['graph_hash']} equal to the local graph's"
             + local_load.extras_text(result))
 
 
 def ask(text):
+    """The prompt of the replace decision. main() uses it only when a person is at the terminal."""
     return input(text)
 
 
@@ -379,6 +416,7 @@ def main(argv=None):
     args = ap.parse_args(argv)
     try:
         local = ls.load(ls.locate(args.stores), release_root=Path(args.release))
+        # With no terminal, as under the runner or a scheduler, nobody can type the name: only --replace decides.
         confirm = ask if sys.stdin is not None and sys.stdin.isatty() else None
         extras = (local_load.tech_graph_loader([Path(args.tech_graph)], Path(args.release)),) if args.tech_graph else ()
         result = copy(local, Path(args.release), replace=args.replace, confirm=confirm, extra_loads=extras)

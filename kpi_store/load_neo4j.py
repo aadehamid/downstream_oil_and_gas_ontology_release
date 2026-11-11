@@ -2,6 +2,15 @@
 
     py -m kpi_store.load_neo4j --stores <local settings file> [--force]
 
+Where it sits in the run: this is the runner's neo4j step (kpi_store.runner). It runs after the Fuseki load and
+before the copy to Neo4j Enterprise (kpi_store.copy_enterprise), which takes only the graph this load verified.
+
+It reads the release folder and the local settings. It writes to the one database [neo4j.local] names, to the
+projection's output folder ([projection] out: the load report and the files the copy reads), and to
+<run folder>/neo4j/ (the log, the two configuration copies and, for the length of the load, the login file). It
+writes no file of the release and never touches the Enterprise server. Python may leave __pycache__ folders beside
+the release code this process imports; the steps it starts as separate commands are told to write none.
+
 The local Neo4j is Neo4j Desktop on the machine that runs the loads. THE LOAD EMPTIES THE DATABASE that
 [neo4j.local] names, then builds the graph again from the release files. The steps and their checks are the
 ontology-to-lpg skill's (skills/ontology-to-lpg/scripts/run_projection.py), run from this release's own run
@@ -46,13 +55,17 @@ from . import local_settings as ls
 from . import ontology_view as ov
 
 STORE = "neo4j"   # the name the local database's marker carries
+# The skill's steps this load runs, in this order: a step reads files or graph content that earlier steps wrote.
 STEPS = ("project", "load", "review", "tags", "release-record")
 SKILL_SCRIPTS = Path("skills") / "ontology-to-lpg" / "scripts"
 PROJECTION = Path("business_architecture") / "ontology" / "projection"
 RUN_CONFIG = PROJECTION / "skill-run" / "epm-run.json"
+# Files the skill's steps write into the projection's output folder. The copy to Enterprise reads them too.
 REPORT, RECORDS, RUN_MANIFEST, INFERRED = "projection-report.json", "release-records.json", "run-manifest.json", "inferred.nt"
+# Files this module writes into <run folder>/neo4j: the login file (removed after the load), the log, and the run
+# configuration with the newest releases as its inputs.
 ENV_FILE, LOG_FILE, CONFIG_FILE = "neo4j-local.env", "neo4j-load.log", "projection-run.json"
-PROJECTION_CONFIG_FILE = "projection-config.json"
+PROJECTION_CONFIG_FILE = "projection-config.json"   # the projection configuration's copy, also in the run folder
 MARKER_HASH = "graph_hash"   # this load's own marker field: the verified graph's hash
 
 
@@ -62,7 +75,7 @@ class LoadError(Exception):
 
 # ---- the release's own code ------------------------------------------------------------------------
 
-_CODE = {}
+_CODE = {}   # {release folder: its imported modules}; it holds one entry at most (release_code)
 
 
 def release_code(release_root):
@@ -72,6 +85,8 @@ def release_code(release_root):
     root = Path(release_root).resolve()
     if root in _CODE:
         return _CODE[root]
+    # The modules are imported by plain name, so Python keeps one copy of each. A second folder would get the
+    # first folder's code under its own name, and load that folder's rules. Refuse instead.
     if _CODE:
         raise LoadError("one process loads one release folder; start a new one for another folder")
     for folder in (root / SKILL_SCRIPTS, root / PROJECTION):
@@ -183,6 +198,8 @@ def with_newest_inputs(cfg_doc, release_root, newest, code, run_dir):
     projection["packages"] = versions
     copy = Path(run_dir) / PROJECTION_CONFIG_FILE
     copy.write_text(json.dumps(projection, indent=2) + "\n", encoding="utf-8", newline="\n")
+    # inputs_script would make the driver ask the projection's own list for the inputs. The list written out
+    # below replaces it, so the versions read are the catalog's newest.
     cfg = {k: v for k, v in cfg_doc.items() if k != "inputs_script"}
     return cfg | {"data": data, "shapes": shapes, "projection_config": str(copy)}
 
@@ -203,9 +220,11 @@ def step_runner(prefixes, log_path, java=None, run=subprocess.run):
     """The run(cmd, cwd, env, capture) function the skill's driver calls. Each command's output goes to the log file,
     so the load prints one line and the detail stays in the run folder."""
     def run_step(cmd, cwd=None, env=None, capture=False):
+        # The step's Python writes no .pyc files into the release folder, and each script reads and prints UTF-8,
+        # which is not the default on Windows.
         env = dict(os.environ if env is None else env) | {"PYTHONDONTWRITEBYTECODE": "1", "PYTHONUTF8": "1"}
         with Path(log_path).open("a", encoding="utf-8", newline="\n") as log:
-            log.write("--- " + " ".join(str(c) for c in cmd[-6:]) + "\n")
+            log.write("--- " + " ".join(str(c) for c in cmd[-6:]) + "\n")   # the command's end names the script
             log.flush()
             done = run(plain_command(cmd, prefixes, java), cwd=cwd, env=env, stdin=subprocess.DEVNULL, text=True,
                        encoding="utf-8", stdout=subprocess.PIPE if capture else log, stderr=log)
@@ -233,6 +252,7 @@ def read_report(out, code, want=None):
 
 
 def release_records(session):
+    """The version IRIs of the release records the database holds, sorted."""
     return sorted(session.run("MATCH (r:ModuleRelease) RETURN r.version_iri AS iri").value())
 
 
@@ -248,6 +268,7 @@ def mark(session, store, want, report, ss, commit):
         raise LoadError(f"{store}: its {len(records)} release record(s) are not one for each of the "
                         f"{len(want['newest'])} newest releases; no marker was written")
     marker = ss.marker(want, store, [nodes, edges], commit_text=commit) | {MARKER_HASH: report["determinism_hash_sorted"]}
+    # SET m = $p replaces every property, so nothing of an earlier marker stays on the node.
     session.run(f"MERGE (m:{ss.MARKER_LABEL} {{store: $s}}) SET m = $p", s=store, p=marker).consume()
     return marker
 
@@ -268,7 +289,7 @@ def load_models(session, store, newest, code, log):
     files, status = models_status(session, store, newest, code)
     if not files or status == "current":
         return status
-    with contextlib.redirect_stdout(log):
+    with contextlib.redirect_stdout(log):   # the loader prints its own lines; they belong in the log
         try:
             code.lm.load_neo4j(session, files, store)
         except SystemExit as stop:   # the loader's own refusal, with its reason
@@ -286,6 +307,7 @@ def is_current(session, store, want, report, code, sep):
         return False
     if release_records(session) != sorted(want["newest"]):
         return False
+    # The graph hash reads every node and relationship, so it comes last, after the cheap comparisons passed.
     return code.lv.hash_graph(session, sep)[0] == report["determinism_hash_sorted"]
 
 
@@ -293,8 +315,8 @@ def is_current(session, store, want, report, code, sep):
 
 def load(local, release_root, run_dir=None, force=False, code=None, connect=connect, run=subprocess.run,
          extra_loads=()):
-    """The whole step. Returns a dict whose "status" is "current" (nothing was changed) or "loaded". Raises
-    LoadError when a step or a check fails.
+    """The whole step. Returns a dict whose "status" is "current" (the ontology's graph was not changed; an extra
+    load may still have replaced its own subgraph) or "loaded". Raises LoadError when a step or a check fails.
 
     extra_loads are functions (session, store name) -> dict that load a subgraph of their own, apart from the
     ontology's Resource nodes, after the logical models and before the marker. They also run when the ontology is
@@ -309,6 +331,9 @@ def load(local, release_root, run_dir=None, force=False, code=None, connect=conn
     sep = cfg_doc.get("separator", code.lv.N10S_SEP)
     result = {"store": STORE, "database": neo4j.database, "out": str(out), "log": str(run_dir / LOG_FILE)}
 
+    # First, the way out that leaves the ontology's graph as it is: an earlier load's report is of this release
+    # and passed, and the database still holds the graph that report verified. The extra loads still run on this
+    # path, so the technical graph is replaced when it is behind.
     if not force and (out / REPORT).is_file():
         try:
             report = read_report(out, code, want)
@@ -323,7 +348,8 @@ def load(local, release_root, run_dir=None, force=False, code=None, connect=conn
         except LoadError:
             pass   # a report that did not pass is replaced by the load below
 
-    java = load_fuseki.find_java((local.fuseki.java if local.fuseki else None))
+    # The load itself. From here the skill's load step empties the database and builds the graph again.
+    java = load_fuseki.find_java((local.fuseki.java if local.fuseki else None))   # ROBOT runs on Java
     config_path = run_dir / CONFIG_FILE
     config_path.write_text(json.dumps(with_newest_inputs(cfg_doc, release_root, want["newest"], code, run_dir), indent=2) + "\n",
                            encoding="utf-8", newline="\n")
@@ -338,6 +364,10 @@ def load(local, release_root, run_dir=None, force=False, code=None, connect=conn
                 raise LoadError(f"the local load stopped: {err}. The detail is in {run_dir / LOG_FILE}") from None
             except (OSError, ValueError) as err:
                 raise LoadError(f"the local load stopped ({type(err).__name__}): {err if isinstance(err, ValueError) else ''}") from None
+            # The marker comes last, after the report passed and every subgraph loaded. The skill's load step
+            # empties the database, marker included. So a load that stops after that point leaves the database
+            # unmarked, and the sync check reads it as not current. A load that stops before it, in the project
+            # step, leaves the earlier graph and its marker as they were.
             report = read_report(out, code, want)
             with connect(neo4j) as driver, driver.session(database=neo4j.database) as session:
                 models = load_models(session, STORE, want["newest"], code, log)
@@ -370,6 +400,7 @@ def summary(report):
 
 
 def line(result):
+    """The one line a person reads."""
     return (f"neo4j (local, database {result['database']}): {result['status']}, {result['nodes']} nodes, "
             f"{result['relationships']} relationships, {result['shacl_violations_in_graph']} SHACL violations over "
             f"{result['in_graph_constraints']} constraints, round trip lost {result['roundtrip_lost']} and added "

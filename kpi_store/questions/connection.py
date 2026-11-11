@@ -1,5 +1,10 @@
 """Where the composite database is, read from a settings file or the environment, never from the release.
 
+`run.py` calls `read` first, before any query. This module opens no connection: it returns the settings, and
+`run.py` gives them to the driver. It also holds the rule that keeps an environment's own files (these settings,
+the mapping file, the answers) outside the release folder this code sits in, which is the folder the runner zips
+and uploads. The rule tests that one folder. It does not see another copy of the release.
+
 The settings file is TOML:
 
     [neo4j]
@@ -25,6 +30,7 @@ from pathlib import Path
 from . import roles as R
 
 KEYS = ("uri", "user", "password", "composite", "governance_alias", "bpa_alias")
+# This file is <release>/kpi_store/questions/connection.py, so the release folder is two levels above its folder.
 RELEASE_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -34,12 +40,13 @@ class SettingsError(Exception):
 
 @dataclass(frozen=True)
 class Connection:
+    """The connection settings, complete and checked."""
     uri: str
     user: str
     composite: str
     governance_alias: str
     bpa_alias: str
-    password: str = field(repr=False)     # kept out of every printed form of the settings
+    password: str = field(repr=False)     # left out of the settings' repr; the field itself is plain text
 
     @property
     def graphs(self) -> dict[str, str]:
@@ -49,6 +56,7 @@ class Connection:
 
 
 def _inside_release(resolved: Path) -> bool:
+    """True when the path is the release folder or lies anywhere under it. The path need not exist yet."""
     chain = [resolved, *resolved.parents]
     root = os.path.normcase(str(RELEASE_ROOT))
     if any(os.path.normcase(str(folder)) == root for folder in chain):
@@ -72,6 +80,8 @@ def outside_release(path: Path, what: str) -> Path:
 
 
 def read(path: Path | None, environ=None) -> Connection:
+    """The connection settings from the file's [neo4j] table, then from the environment, which wins. With no
+    file, the environment must give every value. Raises SettingsError when a value is missing or wrong."""
     environ = os.environ if environ is None else environ
     values = {}
     if path is not None:
@@ -90,6 +100,8 @@ def read(path: Path | None, environ=None) -> Connection:
     if missing:
         raise SettingsError("the connection settings lack " + ", ".join(missing)
                             + ": give them in the settings file's [neo4j] table or in KPI_STORE_NEO4J_* variables")
+    # These three are joined with a dot into the graph names (Connection.graphs). A dot, a space or a quote in
+    # one of them would name another graph or none, so each must be a plain database name.
     for key in ("composite", "governance_alias", "bpa_alias"):
         if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", values[key]):
             raise SettingsError(f"{key} is not a database name: {values[key]}")

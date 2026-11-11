@@ -7,6 +7,15 @@ compared without regard to case, as Windows compares them.
 
 The file's path comes from --stores, or from the environment variable KPI_STORE_LOCAL. kpi_store/stores.example.toml
 is the example to copy. A password is held as a Secret, whose text form is ***, so no message can print it.
+
+Six commands read this file first: the runner, the setup check, the Fuseki and Neo4j loads, the copy to
+Enterprise and the sync check. The cut tool and the questions do not read it. It is not the same file as
+kpi_store.toml, which describes the Databricks environment, travels to the volume and holds no password
+(kpi_store.settings). No command copies or uploads this file. This module only reads: it opens no connection
+and writes nothing.
+
+Each table of the file is optional, so a machine that runs only one command needs only that command's tables. A
+command asks for a part with LocalSettings.need, which stops with the name of the missing table.
 """
 import os
 import tomllib
@@ -14,9 +23,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
 
-ENV_VAR = "KPI_STORE_LOCAL"
+ENV_VAR = "KPI_STORE_LOCAL"   # names the settings file when --stores is not given
 ROOT = Path(__file__).resolve().parents[1]   # the release folder this code sits in
-SYSTEM_DATABASE = "system"
+SYSTEM_DATABASE = "system"   # Neo4j's own database of databases and users; never a place to load into
 
 # Every table and key the file may hold. A key that is not listed is an error: a key spelled wrong must not be
 # read as a key left out. Each table is optional; a step that needs a missing table stops and names it.
@@ -30,6 +39,7 @@ LAYOUT = {
     "projection": {"robot_jar": str, "out": str},
     "tools": {"bash": str},
 }
+# The keys a table may leave out. Every other key of a table that is present is required.
 OPTIONAL = {("databricks", "cli"), ("databricks", "timeout_minutes"), ("fuseki", "data_folder"), ("fuseki", "java"),
             ("neo4j.local", "password"), ("neo4j.local", "password_env"), ("neo4j.local", "plugins_folder"),
             ("neo4j.enterprise", "password"), ("neo4j.enterprise", "password_env"), ("tools", "bash")}
@@ -56,6 +66,7 @@ class Secret:
 
 @dataclass(frozen=True)
 class Neo4j:
+    """One Neo4j server and the one database a command may use there: [neo4j.local] or [neo4j.enterprise]."""
     uri: str
     username: str
     password: Secret
@@ -65,6 +76,7 @@ class Neo4j:
 
 @dataclass(frozen=True)
 class Fuseki:
+    """The local Fuseki, from [fuseki]. The properties give the URLs of one dataset's endpoints."""
     jar: Path
     url: str                  # the dataset's URL, such as http://127.0.0.1:3030/ds
     data_folder: Path | None  # a TDB2 folder that keeps the dataset across restarts; None keeps it in memory
@@ -84,6 +96,7 @@ class Fuseki:
 
     @property
     def ping_url(self):
+        """The server's own "are you up" address, which is not under the dataset."""
         parts = urlsplit(self.url)
         return f"{parts.scheme}://{parts.netloc}/$/ping"
 
@@ -97,19 +110,22 @@ class Fuseki:
 
     @property
     def is_local(self):
+        """True when the URL names this machine. The Fuseki load starts a server itself only then."""
         return urlsplit(self.url).hostname in ("127.0.0.1", "localhost", "::1")
 
 
 @dataclass(frozen=True)
 class Databricks:
+    """How this machine reaches Databricks, from [databricks]: the name of a CLI profile. No secret is kept here."""
     profile: str
     workspace_folder: str     # the workspace folder the notebook is imported into
-    cli: Path | None
-    timeout_minutes: int
+    cli: Path | None          # the CLI's path when it is not on PATH
+    timeout_minutes: int      # how long the runner waits for the notebook run; 60 when not set
 
 
 @dataclass(frozen=True)
 class LocalSettings:
+    """The whole file. A part is None when its table is missing; ask for a part a step needs with need()."""
     path: Path
     settings: Path | None     # this environment's kpi_store.toml, on this machine
     run_folder: Path | None
@@ -149,6 +165,8 @@ def locate(argument=None, environ=None):
 
 
 def _check_layout(doc, layout, where=""):
+    """Refuses a table or a key that LAYOUT does not list, and a value of the wrong type. type() is compared
+    exactly, so true or false is not taken for a whole number."""
     for key, value in doc.items():
         name = f"{where}{key}"
         if key not in layout:
@@ -163,12 +181,15 @@ def _check_layout(doc, layout, where=""):
 
 
 def _required(doc, table, keys):
+    """Raises when a table that is present lacks a key that is not in OPTIONAL."""
     for key in keys:
         if (table, key) not in OPTIONAL and key not in doc:
             raise LocalSettingsError(f"[{table}] lacks {key!r}")
 
 
 def _neo4j(doc, table, environ, base):
+    """A Neo4j from one [neo4j.*] table. The password comes from the file or from an environment variable the
+    file names, and from exactly one of the two, so it is never unclear which one a connection used."""
     _required(doc, table, LAYOUT["neo4j"][table.split(".")[1]])
     given = [k for k in ("password", "password_env") if doc.get(k)]
     if len(given) != 1:
@@ -181,6 +202,7 @@ def _neo4j(doc, table, environ, base):
         text = doc["password"]
     if not doc["uri"].startswith(("bolt://", "bolt+s://", "bolt+ssc://", "neo4j://", "neo4j+s://", "neo4j+ssc://")):
         raise LocalSettingsError(f"[{table}] uri must be a bolt:// or neo4j:// address")
+    # An address is printed in messages and logs; a password inside it would be printed with it.
     if "@" in urlsplit(doc["uri"]).netloc:
         raise LocalSettingsError(f"[{table}] uri must not hold a user name or a password")
     database = doc["database"].strip()
@@ -191,6 +213,7 @@ def _neo4j(doc, table, environ, base):
 
 
 def _path(value, base):
+    """A path of the file: ~ is expanded, and a relative path starts at the folder of the settings file."""
     path = Path(value).expanduser()
     return path if path.is_absolute() else base / path
 
@@ -224,6 +247,8 @@ def parse(data, path, environ=None, release_root=ROOT):
             raise LocalSettingsError("[databricks] timeout_minutes must be 1 or more")
     if fuseki is not None:
         _required(fuseki, "fuseki", LAYOUT["fuseki"])
+        # The URL must be a server and exactly one dataset name, with nothing after it: the query, data and update
+        # URLs are built by adding to it.
         parts = urlsplit(fuseki["url"])
         if parts.scheme not in ("http", "https") or not parts.hostname or parts.path.count("/") != 1 \
                 or len(parts.path) < 2 or parts.query or parts.username:

@@ -42,6 +42,16 @@ value goes through shell.q.
 
 compare-triples and compare-reports are the rebuild's two checks, runnable on their own. Exit codes:
 0 every step passed, 1 a step or check failed, 2 bad configuration or arguments.
+
+In the KPI Store load, the local Neo4j load (kpi_store/load_neo4j.py) does not run this command. It
+imports this file, builds a Driver from the release's run configuration with its own run function, and
+runs five steps: project, load, review, tags and release-record. Its run function swaps the uv prefixes
+(PY and RS below) for the Python that is already running, so the load needs no uv on that machine.
+
+This script itself makes the run configuration's out folder, writes the run manifest into it, deletes
+an earlier load's release-records file there before a load, clears and remakes the rebuild's export
+folder, and empties a Fuseki dataset before the step that loads it. The other writes, to a file, a
+database or a store, are made by the scripts the steps start, each named above.
 """
 import csv
 import hashlib
@@ -517,7 +527,14 @@ def http_update(url, text):
 
 class Driver:
     """One run. run(cmd, cwd, env, capture), ready(url) and update(url, text) are replaceable, so the
-    tests drive every step without a database or a store."""
+    tests drive every step without a database or a store. A caller that must start each script in
+    its own way passes its own run for the same reason.
+
+    Each step is a method named step_<name>. A step starts the skill's other scripts as separate
+    commands, in the order their checks depend on, and raises Failed at the first one that does not
+    exit 0. So within one run no script starts after one that failed. The files a failed script left
+    stay in the out folder: a later run that starts at a later step checks only that the files it
+    needs exist (need), not which run wrote them."""
 
     def __init__(self, cfg, run=run_command, ready=http_ready, update=http_update, log=print, inputs=None):
         self.cfg, self.run, self.ready, self.update, self.log = cfg, run, ready, update, log
@@ -653,6 +670,9 @@ class Driver:
 
     # the steps
     def step_project(self):
+        """Checks the inputs and writes the files the load reads. No database is opened. The ROBOT jar's
+        checksum is compared before anything is written: the reasoner decides which inferred triples
+        are loaded, so another build of it could change the graph without a change to the inputs."""
         jar = self.cfg["robot_jar"]
         with open(jar, "rb") as f:
             if hashlib.sha256(f.read()).hexdigest() != ROBOT_SHA256:
@@ -679,6 +699,8 @@ class Driver:
         self.py("in_graph_shapes.py", "in_graph_shapes.py", "--output", o("shapes-in-graph.ttl"), *self.shapes)
 
     def step_load(self):
+        """Runs load_verify.py on the local Neo4j, which empties that database first, then has build.py
+        check the report against the manifest of the project step. It needs that step's four files."""
         self.need("merged.ttl", "loadable.nt", "inferred.nt", "projection-manifest.json")
         records = self.out_file(RECORDS)
         if os.path.isfile(records):   # the records describe the load they were written for

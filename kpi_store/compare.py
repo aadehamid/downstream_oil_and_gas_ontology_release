@@ -6,6 +6,16 @@ in case, an object the ontology does not have, a measure link proposed from a Ge
 lineage, stale data, a migration pair, a question.
 
 All name comparisons ignore case. The ontology's catalog names are translated by the settings' [names] first.
+
+Where it sits: kpi_store.load_databricks.run calls compare with the ontology's side (kpi_store.ontology_view) and
+the workspace's side (kpi_store.discovery), and gives the rows to kpi_store.report. When a row blocks, the
+notebook stops before the load. This module works on what it is given, the two views, the settings and the
+standing decisions: it sends nothing to Databricks, writes no file and has no command.
+
+Each row carries a proposed fix and, where the evidence is clear, a recommended decision. The decision stays a
+person's: the cut tool applies only the rows a person accepted. A rename is guessed by two tests in turn, and a
+test gives a guess only when exactly one candidate passes it. When neither test does, the row says the object or
+column is missing.
 """
 import datetime as dt
 import re
@@ -15,7 +25,10 @@ from . import discovery as disc
 from . import metric_view as mv
 from . import report as rep
 
+# The kinds of row that stop the load: the ontology names something that Databricks does not hold under that name.
 BLOCKING = ("object-missing", "object-renamed", "column-missing", "column-renamed", "edge-missing")
+# A table with no write for this many days gets a freshness row. The notebook's stale_after_days parameter sets
+# another value. The row is a note and never blocks.
 STALE_AFTER_DAYS = 35
 # Words too common in measure names and filter titles to tell one measure from another.
 COMMON_WORDS = frozenset("a an and the of for by with no not kpi filter market pricing price additional value default".split())
@@ -23,6 +36,7 @@ COMMON_WORDS = frozenset("a an and the of for by with no not kpi filter market p
 
 @dataclass
 class Comparison:
+    """The result: the rows for the report, and how many objects, edges and metric view sources agreed."""
     rows: list = field(default_factory=list)      # report rows without their IDs, in report order
     passes: dict = field(default_factory=dict)    # {"object_names", "table_edges", "metric_view_sources"}
 
@@ -32,12 +46,15 @@ class Comparison:
 
 
 def _row(kind, obj, ontology_value="", found_value="", evidence="", fix=None, recommended="", note=""):
+    """One report row, without its ID. Whether it blocks follows from its kind alone. The decision and decided_by
+    start empty. The runner later proposes the recommended decision in the CSV, and a person confirms it."""
     return {"kind": kind, "blocks": kind in BLOCKING, "object": obj, "ontology_value": ontology_value,
             "found_value": found_value, "evidence": evidence, "proposed_fix": fix or {"action": "none"},
             "recommended": recommended, "decision": "", "decided_by": "", "note": note}
 
 
 def _squash(name):
+    """A name with only its letters and digits, in lower case: ChangeValue and change_value give the same text."""
     return re.sub(r"[^a-z0-9]", "", name.lower())
 
 
@@ -45,6 +62,7 @@ def words(text):
     """The telling words of a title, in lower case and singular: "Crack spreads KPI filter" gives crack, spread."""
     out = set()
     for w in re.findall(r"[a-z0-9]+", text.lower()):
+        # A plain plural loses its s, so "spreads" matches "spread". Short words and words in -ss are left alone.
         w = w[:-1] if len(w) > 3 and w.endswith("s") and not w.endswith("ss") else w
         if w not in COMMON_WORDS and not w.isdigit():
             out.add(w)
@@ -67,6 +85,7 @@ def _renamed_object(name, ontology, found, settings, taken):
 
 
 def _ontology_name(environment_name, ontology, settings):
+    """The ontology's key for an object named as this environment names it: the [names] translation, reversed."""
     for key, obj in ontology.objects.items():
         if settings.environment_name(obj.full_name).lower() == environment_name.lower():
             return key
@@ -98,11 +117,14 @@ def compare(ontology, found, settings, now=None, stale_after_days=STALE_AFTER_DA
     """A Comparison of an OntologyView with a Discovery. stale_after_days None leaves freshness out. `standing` holds
     the keys of the rows a cleared report rejected (report.read_standing): the comparison leaves those rows out."""
     out = Comparison()
+    # Stops when [names] gives two ontology objects the same name here: every lookup below is by that name.
     settings.one_name_each(obj.full_name for obj in ontology.objects.values())
+    # here: ontology key to this environment's name. names_here: the same, the other way round, in lower case.
     here = {key: settings.environment_name(obj.full_name) for key, obj in ontology.objects.items()}
     names_here = {name.lower(): key for key, name in here.items()}
 
-    # 1. Objects.
+    # 1. Objects. Each ontology object is found, renamed or missing. `taken` holds the found objects that already
+    # belong to an ontology object, so a rename is never guessed onto one of them, or onto the same object twice.
     present, taken = {}, set(n for n in names_here if found.exists(n))
     catalogs_found = {t.catalog.lower() for t in found.tables.values()}
     for key, obj in sorted(ontology.objects.items()):
@@ -111,6 +133,7 @@ def compare(ontology, found, settings, now=None, stale_after_days=STALE_AFTER_DA
             present[key] = name.lower()
             continue
         catalog = name.split(".")[0]
+        # A whole catalog that is not there is a matter of this environment's names, not of the ontology.
         if catalog.lower() not in catalogs_found:
             out.rows.append(_row("object-missing", name, obj.full_name, "", f"no object of catalog {catalog} was found",
                                  {"action": "set-catalog-name", "setting": "names", "ontology_catalog": obj.full_name.split(".")[0]},
@@ -128,7 +151,9 @@ def compare(ontology, found, settings, now=None, stale_after_days=STALE_AFTER_DA
                                  {"action": "remove-object", "module": "data-product", "object": obj.full_name}))
     out.passes["object_names"] = len(present)
 
-    # 2. Columns.
+    # 2. Columns, table by table: the same spelling passes, a spelling that differs only in case is a row that
+    # does not block, and any other column is renamed or missing. `used` keeps one current column from being the
+    # new name of two ontology columns.
     by_table = {}
     for column in ontology.columns:
         by_table.setdefault(column.table.lower(), []).append(column)
@@ -161,7 +186,9 @@ def compare(ontology, found, settings, now=None, stale_after_days=STALE_AFTER_DA
                 out.rows.append(_row("column-missing", name, column.name, "", "information_schema.columns does not list it",
                                      {"action": "remove-column", "module": "data-product", "column": column.name}))
 
-    # 3. Table edges and metric view sources.
+    # 3. Table edges and metric view sources. An edge holds when table lineage has it, or when the target is a
+    # metric view whose definition reads the source. A target with no lineage at all and no definition cannot be
+    # checked: it gets one no-lineage row, which does not block, and not one edge-missing row per edge.
     edges_found, unchecked = 0, {}
     for down, up in sorted(ontology.edges):
         if down not in present or up not in present:
@@ -262,6 +289,12 @@ def _filter_view(snippet, space, found):
 
 
 def _genie_rows(ontology, found, names_here):
+    """The rows a Genie space gives: a measure link for each filter whose title names exactly one measure, a
+    second-source row when the ontology says other objects serve that measure and this view does not, and a
+    question for each metric view of the space that no filter links to a measure. None of these rows blocks.
+
+    A filter is matched to a measure by the telling words (words) its title shares with the measure's labels.
+    The measure with the most shared words wins. A tie gives no link."""
     rows = []
     measure_words = {m.notation: words(" ".join((m.label, m.notation.replace("-", " "), *m.alt_labels)))
                      for m in ontology.measures.values()}
