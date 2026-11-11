@@ -185,7 +185,9 @@ ONT=business_architecture/ontology</code></pre>
 <p>The versions in the worked commands are those of this release as you received it. After your first change, read the one you hold, from <code>$ONT/release</code>: <code>py next_version.py current kpi</code>.</p>
 <h2 id="start-here">Start here<a class="hl" href="#start-here" aria-label="Link to this section">#</a></h2>
 <ol><li>Make your own copy. A Git clone keeps your history; an unpacked export works too. The process-map section says what changes without Git.</li><li>Check that the copy works before you change it. The script takes about 10 minutes:
-<pre><code class="lang-sh">bash scripts/check.sh</code></pre></li></ol>
+<pre><code class="lang-sh">bash scripts/check.sh</code></pre>
+<pre><code class="lang-text">...
+all checks passed</code></pre></li></ol>
 <ol start="3"><li>Run <code>scripts/check.sh</code> again after each change. It proves your copy is valid: every package equals a fresh build of its sources, the shapes conform, the competency questions answer and the tests pass. Do not share a change until it passes. In a Git copy, run <code>git add -A</code> first, because one test reads which generated pages Git tracks. The log shows skipped tests and a line that starts <code>FAIL a store request</code>. Both are expected. Most skipped tests read what this release does not hold, a few depend on your machine, and adding <code>-rs</code> to the script's pytest line prints each reason. That <code>FAIL</code> line comes from <code>skills/rdf-store/scripts/test_rdf_store.py</code>, which makes a write fail on purpose. Any other <code>FAIL</code> line is a real failure, such as a generated page that differs from its source, and the script does not reach its last line. The last line, <code>all checks passed</code>, tells you the result. Do not edit files while the script runs: it compares the tree at its start and end, and a change fails the run. Commit when it passes. To try one test file first, run <code>py -m pytest -q &lt;file&gt;</code>, which takes seconds.</li></ol>
 <h2 id="patch-minor-or-major">Patch, minor or major<a class="hl" href="#patch-minor-or-major" aria-label="Link to this section">#</a></h2>
 <p>Classify every change before you make it, then ask your owner to approve it. <code>skills/ontology/references/release.md</code> holds the full rules; rules 3 and 4 are the ones you use most.</p>
@@ -195,7 +197,14 @@ ONT=business_architecture/ontology</code></pre>
 <h2 id="the-release-steps">The release steps<a class="hl" href="#the-release-steps" aria-label="Link to this section">#</a></h2>
 <p>Every change below ends with these steps. Run them once for the module you changed and once for each module that depends on it.</p>
 <ol><li>List the modules to release, in order. The first line is the one you changed. <code>core</code> is the exception: its list holds only the modules that depend on it, because you release <code>core</code> by hand first ("Change a process"):
-<pre><code class="lang-sh">(cd $ONT/release &amp;&amp; py dependents.py kpi)</code></pre></li></ol>
+<pre><code class="lang-sh">(cd $ONT/release &amp;&amp; py dependents.py kpi)</code></pre>
+<pre><code class="lang-text">kpi
+data-product
+market-data
+logical-model
+technical-graph
+value-stream
+integration</code></pre></li></ol>
 <ol start="2"><li>Save the approval. Create the folder <code>$ONT/approvals/</code> if you have none, and write the sentence that approved the release in a file there, such as <code>$ONT/approvals/2026-11-01-kpi.md</code>. One file can cover all the modules of one change. That file is your decision record unless your team keeps its own.</li><li>For each module in that order, set its version, write its package, and move its old package. <code>next_version.py</code> does the edits; <code>pins</code> has no effect in this release, so leave it. A module that only takes the new version of what it requires gets a patch.
 <pre><code class="lang-sh">cd $ONT/release
 py next_version.py start kpi 1.3.1 patch --why "Reworded Unit Utilization's definition; the meaning is the same." \

@@ -293,6 +293,16 @@ def test_a_fenced_example_cannot_stand_in_for_a_record():
         b.record_meta("x.md", lines + ["| Status | Proposed |"])
 
 
+def test_a_tag_after_the_language_of_a_fence_is_not_shown():
+    lines = ["```bash run=scratch exit=2", "echo hello", "```", "", "```text skip reason=\"illustration: a sketch\"",
+             "a -> b", "```", "after"]
+    out = page().blocks(SRC, lines)
+    assert '<pre><code class="lang-bash">echo hello</code></pre>' in out
+    assert '<pre><code class="lang-text">a -&gt; b</code></pre>' in out
+    assert "run=scratch" not in out and "illustration" not in out and "<p>after</p>" in out
+    assert b.unsupported("x.md", lines) == []
+
+
 def test_a_shell_comment_in_a_fence_is_not_taken_for_the_title():
     lines = ["```sh", "# a comment", "```", "# Title", "text"]
     assert b.drop_title(lines) == ["```sh", "# a comment", "```", "text"]

@@ -29,7 +29,7 @@ The `ontology-to-lpg` skill's `run_projection.py` (version 2.3 of its method) ru
 
 With the skill folder in `$SKILLS`:
 
-```
+```bash skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
 cd "$SKILLS/ontology-to-lpg/scripts"
 uv run --no-project --with rdflib python3 run_projection.py --config <your copy of epm-run.json> --plan
 uv run --no-project --with rdflib python3 run_projection.py --config <your copy of epm-run.json>

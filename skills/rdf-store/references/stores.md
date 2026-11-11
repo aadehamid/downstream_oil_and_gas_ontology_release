@@ -26,7 +26,7 @@ An in-memory dataset starts empty on every restart, which makes "nothing you hav
 
 Spark is the only Databricks path. A Databricks notebook already has a Spark session, `spark`, so the load needs no host name, no warehouse and no credential. There is no command for it, because there is no Spark outside the notebook. The notebook imports `rdfstore.py` and calls it:
 
-```python
+```python skip reason="needs-client-server: needs a Spark session in a Databricks workspace"
 import rdfstore as rs
 dataset = rs.pack(files)                      # one named graph per file
 store = rs.SparkStore(spark, "<catalog>.<schema>.<table>")

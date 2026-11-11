@@ -51,7 +51,7 @@ It leaves out, and lists as `// left out:` comments: relationship counts, `sh:in
 
 n10s and APOC run only where the projection is built: "neosemantics is only available for Neo4j self-hosted (CE and EE)" (https://neo4j.com/labs/neosemantics/, "Availability & Installation"), and a managed or shared server often allows no plugin. So build and verify locally (steps 5 and 6), then copy the verified graph with plain Cypher to a database you name:
 
-```bash
+```bash skip reason="illustration: a usage pattern, where square brackets mark the optional arguments"
 uv run --no-project --with rdflib --with neo4j python3 copy_graph.py \
   --source-env <local.env> [--source-database <name>] \
   --target-env <target.env> [--target-database <name>] \
@@ -80,7 +80,7 @@ Loading a store and proving that nothing was lost (an export of everything the s
 
 `triplestore.py` loads the validated inputs into any SPARQL 1.1 store and checks per-graph and per-predicate counts, and with a projection report the three-way counts. It speaks only W3C protocols: the SPARQL 1.1 Graph Store HTTP Protocol (https://www.w3.org/TR/sparql11-http-rdf-update/) to replace each named graph with `PUT` (`?graph=<IRI>`), and the SPARQL 1.1 Protocol to count. There is no store-specific code.
 
-```bash
+```bash skip reason="illustration: a usage pattern, where square brackets mark the optional arguments"
 uv run --no-project --with rdflib python3 triplestore.py --gsp <graph store URL> --query <SPARQL URL> \
   [--env <store.env>] [--graph-base <IRI>] --inferred inferred.nt \
   [--projection-report projection-report.json] [--cq <question.rq>]... --report triplestore-report.json <data.ttl>...
@@ -107,7 +107,7 @@ Give the file's JSON to the server's tools: `validate_data_model` (it accepted t
 
 One `:ModuleRelease` node per released module, in the local Neo4j and every copy. It says what the graph holds without bringing the catalog into the graph (`multi-store.md`, "What each store holds"). `run_projection.py` runs it in its `release-record` step and again on the copy target; files mode skips it, because plain files have no `catalog.ttl`.
 
-```
+```bash skip reason="awaits-the-rewrite: the reader's own values stand in angle brackets, and no test supplies them yet"
 uv run --no-project --with rdflib python3 release_record.py records --report projection-report.json --manifest run-manifest.json --output release-records.json <package.ttl>...
 NEO4J_PASSWORD=... uv run --no-project --with rdflib --with neo4j python3 release_record.py write --records release-records.json --uri bolt://127.0.0.1:<port>
 NEO4J_PASSWORD=... uv run --no-project --with rdflib --with neo4j python3 release_record.py check --records release-records.json --uri bolt://127.0.0.1:<port>
@@ -134,7 +134,7 @@ To read them: `MATCH (r:ModuleRelease)-[:DESCRIBES]->(o) RETURN r.module, r.vers
 
 `model_review.py` checks a loaded graph (after step 6, or on the copy of add-on I) against the anti-patterns of Neo4j's `neo4j-modeling-skill` 1.0.7 that a projection keeps, with that skill's severities (ERROR a correctness failure, WARNING a performance or extensibility risk, INFO a style point):
 
-```bash
+```bash skip reason="illustration: a usage pattern, where square brackets mark the optional arguments"
 NEO4J_PASSWORD="$PASSWORD" uv run --no-project --with rdflib --with neo4j python3 model_review.py \
   --uri "bolt://127.0.0.1:$PORT" [--report model-review.json] [--separator _]
 uv run --no-project --with rdflib --with neo4j python3 model_review.py --env <target.env> [--report ...] [--separator _]

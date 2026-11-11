@@ -64,7 +64,7 @@ The module builder writes each `catalog.ttl` from the release's own version and 
 Each process is a `skos:Concept` with a notation, a definition and a parent (`skos:broader`). An approved relationship between two processes appears twice: as a direct triple, and as a canonical-fact node that carries its evidence row.
 
 <!-- module: core -->
-```turtle
+```turtle parse
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix proc: <https://w3id.org/mpc/ontology/process/> .
 @prefix core: <https://w3id.org/mpc/ontology/modules/core/> .
@@ -87,7 +87,7 @@ fact:CM-1-3-7-1-1--informedBy--CM-1-3-7-4-6 a core:CanonicalFact ;
 The module holds roles (positions, never people), RACI assignments as nodes of their own, and the definition of a control relationship between legal entities. It links to core through `forProcess`: each assignment names the process it is for.
 
 <!-- module: organization -->
-```turtle
+```turtle parse
 @prefix org: <http://www.w3.org/ns/org#> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix proc: <https://w3id.org/mpc/ontology/process/> .
@@ -110,7 +110,7 @@ asg:CM-1-1-2-1--accountable--it-data-owner--e842d6dc a orgm:ResponsibilityAssign
 This is the only company-specific module. It uses the terms of `organization` and `party` and defines none of its own. Keeping MPC's facts here leaves every other module company-neutral (the decision of 2026-10-05).
 
 <!-- module: ref-mpc -->
-```turtle
+```turtle parse
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix orgm: <https://w3id.org/mpc/ontology/modules/organization/> .
 @prefix refmpc: <https://w3id.org/mpc/ontology/modules/ref-mpc/> .
@@ -126,7 +126,7 @@ refmpc:mpc-controls-mplx a orgm:ControlRelationship ;
 The module holds the decision owner's conceptual model of the customer, the customer systems with their data flows and attributes, and the customer lifecycle (the decisions of 2026-10-21 to 2026-10-21). The lifecycle has a business view and a system view. A business stage links to core through `stageProcess`, and to the system stages it matches through `correspondsTo`.
 
 <!-- module: party -->
-```turtle
+```turtle parse
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix proc: <https://w3id.org/mpc/ontology/process/> .
 @prefix party: <https://w3id.org/mpc/ontology/modules/party/> .
@@ -149,7 +149,7 @@ prole:payer a skos:Concept ;
 Each measure is a definition, never a value, classified by its kind (the decision of 2026-10-18). It links to core through `informsProcess`.
 
 <!-- module: kpi -->
-```turtle
+```turtle parse
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix proc: <https://w3id.org/mpc/ontology/process/> .
 @prefix kpi: <https://w3id.org/mpc/ontology/modules/kpi/> .
@@ -167,7 +167,7 @@ measure:crack-spreads
 Each series is a recipe: the benchmark legs it is built from and its region. The module holds no prices; its shapes reject them. It links to `kpi`: each series names the measure it publishes through `seriesOf`.
 
 <!-- module: market-data -->
-```turtle
+```turtle parse
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix mkt: <https://w3id.org/mpc/ontology/modules/market-data/> .
 @prefix series: <https://w3id.org/mpc/ontology/modules/market-data/series/> .
@@ -188,7 +188,7 @@ series:crack-gulf-coast-3-2-1
 The portfolio runs from segments to product lines to data products. A data product links to core directly in a few places, through `producedBy` and `consumedBy`, and a segment through `anchoredIn`. Most of the portfolio's links to processes run through value-stream steps (next section).
 
 <!-- module: data-product -->
-```turtle
+```turtle parse
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix proc: <https://w3id.org/mpc/ontology/process/> .
 @prefix dp: <https://w3id.org/mpc/ontology/modules/data-product/> .
@@ -206,7 +206,7 @@ product:customer-master
 The two value streams are an overlay on the process map. A step `realizes` core processes. A capability aligns to a core process group. A step also `produces` and `consumes` data products, and links to the measures it moves through a measure link that names the relationship.
 
 <!-- module: value-stream -->
-```turtle
+```turtle parse
 @prefix proc: <https://w3id.org/mpc/ontology/process/> .
 @prefix vs: <https://w3id.org/mpc/ontology/modules/value-stream/> .
 @prefix vsprocess: <https://w3id.org/mpc/ontology/modules/value-stream/process/> .
@@ -237,7 +237,7 @@ mlink:market-price-calculation-validation--crack-spreads a vs:MeasureLink ;
 The module holds the applications, office tools and working documents the process map names. It links to core through `supports`, taken from the process map's "systems" fields. The `party` module's customer systems join it through `skos:exactMatch` where they are the same system.
 
 <!-- module: system -->
-```turtle
+```turtle parse
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix proc: <https://w3id.org/mpc/ontology/process/> .
 @prefix sys: <https://w3id.org/mpc/ontology/modules/system/> .
@@ -255,7 +255,7 @@ system:rightangle
 The four office lanes are a code list. The module places only the processes the process map places, with at most one lane each, and a child does not inherit its parent's lane (the decision of 2026-10-19). Here the process is the subject: `officeLane` points from core to the lane.
 
 <!-- module: lane -->
-```turtle
+```turtle parse
 @prefix proc: <https://w3id.org/mpc/ontology/process/> .
 @prefix lane: <https://w3id.org/mpc/ontology/modules/lane/> .
 @prefix lanev: <https://w3id.org/mpc/ontology/modules/lane/lane/> .
@@ -271,7 +271,7 @@ proc:CM-1-2-4 lane:officeLane lanev:back-office .
 The module defines the kinds of thing a technical graph records about a data platform as built: hosts, source databases, tables, views, metric views, pipeline steps, quality checks and agents. *2026-11-11:* 1.1.0 adds the jobs and pipelines that build a data object (`tg:builtBy`) and the data object on an earlier platform that a data object replaces (`tg:replaces`). It holds definitions only; the graph's nodes, row counts and check results stay in the technical graph (the decision of 2026-11-02). Its links reach three modules by IRI: a metric view `implements` a `kpi` measure, a source database `standsFor` a `system` system, and a built thing is `designedAs` its design in `data-product`, with its `layer` from data-product's layer code list. Here the definitions state the first two links.
 
 <!-- module: technical-graph -->
-```turtle
+```turtle parse
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix tg: <https://w3id.org/mpc/ontology/modules/technical-graph/> .
 @prefix kpi: <https://w3id.org/mpc/ontology/modules/kpi/> .
@@ -289,7 +289,7 @@ tg:standsFor rdfs:domain tg:SourceDatabase ;
 
 This quote is from the layer of the made-up example model, `logical-model/example/example-logical-model.layer.ttl`, which `scripts/check.sh` verifies; it is not a release.
 
-```text
+```text skip reason="illustration: triples with a quoted triple, which the Turtle parser here does not read"
 @prefix lm: <https://w3id.org/mpc/ontology/modules/logical-model/> .
 @prefix party: <https://w3id.org/mpc/ontology/modules/party/> .
 @prefix system: <https://w3id.org/mpc/ontology/modules/system/system/> .
@@ -311,7 +311,7 @@ er:example_core_Example_Account_Dim lm:describes party:CustomerAccount ;
 - **consumer** sets how a catalog binds a measure to the data product that publishes it, and what an agent may answer from the graph and must refuse (the decision of 2026-10-19).
 
 <!-- module: integration -->
-```turtle
+```turtle parse
 @prefix plc: <https://w3id.org/mpc/ontology/modules/placement/> .
 @prefix pkind: <https://w3id.org/mpc/ontology/modules/placement/kind/> .
 @prefix auth: <https://w3id.org/mpc/ontology/modules/authority/> .
@@ -338,7 +338,7 @@ src:cme-trading-crack-spreads-2024 auth:evidenceTier tier:industry .
 
 This walk starts at a market-data series and ends at a core process, crossing five modules. Each arrow is a link quoted above.
 
-```text
+```text skip reason="illustration: a sketch in text, not a command or a file"
 Gulf Coast 3-2-1 crack spread (market-data)
   ─seriesOf→ Crack Spreads Pricing (kpi) ─informsProcess→ CM 1.1.4.7.4 (core)
        ↑ measure link, relationship "benchmarks"

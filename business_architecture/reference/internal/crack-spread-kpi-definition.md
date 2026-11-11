@@ -53,7 +53,7 @@ Two treatments of RVO (Renewable Volume Obligation) are defined. **With RVO in t
 
 **A. 3-2-1 Ex-RVO (excluding RVO), closer to net margin**
 
-```text
+```text skip reason="illustration: a formula in text, not a command or a file"
 3-2-1 Ex-RVO, $/bbl
   = ((CBOB × 42 × 2) + (ULSD × 42 × 1)) / 3 − Crude − (RVO × 42)
 
@@ -64,7 +64,7 @@ Equivalent form (same result):
 
 **B. 3-2-1 Inc-RVO (including RVO), closer to gross margin**
 
-```text
+```text skip reason="illustration: a formula in text, not a command or a file"
 3-2-1 Inc-RVO, $/bbl
   = ((CBOB × 42 × 2) + (ULSD × 42 × 1)) / 3 − Crude
 ```
@@ -121,7 +121,7 @@ Available in the metric view as Price Master IDs 39998 (NYMEX 3-2-1 Crack), 4493
 
 Approximates a realized MPC 3-2-1 from three regional 3-2-1s only: USGC, Chicago, and LA.
 
-```text
+```text skip reason="illustration: a formula in text, not a command or a file"
 Before 5 May 2024:  (USGC × 0.40) + (Chicago × 0.40) + (LA × 0.20)
 After  5 May 2024:  (USGC × 0.42) + (Chicago × 0.40) + (LA × 0.18)
 ```

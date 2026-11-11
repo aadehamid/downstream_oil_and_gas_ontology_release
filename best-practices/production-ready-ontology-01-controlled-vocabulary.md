@@ -270,7 +270,7 @@ Unbilled catalog about-ID stays `https://example.org/domain-ontology-kpi/o2c#Unb
 | `cv_term` | preferred label or `term_id` | `label` | `Payer`, `id:payer` |
 | `cv_map` | `local_key` where `term_id` is not null | `map_key` | `APEX-PAYER`, `CONS-4412` |
 
-```sql
+```sql parse
 SELECT DISTINCT
   t.term_id,
   t.preferred_label,
@@ -321,7 +321,7 @@ Do not attach `cv_*` to the certified agent. Do not attach Metric Views to the s
 
 **Paste-ready checks** (`workspace.o2c_unbilled`):
 
-```sql
+```sql parse
 SELECT term_id, preferred_label, ontology_iri
 FROM workspace.o2c_unbilled.cv_term
 ORDER BY term_id;

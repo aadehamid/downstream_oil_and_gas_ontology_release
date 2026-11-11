@@ -147,8 +147,12 @@ These rules were locked by explicit review decisions and govern all content, pre
 
 The complete mapping of **every registered external source → the process areas and rows it informs**, with each source's permitted-use limits, is generated from the workbook itself so it can never drift:
 
-```
+```sh run=release-copy
 uv run --with openpyxl python business_architecture/ontology/build/scripts/step3c-source-traceability.py
+```
+
+```text expect
+wrote <the appendix file>: 48 cited sources, 2 uncited, 1 unknown citations
 ```
 
 Output: [`build/output/source-to-process-traceability.md`](build/output/source-to-process-traceability.md). Regenerate after every batch and at completion. As of 2026-09-21 it maps 46 cited sources across 462 citing rows (4 registered sources currently uncited from workbook rows, retained as earlier-step evidence; zero citations without a register entry).

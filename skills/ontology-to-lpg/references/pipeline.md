@@ -2,7 +2,7 @@
 
 Serves the pipeline steps. Read it before writing or changing the projection's code. The five steps work from ten triples to hundreds of millions; only the loader changes with scale (`running.md`, rule 6). The tool versions named here are the ones tested: Neo4j 2025.06.2 (Community edition), n10s (neosemantics) 2025.06.1 with APOC, ROBOT 1.9.10. Every script named here is in this skill's `scripts/`; run each with `uv run --no-project --with rdflib python3 <script>` (add `--with pyshacl` for `validate_data.py`, `--with neo4j` for `load_verify.py`). `load_verify.py` runs the load and verify sections below (SKILL.md steps 5 and 6) against the local Neo4j end to end and writes the report; the rules below say what it does, so a project can also write its own.
 
-```
+```text skip reason="illustration: a sketch in text, not a command or a file"
  module.ttl ──┐
  shapes.ttl ──┤  check  ─▶  reason  ─▶  serialise  ─▶  load  ─▶  verify      (SKILL.md steps 3 to 6)
  config ──────┘  (rules,    (ELK,       (sorted N-Triples;  (n10s,    (SHACL in the graph,
@@ -35,7 +35,7 @@ The checks of these rules, numbered V1 to V12 in the order they run, are mapped 
 
 4. **Reason once, upstream, with ELK through ROBOT, over the merged released data:**
 
-   ```bash
+   ```bash skip reason="awaits-the-rewrite: the reader's own values stand in angle brackets, and no test supplies them yet"
    uv run --no-project --with rdflib python3 build.py merge --output merged.ttl <every released data file>
    java -jar robot.jar reason --reasoner ELK --input merged.ttl \
      --axiom-generators "SubClass ClassAssertion" --include-indirect true --output reasoned.ttl
@@ -53,12 +53,12 @@ The checks of these rules, numbered V1 to V12 in the order they run, are mapped 
 
 7. **Rule 4b only: flatten each reifier into a plain `EdgeRecord` node with SPARQL 1.2** (Jena 6.1.0+ or RDF4J 6.0.0+), then union, sort and de-duplicate. n10s cannot load triple terms, and RDF 1.1 N-Triples cannot write them. Check first that triple terms appear only as objects of `rdf:reifies`, so `keep.rq` drops nothing else.
 
-   ```sparql
+   ```sparql skip reason="illustration: SPARQL 1.2 with isTRIPLE, which the parser here does not read"
    # keep.rq: every triple whose object is not a triple term
    CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o FILTER(!isTRIPLE(?o)) }
    ```
 
-   ```sparql
+   ```sparql skip reason="illustration: SPARQL 1.2 with SUBJECT, which the parser here does not read"
    # edges.rq: one EdgeRecord per reifier
    PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
    PREFIX lpg: <https://id.example.org/lpg-mapping#>
@@ -80,7 +80,7 @@ Set up the local Neo4j first, as `running.md`, rule 5 says.
 
 9. **Configure n10s with SHORTEN, not MAP**, and add the configuration's prefixes in its order:
 
-   ```cypher
+   ```cypher parse
    CREATE CONSTRAINT n10s_unique_uri IF NOT EXISTS FOR (r:Resource) REQUIRE r.uri IS UNIQUE;
    CALL n10s.graphconfig.init({
      handleVocabUris: 'SHORTEN', handleRDFTypes: 'LABELS_AND_NODES',
@@ -93,7 +93,7 @@ Set up the local Neo4j first, as `running.md`, rule 5 says.
 
 10. **Generate the multivalued list by one rule, and sort arrays only on `:Resource` nodes.** A predicate is literal-valued when any of its objects in the data is a literal. It goes in `multivalPropList` unless a property shape that an applied shape uses (any target kind, as `design-rules.md`, rule 2 defines it) gives its path `sh:maxCount 1`; it goes in anyway when one subject holds more than one literal value for it. So a standard predicate with no shape of its own (`rdfs:label`, `skos:prefLabel`, `dcterms:title`, `owl:versionInfo`) loads as an array, even with one value; give it a shape with `sh:maxCount 1` if consumers need a single value. After the load, sort each listed key, by its SHORTEN name, on resource nodes only:
 
-    ```cypher
+    ```cypher parse
     MATCH (n:Resource) WHERE n.`lib_altTitle` IS NOT NULL SET n.`lib_altTitle` = apoc.coll.sort(n.`lib_altTitle`);
     ```
 
@@ -110,7 +110,7 @@ Set up the local Neo4j first, as `running.md`, rule 5 says.
 
 12. **Rule 4b only: after the load, turn each `EdgeRecord` into a relationship with properties**, generated once per reified predicate with the predicate's SHORTEN name, then delete plain edges that duplicate a reified one:
 
-    ```cypher
+    ```cypher parse
     MATCH (r:lpg_EdgeRecord)-[:lpg_edgeSource]->(s), (r)-[:lpg_edgeTarget]->(t),
           (r)-[:lpg_edgePredicate]->(p {uri: 'https://id.example.org/library/createdBy'})
     WITH r, s, t ORDER BY r.uri
@@ -169,7 +169,7 @@ Set up the local Neo4j first, as `running.md`, rule 5 says.
 
 15. **Run SHACL in the graph and require zero violations; then prove the check can fail.** Commit a deliberate mutant: remove one literal value a loaded `sh:minCount` shape requires, validate, require at least one violation on that node, restore the value, and require zero violations again. `load_verify.py` does it on the first compiled `sh:minCount` of at least 1 on a literal value that some node holds: it walks the candidates in order (`mutant_targets`) and fails the run only when no node holds any of them:
 
-    ```cypher
+    ```cypher parse
     MATCH (n:`lib_Authorship`) WHERE n.`lib_position` IS NOT NULL WITH n ORDER BY n.uri LIMIT 1
     RETURN n.uri AS uri, n.`lib_position` AS value;                       // keep both
     MATCH (n:Resource {uri: $uri}) REMOVE n.`lib_position`;                 // the mutant
@@ -181,7 +181,7 @@ Set up the local Neo4j first, as `running.md`, rule 5 says.
 
 16. **Export the resources and diff against `loadable.nt` plus `inferred.nt`: zero triples lost, zero added.** Export with:
 
-    ```cypher
+    ```cypher parse
     CALL n10s.rdf.export.cypher('MATCH (n:Resource) OPTIONAL MATCH (n)-[r]->(m) RETURN n, r, m')
     YIELD subject, predicate, object, isLiteral, literalType, literalLang
     RETURN subject, predicate, object, isLiteral, literalType, literalLang
@@ -198,7 +198,7 @@ Set up the local Neo4j first, as `running.md`, rule 5 says.
 
 17. **Load twice into an empty database, the second time with the lines of `loadable.nt` shuffled (a fixed seed), and compare graph hashes.** `load_verify.py` shuffles the lines of `loadable.nt` in memory with `random.Random(12).shuffle`, cuts them into batches afresh and sends those; the file itself never changes. On Community edition, which has one user database, empty it between loads:
 
-    ```cypher
+    ```cypher parse
     MATCH (n) DETACH DELETE n;      // the data, the schema nodes and n10s's _GraphConfig, _NsPrefDef and _n10sValidatorConfig nodes
     SHOW CONSTRAINTS YIELD name;    // then DROP CONSTRAINT `<name>` for each one listed
     ```

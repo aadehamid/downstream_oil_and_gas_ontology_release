@@ -38,8 +38,13 @@ Logins go in `~/.config/databricks/epm.env`, `~/.config/neo4j/aura.env` and the 
 
 ## Run the checks
 
-```sh
+```sh run=slow
 bash scripts/check.sh
+```
+
+```text expect
+...
+all checks passed
 ```
 
 It verifies that every released package equals a fresh build from its sources, runs the competency-question regression, the test files and the page check. It passes from a Git clone and from a plain folder. `bash scripts/check-pinned.sh` is separate and optional: it asks whether your copy still equals this release as shipped, and after your first change its failures mean only that your copy has moved on. Both scripts' headers say more.

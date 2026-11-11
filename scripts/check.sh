@@ -132,6 +132,7 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   kpi_store/tests/test_questions_integration.py \
   scripts/test_check_script.py \
   scripts/test_check_standalone.py \
+  scripts/test_doc_snippets.py \
   scripts/test_docs_html.py \
   scripts/test_epm_facts.py \
   scripts/test_modules_guide.py \
@@ -149,6 +150,9 @@ run with_deps python scripts/epm_facts.py modules >/dev/null
 run with_deps python scripts/epm_facts.py coverage >/dev/null
 # The generated pages must equal a fresh build of their Markdown.
 run with_deps python scripts/build_docs_html.py --check
+# Every code block in the Markdown documents is run, compared, parsed or skipped for a stated reason, and the last
+# line counts them. scripts/DOC-SNIPPETS.md explains the tags. The cut adds --strict --all-contexts.
+run with_deps python scripts/doc_snippets.py check
 # The tree refers to nothing outside itself. scripts/standalone-pending.txt lists the paths not yet clean.
 run python3 scripts/check_standalone.py
 

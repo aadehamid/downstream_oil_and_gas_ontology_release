@@ -414,6 +414,14 @@ class Renderer(unittest.TestCase):
         self.assertIn("<ul><li>a nested point</li></ul>", out)
         self.assertIn("<li>Next.</li></ol>", out)
 
+    def test_a_tag_after_the_language_of_a_fence_is_not_shown(self):
+        lines = ["```sh run=scratch exit=2", "run it", "```", "", "after"]
+        out = self.page().blocks(self.src("pipeline.md"), lines)
+        self.assertIn('<pre><code class="lang-sh">run it</code></pre>', out)
+        self.assertNotIn("run=scratch", out)
+        self.assertIn("<p>after</p>", out)
+        self.assertEqual(b.unsupported(lines), [])
+
     def test_an_ordered_list_keeps_its_start(self):
         self.assertIn('<ol start="5">', self.page().blocks(self.src("pipeline.md"), ["5. Five.", "6. Six."]))
 

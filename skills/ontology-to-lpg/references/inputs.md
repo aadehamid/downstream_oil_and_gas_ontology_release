@@ -29,7 +29,7 @@ Data files and shape files are not in the configuration: pass them to each scrip
 
 5. **List each rule gap in a released module as a release exception, with its fix, and fail on an unlisted gap or on a listed gap that no longer occurs.** A gap in a released module (a property with no range, a property with no cardinality shape) can close only in that module's next release, because released packages never change. Only a Rule 1, Rule 2 or Rule 5 failure can be listed. Key each exception by the checker's exact message (a term may be written as a CURIE, as the checker prints it, or as a full IRI, bare or in angle brackets), and say in its fix which release closes it and what that release adds:
 
-   ```json
+   ```json skip reason="illustration: one key of a JSON file, not a whole file"
    "release_exceptions": {
      "Rule 1: lib:shelfmark has no single concrete range":
        "lending 1.0.0 declares no rdfs:range; the next lending release adds rdfs:range xsd:string"

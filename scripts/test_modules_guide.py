@@ -19,7 +19,7 @@ sys.path.insert(0, HERE)
 import epm_facts  # noqa: E402
 
 GUIDE = os.path.join(epm_facts.ROOT, "business_architecture", "ontology", "MODULES.md")
-BLOCK = re.compile(r"<!-- module: ([\w-]+) -->\n```turtle\n(.*?)```", re.S)
+BLOCK = re.compile(r"<!-- module: ([\w-]+) -->\n```turtle[^\n]*\n(.*?)```", re.S)
 
 
 def quoted_blocks(text):

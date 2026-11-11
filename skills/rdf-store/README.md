@@ -11,7 +11,7 @@ This README is for people. Agents read `SKILL.md` and the files it points to.
 1. Start Fuseki. Download `jena-fuseki-server-6.2.0.jar`, check its SHA-256 (`references/stores.md` gives the value and the command), and run `java -jar jena-fuseki-server-6.2.0.jar --mem --update --localhost --port 3030 /ds`.
 2. Round-trip your releases:
 
-   ```sh
+   ```sh skip reason="awaits-the-rewrite: the reader's own values stand in angle brackets, and no test supplies them yet"
    uv run --no-project --with pyoxigraph python3 scripts/rdfstore.py roundtrip --store fuseki \
      --gsp http://127.0.0.1:3030/ds/data --query http://127.0.0.1:3030/ds/query \
      --update http://127.0.0.1:3030/ds/update --report report.json <release>.ttl ...
