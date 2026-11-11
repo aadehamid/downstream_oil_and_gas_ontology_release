@@ -1,0 +1,17 @@
+version: 1.1
+source: idp_sbx.silver_udm_core.mpr_price_detail_fact
+joins:
+  - name: master
+    source: idp_sbx.silver_mdm_core.mpr_price_master_dim
+    on: source.Sample_Master_ID = master.Sample_Master_ID
+filter: source.Sample_Master_ID IN (901, 902, 903) AND source.Sample_Effective_Date >= DATE_SUB(CURRENT_DATE(), 30)
+dimensions:
+  - name: Sample_Label
+    expr: CASE WHEN source.Sample_Master_ID = 901 THEN 'SAMPLE MARKER A' ELSE 'SAMPLE MARKER B' END
+  - name: Settle_Price_Amount
+    expr: source.Settle_Price_Amount
+measures:
+  - name: Avg_Sample_Price
+    expr: AVG(source.Settle_Price_Amount)
+  - name: Row_Count
+    expr: COUNT(1)

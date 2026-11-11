@@ -1,0 +1,50 @@
+{
+  "version": 2,
+  "config": {"sample_questions": [{"id": "q1", "question": ["What is the sample price today?"]}]},
+  "data_sources": {
+    "tables": [
+      {"identifier": "idp_sbx.semantic_sem_commercial.mips_mpr_executive_summary_fact_vw",
+       "column_configs": [{"column_name": "Sample_Sheet_Name"}, {"column_name": "Sample_Display_Name"}]},
+      {"identifier": "idp_sbx.semantic_sem_commercial.mips_mpr_benchmark_prices_fact_vw",
+       "column_configs": [{"column_name": "Sample_Label"}]}
+    ]
+  },
+  "instructions": {
+    "text_instructions": [{"id": "t1", "content": ["Answer in dollars per barrel.\n", "Use the newest price date."]}],
+    "example_question_sqls": [
+      {"id": "e1", "question": ["Show the sample crude prices"],
+       "sql": ["SELECT Sample_Display_Name, MEASURE(Assessment_Amount)\n",
+               "FROM idp_sbx.semantic_sem_commercial.mips_mpr_executive_summary_fact_vw\n", "GROUP BY ALL"]}
+    ],
+    "sql_snippets": {
+      "filters": [
+        {"id": "f01", "display_name": "Crack spread KPI filter",
+         "sql": ["mips_mpr_executive_summary_fact_vw.Sample_Sheet_Name = 'Sample Sheet Cracks'"]},
+        {"id": "f02", "display_name": "Gasoline basis KPI filter",
+         "sql": ["mips_mpr_executive_summary_fact_vw.Sample_Sheet_Name = 'Sample Sheet Gasoline Basis'"]},
+        {"id": "f03", "display_name": "Gasoline cash KPI filter",
+         "sql": ["mips_mpr_executive_summary_fact_vw.Sample_Sheet_Name = 'Sample Sheet Gasoline Cash'"]},
+        {"id": "f04", "display_name": "Distillate basis KPI filter",
+         "sql": ["mips_mpr_executive_summary_fact_vw.Sample_Sheet_Name = 'Sample Sheet Distillate Basis'"]},
+        {"id": "f05", "display_name": "Distillate cash KPI filter",
+         "sql": ["mips_mpr_executive_summary_fact_vw.Sample_Sheet_Name = 'Sample Sheet Distillate Cash'"]},
+        {"id": "f06", "display_name": "Crude KPI filter",
+         "sql": ["Sample_Sheet_Name IN ('Sample Sheet One', 'Sample Sheet Two')\n",
+                 "AND TRIM(Sample_Display_Name) IN ('Sample Item A', 'Sample Item B')"]},
+        {"id": "f07", "display_name": "Renewable KPI filter",
+         "sql": ["mips_mpr_executive_summary_fact_vw.Sample_Sheet_Name = 'Sample Sheet Renewables'"]},
+        {"id": "f08", "display_name": "NGL KPI filter",
+         "sql": ["mips_mpr_executive_summary_fact_vw.Sample_Sheet_Name = 'Sample Sheet NGL'"]},
+        {"id": "f09", "display_name": "Default sample group",
+         "sql": ["mips_mpr_executive_summary_fact_vw.Sample_Sheet_Name LIKE 'Sample%Cash'"]},
+        {"id": "f10", "display_name": "Exclude rows with no value",
+         "sql": ["mips_mpr_executive_summary_fact_vw.Assessment_Amount IS NOT NULL"]}
+      ],
+      "expressions": [
+        {"id": "x01", "alias": "price_change_pct", "display_name": "Price change percent",
+         "sql": ["MEASURE(Change_Value_Amount) / NULLIF(MEASURE(Previous_Amount), 0)"]}
+      ]
+    }
+  },
+  "benchmarks": {"questions": [{"id": "b1", "question": ["What was the sample price yesterday?"]}]}
+}
