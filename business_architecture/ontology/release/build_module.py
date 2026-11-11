@@ -289,7 +289,6 @@ MODULES = {
 # Every newest package names only the newest versions (the decision of 2026-10-31, "All links go through the latest
 # release"): a module is built against the current version of each module it requires, and against core's newest
 # package on disk.
-ROOT = os.path.normpath(os.path.join(ONTOLOGY, "..", ".."))
 
 
 def recorded_where(path):

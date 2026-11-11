@@ -70,7 +70,7 @@ def test_a_finding_names_its_line():
 
 def test_the_allowed_owners_are_public_projects_the_tree_cites():
     assert {"apache", "neo4j", "neo4j-labs", "rdflib", "ontodev"} <= cs.GITHUB_OWNERS
-    assert "aadehamid" not in cs.GITHUB_OWNERS
+    assert "some-owner" not in cs.GITHUB_OWNERS
     assert all(owner == owner.lower() for owner in cs.GITHUB_OWNERS)
 
 
