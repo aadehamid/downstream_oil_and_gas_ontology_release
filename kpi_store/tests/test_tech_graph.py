@@ -7,6 +7,7 @@ The ontology the graph is built against is the one KPI Store 1.1 shipped with: d
 (shipped_root). A released package never changes, and a cut moves a superseded one to releases/previous, so these
 figures hold on any later tree too, whatever correction versions it has gained.
 """
+import hashlib
 import json
 import random
 import shutil
@@ -49,13 +50,26 @@ EXTRAS = (
 
 RELEASES = support.ROOT / "business_architecture" / "ontology" / "releases"
 SHIPPED = (("data-product", "1.2.0"), ("kpi", "1.3.0"))   # the two packages the ontology view reads, as shipped
+# The SHA-256 of each package's content file as KPI Store 1.1 shipped it, copied by hand from the "files" entry of
+# the package's own manifest.json. A released package never changes, so a file that differs is not the baseline
+# these tests' figures were counted from, and the tests stop instead of counting from something else.
+SHIPPED_SHA256 = {
+    ("data-product", "1.2.0"): "247695590ba8241c383fe2f4ccf2be0272c20c0d7c850bd91087d31d9e430a93",
+    ("kpi", "1.3.0"): "484142c656332db4616f5e56c100c83d28e7a10b617bdc2c3f3813db62dc25f7",
+}
 
 
-def shipped_package(module, version):
+def shipped_package(module, version, releases=None):
     """The folder of a package as it was released: among the newest packages, or under releases/previous once a
-    newer version exists. Its files are the same in both places."""
-    for folder in (RELEASES / module / version, RELEASES / "previous" / module / version):
-        if (folder / f"{module}.ttl").is_file():
+    newer version exists. Its content file must have the checksum the release shipped with."""
+    releases = releases or RELEASES
+    for folder in (releases / module / version, releases / "previous" / module / version):
+        content = folder / f"{module}.ttl"
+        if content.is_file():
+            found = hashlib.sha256(content.read_bytes()).hexdigest()
+            assert found == SHIPPED_SHA256[module, version], (
+                f"{content} is not {module} {version} as it was released: its SHA-256 is {found}, not "
+                f"{SHIPPED_SHA256[module, version]}. A released package never changes; restore the file")
             return folder
     raise AssertionError(f"the tree no longer holds {module} {version}")
 
@@ -71,8 +85,22 @@ def shipped_root(tmp_path_factory):
 
 def test_the_shipped_root_holds_the_shipped_versions_whatever_the_tree_has_gained(shipped_root):
     assert ov.read(shipped_root).versions == {"data-product": "1.2.0", "kpi": "1.3.0"}
-    with pytest.raises(AssertionError, match="no longer holds data-product 9.9.9"):
+    with pytest.raises(AssertionError, match="the tree no longer holds data-product 9.9.9"):
         shipped_package("data-product", "9.9.9")
+
+
+def test_a_shipped_package_is_found_after_a_cut_moved_it_and_refused_when_its_file_was_edited(tmp_path):
+    for module, version in SHIPPED:
+        assert shipped_package(module, version).name == version   # the real files have the pinned checksums
+    moved = tmp_path / "previous" / "kpi" / "1.3.0"   # where a cut puts a superseded package
+    shutil.copytree(shipped_package("kpi", "1.3.0"), moved)
+    assert shipped_package("kpi", "1.3.0", tmp_path) == moved
+    with (moved / "kpi.ttl").open("a", encoding="utf-8") as f:
+        f.write("# one edit\n")
+    with pytest.raises(AssertionError, match="is not kpi 1.3.0 as it was released: its SHA-256 is .* A released package never changes"):
+        shipped_package("kpi", "1.3.0", tmp_path)
+    with pytest.raises(AssertionError, match="the tree no longer holds data-product 1.2.0"):
+        shipped_package("data-product", "1.2.0", tmp_path / "empty")
 
 
 @pytest.fixture(scope="module")

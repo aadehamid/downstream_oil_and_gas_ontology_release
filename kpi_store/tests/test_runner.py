@@ -669,9 +669,14 @@ def test_the_last_line_says_every_step_passed_only_when_none_was_left_out():
 def test_a_skipped_check_is_named_in_the_last_line_and_the_summary(setup):
     code = runner.main(["--stores", str(setup.local.path), "--release", str(setup.root), "--skip", "check", "--only", "check,summary",
                         "--run-id", RUN], out=setup.lines.append)
-    assert code == 0 and "  check       left out of this run" in setup.lines
-    assert setup.lines[-1].startswith("the steps that ran passed; left out: cut, check, zip, ") and "every step passed" not in setup.lines
-    assert json.loads((setup.run_dir / "summary.json").read_text(encoding="utf-8"))["left_out"] == [n for n in runner.STEPS if n != "summary"]
+    # Only the summary ran: every other step is named, in the chain's order, on the screen and in summary.json.
+    assert code == 0 and setup.lines[-1] == ("the steps that ran passed; left out: cut, check, zip, volume, upload, notebook, report, fuseki, neo4j, enterprise, sync (not run, so not checked)")
+    assert [line for line in setup.lines if line.endswith("left out of this run")] == [
+        f"  {name:<11} left out of this run" for name in ("cut", "check", "zip", "volume", "upload", "notebook", "report", "fuseki",
+                                                           "neo4j", "enterprise", "sync")]
+    assert "every step passed" not in setup.lines
+    assert json.loads((setup.run_dir / "summary.json").read_text(encoding="utf-8"))["left_out"] == [
+        "cut", "check", "zip", "volume", "upload", "notebook", "report", "fuseki", "neo4j", "enterprise", "sync"]
 
 
 def test_a_run_narrowed_by_only_or_from_never_says_every_step_passed(setup):
@@ -680,11 +685,18 @@ def test_a_run_narrowed_by_only_or_from_never_says_every_step_passed(setup):
     assert runner.main([*args, "--only", "zip,volume"], **options) == 0
     assert setup.lines[-1] == ("the steps that ran passed; left out: cut, check, upload, notebook, report, fuseki, neo4j, enterprise, "
                                "sync, summary (not run, so not checked)")
+    first = len(setup.lines)
     assert runner.main([*args, "--from", "summary"], **options) == 0
-    assert setup.lines[-1].startswith("the steps that ran passed; left out: cut, check, zip, volume, upload, ")
-    # The summary names a step this command left out, and what an earlier command of the same run recorded for it.
-    assert "  zip         left out of this run (recorded earlier: built)" in setup.lines
-    assert "  cut         left out of this run" in setup.lines
+    assert setup.lines[-1] == "the steps that ran passed; left out: cut, check, zip, volume, upload, notebook, report, fuseki, neo4j, enterprise, sync (not run, so not checked)"
+    # The summary names each step this command left out, and what an earlier command of the same run recorded for it.
+    assert setup.lines[first + 1:-2] == [
+        f"summary of run {RUN}:", "  cut         left out of this run", "  check       left out of this run",
+        "  zip         left out of this run (recorded earlier: built)", "  volume      left out of this run (recorded earlier: ready)",
+        "  upload      left out of this run", "  notebook    left out of this run", "  report      left out of this run",
+        "  fuseki      left out of this run", "  neo4j       left out of this run", "  enterprise  left out of this run",
+        "  sync        left out of this run"]
+    assert json.loads((setup.run_dir / "summary.json").read_text(encoding="utf-8"))["left_out"] == [
+        "cut", "check", "zip", "volume", "upload", "notebook", "report", "fuseki", "neo4j", "enterprise", "sync"]
     assert "every step passed" not in setup.lines
 
 
