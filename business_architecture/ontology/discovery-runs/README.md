@@ -19,7 +19,7 @@ The order is 1.2.0, 1.2.1-correction.1, 1.2.1-correction.2, 1.2.2. One function 
 
 Run the tool from the release's top folder. It needs Python 3.11 or later with `rdflib` and `pyshacl`. It needs no Java, no bash and no Git.
 
-```
+```powershell skip reason="awaits-the-rewrite: the step-by-step guides will run the cut in a test"
 py -m kpi_store.cut --report discovery-report.json --approver "the ontology owner"
 ```
 
@@ -51,7 +51,7 @@ A plain folder, one with no `.git` folder, needs no Git. The tool writes the sam
 
 After a cut, run the full check before you load any store. On Windows, run it in Git Bash:
 
-```
+```bash skip reason="awaits-the-rewrite: the step-by-step guides will run the check after a cut in a test"
 bash scripts/check.sh
 ```
 
@@ -87,7 +87,7 @@ The report stays in the volume. From a row's object, ontology value and found va
 
 `standing-decisions.json` lists the rows that a cleared report rejected. The next comparison reads it and leaves those rows out, so a person decides each finding once.
 
-```json
+```json parse
 {
   "format": 1,
   "decisions": [
