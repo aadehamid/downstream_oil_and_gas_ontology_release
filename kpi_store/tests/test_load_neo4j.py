@@ -22,7 +22,7 @@ SECRET = "pw-Only-In-Settings"
 def graph(marked=True, hash_="hash-1"):
     """A database that holds the verified graph: 5 Resource nodes, 7 relationships, the two release records."""
     db = stores_support.FakeNeo4j()
-    db.add(["Resource"], 5)
+    db.add(["Resource"], 5, uri=DP + "/sample-node", graph=DP)   # tagged with its release, as the load tags every node
     db.relationships, db.graph_hash = 7, hash_
     db.add(["ModuleRelease"], version_iri=DP)
     db.add(["ModuleRelease"], version_iri=KPI)
@@ -48,6 +48,7 @@ def stub_code(calls, fails=None, report=REPORT):
             (Path(self.cfg["out"]) / "projection-report.json").write_text(json.dumps(report), encoding="utf-8")
 
     return SimpleNamespace(
+        pipeline=REAL.pipeline,
         rp=SimpleNamespace(read_config=lambda path: json.loads(Path(path).read_text(encoding="utf-8")), Driver=Driver,
                            Failed=REAL.rp.Failed, PY=REAL.rp.PY, RS=REAL.rp.RS),
         lv=SimpleNamespace(hash_graph=lambda session, sep=None: (session.graph_hash, 0, 0, 0), N10S_SEP="__"),
@@ -58,6 +59,7 @@ def stub_code(calls, fails=None, report=REPORT):
 @pytest.fixture
 def local(tmp_path, monkeypatch):
     monkeypatch.setattr(ln.ldb, "expected", lambda root, ss=None: dict(WANT))
+    monkeypatch.setattr(ln, "with_newest_inputs", lambda cfg, root, newest, code, run_dir: cfg)   # tested on its own below
     return stores_support.local_settings(tmp_path, password=f'password = "{SECRET}"')
 
 
@@ -110,6 +112,62 @@ def test_the_login_file_holds_the_four_settings_and_is_private(tmp_path, local):
                                                "NEO4J_DATABASE=neo4j\n")
     if ln.os.name != "nt":
         assert path.stat().st_mode & 0o777 == 0o600
+
+
+def test_a_login_file_whose_write_fails_is_removed(tmp_path, local, monkeypatch):
+    real = ln.os.fdopen
+    def half_written(fd, *args, **options):
+        real(fd, *args, **options).close()   # the file exists by now
+        raise OSError("disk full")
+    monkeypatch.setattr(ln.os, "fdopen", half_written)
+    with pytest.raises(OSError):
+        ln.write_env_file(tmp_path / "neo4j-local.env", local.neo4j_local)
+    assert not (tmp_path / "neo4j-local.env").exists()
+
+
+@pytest.mark.parametrize("error", [KeyboardInterrupt, RuntimeError])
+def test_the_login_file_is_gone_after_an_interrupted_write_or_block(tmp_path, local, monkeypatch, error):
+    path = tmp_path / "neo4j-local.env"
+    with pytest.raises(error):
+        with ln.login_file(path, local.neo4j_local):
+            assert path.is_file()
+            raise error()
+    assert not path.exists()
+    real = ln.os.fdopen
+    def interrupted(fd, *args, **options):   # Ctrl+C arrives while the file is being written
+        real(fd, *args, **options).close()
+        raise KeyboardInterrupt()
+    monkeypatch.setattr(ln.os, "fdopen", interrupted)
+    with pytest.raises(KeyboardInterrupt):
+        ln.load(local, support.ROOT, tmp_path / "run", code=stub_code([]), connect=connect_to(graph(marked=False)))
+    assert not (tmp_path / "run" / "neo4j-local.env").exists()
+
+
+def test_the_inputs_are_the_newest_releases_of_the_folder_not_a_fixed_list(tmp_path):
+    root = support.small_release(tmp_path / "release", versions=("1.0.0", "1.0.1-correction.1"))
+    ontology = root / "business_architecture" / "ontology"
+    (ontology / "provenance").mkdir()
+    (ontology / "provenance" / "run-shapes.ttl").write_text("", encoding="utf-8")
+    # The projection's own list still names the version before the correction, and lists kpi first.
+    code = SimpleNamespace(pipeline=SimpleNamespace(PACKAGES=[("kpi", "1.0.0"), ("data-product", "1.0.0")],
+                                                    SHAPES=["releases/kpi/1.0.0/shapes.ttl", "provenance/run-shapes.ttl"]))
+    correction = DP[:-len("1.0.0")] + "1.0.1-correction.1"
+    data, shapes, versions = ln.newest_inputs(root, [correction, KPI], code)
+    releases = ontology.resolve() / "releases"
+    assert data == [str(releases / "kpi" / "1.0.0" / "kpi.ttl"), str(releases / "data-product" / "1.0.1-correction.1" / "data-product.ttl")]
+    assert shapes == [str(releases / "kpi" / "1.0.0" / "shapes.ttl"), str(releases / "data-product" / "1.0.1-correction.1" / "shapes.ttl"),
+                      str(ontology.resolve() / "provenance" / "run-shapes.ttl")]
+    assert versions == {"kpi": "1.0.0", "data-product": "1.0.1-correction.1"}
+    with pytest.raises(ln.LoadError, match="the release lacks .*2.0.0"):
+        ln.newest_inputs(root, [DP[:-len("1.0.0")] + "2.0.0", KPI], code)
+
+    (tmp_path / "config.json").write_text(json.dumps({"rule4": "4a", "packages": {"kpi": "1.0.0", "data-product": "1.0.0"}}), encoding="utf-8")
+    cfg = ln.with_newest_inputs({"mode": "releases", "inputs_script": "inputs.py", "projection_config": str(tmp_path / "config.json")},
+                                root, [correction, KPI], code, tmp_path)
+    assert "inputs_script" not in cfg and cfg["data"] == data and cfg["shapes"] == shapes
+    assert cfg["projection_config"] == str(tmp_path / "projection-config.json")
+    assert json.loads((tmp_path / "projection-config.json").read_text(encoding="utf-8")) == {
+        "rule4": "4a", "packages": {"kpi": "1.0.0", "data-product": "1.0.1-correction.1"}}
 
 
 # ---- the report and the marker ---------------------------------------------------------------------

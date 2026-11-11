@@ -50,6 +50,17 @@ def test_a_settings_file_inside_the_release_folder_is_refused_whatever_its_case(
     assert ls.parse(b"", tmp_path / "stores.toml", {}, release).fuseki is None   # beside the release folder is outside it
 
 
+def test_the_release_folder_is_the_one_given_not_the_one_the_code_is_in(tmp_path):
+    other = tmp_path / "other-release"
+    stores_support.local_settings(other / "conf")   # accepted against the code's own folder
+    with pytest.raises(ls.LocalSettingsError, match="the local settings file is inside the release folder"):
+        ls.load(other / "conf" / "stores.toml", {}, release_root=other)
+    outside = stores_support.local_settings(tmp_path / "local", run_folder=f'run_folder = "{(other / "runs").as_posix()}"')
+    with pytest.raises(ls.LocalSettingsError, match=r"\[release\] run_folder is inside the release folder"):
+        ls.check_outside(outside, other)
+    assert ls.check_outside(outside, tmp_path / "elsewhere") is outside
+
+
 def test_is_inside_compares_whole_folder_names_without_case(tmp_path):
     assert ls.is_inside(tmp_path / "REL" / "a.toml", tmp_path / "rel")
     assert ls.is_inside(tmp_path / "rel", tmp_path / "rel")

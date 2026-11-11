@@ -3,6 +3,12 @@
     py -m kpi_store.load_fuseki --stores <local settings file>            # start or reuse Fuseki, load, check
     py -m kpi_store.load_fuseki --stores <local settings file> --stop     # stop the Fuseki this command started
 
+--stop never signals a process on its number alone, because after a restart of the machine the saved number can
+belong to another program. The start gives Java a random token (-Dkpi_store.fuseki=<token>) and saves it with the
+process ID. --stop reads the command line of the process that has that ID now (ps on macOS and Linux, PowerShell's
+Get-CimInstance on Windows) and stops it only when the command line holds the token. Otherwise it removes the
+saved file, stops nothing and says so.
+
 What it does, in order:
 1. Checks Java (version 21 or later, which Fuseki 6.2.0's own manifest names) and the Fuseki jar's SHA-256.
 2. Uses the Fuseki that answers at the dataset URL of the local settings. When none answers and the URL is on this
@@ -25,6 +31,7 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import shutil
 import signal
 import subprocess
@@ -43,6 +50,7 @@ JAVA_MINIMUM = 21   # the jar's manifest says Java-Version: 21
 JAVA_VERSION = re.compile(r'version "(\d+)(?:\.(\d+))?')
 START_WAIT_SECONDS = 90
 PID_FILE, LOG_FILE = "fuseki.pid", "fuseki.log"
+TOKEN_PROPERTY = "kpi_store.fuseki"   # the Java system property that carries the start's token
 
 
 class FusekiError(Exception):
@@ -116,18 +124,36 @@ def answers(fuseki, opener=urllib.request.urlopen):
         return False
 
 
-def start_command(java, fuseki):
-    """The command that starts Fuseki, as an argument list. --localhost accepts requests from this machine only."""
+def start_command(java, fuseki, token=None):
+    """The command that starts Fuseki, as an argument list. --localhost accepts requests from this machine only.
+    The token, when given, marks the process as the one this command started (stop)."""
     store = ["--tdb2", "--loc", str(fuseki.data_folder)] if fuseki.data_folder else ["--mem"]
-    return [str(java), "-jar", str(fuseki.jar), *store, "--update", "--localhost", "--port", str(fuseki.port),
+    mark = [f"-D{TOKEN_PROPERTY}={token}"] if token else []
+    return [str(java), *mark, "-jar", str(fuseki.jar), *store, "--update", "--localhost", "--port", str(fuseki.port),
             fuseki.dataset]
 
 
+def command_line(pid, run=subprocess.run, windows=None):
+    """The command line of the process that has this ID now, or None when there is no such process or it cannot
+    be read. No shell: ps on macOS and Linux, PowerShell on Windows."""
+    windows = os.name == "nt" if windows is None else windows
+    if windows:
+        cmd = ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+               f"(Get-CimInstance Win32_Process -Filter 'ProcessId={int(pid)}').CommandLine"]
+    else:
+        cmd = ["ps", "-p", str(int(pid)), "-o", "command="]
+    try:
+        done = run(cmd, capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return done.stdout.strip() if done.returncode == 0 and done.stdout.strip() else None
+
+
 def start(java, fuseki, state_folder, popen=subprocess.Popen, answers=answers, sleep=time.sleep,
-          wait_seconds=START_WAIT_SECONDS):
+          wait_seconds=START_WAIT_SECONDS, token=None):
     """Starts Fuseki apart from this process, so it keeps running when the command ends, and waits until the
-    dataset answers. Its output goes to fuseki.log and its process ID to fuseki.pid, both in state_folder.
-    Returns the process ID."""
+    dataset answers. Its output goes to fuseki.log, and its process ID and the start's token to fuseki.pid, both
+    in state_folder. Returns the process ID."""
     if not fuseki.is_local:
         raise FusekiError("no Fuseki answers at the URL in [fuseki] url, and the URL is not on this machine, "
                           "so this command cannot start one")
@@ -138,10 +164,11 @@ def start(java, fuseki, state_folder, popen=subprocess.Popen, answers=answers, s
     # A new process group on Windows, a new session elsewhere: the server must not end with this command.
     apart = ({"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)}
              if os.name == "nt" else {"start_new_session": True})
+    token = token or secrets.token_hex(16)
     with (state_folder / LOG_FILE).open("ab") as log:
-        process = popen(start_command(java, fuseki), stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+        process = popen(start_command(java, fuseki, token), stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
                         cwd=str(state_folder), **apart)
-    (state_folder / PID_FILE).write_text(f"{process.pid}\n", encoding="utf-8", newline="\n")
+    (state_folder / PID_FILE).write_text(json.dumps({"pid": process.pid, "token": token}) + "\n", encoding="utf-8", newline="\n")
     waited = 0
     while not answers(fuseki):
         if process.poll() is not None:
@@ -153,18 +180,28 @@ def start(java, fuseki, state_folder, popen=subprocess.Popen, answers=answers, s
     return process.pid
 
 
-def stop(state_folder, kill=os.kill):
-    """Stops the Fuseki that start() started, by the process ID it wrote. Returns the ID, or None when there is none."""
+def stop(state_folder, kill=os.kill, command_line=command_line):
+    """Stops the Fuseki that start() started. Returns ("stopped", process ID), ("stale", process ID) when the saved
+    ID no longer belongs to that Fuseki (nothing is signalled; the saved file is removed), or ("none", None) when
+    nothing was saved. The process is signalled only when its command line holds the token start() gave it."""
     pid_file = Path(state_folder) / PID_FILE
     if not pid_file.is_file():
-        return None
-    pid = int(pid_file.read_text(encoding="utf-8").strip())
+        return "none", None
+    try:
+        saved = json.loads(pid_file.read_text(encoding="utf-8"))
+        pid, token = int(saved["pid"]), str(saved["token"])
+    except (ValueError, KeyError, TypeError):
+        pid_file.unlink()   # a file of another shape proves nothing about any process
+        return "stale", None
+    running = command_line(pid)
+    pid_file.unlink()
+    if not token or running is None or f"-D{TOKEN_PROPERTY}={token}" not in running:
+        return "stale", pid
     try:
         kill(pid, signal.SIGTERM)
     except OSError:
-        pass   # it had already stopped
-    pid_file.unlink()
-    return pid
+        pass   # it stopped between the check and the signal
+    return "stopped", pid
 
 
 def ensure_running(fuseki, state_folder, environ=None, **start_options):
@@ -305,10 +342,13 @@ def main(argv=None):
     ap.add_argument("--json", action="store_true", help="print the result as JSON instead of one line")
     args = ap.parse_args(argv)
     try:
-        local = ls.load(ls.locate(args.stores))
+        local = ls.load(ls.locate(args.stores), release_root=Path(args.release))
         if args.stop:
-            pid = stop(local.need("run_folder") / "fuseki")
-            print(f"fuseki: stopped process {pid}" if pid else "fuseki: this command started no Fuseki that still runs")
+            outcome, pid = stop(local.need("run_folder") / "fuseki")
+            print({"stopped": f"fuseki: stopped process {pid}",
+                   "stale": "fuseki: the saved process ID no longer belongs to the Fuseki this command started; nothing "
+                            "was stopped, and the saved file was removed. If a Fuseki still runs, stop it in its own window",
+                   "none": "fuseki: this command started no Fuseki that still runs"}[outcome])
             return 0
         extra = read_extra_graphs(args.extra_graphs) if args.extra_graphs else None
         result = run(local, Path(args.release), extra_graphs=extra, drop_unknown=args.drop_unknown,

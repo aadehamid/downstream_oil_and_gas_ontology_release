@@ -246,13 +246,22 @@ def parse(data, path, environ=None, release_root=ROOT):
         robot_jar=_path(projection["robot_jar"], base) if projection else None,
         projection_out=_path(projection["out"], base) if projection else None,
         bash=_path(doc["tools"]["bash"], base) if doc.get("tools", {}).get("bash") else None)
-    # What the runner writes must stay out of the folder it zips and uploads.
-    for name, value in (("[release] settings", found.settings), ("[release] run_folder", found.run_folder),
-                        ("[projection] out", found.projection_out),
-                        ("[fuseki] data_folder", found.fuseki.data_folder if found.fuseki else None)):
+    return check_outside(found, release_root)
+
+
+def check_outside(local, release_root):
+    """The settings, after checking that the file itself and every folder the commands write to lie outside the
+    release folder, which is zipped and uploaded. Each command calls this with the release folder it was given,
+    which need not be the folder this code is in."""
+    if is_inside(local.path, release_root):
+        raise LocalSettingsError("the local settings file is inside the release folder; move it outside, "
+                                 "because it holds passwords and the release folder is zipped and uploaded")
+    for name, value in (("[release] settings", local.settings), ("[release] run_folder", local.run_folder),
+                        ("[projection] out", local.projection_out),
+                        ("[fuseki] data_folder", local.fuseki.data_folder if local.fuseki else None)):
         if value is not None and is_inside(value, release_root):
             raise LocalSettingsError(f"{name} is inside the release folder; name a folder outside it")
-    return found
+    return local
 
 
 def load(path, environ=None, release_root=ROOT):

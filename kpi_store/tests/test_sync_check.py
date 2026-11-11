@@ -120,7 +120,8 @@ def test_expected_reads_the_folder_and_orders_a_correction_version(tmp_path):
 
 # ---- reading and judging the four stores -----------------------------------------------------------
 
-def stores(tmp_path, monkeypatch, jena=GRAPHS, databricks=None, local=None, enterprise=None, warehouse="wh123", connect=None):
+def stores(tmp_path, monkeypatch, jena=GRAPHS, databricks=None, local=None, enterprise=None, warehouse="wh123", connect=None,
+           quick=False):
     """check()'s rows with every store a stand-in. Each argument is what that store holds."""
     monkeypatch.setattr(sc, "expected", lambda root, ss, ref="worktree", extra=(): dict(WANT))
     local_settings = stores_support.local_settings(tmp_path)
@@ -132,14 +133,15 @@ def stores(tmp_path, monkeypatch, jena=GRAPHS, databricks=None, local=None, ente
             raise jena
         return dict(jena)
     ss.read_jena = read_jena
-    code = SimpleNamespace(ss=ss, lm=SimpleNamespace(models=lambda newest: []))
+    code = SimpleNamespace(ss=ss, lm=SimpleNamespace(models=lambda newest: []),
+                           lv=SimpleNamespace(hash_graph=lambda session: (session.graph_hash, 0, 0, 0)))
     run_sql, sent = databricks or workspace()
     monkeypatch.setattr(sc, "statement_runner", lambda client, warehouse_id: run_sql if (client, warehouse_id) == ("client of DEFAULT", "wh123") else None)
     target = enterprise or marked_target()
     drivers = {"bolt://127.0.0.1:7687": stores_support.FakeDriver({"neo4j": local or graph()}),
                local_settings.neo4j_enterprise.uri: stores_support.FakeDriver({TARGET: target})}
     rows = sc.check(local_settings, support.ROOT, code=code, connect=connect or (lambda neo4j: drivers[neo4j.uri]),
-                    client_for=lambda profile: f"client of {profile}")
+                    client_for=lambda profile: f"client of {profile}", quick=quick)
     return {store: (status, why) for store, status, why in rows}, drivers
 
 
@@ -147,7 +149,8 @@ def marked_target():
     db = graph(marked=False)
     db.name = TARGET
     db.add(["EpmStoreMarker"], store="enterprise", catalog_datasets=2, catalog_digest="digest-1",
-           input_fingerprint="fingerprint-1", count=[5, 7], marked_at="2026-11-10T09:00:00Z", commit="KPI Store 1.1")
+           input_fingerprint="fingerprint-1", count=[5, 7], marked_at="2026-11-10T09:00:00Z", commit="KPI Store 1.1",
+           graph_hash="hash-1")
     return db
 
 
@@ -185,6 +188,32 @@ def test_a_store_loaded_from_another_release_reads_behind_and_one_never_marked_u
     assert rows["enterprise"] == ("unmarked", "no marker: mark it after a checked load")
     assert rows["databricks"] == ("behind", "marked 2026-11-10T08:00:00Z from another release set (input_fingerprint)")
     assert rows["jena"][0] == "empty"
+
+
+def test_an_edit_that_keeps_the_counts_reads_changed_by_the_graph_hash(tmp_path, monkeypatch):
+    edited_local, edited_target = graph(), marked_target()
+    edited_local.graph_hash = edited_target.graph_hash = "hash-after-one-property-changed"   # same nodes, same relationships
+    rows, _ = stores(tmp_path, monkeypatch, local=edited_local, enterprise=edited_target)
+    for store in ("neo4j", "enterprise"):
+        assert rows[store] == ("changed", "its content differs from the graph it was marked with, although the counts are equal")
+    untouched, _ = stores(tmp_path, monkeypatch)
+    assert untouched["enterprise"] == ("current", "marked 2026-11-10T09:00:00Z at commit KPI Store 1.1; graph hash hash-1 equal to the marker's")
+
+
+def test_quick_compares_counts_only_and_says_so(tmp_path, monkeypatch):
+    edited = marked_target()
+    edited.graph_hash = "hash-after-one-property-changed"
+    rows, _ = stores(tmp_path, monkeypatch, enterprise=edited, quick=True)
+    assert rows["enterprise"] == ("current", "marked 2026-11-10T09:00:00Z at commit KPI Store 1.1 (counts only: --quick left the graph hash out)")
+    assert rows["neo4j"][1].endswith("(counts only: --quick left the graph hash out)")
+    assert "counts only" not in rows["jena"][1] and "counts only" not in rows["databricks"][1]
+
+
+def test_a_marker_without_a_graph_hash_cannot_read_current(tmp_path, monkeypatch):
+    old = marked_target()
+    del old.nodes[-1][1]["graph_hash"]
+    rows, _ = stores(tmp_path, monkeypatch, enterprise=old)
+    assert rows["enterprise"] == ("changed", "its marker holds no graph hash, so its content cannot be compared; load it again")
 
 
 def renamed(db):

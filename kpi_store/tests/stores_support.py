@@ -44,6 +44,19 @@ class Result:
         return None
 
 
+def owns(labels, props, bases):
+    """Whether a node is the KPI Store's, written out by hand for the stand-in database: the label and what only
+    the KPI Store's load writes on such a node."""
+    def under(value):
+        return isinstance(value, str) and any(value.startswith(b) for b in bases)
+    return bool(("Resource" in labels and props.get("uri") is not None and under(props.get("graph")))
+                or ("ModuleRelease" in labels and under(props.get("version_iri")))
+                or ("Module" in labels and under(props.get("uri")))
+                or ("EpmStoreMarker" in labels and props.get("store") is not None and props.get("catalog_digest") is not None)
+                or ("LogicalModel" in labels and props.get("uri") is not None and (props.get("models") is not None or props.get("slug") is not None))
+                or ("LogicalModelMarker" in labels and props.get("digest") is not None and props.get("store") is not None))
+
+
 class FakeNeo4j:
     """One database: nodes as (labels, properties), a count of relationships between Resource nodes, and a name.
     run() answers the statements below and fails on any other, so a new statement cannot pass unseen."""
@@ -81,11 +94,18 @@ class FakeNeo4j:
             return Result([{"name": self.name}])
         if text.startswith("CALL db.info() YIELD id"):
             return Result([{"id": self.ident}])
-        if text == "MATCH (n) RETURN labels(n) AS labels, count(*) AS n":
+        if text.startswith("MATCH (n) WITH labels(n) AS labels, coalesce((n:Resource AND ") and text.endswith("RETURN own, labels, count(*) AS n"):
             groups = {}
-            for labels, _ in self.nodes:
-                groups[tuple(labels)] = groups.get(tuple(labels), 0) + 1
-            return Result([{"labels": list(k), "n": n} for k, n in groups.items()])
+            for labels, props in self.nodes:
+                key = (owns(labels, props, params["bases"]), tuple(labels))
+                groups[key] = groups.get(key, 0) + 1
+            return Result([{"own": own, "labels": list(labels), "n": n} for (own, labels), n in groups.items()])
+        if text.startswith("MATCH (n) WHERE NOT coalesce((n:Resource AND ") and text.endswith("LIMIT 5"):
+            foreign = [(l, p) for l, p in self.nodes if not owns(l, p, params["bases"])]
+            return Result([{"labels": list(l), "uri": p.get("uri")} for l, p in foreign[:5]])
+        if text.startswith("MATCH (n) WHERE coalesce((n:Resource AND ") and text.endswith("CALL (n) { DETACH DELETE n } IN TRANSACTIONS OF 1000 ROWS"):
+            self.nodes = [(l, p) for l, p in self.nodes if not owns(l, p, params["bases"])]
+            return Result([])
         if text == "MATCH (n) RETURN count(n) AS n":
             return Result([{"n": len(self.nodes)}])
         if text == "MATCH (n:Resource) RETURN count(n) AS n":
@@ -100,10 +120,6 @@ class FakeNeo4j:
         if text == "MERGE (m:EpmStoreMarker {store: $s}) SET m = $p":
             self.nodes = [(l, p) for l, p in self.nodes if not ("EpmStoreMarker" in l and p.get("store") == params["s"])]
             self.nodes.append((["EpmStoreMarker"], json.loads(json.dumps(params["p"]))))
-            return Result([])
-        m = re.match(r"MATCH \(n:(\w+)\) CALL \(n\) \{ DETACH DELETE n \} IN TRANSACTIONS OF (\d+) ROWS$", text)
-        if m:
-            self.nodes = [(l, p) for l, p in self.nodes if m.group(1) not in l]
             return Result([])
         raise AssertionError(f"the fake Neo4j does not know this statement: {text[:160]}")
 

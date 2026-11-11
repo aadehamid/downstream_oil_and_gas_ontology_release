@@ -4,7 +4,7 @@
     py -m kpi_store.setup_check --stores <local settings file> --only java  # one check
     py -m kpi_store.setup_check --list                                      # the checks' names
 
-The checks, in order: python, packages, local-settings, kpi-store-settings, java, fuseki-jar, robot-jar, bash,
+The checks, in order: python, packages, local-settings, kpi-store-settings, java, fuseki-jar, robot-jar, bash, uv,
 check-script-tools, databricks-cli, databricks-auth, neo4j-local, neo4j-plugins, neo4j-enterprise.
 
 Each check prints "ok" or "FAIL" with what it found, and a failed check prints one line that fixes it. A check
@@ -205,6 +205,14 @@ def bash(ctx):
     return passed(str(found))
 
 
+def uv(ctx):
+    """scripts/check.sh runs every check through uv, which fetches the test dependencies."""
+    found = ctx.which("uv")
+    if not found:
+        return failed("uv was not found; scripts/check.sh runs its checks through uv", "py -m pip install uv")
+    return passed(str(found))
+
+
 def check_script_tools(ctx):
     """scripts/check.sh calls python3 and uv from inside bash, so both must be found there."""
     found = find_bash(ctx.local.bash if ctx.local else None, ctx.environ, ctx.which)
@@ -219,7 +227,9 @@ def check_script_tools(ctx):
 
 def databricks_cli(ctx):
     found = find_databricks(ctx.local, ctx.which)
-    fix = "Install the Databricks CLI (winget install Databricks.DatabricksCLI), open a new terminal, and if it is still not found name databricks.exe in [databricks] cli"
+    fix = ("Install the Databricks CLI as its documentation says (\"Install or update the Databricks CLI\", "
+           "https://docs.databricks.com/aws/en/dev-tools/cli/install), open a new terminal, and if it is still not "
+           "found name databricks.exe in [databricks] cli")
     if found is None:
         return failed("the Databricks CLI was not found", fix)
     code, out = ctx.call([found, "--version"])
@@ -308,7 +318,7 @@ def neo4j_enterprise(ctx):
 
 CHECKS = {"python": python, "packages": packages, "local-settings": local_settings,
           "kpi-store-settings": kpi_store_settings, "java": java, "fuseki-jar": fuseki_jar, "robot-jar": robot_jar,
-          "bash": bash, "check-script-tools": check_script_tools, "databricks-cli": databricks_cli,
+          "bash": bash, "uv": uv, "check-script-tools": check_script_tools, "databricks-cli": databricks_cli,
           "databricks-auth": databricks_auth, "neo4j-local": neo4j_local, "neo4j-plugins": neo4j_plugins,
           "neo4j-enterprise": neo4j_enterprise}
 
@@ -321,13 +331,14 @@ def run_checks(ctx, names=None):
 def main(argv=None, context=Context):
     ap = argparse.ArgumentParser(prog="kpi_store.setup_check", description=__doc__.split("\n\n")[0])
     ap.add_argument("--stores", help=f"the local settings file (default: the one {ls.ENV_VAR} names)")
+    ap.add_argument("--release", default=str(ls.ROOT), help="the release folder (default: the one this code is in)")
     ap.add_argument("--only", action="append", choices=tuple(CHECKS), help="run only this check; may be repeated")
     ap.add_argument("--list", action="store_true", help="print the checks' names and stop")
     args = ap.parse_args(argv)
     if args.list:
         print("\n".join(CHECKS))
         return 0
-    results = run_checks(context(args.stores), args.only)
+    results = run_checks(context(args.stores, release_root=Path(args.release)), args.only)
     for name, ok, detail, fix in results:
         print(f"{'ok  ' if ok else 'FAIL'} {name:<19} {detail}")
         if not ok:

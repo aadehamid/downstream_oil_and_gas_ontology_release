@@ -4,6 +4,7 @@ import csv
 import datetime as dt
 import hashlib
 import json
+import os
 import sys
 import zipfile
 from pathlib import Path
@@ -41,8 +42,8 @@ def release_folder(root):
              "kpi_store/kpi_store.example.toml": support.SETTINGS_TEXT, "data/sample.ttl": "<urn:a> a <urn:B> .\r\n",
              "scripts/check.sh": "echo all checks passed\n",
              # never in the zip:
-             ".git/config": "[core]\n", "kpi_store/__pycache__/x.cpython-312.pyc": "x", "kpi_store.toml": "secret = 1\n",
-             "sub/stores.toml": 'password = "x"\n', "data/.DS_Store": "x"}
+             "kpi_store/__pycache__/x.cpython-312.pyc": "x", "kpi_store.toml": "[release]\n", "data/.DS_Store": "x",
+             ".venv/pyvenv.cfg": "home = /sample\n"}
     for name, text in files.items():
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -99,6 +100,62 @@ def test_the_zip_holds_the_release_files_only_and_is_the_same_twice(setup):
         assert {info.date_time for info in z.infolist()} == {(1980, 1, 1, 0, 0, 0)}
         assert z.read("README.md") == b"# Sample\nrelease\n" and z.read("data/sample.ttl") == b"<urn:a> a <urn:B> .\n"
         assert z.read("data/image.png") == b"\x89PNG\r\n\x1a\n"   # a binary file keeps its bytes
+
+
+PASSWORD_FILE = '[neo4j.enterprise]\npassword = "pw-That-Must-Not-Travel"\n'
+
+
+@pytest.mark.parametrize("name", ["machine-stores.toml", "conf/local.env", ".env.production", "conf/db.ini"])
+def test_a_plain_folder_with_a_password_file_of_any_name_is_not_zipped(setup, name):
+    (setup.root / name).parent.mkdir(parents=True, exist_ok=True)
+    (setup.root / name).write_text(PASSWORD_FILE if name.endswith(".toml") else "NEO4J_PASSWORD=pw-That-Must-Not-Travel\n", encoding="utf-8")
+    with pytest.raises(runner.StepFailed, match=f"{name} in the release folder sets a password") as err:
+        runner.build_zip(setup.root, setup.tmp / "a.zip")
+    assert "pw-That-Must-Not-Travel" not in str(err.value) and not (setup.tmp / "a.zip").exists()
+    with pytest.raises(runner.StepFailed):
+        runner.step_zip(setup.make(runner.subprocess.run))
+    assert not (setup.run_dir / "upload").exists()
+
+
+def test_the_example_settings_file_and_a_commented_password_line_may_travel(setup):
+    (setup.root / "kpi_store" / "stores.example.toml").write_text(stores_support.STORES_TEXT, encoding="utf-8")
+    (setup.root / "environment.example").write_text("# NEO4J_PASSWORD=\n", encoding="utf-8")
+    (setup.root / "notes.toml").write_text('# password = "an example in a comment"\ntitle = "the password rule"\n', encoding="utf-8")
+    _, count = runner.build_zip(setup.root, setup.tmp / "a.zip")
+    assert count == 11
+
+
+def git(root, *args):
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    runner.subprocess.run(["git", "-C", str(root), "-c", "user.name=sample", "-c", "user.email=sample@example.org", *args],
+                          check=True, capture_output=True, stdin=runner.subprocess.DEVNULL, env=env)
+
+
+def test_in_a_git_checkout_the_zip_holds_only_the_files_git_tracks(setup):
+    git(setup.root, "init", "-q")
+    git(setup.root, "add", "README.md", "release.json", "kpi_store/__init__.py", "data/sample.ttl")
+    (setup.root / "machine-stores.toml").write_text(PASSWORD_FILE, encoding="utf-8")   # left in the folder, never added
+    (setup.root / "draft-notes.md").write_text("not part of the release\n", encoding="utf-8")
+    runner.build_zip(setup.root, setup.tmp / "a.zip")
+    with zipfile.ZipFile(setup.tmp / "a.zip") as z:
+        assert z.namelist() == ["README.md", "data/sample.ttl", "kpi_store/__init__.py", "release.json"]
+        assert not any(b"pw-That-Must-Not-Travel" in z.read(name) for name in z.namelist())
+    git(setup.root, "add", "machine-stores.toml")   # a tracked password file is refused, not zipped
+    with pytest.raises(runner.StepFailed, match="machine-stores.toml in the release folder sets a password"):
+        runner.build_zip(setup.root, setup.tmp / "b.zip")
+    def no_git(cmd, **options):
+        raise OSError("git is not installed")
+    with pytest.raises(runner.StepFailed, match="git ls-files did not run"):
+        runner.build_zip(setup.root, setup.tmp / "c.zip", no_git)
+
+
+def test_a_settings_file_inside_the_release_given_is_refused_whatever_its_name(setup, capsys):
+    stores_support.local_settings(setup.root / "conf")   # inside the release the command is given, outside the code's own
+    inside = runner.ls.load(setup.root / "conf" / "stores.toml", {}, release_root=setup.tmp / "elsewhere")
+    with pytest.raises(runner.ls.LocalSettingsError, match="the local settings file is inside the release folder"):
+        runner.Context(inside, setup.root, RUN)
+    assert runner.main(["--stores", str(setup.root / "conf" / "stores.toml"), "--release", str(setup.root), "--only", "zip"]) == 2
+    assert "inside the release folder" in capsys.readouterr().err and not (setup.root / "conf" / "runs").exists()
 
 
 def test_a_changed_file_changes_the_checksum(setup):
@@ -340,6 +397,40 @@ def test_a_report_that_is_not_cleared_stops_the_run_before_the_cut(setup):
     assert called == [] and setup.pending.is_dir()
 
 
+def edit_csv(setup, change):
+    path = setup.pending / runner.TO_CLEAR
+    with path.open(encoding="utf-8", newline="") as f:
+        rows = change(list(csv.DictReader(f)))
+    with path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=rep.ROW_FIELDS)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+@pytest.mark.parametrize("change, said", [
+    (lambda rows: rows[1:], "missing: R001"),                                                   # the row that blocks was deleted
+    (lambda rows: rows[:2], "missing: R003"),
+    (lambda rows: rows + [{**rows[0], "id": "R009"}], "not in the report: R009"),
+    (lambda rows: rows + [rows[1]], "a row ID occurs twice"),
+])
+def test_a_csv_that_does_not_hold_exactly_the_reports_rows_never_reaches_the_cut(setup, change, said):
+    pending_report(setup, {"R001": {"decided_by": "the owner"}})
+    edit_csv(setup, change)
+    called = []
+    with pytest.raises(runner.Stop) as stop:
+        runner.step_cut(setup.make(hooks={"cut": lambda *a: called.append(a) or {"status": "cut"}}))
+    assert "it must hold exactly the report's 3 rows, each once" in str(stop.value) and said in str(stop.value)
+    assert called == [] and (setup.pending / "discovery-report.json").is_file()
+
+
+def test_the_report_itself_is_checked_after_the_csv_is_applied(setup, monkeypatch):
+    pending_report(setup, {"R001": {"decided_by": "the owner"}})
+    # Whatever the CSV step lets through, a blocking row without a decision and a name stops the cut.
+    monkeypatch.setattr(rep, "apply_csv_decisions", lambda report, path: report)
+    with pytest.raises(runner.Stop, match=r"give a decision and your name in decided_by for the row\(s\) that block \(R001\)"):
+        runner.step_cut(setup.make(hooks={"cut": lambda *a: pytest.fail("the cut ran")}))
+
+
 def test_a_cleared_report_is_cut_once_and_unconfirmed_rows_stay_undecided(setup):
     pending_report(setup, {"R001": {"decided_by": "the owner"}})
     seen = []
@@ -414,12 +505,58 @@ def test_a_failed_step_ends_the_chain_with_code_1_and_is_recorded(setup):
     assert not (setup.run_dir / "steps" / "05-upload.json").exists()
 
 
-def test_the_local_loads_are_skipped_when_databricks_did_not_load(setup, monkeypatch):
+@pytest.mark.parametrize("record, said", [
+    ({"status": "blocked", "summary": BLOCKED}, "the notebook stopped on a report, so Databricks does not hold this release"),
+    ({"status": "failed", "why": "the notebook run 7001 did not succeed"}, "the notebook step ended as failed"),
+    ({"status": "waiting", "databricks_run_id": 7001}, "the notebook run has not ended"),
+    ({"status": "checked", "summary": {"status": "checked"}}, "the notebook step ended as checked"),
+])
+def test_a_store_load_after_a_notebook_that_did_not_load_is_a_stop_never_a_pass(setup, monkeypatch, record, said):
     for name in runner.LOCAL_LOADS:
         monkeypatch.setitem(runner.STEP_FUNCTIONS, name, lambda ctx: pytest.fail("a local load ran"))
-    ctx = with_notebook(setup, {"status": "checked"})
-    assert runner.run_steps(ctx, list(runner.LOCAL_LOADS)) == 0
-    assert setup.lines == [f"{name}: skipped, because Databricks did not load this release in this run" for name in runner.LOCAL_LOADS]
+    ctx = setup.make()
+    runner.write_text(ctx.step_file("notebook"), json.dumps(record))
+    assert runner.run_steps(ctx, ["fuseki", "neo4j", "enterprise", "sync", "summary"]) == 3   # as --from fuseki --skip report runs
+    assert setup.lines == [f"fuseki: STOPPED. Next step: {runner.not_loaded_reason(ctx)}"] and said in setup.lines[0]
+    assert not (setup.run_dir / "summary.json").exists()
+
+
+def test_the_last_line_says_every_step_passed_only_when_none_was_left_out():
+    assert runner.closing_line([]) == "every step passed"
+    assert runner.closing_line(["check", "report"]) == "the steps that ran passed; left out: check, report (not run, so not checked)"
+
+
+def test_a_skipped_check_is_named_in_the_last_line_and_the_summary(setup):
+    code = runner.main(["--stores", str(setup.local.path), "--release", str(setup.root), "--only", "check,summary", "--skip", "check",
+                        "--run-id", RUN], out=setup.lines.append)
+    assert code == 0 and "  check       left out of this run" in setup.lines
+    assert setup.lines[-1] == "the steps that ran passed; left out: check (not run, so not checked)"
+    assert json.loads((setup.run_dir / "summary.json").read_text(encoding="utf-8"))["left_out"] == ["check"]
+    assert "every step passed" not in setup.lines
+
+
+def test_mode_check_leaves_the_store_loads_out_and_says_so(setup):
+    runner.main(["--stores", str(setup.local.path), "--release", str(setup.root), "--mode", "check", "--dry-run", "--run-id", RUN],
+                out=setup.lines.append, run=Recorder(), databricks=CLI, bash="/sample/bash")
+    assert setup.lines[0] == f"run {RUN} (dry run): cut, check, zip, volume, upload, notebook, report, summary"
+
+
+def test_a_notebook_wait_that_times_out_keeps_the_run_id_and_the_next_run_polls_the_same_run(setup):
+    slow = databricks(LOADED, states=["RUNNING"] * 1000)
+    assert runner.run_steps(setup.make(slow), ["notebook", "report"]) == 1
+    record = setup.run_dir / "steps" / "06-notebook.json"
+    assert json.loads(record.read_text(encoding="utf-8")) == {"status": "waiting", "databricks_run_id": 7001}
+    unreadable = Recorder(lambda cmd: (1, "", "Error: connection reset"))   # a poll that fails keeps it too
+    assert runner.run_steps(setup.make(unreadable), ["notebook"]) == 1
+    assert json.loads(record.read_text(encoding="utf-8")) == {"status": "waiting", "databricks_run_id": 7001}
+    again = databricks(LOADED, states=["RUNNING", "TERMINATED"])
+    assert runner.run_steps(setup.make(again), ["notebook"]) == 0
+    assert [c[2] for c in again.calls] == ["get-run", "get-run", "get-run-output"]   # no second submit
+    assert sum(1 for run in (slow, unreadable, again) for c in run.calls if c[2] == "submit") == 1
+    assert json.loads(record.read_text(encoding="utf-8"))["status"] == "loaded"
+    failed = databricks(None, result_state="FAILED", error="Stop: the settings file is wrong")
+    assert runner.run_steps(setup.make(failed), ["notebook"]) == 1   # a run that ended and failed is not waited for again
+    assert json.loads(record.read_text(encoding="utf-8"))["status"] == "failed"
 
 
 def test_the_local_steps_pass_the_hooks_on_and_the_summary_lists_the_run(setup, monkeypatch):
@@ -436,11 +573,12 @@ def test_the_local_steps_pass_the_hooks_on_and_the_summary_lists_the_run(setup, 
     monkeypatch.setattr(sync_check, "check", lambda local, root, extra_graphs=(): seen.update(sync=extra_graphs) or [
         ("jena", "current", "8 graphs"), ("neo4j", "current", "marked")])
     loader = lambda session, store: {}   # noqa: E731
+    rules = {"Resource": "n.uri IS NOT NULL", "TechObject": "n.tech_graph IS NOT NULL"}
     ctx = setup.make(replace_enterprise=True, hooks={"extra_graphs": lambda root, run_dir: extra, "neo4j_extra_loads": (loader,),
-                                                     "own_labels": ("Resource", "TechObject")})
+                                                     "own_rules": rules})
     assert runner.run_steps(ctx, ["fuseki", "neo4j", "enterprise", "sync", "summary"]) == 0
     assert seen["fuseki"] == extra and seen["neo4j"] == (loader,) and seen["sync"] == ("urn:sample:tech-graph",)
-    assert seen["enterprise"]["replace"] is True and seen["enterprise"]["own_labels"] == ("Resource", "TechObject")
+    assert seen["enterprise"]["replace"] is True and seen["enterprise"]["own_rules"] == rules
     assert setup.lines[0].startswith("fuseki: loaded, 8 graphs, 33 triples") and "sync: all 2 lines read current" in setup.lines
     summary = json.loads((setup.run_dir / "summary.json").read_text(encoding="utf-8"))
     assert {k: v["status"] for k, v in summary["steps"].items() if v} == {"fuseki": "loaded", "neo4j": "loaded", "enterprise": "copied", "sync": "current"}

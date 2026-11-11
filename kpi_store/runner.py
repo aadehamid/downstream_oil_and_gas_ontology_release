@@ -10,7 +10,9 @@ The steps, in order:
   cut         when a cleared report waits in <run folder>/pending, turn it into a correction version (the cut tool)
   check       scripts/check.sh, with bash (Git Bash on Windows)
   zip         the release folder as one zip: files only, sorted, fixed dates, LF line ends; then a copy of
-              kpi_store.toml that holds the zip's SHA-256
+              kpi_store.toml that holds the zip's SHA-256. In a Git checkout the zip holds the files Git tracks
+              and no other. In a plain folder it holds every file but caches. Either way the step stops when
+              a settings-like file to be zipped holds a password
   volume      create the schema and the volume in Databricks when they are missing
   upload      copy the zip and the settings to the volume
   notebook    import the notebook, submit it as a serverless run, wait, and read its result
@@ -31,8 +33,12 @@ Clearing a report stays a person's job. When the run stops on a report, open
 you disagree, write your name in decided_by on every row you decide, save, and run the same command again. A
 row that blocks needs a decision and a name. A row that does not block and has no name stays undecided.
 
-Exit 0 when every step passed, 1 when a step failed, 2 on bad settings or arguments, 3 when the run stopped for a
-person to act (the last line says what to do).
+A store load never runs after a notebook run that did not load this release: the run then stops, with exit 3.
+--skip leaves a step out on purpose; the last line and the summary then name the steps left out, and the run
+does not say that every step passed.
+
+Exit 0 when every requested step ran and passed, 1 when a step failed, 2 on bad settings or arguments, 3 when the
+run stopped for a person to act (the last line says what to do).
 """
 import argparse
 import csv
@@ -59,7 +65,11 @@ PENDING, TO_CLEAR = "pending", "discovery-report.to-clear.csv"
 CHECK_PASSED = "all checks passed"
 # Never in the zip: Git's folder, caches, and anything that could be a settings file with a password.
 SKIP_FOLDERS = (".git", "__pycache__", ".pytest_cache", ".venv", ".mypy_cache", ".ruff_cache")
-SKIP_FILES = (".DS_Store", "Thumbs.db", SETTINGS_NAME, "stores.toml")
+SKIP_FILES = (".DS_Store", "Thumbs.db", SETTINGS_NAME)
+# A file of these kinds that is about to be zipped may not set a password. The one example file may: it holds none.
+SECRET_SUFFIXES = (".toml", ".env", ".ini", ".cfg", ".conf", ".properties")
+SECRET_LINE = re.compile(rb"(?im)^\s*[\w.\-]*(password|passwd|secret)[\w.\-]*\s*[=:]\s*\S")
+SECRET_EXAMPLES = ("kpi_store/stores.example.toml",)
 SKIP_SUFFIXES = (".pyc", ".pyo")
 # Text files travel with LF line ends, so a checkout that turned them into CRLF still gives the same zip.
 TEXT_SUFFIXES = (".py", ".md", ".ttl", ".rq", ".json", ".csv", ".html", ".jsonld", ".yaml", ".yml", ".cypher", ".txt",
@@ -87,7 +97,7 @@ class Context:
 
     def __init__(self, local, release_root, run_id, mode="load", dry_run=False, replace_enterprise=False,
                  run=subprocess.run, sleep=time.sleep, databricks=None, bash=None, hooks=None, out=print):
-        self.local, self.release_root = local, Path(release_root).resolve()
+        self.local, self.release_root = ls.check_outside(local, release_root), Path(release_root).resolve()
         self.settings_path = local.need("settings")
         self.settings = settings_module.load(self.settings_path)
         self.run_root = local.need("run_folder")
@@ -97,8 +107,9 @@ class Context:
         self.run, self.sleep, self.out = run, sleep, out
         self.databricks = databricks or setup_check.find_databricks(local)
         self.bash = bash or setup_check.find_bash(local.bash)
-        self.hooks = {"cut": cut_with_tool, "extra_graphs": None, "neo4j_extra_loads": (), "own_labels": None} | (hooks or {})
+        self.hooks = {"cut": cut_with_tool, "extra_graphs": None, "neo4j_extra_loads": (), "own_rules": None} | (hooks or {})
         self.planned = []   # --dry-run: the commands a step would run
+        self.left_out = []  # the steps --skip or --mode check left out, for the summary
 
     @property
     def volume_path(self):
@@ -156,8 +167,9 @@ def cut_with_tool(report_json, release_root, run_dir, run=subprocess.run):
 
 def cleared_report(pending):
     """The pending report with the decisions of the to-clear CSV, or Stop when a row that blocks lacks a decision or
-    a name. A row that does not block and has a decision but no name was not confirmed: its decision is dropped.
-    Returns (report, IDs of the rows left undecided)."""
+    a name. The CSV must hold exactly the report's rows, each once: a row deleted from it is not a decision. A
+    row that does not block and has a decision but no name was not confirmed: its decision is dropped. The result
+    is checked again after the CSV is applied, on the report itself. Returns (report, IDs of the rows left undecided)."""
     report = rep.read(pending / rep.JSON_NAME)
     path = pending / TO_CLEAR
     try:
@@ -166,6 +178,14 @@ def cleared_report(pending):
     except OSError:
         raise Stop(f"the report in {pending} has no {TO_CLEAR}; run the report step again") from None
     blocks = {row["id"]: row["blocks"] for row in report["rows"]}
+    found = [row.get("id") or "" for row in rows]
+    missing, unknown = sorted(set(blocks) - set(found)), sorted(set(found) - set(blocks))
+    if missing or unknown or len(found) != len(set(found)):
+        said = "; ".join(text for text in (f"missing: {', '.join(missing)}" if missing else "",
+                                           f"not in the report: {', '.join(unknown)}" if unknown else "",
+                                           "a row ID occurs twice" if len(found) != len(set(found)) else "") if text)
+        raise Stop(f"correct {path}: it must hold exactly the report's {len(blocks)} rows, each once ({said}). Restore the "
+                   "rows, decide them, save, then run the same command again")
     open_rows, undecided = [], []
     for row in rows:
         decision, name = (row.get("decision") or "").strip(), (row.get("decided_by") or "").strip()
@@ -183,9 +203,15 @@ def cleared_report(pending):
         writer.writeheader()
         writer.writerows(rows)
     try:
-        return rep.apply_csv_decisions(report, confirmed), undecided
+        cleared = rep.apply_csv_decisions(report, confirmed)
     except rep.ReportError as err:
         raise Stop(f"correct {path}: {err}. Then run the same command again") from None
+    # The last word is the report that goes to the cut, not the CSV it was built from.
+    still_open = [row["id"] for row in cleared["rows"] if row["blocks"] and not (row["decision"] and row["decided_by"])]
+    if still_open:
+        raise Stop(f"clear the report: in {path} give a decision and your name in decided_by for the row(s) that block "
+                   f"({', '.join(still_open)}), save, then run the same command again")
+    return cleared, undecided
 
 
 def step_cut(ctx):
@@ -228,26 +254,52 @@ def step_check(ctx):
 
 # ---- zip ------------------------------------------------------------------------------------------------
 
-def release_files(root):
-    """The release's files as sorted (path inside the zip, file) pairs. Folders are not entries."""
+def tracked_files(root, run=subprocess.run):
+    """The files Git tracks in a checkout, as paths relative to it. Raises StepFailed when Git cannot say."""
+    try:
+        done = run(["git", "-C", str(root), "ls-files", "-z"], capture_output=True, stdin=subprocess.DEVNULL)
+    except OSError:
+        done = None
+    if done is None or done.returncode != 0:
+        raise StepFailed("the release folder is a Git checkout, but git ls-files did not run. The zip holds only the "
+                         "files Git tracks there, so Git must be on PATH")
+    return [Path(name) for name in done.stdout.decode("utf-8").split("\0") if name]
+
+
+def release_files(root, run=subprocess.run):
+    """The release's files as sorted (path inside the zip, file) pairs. Folders are not entries.
+
+    In a Git checkout these are the files Git tracks, and no other: a file someone left in the folder is not in
+    the zip. A plain folder has no such list, so there every file counts except caches. In both cases a
+    settings-like file (SECRET_SUFFIXES, or a name that starts with .env) that sets a password stops the step:
+    the zip is uploaded, and a password must not travel in it."""
     root = Path(root)
+    if (root / ".git").exists():
+        candidates = tracked_files(root, run)
+    else:
+        candidates = [path.relative_to(root) for path in root.rglob("*")]
     found = []
-    for path in root.rglob("*"):
-        relative = path.relative_to(root)
+    for relative in candidates:
+        path = root / relative
         if any(part in SKIP_FOLDERS for part in relative.parts[:-1]) or not path.is_file() or path.is_symlink():
             continue
         if path.name in SKIP_FILES or path.suffix in SKIP_SUFFIXES or relative.parts[0] in SKIP_FOLDERS:
             continue
-        found.append((relative.as_posix(), path))
+        name = relative.as_posix()
+        if (path.suffix.lower() in SECRET_SUFFIXES or path.name.lower().startswith(".env")) and name not in SECRET_EXAMPLES \
+                and SECRET_LINE.search(path.read_bytes()):
+            raise StepFailed(f"{name} in the release folder sets a password. The zip is uploaded, so nothing was zipped. "
+                             "Move the file outside the release folder")
+        found.append((name, path))
     return sorted(found)
 
 
-def build_zip(root, target):
+def build_zip(root, target, run=subprocess.run):
     """Writes the release zip and returns (SHA-256, number of files). The same files give the same bytes: entries
     are sorted, every entry has one fixed date and mode, and text files get LF line ends."""
     target = Path(target)
+    files = release_files(root, run)   # read in full first: a refused file must leave nothing written
     target.parent.mkdir(parents=True, exist_ok=True)
-    files = release_files(root)
     with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         for name, path in files:
             data = path.read_bytes()
@@ -274,7 +326,7 @@ def step_zip(ctx):
         return {"status": "dry-run", "line": f"would write {target} and a {SETTINGS_NAME} with its SHA-256"}
     if ls.is_inside(ctx.run_dir, ctx.release_root):
         raise StepFailed("the run folder is inside the release folder; the zip would hold itself")
-    sha256, count = build_zip(ctx.release_root, target)
+    sha256, count = build_zip(ctx.release_root, target, ctx.run)
     text = settings_with_checksum(ctx.settings_path.read_text(encoding="utf-8"), sha256)
     write_text(target.parent / SETTINGS_NAME, text)
     try:   # the copy is read back as the notebook will read it
@@ -464,10 +516,21 @@ def step_report(ctx):
 
 # ---- the local stores -----------------------------------------------------------------------------------
 
-def _loaded_in_databricks(ctx):
-    """The local loads follow a Databricks load of this release. --only and --from may run them on their own."""
+def not_loaded_reason(ctx):
+    """Why a store load may not run: this run's notebook step did not load the release. None when it did, or when
+    this run has no notebook step (--only and --from may run the loads on their own)."""
     notebook = ctx.earlier("notebook")
-    return notebook is None or notebook.get("status") in LOADED
+    if notebook is None or notebook.get("status") in LOADED:
+        return None
+    status = notebook.get("status")
+    if status == "blocked":
+        return ("the notebook stopped on a report, so Databricks does not hold this release. Clear the report, then "
+                "run the same command again without --skip report")
+    if status == "waiting":
+        return ("the notebook run has not ended, so Databricks may not hold this release yet. Run the same command "
+                "with --from notebook to wait for it")
+    return (f"the notebook step ended as {status}, so Databricks does not hold this release. Run the same command "
+            "with --from notebook")
 
 
 def step_fuseki(ctx):
@@ -502,11 +565,11 @@ def step_enterprise(ctx):
     if ctx.dry_run:
         return {"status": "dry-run", "line": "would copy the verified graph to the Enterprise database"}
     from . import copy_enterprise
-    labels = ctx.hooks["own_labels"] or copy_enterprise.OWN_LABELS
+    rules = ctx.hooks["own_rules"] or copy_enterprise.OWN_RULES
     try:
         with (ctx.run_dir / "enterprise.log").open("a", encoding="utf-8", newline="\n") as log:
             result = copy_enterprise.copy(ctx.local, ctx.release_root, replace=ctx.replace_enterprise,
-                                          extra_loads=ctx.hooks["neo4j_extra_loads"], own_labels=labels, log=log)
+                                          extra_loads=ctx.hooks["neo4j_extra_loads"], own_rules=rules, log=log)
     except copy_enterprise.Refused as err:
         raise StepFailed(str(err)) from None
     except Exception as err:
@@ -536,9 +599,12 @@ def step_summary(ctx):
     steps = {name: ctx.earlier(name) for name in STEPS if name != "summary"}
     ctx.out(f"summary of run {ctx.run_id}:")
     for name, result in steps.items():
-        if result:
+        if name in ctx.left_out:
+            ctx.out(f"  {name:<11} left out of this run")
+        elif result:
             ctx.out(f"  {name:<11} {result.get('status')}")
-    write_text(ctx.run_dir / "summary.json", json.dumps({"run": ctx.run_id, "steps": steps}, indent=2, default=str) + "\n")
+    write_text(ctx.run_dir / "summary.json", json.dumps({"run": ctx.run_id, "left_out": list(ctx.left_out), "steps": steps},
+                                                        indent=2, default=str) + "\n")
     return {"status": "written", "summary": str(ctx.run_dir / "summary.json"),
             "line": f"the run's files are in {ctx.run_dir}"}
 
@@ -565,9 +631,10 @@ def run_steps(ctx, names):
     """Runs the steps in order. Returns the exit code: 0, 1 (a step failed) or 3 (stopped for a person)."""
     for name in names:
         ctx.planned = []
-        if name in LOCAL_LOADS and not ctx.dry_run and not _loaded_in_databricks(ctx):
-            ctx.out(f"{name}: skipped, because Databricks did not load this release in this run")
-            continue
+        reason = not_loaded_reason(ctx) if name in LOCAL_LOADS and not ctx.dry_run else None
+        if reason:   # a load that did not run is never a pass
+            ctx.out(f"{name}: STOPPED. Next step: {reason}")
+            return 3
         try:
             result = STEP_FUNCTIONS[name](ctx)
         except Stop as stop:
@@ -575,8 +642,12 @@ def run_steps(ctx, names):
             return 3
         except StepFailed as err:
             if not ctx.dry_run:
-                failed = ctx.earlier(name) if name == "sync" else None
-                write_text(ctx.step_file(name), json.dumps(failed or {"status": "failed", "why": str(err)}, indent=2) + "\n")
+                kept = ctx.earlier(name) if name in ("sync", "notebook") else None
+                # A notebook run that is still waited for keeps its record: the record holds the Databricks run ID,
+                # and without it the next run would submit a second job.
+                if name == "notebook" and (kept or {}).get("status") != "waiting":
+                    kept = None
+                write_text(ctx.step_file(name), json.dumps(kept or {"status": "failed", "why": str(err)}, indent=2) + "\n")
             ctx.out(f"{name}: FAILED. {err}")
             return 1
         if ctx.dry_run:
@@ -622,7 +693,7 @@ def main(argv=None, **context_options):
     ap.add_argument("--dry-run", action="store_true", help="print each step's commands as argument lists and run nothing")
     args = ap.parse_args(argv)
     try:
-        local = ls.load(ls.locate(args.stores))
+        local = ls.load(ls.locate(args.stores), release_root=Path(args.release))
         run_root = local.need("run_folder")
         run_id = args.run_id or ((args.start or args.only) and newest_run(run_root)) or new_run_id()
         ctx = Context(local, args.release, run_id, mode=args.mode, dry_run=args.dry_run,
@@ -631,11 +702,22 @@ def main(argv=None, **context_options):
         print(f"runner: {err}", file=sys.stderr)
         return 2
     names = selected(args.only, args.start, args.skip)
+    ctx.left_out = [n for n in args.skip if n in selected(args.only, args.start)]
+    if args.mode == "check":   # the notebook loads nothing in this mode, so the stores are not loaded either
+        ctx.left_out += [n for n in names if n in LOCAL_LOADS]
+        names = [n for n in names if n not in LOCAL_LOADS]
     ctx.out(f"run {run_id}{' (dry run)' if args.dry_run else ''}: {', '.join(names)}")
     code = run_steps(ctx, names)
     if code == 0 and not args.dry_run:
-        ctx.out("every step passed")
+        ctx.out(closing_line(ctx.left_out))
     return code
+
+
+def closing_line(left_out):
+    """The last line of a run whose steps all passed. It says so only when no step was left out."""
+    if not left_out:
+        return "every step passed"
+    return f"the steps that ran passed; left out: {', '.join(left_out)} (not run, so not checked)"
 
 
 if __name__ == "__main__":

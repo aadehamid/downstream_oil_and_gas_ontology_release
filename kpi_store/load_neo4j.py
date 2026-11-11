@@ -20,8 +20,13 @@ release record for each newest release.
 A second run on the same release finds the marker, the report and an equal graph hash, and changes nothing.
 --force loads again.
 
-The skill's scripts read the Neo4j login from a file. This module writes that file into the run folder, outside
-the release, for the length of the load, and deletes it afterwards. No password is printed or logged.
+What is loaded is each module's newest release in this folder, read from the catalog, with the package versions of
+the projection configuration set to match. So a correction version made by the cut is the one that is loaded.
+
+Three of the skill's scripts (model_review.py, module_tags.py, release_record.py) take the Neo4j user and database
+from a login file only. This module therefore writes that file into the run folder, outside the release, readable
+by this user only, for the length of the load. It is removed on every way out, a failed start and Ctrl+C included.
+No password is printed or logged.
 
 Needs rdflib, pyshacl, pyoxigraph and neo4j, Java, and ROBOT 1.9.10 at the path [projection] robot_jar names.
 Exit 0 when the load is current or passed, 1 when a step or check failed, 2 on bad settings.
@@ -47,6 +52,7 @@ PROJECTION = Path("business_architecture") / "ontology" / "projection"
 RUN_CONFIG = PROJECTION / "skill-run" / "epm-run.json"
 REPORT, RECORDS, RUN_MANIFEST, INFERRED = "projection-report.json", "release-records.json", "run-manifest.json", "inferred.nt"
 ENV_FILE, LOG_FILE, CONFIG_FILE = "neo4j-local.env", "neo4j-load.log", "projection-run.json"
+PROJECTION_CONFIG_FILE = "projection-config.json"
 MARKER_HASH = "graph_hash"   # this load's own marker field: the verified graph's hash
 
 
@@ -78,11 +84,12 @@ def release_code(release_root):
     import load_verify
     import logical_models
     import module_tags
+    import pipeline
     import release_record
     import run_projection
     import sync_stores
     _CODE[root] = SimpleNamespace(rp=run_projection, cg=copy_graph, lv=load_verify, rr=release_record, mt=module_tags,
-                                  build=build, ss=sync_stores, lm=logical_models)
+                                  build=build, ss=sync_stores, lm=logical_models, pipeline=pipeline)
     return _CODE[root]
 
 
@@ -120,14 +127,64 @@ def run_config(release_root, local, env_file):
 
 
 def write_env_file(path, neo4j):
-    """The login file the skill's scripts read. Only this user may read it; the caller deletes it after the load."""
+    """The login file the skill's scripts read. It is created for this user only (mode 600 where the system
+    honours it), and a write that fails removes what it wrote."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
-        f.write(f"NEO4J_URI={neo4j.uri}\nNEO4J_USERNAME={neo4j.username}\nNEO4J_PASSWORD={neo4j.password.reveal()}\n"
-                f"NEO4J_DATABASE={neo4j.database}\n")
+    path.unlink(missing_ok=True)   # never write through a file someone else may have opened
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
+            f.write(f"NEO4J_URI={neo4j.uri}\nNEO4J_USERNAME={neo4j.username}\nNEO4J_PASSWORD={neo4j.password.reveal()}\n"
+                    f"NEO4J_DATABASE={neo4j.database}\n")
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
     return path
+
+
+@contextlib.contextmanager
+def login_file(path, neo4j):
+    """The login file for the length of a with block. The clean-up scope opens before the file is created, so no
+    way out of the block, an error or Ctrl+C included, leaves the file."""
+    try:
+        yield write_env_file(path, neo4j)
+    finally:
+        Path(path).unlink(missing_ok=True)
+
+
+def newest_inputs(release_root, newest, code):
+    """(data files, shape files, {module: version}) of the newest releases, as the projection reads them: each
+    module's package file and its shapes, then the shape files outside the packages. The modules keep the order
+    the projection's own list gives them; the versions come from `newest`, the catalog's newest version IRIs, so a
+    version the list does not name yet, such as a correction, is the one that is read."""
+    ontology = Path(release_root).resolve() / "business_architecture" / "ontology"
+    versions = {iri.rsplit("/", 2)[-2]: iri.rsplit("/", 2)[-1] for iri in newest}
+    listed = [module for module, _ in code.pipeline.PACKAGES]
+    order = [m for m in listed if m in versions] + sorted(set(versions) - set(listed))
+    folders = [ontology / "releases" / module / versions[module] for module in order]
+    data = [folder / f"{module}.ttl" for module, folder in zip(order, folders)]
+    shapes = [folder / "shapes.ttl" for folder in folders]
+    shapes += [ontology / path for path in code.pipeline.SHAPES if not path.startswith("releases/")]
+    missing = [str(p) for p in data + shapes if not p.is_file()]
+    if missing:
+        raise LoadError(f"the release lacks {missing[0]}")
+    return [str(p) for p in data], [str(p) for p in shapes], {module: versions[module] for module in order}
+
+
+def with_newest_inputs(cfg_doc, release_root, newest, code, run_dir):
+    """The run configuration that reads the newest releases: its input list written out, and a copy of the
+    projection configuration, in the run folder, whose package versions are those releases'."""
+    data, shapes, versions = newest_inputs(release_root, newest, code)
+    try:
+        projection = json.loads(Path(cfg_doc["projection_config"]).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as err:
+        raise LoadError(f"cannot read the projection configuration: {type(err).__name__}") from None
+    projection["packages"] = versions
+    copy = Path(run_dir) / PROJECTION_CONFIG_FILE
+    copy.write_text(json.dumps(projection, indent=2) + "\n", encoding="utf-8", newline="\n")
+    cfg = {k: v for k, v in cfg_doc.items() if k != "inputs_script"}
+    return cfg | {"data": data, "shapes": shapes, "projection_config": str(copy)}
 
 
 def plain_command(cmd, prefixes, java=None):
@@ -263,9 +320,9 @@ def load(local, release_root, run_dir=None, force=False, code=None, connect=conn
 
     java = load_fuseki.find_java((local.fuseki.java if local.fuseki else None))
     config_path = run_dir / CONFIG_FILE
-    config_path.write_text(json.dumps(cfg_doc, indent=2) + "\n", encoding="utf-8", newline="\n")
-    write_env_file(env_file, neo4j)
-    try:
+    config_path.write_text(json.dumps(with_newest_inputs(cfg_doc, release_root, want["newest"], code, run_dir), indent=2) + "\n",
+                           encoding="utf-8", newline="\n")
+    with login_file(env_file, neo4j):
         with (run_dir / LOG_FILE).open("a", encoding="utf-8", newline="\n") as log:
             try:
                 cfg = code.rp.read_config(str(config_path))
@@ -281,8 +338,6 @@ def load(local, release_root, run_dir=None, force=False, code=None, connect=conn
                 models = load_models(session, STORE, want["newest"], code, log)
                 extras = [extra(session, STORE) for extra in extra_loads]
                 marker = mark(session, STORE, want, report, code.ss, release_label(release_root, code.ss))
-    finally:
-        env_file.unlink(missing_ok=True)
     return {**result, "status": "loaded", **summary(report), "logical_models": models, "extra_loads": extras, "marker": marker}
 
 
@@ -312,7 +367,7 @@ def main(argv=None):
     ap.add_argument("--json", action="store_true", help="print the result as JSON instead of one line")
     args = ap.parse_args(argv)
     try:
-        local = ls.load(ls.locate(args.stores))
+        local = ls.load(ls.locate(args.stores), release_root=Path(args.release))
         result = load(local, Path(args.release), force=args.force)
     except ls.LocalSettingsError as err:
         print(f"neo4j (local): {err}", file=sys.stderr)

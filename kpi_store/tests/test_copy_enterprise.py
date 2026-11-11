@@ -57,7 +57,7 @@ def test_the_statements_the_copy_sends_pass_the_guard():
             REAL.rr.CLEAR, REAL.rr.WRITE, REAL.rr.READ, REAL.mt.NODES, REAL.mt.EDGES, REAL.mt.CLEAR_MODULES, REAL.mt.MODULES,
             REAL.mt.REQUIRES, REAL.lm.NEO4J_NODES, REAL.lm.NEO4J_EDGES, "CALL db.info() YIELD id RETURN id",
             "MERGE (m:EpmStoreMarker {store: $s}) SET m = $p",
-            "MATCH (n:Resource) CALL (n) { DETACH DELETE n } IN TRANSACTIONS OF 1000 ROWS"]
+            f"MATCH (n) WHERE {ce.own_predicate()} CALL (n) {{ DETACH DELETE n }} IN TRANSACTIONS OF 1000 ROWS"]
     for statement in sent:
         ce.check_statement(statement)
     query = SimpleNamespace(text="MATCH (n:Resource) RETURN count(n) AS n")   # the driver's Query object has .text
@@ -88,24 +88,62 @@ def test_a_refused_statement_never_reaches_the_session_or_a_transaction():
 
 # ---- what the target holds, and the decision -------------------------------------------------------
 
+BASES = ["https://w3id.org/mpc/ontology/modules/data-product/", "https://w3id.org/mpc/ontology/modules/kpi/"]
+
+
 def test_holdings_tell_the_kpi_stores_nodes_from_the_others():
     db = graph()
-    db.add(["LogicalModel", "Entity"], 4)
-    assert ce.holdings(db) == {"nodes": 12, "own": {"Resource": 5, "ModuleRelease": 2, "EpmStoreMarker": 1, "LogicalModel": 4},
-                               "foreign": {}, "foreign_nodes": 0}
+    db.add(["LogicalModel", "Entity"], 4, uri="urn:sample:entity", models=["sample-model"])
+    assert ce.holdings(db, BASES) == {"nodes": 12, "own": {"Resource": 5, "ModuleRelease": 2, "EpmStoreMarker": 1, "LogicalModel": 4},
+                                      "foreign": {}, "foreign_nodes": 0, "foreign_examples": []}
     db.add(["Invoice"], 2)
     db.add(["Invoice", "Paid"])
     db.add([])
-    held = ce.holdings(db)
+    held = ce.holdings(db, BASES)
     assert (held["nodes"], held["foreign_nodes"]) == (16, 4)
     assert held["foreign"] == {"Invoice": 3, "Paid": 1, "(no label)": 1}
-    assert ce.holdings(db, ce.OWN_LABELS + ("Invoice",))["foreign_nodes"] == 1
+
+
+@pytest.mark.parametrize("labels, props", [
+    (["Resource", "Customer"], {"uri": "https://other.example/x"}),                    # a generic label, another graph's IRI
+    (["Resource"], {"uri": "https://other.example/y", "graph": "https://other.example/graph/1.0.0"}),   # tagged, by another release
+    (["Resource"], {"graph": "https://w3id.org/mpc/ontology/modules/kpi/1.0.0"}),          # no uri
+    (["Resource"], {"uri": "https://other.example/z", "graph": ["a", "list"]}),
+    (["ModuleRelease"], {"version_iri": "https://other.example/module/1.0.0"}),
+    (["Module"], {"uri": "https://other.example/module/1.0.0"}),
+    (["EpmStoreMarker"], {"store": "enterprise"}),
+    (["LogicalModel"], {"name": "someone else's model"}),
+    (["LogicalModelMarker"], {"store": "enterprise"}),
+])
+def test_a_node_that_only_shares_a_label_with_the_kpi_store_is_foreign_and_survives_a_replace(labels, props):
+    db = graph()
+    db.add(labels, **props)
+    db.add(["Account"], id=7)   # the foreign node's neighbour
+    held = ce.holdings(db, BASES)
+    assert held["foreign_nodes"] == 2 and held["own"] == {"Resource": 5, "ModuleRelease": 2, "EpmStoreMarker": 1}
+    assert held["foreign_examples"][0].startswith(":".join(labels))
+    with pytest.raises(ce.Refused, match=r"holds 2 node\(s\) that are not the KPI Store's"):
+        ce.decide(held, TARGET, replace=True)
+    ce.remove_own(db, BASES)   # even a delete that did run takes the KPI Store's nodes only
+    assert db.nodes == [(labels, props), (["Account"], {"id": 7})]
+
+
+def test_the_check_and_the_delete_use_one_rule():
+    rule = ce.own_predicate()
+    assert rule.startswith("coalesce((n:Resource AND n.uri IS NOT NULL AND any(b IN $bases WHERE toStringOrNull(n.graph) STARTS WITH b))")
+    db = graph()
+    ce.holdings(db, BASES)
+    ce.remove_own(db, BASES)
+    assert all(rule in statement for statement in db.statements) and len(db.statements) == 2
+    assert "MATCH (n) WHERE " + rule + " CALL (n) { DETACH DELETE n }" in db.statements[1]
+    assert not any(statement.startswith("MATCH (n) CALL") or "MATCH (n) DETACH" in statement for statement in db.statements)
 
 
 def test_the_replace_needs_a_decision_and_foreign_nodes_always_stop_it():
-    empty = {"nodes": 0, "own": {}, "foreign": {}, "foreign_nodes": 0}
-    own = {"nodes": 7, "own": {"Resource": 5, "ModuleRelease": 2}, "foreign": {}, "foreign_nodes": 0}
-    mixed = {"nodes": 9, "own": {"Resource": 5}, "foreign": {"Invoice": 3, "Note": 1}, "foreign_nodes": 4}
+    empty = {"nodes": 0, "own": {}, "foreign": {}, "foreign_nodes": 0, "foreign_examples": []}
+    own = {"nodes": 7, "own": {"Resource": 5, "ModuleRelease": 2}, "foreign": {}, "foreign_nodes": 0, "foreign_examples": []}
+    mixed = {"nodes": 9, "own": {"Resource": 5}, "foreign": {"Invoice": 3, "Note": 1}, "foreign_nodes": 4,
+             "foreign_examples": ["Invoice", "Note"]}
     assert ce.decide(empty, TARGET) == "empty"
     with pytest.raises(ce.Refused, match=r"holds 7 node\(s\) of the KPI Store, by label: 2 ModuleRelease, 5 Resource. Nothing was changed"):
         ce.decide(own, TARGET)
@@ -116,17 +154,15 @@ def test_the_replace_needs_a_decision_and_foreign_nodes_always_stop_it():
     with pytest.raises(ce.Refused, match="Nothing was changed"):
         ce.decide(own, TARGET, confirm=lambda text: "yes")
     for options in ({}, {"replace": True}, {"confirm": lambda text: TARGET}):
-        with pytest.raises(ce.Refused, match=r"holds 4 node\(s\) that are not the KPI Store's, by label: 3 Invoice, 1 Note. Nothing was changed"):
+        with pytest.raises(ce.Refused, match=r"holds 4 node\(s\) that are not the KPI Store's, by label: 3 Invoice, 1 Note; for example Invoice, Note. Nothing was changed"):
             ce.decide(mixed, TARGET, **options)
 
 
-def test_the_replace_deletes_by_own_label_and_leaves_other_nodes():
+def test_the_replace_deletes_the_kpi_stores_nodes_and_leaves_other_nodes():
     db = graph()
     db.add(["Invoice"], 3)
-    ce.remove_own(db)
-    assert db.nodes == [(["Invoice"], {})] * 3
-    assert len(db.statements) == 6 and all(s.startswith(f"MATCH (n:{label}) CALL (n) {{ DETACH DELETE n }}")
-                                           for s, label in zip(db.statements, ce.OWN_LABELS))
+    ce.remove_own(db, BASES)
+    assert db.nodes == [(["Invoice"], {})] * 3 and len(db.statements) == 1
 
 
 # ---- the checks after the copy ---------------------------------------------------------------------
@@ -234,6 +270,13 @@ def test_the_copy_is_refused_before_any_write(local_and_out, monkeypatch):
     foreign.add(["Invoice"], 3)
     with pytest.raises(ce.Refused, match=r"3 node\(s\) that are not the KPI Store's, by label: 3 Invoice"):
         run_copy(local, graph(), foreign, monkeypatch, replace=True)
+    shared = graph(hash_="hash-0")   # the KPI Store's old graph, and one node of someone else's that is also labelled Resource
+    shared.name, shared.ident = TARGET, "db-2"
+    shared.add(["Resource", "Customer"], uri="https://other.example/x")
+    with pytest.raises(ce.Refused, match=r"1 node\(s\) that are not the KPI Store's, by label: 1 Customer, 1 Resource; "
+                                         r"for example Resource:Customer https://other.example/x"):
+        run_copy(local, graph(), shared, monkeypatch, replace=True)
+    assert shared.count("Resource") == 6 and shared.writes() == []
     held = graph(hash_="hash-0")
     held.name, held.ident = TARGET, "db-2"
     with pytest.raises(ce.Refused, match="Run the command again with --replace"):
@@ -253,7 +296,7 @@ def test_a_decided_replace_removes_the_old_graph_first(local_and_out, monkeypatc
     assert result["status"] == "copied" and result["replaced"] is True and result["held_before"]["own"]["Resource"] == 5
     assert held.count("Resource") == 5 and held.count("EpmStoreMarker") == 1
     first_write = held.writes()[0]
-    assert first_write.startswith("MATCH (n:Resource) CALL (n) { DETACH DELETE n }")
+    assert first_write.startswith("MATCH (n) WHERE coalesce((n:Resource AND ") and "DETACH DELETE n" in first_write
 
 
 def test_a_copy_whose_hash_differs_writes_no_marker(local_and_out, monkeypatch):

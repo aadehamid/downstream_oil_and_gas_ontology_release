@@ -22,7 +22,7 @@ def context(tmp_path, run=None, which=None, connect=None, version=(3, 12, 4), in
 
 def test_the_checks_have_these_names_in_this_order():
     assert list(sc.CHECKS) == ["python", "packages", "local-settings", "kpi-store-settings", "java", "fuseki-jar", "robot-jar",
-                               "bash", "check-script-tools", "databricks-cli", "databricks-auth", "neo4j-local",
+                               "bash", "uv", "check-script-tools", "databricks-cli", "databricks-auth", "neo4j-local",
                                "neo4j-plugins", "neo4j-enterprise"]
 
 
@@ -53,6 +53,14 @@ def test_the_local_settings_must_exist_outside_the_release(tmp_path):
     assert sc.local_settings(inside)[0] is False and "inside the release folder" in sc.local_settings(inside)[1]
     # A check that needs the settings fails with the settings' fix, not with an error.
     assert sc.java(inside) == (False, f"needs the local settings file: {inside.local_error}", sc.SETTINGS_FIX)
+
+
+def test_the_settings_are_checked_against_the_release_folder_the_command_was_given(tmp_path, capsys):
+    other = tmp_path / "other-release"   # not the folder this code is in
+    stores_support.local_settings(other / "conf")
+    assert sc.main(["--stores", str(other / "conf" / "stores.toml"), "--only", "local-settings"]) == 0
+    assert sc.main(["--stores", str(other / "conf" / "stores.toml"), "--release", str(other), "--only", "local-settings"]) == 1
+    assert "inside the release folder" in capsys.readouterr().out
 
 
 def test_the_kpi_store_settings_file_must_be_valid(tmp_path):
@@ -110,6 +118,11 @@ def test_bash_on_windows_is_git_bash_and_never_the_linux_subsystems(tmp_path):
     assert not ok and "scripts/check.sh is a bash script" in detail and "Install Git for Windows" in fix
 
 
+def test_uv_must_be_on_the_path(tmp_path):
+    assert sc.uv(context(tmp_path, which=lambda name: "/sample/uv" if name == "uv" else None)) == (True, "/sample/uv", "")
+    assert sc.uv(context(tmp_path)) == (False, "uv was not found; scripts/check.sh runs its checks through uv", "py -m pip install uv")
+
+
 def test_the_check_script_needs_python3_and_uv_inside_bash(tmp_path):
     bash = tmp_path / "bash"
     bash.write_text("", encoding="utf-8")
@@ -140,7 +153,8 @@ def test_the_databricks_cli_must_run_and_the_profile_must_be_signed_in(tmp_path)
     assert sc.databricks_auth(ctx) == (False, "the profile DEFAULT is not signed in",
                                        "databricks auth login --host <your workspace> --profile DEFAULT")
     ok, detail, fix = sc.databricks_cli(context(tmp_path))
-    assert not ok and detail == "the Databricks CLI was not found" and "winget install Databricks.DatabricksCLI" in fix
+    assert not ok and detail == "the Databricks CLI was not found" and "winget" not in fix
+    assert '"Install or update the Databricks CLI", https://docs.databricks.com/aws/en/dev-tools/cli/install' in fix
     assert sc.find_databricks(stores_support.local_settings(tmp_path, cli='cli = "gone.exe"'), which) is None
 
 
@@ -201,12 +215,12 @@ def test_the_enterprise_database_must_be_reachable_and_be_the_named_one(tmp_path
 
 
 def test_the_command_prints_one_fix_per_failure_and_exits_1(tmp_path, capsys):
-    make = lambda stores: context(tmp_path, version=(3, 10, 0))   # noqa: E731
+    make = lambda stores, release_root=None: context(tmp_path, version=(3, 10, 0))   # noqa: E731
     assert sc.main(["--only", "python", "--only", "local-settings"], context=make) == 1
     out = capsys.readouterr().out.splitlines()
     assert out[0].startswith("FAIL python") and out[1].startswith("     fix: Install Python 3.11 or later")
     assert out[2].startswith("ok   local-settings") and out[3] == "1 of 2 checks passed; fix the 1 above and run this again"
     assert sc.main(["--only", "local-settings"], context=make) == 0
-    assert sc.main(["--list"]) == 0 and capsys.readouterr().out.splitlines()[-14:] == list(sc.CHECKS)
+    assert sc.main(["--list"]) == 0 and capsys.readouterr().out.splitlines()[-15:] == list(sc.CHECKS)
     with pytest.raises(SystemExit):
         sc.main(["--only", "no-such-check"])

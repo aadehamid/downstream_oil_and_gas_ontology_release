@@ -87,6 +87,7 @@ def test_the_start_command_keeps_the_dataset_on_disk_when_a_folder_is_named(tmp_
     memory = stores_support.local_settings(tmp_path, data_folder='data_folder = ""', url='url = "http://localhost:17999/kpi"').fuseki
     assert lf.start_command("java", memory) == [
         "java", "-jar", str(tmp_path / "jena-fuseki-server-6.2.0.jar"), "--mem", "--update", "--localhost", "--port", "17999", "/kpi"]
+    assert lf.start_command("java", memory, "ab12")[:3] == ["java", "-Dkpi_store.fuseki=ab12", "-jar"]
 
 
 class Process:
@@ -104,10 +105,13 @@ def test_start_waits_until_the_dataset_answers_and_writes_the_process_id(tmp_pat
     def popen(cmd, **options):
         started.append((cmd, options))
         return Process()
-    pid = lf.start("java", fuseki, tmp_path / "state", popen=popen, answers=lambda f: next(polls), sleep=lambda s: None)
-    assert pid == 4242 and (tmp_path / "state" / "fuseki.pid").read_text(encoding="utf-8") == "4242\n"
+    pid = lf.start("java", fuseki, tmp_path / "state", popen=popen, answers=lambda f: next(polls), sleep=lambda s: None, token="ab12")
+    assert pid == 4242 and json.loads((tmp_path / "state" / "fuseki.pid").read_text(encoding="utf-8")) == {"pid": 4242, "token": "ab12"}
     cmd, options = started[0]
-    assert cmd == lf.start_command("java", fuseki) and options["stdin"] == lf.subprocess.DEVNULL
+    assert cmd == lf.start_command("java", fuseki, "ab12") and options["stdin"] == lf.subprocess.DEVNULL
+    lf.start("java", fuseki, tmp_path / "other", popen=popen, answers=lambda f: True)
+    token = json.loads((tmp_path / "other" / "fuseki.pid").read_text(encoding="utf-8"))["token"]
+    assert len(token) == 32 and token != "ab12" and f"-Dkpi_store.fuseki={token}" in started[1][0]   # a new token per start
     assert options.get("start_new_session") is True or "creationflags" in options
     assert (tmp_path / "fuseki-db").is_dir() and (tmp_path / "state" / "fuseki.log").is_file()
 
@@ -129,12 +133,59 @@ def test_a_fuseki_on_another_machine_is_never_started(tmp_path):
         lf.start("java", remote, tmp_path / "state", popen=popen)
 
 
+OURS = "/sample/java -Dkpi_store.fuseki=ab12 -jar jena-fuseki-server-6.2.0.jar --tdb2 --loc db --update --localhost --port 3030 /ds"
+
+
+def saved(tmp_path, text='{"pid": 4242, "token": "ab12"}'):
+    (tmp_path / "fuseki.pid").write_text(text + "\n", encoding="utf-8")
+
+
 def test_stop_ends_the_process_start_wrote_and_only_once(tmp_path):
-    (tmp_path / "fuseki.pid").write_text("4242\n", encoding="utf-8")
+    saved(tmp_path)
     killed = []
-    assert lf.stop(tmp_path, kill=lambda pid, sig: killed.append((pid, sig))) == 4242
+    kill = lambda pid, sig: killed.append((pid, sig))   # noqa: E731
+    assert lf.stop(tmp_path, kill=kill, command_line=lambda pid: OURS if pid == 4242 else None) == ("stopped", 4242)
     assert killed == [(4242, signal.SIGTERM)] and not (tmp_path / "fuseki.pid").exists()
-    assert lf.stop(tmp_path, kill=lambda pid, sig: killed.append((pid, sig))) is None and len(killed) == 1
+    assert lf.stop(tmp_path, kill=kill, command_line=lambda pid: OURS) == ("none", None) and len(killed) == 1
+
+
+@pytest.mark.parametrize("now_running", [
+    "/usr/bin/some-editor notes.txt",                                                      # the number went to another program
+    "/sample/java -Dkpi_store.fuseki=ffff -jar jena-fuseki-server-6.2.0.jar --mem /ds",   # another start of Fuseki
+    "/sample/java -jar jena-fuseki-server-6.2.0.jar --mem --update --port 3030 /ds",      # a Fuseki someone else started
+    None,                                                                                  # no such process, or it cannot be read
+])
+def test_a_saved_process_id_that_now_belongs_to_another_process_is_never_signalled(tmp_path, now_running):
+    saved(tmp_path)
+    def kill(pid, sig):
+        raise AssertionError("another process was signalled")
+    assert lf.stop(tmp_path, kill=kill, command_line=lambda pid: now_running) == ("stale", 4242)
+    assert not (tmp_path / "fuseki.pid").exists()
+
+
+@pytest.mark.parametrize("text", ["4242", '{"pid": 4242}', '{"pid": 4242, "token": ""}', "not json"])
+def test_a_saved_file_without_a_token_proves_nothing_and_stops_nothing(tmp_path, text):
+    saved(tmp_path, text)
+    def kill(pid, sig):
+        raise AssertionError("a process was signalled on its number alone")
+    outcome, _ = lf.stop(tmp_path, kill=kill, command_line=lambda pid: OURS.replace("ab12", ""))
+    assert outcome == "stale" and not (tmp_path / "fuseki.pid").exists()
+
+
+def test_the_command_line_is_read_with_no_shell_on_either_system():
+    calls = []
+    def run(cmd, **options):
+        calls.append((cmd, options))
+        return SimpleNamespace(returncode=0, stdout=OURS + "\n")
+    assert lf.command_line(4242, run, windows=False) == OURS and lf.command_line(4242, run, windows=True) == OURS
+    assert calls[0][0] == ["ps", "-p", "4242", "-o", "command="]
+    assert calls[1][0] == ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+                           "(Get-CimInstance Win32_Process -Filter 'ProcessId=4242').CommandLine"]
+    assert all("shell" not in options for _, options in calls)
+    assert lf.command_line(4242, lambda cmd, **o: SimpleNamespace(returncode=1, stdout=""), windows=False) is None
+    def missing(cmd, **options):
+        raise OSError("no ps")
+    assert lf.command_line(4242, missing, windows=False) is None
 
 
 def test_a_fuseki_that_answers_is_reused_without_java(tmp_path, monkeypatch):

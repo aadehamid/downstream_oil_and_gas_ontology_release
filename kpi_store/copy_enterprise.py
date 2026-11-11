@@ -14,8 +14,11 @@ What this command may touch on Enterprise, enforced in code:
   every statement passes one guard that refuses such a statement before it is sent.
 - A database that already holds nodes is replaced only on an explicit decision: --replace, or the database's name
   typed at the prompt, which first shows what the database holds. When it holds any node that is not the KPI
-  Store's, the command stops and changes nothing, whatever was decided. The KPI Store's nodes carry one of the
-  labels in OWN_LABELS; the replace deletes those nodes only.
+  Store's, the command stops and changes nothing, whatever was decided.
+- A node is the KPI Store's by what only its own loads write, never by a label alone (OWN_RULES). A Resource
+  node, for example, must carry the release tag of one of this release's modules; a node that is merely
+  labelled Resource is someone else's. The check of what the database holds and the delete of a replace use
+  the same rule, so the replace cannot delete a node the check did not count as the KPI Store's.
 
 After the copy, in the target database: the graph hash must equal the local graph's, the counts must equal the
 load report's, the release records are written and read back, each node's and relationship's release tag is
@@ -33,14 +36,29 @@ import sys
 from pathlib import Path
 
 from . import load_databricks as ldb
+from . import load_fuseki
 from . import load_neo4j as local_load
 from . import local_settings as ls
 from . import ontology_view as ov
 
 STORE = "enterprise"   # the name the target database's marker carries
-# The labels of the nodes the KPI Store writes: the ontology, its release records and module graph, the marker, and
-# the logical models with their marker. A node with none of them is someone else's.
-OWN_LABELS = ("Resource", "ModuleRelease", "Module", "EpmStoreMarker", "LogicalModel", "LogicalModelMarker")
+# What makes a node the KPI Store's: its label AND what only the KPI Store's own load writes on it. $bases holds
+# the IRI every version of each module of the release starts with (load_fuseki.module_bases).
+#   Resource            module_tags.py tags every projected node with its release's version IRI, in `graph`
+#   ModuleRelease       release_record.py writes the release's version IRI
+#   Module              module_tags.py's module graph: the node's uri is a version IRI
+#   EpmStoreMarker      the marker's store name and catalog digest
+#   LogicalModel        logical_models.py: a uri, and the model's slug or the models the node belongs to
+#   LogicalModelMarker  the digest of the model files, and the store name
+OWN_RULES = {
+    "Resource": "n.uri IS NOT NULL AND any(b IN $bases WHERE toStringOrNull(n.graph) STARTS WITH b)",
+    "ModuleRelease": "any(b IN $bases WHERE toStringOrNull(n.version_iri) STARTS WITH b)",
+    "Module": "any(b IN $bases WHERE toStringOrNull(n.uri) STARTS WITH b)",
+    "EpmStoreMarker": "n.store IS NOT NULL AND n.catalog_digest IS NOT NULL",
+    "LogicalModel": "n.uri IS NOT NULL AND (n.models IS NOT NULL OR n.slug IS NOT NULL)",
+    "LogicalModelMarker": "n.digest IS NOT NULL AND n.store IS NOT NULL",
+}
+OWN_LABELS = tuple(OWN_RULES)
 BATCH = 1000
 QUERY_TIMEOUT = 600
 # Administration of the server, a change of database inside a statement, and any DROP.
@@ -125,20 +143,32 @@ def open_target(driver, name):
 
 # ---- what the target holds, and the decision to replace it ----------------------------------------
 
-def holdings(session, own=OWN_LABELS):
+def own_predicate(rules=OWN_RULES):
+    """The Cypher condition that is true for a node `n` of the KPI Store. holdings and remove_own both use it."""
+    return "coalesce(" + " OR ".join(f"(n:{label} AND {condition})" for label, condition in rules.items()) + ", false)"
+
+
+def holdings(session, bases, rules=OWN_RULES):
     """What the database holds: {"nodes", "own": {own label: nodes}, "foreign": {label or "(no label)": nodes},
-    "foreign_nodes"}. A node is foreign when it carries none of the own labels."""
-    held = {"nodes": 0, "own": {}, "foreign": {}, "foreign_nodes": 0}
-    for row in session.run("MATCH (n) RETURN labels(n) AS labels, count(*) AS n").data():
+    "foreign_nodes", "foreign_examples"}. A node is foreign unless own_predicate holds for it, whatever its
+    labels are. foreign_examples names up to five foreign nodes by their labels and uri."""
+    held = {"nodes": 0, "own": {}, "foreign": {}, "foreign_nodes": 0, "foreign_examples": []}
+    rows = session.run(f"MATCH (n) WITH labels(n) AS labels, {own_predicate(rules)} AS own "
+                       "RETURN own, labels, count(*) AS n", bases=list(bases)).data()
+    for row in rows:
         labels, n = row["labels"], row["n"]
         held["nodes"] += n
-        mine = [label for label in own if label in labels]
-        if mine:
-            held["own"][mine[0]] = held["own"].get(mine[0], 0) + n
+        if row["own"]:
+            first = next(label for label in rules if label in labels)
+            held["own"][first] = held["own"].get(first, 0) + n
         else:
             held["foreign_nodes"] += n
             for label in labels or ["(no label)"]:
                 held["foreign"][label] = held["foreign"].get(label, 0) + n
+    if held["foreign_nodes"]:
+        found = session.run(f"MATCH (n) WHERE NOT {own_predicate(rules)} "
+                            "RETURN labels(n) AS labels, n.uri AS uri ORDER BY toStringOrNull(n.uri) LIMIT 5", bases=list(bases)).data()
+        held["foreign_examples"] = [":".join(r["labels"]) + (f" {r['uri']}" if r["uri"] else "") for r in found]
     return held
 
 
@@ -154,8 +184,9 @@ def decide(held, database, replace=False, confirm=None):
         return "empty"
     if held["foreign_nodes"]:
         raise Refused(f"the database {database} holds {held['foreign_nodes']} node(s) that are not the KPI Store's, "
-                      f"by label: {describe(held['foreign'])}. Nothing was changed, and this command will not "
-                      "delete them. Check [neo4j.enterprise] database, or ask the owner of those nodes")
+                      f"by label: {describe(held['foreign'])}; for example {', '.join(held.get('foreign_examples') or ['(none read)'])}. "
+                      "Nothing was changed, and this command will not delete them. Check [neo4j.enterprise] database, "
+                      "or ask the owner of those nodes")
     what = f"the database {database} holds {held['nodes']} node(s) of the KPI Store, by label: {describe(held['own'])}"
     if replace:
         return "replace"
@@ -164,10 +195,10 @@ def decide(held, database, replace=False, confirm=None):
     raise Refused(f"{what}. Nothing was changed. Run the command again with --replace to replace them")
 
 
-def remove_own(session, own=OWN_LABELS, batch=BATCH):
-    """Deletes the KPI Store's nodes, one own label at a time, in batches. Never every node."""
-    for label in own:
-        session.run(f"MATCH (n:{label}) CALL (n) {{ DETACH DELETE n }} IN TRANSACTIONS OF {int(batch)} ROWS").consume()
+def remove_own(session, bases, rules=OWN_RULES, batch=BATCH):
+    """Deletes the KPI Store's nodes, in batches: exactly the nodes own_predicate holds for, never every node."""
+    session.run(f"MATCH (n) WHERE {own_predicate(rules)} CALL (n) {{ DETACH DELETE n }} IN TRANSACTIONS OF {int(batch)} ROWS",
+                bases=list(bases)).consume()
 
 
 # ---- the checks after the copy ----------------------------------------------------------------------
@@ -211,13 +242,13 @@ def write_records(target, out, code):
 # ---- the copy ------------------------------------------------------------------------------------
 
 def copy(local, release_root, replace=False, confirm=None, code=None, connect=local_load.connect, extra_loads=(),
-         own_labels=OWN_LABELS, log=None):
+         own_rules=OWN_RULES, log=None):
     """The whole step. Returns a dict whose "status" is "current" (nothing was changed) or "copied". Raises
     Refused when the copy is refused or a check fails.
 
     extra_loads are functions (session, store name) -> dict that load a subgraph of their own after the logical
-    models and before the marker; own_labels must then also name that subgraph's labels. The technical graph
-    joins here."""
+    models and before the marker; own_rules must then also hold that subgraph's labels, each with the condition
+    that only its loader's nodes meet. The technical graph joins here."""
     code = code or local_load.release_code(release_root)
     source_cfg, target_cfg = local.need("neo4j_local"), local.need("neo4j_enterprise")
     out = local.need("projection_out")
@@ -242,14 +273,15 @@ def copy(local, release_root, replace=False, confirm=None, code=None, connect=lo
         if source_hash != report["determinism_hash_sorted"]:
             raise Refused("the local graph is not the graph the load report verified; nothing was changed on "
                           "Enterprise. Run the local Neo4j load again")
-        held = holdings(target, own_labels)
+        bases = load_fuseki.module_bases(code.ss)
+        held = holdings(target, bases, own_rules)
         if held["nodes"] and not held["foreign_nodes"] and local_load.is_current(target, STORE, want, report, code, sep) \
                 and local_load.models_status(target, STORE, want["newest"], code)[1] in ("current", "none"):
             return {**result, "status": "current", "nodes": report["nodes"], "relationships": report["relationships"],
                     "graph_hash": source_hash, "held_before": held, "marker": code.ss.read_neo4j(target, STORE)[0]}
         action = decide(held, database, replace, confirm)
         if action == "replace":
-            remove_own(target, own_labels)
+            remove_own(target, bases, own_rules)
         copied = code.cg.copy(source, target, BATCH)
         target_hash = code.cg.graph_hash(target)
         if target_hash != source_hash:
@@ -290,7 +322,7 @@ def main(argv=None):
     ap.add_argument("--json", action="store_true", help="print the result as JSON instead of one line")
     args = ap.parse_args(argv)
     try:
-        local = ls.load(ls.locate(args.stores))
+        local = ls.load(ls.locate(args.stores), release_root=Path(args.release))
         confirm = ask if sys.stdin is not None and sys.stdin.isatty() else None
         result = copy(local, Path(args.release), replace=args.replace, confirm=confirm)
     except ls.LocalSettingsError as err:

@@ -16,6 +16,10 @@ that Git ref. The judgement is the release's own (sync_stores.drift): a store is
 changed (its content moved since it was marked), unmarked, empty or unreachable. A Neo4j database also gets an
 lm: line for its logical models when the release holds any.
 
+For a Neo4j database, equal counts are not enough: a property can change while the counts stay. So the check also
+computes the database's graph hash, as the load does, and compares it with the hash its marker holds. A database
+whose hash differs reads changed. --quick leaves the hash out, and each Neo4j line then says "counts only".
+
 This command only reads. Exit 0 when every line reads current, 1 otherwise, 2 on bad settings.
 Needs rdflib; databricks-sdk for databricks; neo4j for the two Neo4j databases.
 """
@@ -33,6 +37,7 @@ from . import local_settings as ls
 from . import settings as settings_module
 
 STORES = ("databricks", "jena", "neo4j", "enterprise")
+NEO4J_STORES = ("neo4j", "enterprise")
 WORKTREE = "worktree"
 STATEMENT_WAIT_SECONDS = 300
 
@@ -106,22 +111,43 @@ def _why(err, ss):
     return ss.reason(err)   # the error's name, never its message, which can carry an address
 
 
-def read_neo4j(session, store, newest, code):
-    """(marker, counts, the logical models' lm: row or None) of one Neo4j database."""
+def read_neo4j(session, store, newest, code, quick=False):
+    """(marker, counts, the live graph hash or None, the logical models' lm: row or None) of one Neo4j database.
+    The hash is computed only for a marked database, and not with quick."""
     marker, counts = code.ss.read_neo4j(session, store)
+    live_hash = code.lv.hash_graph(session)[0] if marker and not quick else None
     files = code.lm.models(newest)
     if not files:
-        return marker, counts, None
+        return marker, counts, live_hash, None
     nodes, edges = code.lm.graph_rows(files)
-    return marker, counts, code.lm.drift({store: code.lm.read_marker(session)}, code.lm.digest(files),
-                                         code.lm.content(nodes, edges))[0]
+    return marker, counts, live_hash, code.lm.drift({store: code.lm.read_marker(session)}, code.lm.digest(files),
+                                                    code.lm.content(nodes, edges))[0]
 
 
-def read_stores(stores, local, newest, code, connect=local_load.connect, client_for=workspace_client):
-    """(markers, live, lm rows) for sync_stores.drift. A store that cannot be read, or whose settings are missing,
-    reads as unreachable with the reason; the others are still read."""
+def judge_hashes(rows, markers, hashes, quick=False):
+    """The rows with each Neo4j database that drift read as current judged by its content too: its live graph hash
+    must equal the hash its marker holds. With quick the row stays and says that only counts were compared."""
+    judged = []
+    for store, status, why in rows:
+        if store in NEO4J_STORES and status == "current":
+            marked = (markers.get(store) or {}).get(local_load.MARKER_HASH)
+            if quick:
+                why += " (counts only: --quick left the graph hash out)"
+            elif not marked:
+                status, why = "changed", "its marker holds no graph hash, so its content cannot be compared; load it again"
+            elif hashes.get(store) != marked:
+                status, why = "changed", "its content differs from the graph it was marked with, although the counts are equal"
+            else:
+                why += f"; graph hash {marked[:12]} equal to the marker's"
+        judged.append((store, status, why))
+    return judged
+
+
+def read_stores(stores, local, newest, code, connect=local_load.connect, client_for=workspace_client, quick=False):
+    """(markers, live, lm rows, live graph hashes) for sync_stores.drift and judge_hashes. A store that cannot be
+    read, or whose settings are missing, reads as unreachable with the reason; the others are still read."""
     ss = code.ss
-    markers, live, models = {}, {}, []
+    markers, live, models, hashes = {}, {}, [], {}
     for store in stores:
         try:
             if store == "databricks":
@@ -135,24 +161,24 @@ def read_stores(stores, local, newest, code, connect=local_load.connect, client_
             elif store == "neo4j":
                 neo4j = local.need("neo4j_local")
                 with connect(neo4j) as driver, driver.session(database=neo4j.database) as session:
-                    markers[store], live[store], row = read_neo4j(session, store, newest, code)
+                    markers[store], live[store], hashes[store], row = read_neo4j(session, store, newest, code, quick)
                 models += [row] if row else []
             else:
                 neo4j = local.need("neo4j_enterprise")
                 with connect(neo4j) as driver, copy_enterprise.open_target(driver, neo4j.database) as session:
-                    markers[store], live[store], row = read_neo4j(session, store, newest, code)
+                    markers[store], live[store], hashes[store], row = read_neo4j(session, store, newest, code, quick)
                 models += [row] if row else []
         except Exception as err:
             markers[store], live[store] = None, _why(err, ss)
-    return markers, live, models
+    return markers, live, models, hashes
 
 
-def check(local, release_root, stores=STORES, ref=WORKTREE, extra_graphs=(), code=None, **readers):
+def check(local, release_root, stores=STORES, ref=WORKTREE, extra_graphs=(), code=None, quick=False, **readers):
     """[(line name, status, why)] for the named stores, then the lm: rows. Reads only."""
     code = code or local_load.release_code(release_root)
     want = expected(release_root, code.ss, ref, extra_graphs)
-    markers, live, models = read_stores(stores, local, want["newest"], code, **readers)
-    rows = code.ss.drift(markers, live, want, stores)
+    markers, live, models, hashes = read_stores(stores, local, want["newest"], code, quick=quick, **readers)
+    rows = judge_hashes(code.ss.drift(markers, live, want, stores), markers, hashes, quick)
     return rows + [("lm:" + store, status, why) for store, status, why in models]
 
 
@@ -172,12 +198,14 @@ def main(argv=None):
     ap.add_argument("--ref", default=WORKTREE, help="whose files say what is current: worktree (the default; needs "
                     "no Git) or a Git ref")
     ap.add_argument("--extra-graphs", help="the JSON file of graphs outside the release that the Fuseki load was given")
+    ap.add_argument("--quick", action="store_true",
+                    help="compare a Neo4j database's counts only, not its graph hash; each such line says so")
     ap.add_argument("--json", action="store_true", help="print the rows as JSON")
     args = ap.parse_args(argv)
     try:
-        local = ls.load(ls.locate(args.stores))
+        local = ls.load(ls.locate(args.stores), release_root=Path(args.release))
         extra = load_fuseki.read_extra_graphs(args.extra_graphs) if args.extra_graphs else {}
-        rows = check(local, Path(args.release), tuple(args.store or STORES), args.ref, tuple(extra))
+        rows = check(local, Path(args.release), tuple(args.store or STORES), args.ref, tuple(extra), quick=args.quick)
     except (ls.LocalSettingsError, load_fuseki.FusekiError) as err:
         print(f"sync check: {err}", file=sys.stderr)
         return 2
