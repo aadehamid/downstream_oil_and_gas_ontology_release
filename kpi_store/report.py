@@ -3,6 +3,15 @@
 One JSON file, discovery-report.json, holds the run and its rows. discovery-report.csv holds the same rows for a
 person to read and to clear. A person clears a row by writing a decision; the report is cleared when every row
 that blocks has one.
+
+Where it sits: the report is the one file that passes between the three parts of the loop. The notebook writes it
+to the volume (kpi_store.load_databricks.run). The runner fetches it, and a person clears it. The cut tool reads
+the cleared report and turns the accepted rows into a correction version. This module holds the format for all
+three, so they share one definition of it. It has no command.
+
+A row's decision is one of DECISIONS. "accept" applies the row's proposed fix. "reject" changes nothing and
+becomes a standing decision, so the next comparison leaves the row out. "environment setting" means the
+difference belongs to this environment and goes into kpi_store.toml, not into the ontology.
 """
 import csv
 import hashlib
@@ -11,15 +20,18 @@ import json
 import secrets
 from pathlib import Path
 
-FORMAT = 1
+FORMAT = 1   # the format's number; read refuses a report with another
 JSON_NAME = "discovery-report.json"
 CSV_NAME = "discovery-report.csv"
+# Every kind a row may have. A row blocks exactly when its kind is one of BLOCKING_KINDS. validate refuses a
+# report in which a row's blocks does not follow from its kind, so a hand edit of blocks alone is caught. It does
+# not catch a hand edit of the kind itself: a blocking kind rewritten as another kind passes.
 BLOCKING_KINDS = ("object-missing", "object-renamed", "column-missing", "column-renamed", "edge-missing")
 OTHER_KINDS = ("column-case", "object-extra", "measure-link", "second-source", "no-lineage", "stale-data",
                "migration-pair", "question")
 KINDS = BLOCKING_KINDS + OTHER_KINDS
 DECISIONS = ("accept", "reject", "environment setting")
-PASSES = ("object_names", "table_edges", "metric_view_sources")
+PASSES = ("object_names", "table_edges", "metric_view_sources")   # the three counts of what agreed
 ROW_FIELDS = ("id", "kind", "blocks", "object", "ontology_value", "found_value", "evidence", "proposed_fix",
               "recommended", "decision", "decided_by", "note")
 RUN_FIELDS = ("id", "at", "settings_sha256", "zip_sha256")
@@ -32,7 +44,9 @@ class ReportError(Exception):
 
 
 def new_run(now, settings_sha256, zip_sha256):
-    """The report's run record. The ID is the UTC time and eight random hexadecimal digits."""
+    """The report's run record. The ID is the UTC time and eight random hexadecimal digits, which keep two runs
+    in the same second apart unless the digits repeat. The two checksums say which settings and which zip the
+    run read."""
     return {"id": f"{now.strftime('%Y%m%dT%H%M%SZ')}-{secrets.token_hex(4)}", "at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "settings_sha256": settings_sha256, "zip_sha256": zip_sha256}
 
@@ -112,6 +126,7 @@ def is_cleared(report):
 
 
 def to_json(report):
+    """The report as JSON text. Letters outside ASCII stay as they are, so a person can read the file."""
     return json.dumps(report, indent=2, ensure_ascii=False) + "\n"
 
 
@@ -151,6 +166,8 @@ def read(path):
 def standing_key(row):
     """What makes two findings the same one: the kind, the object, the ontology's value and the found value, case
     ignored. It is a SHA-256, so the standing decisions never hold a found value as text."""
+    # The parts are joined with the unit separator (\x1f), a character names do not use, so the parts of one row
+    # do not run together into the text of another.
     parts = (row["kind"], row["object"].lower(), row["ontology_value"].lower(), row["found_value"].lower())
     return hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
 
@@ -171,6 +188,7 @@ def read_standing(release_root):
 def apply_csv_decisions(report, csv_path):
     """The report with the decision, decided_by and note of each row taken from a cleared CSV, matched by ID. The
     CSV may be the one a person edited in a spreadsheet. A row ID the report does not have raises ReportError."""
+    # utf-8-sig: a spreadsheet may save the file with a byte-order mark in front of the first column's name.
     with Path(csv_path).open(encoding="utf-8-sig", newline="") as f:
         cleared = {r["id"]: r for r in csv.DictReader(f)}
     unknown = sorted(set(cleared) - {r["id"] for r in report["rows"]})

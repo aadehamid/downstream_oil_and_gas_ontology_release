@@ -3,15 +3,42 @@
     py -m kpi_store.cut --report discovery-report.json [--decisions discovery-report.csv] [--release .] [--approver "<role>"]
     py -m kpi_store.cut --report discovery-report.json --plan      # show what a cut would do, and change nothing
 
+Where it sits in the run: the Databricks notebook compares the ontology with the workspace and stops on a report
+when a row blocks the load. A person clears the report. The runner's `cut` step (kpi_store/runner.py) then calls
+this tool, and the steps after it check, zip and load the release, so the next load reads the correction version.
+The tool also runs alone, with the commands above.
+
 The tool reads the report, shows each row and what it will change, and asks the person who runs it to approve. It
 then changes the data-product module's tables, rebuilds the module, writes the package at the correction version,
 gives every module that depends on it a correction version too, rebuilds the catalog and the projection manifest,
 runs the competency questions, verifies each written package against a fresh build and writes the discovery-run
-record. In a Git copy it commits and tags: the cut ends with
-its commit and its tag, or it changes nothing. In a plain folder it writes the same files.
+record. In a Git copy it then commits and tags. In a plain folder it writes the same files.
 
-All of the work happens in a temporary copy of the release. The release itself changes only after every step has
-passed, so a failure leaves it as it was. A report that was cut before changes nothing.
+All of the building happens in a temporary copy of the release, in the system's temporary folder. The release's
+files change only after every build and check has passed on the copy, so a failure before that point leaves the
+release as it was. A failure while the files are written, or a failed commit, puts the files back from a backup.
+The limits:
+- When a file cannot be put back, the error names each path that is not as it was.
+- When the commit is made and Git cannot tag it, the commit stays (CutIncomplete). The same command again makes
+  the tag.
+- Ctrl+C while the files are written puts them back. Ctrl+C during the commit leaves them written and not
+  committed. A process ended from outside (a closed terminal, a kill, a power cut) puts nothing back, and the
+  backup then stays in the temporary folder.
+A report that was cut before changes no file. When its tag is missing in a Git copy, the tool makes the tag.
+
+What it reads and writes:
+- It reads the report, the cleared CSV when one is given, and the release folder.
+- In the release folder it writes the data-product module's pricing tables and Turtle, the new packages under
+  releases/, the old ones moved to releases/previous/, the catalog, the projection manifest, the standing
+  decisions, the stand-alone exceptions and one discovery-run record. In a Git copy it adds one commit and one tag.
+- Outside the release folder it writes one temporary folder, where the system keeps temporary files. It holds the
+  working copy of the release and a backup of each file the cut replaces. It is removed when the tool ends,
+  unless the process is ended from outside.
+- It does not write the report, kpi_store.toml or any store, and it opens no network connection. It runs the
+  release's own build scripts and, in a Git copy, Git commands on that copy.
+
+How to find a part of this file: the pricing tables and one function per fix; reading the report and planning;
+the cut itself; the discovery-run record; the move from the temporary copy to the release; Git; the command line.
 
 Rules:
 - A report is cut only when every row that blocks has a decision.
@@ -27,7 +54,8 @@ Rules:
   or a load may hold: a column whose new name differs by more than case, an object's name, or the removal of a
   column, an object or a table edge. A case-only spelling and an added measure are not breaking.
 
-Needs Python 3.11 or later with rdflib and pyshacl. It needs no Java, no bash and no Git.
+Needs Python 3.11 or later with rdflib and pyshacl. It needs no Java and no bash. A plain folder needs no Git; a
+Git copy needs Git installed.
 """
 import argparse
 import ast
@@ -48,15 +76,27 @@ from pathlib import Path
 from . import ontology_view as ov
 from . import report as rep
 
+# Every path is relative to the release's top folder.
 ONTOLOGY = Path("business_architecture") / "ontology"
-RUNS = ONTOLOGY / "discovery-runs"
+RUNS = ONTOLOGY / "discovery-runs"      # one record per cut, and the standing decisions
 PRICING = ONTOLOGY / "data-product" / "pricing"
 EXCEPTIONS = Path("scripts") / "standalone-exceptions.txt"
+# The one module a correction changes: it holds the objects, columns and table edges that discovery compares.
 MODULE = "data-product"
+# The module's input tables, as file names without .csv. The module's Turtle is built from them, so a cut edits
+# these and rebuilds. The cut's own code writes no Turtle and no package content: the release's build scripts do.
+# Its one direct change to such a file is to set CRLF line ends back to LF in the temporary copy (_difference).
 TABLES = ("tables", "lineage", "columns", "agents", "view-systems")
+# Names that are not part of the release. A folder with one of these names, at any depth, is neither copied to
+# the temporary copy nor compared. A file with one of these names is not copied either, but it is compared, so
+# the cut would list it as removed. The .git of a Git worktree is such a file.
 IGNORED = {".git", "__pycache__", ".venv", ".pytest_cache"}
+# Files whose line ends are set to LF before the cut compares them (_difference).
 TEXT_SUFFIXES = {".ttl", ".json", ".jsonld", ".md", ".py", ".csv", ".nt", ".txt"}
+# The run ID becomes the record's file name, so it may hold no path separator and no more than 100 characters.
 RUN_ID = re.compile(r"[0-9A-Za-z][0-9A-Za-z._-]{0,99}")
+# Actions a correction cannot hold, each with the reason the plan shows. A correction changes names and removes
+# content; anything that adds a concept goes through a minor version of its module.
 NEEDS_MINOR = {"add-measure-link": "a measure link with its filter needs a new property",
                "record-replaces": "the table a Databricks table replaces belongs to the technical-graph module",
                "add-object": "a new object is a new concept",
@@ -66,6 +106,8 @@ NEEDS_MINOR = {"add-measure-link": "a measure link with its filter needs a new p
 # A column name is letters, digits, underscores and dollar signs. An object name is one to three such parts, which
 # may also hold a hyphen, joined by dots. A table type is capital letters and underscores.
 # Every form is applied with fullmatch: with match, a "$" would let a final line end through.
+# A row's ID is the exception: the report's format asks only that it is text and not used twice, and the cut
+# copies it into the record and into the new version's reason as it stands.
 COLUMN_NAME = re.compile(r"[\w$]{1,255}")
 PART = r"[\w$-]{1,255}"
 NAME_PART = re.compile(PART)
@@ -94,7 +136,9 @@ FIX_FORM = {"rename-column": {"from": COLUMN_NAME, "to": COLUMN_NAME},
 FIX_MODULE = {**{action: MODULE for action in ("rename-column", "add-serves-measure", "rename-object", "remove-column",
                                                "remove-edge", "remove-object", "add-measure-link", "add-object", "add-edge")},
               "record-replaces": "technical-graph"}
+# What the record shows in place of a value that does not have the form of a name.
 KEPT = "(kept in the report)"
+# The forms of the run's checksums and of its time (UTC, to the second). The record copies all three.
 SHA256 = re.compile(r"[0-9a-f]{64}")
 RUN_AT = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ")
 # Who decided a row, and who cleared the report: a role or initials. The record is committed, so it takes no free
@@ -103,8 +147,10 @@ RUN_AT = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ")
 ROLE = re.compile(r"(?:[^\W_]|[ .'-]){1,60}")
 ROLE_HELP = ("write a role or initials, such as \"the ontology owner\": letters, digits, spaces, dots, hyphens and "
              "apostrophes, at most 60 characters, at least one letter, and no number of four digits or more")
+# The approver a new version's approval names when --approver is not given.
 DEFAULT_APPROVER = "The person who ran the cut"
 CHECK_COMMAND = "bash scripts/check.sh"
+# Environment variables that point Git at a repository. _git removes them, so Git works on the release folder.
 GIT_PLACE = {"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR", "GIT_PREFIX", "GIT_NAMESPACE"}
 
 
@@ -113,7 +159,8 @@ class CutRefused(Exception):
 
 
 class CutFailed(Exception):
-    """A step of the cut failed. The release is as it was before the cut."""
+    """A step of the cut failed. The release is as it was before the cut, unless the message names paths that
+    could not be put back."""
 
 
 class CutIncomplete(Exception):
@@ -134,6 +181,7 @@ class Item:
 
 @dataclass
 class Plan:
+    """What a cut of one report does to one release. Making a plan changes no file."""
     report: dict
     items: list
     versions: dict                  # {module: (current version, correction version)}, in release order; empty when no row applies
@@ -147,6 +195,7 @@ class Plan:
 
 @dataclass
 class Outcome:
+    """What a call of cut() did."""
     status: str                     # cut, recorded (decisions only, no version), already cut, planned
     plan: Plan
     record: Path | None = None      # the discovery-run record, relative to the release root
@@ -173,6 +222,7 @@ class Tables:
                 raise CutRefused(f"{path} is missing: this folder is not a KPI Store release") from None
 
     def text(self, name):
+        """One table as CSV text with LF line ends, whatever the platform."""
         out = io.StringIO(newline="")
         writer = csv.DictWriter(out, self.fields[name], lineterminator="\n")
         writer.writeheader()
@@ -207,9 +257,20 @@ def _file(name):
     return (PRICING / f"{name}.csv").as_posix()
 
 
+# One function per action a correction applies (APPLY, below). Each takes the tables, the report row and its
+# proposed fix, and changes the tables in memory only: the files are written later, in the temporary copy.
+# Each returns None when it finds nothing to change, and the plan then shows the row as already applied. That is
+# what a second cut of the same fix meets. The test is loose in two places: a rename of an object returns None
+# when any object already has the new name, and a removal returns None when the tables do not name the object
+# exactly once.
+# Otherwise it returns (the sentence for the plan, whether the change is breaking, the text the person types to
+# confirm a breaking change, [(file, before, after)] for the record). It raises Unappliable when the tables do
+# not hold what the fix names.
+
 def _rename_column(tables, row, fix):
     slug, old, new = tables.slug(row["object"]), fix["from"], fix["to"]
     changes = []
+    # columns.csv names a column twice: as a table's own column, and as the source of a column built from it.
     for mine, table_key, column_key in (("column", "table", "column"), ("source column", "from_table", "from_column")):
         for r in tables.rows["columns"]:
             if r[table_key] == slug and r[column_key] == old:
@@ -221,7 +282,7 @@ def _rename_column(tables, row, fix):
         if held:
             return None
         raise Unappliable(f"the ontology's tables hold no column {old} of {tables.name(slug)}")
-    breaking = old.lower() != new.lower()
+    breaking = old.lower() != new.lower()   # the loads compare names without case; a case-only spelling is not breaking
     return (f"column {old} of {tables.name(slug)} becomes {new}" + ("" if breaking else " (case only)"), breaking, new, changes)
 
 
@@ -262,6 +323,7 @@ def _remove_edge(tables, row, fix):
     lineage = [r for r in tables.rows["lineage"] if (r["table"], r["derived_from"]) != (down, up)]
     if len(lineage) == len(tables.rows["lineage"]):
         return None
+    # The column rows that run along the edge go with it: a column cannot come from a table its table is not built from.
     columns = [r for r in tables.rows["columns"] if (r["table"], r["from_table"]) != (down, up)]
     changes = [(_file("lineage"), f"{down} is derived from {up}", "removed")]
     if len(columns) != len(tables.rows["columns"]):
@@ -276,6 +338,7 @@ def _remove_object(tables, row, fix):
     except Unappliable:
         return None
     name, changes = tables.name(slug), []
+    # Each of the five tables loses its rows that name the object, so none is left that points at a removed object.
     for table, keys in (("tables", ("slug",)), ("lineage", ("table", "derived_from")), ("columns", ("table", "from_table")),
                         ("view-systems", ("view",))):
         keep = [r for r in tables.rows[table] if all(r[k] != slug for k in keys)]
@@ -304,6 +367,7 @@ def load_report(report_path, decisions=None):
         report_path, decisions = report_path.with_suffix(".json"), decisions or report_path
     try:
         report = rep.read(report_path)
+        # The record holds these checksums, so a later reader can tell which files the cut was made from.
         sums = {"report": _sha(report_path.read_bytes())}
         if decisions:
             report = rep.apply_csv_decisions(report, decisions)
@@ -316,6 +380,7 @@ def load_report(report_path, decisions=None):
     # The record copies these, so each must have its form.
     if not RUN_AT.fullmatch(run["at"]) or not SHA256.fullmatch(run["settings_sha256"]) or not SHA256.fullmatch(run["zip_sha256"]):
         raise CutRefused("the report's run must hold its time as <date>T<time>Z and two SHA-256 checksums in lower-case hexadecimal")
+    # The release's own version rule (release/newest.py) says what a version is.
     newest = ov.release_scripts_newest()
     odd = sorted(m for m, v in report["ontology"].items() if not NAME_PART.fullmatch(m) or newest.version_key(v) is None)
     if odd:
@@ -327,12 +392,15 @@ def load_report(report_path, decisions=None):
 
 
 def is_role(text):
-    """True when the text names who decided in the form the record may hold: a role or initials."""
+    """True when the text names who decided in the form the record may hold: a role or initials. ROLE allows the
+    characters. The other tests refuse a space at either end, text with no letter, and a run of four digits, as a
+    staff number or a phone number would hold."""
     return (isinstance(text, str) and bool(ROLE.fullmatch(text)) and text == text.strip() and not re.search(r"\d{4}", text)
             and any(c.isalpha() for c in text))
 
 
 def record_path(report):
+    """The discovery-run record's path in the release. One run has one record, which is how a second cut is seen."""
     return RUNS / f"{report['run']['id']}.md"
 
 
@@ -341,6 +409,10 @@ def plan(report, release_root, sums=None):
     root = Path(release_root)
     tables = Tables(root)
     record = root / record_path(report)
+    # A record of this run means the run was cut. The same report file then changes no file. Another JSON file
+    # with the same run ID is refused, because its decisions may differ from the ones the release already holds.
+    # The test compares the JSON file's checksum with the one in the record, so it needs a record that holds that
+    # line, and it does not see another decisions CSV given with the same JSON file.
     if record.is_file():
         cut_from = re.search(r"^\| Report checksum \(SHA-256\) \| ([0-9a-f]{64}) \|$", record.read_text(encoding="utf-8"), re.M)
         if sums and cut_from and cut_from.group(1) != sums["report"]:
@@ -354,6 +426,8 @@ def plan(report, release_root, sums=None):
         raise CutRefused(str(err)) from None
     if report["release"] != release:
         raise CutRefused(f"the report is of {report['release']}, and this folder holds {release}")
+    # The report's rows describe the version discovery read. Applied to any other version they could name
+    # columns and objects that are not there, or undo a later change.
     read, now = report["ontology"].get(MODULE), held.get(MODULE)
     if read != now:
         raise CutRefused(f"the report read {MODULE} {read}, and this release holds {MODULE} {now}. "
@@ -361,18 +435,21 @@ def plan(report, release_root, sums=None):
     open_rows = [r["id"] for r in report["rows"] if r["blocks"] and not r["decision"]]
     if open_rows:
         raise CutRefused(f"the report is not cleared. Rows that block the load and have no decision: {', '.join(open_rows)}")
+    # _item applies each accepted fix to `tables` in memory, row by row, so a later row sees an earlier row's change.
     items = [_item(row, tables) for row in report["rows"]]
     versions = _versions(root) if any(i.outcome == "apply" for i in items) else {}
     return Plan(report, items, versions, tables)
 
 
 def _item(row, tables):
+    """One row's Item. The order of the tests is the order of precedence: a rejected row is never read further, an
+    accepted row is checked for names before the cut does anything with it, and a fix is applied only last."""
     fix, decision = row["proposed_fix"], row["decision"]
     action = fix.get("action", "none")
     if decision == "reject":
         return Item(row, "rejected", "no change; a standing decision keeps the row out of the next comparison")
     if decision == "accept":
-        _check_fix(row, action)   # before anything else: an accepted row is refused unless it holds names only
+        _check_fix(row, action)   # before anything else: the fields the cut uses of an accepted row must be names
     if _is_setting(row):
         return Item(row, "environment setting", _setting(row))
     if action == "none" and row["kind"] == "question":
@@ -446,7 +523,10 @@ def _setting(row):
 
 def _versions(root):
     """{module: (current, correction version)} for data-product and every module that depends on it, in the order
-    to release them."""
+    to release them. A package names the versions it requires, so a module that requires data-product gets a
+    correction version too, with no other change. The release's own rule gives the number
+    (release/newest.py, correction_version): 1.2.0 becomes 1.2.1-correction.1, and a correction of that becomes
+    1.2.1-correction.2."""
     release = root / ONTOLOGY / "release"
     modules = _modules(release / "build_module.py")
     newest = ov.release_scripts_newest(root)
@@ -454,14 +534,15 @@ def _versions(root):
     versions = {}
     for module in order:
         spec = modules[module]
-        if spec.get("stage") is not None:
+        if spec.get("stage") is not None:   # a candidate has no released version for a correction to follow
             raise CutRefused(f"{module} {spec['version']} is a release candidate; release it before a correction")
         versions[module] = (spec["version"], newest.correction_version(spec["version"]))
     return versions
 
 
 def _modules(builder):
-    """build_module.py's MODULES table, read without importing the builder."""
+    """build_module.py's MODULES table, read without importing the builder. Importing would run the builder's
+    code in this process; parsing reads the one literal the cut needs."""
     for node in ast.parse(builder.read_text(encoding="utf-8")).body:
         if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", None) == "MODULES":
             return ast.literal_eval(node.value)
@@ -503,11 +584,16 @@ def cut(report_path, release_root=".", decisions=None, approver=None, ask=input,
         before_step=None):
     """Cuts the report into the release and returns an Outcome. `ask(prompt)` returns what the person typed and
     `say(line)` shows a line. `before_step(name)` is called before each step, for a caller that follows progress.
-    Raises CutRefused when the report, the Git copy or an answer stops the cut and CutFailed when a step fails; the
-    release is unchanged in both cases. In a Git copy a cut ends with its commit and its tag, or changes nothing.
-    The one exception raises CutIncomplete: the commit is made and Git could not tag it. The same call again
-    finishes the tag."""
+    Raises CutRefused when the report, the Git copy or an answer stops the cut: no file of the release was
+    changed. Raises CutFailed when a step fails. A step that fails before the release is written leaves it
+    unchanged. A failure while it is written, or a failed commit, puts the files back, and the message names any
+    path that could not be put back. Raises CutIncomplete when the commit is made and Git could not tag it. The
+    same call again finishes the tag. An interrupt during the commit is not handled: the files stay written."""
     root = Path(release_root).resolve()
+    # The tests from here to the questions write no file of the release: the packages needed, the approver, the
+    # report, the plan and the state of Git. They refuse, before anything is written, a cut that is already known
+    # not to finish. A build or a check can still fail later, on the temporary copy. One path here does write: for
+    # a run that was cut before, _finish_tag makes a missing tag. git status may also refresh Git's own index.
     _requirements()
     if approver is not None and not is_role(approver):
         raise CutRefused(f"--approver is not a role or initials: {ROLE_HELP}.")
@@ -523,6 +609,8 @@ def cut(report_path, release_root=".", decisions=None, approver=None, ask=input,
             _follow_up(report, True, outcome, say)
         return outcome
     git = _git_ready(root, plan_)
+    # A breaking change can stop a query or a load that holds the old name. The person types the new name, or
+    # the name of what is removed, so the change was read and not only approved with the rest.
     for item in plan_.applied:
         if item.breaking:
             typed = ask(f"Row {item.row['id']} is a breaking change: {item.text}. Type {item.confirm} to confirm: ")
@@ -533,11 +621,17 @@ def cut(report_path, release_root=".", decisions=None, approver=None, ask=input,
         raise CutRefused("the cut was not approved; nothing was changed")
     now = now or dt.datetime.now(dt.timezone.utc)
     step = _Steps(say, before_step)
+    # From here the work is done on `staging`, a copy of the release in a temporary folder. The release's files
+    # are written once, by _apply, after every build and check has passed on the copy. `backup` holds each file
+    # _apply replaces or removes. Both lie in the temporary folder, which goes when this block ends: after the
+    # commit, or after a failure. A process that is killed leaves the folder behind.
     with tempfile.TemporaryDirectory(prefix="kpi-store-cut-") as tmp:
         staging, backup = Path(tmp) / "release", Path(tmp) / "backup"
         step("copy the release", lambda: shutil.copytree(root, staging, ignore=shutil.ignore_patterns(*IGNORED)))
         _build(plan_, staging, approver, now, step)
         step("write the standing decisions", lambda: _write_standing(plan_, staging))
+        # The record lists the files the cut changed, and it is one of them. So the difference is taken twice:
+        # once to write the list into the record, and once more with the record in place.
         files = _difference(root, staging)
         record = _record(plan_, sums, approver, now, sorted(set(files) | {record_path(report).as_posix()}))
         _write(staging / record_path(report), record)
@@ -567,6 +661,9 @@ def _follow_up(report, wrote_version, outcome, say):
 
 
 class _Steps:
+    """Runs one named step: shows its name, then calls it. Any error in a step becomes CutFailed with the step's
+    name, so the person reads which step failed and not a traceback."""
+
     def __init__(self, say, before_step):
         self.say, self.before_step = say, before_step
 
@@ -583,6 +680,7 @@ class _Steps:
 
 
 def _requirements():
+    """Stops the cut when a package the release's builders import is missing, with the command that installs it."""
     missing = [name for name in ("rdflib", "pyshacl") if not _importable(name)]
     if missing:
         raise CutRefused(f"the cut needs the Python package{'s' if len(missing) > 1 else ''} {' and '.join(missing)}: "
@@ -596,6 +694,9 @@ def _importable(name):
 
 def _run(name, args, cwd):
     """Runs one of the release's own scripts with this Python, without a shell, and returns what it printed."""
+    # No bytecode files: planning runs one script in the release folder itself (_versions), and it must leave no
+    # __pycache__ folder there. UTF-8 mode: on Windows a script would otherwise read and print in the machine's
+    # code page.
     env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "PYTHONUTF8": "1"}
     done = subprocess.run([sys.executable, "-B", *args], cwd=str(cwd), capture_output=True, text=True, encoding="utf-8",
                           env=env, check=False)
@@ -606,13 +707,17 @@ def _run(name, args, cwd):
 
 
 def _approval(report):
+    """The words of approval that each new version records. They say what was typed, and name no person."""
     return f"Typed yes to approve the cut of discovery run {report['run']['id']}."
 
 
 def _build(plan_, staging, approver, now, step):
-    """Every change of the cut, made in the staging copy."""
+    """Every change of the cut, made in the staging copy with the release's own build scripts, in the order a
+    release is made by hand: the tables, the module's Turtle, each package at its new version, the old packages
+    to releases/previous, then the catalog and the projection manifest, which both read the packages. The
+    competency questions and the verify steps run last, on the finished copy."""
     report = plan_.report
-    if not plan_.versions:
+    if not plan_.versions:   # only rejected rows or settings: the cut writes the record and builds nothing
         return
     ontology, release = staging / ONTOLOGY, staging / ONTOLOGY / "release"
     record = record_path(report)
@@ -622,6 +727,7 @@ def _build(plan_, staging, approver, now, step):
     _write(staging / record, f"# Discovery run {report['run']['id']}\n")
     where = record.relative_to(ONTOLOGY).as_posix()
     rows = ", ".join(i.row["id"] for i in plan_.applied)
+    # plan_.versions is in release order: data-product first, then each module after the ones it requires.
     for module, (old, new) in plan_.versions.items():
         why = (f"A correction from discovery run {report['run']['id']}, rows {rows}: "
                + "; ".join(i.text for i in plan_.applied) + f". Record: {where}." if module == MODULE else
@@ -632,6 +738,8 @@ def _build(plan_, staging, approver, now, step):
         step(f"set {module} to {new}", lambda args=args, module=module: _run(f"set {module}", args, release))
         step(f"write the {module} package", lambda module=module: _run(f"write the {module} package",
                                                                          ["build_module.py", module, "--write"], release))
+    # The old packages move only after every new one is written: a new package is built while the package it
+    # follows is still in place.
     for module, (old, new) in plan_.versions.items():
         step(f"move {module} {old} to releases/previous", lambda module=module, old=old: _run(
             f"move {module} {old}", ["next_version.py", "finish", module, old], release))
@@ -655,6 +763,7 @@ def _agreement(plan_, staging):
     from rdflib import Graph, Namespace
     releases = staging / ov.RELEASES
     held = ov.newest_versions(releases)
+    # A dataset's IRI in the catalog ends in <module>/<version>.
     listed = {str(d).rsplit("/", 2)[-2]: str(d).rsplit("/", 1)[-1] for d in Graph().parse(releases / "catalog.ttl", format="turtle")
               .objects(None, Namespace("http://www.w3.org/ns/dcat#").dataset)}
     manifest = json.loads((staging / ONTOLOGY / "projection" / "projection-manifest.json").read_text(encoding="utf-8"))
@@ -707,6 +816,8 @@ def _carry_exceptions(staging, versions):
 
 
 def _write_standing(plan_, staging):
+    """Adds each rejected row to the standing decisions, the file the next comparison reads to leave the same
+    finding out. A decision is kept under a key (report.standing_key), so the same finding is added once."""
     rejected = [i.row for i in plan_.items if i.outcome == "rejected"]
     if not rejected:
         return
@@ -723,10 +834,14 @@ def _write_standing(plan_, staging):
 # ---------- the discovery-run record ----------
 
 def _cell(text):
+    """A value as one cell of a Markdown table: a bar or a line end in it would break the row."""
     return str(text).replace("|", "\\|").replace("\r", " ").replace("\n", " ").strip() or " "
 
 
 def _record(plan_, sums, approver, now, files):
+    """The discovery-run record as Markdown: the run, the versions written, every row with its decision and
+    outcome, each change, and the files the cut changed. plan() and _finish_tag() read two of its table lines
+    back, so the "Report checksum" line and the "Versions written" rows keep their form."""
     report, run = plan_.report, plan_.report["run"]
     cut_at = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     head = [("Run", run["id"]), ("Run at", run["at"]), ("Release", report["release"]),
@@ -772,6 +887,7 @@ def _record(plan_, sums, approver, now, files):
 # ---------- from the staging copy to the release ----------
 
 def _files(root):
+    """{path relative to root, with forward slashes: the file} for every file under root but the ignored folders."""
     out = {}
     for folder, dirs, names in os.walk(root):
         dirs[:] = sorted(d for d in dirs if d not in IGNORED)
@@ -783,7 +899,8 @@ def _files(root):
 
 def _difference(root, staging):
     """Every path that differs between the release and the staging copy. A text file a script wrote with CRLF line
-    ends (Windows) is first set back to LF, so a cut writes the same bytes on every platform."""
+    ends (Windows) is first set back to LF, so the files with a suffix in TEXT_SUFFIXES get LF line ends on
+    every platform."""
     before, after = _files(root), _files(staging)
     changed = []
     for rel, path in after.items():
@@ -801,11 +918,15 @@ def _difference(root, staging):
 
 def _apply(root, staging, files, backup):
     """Writes the changed files into the release, keeping a copy of each file it replaces or removes in `backup`.
-    A failure puts every file back and raises CutFailed, which says what state the release is in."""
+    A failure tries to put every file back (_restore) and raises CutFailed, which says whether the release is as
+    it was or which paths are not. Ctrl+C is handled the same way. A process ended from outside, by a closed
+    terminal or a kill, runs none of this and leaves the release part written."""
     done = []
     try:
         for rel in files:
             target, source, kept = root / rel, staging / rel, backup / rel
+            # The order protects the release: the backup copy is made first, and the path is noted as touched
+            # before it is written, so after a failure in the middle of a write the restore covers this file too.
             if target.exists():
                 kept.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(target, kept)
@@ -815,7 +936,7 @@ def _apply(root, staging, files, backup):
                 shutil.copy2(source, target)
             else:
                 target.unlink()
-    except BaseException as err:
+    except BaseException as err:   # also Ctrl+C: the restore runs before the cut stops. A kill does not reach here.
         state = _state(_restore(root, done, backup))
         if isinstance(err, Exception):
             raise CutFailed(f"writing the release failed at {done[-1] if done else files[0]}: {type(err).__name__}: {err}. {state}") from err
@@ -830,7 +951,8 @@ AS_IT_WAS = "The release is as it was."
 
 def _restore(root, files, backup):
     """Puts back exactly the paths the cut wrote: a file the cut changed or removed is copied back from the backup,
-    and a file the cut created is deleted. No other path is touched. It never raises. It then reads each path again
+    and a file the cut created is deleted. No other file is touched; a folder the restore leaves empty is removed.
+    An error on one path does not stop it: it goes on to the next. It then reads each path again
     and returns those that are not as they were, each with its state, so the answer rests on the files' own bytes
     and not on whether a copy raised an error. An empty list means the release's files are as they were."""
     failed = []
@@ -872,7 +994,8 @@ def _state(failed):
 
 
 def _prune(root, files):
-    """Removes each folder the change left empty."""
+    """Removes each folder the change left empty, deepest first, and then its parents while they are empty too.
+    A package that moved to releases/previous leaves such folders. The release's top folder always stays."""
     for folder in sorted({(root / rel).parent for rel in files}, key=lambda p: len(p.parts), reverse=True):
         while folder != root and folder.is_dir() and not any(folder.iterdir()):
             folder.rmdir()
@@ -882,6 +1005,9 @@ def _prune(root, files):
 # ---------- Git, when the release is a Git copy ----------
 
 def _git(root, *args, stdin=None):
+    """Runs one Git command on the release folder and returns the finished process. A command that fails does not
+    raise: each caller reads the exit code. It does raise when Git cannot be started, so each caller first makes
+    sure Git is installed (_git_state)."""
     # A caller such as a Git hook sets these to its own repository; the cut works on the release it was given.
     env = {k: v for k, v in os.environ.items() if k not in GIT_PLACE}
     return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, encoding="utf-8", env=env,
@@ -908,6 +1034,7 @@ def _git_state(root):
 
 
 def _tag(plan_):
+    """The cut's tag, such as data-product-1.2.1-correction.1, or "" for a cut that writes no version."""
     return f"{MODULE}-{plan_.versions[MODULE][1]}" if plan_.versions else ""
 
 
@@ -916,8 +1043,9 @@ def _tag_exists(root, tag):
 
 
 def _git_ready(root, plan_):
-    """Everything Git needs for the commit and the tag, checked before any file changes. Returns "none" for a plain
-    folder and "ready" for a Git copy; anything else stops the cut."""
+    """What Git is known to need for the commit and the tag, checked before any file changes: Git itself, a clean
+    copy, an author, and a free tag name. The commit can still fail later, for example in a hook. Returns "none"
+    for a plain folder and "ready" for a Git copy; anything else stops the cut."""
     state = _git_state(root)
     plain = "A plain folder, one with no .git folder, needs no Git."
     if state == "no git":
@@ -943,6 +1071,7 @@ def _commit(root, git, plan_, outcome, backup):
     run, tag = plan_.report["run"]["id"], _tag(plan_)
     subject = (f"Cut {MODULE} {plan_.versions[MODULE][1]} from discovery run {run}" if plan_.versions
                else f"Record the decisions of discovery run {run}")
+    # Only the cut's own paths are named to git add and git commit, so no other path enters the commit.
     spec = ["--pathspec-from-file=-", "--pathspec-file-nul"]
     for args in (["add", "-A", *spec], ["commit", "-q", "-m", subject, "-m", f"The record is {outcome.record.as_posix()}.", *spec]):
         done = _git(root, *args, stdin=_paths(outcome.files))
@@ -970,6 +1099,7 @@ def _undo(root, files, backup):
 
 
 def _make_tag(root, tag, commit):
+    """Tags the commit. The commit exists by now and is not undone, so a failure is CutIncomplete, not CutFailed."""
     done = _git(root, "tag", tag, commit)
     if done.returncode != 0:
         raise CutIncomplete(f"the cut is committed, and git tag {tag} failed: {(done.stderr or done.stdout).strip()}. "
@@ -981,6 +1111,8 @@ def _finish_tag(root, report, outcome, say):
     run's record. A cut whose tag failed is finished this way. Returns True when it made the tag."""
     if _git_state(root) in ("none", "no git"):
         return
+    # The record's "Versions written" table gives the version, so the tag's name does not depend on the release's
+    # state now, which a later cut may have changed.
     written = re.search(rf"^\| {re.escape(MODULE)} \| \S+ \| (\S+) \|", (root / record_path(report)).read_text(encoding="utf-8"), re.M)
     if not written or ov.release_scripts_newest(root).version_key(written.group(1)) is None:
         return   # the cut wrote no version, so it has no tag
@@ -988,6 +1120,7 @@ def _finish_tag(root, report, outcome, say):
     if _tag_exists(root, tag):
         outcome.tag = tag
         return
+    # The commit that added the record is the cut's commit, wherever HEAD is now.
     commit = _git(root, "log", "-1", "--format=%H", "--diff-filter=A", "--", record_path(report).as_posix()).stdout.strip()
     if not commit:
         raise CutIncomplete(f"the cut's files are in this Git copy and are not committed, so the tag {tag} cannot be made. "
@@ -1005,6 +1138,7 @@ def _sha(data):
 
 
 def _write(path, text):
+    """Writes a text file as UTF-8 with LF line ends on every platform, and makes its folder when missing."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="\n") as f:
         f.write(text)
@@ -1021,7 +1155,7 @@ def main(argv=None):
     a = ap.parse_args(argv)
     try:
         cut(a.report, a.release, a.decisions, a.approver, plan_only=a.plan)
-    except EOFError:
+    except EOFError:   # the questions need a terminal; with none, input() ends here and before any file changes
         print("No answer was typed; nothing was changed.", file=sys.stderr)
         return 1
     except (CutRefused, CutFailed, CutIncomplete) as err:

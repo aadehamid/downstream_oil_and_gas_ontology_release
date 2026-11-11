@@ -2,6 +2,20 @@
 
 The file sits in the volume beside the release zip, never inside it. A missing or wrong file raises
 SettingsError, and the caller stops before any read or write.
+
+The file names the zip and its SHA-256, the catalog and the two schemas the KPI Store may write to, the volume,
+the catalogs it may read, how the ontology's catalog names translate to this environment's, what to skip, and
+which Genie spaces to read. It holds no password. kpi_store/kpi_store.example.toml is the example to copy.
+
+Two places read it. On the machine that runs the loads, the runner reads the copy the local settings name, and
+its zip step writes the zip's SHA-256 into the copy it uploads. In Databricks, the notebook reads the uploaded
+copy twice. First its own bootstrap, which uses the standard library only, reads the zip's name and checksum
+from it and hashes the zip before it unpacks it. Then, with the code from the unpacked zip, it validates the
+whole file here (load) and hashes the zip again (check_zip). So check_zip runs after the unpack, not before it.
+This module reads and checks; it writes nothing and needs the standard library only.
+
+Every name the file gives is checked against a strict pattern here, because the load builds SQL statements and
+file paths from these names.
 """
 import fnmatch
 import hashlib
@@ -10,11 +24,15 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-IDENTIFIER = re.compile(r"^[A-Za-z0-9_]+$")
-PATTERN = re.compile(r"^[A-Za-z0-9_*?]+$")
-SHA256 = re.compile(r"^[0-9a-f]{64}$")
-ZIP_NAME = re.compile(r"^[A-Za-z0-9._-]+\.zip$")
+# The forms a value may take. Each leaves out quotes, spaces and slashes, so a value can go into a SQL statement
+# or a path and stay one name. All but ZIP_NAME leave out dots too; a zip's name may hold them, as a file name does.
+IDENTIFIER = re.compile(r"^[A-Za-z0-9_]+$")          # a catalog, schema, volume or warehouse name
+PATTERN = re.compile(r"^[A-Za-z0-9_*?]+$")           # a skip rule: a name that may hold the wildcards * and ?
+SHA256 = re.compile(r"^[0-9a-f]{64}$")               # lower case only, as hashlib writes it, so two texts compare equal
+ZIP_NAME = re.compile(r"^[A-Za-z0-9._-]+\.zip$")     # a file name with no folder: the zip is beside this file
 SPACE_ID = re.compile(r"^[A-Za-z0-9_-]+$")
+# The three system schemas discovery reads on top of the read catalogs: objects and columns, lineage, and the
+# jobs and pipelines that build the tables. The Gate of kpi_store.load_databricks allows no other system schema.
 SYSTEM_SCHEMAS = ("system.information_schema", "system.access", "system.lakeflow")
 
 # Every table and key the file may hold, with the type of each value. Anything else is an error: a key
@@ -27,6 +45,7 @@ LAYOUT = {
     "skip": {"schemas": list, "tables": list},
     "genie": {"spaces": list},
 }
+# The notebook needs no SQL warehouse. The sync check, which runs outside the notebook, reads Databricks through one.
 OPTIONAL = {("databricks", "warehouse_id")}
 
 
@@ -36,6 +55,7 @@ class SettingsError(Exception):
 
 @dataclass(frozen=True)
 class Settings:
+    """The validated file. The properties build the full names of the schema, the two tables and the zip."""
     zip_name: str
     zip_sha256: str
     write_catalog: str
@@ -53,6 +73,7 @@ class Settings:
 
     @property
     def zip_path(self):
+        """The zip, beside the settings file."""
         return self.folder / self.zip_name
 
     @property
@@ -101,6 +122,8 @@ class Settings:
 
 
 def _strings(where, value, pattern, what, allow_empty=True):
+    """A list of the file as a tuple, after checking that each value is text of the given form and that none
+    occurs twice. Case is ignored for "twice", as it is in every name comparison."""
     if not all(isinstance(v, str) for v in value):
         raise SettingsError(f"{where} must be a list of strings")
     for v in value:
@@ -145,6 +168,7 @@ def parse(data, folder=Path(".")):
     for key in ("write_catalog", "write_schema", "tech_graph_schema", "volume"):
         if not IDENTIFIER.match(bricks[key]):
             raise SettingsError(f"[databricks] {key} must be letters, digits and _ only")
+    # The technical graph is rebuilt for each environment and stays apart from the ontology's tables: a schema each.
     if bricks["write_schema"].lower() == bricks["tech_graph_schema"].lower():
         raise SettingsError("[databricks] write_schema and tech_graph_schema must differ")
     warehouse = bricks.get("warehouse_id", "")
@@ -153,6 +177,7 @@ def parse(data, folder=Path(".")):
     read = _strings("[databricks] read_catalogs", bricks["read_catalogs"], IDENTIFIER, "a catalog name", allow_empty=False)
     if "system" in {c.lower() for c in read}:
         raise SettingsError("[databricks] read_catalogs must not name system; the three system schemas are always read")
+    # [names]: each ontology catalog name maps to one read catalog, and no two map to the same one.
     names = {}
     for ontology_name, here in doc["names"].items():
         if not isinstance(here, str) or not IDENTIFIER.match(ontology_name) or not IDENTIFIER.match(here):
@@ -197,7 +222,8 @@ def file_sha256(path):
 
 
 def check_zip(settings):
-    """The zip's checksum, after checking it equals the one the settings name. Raises SettingsError otherwise."""
+    """The zip's checksum, after checking it equals the one the settings name. Raises SettingsError otherwise.
+    The notebook calls it after it has unpacked the zip, as a second check; its own first check comes before."""
     if not settings.zip_path.is_file():
         raise SettingsError(f"the release zip {settings.zip_name} is not beside the settings file")
     found = file_sha256(settings.zip_path)

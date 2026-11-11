@@ -11,6 +11,17 @@ Each check prints "ok" or "FAIL" with what it found, and a failed check prints o
 that needs the local settings file fails with that file's fix when the file is missing. No check changes
 anything: the Neo4j checks only read, and no password is printed.
 
+Run it once on a new machine, before the first run of the runner (kpi_store.runner), and again after you change
+the machine. The runner does not call it. The runner does use two functions of this file, find_bash and
+find_databricks, so both commands look for those tools in the same places.
+
+The checks follow the chain's needs in order: Python and its packages; the two settings files; Java and the
+Fuseki jar for the Fuseki load; the ROBOT jar for the Neo4j load; bash and uv for scripts/check.sh; the Databricks
+CLI and its sign-in; then the local Neo4j with its plugins and the Neo4j Enterprise database.
+
+Each check is a function that takes the Context and returns (passed, what it found, the fix). CHECKS, near the
+end, maps each check's name to its function and sets the order.
+
 Exit 0 when every check passed, 1 when one failed, 2 on bad arguments.
 """
 import argparse
@@ -25,14 +36,19 @@ from . import load_fuseki
 from . import local_settings as ls
 from . import settings as settings_module
 
-PYTHON_MINIMUM = (3, 11)   # tomllib
+PYTHON_MINIMUM = (3, 11)   # the first Python with tomllib, which reads both settings files
 # The versions the release was tested with. The notebook installs the same ones where it needs them.
 PACKAGES = {"rdflib": "7.6.0", "pyshacl": "0.40.2", "pyoxigraph": "0.5.13", "neo4j": "6.4.1",
             "databricks-sdk": "0.164.0", "sqlglot": "30.31.0", "pyyaml": "6.0.3"}
+# A jar is accepted by its checksum, not by its file name: a jar of another version may still start, and may
+# behave differently from the one the release was tested with.
 ROBOT_SHA256 = "16a73c074f3df359a7338a84b4e0788785fe06117f931bb9796e9619ea776105"   # ROBOT 1.9.10
+# The local Neo4j and its two plugins, at the versions the load and its checks were tested with. The check
+# accepts no other: n10s imports the ontology, and its result must be the one the checks expect.
 NEO4J_VERSION, N10S_VERSION, APOC_VERSION = "2025.06.2", "2025.06.1", "2025.06.2"
 # Where Git for Windows puts bash.exe. C:\Windows\System32\bash.exe is not a bash: it starts the Linux subsystem.
 GIT_BASH_FOLDERS = ("{ProgramFiles}/Git/bin", "{ProgramFiles(x86)}/Git/bin", "{LOCALAPPDATA}/Programs/Git/bin")
+# The one fix for every check that could not read the local settings file.
 SETTINGS_FIX = ("Copy kpi_store/stores.example.toml to a folder outside the release folder, fill it in, and pass "
                 "its path with --stores or set KPI_STORE_LOCAL to it")
 
@@ -48,6 +64,8 @@ class Context:
         self.version = version or sys.version_info[:3]
         self.installed = installed
         self.connect = connect
+        # Settings that cannot be read do not stop the command: the checks that need none still run, and each
+        # check that needs them fails with the settings' own fix (needs_settings).
         self.local, self.local_error = None, None
         try:
             self.local = ls.load(ls.locate(stores, self.environ), self.environ, self.release_root)
@@ -64,10 +82,12 @@ class Context:
 
 
 def passed(detail):
+    """A check's result when it passed: what it found, and no fix."""
     return True, detail, ""
 
 
 def failed(detail, fix):
+    """A check's result when it failed: what it found, and the one line that fixes it."""
     return False, detail, fix
 
 
@@ -85,6 +105,7 @@ def needs_settings(check):
 
 
 # ---- the tools --------------------------------------------------------------------------------------
+# The runner calls these two as well, so a tool the setup check found is the one the runner uses.
 
 def find_bash(setting=None, environ=None, which=shutil.which, windows=None):
     """bash for scripts/check.sh. On Windows: the settings' own, else bash.exe beside Git, else Git's usual
@@ -106,7 +127,7 @@ def find_bash(setting=None, environ=None, which=shutil.which, windows=None):
         except KeyError:
             continue
     found = which("bash")
-    if found and "system32" not in found.lower():
+    if found and "system32" not in found.lower():   # the one in System32 starts the Linux subsystem (above)
         candidates.append(Path(found))
     return next((c for c in candidates if c.is_file()), None)
 
@@ -120,8 +141,10 @@ def find_databricks(local=None, which=shutil.which):
 
 
 # ---- the checks -------------------------------------------------------------------------------------
+# In the order they run. A later check may tell the person to fix an earlier one first.
 
 def python(ctx):
+    """The Python that runs this command must be 3.11 or later."""
     found = ".".join(str(p) for p in ctx.version)
     if tuple(ctx.version[:2]) < PYTHON_MINIMUM:
         return failed(f"Python {found}", "Install Python 3.11 or later from https://www.python.org/downloads/ and run "
@@ -130,6 +153,8 @@ def python(ctx):
 
 
 def packages(ctx):
+    """Every package in PACKAGES is installed at exactly its pinned version. The fix is one pip command that
+    names only the packages that are missing or differ."""
     wrong = []
     for name, version in PACKAGES.items():
         try:
@@ -145,6 +170,7 @@ def packages(ctx):
 
 
 def local_settings(ctx):
+    """The local settings file was found, is valid, and lies outside the release folder (kpi_store.local_settings)."""
     if ctx.local is None:
         return failed(ctx.local_error, SETTINGS_FIX)
     return passed(f"{ctx.local.path}, outside the release folder")
@@ -152,6 +178,7 @@ def local_settings(ctx):
 
 @needs_settings
 def kpi_store_settings(ctx):
+    """The kpi_store.toml that the local settings name is valid, and names a SQL warehouse."""
     path = ctx.local.need("settings")
     try:
         found = settings_module.load(path)
@@ -165,6 +192,7 @@ def kpi_store_settings(ctx):
 
 @needs_settings
 def java(ctx):
+    """A Java that Fuseki can run on is found: the one the settings name, or the one load_fuseki.find_java finds."""
     fuseki = ctx.local.fuseki
     found = load_fuseki.find_java(fuseki.java if fuseki else None, ctx.environ, ctx.which)
     fix = "Install a Java 21 runtime, such as Eclipse Temurin 21, open a new terminal, and if java is still not found name java.exe in [fuseki] java"
@@ -177,6 +205,7 @@ def java(ctx):
 
 
 def _jar(path, want, name, url):
+    """Checks that a jar is there and has the pinned SHA-256. The fix names the public download and where to save it."""
     if not path.is_file():
         return failed(f"{path} is missing", f"Download {name} from {url} and save it as {path}")
     found = load_fuseki.file_sha256(path)
@@ -187,17 +216,20 @@ def _jar(path, want, name, url):
 
 @needs_settings
 def fuseki_jar(ctx):
+    """The Fuseki server jar the local settings name is the pinned jena-fuseki-server-6.2.0.jar."""
     return _jar(ctx.local.need("fuseki").jar, load_fuseki.FUSEKI_SHA256, "jena-fuseki-server-6.2.0.jar",
                 "https://repo1.maven.org/maven2/org/apache/jena/jena-fuseki-server/6.2.0/")
 
 
 @needs_settings
 def robot_jar(ctx):
+    """The ROBOT jar the local settings name is the pinned 1.9.10. The Neo4j load's projection runs it."""
     return _jar(ctx.local.need("robot_jar"), ROBOT_SHA256, "robot.jar (ROBOT 1.9.10)",
                 "https://github.com/ontodev/robot/releases/download/v1.9.10/robot.jar")
 
 
 def bash(ctx):
+    """A bash is found for scripts/check.sh, which the runner's check step runs (find_bash)."""
     found = find_bash(ctx.local.bash if ctx.local else None, ctx.environ, ctx.which)
     if found is None:
         return failed("bash was not found; scripts/check.sh is a bash script",
@@ -226,6 +258,8 @@ def check_script_tools(ctx):
 
 
 def databricks_cli(ctx):
+    """The Databricks CLI is found and starts. The runner's volume, upload, notebook and report steps go through
+    it. The sync check reads Databricks through the SDK instead, with the same profile."""
     found = find_databricks(ctx.local, ctx.which)
     fix = ("Install the Databricks CLI as its documentation says (\"Install or update the Databricks CLI\", "
            "https://docs.databricks.com/aws/en/dev-tools/cli/install), open a new terminal, and if it is still not "
@@ -240,6 +274,8 @@ def databricks_cli(ctx):
 
 @needs_settings
 def databricks_auth(ctx):
+    """The CLI profile the local settings name is signed in: the CLI can say who the current user is. The check
+    stores nothing; the sign-in itself is the CLI's own (OAuth)."""
     profile = ctx.local.need("databricks").profile
     found = find_databricks(ctx.local, ctx.which)
     if found is None:
@@ -252,6 +288,7 @@ def databricks_auth(ctx):
 
 
 def _connect(ctx, neo4j):
+    """A Neo4j driver for one server of the local settings. The tests pass their own through Context.connect."""
     if ctx.connect is not None:
         return ctx.connect(neo4j)
     from . import load_neo4j
@@ -260,6 +297,7 @@ def _connect(ctx, neo4j):
 
 @needs_settings
 def neo4j_local(ctx):
+    """The local Neo4j answers, and it, n10s and APOC are at the pinned versions. Two read-only queries."""
     neo4j = ctx.local.need("neo4j_local")
     try:
         with _connect(ctx, neo4j) as driver, driver.session(database=neo4j.database) as session:
@@ -283,10 +321,13 @@ def neo4j_local(ctx):
 
 @needs_settings
 def neo4j_plugins(ctx):
+    """The two plugin jars in [neo4j.local] plugins_folder have the pinned checksums, by the ontology-to-lpg
+    skill's check_plugins. The folder is optional: without it the check passes and says the jars were not checked."""
     folder = ctx.local.need("neo4j_local").plugins_folder
     if folder is None:
         return passed("skipped: [neo4j.local] plugins_folder is not set, so the jars are not checked by checksum")
     from . import load_neo4j
+    # check_plugins is a script of the skill, in a folder that is no package, so its folder goes on the import path.
     scripts = ctx.release_root / load_neo4j.SKILL_SCRIPTS
     if str(scripts) not in sys.path:
         sys.path.insert(0, str(scripts))
@@ -303,6 +344,9 @@ def neo4j_plugins(ctx):
 
 @needs_settings
 def neo4j_enterprise(ctx):
+    """The Enterprise server answers and has the database the settings name. The check opens it the way the copy
+    does (copy_enterprise.open_target), so a database that the copy could not open fails here first. The copy's
+    other refusals, such as nodes that are not the KPI Store's, are not tested here. The check only counts nodes."""
     from . import copy_enterprise
     neo4j = ctx.local.need("neo4j_enterprise")
     try:
@@ -316,6 +360,7 @@ def neo4j_enterprise(ctx):
     return passed(f"database {neo4j.database} is there and holds {nodes} node(s)")
 
 
+# The checks by the names --only and --list use, in the order they run.
 CHECKS = {"python": python, "packages": packages, "local-settings": local_settings,
           "kpi-store-settings": kpi_store_settings, "java": java, "fuseki-jar": fuseki_jar, "robot-jar": robot_jar,
           "bash": bash, "uv": uv, "check-script-tools": check_script_tools, "databricks-cli": databricks_cli,
@@ -329,6 +374,7 @@ def run_checks(ctx, names=None):
 
 
 def main(argv=None, context=Context):
+    """Runs the checks and prints one line per check, a fix under each failure, and the count. Returns the exit code."""
     ap = argparse.ArgumentParser(prog="kpi_store.setup_check", description=__doc__.split("\n\n")[0])
     ap.add_argument("--stores", help=f"the local settings file (default: the one {ls.ENV_VAR} names)")
     ap.add_argument("--release", default=str(ls.ROOT), help="the release folder (default: the one this code is in)")

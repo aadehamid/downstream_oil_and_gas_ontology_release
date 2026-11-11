@@ -1,6 +1,14 @@
 """What is newest on disk, and what a write may overwrite. Standard library only, so any builder can import it.
 
 A builder or test that needs "the current core" asks here, so a new core release needs no edit to them.
+
+This file is a library with no command. It reads folder and file names under releases/ and release/, and the text
+of a package about to be overwritten. It writes nothing.
+
+The KPI Store uses two things from it. version_key is the one order of versions: the loads and the sync check use it
+to pick each module's newest package (through kpi_store/ontology_view.py and projection/sync_stores.py), so a
+correction version is loaded in place of the version it corrects. correction_version is how the cut tool
+(kpi_store/cut.py) names the version it writes.
 """
 import os
 import re

@@ -5,6 +5,10 @@
 // One row per thing that depends on the system. The KPI Store graph gives the replica tables that copy the
 // system and everything built from them. The governance graph gives the tables the system holds and, where it
 // records lineage, the tables built from those.
+//
+// Part 1, KPI Store graph. The replica tables that copy the system, the tables built from them through at most
+// 6 steps of lineage, and the data products and KPIs the built tables serve. A table more than 6 steps away is
+// not found. A system the ontology does not hold gives an empty list here, and the governance graph still answers.
 CALL () {
   USE graph.byName($bpa_graph)
   OPTIONAL MATCH (s:{{label:ontology_system.node}})
@@ -14,6 +18,8 @@ CALL () {
   OPTIONAL MATCH (built)-[:{{relationship:platform_table.in_layer}}]->(l:{{label:layer.node}})
   OPTIONAL MATCH (built)-[:{{relationship:platform_table.part_of}}]->(p:{{label:data_product.node}})
   OPTIONAL MATCH (built)-[:{{relationship:platform_table.serves_measure}}]->(m:{{label:measure.node}})
+  // Four lists in one shape (kind, name, label, layer), so the rows of both graphs fit one table. An entry with
+  // no name comes from an optional match that found nothing, or from a node with no name. The RETURN drops it.
   WITH collect(DISTINCT {kind: 'replica table', name: replica.{{property:platform_table.full_name}},
                          label: null, layer: 'replica'})
      + collect(DISTINCT {kind: CASE l.{{property:layer.code}} WHEN 'metric-view' THEN 'metric view'
@@ -26,6 +32,9 @@ CALL () {
                          label: m.{{property:measure.name}}, layer: null}) AS things
   RETURN [thing IN things WHERE thing.name IS NOT NULL | thing {.*, graph: 'kpi store'}] AS in_kpi_store
 }
+// Part 2, governance graph. The tables the system holds. The four variants below differ in two things only:
+// whether the governance graph records lineage (then the tables built from those are listed too), and whether
+// its tables have a layer property (then each row shows the layer).
 CALL () {
   USE graph.byName($governance_graph)
   OPTIONAL MATCH (g:{{label:system.node}})
@@ -54,6 +63,7 @@ CALL () {
 //#endif
   RETURN [thing IN things WHERE thing.name IS NOT NULL | thing {.*, graph: 'governance'}] AS in_governance
 }
+// One row per thing. The KPI Store's rows come first, in the order of the chain from replica table to KPI.
 UNWIND in_kpi_store + in_governance AS thing
 RETURN thing.graph AS graph, thing.kind AS kind, thing.name AS name, thing.label AS label, thing.layer AS layer
 ORDER BY graph DESC, CASE kind WHEN 'replica table' THEN 1 WHEN 'silver table' THEN 2 WHEN 'gold table' THEN 3

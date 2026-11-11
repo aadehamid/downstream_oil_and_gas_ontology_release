@@ -16,6 +16,10 @@ that Git ref. The judgement is the release's own (sync_stores.drift): a store is
 changed (its content moved since it was marked), unmarked, empty or unreachable. A Neo4j database also gets an
 lm: line for its logical models when the release holds any.
 
+Where it sits in the run: this is the runner's sync step (kpi_store.runner), the last check after the three
+loads and the copy. It also runs alone at any time, for example after a change to the release folder, to see
+which stores are now behind.
+
 For a Neo4j database, equal counts are not enough: a property can change while the counts stay. So the check also
 computes the database's graph hash, as the load does, and compares it with the hash its marker holds. A database
 whose hash differs reads changed. --quick leaves the hash out, and each Neo4j line then says "counts only".
@@ -43,13 +47,17 @@ from . import load_neo4j as local_load
 from . import local_settings as ls
 from . import settings as settings_module
 
-STORES = ("databricks", "jena", "neo4j", "enterprise")
+STORES = ("databricks", "jena", "neo4j", "enterprise")   # also the order of the lines
 TECH_FOLDER = "tech-graph"   # in the run folder: the technical graph's file as the runner last fetched it
+# Two statuses of the technical graph's lines that no store gives. "not checked" fails the command; "left out"
+# does not decide (all_current).
 NOT_CHECKED, LEFT_OUT = "not checked", "left out"
 NO_FILE = ("no tech-graph.nq was named or fetched, so its content was not compared; name the file with --tech-graph, "
            "or let the runner's report step fetch it")
 NEO4J_STORES = ("neo4j", "enterprise")
-WORKTREE = "worktree"
+WORKTREE = "worktree"   # the --ref that reads the folder's files as they are
+# How long a statement is polled after the first call's own 30 seconds. A warehouse that was stopped may have to
+# start first. When the time is over the check gives up on the statement; it does not cancel it.
 STATEMENT_WAIT_SECONDS = 300
 
 
@@ -62,6 +70,7 @@ def workspace_client(profile):
 
 
 def _state(response):
+    """The statement's state as text. The SDK gives an enum; a test's stand-in may give the text itself."""
     state = getattr(getattr(response, "status", None), "state", None)
     return getattr(state, "value", state)
 
@@ -70,6 +79,8 @@ def statement_runner(client, warehouse_id, wait_seconds=STATEMENT_WAIT_SECONDS, 
     """run_sql(statement) -> list of row dicts, on one SQL warehouse. Values arrive as text (the API's JSON_ARRAY
     format), so a caller converts a count itself. A statement that does not succeed raises RuntimeError."""
     def run_sql(statement):
+        # The call itself waits up to 30 seconds. A statement that takes longer comes back PENDING or RUNNING and
+        # is polled below.
         response = client.statement_execution.execute_statement(statement=statement, warehouse_id=warehouse_id,
                                                                 wait_timeout="30s")
         waited = 0
@@ -82,6 +93,7 @@ def statement_runner(client, warehouse_id, wait_seconds=STATEMENT_WAIT_SECONDS, 
         if _state(response) != "SUCCEEDED":
             raise RuntimeError(f"the statement ended as {_state(response)}")
         columns = [c.name for c in response.manifest.schema.columns]
+        # A large result arrives in chunks. Each chunk names the next one; the last names none.
         result, rows = response.result, []
         while result is not None:
             rows += list(result.data_array or [])
@@ -96,7 +108,7 @@ def read_databricks(settings, run_sql, ss):
     which refuses anything outside the KPI Store's schemas."""
     gate = ldb.Gate(settings, run_sql)
     marker = ldb.read_marker(gate, settings)
-    if marker is None:
+    if marker is None:   # unmarked: the triple table may not exist yet, so it is not read
         return None, [0], {}
     rows = gate.run(f"SELECT graph, count(*) AS n FROM {settings.triples_table} GROUP BY graph")
     held = ss.rows_per_graph((row["graph"], int(row["n"])) for row in rows)
@@ -117,6 +129,7 @@ def expected(release_root, ss, ref=WORKTREE, extra_graphs=()):
 
 
 def _why(err, ss):
+    """The reason a store could not be read, as the line shows it."""
     if isinstance(err, (ls.LocalSettingsError, copy_enterprise.Refused, settings_module.SettingsError)):
         return str(err)   # this code's own words
     return ss.reason(err)   # the error's name, never its message, which can carry an address
@@ -176,10 +189,13 @@ def read_stores(stores, local, newest, code, connect=local_load.connect, client_
                 models += [row] if row else []
             else:
                 neo4j = local.need("neo4j_enterprise")
+                # Enterprise is read through the copy's guarded session: the same one database, confirmed by the
+                # server, and the copy's guard on every statement. The guard refuses server administration and
+                # DROP, not every write; it is this check's own queries that only read.
                 with connect(neo4j) as driver, copy_enterprise.open_target(driver, neo4j.database) as session:
                     markers[store], live[store], hashes[store], row = read_neo4j(session, store, newest, code, quick)
                 models += [row] if row else []
-        except Exception as err:
+        except Exception as err:   # an error becomes this store's line; an exit (SystemExit) is not caught here
             markers[store], live[store] = None, _why(err, ss)
     return markers, live, models, hashes
 
@@ -248,6 +264,7 @@ def tech_rows(stores, local, graph_files, release_root, code, connect=local_load
 
 
 def lines(rows):
+    """The rows as aligned text, one line per row: name, status, reason."""
     return [f"{store:<15} {status:<11} {why}" for store, status, why in rows]
 
 

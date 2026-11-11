@@ -2,6 +2,19 @@
 
 The file lives outside the release folder, because it describes one environment's governance graph. `drift`
 compares it with the live schema and names every role whose label, property or relationship type is gone.
+
+The file's life: `discover` writes a proposal (`discover.propose`), a person corrects it, and `confirm` marks it
+as confirmed and stores a digest of its values. After that `check` and `ask` only read it; a new `confirm`, or
+`discover --replace`, writes it again. `render.py` refuses a mapping that is not confirmed, and `run.py` runs
+`drift` before every question.
+
+What `drift` proves is narrow. Each mapped label still exists, each mapped property is still on its label, each
+mapped relationship type still runs between its labels, and each mapped path still connects. So a question does
+not run when a name it uses is gone. `drift` does not see any other change of the schema: a new label, a new
+property, or a mapped name that now means something else. The schema is read just before the question, in its
+own transaction, so a change between the two is not seen either.
+
+This module reads and writes the mapping file and nothing else.
 """
 from __future__ import annotations
 
@@ -19,6 +32,7 @@ class MappingError(Exception):
 
 
 def load(path: Path) -> dict:
+    """The mapping file's content. Raises MappingError when the file is missing, is not JSON or has another format."""
     try:
         with Path(path).open(encoding="utf-8", newline="\n") as f:
             mapping = json.load(f)
@@ -32,6 +46,7 @@ def load(path: Path) -> dict:
 
 
 def save(path: Path, mapping: dict) -> None:
+    """Writes the mapping file with sorted keys and LF line ends, so the same mapping gives the same file."""
     with Path(path).open("w", encoding="utf-8", newline="\n") as f:
         json.dump(mapping, f, indent=2, sort_keys=True)
         f.write("\n")
@@ -44,16 +59,20 @@ def value_of(mapping: dict, role_name: str):
 
 
 def digest(mapping: dict) -> str:
+    """A SHA-256 of every role's value. The notes around a value (confidence, alternatives, meaning) are left
+    out: only a change of a value changes which label, property or relationship type a query names."""
     values = {name: entry.get("value") for name, entry in mapping["roles"].items()}
     return hashlib.sha256(json.dumps(values, sort_keys=True).encode("utf-8")).hexdigest()
 
 
 def is_confirmed(mapping: dict) -> bool:
     # The digest ties the confirmation to the values the person saw. An edit after it needs a new confirmation.
+    # It is a plain checksum with no key: it catches an edit, not a person who also rewrites the digest.
     return mapping.get("confirmed") is True and mapping.get("digest") == digest(mapping)
 
 
 def require_confirmed(mapping: dict) -> None:
+    """Raises MappingError unless is_confirmed holds, and says which of its two tests failed."""
     if mapping.get("confirmed") is not True:
         raise MappingError("the role mapping is not confirmed: read it, then run confirm")
     if mapping.get("digest") != digest(mapping):
@@ -98,6 +117,11 @@ def drift(mapping: dict, schemas: dict[str, Schema]) -> list[str]:
 
 
 def _path_drift(role, value, start, end, schema, where):
+    """The drift lines for one path role: its value must have the right form, each of its types must still
+    exist, and the types must still lead from the start label to the end label within max_hops steps."""
+    # The renderer writes max_hops into the query as the upper bound of a variable-length pattern. The limit of 5
+    # keeps a hand-edited mapping from asking the server for a search of any length. bool is refused by name
+    # because Python counts True as the integer 1.
     if (not isinstance(value, dict) or not value.get("types") or not isinstance(value.get("max_hops"), int)
             or isinstance(value["max_hops"], bool) or not 1 <= value["max_hops"] <= 5):
         return [f"role {role.name}: a path needs a list of types and max_hops from 1 to 5"]
@@ -105,6 +129,7 @@ def _path_drift(role, value, start, end, schema, where):
     gone = [t for t in value["types"] if t not in live]
     if gone:
         return [f"role {role.name}: relationship type {', '.join(gone)} no longer exists {where}"]
+    # Walk the schema, not the data: one step moves from every label reached so far along the path's types.
     reached, frontier = {start}, {start}
     for _ in range(value["max_hops"]):
         frontier = {e for s, t, e in schema.relationships if s in frontier and t in value["types"]}
@@ -116,7 +141,8 @@ def _path_drift(role, value, start, end, schema, where):
 
 
 def confirm(mapping: dict, schemas: dict[str, Schema], now: dt.datetime | None = None) -> dict:
-    """The mapping marked as confirmed. Refuses a mapping that does not fit the live schema."""
+    """The mapping marked as confirmed. Refuses a mapping that does not fit the live schema. The digest is taken
+    last, over the values as confirmed, so is_confirmed can tell a later edit."""
     problems = drift(mapping, schemas)
     if problems:
         raise MappingError("the mapping does not fit the graphs:\n  " + "\n  ".join(problems))
