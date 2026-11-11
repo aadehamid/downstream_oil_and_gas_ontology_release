@@ -37,3 +37,7 @@ scripts/test_published_figures.py::test_guide_module_figures_match_the_newest_re
 business_architecture/ontology/release/test_build_catalog.py::test_every_distribution_is_a_file_in_its_package
 business_architecture/ontology/release/test_build_catalog.py::test_one_dataset_per_release_package
 kpi_store/tests/test_load_databricks.py::test_the_graph_set_is_the_one_sync_stores_expects_for_this_release
+# The two viewer pages are built from the packages of the release as shipped. A cut, a new version or a new module
+# makes them stale until they are rebuilt, and that must not fail the check that the runner runs after a cut.
+business_architecture/ontology/viewer/test_viewer.py::test_the_committed_page_equals_a_fresh_build
+business_architecture/ontology/viewer/test_horoi.py::test_the_committed_page_and_record_equal_a_fresh_build
