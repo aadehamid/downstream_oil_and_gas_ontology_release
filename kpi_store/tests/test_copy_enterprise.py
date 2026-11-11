@@ -107,7 +107,9 @@ def test_the_rules_read_the_module_iris_the_store_name_and_the_projections_label
 
 
 def test_the_technical_graphs_class_names_come_from_its_newest_package():
-    newest = ["https://w3id.org/mpc/ontology/modules/kpi/1.3.0", "https://w3id.org/mpc/ontology/modules/technical-graph/1.1.0"]
+    from kpi_store import ontology_view as ov
+    version = ov.newest_version("technical-graph", support.ROOT / ov.RELEASES)   # 1.1.0 as shipped; a cut moves it on
+    newest = ["https://w3id.org/mpc/ontology/modules/kpi/1.3.0", f"https://w3id.org/mpc/ontology/modules/technical-graph/{version}"]
     assert ce.tech_class_names(support.ROOT, newest) == [
         "Agent", "Builder", "DataObject", "DefinitionsView", "Host", "Job", "MetricView", "Orchestrator", "Pipeline",
         "PipelineStep", "QualityCheck", "SourceDatabase", "Table", "TechnicalObject", "View"]

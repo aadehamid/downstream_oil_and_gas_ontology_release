@@ -1,9 +1,11 @@
 """The notebook: its start-up checks stop before any read or write, and its run is the tested run."""
+import contextlib
 import functools
 import hashlib
 import importlib.util
 import json
 import re
+import sys
 import zipfile
 
 import pytest
@@ -22,6 +24,40 @@ def notebook():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)   # outside Databricks there is no dbutils, so nothing runs on import
     return module
+
+
+@contextlib.contextmanager
+def import_state_kept():
+    """The notebook puts the unzipped release first on the import path and drops every loaded kpi_store module, as
+    it must in Databricks. In a test process that would leave later tests importing the small release's kpi_store,
+    which lacks whole sub-packages. This puts the import path and the modules back as they were."""
+    def loaded():
+        return {name: module for name, module in sys.modules.items() if name == "kpi_store" or name.startswith("kpi_store.")}
+    path, modules = list(sys.path), loaded()
+    try:
+        yield
+    finally:
+        sys.path[:] = path
+        for name in loaded():
+            del sys.modules[name]
+        sys.modules.update(modules)
+
+
+@pytest.fixture(autouse=True)
+def the_import_state_is_put_back():
+    with import_state_kept():
+        yield
+
+
+def test_a_notebook_run_leaves_the_import_path_and_the_loaded_modules_as_they_were(tmp_path):
+    import kpi_store.questions   # a sub-package the zip of these tests does not hold
+    before, package = list(sys.path), sys.modules["kpi_store"]
+    with import_state_kept():
+        run_main(volume(tmp_path), support.small_workspace())
+        assert sys.path != before and sys.modules["kpi_store"] is not package   # what the notebook does
+        assert "kpi_store.questions" not in sys.modules
+    assert sys.path == before and sys.modules["kpi_store"] is package
+    assert sys.modules["kpi_store.questions"] is kpi_store.questions
 
 
 def volume(tmp_path, zip_bytes=None, sha256=None, settings=True, top_folder=""):

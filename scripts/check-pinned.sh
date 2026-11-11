@@ -9,5 +9,5 @@ while IFS= read -r var; do unset "$var"; done < <(compgen -e | grep '^GIT_' || t
 export PYTHONDONTWRITEBYTECODE=1 EPM_PINNED_ONLY=1
 files="$(grep -v '^#' scripts/pinned-tests.txt | cut -d: -f1 | sort -u)"
 # shellcheck disable=SC2086
-uv run -q --no-project --with pytest --with rdflib --with pyshacl --with openpyxl --with jsonschema --with pyoxigraph==0.5.13 --with "markdown-it-py>=4,<5" \
+uv run -q --no-project --with pytest --with rdflib --with pyshacl --with openpyxl --with jsonschema --with pyoxigraph==0.5.13 --with pyyaml==6.0.3 --with sqlglot==30.31.0 --with "markdown-it-py>=4,<5" \
   python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcutdir "$ROOT" $files

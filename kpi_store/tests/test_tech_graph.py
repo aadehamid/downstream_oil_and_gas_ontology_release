@@ -419,7 +419,7 @@ RELEASES = support.ROOT / "business_architecture" / "ontology" / "releases"
 def shapes():
     """(the module's released shapes, the releases a technical graph is checked with)."""
     from rdflib import Graph
-    package = RELEASES / "technical-graph" / "1.1.0"
+    package = RELEASES / "technical-graph" / ov.newest_version("technical-graph", RELEASES)   # a cut moves the version on
     linked = Graph().parse(package / "technical-graph.ttl")
     for module in ("data-product", "kpi", "system"):
         linked.parse(RELEASES / module / ov.newest_version(module, RELEASES) / f"{module}.ttl")
