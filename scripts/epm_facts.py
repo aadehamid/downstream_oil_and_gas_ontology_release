@@ -66,9 +66,6 @@ TAXONOMY = os.path.join(ROOT, "business_architecture", "ontology", "build", "out
 DECISIONS = os.path.join(ROOT, "business_architecture", "domain", "decisions")
 ANSWERS = os.path.join(REVIEWS, "the review comments of a subject matter expert")
 SCOPED = os.path.join(STEP4, "scoped-sequence")
-# The share release (the decision of 2026-10-31) leaves the Step 4 gate out; in release mode (EPM_SHARE_RELEASE, or release.json
-# at the tree's root) `counts` gives the taxonomy figures alone. On main the gate must be here, as before.
-SHARE_RELEASE = bool(os.environ.get("EPM_SHARE_RELEASE")) or os.path.isfile(os.path.join(ROOT, "release.json"))
 
 NOT_HELD = {"AmbiguousDeferred", "ExternalGovernanceReference", "StructuredFlowValue"}
 HOLD_WORD = re.compile(r"(?i)\bhold\b|\bheld\b")
@@ -324,8 +321,8 @@ def taxonomy():
 # ---------- commands ----------
 
 def cmd_counts(args):
-    if SHARE_RELEASE and not os.path.isfile(os.path.join(STEP4, "mapping_v2.py")):
-        # The share release, without the Step 4 gate: the taxonomy figures only. On main a missing gate fails below.
+    if not os.path.isfile(os.path.join(STEP4, "mapping_v2.py")):
+        # Without the Step 4 gate (the decision of 2026-10-31): the taxonomy figures only.
         out = {"commit": commit(), "step4_gate": "not in this tree", "taxonomy": taxonomy(), "sources": [rel(TAXONOMY)]}
         if args.json:
             print(json.dumps(out, indent=2))
@@ -1103,7 +1100,7 @@ COMMENT_ID = re.compile(r"comment (\d{6,})")
 
 
 def markdown_files(root=ROOT):
-    """Every tracked Markdown file from the root; in a tree without Git (the share release), every .md file in it."""
+    """Every tracked Markdown file from the root; in a tree without Git, every .md file in it."""
     if os.path.exists(os.path.join(root, ".git")):
         out = subprocess.run(["git", "ls-files", "-z", "*.md"], cwd=root, capture_output=True, text=True, check=True).stdout
         return [f for f in out.split("\0") if f]
@@ -1279,7 +1276,7 @@ def _name_texts(path, name):
 
 
 def tracked_files(root=ROOT):
-    """Every tracked path from the root, or, in a tree without Git (the share release), every file in it but the
+    """Every tracked path from the root, or, in a tree without Git, every file in it but the
     caches and environments a run leaves behind."""
     if os.path.exists(os.path.join(root, ".git")):
         # Inherited GIT_DIR or GIT_INDEX_FILE (a hook sets them) would point git at another repository.
@@ -1366,7 +1363,7 @@ def module_releases(releases=None, builder=None):
     out = []
     for module in sorted(os.listdir(releases)):
         folder = os.path.join(releases, module)
-        if module == "previous":  # the share release's history folder: each module's previous package
+        if module == "previous":  # the history folder: each module's previous package
             continue
         versions = sorted((v for v in os.listdir(folder) if os.path.isfile(os.path.join(folder, v, "manifest.json")))
                           if os.path.isdir(folder) else [], key=_version_key)

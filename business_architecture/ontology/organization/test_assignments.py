@@ -4,20 +4,15 @@ SHACL that holds.
 
 Run: python3 -m pytest test_assignments.py (needs rdflib, pyshacl).
 """
-import json
-import os
-import sys
 import unittest
 from collections import Counter
 from unittest import mock
 
 from rdflib import Graph, Literal
-from rdflib.namespace import DCTERMS, OWL, RDF
+from rdflib.namespace import OWL, RDF
 
 import build_assignments as ba
 import build_roles as br
-sys.path.insert(0, os.path.join(br.HERE, "..", "release"))
-import build_module as bm  # noqa: E402  (release mode, and where a released package sits in either layout)
 
 ENTRIES, REGISTER, GRAPH = ba.build()
 ROLES_OF = {r["source_text"]: r["roles"].split(";") for r in REGISTER}
@@ -99,15 +94,6 @@ class Assignments(unittest.TestCase):
 class RoleMerges(unittest.TestCase):
     """Organization 2.0.0 (the decision of 2026-10-18): The decision owner's three merges deprecate, never delete."""
 
-    def released(self):
-        """organization 1.0.0's Turtle, in either layout. In the share release, where 1.0.0 may not have shipped, the
-        test skips; on main the package is always on disk."""
-        folder = bm.package_folder("organization", "1.0.0")
-        if folder is None and bm.SHARE_RELEASE:
-            self.skipTest("organization 1.0.0 did not ship (the share release holds the newest and previous packages only)")
-        self.assertIsNotNone(folder, "organization 1.0.0 is not on disk under releases/")
-        return Graph().parse(os.path.join(folder, "organization.ttl"))
-
     def test_no_assignment_names_a_deprecated_role(self):
         roles = Graph().parse(br.OUTPUT)
         deprecated = {s for s in roles.subjects(OWL.deprecated, Literal(True))}
@@ -121,31 +107,6 @@ class RoleMerges(unittest.TestCase):
         g.set((a, O.assignedRole, br.ROLE["rcvo-advisor"]))
         with self.assertRaises(SystemExit):
             ba.shacl(g)
-
-    def test_the_merges_keep_every_released_iri(self):
-        # The same assignment IRIs as 1.0.0, and every 1.0.0 role still present.
-        released = self.released()
-        self.assertEqual(set(GRAPH.subjects(RDF.type, O.ResponsibilityAssignment)),
-                         set(released.subjects(RDF.type, O.ResponsibilityAssignment)))
-        roles = Graph().parse(br.OUTPUT)
-        self.assertEqual(set(released.subjects(RDF.type, br.ORG.Role)), set(roles.subjects(RDF.type, br.ORG.Role)))
-
-    def test_a_deprecated_role_keeps_its_triples_and_names_its_successor(self):
-        released = self.released()
-        roles = Graph().parse(br.OUTPUT)
-        for slug, successor in ((s, r) for s, r in LIVE.items() if r != s):
-            with self.subTest(role=slug):
-                for triple in released.triples((br.ROLE[slug], None, None)):
-                    self.assertIn(triple, roles)
-                self.assertEqual(roles.value(br.ROLE[slug], DCTERMS.isReplacedBy), br.ROLE[successor])
-
-    def test_exactly_the_three_moved_assignments_changed_role(self):
-        released = self.released()
-        moved = {a for a in GRAPH.subjects(RDF.type, O.ResponsibilityAssignment)
-                 if GRAPH.value(a, O.assignedRole) != released.value(a, O.assignedRole)}
-        self.assertEqual(len(moved), dict(ba.ledger(ENTRIES, REGISTER, GRAPH))["assignments moved to a successor role"])
-        self.assertEqual(len(moved), 3)
-
 
 if __name__ == "__main__":
     unittest.main()

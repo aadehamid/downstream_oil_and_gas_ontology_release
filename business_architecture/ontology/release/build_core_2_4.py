@@ -31,13 +31,13 @@ from rdflib import Graph, Literal, URIRef
 from rdflib.namespace import DCTERMS, OWL, RDF, SKOS, XSD
 
 import build_core_2_3 as prev
-import build_module as bm  # release mode, and where an approval is recorded
+import build_module as bm  # where an approval is recorded
 import frozen_sources
 import newest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ONTOLOGY = os.path.dirname(HERE)
-BASE = frozen_sources.package_dir(ONTOLOGY, "core", "2.3.0")  # or the share release's history folder
+BASE = frozen_sources.package_dir(ONTOLOGY, "core", "2.3.0")  # in releases/ or the history folder
 SOURCE_PATH = prev.SOURCE_PATH
 # The map as 2.3.0 was built from it, and the map as 2.4.0 is built from it: the commit that applied
 # MPC-P12, the last change to the map's names before this release.

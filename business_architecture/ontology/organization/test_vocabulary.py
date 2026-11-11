@@ -15,15 +15,13 @@ from rdflib.namespace import DCTERMS, OWL, RDF, RDFS, SKOS, XSD
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "release"))
-import build_module as bm  # noqa: E402  (release mode, and where a released package sits in either layout)
+import build_module as bm  # noqa: E402  (where a released package sits)
 
 
 def released(tc, module, version, fname):
-    """A file of a released package, in either layout. In the share release a package that did not ship skips the
-    test; on main every package is on disk, so a missing one fails."""
+    """A file of a released package, in releases/ or the history folder. The tree holds each module's newest and
+    previous packages, so a missing one fails."""
     folder = bm.package_folder(module, version)
-    if folder is None and bm.SHARE_RELEASE:
-        tc.skipTest(f"{module} {version} did not ship (the share release holds the newest and previous packages only)")
     tc.assertIsNotNone(folder, f"{module} {version} is not on disk under releases/")
     return os.path.join(folder, fname)
 
@@ -157,13 +155,13 @@ class Vocabulary(unittest.TestCase):
         message = URIRef("http://www.w3.org/ns/shacl#message")
         self.assertEqual([str(m) for m in SHAPES.objects(None, message) if "'" in str(m)], [])
 
-    def test_no_iri_changed_since_2_0_0(self):
+    def test_no_iri_changed_since_2_1_0(self):
         # A minor release removes no IRI: every subject of the earlier package, the ontology header aside, is still a
         # subject of the next, and nothing is newly deprecated (the decision of 2026-10-26; 2.2.0, the decision of 2026-10-18, amendment
         # of 2026-10-28).
         header = URIRef("https://w3id.org/mpc/ontology/modules/organization")
         deprecated = URIRef("http://www.w3.org/2002/07/owl#deprecated")
-        for before, after in (("2.0.0", "2.1.0"), ("2.1.0", "2.2.0")):
+        for before, after in (("2.1.0", "2.2.0"),):
             old = Graph().parse(released(self, "organization", before, "organization.ttl"))
             new = Graph().parse(released(self, "organization", after, "organization.ttl"))
             self.assertEqual({s for s in old.subjects() if s != header} - set(new.subjects()), set(), after)

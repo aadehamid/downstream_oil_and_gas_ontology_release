@@ -1,5 +1,6 @@
 # The technical-graph module's example graph: test data, not ontology content (the decision of 2026-11-02, item 4).
-# Built by build_example.py from the pricing demo's technical graph. Do not edit by hand.
+# It never ships in the module's package. The regression runs competency questions 45 to 50 on it, and the
+# module's tests check it against the module's shapes. It is kept as committed; no script rebuilds it.
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix dp: <https://w3id.org/mpc/ontology/modules/data-product/> .
 @prefix layer: <https://w3id.org/mpc/ontology/modules/data-product/layer/> .

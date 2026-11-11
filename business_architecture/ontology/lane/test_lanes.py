@@ -17,15 +17,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import build_lanes as bl  # noqa: E402
 sys.path.insert(0, os.path.join(HERE, "..", "release"))
-import build_module as bm  # noqa: E402  (release mode, and where a released package sits in either layout)
+import build_module as bm  # noqa: E402  (where a released package sits)
 
 
 def released(tc, module, version, fname):
-    """A file of a released package, in either layout. In the share release a package that did not ship skips the
-    test; on main every package is on disk, so a missing one fails."""
+    """A file of a released package, in releases/ or the history folder. The tree holds each module's newest and
+    previous packages, so a missing one fails."""
     folder = bm.package_folder(module, version)
-    if folder is None and bm.SHARE_RELEASE:
-        tc.skipTest(f"{module} {version} did not ship (the share release holds the newest and previous packages only)")
     tc.assertIsNotNone(folder, f"{module} {version} is not on disk under releases/")
     return os.path.join(folder, fname)
 

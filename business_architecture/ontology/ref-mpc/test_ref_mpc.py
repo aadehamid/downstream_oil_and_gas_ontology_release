@@ -18,16 +18,12 @@ from rdflib.namespace import DCTERMS, OWL, RDF, RDFS, SKOS, XSD
 HERE = os.path.dirname(os.path.abspath(__file__))
 ORGANIZATION = os.path.join(HERE, "..", "organization")
 sys.path.insert(0, os.path.join(HERE, "..", "release"))
-import build_module as bm  # noqa: E402  (release mode, and where a released package sits in either layout)
+import build_module as bm  # noqa: E402  (where a released package sits)
 
 
 def core_shapes_graph():
-    """Core 1.0.0's shapes, which hold the source shape (the decision of 2026-10-13). In the share release, which holds the
-    newest and previous core only, the newest core's shapes carry the same shape; on main 1.0.0 is always on disk."""
-    folder = bm.package_folder("core", "1.0.0")
-    if folder is None and bm.SHARE_RELEASE:
-        folder = os.path.join(bm.ONTOLOGY, "releases", "core", bm.newest_on_disk("core"))
-    return Graph().parse(os.path.join(folder, "shapes.ttl"))
+    """The newest core's shapes, which hold the source shape (the decision of 2026-10-13)."""
+    return Graph().parse(os.path.join(bm.ONTOLOGY, "releases", "core", bm.newest_on_disk("core"), "shapes.ttl"))
 
 REF = Namespace("https://w3id.org/mpc/ontology/modules/ref-mpc/")
 ORGM = Namespace("https://w3id.org/mpc/ontology/modules/organization/")

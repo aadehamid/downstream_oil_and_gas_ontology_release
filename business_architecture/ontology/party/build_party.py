@@ -50,18 +50,8 @@ SYSTEM_MODULE = os.path.join(HERE, "..", "system", "systems.csv")
 # The system module's systems the process map does not name, such as PRM since system 1.5.0 (the decision of 2026-10-25, the decision of 2026-10-27).
 SYSTEM_OTHERS = os.path.join(HERE, "..", "system", "other-systems.csv")
 CHANGE_NOTES = os.path.join(HERE, "change-notes.csv")
-# A change note ends with its record, "(the decision of 2026-10-27)." on main. The share release carries no records and writes
-# "(the decision of 2026-10-27)." instead (the decision of 2026-10-31); that form is accepted only in release mode
-# (EPM_SHARE_RELEASE, or release.json at the tree's root), so a note on main must still cite its record.
-SHARE_RELEASE = bool(os.environ.get("EPM_SHARE_RELEASE")) or os.path.isfile(os.path.join(HERE, "..", "..", "..", "release.json"))
-
-
-def note_form(share):
-    """The form a change note must take: dated, and ending with its record; in release mode the record may be a date."""
-    return r"\d{4}-\d{2}-\d{2}: .*\((?:DEC-\d{4}" + (r"|the decision of \d{4}-\d{2}-\d{2}" if share else "") + r")\)\.$"
-
-
-NOTE_FORM = note_form(SHARE_RELEASE)
+# A change note is dated and ends with the decision it rests on, "(the decision of 2026-10-27).".
+NOTE_FORM = r"\d{4}-\d{2}-\d{2}: .*\(the decision of \d{4}-\d{2}-\d{2}\)\.$"
 CODE_MAPPINGS = os.path.join(HERE, "code-list-mappings.csv")
 # The definitions' sources are shared with the system module (item G, the decision of 2026-10-25).
 SYSTEM_SOURCES = os.path.join(HERE, "..", "system", "sources.csv")
@@ -454,7 +444,7 @@ def build_systems(systems, flows, sources, attrs, existing):
 def add_change_notes(graphs):
     """Each row of change-notes.csv gives one dated skos:changeNote to a term the module builds: a term whose meaning a
     release changed keeps its IRI and says what changed (since 2.0.0; the decision of 2026-10-27). The build fails unless the term
-    is built and the note is dated and cites its record."""
+    is built and the note is dated and names its decision."""
     import re
     rows = read(CHANGE_NOTES)
     problems = []
@@ -464,7 +454,7 @@ def add_change_notes(graphs):
         if not where:
             problems.append(f"change-notes.csv: {r['term']} is not a term the module builds")
         elif not re.match(NOTE_FORM, r["note"]):
-            problems.append(f"change-notes.csv: {r['term']}: the note must start with its date and end with its record")
+            problems.append(f"change-notes.csv: {r['term']}: the note must start with its date and end with its decision")
         else:
             where[0].add((term, SKOS.changeNote, Literal(r["note"], lang="en")))
     if problems:

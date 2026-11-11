@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Step 3c workbook review gate (mechanical checks + review-findings report).
 
-Synced 2026-09-19 to the post-#31 semantic-intake workbook. This is the
+Synced 2026-09-19 to the semantic-intake workbook. This is the
 same class of follow-up as an earlier change (lock the reviewer guide, then make the
 script enforce it). The locked human text is
 `step3c-reviewer-instructions.md` v2026-09-19b.
@@ -236,8 +236,8 @@ def main() -> int:
     idx = {h: i for i, h in enumerate(headers)}
     missing = [h for h in REQUIRED_HEADERS if h not in idx]
     if missing:
-        print("workbook is missing post-#31 headers: " + ", ".join(missing), file=sys.stderr)
-        print("point --workbook at the semantic-intake xlsx, not a pre-#31 copy", file=sys.stderr)
+        print("workbook is missing semantic-intake headers: " + ", ".join(missing), file=sys.stderr)
+        print("point --workbook at the semantic-intake xlsx, not an earlier copy", file=sys.stderr)
         return 1
 
     idmap = {r["slug"]: r for r in json.load(open(a.identity_map))}
@@ -304,7 +304,7 @@ def main() -> int:
                 slug,
                 "bad-status",
                 f"status={status!r}; must be one of {sorted(STATUS_OK)} "
-                "(workbook Controlled vocabularies, post-#31).",
+                "(workbook Controlled vocabularies).",
             )
             continue
 
@@ -430,7 +430,7 @@ def main() -> int:
                     BLOCKING,
                     slug,
                     "missing-phase-1",
-                    "Post-#31 approval requires concept_type_check, "
+                    "Approval requires concept_type_check, "
                     "primary_purpose, and reference_sources. Missing: "
                     + ", ".join(missing_phase1)
                     + ".",
@@ -475,7 +475,7 @@ def main() -> int:
         # Circular definition: the definition restates the label instead of
         # explaining it — "Refinery Planning is the process of refinery
         # planning". Reusing a domain noun is NOT circular: "Regional
-        # Optimization" must be free to say "regional". The pre-#34 test
+        # Optimization" must be free to say "regional". An earlier test
         # substring-matched either of the first two label words anywhere in the
         # first six words, which fired on 10 rows, none of them circular,
         # including four approved L3 parents. Now anchored at the opening.
@@ -510,7 +510,7 @@ def main() -> int:
         # missing owner name is a hint, not a failed merge.
         # Recognises the two conventions actually in use: a prose owner phrase,
         # and a trailing parenthetical owner or slug — "trade execution (Supply
-        # And Trading)", "(CM-1-1-2-10)". Pre-#34 this only matched the prose
+        # And Trading)", "(CM-1-1-2-10)". An earlier version only matched the prose
         # form and noted all five rows, each of which does name its owners.
         _owner_named = re.search(
             r"\b(owned by|belongs to|sibling|see |under )\b", out_sc or "", re.I

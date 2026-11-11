@@ -1,14 +1,9 @@
 #!/usr/bin/env bash
 # The release's automated checks: every builder's --verify, the projection manifest, the competency regression,
-# every test file, the module map and the coverage counts, and the generated pages. Run it from the release root
-# before you change anything, and again after.
+# every test file, the module map and the coverage counts, the generated pages, and the stand-alone check. Run it
+# from the release root before you change anything, and again after.
 #
 # Needs python3 and uv (https://docs.astral.sh/uv/) for the test dependencies.
-#
-# Compared with the repository this release was cut from, four checks are not here, because what they read did
-# not ship: the Step 4 evidence gate and its tests (the review evidence of the process-map mapping), the Step 4
-# pin check (Git history), the decision-record, quote, citation and name checks (the decision records and the
-# saved review comments), and the pre-push hook test. Every content check runs.
 #
 # This script proves your copy is valid. It leaves out the tests in scripts/pinned-tests.txt, which ask whether your
 # copy still equals the release as shipped. scripts/check-pinned.sh runs those, and you may ignore it after you change
@@ -18,7 +13,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 while IFS= read -r var; do unset "$var"; done < <(compgen -e | grep '^GIT_' || true)
 export PYTHONDONTWRITEBYTECODE=1
-export EPM_SHARE_RELEASE=1   # the builders and tests read the release's layout: the newest set, and releases/previous/
 run() { echo "--- $*"; "$@"; }
 run_tests() {  # unittest exits 0 on zero tests; a test command must have run at least one
   echo "--- $*"; local out; out="$("$@" 2>&1)"; local rc=$?; printf '%s\n' "$out"
@@ -80,8 +74,7 @@ CORE_BUILDER="$(cd $ONT/release && python3 -c 'import newest; print(newest.core_
 (cd $ONT/party && run with_deps python build_party.py --verify)
 # The projection's checked, serialised inputs must match the manifest.
 (cd $ONT/projection && run with_deps python pipeline.py build --verify)
-# Every test file of the ontology, the demo and the scripts, in parallel (the list is written at the cut;
-# test_check_script.py checks it is complete).
+# Every test file of the ontology and the scripts, in parallel (test_check_script.py checks the list is complete).
 run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcutdir "$ROOT" -n "${CHECK_WORKERS:-auto}" --maxprocesses=8 --dist load \
   business_architecture/business_process/test_business_process.py \
   business_architecture/ontology/apqc/test_apqc_elements.py \
@@ -113,17 +106,11 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   business_architecture/ontology/ref-mpc/test_ref_mpc.py \
   business_architecture/ontology/regression/test_run.py \
   business_architecture/ontology/release/test_build_catalog.py \
-  business_architecture/ontology/release/test_build_core.py \
-  business_architecture/ontology/release/test_build_core_2_1.py \
-  business_architecture/ontology/release/test_build_core_2_2.py \
-  business_architecture/ontology/release/test_build_core_2_3.py \
   business_architecture/ontology/release/test_build_core_2_4.py \
-  business_architecture/ontology/release/test_build_core_next.py \
   business_architecture/ontology/release/test_build_module.py \
   business_architecture/ontology/release/test_dependents.py \
   business_architecture/ontology/release/test_frozen_sources.py \
   business_architecture/ontology/release/test_newest.py \
-  business_architecture/ontology/step4/scoped-sequence/test_scoped_sequences.py \
   business_architecture/ontology/system/test_systems.py \
   business_architecture/ontology/technical-graph/test_technical_graph.py \
   business_architecture/ontology/validation/test_all_module_shapes.py \
@@ -131,7 +118,6 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   business_architecture/ontology/validation/test_release_package_shapes.py \
   business_architecture/ontology/value-stream/test_value_streams.py \
   business_architecture/ontology/viewer/test_viewer.py \
-  demos/downstream-pricing-databricks-free/tests/test_demo.py \
   kpi_store/tests/test_compare.py \
   kpi_store/tests/test_discovery.py \
   kpi_store/tests/test_load_databricks.py \
@@ -143,6 +129,7 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   kpi_store/tests/test_report.py \
   kpi_store/tests/test_settings.py \
   scripts/test_check_script.py \
+  scripts/test_check_standalone.py \
   scripts/test_docs_html.py \
   scripts/test_epm_facts.py \
   scripts/test_modules_guide.py \
@@ -160,6 +147,8 @@ run with_deps python scripts/epm_facts.py modules >/dev/null
 run with_deps python scripts/epm_facts.py coverage >/dev/null
 # The generated pages must equal a fresh build of their Markdown.
 run with_deps python scripts/build_docs_html.py --check
+# The tree refers to nothing outside itself. scripts/standalone-pending.txt lists the paths not yet clean.
+run python3 scripts/check_standalone.py
 
 # The last load's report. A stale report means the stores are behind the packages, not that the ontology is invalid.
 if ! EPM_PINNED_ONLY=1 with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcutdir "$ROOT" business_architecture/ontology/projection/test_pipeline.py \

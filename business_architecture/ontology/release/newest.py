@@ -1,7 +1,6 @@
 """What is newest on disk, and what a write may overwrite. Standard library only, so any builder can import it.
 
-A builder or test that needs "the current core" asks here, so a new core release needs no edit to them. On `main` the
-newest core is the one the builders were written against, so nothing changes there.
+A builder or test that needs "the current core" asks here, so a new core release needs no edit to them.
 """
 import os
 import re

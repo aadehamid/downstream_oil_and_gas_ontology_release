@@ -1,7 +1,6 @@
-"""Frozen sources: the builders read a frozen copy of the process map when one exists, else Git."""
-import contextlib
+"""Frozen sources: the core builders read the process map from frozen files, and a released package is found in
+releases/ or in the history folder releases/previous/."""
 import os
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -9,162 +8,65 @@ from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-import build_module as bm  # noqa: E402  (release mode: EPM_SHARE_RELEASE, or release.json at the tree's root)
+import build_module as bm  # noqa: E402
 import frozen_sources as fs  # noqa: E402
 
 
 class Frozen(unittest.TestCase):
-    def test_the_frozen_file_is_read_before_git(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            old = fs.FROZEN
-            fs.FROZEN = tmp
-            try:
-                self.assertFalse(fs.is_frozen("abc123def456", "x/map.json"))
-                with open(fs.frozen_path("abc123def456", "x/map.json"), "wb") as f:
-                    f.write(b'{"frozen": true}')
-                self.assertTrue(fs.is_frozen("abc123def456", "x/map.json"))
-                self.assertEqual(fs.read("abc123def456", "x/map.json", repo="/nonexistent"), b'{"frozen": true}')
-            finally:
-                fs.FROZEN = old
+    def test_the_frozen_file_is_read(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(fs, "FROZEN", tmp):
+            self.assertFalse(fs.is_frozen("abc123def456", "x/map.json"))
+            with open(fs.frozen_path("abc123def456", "x/map.json"), "wb") as f:
+                f.write(b'{"frozen": true}')
+            self.assertTrue(fs.is_frozen("abc123def456", "x/map.json"))
+            self.assertEqual(fs.read("abc123def456", "x/map.json"), b'{"frozen": true}')
 
-    def test_without_a_frozen_file_git_is_read(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-            subprocess.run(["git", "init", "-q", tmp], check=True, env=env)
-            with open(os.path.join(tmp, "map.json"), "w") as f:
-                f.write('{"v": 1}')
-            subprocess.run(["git", "-C", tmp, "add", "map.json"], check=True, env=env)
-            subprocess.run(["git", "-C", tmp, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "m"], check=True, env=env)
-            sha = subprocess.run(["git", "-C", tmp, "rev-parse", "HEAD"], capture_output=True, text=True, env=env).stdout.strip()
-            old = fs.FROZEN
-            fs.FROZEN = os.path.join(tmp, "frozen")
-            try:
-                self.assertEqual(fs.read(sha, "map.json", repo=tmp), b'{"v": 1}')
-            finally:
-                fs.FROZEN = old
+    def test_without_a_frozen_file_the_read_fails_and_names_the_file(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(fs, "FROZEN", tmp):
+            with self.assertRaises(FileNotFoundError) as raised:
+                fs.read("abc123def4567890", "x/map.json")
+            self.assertIn("abc123def456-map.json", str(raised.exception))
 
-    def test_the_history_folder_is_read_only_in_release_mode(self):
-        # On main a package missing from releases/<module>/<version>/ is missing, even if a copy of that version sits
-        # under releases/previous/; only the share release puts packages there (the decision of 2026-10-31).
+    def test_a_package_is_found_in_the_history_folder_when_releases_lacks_it(self):
         with tempfile.TemporaryDirectory() as tmp:
             plain = os.path.join(tmp, "releases", "core", "2.3.0")
             previous = os.path.join(tmp, "releases", "previous", "core", "2.3.0")
-            os.makedirs(previous)
-            with open(os.path.join(previous, "manifest.json"), "w") as f:
-                f.write("{}\n")
-            with mock.patch.object(fs, "SHARE_RELEASE", False):
-                self.assertEqual(fs.package_dir(tmp, "core", "2.3.0"), plain)
-            with mock.patch.object(fs, "SHARE_RELEASE", True):
-                self.assertEqual(fs.package_dir(tmp, "core", "2.3.0"), previous)
             with mock.patch.object(bm, "ONTOLOGY", tmp):
-                with mock.patch.object(bm, "SHARE_RELEASE", False):
-                    self.assertIsNone(bm.package_folder("core", "2.3.0"))
-                    with self.assertRaises(FileNotFoundError):
-                        bm.released_requires("core", "2.3.0")
-                with mock.patch.object(bm, "SHARE_RELEASE", True):
-                    self.assertEqual(bm.package_folder("core", "2.3.0"), previous)
-                    self.assertEqual(bm.released_requires("core", "2.3.0"), {})
+                self.assertEqual(fs.package_dir(tmp, "core", "2.3.0"), plain)  # neither folder: the plain path
+                self.assertIsNone(bm.package_folder("core", "2.3.0"))
+                with self.assertRaises(FileNotFoundError):
+                    bm.released_requires("core", "2.3.0")
+                os.makedirs(previous)
+                with open(os.path.join(previous, "manifest.json"), "w") as f:
+                    f.write("{}\n")
+                self.assertEqual(fs.package_dir(tmp, "core", "2.3.0"), previous)
+                self.assertEqual(bm.package_folder("core", "2.3.0"), previous)
+                self.assertEqual(bm.released_requires("core", "2.3.0"), {})
+                os.makedirs(plain)
+                with open(os.path.join(plain, "manifest.json"), "w") as f:
+                    f.write('{"depends_on": {"x": "1.0.0"}}\n')
+                self.assertEqual(fs.package_dir(tmp, "core", "2.3.0"), plain)  # releases/ wins when both hold it
+                self.assertEqual(bm.package_folder("core", "2.3.0"), plain)
 
-    def test_the_pinned_commits_are_the_four_the_core_builders_name(self):
+    def test_the_frozen_maps_are_the_four_the_core_builders_name(self):
         pins = fs.pinned()
         self.assertEqual([c[:8] for c, _ in pins], ["b75fd991", "82593547", "c351ef0e", "4906666a"])
         self.assertTrue(all(p == "business_architecture/business_process/downstream_process_map.json" for _, p in pins))
-
-    def test_freeze_writes_one_file_per_pinned_commit(self):
-        if bm.SHARE_RELEASE:  # with or without .git: a clone of the release does not hold the pinned commits
-            self.skipTest("the share release reads its frozen copies and never freezes")
-        # Anywhere else, Git or not, freeze() must write the four files or fail: a source tree is not a release.
-        with tempfile.TemporaryDirectory() as tmp:
-            old = fs.FROZEN
-            fs.FROZEN = tmp
-            try:
-                written = fs.freeze()
-                self.assertEqual(len(written), 4)
-                for p in written:
-                    with open(p, "rb") as f:
-                        self.assertTrue(f.read().lstrip().startswith(b"["))
-            finally:
-                fs.FROZEN = old
+        for commit, path in pins:
+            self.assertTrue(fs.is_frozen(commit, path), commit)
+            self.assertTrue(fs.read(commit, path).lstrip().startswith(b"["))
 
 
-class ReleaseMode(unittest.TestCase):
-    """build_module reads release mode from EPM_SHARE_RELEASE or release.json at the tree's root. Each test that sets
-    the variable puts the caller's value back (a release run sets it for the whole session) and reloads the module."""
+class NewestSet(unittest.TestCase):
+    def test_every_module_is_built_against_the_newest_set(self):
+        self.assertEqual(bm.newest_on_disk("core"), "2.4.0")
+        self.assertEqual(bm.dependencies("kpi")["core"], "2.4.0")
+        self.assertEqual(bm.dependencies("ref-mpc"), {"organization": "2.2.0", "party": "2.1.0"})
+        self.assertEqual(bm.dependencies("technical-graph"), {"data-product": "1.2.0", "kpi": "1.3.0", "system": "1.5.0"})
 
-    @contextlib.contextmanager
-    def with_env(self, value):
-        """Run build_module with EPM_SHARE_RELEASE set to `value` (None: unset); restore the environment after."""
-        import importlib
-        import build_module as bm
-        missing = object()
-        before = os.environ.get("EPM_SHARE_RELEASE", missing)
-        if value is None:
-            os.environ.pop("EPM_SHARE_RELEASE", None)
-        else:
-            os.environ["EPM_SHARE_RELEASE"] = value
-        try:
-            yield importlib.reload(bm)
-        finally:
-            if before is missing:
-                os.environ.pop("EPM_SHARE_RELEASE", None)
-            else:
-                os.environ["EPM_SHARE_RELEASE"] = before
-            importlib.reload(bm)
-
-    def test_the_marker_file_or_the_variable_means_release_mode(self):
-        import build_module as bm
-        with tempfile.TemporaryDirectory() as tmp:
-            with self.with_env(None) as bm:
-                self.assertFalse(bm.share_release(tmp))
-                with open(os.path.join(tmp, "release.json"), "w") as f:
-                    f.write("{}\n")
-                self.assertTrue(bm.share_release(tmp))
-            with self.with_env("1") as bm:
-                self.assertTrue(bm.share_release(tempfile.gettempdir()))
-
-    def test_pins_are_dropped_and_core_is_its_newest_package(self):
-        with self.with_env("1") as bm:
-            self.assertTrue(bm.SHARE_RELEASE)
-            deps = bm.dependencies("kpi")
-            self.assertEqual(deps["core"], bm.newest_on_disk("core"))
-            self.assertEqual(bm.newest_on_disk("core"), "2.4.0")
-            for name in bm.MODULES:
-                for dep, version in bm.dependencies(name).items():
-                    expected = bm.newest_on_disk("core") if dep == "core" else bm.label(bm.MODULES[dep])
-                    self.assertEqual(version, expected, (name, dep))
-
-    def test_the_callers_variable_is_put_back(self):
-        missing = object()
-        before = os.environ.get("EPM_SHARE_RELEASE", missing)
-        for preset in ("preset", None):
-            if preset is None:
-                os.environ.pop("EPM_SHARE_RELEASE", None)
-            else:
-                os.environ["EPM_SHARE_RELEASE"] = preset
-            try:
-                with self.with_env("1") as bm:
-                    self.assertTrue(bm.SHARE_RELEASE)
-                self.assertEqual(os.environ.get("EPM_SHARE_RELEASE", None), preset)
-            finally:
-                if before is missing:
-                    os.environ.pop("EPM_SHARE_RELEASE", None)
-                else:
-                    os.environ["EPM_SHARE_RELEASE"] = before
-        import importlib
-        import build_module as bm
-        importlib.reload(bm)
-
-    def test_without_the_marker_and_the_variable_the_pins_stand(self):
-        # No skip: the mode is read from the two inputs themselves, and each mode has its own assertion.
-        import build_module as bm
-        marker = os.path.isfile(os.path.join(bm.ROOT, "release.json"))
-        variable = bool(os.environ.get("EPM_SHARE_RELEASE"))
-        self.assertEqual(bm.SHARE_RELEASE, marker or variable)
-        if marker or variable:
-            self.assertEqual(bm.dependencies("kpi")["core"], bm.newest_on_disk("core"))
-        else:
-            self.assertEqual(bm.dependencies("kpi")["core"], "2.3.0")  # the pin on main (the decision of 2026-10-26)
-            self.assertEqual(bm.dependencies("ref-mpc"), {"organization": "2.1.0", "party": "2.0.0"})
+    def test_a_shape_path_names_the_modules_newest_package(self):
+        self.assertEqual(bm.resolve("releases/organization/2.1.0/shapes.ttl"), "releases/organization/2.2.0/shapes.ttl")
+        self.assertEqual(bm.resolve("ref-mpc/shapes.ttl"), "ref-mpc/shapes.ttl")
 
 
 if __name__ == "__main__":

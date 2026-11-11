@@ -284,24 +284,6 @@ def _text(cell):
     return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", "", cell))).strip()
 
 
-@pytest.mark.inputs("records")
-def test_every_index_row_shows_its_record_title_full_status_and_date():
-    page = PAGES[b.DECISIONS_PAGE]
-    rows = dict(re.findall(r'<tr><td class="num"><a href="#(DEC-\d{4})">\d{4}</a></td>(.*?)</tr>', page))
-    folder = os.path.join(b.ROOT, b.DECISIONS_DIR)
-    records = sorted(f for f in os.listdir(folder) if b.DEC_FILE.search(f))
-    assert len(rows) == len(records)
-    for f in records:
-        lines = _shown_lines(os.path.join(folder, f))
-        h1 = next(x[2:] for x in lines if x.startswith("# ")).split(":", 1)[1].strip()
-        status = next(re.match(r"^\|\s*Status\s*\|(.*)\|\s*$", x).group(1) for x in lines if x.startswith("| Status |"))
-        date = next(re.match(r"^\|\s*Date\s*\|(.*)\|\s*$", x).group(1) for x in lines if x.startswith("| Date |"))
-        cells = [_text(c) for c in re.findall(r"<td[^>]*>(.*?)</td>", rows[b.record_id(f)], re.S)]
-        # The displayed text: the Markdown without its code and emphasis marks.
-        expect = [re.sub(r"\s+", " ", re.sub(r"[`*]|~~", "", v)).strip() for v in (h1, status, date)]
-        assert cells == expect, f
-
-
 def test_a_fenced_example_cannot_stand_in_for_a_record():
     lines = ["# the decision of an earlier date: The real title", "", "```", "# the decision of an earlier date: An example",
              "| Status | Proposed |", "| Date | 1900-01-01 |", "```", "", "| Field | Value |", "|---|---|",
@@ -344,17 +326,6 @@ def test_every_source_exists():
             assert os.path.isfile(os.path.join(b.ROOT, src)), src
 
 
-@pytest.mark.inputs("records")
-def test_every_decision_record_has_its_anchor_and_index_row():
-    page = PAGES[b.DECISIONS_PAGE]
-    records = [f for f in os.listdir(os.path.join(b.ROOT, b.DECISIONS_DIR)) if b.DEC_FILE.search(f)]
-    assert records
-    for f in records:
-        rid = b.record_id(f)
-        assert f'<section class="rec" id="{rid}">' in page, rid
-        assert f'<td class="num"><a href="#{rid}">{rid[-4:]}</a></td>' in page, rid
-
-
 def test_every_link_on_every_page_resolves():
     """A relative link names a file that exists, and an anchor on a linked HTML page exists there."""
     ids = {os.path.normpath(os.path.join(b.ROOT, out)): set(re.findall(r'id="([^"]+)"', page))
@@ -381,9 +352,8 @@ def test_every_link_on_every_page_resolves():
 
 
 def test_without_a_decisions_page_nothing_links_to_it(monkeypatch):
-    # The share release's tree (the decision of 2026-10-31): the decisions page is not built, so the navigation has no link
-    # to it, a record ID in text stays text, a Markdown link to a record keeps its text alone, and every link that
-    # is generated resolves.
+    # The decisions page is not built (the decision of 2026-10-31), so the navigation has no link to it, and every
+    # link that is generated resolves.
     reduced = [s for s in b.all_pages() if not s.get("decisions")]
     monkeypatch.setattr(b, "pages", lambda: reduced)
     built = b.build_all()
@@ -398,43 +368,20 @@ def test_without_a_decisions_page_nothing_links_to_it(monkeypatch):
                 assert os.path.exists(os.path.normpath(os.path.join(os.path.dirname(here), path))), (out, href)
 
 
-@pytest.mark.inputs("record-citations")
-def test_without_a_decisions_page_a_record_citation_stays_text():
-    reduced = [s for s in b.all_pages() if not s.get("decisions")]
-    spec = next(s for s in reduced if s["out"] == "business_architecture/ontology/README.html")
-    p = b.Page(spec, b.generated_map(reduced), decisions_page=False)
-    assert p.inline(SRC, "see the decision of 2026-10-18.") == "see the decision of 2026-10-18."
-    assert p.inline(SRC, "[0099](../domain/decisions/the decision of 2026-10-25-item-g.md)") == "0099"
-    assert 'href="MODULES.html"' in p.inline(SRC, "[guide](MODULES.md)")  # other links are unchanged
-
-
 def no_records(monkeypatch):
     real = b.glob.glob
     monkeypatch.setattr(b.glob, "glob", lambda pattern: [] if "DEC-" in pattern else real(pattern))
 
 
-@pytest.mark.inputs("records")
-def test_on_main_no_records_stops_the_build(monkeypatch):
-    # Main's strictness over a tree that holds every other document: an empty record set is refused, not rendered empty.
+def test_no_records_means_no_decisions_page(monkeypatch):
     no_records(monkeypatch)
-    monkeypatch.setattr(b, "SHARE_RELEASE", False)
-    with pytest.raises(ValueError, match="no decision records"):
-        b.all_pages()
-
-
-def test_in_release_mode_no_records_means_no_decisions_page(monkeypatch):
-    no_records(monkeypatch)
-    monkeypatch.setattr(b, "SHARE_RELEASE", True)
     assert not any(s.get("decisions") for s in b.all_pages())
 
 
-def test_on_main_a_missing_source_still_stops_the_build(monkeypatch):
-    # Release mode off: single() reads the source's title as it always did, so a source that is not here raises.
-    monkeypatch.setattr(b, "SHARE_RELEASE", False)
-    with pytest.raises(FileNotFoundError):
-        b.single("business_architecture/ontology/no-such-document.md", "lead")
-    monkeypatch.setattr(b, "SHARE_RELEASE", True)
+def test_a_missing_source_makes_no_page():
+    # single() gives a source that is not here no title, and pages() drops it.
     assert b.single("business_architecture/ontology/no-such-document.md", "lead")["title"] is None
+    assert all(os.path.exists(os.path.join(b.ROOT, src)) for spec in b.pages() for src in spec["sources"])
 
 
 def page(spec_out="business_architecture/ontology/README.html"):
@@ -449,21 +396,6 @@ SRC = os.path.normpath(os.path.join(b.ROOT, "business_architecture/ontology/READ
 def test_a_link_to_a_generated_document_goes_to_its_page():
     assert 'href="MODULES.html"' in page().inline(SRC, "[guide](MODULES.md)")
     assert 'href="kpi/README.html#releases"' in page().inline(SRC, "[kpi](kpi/README.md#releases)")
-
-
-@pytest.mark.inputs("records")
-def test_a_link_to_a_decision_record_goes_to_its_anchor():
-    out = page().inline(SRC, "[0099](../domain/decisions/the decision of 2026-10-25-item-g.md)")
-    assert 'href="../domain/decisions/decisions.html#the decision of 2026-10-25"' in out
-
-
-@pytest.mark.inputs("records")
-def test_a_decision_id_in_text_becomes_a_link_but_not_inside_code_or_a_link():
-    p = page()
-    assert 'the decision of 2026-10-18' in \
-        p.inline(SRC, "see the decision of 2026-10-18.")
-    assert p.inline(SRC, "`the decision of 2026-10-18`") == "<code>the decision of 2026-10-18</code>"
-    assert p.inline(SRC, "the decision of 2026-10-18").count("<a ") == 1
 
 
 def test_a_link_to_another_file_stays_relative():

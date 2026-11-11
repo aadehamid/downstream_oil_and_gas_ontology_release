@@ -24,7 +24,6 @@ import argparse
 import hashlib
 import json
 import os
-import subprocess
 import sys
 from collections import Counter
 
@@ -95,10 +94,9 @@ def domain_of(process, value):
 
 
 def source_map():
-    """The bytes of the process map at SOURCE_COMMIT: the frozen copy if there is one (release/frozen/), else Git."""
+    """The bytes of the process map that SOURCE_COMMIT names: the frozen copy in release/frozen/."""
     import frozen_sources
-    repo = os.path.dirname(os.path.dirname(ONTOLOGY))
-    return frozen_sources.read(SOURCE_COMMIT, SOURCE_PATH, repo)
+    return frozen_sources.read(SOURCE_COMMIT, SOURCE_PATH)
 
 
 def sipoc():

@@ -8,7 +8,6 @@ Run: python3 -m pytest test_build_core_2_4.py (needs rdflib, pyshacl).
 import hashlib
 import json
 import os
-import re
 import unittest
 from collections import Counter
 from unittest import mock
@@ -17,7 +16,6 @@ from rdflib import Graph, Literal, URIRef
 from rdflib.namespace import DCTERMS, OWL, RDF, SKOS, XSD
 
 import build_core_2_4 as b
-import build_module as bm  # release mode: EPM_SHARE_RELEASE, or release.json at the tree's root
 
 G, COUNTS = b.build()
 BASE = Graph().parse(os.path.join(b.BASE, "core.ttl"))
@@ -168,30 +166,15 @@ class Package(unittest.TestCase):
             with open(os.path.join(b.RELEASE_DIR, name)) as f:
                 self.assertEqual(f.read(), text, name)
 
-    def test_the_approval_is_the_delegation_in_the_saved_file(self):
+    def test_the_approval_is_the_delegation_and_the_manifest_carries_its_words(self):
         path, words = b.APPROVAL
         self.assertEqual(words, "Approved as described")
-        if bm.SHARE_RELEASE and not os.path.exists(os.path.join(b.ONTOLOGY, path)):
-            # The share release carries no answers folder: the builder names the review comments of a subject
-            # matter expert instead of a file, and the words travel in the manifest (the decision of 2026-10-31).
-            self.assertIn("subject matter expert", path)
-        else:
-            with open(os.path.join(b.ONTOLOGY, path)) as f:
-                body = re.sub(r"<!--.*?-->", "", f.read(), flags=re.S)
-            self.assertIn(words, body)
+        # The builder names the review comments of a subject matter expert, a sentence and not a file, and the
+        # words travel in the manifest (the decision of 2026-10-31). The manifest names no file.
+        self.assertEqual(path, "(the review comments of a subject matter expert reviewing the documents)")
         manifest = json.loads(self.FILES["manifest.json"])
-        # The share release names no file it does not ship: the field comes out there (bm.recorded_where).
-        file = {"file": path} if bm.recorded_where(path) else {}
-        self.assertEqual(manifest["approval"], {"who": b.APPROVER, **file, "words": words})
+        self.assertEqual(manifest["approval"], {"who": b.APPROVER, "words": words})
         self.assertFalse(manifest["release_candidate"])
-
-    def test_the_proposal_acceptance_is_the_decision_owners_words(self):
-        path = os.path.join(b.ONTOLOGY, "(the review comments of a subject matter expert reviewing the documents)")
-        if bm.SHARE_RELEASE and not os.path.exists(path):
-            self.skipTest("the answers folder is not here (the share release carries none)")
-        with open(path) as f:
-            body = re.sub(r"<!--.*?-->", "", f.read(), flags=re.S)
-        self.assertIn("Rename by parent (Recommended)", body)
 
     def test_shapes_and_mapping_are_2_3_0s(self):
         for name in ("shapes.ttl", "canonical-facts.csv"):

@@ -34,7 +34,7 @@ ONTOLOGY = os.path.dirname(HERE)
 BASE = frozen_sources.package_dir(ONTOLOGY, "core", "2.2.0")
 SOURCE_PATH = prev.SOURCE_PATH
 # The map as 2.2.0 was built from it, and the map as 2.3.0 is built from it: the merge of the pull
-# request that added CM 1.3.7.1.7, the last change to the map on main before this release.
+# request that added CM 1.3.7.1.7, the last change to the map before this release.
 EARLIER_COMMIT = prev.SOURCE_COMMIT
 SOURCE_COMMIT = "c351ef0ecb1e3cbe6af38f46f66065499c73442f"
 CHANGELOG = os.path.join(ONTOLOGY, "releases", "core", "CHANGELOG-2.3.0.md")

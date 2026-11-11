@@ -13,16 +13,12 @@ from rdflib.namespace import OWL, PROV, RDF, SH, XSD
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "release"))
-import build_module as bm  # noqa: E402  (release mode, and where a released package sits in either layout)
+import build_module as bm  # noqa: E402  (where a released package sits)
 
 
 def core_package():
-    """core 1.0.0's Turtle, always on main. In the share release, which holds the newest and previous core only, the
-    newest core, whose run shapes are the same."""
-    folder = bm.package_folder("core", "1.0.0")
-    if folder is None and bm.SHARE_RELEASE:
-        folder = os.path.join(bm.ONTOLOGY, "releases", "core", bm.newest_on_disk("core"))
-    return os.path.join(folder, "core.ttl")
+    """The newest core's Turtle."""
+    return os.path.join(bm.ONTOLOGY, "releases", "core", bm.newest_on_disk("core"), "core.ttl")
 
 
 CORE = Graph().parse(core_package())

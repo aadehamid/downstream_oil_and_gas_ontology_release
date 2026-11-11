@@ -4,7 +4,6 @@ file in that package, and it says nothing about a release that the package's own
 
 Run: python3 -m pytest test_build_catalog.py (needs rdflib).
 """
-import glob
 import importlib
 import os
 import unittest
@@ -21,13 +20,8 @@ core = importlib.import_module(newest.core_builder())  # the newest core builder
 MODULES_NS = "https://w3id.org/mpc/ontology/modules/"
 
 
-def package_folders():
-    found = {tuple(p.rstrip(os.sep).split(os.sep)[-2:]) for p in glob.glob(os.path.join(bc.RELEASES, "*", "*", ""))}
-    return {(m, v) for m, v in found if m != "previous"}  # the share release's history folder is not a package
-
-
 def newest_set():
-    """The share release's packages, from the builders' own tables (never from the folders the catalog is checked
+    """The newest packages, from the builders' own tables (never from the folders the catalog is checked
     against): each module's newest version and the newest core."""
     return {(m, build_module.label(build_module.MODULES[m])) for m in build_module.MODULES} | {("core", core.VERSION)}
 
@@ -51,16 +45,17 @@ class Catalog(unittest.TestCase):
 
     def test_one_dataset_per_release_package(self):
         datasets = {str(d)[len(MODULES_NS):] for d in self.g.objects(bc.CATALOG, bc.DCAT.dataset)}
-        # The share release's catalog lists its newest set only (the decision of 2026-10-31): one dataset per package on disk.
-        self.assertEqual(len(datasets), len(newest_set()) if build_module.SHARE_RELEASE else 51)  # then technical-graph 1.0.0 (the decision of 2026-11-02):  # 50, then kpi 1.3.0 (the decision of 2026-10-28):  # 49, then party 2.1.0 and integration 2.5.0 (the decision of 2026-10-25, amendment of 2026-10-28):  # 47, then organization 2.2.0 (the decision of 2026-10-18, amendment of 2026-10-28):  # 46, then ref-mpc 1.3.0 (the decision of 2026-10-27, amendment of 2026-10-27):  # 45, then party 2.0.0, system 1.5.0 and integration 2.4.0 (the decision of 2026-10-27):  # 42, then system 1.4.0 and party 1.4.0 (the decision of 2026-10-26):  # 40, then core 2.4.0 (the decision of 2026-10-26):  # 39, then three more (the decision of 2026-10-26):  # 25, then item G's three (the decision of 2026-10-25) and item F's five (the decision of 2026-10-25)
-        self.assertEqual({tuple(d.split("/")) for d in datasets}, newest_set() if build_module.SHARE_RELEASE else package_folders())
+        # The catalog lists the newest set only (the decision of 2026-10-31): one dataset per newest package.
+        self.assertEqual(len(datasets), 13)  # twelve modules and core
+        self.assertEqual({tuple(d.split("/")) for d in datasets}, newest_set())
         for d in self.g.objects(bc.CATALOG, bc.DCAT.dataset):
             self.assertIn((d, RDF.type, bc.DCAT.Dataset), self.g)
 
     def test_every_distribution_is_a_file_in_its_package(self):
         # Read from each dataset's dcat:distribution links, so a link to an undescribed distribution fails.
         linked = set(self.g.objects(None, bc.DCAT.distribution))
-        self.assertEqual(len(linked), distributions_of(newest_set()) if build_module.SHARE_RELEASE else 158)  # then technical-graph 1.0.0's three (the decision of 2026-11-02):  # 155, then kpi 1.3.0's three (the decision of 2026-10-28):  # 152, then party 2.1.0's and integration 2.5.0's three each (0099, amendment of 2026-10-28):  # 146, then organization 2.2.0's three (0045, amendment of 2026-10-28):  # 143, then ref-mpc 1.3.0's three (0108, amendment):  # 140, then nine more, three packages of three (the decision of 2026-10-27):  # 131, then six more (the decision of 2026-10-26):  # 125, then core 2.4.0's four:  # 121, then nine more:  # 79, then eight packages of three distributions
+        self.assertEqual(len(linked), 42)  # three files for each of the twelve modules, core's four, and logical-model's two model graphs
+        self.assertEqual(len(linked), distributions_of(newest_set()))
         for dist in linked:
             self.assertIn((dist, RDF.type, bc.DCAT.Distribution), self.g)
             self.assertEqual(list(self.g.objects(dist, bc.DCAT.downloadURL)), [dist])

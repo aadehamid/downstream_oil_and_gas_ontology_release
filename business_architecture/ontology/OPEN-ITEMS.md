@@ -1,6 +1,6 @@
 # What is open on the ontology
 
-The ontology is done (the decision of 2026-10-26), and this page lists what stays open on it. Each row points to the record that holds the detail; where they differ, the record wins. It leaves out the pricing demo's work and the repository's own tooling. Last checked on 2026-10-31. On 2026-11-02 a row for releasing the technical-graph module was added, then removed the same day when the subject matter expert approved its `1.0.0` (the decision of 2026-11-02).
+The ontology is done (the decision of 2026-10-26), and this page lists what stays open on it. Each row points to the record that holds the detail; where they differ, the record wins. It leaves out the repository's own tooling. Last checked on 2026-10-31. On 2026-11-02 a row for releasing the technical-graph module was added, then removed the same day when the subject matter expert approved its `1.0.0` (the decision of 2026-11-02).
 
 ## Decisions for the decision owner
 
@@ -56,7 +56,7 @@ These also wait on the business, and their changelogs hold the detail:
 
 | Item | What is needed | Record |
 |---|---|---|
-| Keeping the stores in step with Git | A check of the technical graph against the demo's files in CI, and content comparison. The drift check is a written step of each release, with no schedule (the decision of 2026-11-02, amendment of 2026-11-02 (later), item 3). The plan is in the guide and the walkthrough | an earlier change |
+| Keeping the stores in step with Git | A check of the technical graph against its source files in CI, and content comparison. The drift check is a written step of each release, with no schedule (the decision of 2026-11-02, amendment of 2026-11-02 (later), item 3). The plan is in the guide and the walkthrough | an earlier change |
 | A small fix in the next `market-data` release | Reword its one shape message that holds an apostrophe | the decision of 2026-10-26 |
 | The process playbook's log | Backfill the entries of batches 1 to 20 | `business-process-architecture-playbook.md`, §9 |
 

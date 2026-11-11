@@ -120,7 +120,7 @@ including the logical-model module added by the shared release cut: a link not i
 | `build/output/step2-identity-report.md` | Identity normalization summary |
 | `build/output/apqc_crosscheck_results.json` | Raw cross-check scores |
 | `build/step3-skos-taxonomy.py` | Reproducible script: 680 `skos:Concept` taxonomy with URIs, labels, definitions, scope notes, APQC + validator + human-author provenance (`--adoptions`, `--authored`) |
-| `build/output/step3-taxonomy.ttl` | The SKOS taxonomy. Measured on `main` 37ab0a0 (2026-09-30): 14,496 triples, 683 `skos:Concept`, 681 `skos:broader` links, 680 concepts with `skos:definition`. Still carries the provisional `intake:` annotations until the `core` 1.0.0 release |
+| `build/output/step3-taxonomy.ttl` | The SKOS taxonomy. Measured on 2026-09-30: 14,496 triples, 683 `skos:Concept`, 681 `skos:broader` links, 680 concepts with `skos:definition`. Still carries the provisional `intake:` annotations until the `core` 1.0.0 release |
 | `build/output/step3-taxonomy-report.md` | Step 3 build summary |
 | `build/step3b-definition-triangulation.py` | Reproducible script: APQC candidate matching + EIA/web triangulation over the 503 definition gaps |
 | `build/step3b-merge-validations.py` | Merge automated + human validation records into final adoption decisions |

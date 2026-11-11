@@ -71,7 +71,7 @@ APPROVALS["kpi"] = DELEGATED  # kpi 1.3.0, the KPI and OPM identifiers, the deci
 # amendment of 2026-11-02, later).
 APPROVALS["technical-graph"] = ("(the review comments of a subject matter expert reviewing the documents)",
                                 "1. approve 1.0.0")
-APPROVALS["logical-model"] = ("(the review comments of a subject matter expert reviewing the documents)", "I approve logical-model 1.0.0,")  # added by the share release's cut
+APPROVALS["logical-model"] = ("(the review comments of a subject matter expert reviewing the documents)", "I approve logical-model 1.0.0,")
 
 
 def approval_holds(name, m):
@@ -80,9 +80,9 @@ def approval_holds(name, m):
     path, words = m["approval"]
     if (path, words) != APPROVALS[name]:
         return False
-    if bm.SHARE_RELEASE and not os.path.exists(os.path.join(bm.ONTOLOGY, path)):
-        # The share release carries no answers folder: its builders name the review comments of a subject matter
-        # expert instead of a file, and the words still travel with the package (the decision of 2026-10-31).
+    if not os.path.exists(os.path.join(bm.ONTOLOGY, path)):
+        # The builders name the review comments of a subject matter expert, a sentence and not a file, and the
+        # words travel with the package (the decision of 2026-10-31).
         return "subject matter expert" in path
     with open(os.path.join(bm.ONTOLOGY, path)) as f:
         # the words of a subject matter expert reviewing the documents sit in the body; the context sits in HTML comments.
@@ -91,23 +91,11 @@ def approval_holds(name, m):
 
 
 def shipped(tc, name, version):
-    """The package's folder in either layout (build_module.package_folder). In the share release a package that did
-    not ship skips the test; on main every package is on disk, so a missing one fails."""
+    """The package's folder, in releases/ or the history folder (build_module.package_folder). The tree holds each
+    module's newest and previous packages, so a missing one fails."""
     folder = bm.package_folder(name, version)
-    if folder is None and bm.SHARE_RELEASE:
-        tc.skipTest(f"{name} {version} did not ship (the share release holds each module's newest and previous packages only)")
     tc.assertIsNotNone(folder, f"{name} {version} is not on disk under releases/")
     return folder
-
-
-def approval_file(tc, folder):
-    """The approval file a package's manifest names. The share release's manifests name none (approval.file comes
-    out, the decision of 2026-10-31), so there the test skips; on main the field is always there."""
-    with open(os.path.join(folder, "manifest.json")) as f:
-        approved = json.load(f)["approved_by"]
-    if bm.SHARE_RELEASE and "recorded_in" not in approved:
-        tc.skipTest("the manifest's approval file does not ship (the share release names a subject matter expert instead)")
-    return approved["recorded_in"]
 
 
 class Packages(unittest.TestCase):
@@ -134,7 +122,7 @@ class Packages(unittest.TestCase):
                     iri = URIRef(bm.MODULES_NS + name)
                     self.assertEqual(g.value(iri, DCTERMS.modified), g.value(iri, DCTERMS.issued))
                     self.assertFalse(manifest["release_candidate"])
-                    # The share release names no file it does not ship: the field comes out there (bm.recorded_where).
+                    # A manifest names no file the tree does not hold: the field comes out (bm.recorded_where).
                     self.assertEqual(manifest["approved_by"].get("recorded_in"), bm.recorded_where(path))
                 else:
                     self.assertFalse(issued)
@@ -146,16 +134,15 @@ class Packages(unittest.TestCase):
         self.assertTrue(approval_holds("organization", bm.MODULES["organization"]))
 
     def test_a_manifest_names_where_an_approval_is_recorded_only_as_a_path(self):
-        # In a share release the sources name a subject matter expert's review comments, a sentence, where the answers
-        # file was; the manifest then leaves the field out. A file in the tree is named in either mode.
+        # The sources name a subject matter expert's review comments, a sentence, and the manifest then leaves the
+        # field out. A file in the tree is named.
         sentence = "(the review comments of a subject matter expert reviewing the documents)"
-        self.assertIsNone(bm.recorded_where(sentence, release_mode=True))
-        self.assertEqual(bm.recorded_where(sentence, release_mode=False), sentence)
-        self.assertEqual(bm.recorded_where("README.md", release_mode=True), "README.md")
+        self.assertIsNone(bm.recorded_where(sentence))
+        self.assertEqual(bm.recorded_where("README.md"), "README.md")
         name = "organization"
         m = dict(bm.MODULES[name], approval=(sentence, "Approved as described"))
         g = bm.build(name)
-        with mock.patch.object(bm, "SHARE_RELEASE", True), mock.patch.dict(bm.MODULES, {name: m}):
+        with mock.patch.dict(bm.MODULES, {name: m}):
             approved = json.loads(bm.package(name, g)["manifest.json"])["approved_by"]
         self.assertNotIn("recorded_in", approved)
         self.assertEqual(approved["words"], "Approved as described")
@@ -189,7 +176,7 @@ class Packages(unittest.TestCase):
             cat = Graph().parse(data=bm.catalog(name), format="turtle")
             dataset = next(cat.subjects(RDF.type, DCAT.Dataset))
             names = {str(d).rsplit("/", 1)[1] for d in cat.objects(dataset, DCAT.distribution)}
-            # and a graph the package carries as it is (build_module's "graphs"; only the share release's logical-model has any)
+            # and a graph the package carries as it is (build_module's "graphs"; only logical-model has any)
             graphs = {os.path.basename(p) for p in bm.MODULES[name].get("graphs", [])}
             self.assertEqual(names, {f"{name}.ttl", f"{name}.jsonld", "shapes.ttl"} | graphs)
 
@@ -203,18 +190,6 @@ class Packages(unittest.TestCase):
 
 
 class EarlierReleases(unittest.TestCase):
-    def test_earlier_packages_are_untouched(self):
-        # The builder now builds organization 2.0.0 and ref-mpc 1.1.0; each released 1.0.0 package
-        # must still match its own manifest.
-        for name in ("organization", "ref-mpc", "kpi", "value-stream", "data-product", "party", "integration"):
-            out = os.path.join(shipped(self, name, "1.0.0"))
-            with open(os.path.join(out, "manifest.json")) as f:
-                manifest = json.load(f)
-            self.assertEqual(manifest["version"], "1.0.0")
-            for fname, digest in manifest["files"].items():
-                with self.subTest(module=name, file=fname), open(os.path.join(out, fname), "rb") as f:
-                    self.assertEqual(hashlib.sha256(f.read()).hexdigest(), digest)
-
     def test_party_holds_its_four_source_files_and_nothing_else(self):
         # the decision of 2026-10-22, item 2: the vocabulary, code lists, systems and lifecycle, read here from the
         # source files rather than from the builder's list; the reference parties and examples stay out.
@@ -231,35 +206,27 @@ class EarlierReleases(unittest.TestCase):
             self.assertFalse(set(outside) & set(released), path)
 
     def test_the_new_releases_require_the_current_ones(self):
-        if bm.SHARE_RELEASE:
-            # The share release rebuilds every newest package against the newest versions (the decision of 2026-10-31).
-            for name in bm.MODULES:
-                for dep, version in bm.dependencies(name).items():
-                    self.assertEqual(version, bm.newest_on_disk("core") if dep == "core" else bm.label(bm.MODULES[dep]), (name, dep))
-            return
-        self.assertEqual(bm.dependencies("ref-mpc"), {"organization": "2.1.0", "party": "2.0.0"})  # 2.0.0 and 1.0.0 in 1.2.0 (the decision of 2026-10-22); 1.3.0 (the decision of 2026-10-27)
-        self.assertEqual(bm.dependencies("organization"), {"core": "2.3.0"})  # 2.1.0 in 2.0.0; 2.3.0 since 2.1.0 (the decision of 2026-10-26)
-        self.assertEqual(bm.dependencies("kpi"), {"core": "2.3.0"})  # since 1.1.1 (the decision of 2026-10-23); 2.2.0 in 1.1.0; 1.2.0 too
-        self.assertEqual(bm.dependencies("party"), {"core": "2.4.0", "system": "1.5.0"})  # system 1.1.0 in 1.2.0 (the decision of 2026-10-25); 1.3.0 (the decision of 2026-10-26); 1.4.0 (the decision of 2026-10-26); 1.5.0 (the decision of 2026-10-27)
-        # the decision of 2026-10-22: the Step 7 modules require core 2.2.0, and the modules whose IRIs they use.
-        self.assertEqual(bm.dependencies("data-product"), {"core": "2.3.0", "kpi": "1.2.0", "system": "1.2.0"})  # 1.2.0 (the decision of 2026-10-25)
-        # value-stream 1.1.0 required the current releases (the decision of 2026-10-23), and 1.2.0 does too (the decision of 2026-10-26).
-        self.assertEqual(bm.dependencies("value-stream"), {"core": "2.3.0", "data-product": "1.2.0", "kpi": "1.2.0"})
-        self.assertEqual(bm.dependencies("system"), {"core": "2.4.0"})  # 2.3.0 since 1.1.0 (the decision of 2026-10-25); 2.4.0 since 1.4.0 (0104, 0105)
-        self.assertEqual(bm.dependencies("lane"), {"core": "2.3.0"})  # 2.2.0 in 1.0.0; 2.3.0 since 1.1.0 (the decision of 2026-10-26)
-        self.assertEqual(bm.dependencies("market-data"), {"kpi": "1.2.0"})  # since 1.1.0 (the decision of 2026-10-25)
-        # the decision of 2026-10-22: integration names terms of each of these releases; 2.0.0 requires the current ones (the decision of 2026-10-23),
-        # and so do 2.4.0 (the decision of 2026-10-27) and 2.5.0 (the decision of 2026-10-25, amendment of 2026-10-28).
+        # Every newest package is built against the newest versions (the decision of 2026-10-31).
+        self.assertEqual(bm.dependencies("ref-mpc"), {"organization": "2.2.0", "party": "2.1.0"})
+        self.assertEqual(bm.dependencies("organization"), {"core": "2.4.0"})
+        self.assertEqual(bm.dependencies("kpi"), {"core": "2.4.0"})
+        self.assertEqual(bm.dependencies("party"), {"core": "2.4.0", "system": "1.5.0"})
+        self.assertEqual(bm.dependencies("data-product"), {"core": "2.4.0", "kpi": "1.3.0", "system": "1.5.0"})
+        self.assertEqual(bm.dependencies("value-stream"), {"core": "2.4.0", "data-product": "1.2.0", "kpi": "1.3.0"})
+        self.assertEqual(bm.dependencies("system"), {"core": "2.4.0"})
+        self.assertEqual(bm.dependencies("lane"), {"core": "2.4.0"})
+        self.assertEqual(bm.dependencies("market-data"), {"kpi": "1.3.0"})
         self.assertEqual(bm.dependencies("integration"), {
-            "core": "2.4.0", "organization": "2.2.0", "kpi": "1.2.0", "data-product": "1.2.0",
-            "value-stream": "1.2.0", "system": "1.5.0", "lane": "1.1.0", "market-data": "1.1.0", "party": "2.1.0"})  # 2.5.0
+            "core": "2.4.0", "organization": "2.2.0", "kpi": "1.3.0", "data-product": "1.2.0",
+            "value-stream": "1.2.0", "system": "1.5.0", "lane": "1.1.0", "market-data": "1.1.0", "party": "2.1.0"})
+        self.assertEqual(bm.dependencies("logical-model"), {"party": "2.1.0", "system": "1.5.0", "data-product": "1.2.0"})
 
-    def test_in_release_mode_the_closure_reads_the_builders_table_and_no_manifest(self):
-        # The export rebuilds the newest packages in some order, so a manifest not yet rebuilt still names the old
-        # pins (system 1.2.0, core 2.3.0): in release mode the closure never opens one (the decision of 2026-10-31).
+    def test_the_closure_reads_the_builders_table_and_no_manifest(self):
+        # The newest packages are rebuilt in some order, so a manifest not yet rebuilt may still name a version the
+        # tree does not hold: a module's closure never opens one (the decision of 2026-10-31).
         def manifest_opened(dep, version):
-            raise AssertionError(f"released_requires({dep}, {version}) was read in release mode")
-        with mock.patch.object(bm, "SHARE_RELEASE", True), mock.patch.object(bm, "released_requires", manifest_opened), \
+            raise AssertionError(f"released_requires({dep}, {version}) was read")
+        with mock.patch.object(bm, "released_requires", manifest_opened), \
                 mock.patch.object(bm, "newest_on_disk", lambda module: "9.9.9"):
             def reach(name):
                 # Every module reachable through the builders' raw depends_on lists (core reaches nothing).
@@ -274,18 +241,6 @@ class EarlierReleases(unittest.TestCase):
             self.assertEqual(reach("value-stream"), {"core", "data-product", "kpi", "system"})
             for name in bm.MODULES:
                 self.assertEqual(bm.released_closure(name), {d: newest(d) for d in reach(name)}, name)
-
-    def test_a_check_loads_one_release_of_each_module(self):
-        if bm.SHARE_RELEASE:
-            self.skipTest("release mode: the pins move to the newest set, so the pinned closures do not hold")
-        # value-stream reaches core three times: directly, and through kpi 1.2.0 and data-product 1.2.0, each at 2.3.0;
-        # data-product also reaches system 1.2.0. One release of each loads.
-        self.assertEqual(bm.released_closure("value-stream"), {"core": "2.3.0", "data-product": "1.2.0", "kpi": "1.2.0",
-                                                               "system": "1.2.0"})
-        self.assertEqual(bm.released_closure("market-data"), {"kpi": "1.2.0", "core": "2.3.0"})  # 1.1.0 (the decision of 2026-10-25)
-        # ref-mpc 1.3.0 reaches core through organization 2.1.0 (2.3.0) and party 2.0.0 (2.4.0); the higher one loads.
-        self.assertEqual(bm.released_closure("ref-mpc"), {"organization": "2.1.0", "party": "2.0.0", "core": "2.4.0",
-                                                          "system": "1.5.0"})
 
     def test_a_release_that_loses_to_a_higher_one_adds_no_requirements(self):
         # catalog 1.0.0 needs types 1.0.0; catalog 1.1.0 needs nothing. reviews needs catalog 1.1.0, so
@@ -328,75 +283,6 @@ class EarlierReleases(unittest.TestCase):
         finally:
             bm.released_requires = real
 
-    def test_the_validated_graph_holds_one_core_release(self):
-        if bm.SHARE_RELEASE:
-            self.skipTest("release mode: the pins move to the newest set, so the pinned closures do not hold")
-        # the graph the shapes see, not only the version table.
-        core = URIRef(bm.MODULES_NS + "core")
-        expected = {"value-stream": "2.3.0", "market-data": "2.3.0", "ref-mpc": "2.4.0"}  # market-data 1.1.0 (the decision of 2026-10-25); ref-mpc 1.3.0 (the decision of 2026-10-27)
-        for name, version in expected.items():
-            with self.subTest(module=name):
-                data = bm.validation_graph(name, bm.build(name))
-                self.assertEqual({str(v) for v in data.objects(core, OWL.versionInfo)}, {version})
-        # core 2.2.0 corrected two 19948 decisions (2.3.0 keeps them); the superseded 2.1.0 triples must not come back.
-        data = bm.validation_graph("value-stream", bm.build("value-stream"))
-        review = URIRef(bm.MODULES_NS + "core/apqc-mapping-decision/review-link")
-        decision = URIRef(bm.MODULES_NS + "core/apqcMappingDecision")
-        for slug in ("CM-1-2-6-3", "L0-downstream-operations"):
-            self.assertNotIn((URIRef("https://w3id.org/mpc/ontology/process/" + slug), decision, review), data)
-
-    def test_check_hands_the_validator_one_core_release(self):
-        if bm.SHARE_RELEASE:
-            self.skipTest("release mode: the pins move to the newest set, so the pinned closures do not hold")
-        # observe the graph check() passes to SHACL itself, not only the helper's result.
-        core = URIRef(bm.MODULES_NS + "core")
-        review = URIRef(bm.MODULES_NS + "core/apqc-mapping-decision/review-link")
-        decision = URIRef(bm.MODULES_NS + "core/apqcMappingDecision")
-        seen, real = [], bm.validate
-
-        def capture(data, **kwargs):
-            seen.append(data)
-            return real(data, **kwargs)
-        bm.validate = capture
-        try:
-            expected = {"value-stream": "2.3.0", "market-data": "2.3.0", "ref-mpc": "2.4.0"}  # market-data 1.1.0 (the decision of 2026-10-25); ref-mpc 1.3.0 (the decision of 2026-10-27)
-            for name, version in expected.items():
-                with self.subTest(module=name):
-                    seen.clear()
-                    self.assertTrue(bm.check(name, bm.build(name))[0])
-                    self.assertEqual(len(seen), 1)
-                    self.assertEqual({str(v) for v in seen[0].objects(core, OWL.versionInfo)}, {version})
-                    if version in ("2.2.0", "2.3.0"):
-                        for slug in ("CM-1-2-6-3", "L0-downstream-operations"):
-                            self.assertNotIn((URIRef("https://w3id.org/mpc/ontology/process/" + slug), decision, review), seen[0])
-        finally:
-            bm.validate = real
-
-    def test_a_later_dependency_release_leaves_the_released_packages_unchanged(self):
-        if bm.SHARE_RELEASE:
-            self.skipTest("release mode: the pins move to the newest set, so the pinned closures do not hold")
-        # kpi 1.1.0 and a later data-product must not change value-stream or market-data 1.0.0,
-        # nor what their checks load (closures come from each selected release's own manifest).
-        saved = {n: dict(bm.MODULES[n]) for n in ("kpi", "data-product")}
-        try:
-            bm.MODULES["kpi"].update(version="1.1.0", pins={"core": "2.2.0"})
-            bm.MODULES["data-product"].update(version="1.1.0")
-            # value-stream 1.2.0 pins data-product 1.2.0 and kpi 1.2.0 (the decision of 2026-10-26), so the edited table changes nothing.
-            self.assertEqual(bm.released_closure("value-stream"), {"core": "2.3.0", "data-product": "1.2.0", "kpi": "1.2.0",
-                                                                   "system": "1.2.0"})
-            # market-data 1.1.0 requires kpi 1.2.0 (the decision of 2026-10-25); its 1.0.0 manifest still names kpi 1.0.1.
-            self.assertEqual(bm.released_closure("market-data"), {"kpi": "1.2.0", "core": "2.3.0"})
-            self.assertEqual(bm.released_requires("market-data", "1.0.0"), {"kpi": "1.0.1"})
-            for name in ("value-stream", "market-data"):
-                with self.subTest(module=name):
-                    for fname, text in bm.package(name, bm.build(name)).items():
-                        with open(os.path.join(bm.release_dir(name), fname)) as f:
-                            self.assertEqual(f.read(), text, fname)
-        finally:
-            for n, m in saved.items():
-                bm.MODULES[n].clear()
-                bm.MODULES[n].update(m)
-
     def test_each_step7_package_holds_its_two_source_files(self):
         # the decision of 2026-10-22: each package is its module's vocabulary and instance file, nothing else. The newest
         # release of each is compared with the sources (value-stream 1.1.0 since the decision of 2026-10-23).
@@ -413,16 +299,6 @@ class EarlierReleases(unittest.TestCase):
                     sources.parse(os.path.join(bm.ONTOLOGY, name, part))
                 sources.remove((header, None, None))
                 self.assertEqual(set(released), set(sources))
-
-    def test_ref_mpc_1_1_0_is_untouched(self):
-        # A later ref-mpc is built now; the released 1.1.0 package must still match its own manifest.
-        out = os.path.join(shipped(self, "ref-mpc", "1.1.0"))
-        with open(os.path.join(out, "manifest.json")) as f:
-            manifest = json.load(f)
-        self.assertEqual(manifest["version"], "1.1.0")
-        for fname, digest in manifest["files"].items():
-            with self.subTest(file=fname), open(os.path.join(out, fname), "rb") as f:
-                self.assertEqual(hashlib.sha256(f.read()).hexdigest(), digest)
 
     def test_ref_mpc_1_2_0_is_untouched(self):
         # ref-mpc 1.3.0 is built now; the released 1.2.0 package must still match its own manifest.
@@ -469,16 +345,6 @@ class EarlierReleases(unittest.TestCase):
         self.assertEqual(set(released), set(sources))
         self.assertIn((URIRef(bm.MODULES_NS + "ref-mpc/party/mpc-payer"), None, None), released)
 
-    def test_kpi_1_0_1_is_untouched(self):
-        # kpi 1.1.0 is built now; the released 1.0.1 package must still match its own manifest.
-        out = os.path.join(shipped(self, "kpi", "1.0.1"))
-        with open(os.path.join(out, "manifest.json")) as f:
-            manifest = json.load(f)
-        self.assertEqual(manifest["version"], "1.0.1")
-        for fname, digest in manifest["files"].items():
-            with self.subTest(file=fname), open(os.path.join(out, fname), "rb") as f:
-                self.assertEqual(hashlib.sha256(f.read()).hexdigest(), digest)
-
     def test_kpi_holds_the_measures_and_the_populations(self):
         # the decision of 2026-10-22: the kpi vocabulary and measures, and the population vocabulary and statements, in the newest
         # release (1.1.1 since the decision of 2026-10-23, which adds pop:populationEvidence's range).
@@ -495,25 +361,6 @@ class EarlierReleases(unittest.TestCase):
         xsd_string = URIRef("http://www.w3.org/2001/XMLSchema#string")
         rng = URIRef("http://www.w3.org/2000/01/rdf-schema#range")
         self.assertEqual(set(released.objects(URIRef(bm.MODULES_NS + "population/populationEvidence"), rng)), {xsd_string})
-
-    def test_kpi_1_1_0_is_untouched(self):
-        # kpi 1.1.1 is built now; the released 1.1.0 package must still match its own manifest.
-        out = os.path.join(shipped(self, "kpi", "1.1.0"))
-        with open(os.path.join(out, "manifest.json")) as f:
-            manifest = json.load(f)
-        for fname, digest in manifest["files"].items():
-            with self.subTest(file=fname), open(os.path.join(out, fname), "rb") as f:
-                self.assertEqual(hashlib.sha256(f.read()).hexdigest(), digest)
-
-    def test_released_dependents_stay_on_kpi_1_0_1(self):
-        # value-stream 1.0.0, market-data and integration were released against kpi 1.0.1 and keep naming it;
-        # value-stream 1.1.0 requires kpi 1.1.0 (the decision of 2026-10-23), and its 1.0.0 manifest is unchanged.
-        # integration 2.0.0 requires kpi 1.1.1 (the decision of 2026-10-23); its 1.0.0 manifest still names 1.0.1.
-        for name in ("market-data", "integration", "value-stream"):
-            shipped(self, name, "1.0.0")
-        self.assertEqual(bm.released_requires("market-data", "1.0.0")["kpi"], "1.0.1")  # 1.1.0 requires kpi 1.2.0 (the decision of 2026-10-25)
-        self.assertEqual(bm.released_requires("integration", "1.0.0")["kpi"], "1.0.1")
-        self.assertEqual(bm.released_requires("value-stream", "1.0.0")["kpi"], "1.0.1")
 
     def test_integration_holds_three_vocabularies_and_neither_population_nor_apqc(self):
         # the decision of 2026-10-22: placement, authority (vocabulary and source tiers) and consumer, read from the
@@ -580,23 +427,15 @@ class EarlierReleases(unittest.TestCase):
         self.assertEqual((m["version"], m["stage"], m["issued"]), ("2.2.0", None, "2026-10-28"))
         self.assertTrue(m["approver"].startswith("a subject matter expert reviewing the documents"))
 
-    def test_the_mpc_p11_releases_carry_the_brief(self):
-        # the decision of 2026-10-26: system 1.4.0 and party 1.4.0, minors a subject matter expert approved and the brief.
-        # Since system 1.5.0 and party 2.0.0 (the decision of 2026-10-27) the builder builds neither; their packages keep it.
-        for name in ("system", "party"):
-            self.assertEqual(approval_file(self, shipped(self, name, "1.4.0")), BRIEF[0])
-
     def test_the_customer_inputs_releases_carry_the_alignment(self):
         # the decision of 2026-10-27: party 2.0.0, a major the subject matter expert approved by aligning with the plan that names it;
         # system 1.5.0 and integration 2.4.0, minors a subject matter expert approved with that alignment.
         # party 2.0.0 and integration 2.4.0 carried it until party 2.1.0 and integration 2.5.0 (the decision of 2026-10-25,
-        # amendment of 2026-10-28); their packages keep it.
+        # amendment of 2026-10-28).
         m = bm.MODULES["system"]
         self.assertEqual(m["approval"], CUSTOMER_INPUTS)
         self.assertEqual((m["version"], m["stage"], m["issued"]), ("1.5.0", None, "2026-10-27"))
         self.assertIn("the decision of 2026-10-27", m["decisions"])
-        for name, version in (("party", "2.0.0"), ("integration", "2.4.0")):
-            self.assertEqual(approval_file(self, shipped(self, name, version)), CUSTOMER_INPUTS[0])
         for name, version in (("party", "2.1.0"), ("integration", "2.5.0")):
             m = bm.MODULES[name]
             self.assertEqual(m["approval"], DELEGATED)
@@ -611,14 +450,6 @@ class EarlierReleases(unittest.TestCase):
             self.assertEqual(bm.MODULES[name]["approval"], ITEM_F)
             self.assertEqual((bm.MODULES[name]["version"], bm.MODULES[name]["stage"], bm.MODULES[name]["issued"]),
                              (version, None, "2026-10-25"))
-        # Since kpi 1.3.0 (the decision of 2026-10-28) the builder builds kpi 1.3.0; kpi 1.2.0's package keeps the approval it names.
-        self.assertEqual(approval_file(self, shipped(self, "kpi", "1.2.0")), ITEM_F[0])
-
-    def test_the_close_out_releases_carry_the_close_out_approval(self):
-        # the decision of 2026-10-23: the subject matter expert approved the six close-out releases together. Since value-stream 1.2.0
-        # (the decision of 2026-10-26) the builder builds none of them; value-stream 1.1.0's package keeps the approval it names.
-        self.assertEqual(approval_file(self, shipped(self, "value-stream", "1.1.0")), CLOSEOUT[0])
-
 
 class BuilderGate(unittest.TestCase):
     def test_the_builder_runs_sparql_targets(self):
