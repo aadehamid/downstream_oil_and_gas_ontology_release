@@ -15,6 +15,7 @@ import os
 import shutil
 import tempfile
 import unittest
+from unittest import mock
 
 from pyshacl import validate
 from rdflib import BNode, Graph, Literal, URIRef
@@ -958,14 +959,20 @@ class FakeResult:
 class FakeSession:
     """Answers the load script's statements with the rows given."""
 
-    def __init__(self, status="OK", shape_rows=3, listed=3):
-        self.status, self.shape_rows, self.listed = status, shape_rows, listed
+    def __init__(self, status="OK", shape_rows=3, listed=3, drop=0):
+        self.status, self.shape_rows, self.listed, self.drop = status, shape_rows, listed, drop
+        self.sent = []   # (statement, {parameter: text}) for every import request
 
-    def run(self, stmt, **_):
+    def run(self, stmt, **params):
+        if ".import." in stmt:
+            self.sent.append((stmt, params))
         if "shacl.import" in stmt:
             return FakeResult([{"target": "x"}] * self.shape_rows)
-        if "rdf.import" in stmt or "onto.import" in stmt:
-            return FakeResult([{"terminationStatus": self.status}])
+        if "rdf.import" in stmt:
+            (text,) = params.values()
+            return FakeResult([{"terminationStatus": self.status, "triplesLoaded": text.count("\n") - self.drop}])
+        if "onto.import" in stmt:
+            return FakeResult([{"terminationStatus": self.status, "triplesLoaded": 1}])
         if "listShapes" in stmt:
             return FakeResult([{"n": self.listed}])
         return FakeResult([])
@@ -977,20 +984,150 @@ class LoadChecks(unittest.TestCase):
     def statements(self):
         return [line for line in build.cypher(config(), module(), shapes()).splitlines() if line]
 
+    REQUESTS = {"ontology": ["@prefix a: <http://a/> .\n"], "shapes": ["# shapes\n"],
+                "loadable": ["<http://a> <http://p> <http://b> .\n<http://a> <http://p> <http://c> .\n",
+                             "<http://a> <http://p> <http://d> .\n"],
+                "inferred": []}
+
     def test_good_load_returns_both_counts(self):
-        self.assertEqual(lv.load(FakeSession(), self.statements()), (3, 3))
+        self.assertEqual(lv.load(FakeSession(), self.statements(), self.REQUESTS), (3, 3))
 
     def test_failed_import_stops(self):
         with self.assertRaises(lv.Failed):
-            lv.load(FakeSession(status="KO"), self.statements())
+            lv.load(FakeSession(status="KO"), self.statements(), self.REQUESTS)
 
     def test_shapes_count_mismatch_stops(self):
         with self.assertRaises(lv.Failed):
-            lv.load(FakeSession(shape_rows=2, listed=3), self.statements())
+            lv.load(FakeSession(shape_rows=2, listed=3), self.statements(), self.REQUESTS)
 
     def test_no_shapes_stops(self):
         with self.assertRaises(lv.Failed):
-            lv.load(FakeSession(shape_rows=0, listed=0), self.statements())
+            lv.load(FakeSession(shape_rows=0, listed=0), self.statements(), self.REQUESTS)
+
+    def test_the_load_script_sends_content_inline_and_names_no_file(self):
+        text = build.cypher(config(), module(), shapes())
+        self.assertIn("CALL n10s.onto.import.inline($ontology, 'Turtle');", text)
+        self.assertIn("CALL n10s.validation.shacl.import.inline($shapes, 'Turtle');", text)
+        self.assertIn("CALL n10s.rdf.import.inline($loadable, 'N-Triples');", text)
+        self.assertIn("CALL n10s.rdf.import.inline($inferred, 'N-Triples');", text)
+        for gone in ("fetch", "file:", "/import/"):
+            self.assertNotIn(gone, text)
+
+    def test_each_request_carries_its_text_once_and_in_order(self):
+        session = FakeSession()
+        lv.load(session, self.statements(), self.REQUESTS)
+        self.assertEqual(session.sent, [
+            ("CALL n10s.onto.import.inline($ontology, 'Turtle');", {"ontology": "@prefix a: <http://a/> .\n"}),
+            ("CALL n10s.validation.shacl.import.inline($shapes, 'Turtle');", {"shapes": "# shapes\n"}),
+            ("CALL n10s.rdf.import.inline($loadable, 'N-Triples');",
+             {"loadable": "<http://a> <http://p> <http://b> .\n<http://a> <http://p> <http://c> .\n"}),
+            ("CALL n10s.rdf.import.inline($loadable, 'N-Triples');", {"loadable": "<http://a> <http://p> <http://d> .\n"})])
+
+    def test_a_request_that_loads_fewer_triples_than_its_lines_stops(self):
+        with self.assertRaisesRegex(lv.Failed, "loaded 1 triples in 2 request.s., but the file has 3 lines"):
+            lv.load(FakeSession(drop=1), self.statements(), self.REQUESTS)
+
+    def test_a_parameter_the_run_does_not_supply_stops(self):
+        with self.assertRaisesRegex(lv.Failed, "does not supply"):
+            lv.load(FakeSession(), self.statements(), {k: v for k, v in self.REQUESTS.items() if k != "inferred"})
+
+
+class Batches(unittest.TestCase):
+    """The N-Triples files travel in requests of whole lines: no triple is cut, and every line goes once."""
+
+    # Four triples, written by hand. The second holds U+2028 and U+0085, which str.splitlines would cut at;
+    # the lines are 30, 51, 137 and 34 bytes with their newlines.
+    LINES = ['<http://a> <http://p> "one" .\n',
+             '<http://a> <http://p> "two\u2028still two\u0085and two" .\n',
+             '<http://a> <http://p> "' + "x" * 110 + '" .\n',
+             '<http://a> <http://p> "four"@en .\n']
+
+    def test_a_split_never_cuts_a_triple_and_covers_every_line_once(self):
+        text = "".join(self.LINES)
+        for limit in (1, 30, 31, 81, 137, 138, 1000):
+            with self.subTest(limit=limit):
+                out = lv.batches(text, limit)
+                self.assertEqual("".join(out), text)
+                self.assertEqual([line for b in out for line in lv.nt_lines(b)], self.LINES)
+                for b in out:
+                    self.assertTrue(b.endswith(" .\n"), b)
+                    self.assertTrue(len(b.encode("utf-8")) <= limit or len(lv.nt_lines(b)) == 1, b)
+
+    def test_the_batches_at_known_limits(self):
+        text = "".join(self.LINES)
+        self.assertEqual([len(lv.nt_lines(b)) for b in lv.batches(text, 1)], [1, 1, 1, 1])
+        self.assertEqual([len(lv.nt_lines(b)) for b in lv.batches(text, 81)], [2, 1, 1])
+        self.assertEqual([len(lv.nt_lines(b)) for b in lv.batches(text, 80)], [1, 1, 1, 1])
+        self.assertEqual([len(lv.nt_lines(b)) for b in lv.batches(text, 217)], [2, 2])
+        self.assertEqual([len(lv.nt_lines(b)) for b in lv.batches(text, 218)], [3, 1])
+        self.assertEqual([len(lv.nt_lines(b)) for b in lv.batches(text, 1000)], [4])
+        self.assertEqual(lv.batches("", 10), [])
+
+    def test_the_limit_counts_bytes_not_characters(self):
+        line = '<http://a> <http://p> "' + "é" * 10 + '" .\n'     # 37 characters, 47 bytes
+        self.assertEqual(len(line), 37)
+        self.assertEqual(len(lv.batches(line * 2, 80)), 2)         # 94 bytes: two requests
+        self.assertEqual(len(lv.batches(line * 2, 94)), 1)
+
+    def test_the_shuffle_keeps_every_line_whole(self):
+        text = "".join(self.LINES)
+        mixed = lv.shuffled(text)
+        self.assertNotEqual(mixed, text)
+        self.assertEqual(sorted(lv.nt_lines(mixed)), sorted(self.LINES))
+
+    def test_the_default_limit_is_one_megabyte_and_the_whole_limit_32(self):
+        self.assertEqual((lv.BATCH_BYTES, lv.WHOLE_BYTES), (1000000, 33554432))
+
+    def test_text_that_must_go_whole_is_refused_when_too_large(self):
+        self.assertEqual(lv.whole("abc", "x"), ["abc"])
+        with mock.patch.object(lv, "WHOLE_BYTES", 2), self.assertRaisesRegex(lv.Failed, "cannot be split"):
+            lv.whole("abc", "the ontology")
+
+    def test_the_payloads_name_the_load_scripts_parameters(self):
+        got = lv.payloads("O", "S", self.LINES[0] + self.LINES[3], "")
+        self.assertEqual(got, {"ontology": ["O"], "shapes": ["S"], "loadable": [self.LINES[0] + self.LINES[3]], "inferred": []})
+
+
+class Connection(unittest.TestCase):
+    """load_verify.py reaches a server that already runs: an env file, or --bolt with the environment."""
+
+    def env(self, text):
+        f = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False)
+        f.write(text)
+        f.close()
+        self.addCleanup(os.remove, f.name)
+        return f.name
+
+    def test_an_env_file_gives_uri_user_password_and_database(self):
+        path = self.env("NEO4J_URI=bolt://h:1\nNEO4J_USERNAME=u\nNEO4J_PASSWORD=p\nNEO4J_DATABASE=d\n")
+        self.assertEqual(lv.connection({"--env": path}, {}), ("bolt://h:1", ("u", "p"), "d"))
+        self.assertEqual(lv.connection({"--env": path, "--database": "other"}, {}), ("bolt://h:1", ("u", "p"), "other"))
+
+    def test_bolt_reads_the_environment(self):
+        self.assertEqual(lv.connection({"--bolt": "bolt://h:1"}, {"NEO4J_PASSWORD": "p"}), ("bolt://h:1", ("neo4j", "p"), None))
+        self.assertEqual(lv.connection({"--bolt": "bolt://h:1", "--database": "d"}, {"NEO4J_PASSWORD": "p", "NEO4J_USERNAME": "u"}),
+                         ("bolt://h:1", ("u", "p"), "d"))
+
+    def test_neither_both_or_no_password_is_refused(self):
+        path = self.env("NEO4J_URI=bolt://h:1\nNEO4J_USERNAME=u\nNEO4J_PASSWORD=p\n")
+        for opts in ({}, {"--bolt": "bolt://h", "--env": path}):
+            with self.subTest(opts=sorted(opts)), self.assertRaises(ValueError):
+                lv.connection(opts, {"NEO4J_PASSWORD": "p"})
+        with self.assertRaises(ValueError):
+            lv.connection({"--bolt": "bolt://h"}, {})
+
+    def test_the_removed_container_options_are_refused(self):
+        for gone in ("--import-dir", "--container", "--compose-project"):
+            with self.subTest(gone), mock.patch.dict(os.environ, {"NEO4J_PASSWORD": "x"}), \
+                    mock.patch.object(lv, "run") as run:
+                err = io.StringIO()
+                with contextlib.redirect_stderr(err), contextlib.redirect_stdout(err):
+                    code = lv.main(["--config", CONFIG, "--shapes", SHAPES, "--bolt", "bolt://127.0.0.1:1", gone, "x",
+                                    "--merged", MODULE, "--loadable", MODULE, "--inferred", MODULE, "--report",
+                                    os.path.join(tempfile.mkdtemp(), "r.json"), MODULE])
+                self.assertEqual(code, 2, err.getvalue())
+                self.assertIn("unknown option", err.getvalue())
+                run.assert_not_called()
 
 
 class RoundFour(OneBreak, unittest.TestCase):
@@ -1047,7 +1184,7 @@ class RoundFour(OneBreak, unittest.TestCase):
         from unittest import mock
         with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"NEO4J_PASSWORD": "x"}):
             args = ["--config", self.config_4b(tmp), "--shapes", SHAPES, "--bolt", "bolt://127.0.0.1:1",
-                    "--import-dir", tmp, "--merged", MODULE, "--loadable", MODULE, "--inferred", MODULE,
+                    "--merged", MODULE, "--loadable", MODULE, "--inferred", MODULE,
                     "--report", os.path.join(tmp, "r.json"), MODULE]
             code, out = run_main(lv.main, args)
         self.assertEqual(code, 2, out)
@@ -1136,8 +1273,7 @@ class RoundFive(unittest.TestCase):
             mock.patch.object(lv, "run", return_value=run_result)
         with mock.patch.dict(os.environ, {"NEO4J_PASSWORD": "x"}), mock.patch.dict(_sys.modules, {"neo4j": fake}), \
                 patch as run:
-            args = ["--config", CONFIG, "--shapes", SHAPES, "--bolt", "bolt://127.0.0.1:1", "--import-dir", tmp,
-                    "--merged", MODULE, "--loadable", MODULE, "--inferred", MODULE, "--report", path, MODULE]
+            args = ["--config", CONFIG, "--shapes", SHAPES, "--bolt", "bolt://127.0.0.1:1", "--merged", MODULE, "--loadable", MODULE, "--inferred", MODULE, "--report", path, MODULE]
             code, out = run_main(lv.main, args)
         return code, out, path, run
 
@@ -1186,8 +1322,7 @@ class QuickCheckSix(unittest.TestCase):
         self.assertTrue(any("newline" in f for f in build.check_serialised(a, b"")))
 
     # 10: printed commands are shell-quoted
-    def test_printed_container_name_is_quoted(self):
-        self.assertEqual(lv.remove_command({"--container": "a; rm -rf x"}), "docker rm -f -v 'a; rm -rf x'")
+    def test_printed_report_path_is_quoted(self):
         self.assertIn("--report 'my report.json'", lv.check_report_command("my report.json"))
 
 
@@ -1217,12 +1352,35 @@ class DocsAgreeWithScripts(unittest.TestCase):
         self.assertNotIn("make every value of it load the same way", rules)
         self.assertNotIn("owl:AnnotationProperty .                         # node property\n", rules)
 
-    # 10: the run file quotes its values, and every source line is quoted
-    def test_run_env_is_written_quoted(self):
-        running = skill_text("references", "running.md")
-        self.assertIn("CONTAINER=%q", running)
-        self.assertNotIn(". <run folder>/run.env", running)
+    # 10: no copy puts a password on a command line
+    def test_no_password_on_a_command_line(self):
         self.assertNotIn("cypher-shell -u neo4j -p", skill_text("references", "pipeline.md"))
+
+    # The method starts no server and the server reads no file, and every copy an agent follows says so.
+    def test_the_docs_describe_a_running_server_and_inline_triples(self):
+        running = skill_text("references", "running.md")
+        for needed in ("check_plugins.py <plugins folder>", "--env <file>", "dbms.security.procedures.unrestricted=apoc.*,n10s.*",
+                       "The load empties the database it is pointed at", "`import.inline`"):
+            self.assertIn(needed, running, needed)
+        pipeline = skill_text("references", "pipeline.md")
+        for statement in ("n10s.onto.import.inline($ontology, 'Turtle')", "n10s.validation.shacl.import.inline($shapes, 'Turtle')",
+                          "n10s.rdf.import.inline($loadable, 'N-Triples')", "n10s.rdf.import.inline($inferred, 'N-Triples')"):
+            self.assertIn(statement, pipeline, statement)
+            self.assertIn(statement, build.cypher(config(), module(), shapes()), statement)
+        add_ons = skill_text("references", "add-ons.md")
+        for flag in ("--source-env", "--source-database", "--target-env", "--target-database"):
+            self.assertIn(flag, add_ons, flag)
+            self.assertIn(flag, skill_text("scripts", "copy_graph.py").split('"""')[1], flag)
+        gone = ("docker", "aura", "container", "compose", "import.fetch", "import-dir", "file:///", "keep_neo4j", "keep_jena",
+                "access_token", "sql connector")
+        for parts in (("SKILL.md",), ("README.md",), ("SOURCES.md",), ("templates", "run-config.json"),
+                      ("references", "running.md"), ("references", "pipeline.md"), ("references", "run-config.md"),
+                      ("references", "add-ons.md"), ("references", "multi-store.md"), ("references", "versions.md"),
+                      ("references", "inputs.md"), ("references", "design-rules.md"), ("references", "learning-path.md"),
+                      ("references", "diagrams", "data-flow.eraser"), ("references", "diagrams", "validation-path.eraser")):
+            text = skill_text(*parts).lower()
+            for word in gone:
+                self.assertNotIn(word, text, (parts[-1], word))
 
     # 11: step 2 and the changelog use the own_namespaces definition
     def test_own_namespaces_wording(self):

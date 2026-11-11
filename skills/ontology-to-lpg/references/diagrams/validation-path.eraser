@@ -14,7 +14,7 @@ Before the load (files) [color: orange] {
 }
 
 In the local Neo4j (n10s) [color: green] {
-  V6 [icon: download, label: "V6 Load in fixed order; every import returns OK"]
+  V6 [icon: download, label: "V6 Load in fixed order, triples in the request; every import returns OK"]
   V7 [icon: eye, label: "V7 Engine readback: listShapes() vs the shapes file; every constraint n10s did not compile is listed (V2 already checked it)"]
   V8 [icon: shield, label: "V8 n10s SHACL validate(): 0 violations"]
   V9 [icon: zap, label: "V9 One fail case per compiled constraint: must name the right node, path and component; a committed mutant is caught, then restored"]
@@ -24,15 +24,15 @@ In the local Neo4j (n10s) [color: green] {
 }
 
 Delivery [color: purple] {
-  V13 [icon: cloud, label: "V13 Aura copy: Aura hash = local hash = report hash"]
+  V13 [icon: server, label: "V13 Copy to a named database: target hash = local hash = report hash"]
   V14 [icon: database, label: "V14 Triple store: counts per graph, per predicate; three-way (files, store, Neo4j) with --projection-report"]
 }
 
-GRAPH TYPE on Aura [color: red] {
+GRAPH TYPE on the copy [color: red] {
   G1 [icon: code, label: "G1 build.py graph-type --output: one statement from the sh:targetClass shapes; left-out list as comments (coverage depends on sh:targetClass shapes)"]
   G2 [icon: upload, label: "G2 Apply after V13: ALTER CURRENT GRAPH TYPE SET; confirm with SHOW CURRENT GRAPH TYPE"]
   G3 [icon: x-octagon, label: "G3 Probe: a write that breaks the type must fail (ConstraintValidationFailed)"]
-  G4 [icon: users, label: "G4 From then on Aura rejects bad writes from apps; n10s cannot run there"]
+  G4 [icon: users, label: "G4 From then on the database rejects bad writes from apps; n10s does not run there"]
 }
 
 Fail [shape: oval, icon: alert-triangle, color: red, label: "Any failure stops the run; no report"]

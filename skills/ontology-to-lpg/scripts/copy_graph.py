@@ -1,30 +1,37 @@
 #!/usr/bin/env python3
-"""Copy a validated projection from the local Neo4j to another Neo4j (Aura included), then prove
-the copy is identical by the graph hash.
+"""Copy a validated projection from the Neo4j that built it to a named database on another Neo4j,
+then prove the copy is identical by the graph hash.
 
-n10s is not available on Aura, so the projection is built and verified locally (load_verify.py),
-and this script copies the result with plain Cypher over the Python driver.
+The target needs no plugin. n10s and APOC run only where the projection is built and verified
+(load_verify.py); this script copies the result with plain Cypher over the Python driver, and calls
+neither n10s nor APOC on either server.
 
-Run: NEO4J_PASSWORD=<local password> uv run --no-project --with rdflib --with neo4j python3 copy_graph.py \
-         --source bolt://127.0.0.1:<port> --target-env <file> --report <projection-report.json> \
+Run: uv run --no-project --with rdflib --with neo4j python3 copy_graph.py \
+         (--source-env <file> | --source bolt://<host>:<port>) [--source-database <name>] \
+         --target-env <file> [--target-database <name>] --report <projection-report.json> \
          [--batch 1000] [--replace] [--query-timeout <seconds>]
+     On Windows, after `py -m pip install rdflib neo4j`: py copy_graph.py ...
 
---target-env names a file of KEY=VALUE lines: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD and
-optionally NEO4J_DATABASE (the format of an Aura credentials file). The password is never printed.
+--source-env and --target-env each name a file of KEY=VALUE lines, kept outside the repository:
+NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD and optionally NEO4J_DATABASE. With --source, the source's
+user and password come from the environment instead: NEO4J_PASSWORD, and NEO4J_USERNAME (default
+neo4j). --source-database and --target-database name the database on each side and override the
+file's NEO4J_DATABASE; without either, the server's default database is used. No password is printed.
 
 What it copies: every :Resource node (labels and properties, the n10s schema nodes included,
 because the graph hash and the round trip count them) and every relationship between two :Resource
 nodes. It leaves out n10s's own configuration nodes (_GraphConfig, _NsPrefDef,
-_n10sValidatorConfig), which have no Resource label. It creates the n10s uniqueness constraint on
+_n10sValidatorConfig), which have no Resource label. It creates the uniqueness constraint on
 :Resource(uri) on the target first, then writes nodes and relationships in batches with UNWIND and
-dynamic labels and types (Cypher 5.26 and later; Aura runs current versions).
+dynamic labels and types (Cypher 5.26 and later).
 
 --report is required: the projection report load_verify.py wrote. The script reads it before it
 touches either database and stops (exit 2) unless the report earns its pass: passed alone is not
 trusted, and build.report_earned rechecks every field check-report checks except the fingerprints
 (the numbers, equal hashes, a passing case for every compiled row, the mutant). It also stops on an
 unknown flag, such as the old --expect-hash, and (exit 1, before any write or delete) when the
-target is the source database, compared by the id db.info() returns on both. It then hashes the source and stops (exit 1), before writing or deleting anything on
+target is the source database, compared by the id db.info() returns on both, so one server's two
+databases are two and one database under two addresses is one. It then hashes the source and stops (exit 1), before writing or deleting anything on
 the target, unless that hash equals the report's determinism_hash_sorted: only the verified graph is
 copied. It refuses a target that holds any node unless --replace is given, which deletes everything
 on the target first (in batches). After the copy it hashes the target exactly as load_verify.py
@@ -67,12 +74,30 @@ def read_env_file(path):
     return values
 
 
-def describe_target(values):
-    """The target as it may be printed: never the password, every value shell-quoted."""
+def describe_target(values, database=None):
+    """The target as it may be printed: never the password, every value shell-quoted. database is the
+    one the copy writes to, when it is not the file's own."""
     uri = redact(values["NEO4J_URI"])
-    if values.get("NEO4J_DATABASE"):
-        return f"{q(uri)} as {q(values['NEO4J_USERNAME'])} (database {q(values['NEO4J_DATABASE'])})"
+    database = database or values.get("NEO4J_DATABASE")
+    if database:
+        return f"{q(uri)} as {q(values['NEO4J_USERNAME'])} (database {q(database)})"
     return f"{q(uri)} as {q(values['NEO4J_USERNAME'])}"
+
+
+def source_connection(opts, environ=None):
+    """(uri, (user, password), database) of the source: --source-env, or --source with NEO4J_USERNAME
+    (default neo4j) and NEO4J_PASSWORD in the environment. --source-database overrides the file's."""
+    environ = os.environ if environ is None else environ
+    if ("--source" in opts) == ("--source-env" in opts):
+        raise Refusal("give exactly one of --source and --source-env")
+    if "--source-env" in opts:
+        values = read_env_file(opts["--source-env"])
+        found = values["NEO4J_URI"], (values["NEO4J_USERNAME"], values["NEO4J_PASSWORD"]), values.get("NEO4J_DATABASE")
+    else:
+        if not environ.get("NEO4J_PASSWORD"):
+            raise Refusal("set NEO4J_PASSWORD to the source's password, or give --source-env")
+        found = opts["--source"], (environ.get("NEO4J_USERNAME") or "neo4j", environ["NEO4J_PASSWORD"]), None
+    return found[0], found[1], opts.get("--source-database") or found[2] or None
 
 
 def verified_hash(report_path):
@@ -118,6 +143,7 @@ def empty_target(session, size):
 
 def copy(source, target, size):
     copied = {"nodes": 0, "relationships": 0}
+    # Plain Cypher only: the constraint keeps n10s's name, but the target needs no n10s to hold it.
     target.run("CREATE CONSTRAINT n10s_unique_uri IF NOT EXISTS FOR (r:Resource) REQUIRE r.uri IS UNIQUE").consume()
     for rows in batches(source, NODES, size):
         target.run(WRITE_NODES, rows=[{"labels": r["labels"], "props": r["props"]} for r in rows]).consume()
@@ -128,36 +154,38 @@ def copy(source, target, size):
     return copied
 
 
+FLAGS = ("--source", "--source-env", "--source-database", "--target-env", "--target-database", "--report",
+         "--replace", "--batch", "--query-timeout")
+
+
 def main(argv):
     try:
         opts, rest = build.options(argv, flags=("--replace",))
-        build.need(opts, "--source", "--target-env", "--report")
-        unknown = sorted(set(opts) - {"--source", "--target-env", "--report", "--replace", "--batch", "--query-timeout"})
+        unknown = sorted(set(opts) - set(FLAGS))
         if rest or unknown:
             # Counted, never shown: an unknown option or a stray value is text the user supplied.
-            raise Refusal(f"unknown option(s) or argument(s): {len(rest) + len(unknown)}; the flags are --source, "
-                          "--target-env, --report, --replace, --batch, --query-timeout")
+            raise Refusal(f"unknown option(s) or argument(s): {len(rest) + len(unknown)}; the flags are "
+                          + ", ".join(FLAGS))
+        build.need(opts, "--target-env", "--report")
         try:
             size = int(opts.get("--batch", 1000))
         except ValueError:
             raise Refusal("--batch needs a whole number") from None
         timeout = lv.query_timeout(opts)
-        password = os.environ.get("NEO4J_PASSWORD")
-        if not password:
-            raise Refusal("set NEO4J_PASSWORD to the local (source) password")
+        source_uri, source_auth, source_db = source_connection(opts)
         target_values = read_env_file(opts["--target-env"])
+        target_db = opts.get("--target-database") or target_values.get("NEO4J_DATABASE") or None
         expected = verified_hash(opts["--report"])
     except (OSError, ValueError) as exc:
-        print(f"ERROR {q(error_line('the arguments, the --target-env file or the report could not be read', exc))}",
+        print(f"ERROR {q(error_line('the arguments, an env file or the report could not be read', exc))}",
               file=sys.stderr)
         return 2
     from neo4j import GraphDatabase
     try:
-        with GraphDatabase.driver(opts["--source"], auth=("neo4j", password)) as src_driver, \
+        with GraphDatabase.driver(source_uri, auth=source_auth) as src_driver, \
                 GraphDatabase.driver(target_values["NEO4J_URI"],
                                      auth=(target_values["NEO4J_USERNAME"], target_values["NEO4J_PASSWORD"])) as dst_driver:
-            database = target_values.get("NEO4J_DATABASE") or None
-            with src_driver.session() as raw_source, dst_driver.session(database=database) as raw_target:
+            with src_driver.session(database=source_db) as raw_source, dst_driver.session(database=target_db) as raw_target:
                 # Every statement on either side carries the server-side timeout (load_verify.Timed).
                 source, target = lv.Timed(raw_source, timeout), lv.Timed(raw_target, timeout)
                 # Compared by the server's own database id, before anything is written or deleted:
@@ -173,7 +201,7 @@ def main(argv):
                     return 1
                 present = count_nodes(target)
                 if present and not opts.get("--replace"):
-                    print(f"FAIL the target {describe_target(target_values)} holds {q(present)} nodes; "
+                    print(f"FAIL the target {describe_target(target_values, target_db)} holds {q(present)} nodes; "
                           "pass --replace to delete them first")
                     return 1
                 if present:
@@ -186,7 +214,7 @@ def main(argv):
               "the target may hold a partial copy")
         return 1
     print(f"copied {q(copied['nodes'])} nodes and {q(copied['relationships'])} relationships to "
-          f"{describe_target(target_values)}")
+          f"{describe_target(target_values, target_db)}")
     if target_hash != source_hash:
         print(f"FAIL the target hash {q(target_hash)} differs from the source hash {q(source_hash)}")
         return 1

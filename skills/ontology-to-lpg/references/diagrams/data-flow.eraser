@@ -17,9 +17,8 @@ Skolemize [icon: hash, label: "Skolemize blank nodes (stable IRIs)"]
 
 Triple stores [icon: database, color: purple] {
   Jena Fuseki [icon: database, label: "Apache Jena Fuseki (Graph Store Protocol, one named graph per package)"]
-  Databricks Delta [icon: databricks, label: "Databricks: Delta triple table in Unity Catalog (planned)"]
-  Databricks Free [icon: laptop, label: "Free Edition: transfers run from your machine (SQL connector)"]
-  Databricks Enterprise [icon: server, label: "Enterprise: from your machine, or a job in the workspace"]
+  Databricks Delta [icon: databricks, label: "Databricks: Delta triple table in Unity Catalog"]
+  Databricks notebook [icon: laptop, label: "Written and read by a notebook's own Spark session, through a staging table"]
 }
 
 ontology-to-lpg skill [icon: tool, color: orange] {
@@ -29,12 +28,12 @@ ontology-to-lpg skill [icon: tool, color: orange] {
 }
 
 Neo4j local [icon: neo4j, color: green] {
-  n10s load [icon: download, label: "n10s load (SHORTEN, fixed order)"]
+  n10s load [icon: download, label: "n10s load (SHORTEN, fixed order), triples sent in the request"]
   Engine gate [icon: shield, label: "Gate: listShapes readback, fail case per constraint, round trip, determinism hash"]
 }
 
-Neo4j Aura [icon: cloud, color: green] {
-  Aura copy [icon: upload, label: "Driver copy, hash must match"]
+Neo4j copy [icon: server, color: green] {
+  Driver copy [icon: upload, label: "Copy over the driver to a named database (no plugins), hash must match"]
   GRAPH TYPE [icon: lock, label: "GRAPH TYPE (schema enforced by the database)"]
 }
 
@@ -48,17 +47,16 @@ Reference process model > Steps 1 to 11
 Steps 1 to 11 > Checks
 Checks > Released packages
 Released packages > Skolemize
-Skolemize > Jena Fuseki: load + export back, counts per predicate
+Skolemize > Jena Fuseki: load + export back, compare hashes
 Skolemize > Databricks Delta: load + export back, triple-for-triple
 Skolemize > Rule check
 Rule check > Reason > Serialise
 Serialise > n10s load
 n10s load > Engine gate
-Engine gate > Aura copy: validated graph
-Aura copy > GRAPH TYPE
+Engine gate > Driver copy: validated graph
+Driver copy > GRAPH TYPE
 Jena Fuseki <> Engine gate: three-way counts with --projection-report (files, store, Neo4j)
-Databricks Delta > Rule check: rebuild Neo4j + Aura from the store export
+Jena Fuseki > Rule check: rebuild the local Neo4j + the copy from the store export
 Released packages > OntoBricks
 Databricks Delta > OntoBricks
-Databricks Free > Databricks Delta
-Databricks Enterprise > Databricks Delta
+Databricks notebook > Databricks Delta

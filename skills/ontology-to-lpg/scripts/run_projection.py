@@ -11,33 +11,34 @@ The steps, in this order (references/run-config.md has the run configuration and
   project      check the rules and pins, validate, reason with ELK through ROBOT (its SHA-256 checked
                first), serialise, check and validate the serialised files, write the manifest, and the
                advisory in-graph shapes (steps 2 to 4, checks V1 to V5)
-  load         start Neo4j with n10s from docker/compose.yaml, run load_verify.py, then build.py
-               check-report (steps 5 and 6, V6 to V12); a failure removes the container
+  load         load_verify.py on the local Neo4j the run configuration names (it empties that database
+               first and sends the triples in the request), then build.py check-report (steps 5 and 6,
+               V6 to V12); with plugins_dir, check_plugins.py first
   review       model_review.py on the local Neo4j
   tags         module_tags.py tag, check and modules on the local Neo4j (add-on F)
   release-record  release_record.py records, write and check: one :ModuleRelease node per module on the
                local Neo4j, from catalog.ttl, shapes.ttl and the report; releases mode only
   graph-type   build.py graph-type (add-on H); it applies nothing
   triplestore  triplestore.py: the inputs in Jena Fuseki, counts tied to the report (add-on J)
-  copy         copy_graph.py to the target env file (add-on I; the hash must match), then the tag
-               check, the module graph, the release records and model_review.py there
+  copy         copy_graph.py to the database the target env file names (add-on I; the hash must match),
+               then the tag check, the module graph, the release records and model_review.py there
   jena         the rdf-store skill's roundtrip of the release (data plus its release graphs) through
                Jena Fuseki: the store's export must hash equal to the files (RDFC-1.0)
-  databricks   the same roundtrip through a Databricks Delta table (add-on K)
   explore      the inputs and inferred.nt in Jena Fuseki, then explore.py compare against the local
                Neo4j and, when this run copied, the target: every saved walk and the module map (add-on F)
-  rebuild      export the release from a store (jena or databricks) or take the repository files, run
-               project and load on them into another output folder, require loadable.nt and
-               inferred.nt to hold this run's triples (RDF 1.1 terms) and the report's two graph hashes
-               to equal this run's, then tag, write the release records, copy (when configured) and explore
+  rebuild      export the release from Jena or take the repository files, run project and load on them
+               into another output folder, require loadable.nt and inferred.nt to hold this run's
+               triples (RDF 1.1 terms) and the report's two graph hashes to equal this run's, then tag,
+               write the release records, copy (when configured) and explore
 A step whose configuration is absent is skipped and says so; --only and --skip name steps by the
-names above. --plan prints the steps that would run and runs nothing. The local Neo4j is removed when
-the run ends, pass or fail, unless the configuration sets "keep_neo4j"; every Fuseki is removed, except
-that "keep_jena" leaves the jena step's Fuseki running, loaded, once its round trip has passed.
+names above. --plan prints the steps that would run and runs nothing.
 
-Secrets: the local Neo4j password is generated, written only to <out>/neo4j-run/run.env (mode 600)
-and passed to the scripts in their environment; the target and Databricks env files are passed by
-path, never read here. Every printed value goes through shell.q.
+The servers already run: this script starts and stops none. neo4j_env names the local Neo4j (with n10s
+and APOC), target_env the copy's target, and jena, explore_fuseki and triplestore_fuseki each the URL
+of a Fuseki dataset of the run's own, which the step empties (DROP ALL) before it loads.
+
+Secrets: no password is read here. The env files are passed to the scripts by path. Every printed
+value goes through shell.q.
 
 compare-triples and compare-reports are the rebuild's two checks, runnable on their own. Exit codes:
 0 every step passed, 1 a step or check failed, 2 bad configuration or arguments.
@@ -48,7 +49,6 @@ import json
 import os
 import subprocess
 import sys
-import time
 import urllib.parse
 import urllib.request
 
@@ -56,7 +56,7 @@ from shell import Refusal, error_line, q
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.dirname(HERE)
-STEPS = ("project", "load", "review", "tags", "release-record", "graph-type", "triplestore", "copy", "jena", "databricks",
+STEPS = ("project", "load", "review", "tags", "release-record", "graph-type", "triplestore", "copy", "jena",
          "explore", "rebuild")
 # references/running.md, rule 2
 ROBOT_SHA256 = "16a73c074f3df359a7338a84b4e0788785fe06117f931bb9796e9619ea776105"
@@ -72,12 +72,14 @@ FILE_GRAPH = "urn:ontology-to-lpg:file:"
 # The graph hashes of the sorted and shuffled loads (load_verify.py's report); both reports must hold
 # exactly these hash fields, so a changed report cannot skip one.
 REPORT_HASHES = ("determinism_hash_sorted", "determinism_hash_shuffled")
-PY = ("uv", "run", "-q", "--no-project", "--with", "rdflib", "--with", "pyshacl", "--with", "neo4j", "python3")
-RS = ("uv", "run", "-q", "--no-project", "--with", "pyoxigraph", "--with", "databricks-sql-connector", "python3")
-DEFAULTS = {"neo4j": {"compose_project": "lpg-local", "bolt_port": 17711},
-            "jena": {"compose_project": "lpg-jena", "port": 13031},
-            "explore_fuseki": {"compose_project": "lpg-explore", "port": 13032},
-            "triplestore_fuseki": {"compose_project": "lpg-triplestore", "port": 13030}}
+PY = ("uv", "run", "-q", "--no-project", "--with", "rdflib", "--with", "pyshacl", "--with", "neo4j", "python")
+RS = ("uv", "run", "-q", "--no-project", "--with", "pyoxigraph", "python")
+# The three Fuseki datasets a run may use, each named by its URL in the run configuration.
+FUSEKIS = ("jena", "explore_fuseki", "triplestore_fuseki")
+# The run-configuration key a step cannot run without.
+NEEDS = {"project": ("robot_jar",), "load": ("neo4j_env",), "review": ("neo4j_env",), "tags": ("neo4j_env",),
+         "release-record": ("neo4j_env",), "triplestore": ("triplestore_fuseki",), "copy": ("neo4j_env", "target_env"),
+         "jena": ("jena",), "explore": ("queries", "explore_fuseki"), "rebuild": ("rebuild", "neo4j_env")}
 
 
 class Failed(Exception):
@@ -117,8 +119,8 @@ def read_config(path):
         return os.path.normpath(os.path.join(base, os.path.expanduser(value)))
 
     known = {"mode", "projection_config", "data", "shapes", "releases", "inputs_script", "files", "graphs", "out",
-             "robot_jar", "manual_cases", "release_graphs", "queries", "target_env", "replace_target", "databricks",
-             "rdf_store", "rebuild", "keep_neo4j", "keep_jena", "separator"} | set(DEFAULTS)
+             "robot_jar", "manual_cases", "release_graphs", "queries", "neo4j_env", "plugins_dir", "target_env",
+             "replace_target", "rdf_store", "rebuild", "separator"} | set(FUSEKIS)
     unknown = sorted(set(cfg) - known)
     if unknown:
         raise Refusal("the run configuration has a key it does not know; references/run-config.md lists them")
@@ -129,7 +131,7 @@ def read_config(path):
             raise Refusal(f"the run configuration lacks {key}")
     cfg["base"] = base
     for key in ("projection_config", "out", "releases", "inputs_script", "robot_jar", "manual_cases",
-                "queries", "target_env", "rdf_store"):
+                "queries", "neo4j_env", "plugins_dir", "target_env", "rdf_store"):
         if key in cfg:
             cfg[key] = path_of(cfg[key])
     for key in ("data", "shapes", "files"):
@@ -156,18 +158,25 @@ def read_config(path):
         if not isinstance(graphs, dict) or not all(isinstance(v, str) and ":" in v for v in graphs.values()):
             raise Refusal("graphs must map a file to a graph IRI")
         cfg["graphs"] = {path_of(k): v for k, v in graphs.items()}
-    if "databricks" in cfg:
-        d = cfg["databricks"]
-        if not isinstance(d, dict) or set(d) != {"env", "table"}:
-            raise Refusal("databricks takes exactly env and table")
-        cfg["databricks"] = {"env": path_of(d["env"]), "table": str(d["table"])}
+    for key in FUSEKIS:
+        if key in cfg:
+            url = cfg[key]
+            if not isinstance(url, str) or not url.startswith(("http://", "https://")):
+                raise Refusal(f"{key} must be the URL of a Fuseki dataset, such as http://127.0.0.1:3030/ds")
+            cfg[key] = url.rstrip("/")
+    named = [cfg[key] for key in FUSEKIS if key in cfg]
+    if len(set(named)) != len(named):
+        # Each step empties its dataset before it loads, so a shared one would lose the other step's copy.
+        raise Refusal("jena, explore_fuseki and triplestore_fuseki must each name a dataset of its own")
+    if "neo4j_env" in cfg and cfg["neo4j_env"] == cfg.get("target_env"):
+        raise Refusal("target_env must differ from neo4j_env: the copy goes to another database")
     if "rebuild" in cfg:
         r = cfg["rebuild"]
-        if not isinstance(r, dict) or set(r) != {"source", "out"} or r["source"] not in ("repo", "jena", "databricks"):
-            raise Refusal("rebuild takes exactly source (repo, jena or databricks) and out")
+        if not isinstance(r, dict) or set(r) != {"source", "out"} or r["source"] not in ("repo", "jena"):
+            raise Refusal("rebuild takes exactly source (repo or jena) and out")
         cfg["rebuild"] = {"source": r["source"], "out": path_of(r["out"])}
-        if r["source"] == "databricks" and "databricks" not in cfg:
-            raise Refusal("a rebuild from databricks needs the databricks key")
+        if r["source"] == "jena" and "jena" not in cfg:
+            raise Refusal("a rebuild from jena needs the jena key")
         if cfg["rebuild"]["out"] == cfg["out"]:
             raise Refusal("rebuild.out must differ from out")
     graphs = cfg.setdefault("release_graphs", [])
@@ -180,8 +189,6 @@ def read_config(path):
             build.separator({"--separator": cfg["separator"]})
         except Refusal:
             raise Refusal("separator must be a non-empty string of underscores only, such as \"_\"") from None
-    for key, default in DEFAULTS.items():
-        cfg[key] = {**default, **cfg.get(key, {})}
     cfg.setdefault("rdf_store", os.path.join(os.path.dirname(SKILL), "rdf-store"))
     for out in (cfg["out"], cfg.get("rebuild", {}).get("out")):
         if out and inside_repository(out, base):
@@ -214,16 +221,15 @@ def inside_repository(out, base):
 
 def plan(cfg, only=None, skip=()):
     """(step, reason) pairs: reason None means the step runs."""
-    needs = {"project": "robot_jar", "copy": "target_env", "databricks": "databricks", "explore": "queries",
-             "rebuild": "rebuild"}
     rows = []
     for step in STEPS:
         if only is not None and step not in only:
             rows.append((step, "not in --only"))
         elif step in skip:
             rows.append((step, "--skip"))
-        elif step in needs and needs[step] not in cfg:
-            rows.append((step, f"no {needs[step]} in the run configuration"))
+        elif any(key not in cfg for key in NEEDS.get(step, ())):
+            missing = next(key for key in NEEDS[step] if key not in cfg)
+            rows.append((step, f"no {missing} in the run configuration"))
         elif step == "release-record" and cfg["mode"] == "files":
             rows.append((step, "files mode has no catalog.ttl to read"))
         else:
@@ -497,15 +503,25 @@ def http_ready(url):
         return False
 
 
-class Driver:
-    """One run. run(cmd, cwd, env, capture) and ready(url) are replaceable, so the tests drive every
-    step without Docker, a database or a store."""
+def http_update(url, text):
+    """Sends one SPARQL Update request; True when the store accepted it."""
+    request = urllib.request.Request(url, data=text.encode("utf-8"), method="POST",
+                                     headers={"Content-Type": "application/sparql-update"})
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            return 200 <= response.status < 300
+    except OSError:
+        return False
 
-    def __init__(self, cfg, run=run_command, ready=http_ready, sleep=time.sleep, log=print, inputs=None):
-        self.cfg, self.run, self.ready, self.sleep, self.log = cfg, run, ready, sleep, log
+
+class Driver:
+    """One run. run(cmd, cwd, env, capture), ready(url) and update(url, text) are replaceable, so the
+    tests drive every step without a database or a store."""
+
+    def __init__(self, cfg, run=run_command, ready=http_ready, update=http_update, log=print, inputs=None):
+        self.cfg, self.run, self.ready, self.update, self.log = cfg, run, ready, update, log
         self.out = cfg["out"]
         self.sk = HERE
-        self.compose = os.path.join(SKILL, "docker", "compose.yaml")
         self.rs_dir = os.path.join(cfg["rdf_store"], "scripts")
         self.files = cfg["mode"] == "files"
         self.default_shapes = False
@@ -515,13 +531,9 @@ class Driver:
         # with catalog.ttl and shapes.ttl beside them, because a store's export holds each graph as a file of its own.
         self.package_files = self.data
         self.package_manifest = self.out_file("run-manifest.json")
-        self.local_up = False
         self.copied = False
-        self.fusekis = []
         self.jena = None
-        self.jena_handle = None
         self.passed = []
-        self.not_removed = 0
 
     # inputs
     def read_inputs(self):
@@ -621,64 +633,22 @@ class Driver:
         if missing:
             raise Failed(f"no {', '.join(missing)} in out: run the earlier steps first")
 
-    # the local Neo4j
-    def run_dir(self):
-        return self.out_file("neo4j-run")
-
-    def neo4j_env(self, password="unused"):
-        return {**os.environ, "LPG_RUN": self.run_dir(), "NEO4J_PASSWORD": password,
-                "LPG_BOLT_PORT": str(self.cfg["neo4j"]["bolt_port"])}
-
-    def neo4j_compose(self):
-        return ["docker", "compose", "-f", self.compose, "-p", self.cfg["neo4j"]["compose_project"]]
-
-    def neo4j_down(self):
-        code, _ = self.run(self.neo4j_compose() + ["--profile", "neo4j", "--profile", "fuseki", "down", "-v"],
-                           env=self.neo4j_env(), capture=True)
-        if code != 0:
-            raise Failed(f"docker compose down (Neo4j) exited {code}")
-        self.local_up = False
-
-    def password(self):
-        values = {}
-        with open(os.path.join(self.run_dir(), "run.env"), encoding="utf-8") as f:
-            for line in f:
-                key, _, value = line.strip().partition("=")
-                values[key] = value
-        return values["PASSWORD"]
-
+    # the servers the run configuration names
     def local(self):
-        """(arguments naming the local Neo4j, environment holding its password)."""
-        if not self.local_up:
-            raise Failed("the local Neo4j is not up: run the load step in this run")
-        return ["--uri", f"bolt://127.0.0.1:{self.cfg['neo4j']['bolt_port']}"], {**os.environ, "NEO4J_PASSWORD": self.password()}
+        """The arguments that name the local Neo4j: its env file, passed by path."""
+        if "neo4j_env" not in self.cfg:
+            raise Failed("no neo4j_env in the run configuration: it names the local Neo4j")
+        return ["--env", self.cfg["neo4j_env"]]
 
-    # Fuseki
-    def fuseki_up(self, compose, project, port, port_var, profile=None):
-        env = {**os.environ, port_var: str(port)}
-        base = ["docker", "compose", "-f", compose, "-p", project] + (["--profile", profile] if profile else [])
-        self.run(base + ["down", "-v"], env=env, capture=True)
-        self.fusekis.append((base, env))
-        self.call("docker compose up (Fuseki)", base + ["up", "-d", "--build"], env=env)
-        ask = f"http://127.0.0.1:{port}/ds/query?" + urllib.parse.urlencode({"query": "ASK {}"})
-        for _ in range(60):
-            if self.ready(ask):
-                return f"http://127.0.0.1:{port}/ds"
-            self.sleep(2)
-        raise Failed("Fuseki did not start")
-
-    def fuseki_down(self, base_env):
-        base, env = base_env
-        code, _ = self.run(base + ["down", "-v"], env=env, capture=True)
-        if code != 0:
-            raise Failed(f"docker compose down (Fuseki) exited {code}")
-        if base_env in self.fusekis:   # tracked until removed, so finish() retries a failed removal
-            self.fusekis.remove(base_env)
-
-    def rdf_store_fuseki(self, key):
-        c = self.cfg[key]
-        return self.fuseki_up(os.path.join(self.cfg["rdf_store"], "docker", "compose.yaml"), c["compose_project"],
-                              c["port"], "RDF_FUSEKI_PORT")
+    def fuseki(self, key):
+        """The dataset URL the configuration gives for key, answering and emptied: the round trips export
+        everything a dataset holds, so anything an earlier run left would fail them."""
+        ds = self.cfg[key]
+        if not self.ready(ds + "/query?" + urllib.parse.urlencode({"query": "ASK {}"})):
+            raise Failed(f"Fuseki does not answer at the URL the run configuration gives for {key}")
+        if not self.update(ds + "/update", "DROP ALL"):
+            raise Failed(f"the Fuseki dataset for {key} could not be emptied: start it with --update")
+        return ds
 
     # the steps
     def step_project(self):
@@ -712,40 +682,15 @@ class Driver:
         records = self.out_file(RECORDS)
         if os.path.isfile(records):   # the records describe the load they were written for
             os.remove(records)
-        run = self.run_dir()
-        self.neo4j_down()
-        if os.path.isdir(run):
-            import shutil
-            shutil.rmtree(run)
-        os.makedirs(run)
-        os.chmod(run, 0o711)
-        for sub in ("plugins", "import"):
-            os.makedirs(os.path.join(run, sub))
-            os.chmod(os.path.join(run, sub), 0o755)
-        password = os.urandom(12).hex()
-        fd = os.open(os.path.join(run, "run.env"), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, "w") as f:
-            f.write(f"PROJECT={self.cfg['neo4j']['compose_project']}\nPORT={self.cfg['neo4j']['bolt_port']}\n"
-                    f"PASSWORD={password}\n")
-        env = self.neo4j_env(password)
-        self.local_up = True   # from here on, the end of the run removes it
-        self.call("docker compose up (Neo4j)", self.neo4j_compose() + ["--profile", "neo4j", "up", "-d"], env=env)
-        for _ in range(100):
-            _, logs = self.run(self.neo4j_compose() + ["logs", "neo4j"], env=env, capture=True)
-            if "Started." in (logs or ""):
-                break
-            self.sleep(3)
-        else:
-            raise Failed("Neo4j did not start")
-        self.sleep(5)
         o = self.out_file
-        manual = ["--manual-cases", self.cfg["manual_cases"]] if "manual_cases" in self.cfg else []
-        manual += self.sep_args()
+        extra = ["--manual-cases", self.cfg["manual_cases"]] if "manual_cases" in self.cfg else []
+        extra += self.sep_args()
+        if "plugins_dir" in self.cfg:
+            self.py("check_plugins.py", "check_plugins.py", self.cfg["plugins_dir"])
+            extra += ["--plugins-dir", self.cfg["plugins_dir"]]
         self.py("load_verify.py", "load_verify.py", "--config", self.cfg["projection_config"], *self.shape_args(),
-                "--bolt", f"bolt://127.0.0.1:{self.cfg['neo4j']['bolt_port']}", "--import-dir", os.path.join(run, "import"),
-                "--plugins-dir", os.path.join(run, "plugins"), "--compose-project", self.cfg["neo4j"]["compose_project"],
-                "--merged", o("merged.ttl"), "--loadable", o("loadable.nt"), "--inferred", o("inferred.nt"),
-                "--report", o("projection-report.json"), *manual, *self.data, env={**os.environ, "NEO4J_PASSWORD": password})
+                *self.local(), "--merged", o("merged.ttl"), "--loadable", o("loadable.nt"), "--inferred", o("inferred.nt"),
+                "--report", o("projection-report.json"), *extra, *self.data)
         self.py("build.py check-report", "build.py", "check-report", "--manifest", o("projection-manifest.json"),
                 "--report", o("projection-report.json"))
 
@@ -756,37 +701,34 @@ class Driver:
         return ["--separator", self.cfg["separator"]] if "separator" in self.cfg else []
 
     def step_review(self):
-        target, env = self.local()
-        self.py("model_review.py", "model_review.py", *target, "--report", self.out_file("model-review.json"),
-                *self.sep_args(), env=env)
+        self.py("model_review.py", "model_review.py", *self.local(), "--report", self.out_file("model-review.json"),
+                *self.sep_args())
 
-    def tag_checks(self, target, env, write):
+    def tag_checks(self, target, write):
         c, inferred = self.cfg["projection_config"], self.out_file("inferred.nt")
         if write:
             self.py("module_tags.py tag", "module_tags.py", "tag", "--config", c, "--inferred", inferred, *target,
-                    *self.plain(), *self.sep_args(), *self.data, env=env)
+                    *self.plain(), *self.sep_args(), *self.data)
         self.py("module_tags.py check", "module_tags.py", "check", "--config", c, "--inferred", inferred, *target,
-                *self.plain(), *self.sep_args(), *self.data, env=env)
-        self.py("module_tags.py modules", "module_tags.py", "modules", *target, *self.plain(), *self.sep_args(), *self.data, env=env)
+                *self.plain(), *self.sep_args(), *self.data)
+        self.py("module_tags.py modules", "module_tags.py", "modules", *target, *self.plain(), *self.sep_args(), *self.data)
 
     def step_tags(self):
         self.need("inferred.nt")
-        target, env = self.local()
-        self.tag_checks(target, env, write=True)
+        self.tag_checks(self.local(), write=True)
 
     def step_release_record(self):
         self.need("projection-report.json")
-        target, env = self.local()
         self.py("release_record.py records", "release_record.py", "records", "--report", self.out_file("projection-report.json"),
                 "--manifest", self.package_manifest,
                 "--output", self.out_file(RECORDS), *self.package_files)
-        self.record_checks(target, env)
+        self.record_checks(self.local())
 
-    def record_checks(self, target, env):
+    def record_checks(self, target):
         """Writes the run's release records to a Neo4j and reads them back there."""
         for command in ("write", "check"):
             self.py(f"release_record.py {command}", "release_record.py", command, "--records", self.out_file(RECORDS),
-                    *target, env=env)
+                    *target)
 
     def step_graph_type(self):
         self.py("build.py graph-type", "build.py", "graph-type", "--config", self.cfg["projection_config"],
@@ -794,80 +736,53 @@ class Driver:
 
     def step_triplestore(self):
         self.need("inferred.nt", "projection-report.json")
-        c = self.cfg["triplestore_fuseki"]
-        ds = self.fuseki_up(self.compose, c["compose_project"], c["port"], "LPG_FUSEKI_PORT", profile="fuseki")
-        try:
-            self.py("triplestore.py", "triplestore.py", "--gsp", ds, "--query", ds + "/query",
-                    "--inferred", self.out_file("inferred.nt"), "--projection-report", self.out_file("projection-report.json"),
-                    "--report", self.out_file("triplestore-report.json"), *self.data)
-        finally:
-            self.remove(lambda b=self.fusekis[-1]: self.fuseki_down(b))
+        ds = self.fuseki("triplestore_fuseki")
+        self.py("triplestore.py", "triplestore.py", "--gsp", ds, "--query", ds + "/query",
+                "--inferred", self.out_file("inferred.nt"), "--projection-report", self.out_file("projection-report.json"),
+                "--report", self.out_file("triplestore-report.json"), *self.data)
 
     def step_copy(self):
         self.need("projection-report.json", "inferred.nt")
-        source, env = self.local()
         target_env = self.cfg["target_env"]
         replace = ["--replace"] if self.cfg.get("replace_target") else []
-        self.py("copy_graph.py", "copy_graph.py", "--source", source[1], "--target-env", target_env,
-                "--report", self.out_file("projection-report.json"), *replace, env=env)
+        self.py("copy_graph.py", "copy_graph.py", "--source-env", self.local()[1], "--target-env", target_env,
+                "--report", self.out_file("projection-report.json"), *replace)
         self.copied = True
         target = ["--env", target_env]
-        self.tag_checks(target, None, write=False)
+        self.tag_checks(target, write=False)
         if os.path.isfile(self.out_file(RECORDS)):
-            self.record_checks(target, None)
+            self.record_checks(target)
         self.py("model_review.py (target)", "model_review.py", *target, "--report", self.out_file("model-review-target.json"),
                 *self.sep_args())
 
     def step_jena(self):
         os.makedirs(self.out, exist_ok=True)   # rdfstore.py needs its report's folder, and --only jena may be first
-        ds = self.jena_ds()
+        ds = self.jena = self.fuseki("jena")
         self.rdfstore("rdfstore.py roundtrip (Jena)", "roundtrip", "--store", "fuseki", "--gsp", ds + "/data",
                       "--query", ds + "/query", "--update", ds + "/update", "--report", self.out_file("jena-roundtrip.json"),
                       *self.store_args())
-        if self.cfg.get("keep_jena") and self.jena_handle in self.fusekis:
-            self.fusekis.remove(self.jena_handle)   # no longer this run's to remove: it holds the proven copy
-            self.log(f"Jena left standing, loaded, on port {q(self.cfg['jena']['port'])}: its dataset is in memory, so a restart empties it")
-
-    def jena_ds(self):
-        if not self.jena:
-            self.jena = self.rdf_store_fuseki("jena")
-            self.jena_handle = self.fusekis[-1]
-        return self.jena
-
-    def step_databricks(self):
-        os.makedirs(self.out, exist_ok=True)
-        d = self.cfg["databricks"]
-        self.rdfstore("rdfstore.py roundtrip (Databricks)", "roundtrip", "--store", "databricks", "--env", d["env"],
-                      "--table", d["table"], "--report", self.out_file("databricks-roundtrip.json"), *self.store_args())
 
     def step_explore(self):
         self.need("inferred.nt")
         inferred = self.out_file("inferred.nt")
-        ds = self.rdf_store_fuseki("explore_fuseki")
-        try:
-            self.rdfstore("rdfstore.py roundtrip (explore)", "roundtrip", "--store", "fuseki", "--gsp", ds + "/data",
-                          "--query", ds + "/query", "--update", ds + "/update", "--report", self.out_file("explore-roundtrip.json"),
-                          "--graph", f"{inferred}={INFERRED_GRAPH}", *self.store_args(release_graphs=False), inferred)
-            sides = []
-            if self.local_up:
-                sides.append(("local", *self.local()))
-            if self.copied:
-                sides.append(("target", ["--env", self.cfg["target_env"]], None))
-            if not sides:
-                raise Failed("explore needs the local Neo4j (load) or a copy in this run")
-            for name, target, env in sides:
-                report = self.out_file("explore-report.json" if name == "local" else "explore-report-target.json")
-                self.py(f"explore.py compare ({name})", "explore.py", "compare", "--config", self.cfg["projection_config"],
-                        *target, "--sparql", ds + "/query", "--queries", self.cfg["queries"], "--report", report,
-                        *(["--files"] if self.files else []), *self.sep_args(), env=env)
-        finally:
-            self.remove(lambda b=self.fusekis[-1]: self.fuseki_down(b))
+        ds = self.fuseki("explore_fuseki")
+        self.rdfstore("rdfstore.py roundtrip (explore)", "roundtrip", "--store", "fuseki", "--gsp", ds + "/data",
+                      "--query", ds + "/query", "--update", ds + "/update", "--report", self.out_file("explore-roundtrip.json"),
+                      "--graph", f"{inferred}={INFERRED_GRAPH}", *self.store_args(release_graphs=False), inferred)
+        sides = [("local", self.local())] if "neo4j_env" in self.cfg else []
+        if self.copied:
+            sides.append(("target", ["--env", self.cfg["target_env"]]))
+        if not sides:
+            raise Failed("explore needs the local Neo4j (neo4j_env) or a copy in this run")
+        for name, target in sides:
+            report = self.out_file("explore-report.json" if name == "local" else "explore-report-target.json")
+            self.py(f"explore.py compare ({name})", "explore.py", "compare", "--config", self.cfg["projection_config"],
+                    *target, "--sparql", ds + "/query", "--queries", self.cfg["queries"], "--report", report,
+                    *(["--files"] if self.files else []), *self.sep_args())
 
     def step_rebuild(self):
         r = self.cfg["rebuild"]
         self.need("loadable.nt", "inferred.nt", "projection-report.json")
-        if self.local_up:
-            self.neo4j_down()   # the rebuild loads its own Neo4j on the same port
         os.makedirs(r["out"], exist_ok=True)
         self.same_source()
         if r["source"] == "repo":
@@ -878,14 +793,10 @@ class Driver:
                 import shutil
                 shutil.rmtree(export)
             os.makedirs(export)
-            if r["source"] == "jena":
-                if "jena" not in self.passed:
-                    self.step_jena()   # the store must hold the release before it is exported
-                ds = self.jena_ds()
-                store = ["--store", "fuseki", "--gsp", ds + "/data", "--query", ds + "/query"]
-            else:
-                d = self.cfg["databricks"]
-                store = ["--store", "databricks", "--env", d["env"], "--table", d["table"]]
+            if "jena" not in self.passed:
+                self.step_jena()   # the store must hold the release before it is exported
+            ds = self.jena
+            store = ["--store", "fuseki", "--gsp", ds + "/data", "--query", ds + "/query"]
             self.rdfstore("rdfstore.py export", "export", *store, "--out", os.path.join(export, "store.nq"),
                           "--ttl-dir", os.path.join(export, "ttl"))
             self.rdfstore("rdfstore.py pack", "pack", "--out", os.path.join(export, "release.nq"), *self.store_args())
@@ -901,32 +812,27 @@ class Driver:
             for kind, p, repo in rows:
                 if repo:
                     self.log(f"  {q(os.path.basename(p))} was not in the store, so it comes from the repository")
-        child = Driver({**self.cfg, "out": r["out"]}, run=self.run, ready=self.ready, sleep=self.sleep, log=self.log,
+        child = Driver({**self.cfg, "out": r["out"]}, run=self.run, ready=self.ready, update=self.update, log=self.log,
                        inputs=(data, shapes, graphs))
         child.default_shapes = self.default_shapes
         child.package_files = self.package_files
         child.package_manifest = self.package_manifest
         steps = ["project", "load", "compare", "tags"] + ([] if self.files else ["release-record"]) + \
                 (["copy"] if "target_env" in self.cfg else []) + \
-                (["explore"] if "queries" in self.cfg else [])
-        try:
-            for step in steps:
-                if step == "compare":
-                    problems, lines = compare_triples(r["out"], self.out)
-                    more, lines2 = compare_reports(child.out_file("projection-report.json"), self.out_file("projection-report.json"))
-                    for line in lines + lines2:
-                        self.log(f"  {q(line)}")
-                    if problems + more:
-                        raise Failed("; ".join(problems + more))
-                else:
-                    self.log(f"== rebuild: {q(step)}")
-                    getattr(child, "step_" + step.replace("-", "_"))()
-        finally:
-            child.finish()
-            # what the child could not remove becomes this run's to retry: its Fuseki handles, and its
-            # Neo4j, which shares this run's compose project
-            self.fusekis += child.fusekis
-            self.local_up = self.local_up or child.local_up
+                (["explore"] if "queries" in self.cfg and "explore_fuseki" in self.cfg else [])
+        # The rebuild loads the same local Neo4j again: load_verify.py empties it first, and the equal
+        # graph hashes prove the rebuilt graph is the one this run verified.
+        for step in steps:
+            if step == "compare":
+                problems, lines = compare_triples(r["out"], self.out)
+                more, lines2 = compare_reports(child.out_file("projection-report.json"), self.out_file("projection-report.json"))
+                for line in lines + lines2:
+                    self.log(f"  {q(line)}")
+                if problems + more:
+                    raise Failed("; ".join(problems + more))
+            else:
+                self.log(f"== rebuild: {q(step)}")
+                getattr(child, "step_" + step.replace("-", "_"))()
 
     def same_source(self):
         """The rebuild compares with out's run, so the inputs must be the ones that run read: every SHA-256
@@ -944,39 +850,12 @@ class Driver:
         if {e["path"]: e["sha256"] for e in manifest.get("catalogs", [])} != catalogs:
             raise Failed("the catalogs differ from the ones out/run-manifest.json records: run project again first")
 
-    def finish(self):
-        """Removes every container this run started, each attempt independent of the others, so one
-        failed removal leaves no other running; a failure is said and does not hide the step's own."""
-        teardowns = [lambda b=base_env: self.fuseki_down(b) for base_env in list(self.fusekis)]
-        if self.local_up and not self.cfg.get("keep_neo4j"):
-            teardowns.append(self.neo4j_down)
-        for teardown in teardowns:
-            self.remove(teardown)
-
-    def remove(self, teardown):
-        """Runs one container removal; a failure is said, never raised, so it cannot hide a step's own."""
-        try:
-            teardown()
-        except Failed as exc:
-            self.not_removed += 1
-            self.log(f"WARNING {q(str(exc))}")
-        except Exception as exc:  # noqa: BLE001 (any failure; the next removal still runs)
-            self.not_removed += 1
-            self.log(f"WARNING {q(error_line('a container could not be removed', exc))}")
-
     def run_steps(self, steps):
-        """Runs the steps, then removes the containers. A step's failure propagates; with every step
-        passed, a removal that failed fails the run, so a pass leaves up only what keep_neo4j and keep_jena keep."""
-        self.not_removed = 0
-        try:
-            for step in steps:
-                self.log(f"== {q(step)}")
-                getattr(self, "step_" + step.replace("-", "_"))()
-                self.passed.append(step)
-        finally:
-            self.finish()
-        if self.not_removed:
-            raise Failed(f"{self.not_removed} container removal(s) failed; remove them with docker compose down -v")
+        """Runs the steps in order. A step's failure propagates and ends the run."""
+        for step in steps:
+            self.log(f"== {q(step)}")
+            getattr(self, "step_" + step.replace("-", "_"))()
+            self.passed.append(step)
 
 
 def compare_main(argv):

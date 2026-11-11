@@ -2,12 +2,12 @@
 
 This file lists every source the rdf-store skill draws on: what the skill took from each, the version or date used, and how to check for a newer one. Agents do not read it. All text in the skill is our own wording.
 
-Last full review: 2026-10-24. Check the sources below every three months, and whenever pyoxigraph, Jena Fuseki, the Databricks SQL connector or a W3C specification below publishes a new version.
+Last full review: 2026-10-24; sections 4 and 5 updated 2026-11-11. Check the sources below every three months, and whenever pyoxigraph, Jena Fuseki or a W3C specification below publishes a new version.
 
 ## 1. The owner's decision to split the skill
 
-- **What it is:** the owner's instruction of 2026-10-24, recorded in the store-tests handoff: "record it in the handoff as the first piece of step 2. I like the idea of splitting it from the projection skill", answering "should we have a skill that loads .ttl files to any typical triple store, using Jena as default. The skill should alos be able to load .ttl to databrick in a way that there is no loss of data and we go from Databrick to .ttl and back without losing data." Also, on Databricks: "there must be options to use both Databrick Free and Databrick Enterprise edition".
-- **What the skill took:** its scope (any SPARQL 1.1 store with Jena as the default, and Databricks both editions), the round trip as the test, and the plain Delta triple table the owner chose over OntoBricks for the lossless store.
+- **What it is:** the owner's instruction of 2026-10-24: "I like the idea of splitting it from the projection skill", answering "should we have a skill that loads .ttl files to any typical triple store, using Jena as default. The skill should alos be able to load .ttl to databrick in a way that there is no loss of data and we go from Databrick to .ttl and back without losing data."
+- **What the skill took:** its scope (any SPARQL 1.1 store with Jena as the default, and Databricks), the round trip as the test, and the plain Delta triple table the owner chose over OntoBricks for the lossless store.
 
 ## 2. W3C specifications
 
@@ -28,13 +28,15 @@ Last full review: 2026-10-24. Check the sources below every three months, and wh
 
 ## 4. Apache Jena Fuseki
 
-- **What it is:** Jena's SPARQL server. `docker/fuseki/Dockerfile` builds 6.2.0 from Jena's `jena-fuseki-docker` package and server jar on Maven Central, each checked against a pinned SHA-256; its build steps match `ontology-to-lpg`'s copy (the opening comments differ), which records the pins' sources in its `SOURCES.md`.
-- **Version used:** 6.2.0; run 2026-10-24 in Docker 29.8.2.
-- **What the skill took:** the default store, with an in-memory dataset `/ds` and its `/data` and `/query` endpoints.
+- **What it is:** Jena's SPARQL server, as the plain Apache download: one jar, `jena-fuseki-server-6.2.0.jar`, from Maven Central (https://repo1.maven.org/maven2/org/apache/jena/jena-fuseki-server/6.2.0/), started with Java.
+- **Version used:** 6.2.0; run 2026-11-11 on Java 21.0.2 with `java -jar jena-fuseki-server-6.2.0.jar --mem --update --localhost --port <port> /ds`.
+- **The pin:** SHA-256 `2c92c598e65ab69d99820052e05f4277ed1d77980a8845f87545ad35b71a76ee`, computed 2026-10-23 from the jar whose SHA-1 matched Maven Central's, and again on 2026-11-11 from the jar that run used. `references/stores.md` gives the check; a test holds the two documents to this value.
+- **What the skill took:** the default store, with an in-memory dataset `/ds` and its `/data`, `/query` and `/update` endpoints.
+- **How to check for updates:** `curl -s https://repo1.maven.org/maven2/org/apache/jena/jena-fuseki-server/maven-metadata.xml | grep release`.
 
-## 5. The Databricks SQL connector and Delta
+## 5. Spark SQL and Delta on Databricks
 
-- **What it is:** `databricks-sql-connector` on PyPI, the Python DB API driver for Databricks SQL warehouses. https://pypi.org/project/databricks-sql-connector/
-- **Version used:** 4.8.0, the version uv resolved on 2026-10-24, against a Databricks SQL warehouse at version 2026.39.
-- **What the skill took:** `sql.connect(server_hostname, http_path, access_token)` from this machine, so Free Edition's outbound limits do not apply; `CREATE OR REPLACE TABLE ... USING DELTA`; `FROM VALUES` with `unbase64` and `decode` to keep data text out of the SQL. Without `pyarrow` the connector warns that Arrow fetches are off; the plain fetch read 36,575 rows in a few seconds.
-- **How to check for updates:** the connector's PyPI page and its changelog in https://github.com/databricks/databricks-sql-python.
+- **What it is:** the Spark session a Databricks notebook already has (`spark`), and Delta tables in Unity Catalog.
+- **Version used:** none run by this skill's tests, which use a stand-in session that decodes the statements `SparkStore` sends. Run the round trip in your own workspace to prove it there; its result is the proof for that workspace.
+- **What the skill took:** `spark.sql(<statement>)` and `.collect()` on its result, the only two calls `SparkStore` makes; `CREATE OR REPLACE TABLE ... USING DELTA`; `CREATE OR REPLACE TABLE ... AS SELECT` as the one replace; `FROM VALUES` with `unbase64` and `decode` to keep data text out of the SQL.
+- **How to check for updates:** the Databricks SQL language reference for `unbase64`, `decode` and `CREATE TABLE`.

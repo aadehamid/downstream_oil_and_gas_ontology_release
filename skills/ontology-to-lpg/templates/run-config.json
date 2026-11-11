@@ -5,8 +5,11 @@
   "shapes": ["library-shapes.ttl"],
   "out": "~/lpg-out/library",
   "robot_jar": "~/tools/robot-1.9.10.jar",
-  "target_env": "~/.config/neo4j/aura.env",
+  "neo4j_env": "~/.config/neo4j/local.env",
+  "target_env": "~/.config/neo4j/target.env",
   "replace_target": false,
+  "jena": "http://127.0.0.1:3030/ds",
+  "explore_fuseki": "http://127.0.0.1:3031/ds",
   "queries": "queries.json",
   "rebuild": {"source": "jena", "out": "~/lpg-out/library-rebuild"}
 }

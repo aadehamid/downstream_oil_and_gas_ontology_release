@@ -2,7 +2,7 @@
 """Load RDF releases into a store and prove, by a round trip, that nothing was lost.
 
 Run: uv run --no-project --with pyoxigraph python3 rdfstore.py <command> ...
-     (add --with databricks-sql-connector for --store databricks)
+     On Windows, after `py -m pip install pyoxigraph`: py rdfstore.py <command> ...
 
 Inputs: Turtle (.ttl), N-Triples (.nt) or N-Quads (.nq). A Turtle or N-Triples file is one named
 graph: the owl:versionIRI of its one owl:Ontology (exactly one distinct value), else that ontology's
@@ -18,9 +18,9 @@ Commands:
       input or that two inputs share. Writes <dir>/<file name> as sorted N-Triples.
   pack --out <dataset.nq> [--graph FILE=IRI]... <file>...
       The dataset as sorted N-Quads.
-  roundtrip --store fuseki|databricks <store options> [--report <json>] [--graph FILE=IRI]... <file>...
+  roundtrip --store fuseki <store options> [--report <json>] [--graph FILE=IRI]... <file>...
       Publish the dataset to the store, export everything the store holds, and compare (below).
-  export --store fuseki|databricks <store options> --out <dataset.nq> [--ttl-dir <dir>]
+  export --store fuseki <store options> --out <dataset.nq> [--ttl-dir <dir>]
       Write everything the store holds as sorted N-Quads, and with --ttl-dir one Turtle file per
       named graph (graph-<n>.ttl, listed in <dir>/graphs.tsv with its graph IRI). --out must not
       exist and --ttl-dir must be empty or absent; the outputs are written all together or not at all.
@@ -33,13 +33,13 @@ Store options:
               SPARQL 1.1 Update says "SHOULD be treated atomically" (not a guarantee); without it
               each graph is replaced by its own HTTP PUT. Either failure ends the run with exit 1;
               reload the store then. A blank node in two graphs is refused before any request.
-  databricks  --env <file> [--table <name>]   the file holds DATABRICKS_HOST, DATABRICKS_TOKEN,
-              DATABRICKS_HTTP_PATH, DATABRICKS_CATALOG, DATABRICKS_SCHEMA. --table defaults to
-              rdf_quads. The rows go to a staging table of this run's own (<table>__staging_<random>),
-              which is exported and compared first; only a staging copy with the same hash replaces
-              <table>, in one CREATE OR REPLACE ... AS SELECT, so a failure before that leaves the
-              previous table as it was; the staging table is always dropped. The token is never
-              printed: it is removed from every message and from the report.
+
+A Databricks Delta table has no command here, because Spark exists only inside a notebook. The notebook
+imports this file and runs roundtrip(SparkStore(spark, "<catalog>.<schema>.<table>"), dataset). The
+rows go to a staging table of this run's own (<table>__staging_<random>), which is exported and
+compared first; only a staging copy with the same hash replaces <table>, in one CREATE OR REPLACE ...
+AS SELECT, so a failure before that leaves the previous table as it was; the staging table is always
+dropped.
 
 The proof is the hash (references/no-loss.md): each dataset is canonicalized with RDFC-1.0
 (pyoxigraph's implementation), its quads are written in canonical N-Quads form and sorted, and the
@@ -57,6 +57,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import sys
 import tempfile
 import time
@@ -392,70 +393,37 @@ def create_sql(table):
             "USING DELTA COMMENT 'RDF quads, one row per quad (rdf-store skill)'")
 
 
-def read_env_file(path):
-    values = {}
-    with open(path, encoding="utf-8") as f:
-        for number, line in enumerate(f, 1):
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            key, sep, value = line.partition("=")
-            if not sep:
-                raise BadInput(f"{path} line {number} is not KEY=VALUE")
-            values[key.strip()] = value.strip().strip('"').strip("'")
-    return values
-
-
-class DatabricksStore:
-    """A Delta table in Unity Catalog, written and read from this machine over the Databricks SQL
-    connector, so it works on Free Edition's serverless warehouse with its outbound limits."""
+class SparkStore:
+    """A Delta table in Unity Catalog, written and read through a Spark session: the `spark` object a
+    Databricks notebook already has. Spark is the only Databricks path, so no host, warehouse or
+    credential is read here. The session needs one method, sql(statement), whose result has collect()."""
 
     BATCH = 2000
+    NAME = re.compile(r"[A-Za-z0-9_]+(\.[A-Za-z0-9_]+){0,2}")
 
-    def __init__(self, connection, table):
-        self.connection, self.table = connection, table
+    def __init__(self, spark, table):
+        # The name goes into SQL as it is, so only letters, digits and _ are allowed in each part.
+        if not isinstance(table, str) or not self.NAME.fullmatch(table):
+            raise BadInput("the table name must be one to three parts of letters, digits and _, joined by dots")
+        self.spark, self.table = spark, table
         # One staging table per run, so two runs on one live table never verify or promote each
         # other's rows.
         self.staging = f"{table}__staging_{uuid.uuid4().hex[:12]}"
 
-    @staticmethod
-    def check_env(env_path, table):
-        env = read_env_file(env_path)
-        missing = [k for k in ("DATABRICKS_HOST", "DATABRICKS_TOKEN", "DATABRICKS_HTTP_PATH",
-                               "DATABRICKS_CATALOG", "DATABRICKS_SCHEMA") if not env.get(k)]
-        if missing:
-            raise BadInput(f"{env_path} lacks {', '.join(missing)}")
-        # The messages name the setting, never its value, which could hold anything, the token included.
-        for name, part in (("DATABRICKS_CATALOG", env["DATABRICKS_CATALOG"]), ("DATABRICKS_SCHEMA", env["DATABRICKS_SCHEMA"]), ("--table", table)):
-            if not part.replace("_", "").isalnum():
-                raise BadInput(f"{name} must be letters, digits and _ only")
-        return env
-
-    @classmethod
-    def from_env(cls, env, table):
-        from databricks import sql
-        connection = sql.connect(server_hostname=env["DATABRICKS_HOST"].removeprefix("https://").rstrip("/"),
-                                 http_path=env["DATABRICKS_HTTP_PATH"], access_token=env["DATABRICKS_TOKEN"])
-        return cls(connection, f"{env['DATABRICKS_CATALOG']}.{env['DATABRICKS_SCHEMA']}.{table}")
-
     def _export(self, table):
-        with self.connection.cursor() as cur:
-            cur.execute(f"SELECT {', '.join(COLUMNS)} FROM {table}")
-            return from_rows(tuple(r) for r in cur.fetchall())
+        rows = self.spark.sql(f"SELECT {', '.join(COLUMNS)} FROM {table}").collect()
+        return from_rows(tuple(r) for r in rows)
 
     def stage(self, rows):
-        with self.connection.cursor() as cur:
-            cur.execute(create_sql(self.staging))
-            for start in range(0, len(rows), self.BATCH):
-                cur.execute(insert_sql(self.staging, rows[start:start + self.BATCH]))
+        self.spark.sql(create_sql(self.staging))
+        for start in range(0, len(rows), self.BATCH):
+            self.spark.sql(insert_sql(self.staging, rows[start:start + self.BATCH]))
 
     def promote(self):
-        with self.connection.cursor() as cur:
-            cur.execute(f"CREATE OR REPLACE TABLE {self.table} AS SELECT * FROM {self.staging}")
+        self.spark.sql(f"CREATE OR REPLACE TABLE {self.table} AS SELECT * FROM {self.staging}")
 
     def drop_staging(self):
-        with self.connection.cursor() as cur:
-            cur.execute(f"DROP TABLE IF EXISTS {self.staging}")
+        self.spark.sql(f"DROP TABLE IF EXISTS {self.staging}")
 
     def export(self):
         return self._export(self.table)
@@ -467,7 +435,7 @@ def roundtrip(store, dataset):
     """(passed, report). Validates the whole dataset before the store is touched."""
     started = time.time()
     report = {}
-    if isinstance(store, DatabricksStore):
+    if isinstance(store, SparkStore):
         rows = to_rows(dataset)   # BadInput here leaves the store untouched
         expected = canonical_lines(dataset)
         try:
@@ -503,8 +471,8 @@ def roundtrip(store, dataset):
 ALLOWED = {
     "skolemize": {"--authority", "--out", "--graph"},
     "pack": {"--out", "--graph"},
-    "roundtrip": {"--store", "--gsp", "--query", "--update", "--env", "--table", "--report", "--graph"},
-    "export": {"--store", "--gsp", "--query", "--env", "--table", "--out", "--ttl-dir"},
+    "roundtrip": {"--store", "--gsp", "--query", "--update", "--report", "--graph"},
+    "export": {"--store", "--gsp", "--query", "--out", "--ttl-dir"},
     "compare": set(),
 }
 
@@ -531,24 +499,6 @@ def options(command, argv):
             files.append(arg)
             i += 1
     return opts, files
-
-
-def redact(text, secrets):
-    for s in secrets:
-        if s:
-            text = text.replace(s, "[redacted]")
-    return text
-
-
-def redact_all(value, secrets):
-    """The value with every secret removed from every string in it, however deep."""
-    if isinstance(value, str):
-        return redact(value, secrets)
-    if isinstance(value, dict):
-        return {redact_all(k, secrets): redact_all(v, secrets) for k, v in value.items()}
-    if isinstance(value, list):
-        return [redact_all(v, secrets) for v in value]
-    return value
 
 
 def write_atomically(path, data, tmp=None):
@@ -607,32 +557,22 @@ def report_paths(argv):
 
 
 def refuse_aliases(outputs, protected):
-    """Every output path is distinct, and none is an input or the credential file."""
+    """Every output path is distinct, and none is an input."""
     real_out = [os.path.realpath(p) for p in outputs]
     if len(set(real_out)) != len(real_out):
         raise BadInput("two outputs share one path; give the inputs distinct file names or separate runs")
     clash = set(real_out) & {os.path.realpath(p) for p in protected}
     if clash:
-        raise BadInput(f"an output would overwrite an input or the credential file: {sorted(clash)[0]}")
+        raise BadInput(f"an output would overwrite an input: {sorted(clash)[0]}")
 
 
-def store_from(opts, secrets):
-    """The store kind and a factory for it. A Databricks token joins `secrets` as soon as the env file
-    is read, before anything that could print a message."""
-    kind = opts.get("--store")
-    if kind == "fuseki":
-        if "--gsp" not in opts or "--query" not in opts or "--env" in opts or "--table" in opts:
-            raise BadInput("--store fuseki takes --gsp, --query and optionally --update")
-        return kind, lambda: FusekiStore(opts["--gsp"], opts["--query"], opts.get("--update"))
-    if kind == "databricks":
-        if "--env" not in opts or any(k in opts for k in ("--gsp", "--query", "--update")):
-            raise BadInput("--store databricks takes --env and optionally --table")
-        token = read_env_file(opts["--env"]).get("DATABRICKS_TOKEN")
-        if token:
-            secrets.append(token)
-        env = DatabricksStore.check_env(opts["--env"], opts.get("--table", "rdf_quads"))
-        return kind, lambda: DatabricksStore.from_env(env, opts.get("--table", "rdf_quads"))
-    raise BadInput("--store must be fuseki or databricks")
+def store_from(opts):
+    """A factory for the store the options name. Fuseki is the only store with a command line."""
+    if opts.get("--store") != "fuseki":
+        raise BadInput("--store must be fuseki")
+    if "--gsp" not in opts or "--query" not in opts:
+        raise BadInput("--store fuseki takes --gsp, --query and optionally --update")
+    return lambda: FusekiStore(opts["--gsp"], opts["--query"], opts.get("--update"))
 
 
 def nquads_text(dataset):
@@ -644,10 +584,10 @@ def main(argv):
         print(__doc__, file=sys.stderr)
         return 2
     command, rest = argv[0], argv[1:]
-    secrets, report_tmp = [], None
+    report_tmp = None
     try:
         # An old report goes before anything can fail, unless the path is also another argument
-        # (an input or the env file), which the parse below refuses.
+        # (an input), which the parse below refuses.
         for path in report_paths(rest):
             others = {os.path.realpath(a) for a in rest if a != path and os.path.exists(a)}
             if os.path.realpath(path) not in others and os.path.isfile(path):
@@ -655,7 +595,7 @@ def main(argv):
         opts, files = options(command, rest)
         report_path = opts.get("--report")
         if report_path:
-            refuse_aliases([report_path], files + ([opts["--env"]] if "--env" in opts else []))
+            refuse_aliases([report_path], files)
             # The report's folder must take a file before any store is touched.
             fd, report_tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(report_path)), prefix=".rdfstore.")
             os.close(fd)
@@ -672,11 +612,10 @@ def main(argv):
             if os.path.lexists(opts["--out"]):
                 # A failed export removes what it wrote, so it must never have replaced an older file.
                 raise BadInput(f"{opts['--out']} already exists; export writes only a new file")
-            kind, make = store_from(opts, secrets)
+            make = store_from(opts)
             ttl = opts.get("--ttl-dir")
             if ttl and os.path.exists(ttl) and (not os.path.isdir(ttl) or os.listdir(ttl)):
                 raise BadInput("--ttl-dir must be an empty folder or not exist yet, so no old graph file stays beside the new ones")
-            refuse_aliases([opts["--out"]], [opts["--env"]] if "--env" in opts else [])
         else:
             if not files:
                 raise BadInput(f"{command} needs input files")
@@ -707,15 +646,13 @@ def main(argv):
             print(f"wrote {opts['--out']}: {len(dataset)} quads in {len(counts(dataset)[0])} graphs")
             return 0
         if command == "roundtrip":
-            kind, make = store_from(opts, secrets)
+            make = store_from(opts)
             dataset = pack(files, named)
-            if kind == "databricks":
-                to_rows(dataset)
-            elif shared_blank_nodes(dataset):
+            if shared_blank_nodes(dataset):
                 raise BadInput("blank nodes occur in more than one graph, which a Graph Store Protocol store "
                                "cannot hold; skolemize them or keep each in one graph")
     except (BadInput, OSError, SyntaxError, ValueError) as exc:
-        print(f"ERROR {redact(str(exc), secrets)}", file=sys.stderr)
+        print(f"ERROR {exc}", file=sys.stderr)
         if report_tmp and os.path.exists(report_tmp):
             os.remove(report_tmp)
         return 2
@@ -726,7 +663,7 @@ def main(argv):
             graphs = named_graphs(exported)
             ttl = opts.get("--ttl-dir")
             side = [os.path.join(ttl, f"graph-{n}.ttl") for n in range(1, len(graphs) + 1)] + [os.path.join(ttl, "graphs.tsv")] if ttl else []
-            refuse_aliases([opts["--out"]] + side, [opts["--env"]] if "--env" in opts else [])
+            refuse_aliases([opts["--out"]] + side, [])
             outputs = [(opts["--out"], lambda: nquads_text(exported))]
             if ttl:
                 for path, g in zip(side, graphs):
@@ -738,15 +675,14 @@ def main(argv):
             print(f"wrote {opts['--out']}: {len(exported)} quads in {len(graphs)} graphs")
             return 0
         passed, report = roundtrip(store, dataset)
-        report["store"] = kind
-        report = redact_all(report, secrets)
+        report["store"] = "fuseki"
         if report_tmp:
             write_atomically(opts["--report"], json.dumps(report, indent=2).encode("utf-8"), report_tmp)
     except BadInput as exc:
-        print(f"ERROR {redact(str(exc), secrets)}", file=sys.stderr)
+        print(f"ERROR {exc}", file=sys.stderr)
         return 2
-    except Exception as exc:  # a failed request (the store, the network, the warehouse) or a local write
-        print(f"FAIL a store request or write failed: {type(exc).__name__}: {redact(str(exc), secrets)}. No report was written.")
+    except Exception as exc:  # a failed request (the store, the network) or a local write
+        print(f"FAIL a store request or write failed: {type(exc).__name__}: {exc}. No report was written.")
         return 1
     finally:
         if report_tmp and os.path.exists(report_tmp):

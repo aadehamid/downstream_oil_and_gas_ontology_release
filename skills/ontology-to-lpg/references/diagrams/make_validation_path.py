@@ -79,9 +79,9 @@ pre = row(0, 40, [
     "V5 Manifest:\nSHA-256 of every\ninput and shape file"], ORANGE)
 arrow(rel, pre[0])
 
-group(-20, 270, 7 * (W + GAP) + 10, 230, "In the local Neo4j (Docker + n10s)", "#2f9e44")
+group(-20, 270, 7 * (W + GAP) + 10, 230, "In the local Neo4j (n10s + APOC)", "#2f9e44")
 neo = row(0, 320, [
-    "V6 Load in a fixed\norder; every import\nreturns OK",
+    "V6 Load in a fixed\norder, triples in the\nrequest; every import\nreturns OK",
     "V7 Engine readback:\nlistShapes() vs the shapes\nfile; every constraint n10s\ndid not compile is listed",
     "V8 n10s SHACL\nvalidate():\n0 violations",
     "V9 One fail case per\ncompiled constraint: right\nnode, path, component;\na mutant is caught",
@@ -91,18 +91,18 @@ neo = row(0, 320, [
 arrow(pre[-1], neo[0], side=("b", "t"))
 
 group(-20, 550, 2 * (W + GAP) + 10, 230, "Delivery", "#6741d9")
-dl = [box(W + GAP, 600, W, H, "V13 Aura copy:\nAura hash = local hash\n= report hash", PURPLE),
+dl = [box(W + GAP, 600, W, H, "V13 Copy to a named\ndatabase: target hash =\nlocal hash = report hash", PURPLE),
       box(0, 600, W, H, "V14 Triple store: counts\nper graph, per predicate;\nthree-way with\n--projection-report", PURPLE)]
 arrow(neo[-1], dl[0], side=("b", "t"))
 arrow(neo[-1], dl[1], side=("b", "t"))
 
 gx = 2 * (W + GAP) + 40
-group(gx - 20, 550, 4 * (W + GAP) + 10, 380, "GRAPH TYPE on Aura (Enterprise or Aura; Community refuses it)", "#c92a2a")
+group(gx - 20, 550, 4 * (W + GAP) + 10, 380, "GRAPH TYPE on the copy (Enterprise Edition; Community refuses it)", "#c92a2a")
 gt = row(gx, 600, [
     "G1 build.py graph-type:\none statement, to a file,\nfrom sh:targetClass shapes;\nleft out as comments",
     "G2 Apply after V13:\nALTER CURRENT GRAPH\nTYPE SET; confirm with\nSHOW CURRENT GRAPH TYPE",
     "G3 Probe: a write that\nbreaks the type must\nfail (ConstraintValidation\nFailed)",
-    "G4 From then on Aura\nrejects bad writes from\napps; n10s cannot run\nthere"], RED)
+    "G4 From then on the\ndatabase rejects bad\nwrites from apps; n10s\ndoes not run there"], RED)
 arrow(dl[0], gt[0])
 box(gx, 780, 4 * (W + GAP) - GAP, 120,
     "Covers: labels, property types, NOT NULL (sh:minCount at least 1, list or scalar), lists, relationship endpoints.\n"

@@ -12,7 +12,9 @@ Run with: uv run --no-project --with rdflib python3 build.py <command> ...
             rdf:type or rdfs:subClassOf between two IRIs and the object is outside the OWL and RDFS
             namespaces. Both graphs are parsed and compared as triples, not as lines.
   cypher    --config <config.json> --shapes <shapes.ttl>... --output load.cypher <data.ttl>...
-            Writes the generated load script for n10s (references/pipeline.md, rules 8 to 11).
+            Writes the generated load script for n10s (references/pipeline.md, rules 8 to 11). The
+            four imports take their RDF text as a parameter ($ontology, $shapes, $loadable,
+            $inferred): load_verify.py sends the text in the request, so the server reads no file.
   manifest  --config <config.json> --shapes <shapes.ttl>... --loadable loadable.nt
             --inferred inferred.nt --output manifest.json [--verify] <data.ttl>...
             Writes the manifest, or with --verify fails when the committed one differs. File paths
@@ -188,10 +190,12 @@ def cypher(cfg, data, shapes):
              f"handleMultival: 'ARRAY', multivalPropList: {json.dumps(multival)}, "
              "keepLangTag: true, keepCustomDataTypes: true});"]
     lines += [f"CALL n10s.nsprefixes.add({json.dumps(p)}, {json.dumps(ns)});" for p, ns in cfg.prefixes.items()]
-    lines += ["CALL n10s.onto.import.fetch('file:///import/merged.ttl', 'Turtle');",
-              "CALL n10s.validation.shacl.import.fetch('file:///import/shapes-in-graph.ttl', 'Turtle');",
-              "CALL n10s.rdf.import.fetch('file:///import/loadable.nt', 'N-Triples');",
-              "CALL n10s.rdf.import.fetch('file:///import/inferred.nt', 'N-Triples');"]
+    # The RDF text travels in the request, never by a path the server would have to read. load_verify.py
+    # supplies each parameter: $ontology and $shapes whole, $loadable and $inferred in batches of lines.
+    lines += ["CALL n10s.onto.import.inline($ontology, 'Turtle');",
+              "CALL n10s.validation.shacl.import.inline($shapes, 'Turtle');",
+              "CALL n10s.rdf.import.inline($loadable, 'N-Triples');",
+              "CALL n10s.rdf.import.inline($inferred, 'N-Triples');"]
     for iri in multival:
         key = shorten(URIRef(iri), cfg)
         lines.append(f"MATCH (n:Resource) WHERE n.`{key}` IS NOT NULL SET n.`{key}` = apoc.coll.sort(n.`{key}`);")
@@ -357,8 +361,8 @@ def _spec(key, typed):
 
 
 def graph_type_omissions(nodes, rels):
-    """What a GRAPH TYPE cannot hold of the element types: a node type with no typed property (Aura
-    rejects an empty one) and a relationship type used between several label pairs (one identifying
+    """What a GRAPH TYPE cannot hold of the element types: a node type with no typed property (a
+    server rejects an empty one) and a relationship type used between several label pairs (one identifying
     pair only). data_model keeps both and lists them under metadata.not_in_graph_type."""
     omitted = [f"{label}: no typed property, so no node element type" for label, props in sorted(nodes.items())
                if not props]
@@ -372,13 +376,13 @@ def graph_type(cfg, shapes, data, sep=SEPARATOR):
     """(statement, left out) for the shapes: one node element type per sh:targetClass that has at
     least one typed property, and one relationship element type per predicate whose property shapes
     name one sh:class, from the shapes' target class to that class. An endpoint may name a label
-    with no node element type of its own (Aura Free accepted it on 2026-10-23); an empty node element
+    with no node element type of its own (a hosted Enterprise database accepted it on 2026-10-23); an empty node element
     type `(:Label =>)` is a syntax error there, so none is written.
 
     A property is typed from a mappable sh:datatype. It is a LIST<T NOT NULL> exactly when the load
     stores it as an array, which is the global multivalued decision of the load script
     (multivalued(data, shapes), references/pipeline.md, rule 10), and a scalar otherwise. It is NOT
-    NULL when sh:minCount is at least 1 (Aura Free accepted `LIST<STRING NOT NULL> NOT NULL`). When two property shapes on one target map one key
+    NULL when sh:minCount is at least 1 (the same server accepted `LIST<STRING NOT NULL> NOT NULL`). When two property shapes on one target map one key
     differently, the first (by shape IRI) is kept and the other is listed. Everything that has no
     GRAPH TYPE form is listed in left out. sep is the kept graph's separator (element_types)."""
     nodes, rels, left_out = element_types(cfg, shapes, data, sep)
@@ -612,7 +616,7 @@ def load_config(path):
 
 
 def write(path, text):
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
 
 

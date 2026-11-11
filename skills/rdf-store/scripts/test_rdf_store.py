@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Tests for rdfstore.py. None needs Docker or Databricks: the Graph Store Protocol runs against a
+"""Tests for rdfstore.py. None needs a running store: the Graph Store Protocol runs against a
 small HTTP server in this process backed by a pyoxigraph Store that executes the SPARQL it receives,
-and the Delta table against a fake connection that decodes the SQL rdfstore.py sends and keeps one
+and the Delta table against a fake Spark session that decodes the SQL rdfstore.py sends and keeps one
 row list per table. Each planted fault must fail the round trip, with the diff in the right direction.
 
-Live tests run only when asked: RDF_STORE_LIVE_FUSEKI=<base URL of a Fuseki dataset, such as
-http://127.0.0.1:13031/ds> and RDF_STORE_LIVE_DATABRICKS=<env file>.
+The live test runs only when asked: RDF_STORE_LIVE_FUSEKI=<base URL of a Fuseki dataset, such as
+http://127.0.0.1:3030/ds>.
 
 Run: uv run --no-project --with pyoxigraph python3 -m unittest test_rdf_store
 """
@@ -209,35 +209,40 @@ def close(server):
     server.server_close()
 
 
-# ---- a fake Databricks connection that runs the SQL rdfstore.py sends ---------------------
+# ---- a fake Spark session that runs the SQL rdfstore.py sends -------------------------------
 
-class FakeCursor:
-    def __init__(self, db):
-        self.db, self.result = db, []
+class FakeResult:
+    def __init__(self, rows):
+        self.rows = rows
 
-    def __enter__(self):
-        return self
+    def collect(self):
+        return self.rows
 
-    def __exit__(self, *exc):
-        return False
 
-    def execute(self, sql):
-        self.db.statements.append(sql)
-        if self.db.fail_on and self.db.fail_on(sql, len(self.db.statements)):
-            raise RuntimeError(f"warehouse error while running statement {len(self.db.statements)}")
+class FakeSpark:
+    """The one method SparkStore calls: sql(statement), whose result has collect()."""
+
+    def __init__(self, fault=None, fault_table=None, fail_on=None, tables=None):
+        self.tables, self.statements = dict(tables or {}), []
+        self.fault, self.fault_table, self.fail_on = fault, fault_table, fail_on
+
+    def sql(self, sql):
+        self.statements.append(sql)
+        if self.fail_on and self.fail_on(sql, len(self.statements)):
+            raise RuntimeError(f"Spark error while running statement {len(self.statements)}")
         m = re.match(r"CREATE OR REPLACE TABLE (\S+) AS SELECT \* FROM (\S+)$", sql)
         if m:
-            self.db.tables[m.group(1)] = list(self.db.tables[m.group(2)])
-            return
+            self.tables[m.group(1)] = list(self.tables[m.group(2)])
+            return FakeResult([])
         m = re.match(r"CREATE OR REPLACE TABLE (\S+) \((.*?)\) USING DELTA", sql)
         if m:
             assert [c.split()[0] for c in m.group(2).split(", ")] == list(rs.COLUMNS), m.group(2)
-            self.db.tables[m.group(1)] = []
-            return
+            self.tables[m.group(1)] = []
+            return FakeResult([])
         m = re.match(r"DROP TABLE IF EXISTS (\S+)$", sql)
         if m:
-            self.db.tables.pop(m.group(1), None)
-            return
+            self.tables.pop(m.group(1), None)
+            return FakeResult([])
         m = re.match(r"INSERT INTO (\S+) \((.*?)\)\n", sql)
         if m:
             assert m.group(2).split(", ") == list(rs.COLUMNS), m.group(2)
@@ -245,31 +250,18 @@ class FakeCursor:
             for line in body.split(",\n"):
                 cells = re.findall(r"NULL|'[A-Za-z0-9+/=]*'", line)
                 assert len(cells) == len(rs.COLUMNS), line
-                self.db.tables[m.group(1)].append(tuple(None if c == "NULL" else base64.b64decode(c[1:-1]).decode("utf-8") for c in cells))
-            return
+                self.tables[m.group(1)].append(tuple(None if c == "NULL" else base64.b64decode(c[1:-1]).decode("utf-8") for c in cells))
+            return FakeResult([])
         m = re.match(r"SELECT (.*?) FROM (\S+)$", sql)
         if m:
             assert m.group(1).split(", ") == list(rs.COLUMNS), m.group(1)
-            rows = list(self.db.tables[m.group(2)])
-            if self.db.fault and (self.db.fault_table is None or self.db.fault_table == m.group(2)):
+            rows = list(self.tables[m.group(2)])
+            if self.fault and (self.fault_table is None or self.fault_table == m.group(2)):
                 ds = rs.from_rows(rows)
-                self.db.fault(ds)
+                self.fault(ds)
                 rows = rs.to_rows(ds)
-            self.result = rows
-            return
+            return FakeResult(rows)
         raise AssertionError(sql)
-
-    def fetchall(self):
-        return self.result
-
-
-class FakeConnection:
-    def __init__(self, fault=None, fault_table=None, fail_on=None, tables=None):
-        self.tables, self.statements = dict(tables or {}), []
-        self.fault, self.fault_table, self.fail_on = fault, fault_table, fail_on
-
-    def cursor(self):
-        return FakeCursor(self)
 
 
 OLD_ROWS = [("https://example.org/old", "https://example.org/p", "old", "literal", rs.XSD_STRING, None, "https://example.org/g")]
@@ -427,20 +419,20 @@ class DeltaTable(unittest.TestCase):
     def test_text_that_looks_like_sql_or_a_term_stays_a_literal(self):
         ds = ox.Dataset([ox.Quad(ox.NamedNode("http://s"), ox.NamedNode("http://p"), ox.Literal(text), ox.NamedNode("http://g"))
                          for text in ("_:b0", "http://looks.like/an/iri", "it's'); DROP TABLE x; --", "back\\slash")])
-        conn = FakeConnection()
-        passed, _ = rs.roundtrip(rs.DatabricksStore(conn, "c.s.t"), ds)
+        spark = FakeSpark()
+        passed, _ = rs.roundtrip(rs.SparkStore(spark, "c.s.t"), ds)
         self.assertTrue(passed)
-        self.assertFalse(any("DROP TABLE x" in s for s in conn.statements))
+        self.assertFalse(any("DROP TABLE x" in s for s in spark.statements))
 
     def test_a_clean_round_trip_stages_then_replaces_the_table(self):
-        conn = FakeConnection(tables={"c.s.t": OLD_ROWS})
-        store = rs.DatabricksStore(conn, "c.s.t")
+        spark = FakeSpark(tables={"c.s.t": OLD_ROWS})
+        store = rs.SparkStore(spark, "c.s.t")
         store.BATCH = 3
         passed, report = rs.roundtrip(store, release_dataset())
         self.assertTrue(passed, report)
-        self.assertGreater(sum(s.startswith(f"INSERT INTO {store.staging}") for s in conn.statements), 1)
-        self.assertEqual(sorted(conn.tables), ["c.s.t"])
-        self.assertEqual(rs.dataset_hash(rs.from_rows(conn.tables["c.s.t"])), rs.dataset_hash(release_dataset()))
+        self.assertGreater(sum(s.startswith(f"INSERT INTO {store.staging}") for s in spark.statements), 1)
+        self.assertEqual(sorted(spark.tables), ["c.s.t"])
+        self.assertEqual(rs.dataset_hash(rs.from_rows(spark.tables["c.s.t"])), rs.dataset_hash(release_dataset()))
 
     def test_a_failure_on_any_batch_leaves_the_previous_table(self):
         batches = -(-len(rs.to_rows(release_dataset())) // 4)
@@ -454,71 +446,123 @@ class DeltaTable(unittest.TestCase):
                         return False
                     count["n"] += 1
                     return count["n"] == number
-                conn = FakeConnection(fail_on=fail, tables={"c.s.t": OLD_ROWS})
-                store = rs.DatabricksStore(conn, "c.s.t")
+                spark = FakeSpark(fail_on=fail, tables={"c.s.t": OLD_ROWS})
+                store = rs.SparkStore(spark, "c.s.t")
                 store.BATCH = 4
                 with self.assertRaises(RuntimeError):
                     rs.roundtrip(store, release_dataset())
                 self.assertEqual(count["n"], number)
-                self.assertEqual(conn.tables, {"c.s.t": OLD_ROWS})
+                self.assertEqual(spark.tables, {"c.s.t": OLD_ROWS})
 
     def test_a_failed_promotion_leaves_the_previous_table_and_drops_staging(self):
-        conn = FakeConnection(fail_on=lambda sql, _n: " AS SELECT * FROM " in sql, tables={"c.s.t": OLD_ROWS})
+        spark = FakeSpark(fail_on=lambda sql, _n: " AS SELECT * FROM " in sql, tables={"c.s.t": OLD_ROWS})
         with self.assertRaises(RuntimeError):
-            rs.roundtrip(rs.DatabricksStore(conn, "c.s.t"), release_dataset())
-        self.assertEqual(conn.tables, {"c.s.t": OLD_ROWS})
+            rs.roundtrip(rs.SparkStore(spark, "c.s.t"), release_dataset())
+        self.assertEqual(spark.tables, {"c.s.t": OLD_ROWS})
 
     def test_a_failed_staging_drop_or_live_read_fails_the_run(self):
         for name, fail in (("drop", lambda sql, _n: sql.startswith("DROP TABLE")),
                            ("live read", lambda sql, _n: sql.startswith("SELECT") and "__staging_" not in sql)):
             with self.subTest(name):
-                conn = FakeConnection(fail_on=fail, tables={"c.s.t": OLD_ROWS})
+                spark = FakeSpark(fail_on=fail, tables={"c.s.t": OLD_ROWS})
                 with self.assertRaises(RuntimeError):
-                    rs.roundtrip(rs.DatabricksStore(conn, "c.s.t"), release_dataset())
+                    rs.roundtrip(rs.SparkStore(spark, "c.s.t"), release_dataset())
 
     def test_two_runs_on_one_table_never_promote_each_others_rows(self):
-        conn = FakeConnection(tables={"c.s.t": OLD_ROWS})
-        a, b = rs.DatabricksStore(conn, "c.s.t"), rs.DatabricksStore(conn, "c.s.t")
+        spark = FakeSpark(tables={"c.s.t": OLD_ROWS})
+        a, b = rs.SparkStore(spark, "c.s.t"), rs.SparkStore(spark, "c.s.t")
         self.assertNotEqual(a.staging, b.staging)
         mine, theirs = release_dataset(), release_dataset()
         add_a_triple(theirs)
         a.stage(rs.to_rows(mine))
         b.stage(rs.to_rows(theirs))      # B writes between A's check and A's promotion
         a.promote()
-        self.assertEqual(rs.dataset_hash(rs.from_rows(conn.tables["c.s.t"])), rs.dataset_hash(mine))
+        self.assertEqual(rs.dataset_hash(rs.from_rows(spark.tables["c.s.t"])), rs.dataset_hash(mine))
 
     def test_a_successful_run_canonicalizes_three_times(self):
         calls = []
         real = rs.canonical_lines
         rs.canonical_lines = lambda d: calls.append(1) or real(d)
         try:
-            passed, _ = rs.roundtrip(rs.DatabricksStore(FakeConnection(), "c.s.t"), release_dataset())
+            passed, _ = rs.roundtrip(rs.SparkStore(FakeSpark(), "c.s.t"), release_dataset())
         finally:
             rs.canonical_lines = real
         self.assertTrue(passed)
         self.assertEqual(len(calls), 3)
 
     def test_a_staging_copy_that_differs_is_never_published(self):
-        conn = FakeConnection(fault=change_a_literal, tables={"c.s.t": OLD_ROWS})
-        store = rs.DatabricksStore(conn, "c.s.t")
-        conn.fault_table = store.staging
+        spark = FakeSpark(fault=change_a_literal, tables={"c.s.t": OLD_ROWS})
+        store = rs.SparkStore(spark, "c.s.t")
+        spark.fault_table = store.staging
         passed, report = rs.roundtrip(store, release_dataset())
         self.assertFalse(passed)
         self.assertFalse(report["published"])
-        self.assertEqual(conn.tables, {"c.s.t": OLD_ROWS})
+        self.assertEqual(spark.tables, {"c.s.t": OLD_ROWS})
+
+    def test_the_load_sends_exactly_these_statements(self):
+        ds = ox.Dataset([ox.Quad(ox.NamedNode("http://s"), ox.NamedNode("http://p"), ox.Literal("v"), ox.NamedNode("http://g"))])
+        spark = FakeSpark()
+        store = rs.SparkStore(spark, "c.s.t")
+        passed, _ = rs.roundtrip(store, ds)
+        self.assertTrue(passed)
+        stg = store.staging
+        self.assertRegex(stg, r"^c\.s\.t__staging_[0-9a-f]{12}$")
+        cols = "subject, predicate, object, object_kind, datatype, lang, graph"
+        self.assertEqual(spark.statements, [
+            f"CREATE OR REPLACE TABLE {stg} (subject STRING NOT NULL, predicate STRING NOT NULL, object STRING NOT NULL, "
+            "object_kind STRING NOT NULL, datatype STRING, lang STRING, graph STRING) USING DELTA "
+            "COMMENT 'RDF quads, one row per quad (rdf-store skill)'",
+            f"INSERT INTO {stg} ({cols})\nSELECT decode(unbase64(c0), 'UTF-8'), decode(unbase64(c1), 'UTF-8'), "
+            "decode(unbase64(c2), 'UTF-8'), decode(unbase64(c3), 'UTF-8'), decode(unbase64(c4), 'UTF-8'), "
+            "decode(unbase64(c5), 'UTF-8'), decode(unbase64(c6), 'UTF-8')\nFROM VALUES\n"
+            "('aHR0cDovL3M=', 'aHR0cDovL3A=', 'dg==', 'bGl0ZXJhbA==', 'aHR0cDovL3d3dy53My5vcmcvMjAwMS9YTUxTY2hlbWEjc3RyaW5n', NULL, 'aHR0cDovL2c=')\n"
+            "AS v(c0, c1, c2, c3, c4, c5, c6)",
+            f"SELECT {cols} FROM {stg}",
+            f"CREATE OR REPLACE TABLE c.s.t AS SELECT * FROM {stg}",
+            f"DROP TABLE IF EXISTS {stg}",
+            f"SELECT {cols} FROM c.s.t"])
+
+    def test_hand_written_rows_export_as_these_quads(self):
+        rows = [("http://s", "http://p", "21", "literal", "http://www.w3.org/2001/XMLSchema#integer", None, "http://g"),
+                ("_:b0", "http://p", "Prêt", "literal", None, "fr", "http://g"),
+                ("http://s", "http://q", "_:b0", "bnode", None, None, "http://g"),
+                ("http://s", "http://q", "http://o", "iri", None, None, None)]
+        store = rs.SparkStore(FakeSpark(tables={"t": rows}), "t")
+        self.assertEqual(sorted(f"{q} ." for q in store.export()), [
+            '<http://s> <http://p> "21"^^<http://www.w3.org/2001/XMLSchema#integer> <http://g> .',
+            '<http://s> <http://q> <http://o> .',
+            '<http://s> <http://q> _:b0 <http://g> .',
+            '_:b0 <http://p> "Prêt"@fr <http://g> .'])
+
+    def test_a_table_name_that_is_not_plain_is_refused(self):
+        for name in ("c.s.t; DROP TABLE x", "c.s.`t`", "a.b.c.d", "", "c..t", "c.s.t-1"):
+            with self.subTest(name):
+                spark = FakeSpark()
+                with self.assertRaises(rs.BadInput):
+                    rs.SparkStore(spark, name)
+                self.assertEqual(spark.statements, [])
+
+    def test_100000_rows_go_in_batches_and_come_back_with_the_same_hash(self):
+        g = ox.NamedNode("http://g")
+        ds = ox.Dataset(ox.Quad(ox.NamedNode(f"http://s/{i}"), ox.NamedNode("http://p"), ox.Literal(str(i)), g) for i in range(100000))
+        spark = FakeSpark()
+        passed, report = rs.roundtrip(rs.SparkStore(spark, "c.s.t"), ds)
+        self.assertTrue(passed)
+        self.assertEqual(sum(s.startswith("INSERT INTO") for s in spark.statements), 50)
+        self.assertEqual(report["actual_quads"], 100000)
 
     def test_unsupported_terms_are_refused_before_any_statement(self):
         ds = ox.Dataset([ox.Quad(ox.NamedNode("http://s"), ox.NamedNode("http://p"),
                                  ox.Triple(ox.NamedNode("http://a"), ox.NamedNode("http://b"), ox.NamedNode("http://c")), ox.NamedNode("http://g"))])
-        conn = FakeConnection(tables={"c.s.t": OLD_ROWS})
+        spark = FakeSpark(tables={"c.s.t": OLD_ROWS})
         with self.assertRaises(rs.BadInput):
-            rs.roundtrip(rs.DatabricksStore(conn, "c.s.t"), ds)
-        self.assertEqual(conn.statements, [])
+            rs.roundtrip(rs.SparkStore(spark, "c.s.t"), ds)
+        self.assertEqual(spark.statements, [])
 
     def test_each_fault_in_the_published_table_fails(self):
         for fault, _, _ in FAULTS:
             with self.subTest(fault.__name__):
-                passed, _ = rs.roundtrip(rs.DatabricksStore(FakeConnection(fault, fault_table="c.s.t"), "c.s.t"), release_dataset())
+                passed, _ = rs.roundtrip(rs.SparkStore(FakeSpark(fault, fault_table="c.s.t"), "c.s.t"), release_dataset())
                 self.assertFalse(passed)
 
 
@@ -628,39 +672,6 @@ class GraphStoreProtocol(unittest.TestCase):
             close(server)
         self.assertFalse(passed)
         self.assertEqual(report["graph_counts"]["(default graph)"], [0, 1])
-
-
-class FakeDatabricks:
-    """A fake databricks.sql package on PYTHONPATH, for the command-line tests."""
-
-    @staticmethod
-    def install(mode):
-        folder = tempfile.mkdtemp()
-        os.makedirs(os.path.join(folder, "databricks"))
-        write(folder, os.path.join("databricks", "__init__.py"), "")
-        write(folder, os.path.join("databricks", "sql.py"), textwrap_sql(mode))
-        return folder
-
-
-def textwrap_sql(mode):
-    return f"""
-MODE = {mode!r}
-class Cursor:
-    def __init__(self, token): self.token = token
-    def __enter__(self): return self
-    def __exit__(self, *a): return False
-    def execute(self, sql):
-        if MODE == "fail-load" and sql.startswith("INSERT"):
-            raise RuntimeError("warehouse said: bad token " + self.token)
-    def fetchall(self): return []
-class Connection:
-    def __init__(self, token): self.token = token
-    def cursor(self): return Cursor(self.token)
-def connect(server_hostname, http_path, access_token):
-    if MODE == "fail-connect":
-        raise RuntimeError("could not connect with token " + access_token + " to " + server_hostname)
-    return Connection(access_token)
-"""
 
 
 class CommandLine(unittest.TestCase):
@@ -804,54 +815,14 @@ class CommandLine(unittest.TestCase):
             os.replace = real
         self.assertEqual(os.listdir(folder), [])
 
-    def test_the_token_is_never_printed_when_the_env_file_is_incomplete(self):
+    def test_databricks_has_no_command_line(self):
+        # Spark exists only inside a notebook, so the command line names Fuseki alone.
         folder, files = release_files()
-        env = write(folder, "db.env", "DATABRICKS_HOST=https://h\nDATABRICKS_TOKEN=dapiSECRET123\n")
-        r = self.run_cli("roundtrip", "--store", "databricks", "--env", env, *files)
-        self.assertEqual(r.returncode, 2)
-        self.assertNotIn("dapiSECRET123", r.stdout + r.stderr)
-
-    def test_the_token_is_redacted_from_connector_errors(self):
-        folder, files = release_files()
-        env = write(folder, "db.env", "DATABRICKS_HOST=https://h\nDATABRICKS_TOKEN=dapiSECRET123\nDATABRICKS_HTTP_PATH=/sql/1.0/warehouses/x\n"
-                                      "DATABRICKS_CATALOG=c\nDATABRICKS_SCHEMA=s\n")
-        report = os.path.join(folder, "r.json")
-        for mode in ("fail-connect", "fail-load"):
-            with self.subTest(mode):
-                fake = FakeDatabricks.install(mode)
-                r = self.run_cli("roundtrip", "--store", "databricks", "--env", env, "--report", report, *files,
-                                 env={"PYTHONPATH": fake})
-                self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
-                self.assertNotIn("dapiSECRET123", r.stdout + r.stderr)
-                self.assertIn("[redacted]", r.stdout)
-                self.assertFalse(os.path.exists(report))
-
-    def test_a_token_in_an_identifier_is_never_printed(self):
-        folder, files = release_files()
-        base = "DATABRICKS_HOST=https://h\nDATABRICKS_TOKEN=dapiSECRET123\nDATABRICKS_HTTP_PATH=/p\n"
-        for name, env_text, extra in (
-                ("catalog", base + "DATABRICKS_CATALOG=x-dapiSECRET123\nDATABRICKS_SCHEMA=s\n", []),
-                ("schema", base + "DATABRICKS_CATALOG=c\nDATABRICKS_SCHEMA=x-dapiSECRET123\n", []),
-                ("table", base + "DATABRICKS_CATALOG=c\nDATABRICKS_SCHEMA=s\n", ["--table", "x-dapiSECRET123"])):
-            with self.subTest(name):
-                env = write(folder, "db.env", env_text)
-                r = self.run_cli("roundtrip", "--store", "databricks", "--env", env, *extra, *files)
-                self.assertEqual(r.returncode, 2)
-                self.assertNotIn("dapiSECRET123", r.stdout + r.stderr)
-
-    def test_a_token_inside_the_data_is_redacted_from_a_mismatch(self):
-        folder = tempfile.mkdtemp()
-        data = write(folder, "lib.ttl", LIBRARY + '<https://example.org/x> <https://example.org/p> "dapiSECRET123" .\n')
-        env = write(folder, "db.env", "DATABRICKS_HOST=https://h\nDATABRICKS_TOKEN=dapiSECRET123\nDATABRICKS_HTTP_PATH=/p\n"
-                                      "DATABRICKS_CATALOG=c\nDATABRICKS_SCHEMA=s\n")
-        report = os.path.join(folder, "r.json")
-        r = self.run_cli("roundtrip", "--store", "databricks", "--env", env, "--report", report, data,
-                         env={"PYTHONPATH": FakeDatabricks.install("empty")})
-        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
-        with open(report) as f:
-            saved = f.read()
-        self.assertIn("missing from the store", saved)
-        self.assertNotIn("dapiSECRET123", r.stdout + r.stderr + saved)
+        for args in (("roundtrip", "--store", "databricks", *files), ("export", "--store", "databricks", "--out", os.path.join(folder, "o.nq")),
+                     ("roundtrip", "--store", "fuseki", "--env", "x", *files), ("roundtrip", "--store", "fuseki", "--table", "t", *files)):
+            with self.subTest(args[:4]):
+                r = self.run_cli(*args)
+                self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
 
     def test_export_refuses_an_output_that_a_side_file_would_overwrite(self):
         folder, files = release_files()
@@ -959,19 +930,16 @@ class CommandLine(unittest.TestCase):
         self.assertEqual(rs.dataset_hash(rebuilt), rs.dataset_hash(rs.pack(files)))
 
 
-class FusekiImage(unittest.TestCase):
-    def test_the_fuseki_build_steps_match_ontology_to_lpg(self):
-        # Each skill installs on its own, so each keeps a copy; the build steps must not drift. The
-        # leading comment block differs, since each names its own skill and compose file.
-        other = os.path.join(SKILL, "..", "ontology-to-lpg", "docker", "fuseki", "Dockerfile")
-        if not os.path.exists(other):
-            self.skipTest("ontology-to-lpg is not beside this skill")
+class FusekiJar(unittest.TestCase):
+    PIN = "2c92c598e65ab69d99820052e05f4277ed1d77980a8845f87545ad35b71a76ee"   # jena-fuseki-server-6.2.0.jar
 
-        def steps(path):
-            with open(path) as f:
-                lines = f.read().splitlines()
-            return lines[next(i for i, line in enumerate(lines) if not line.startswith("#")):]
-        self.assertEqual(steps(os.path.join(SKILL, "docker", "fuseki", "Dockerfile")), steps(other))
+    def test_the_documents_give_the_pinned_checksum(self):
+        for name in (os.path.join("references", "stores.md"), "SOURCES.md"):
+            with open(os.path.join(SKILL, name), encoding="utf-8") as f:
+                self.assertIn(self.PIN, f.read(), name)
+
+    def test_no_container_files_remain(self):
+        self.assertFalse(os.path.exists(os.path.join(SKILL, "docker")))
 
 
 @unittest.skipUnless(os.environ.get("RDF_STORE_LIVE_FUSEKI"), "set RDF_STORE_LIVE_FUSEKI to a Fuseki dataset URL")
@@ -979,14 +947,6 @@ class LiveFuseki(unittest.TestCase):
     def test_round_trip(self):
         base = os.environ["RDF_STORE_LIVE_FUSEKI"].rstrip("/")
         passed, report = rs.roundtrip(rs.FusekiStore(base + "/data", base + "/query", base + "/update"), release_dataset())
-        self.assertTrue(passed, report)
-
-
-@unittest.skipUnless(os.environ.get("RDF_STORE_LIVE_DATABRICKS"), "set RDF_STORE_LIVE_DATABRICKS to an env file")
-class LiveDatabricks(unittest.TestCase):
-    def test_round_trip(self):
-        env = rs.DatabricksStore.check_env(os.environ["RDF_STORE_LIVE_DATABRICKS"], "rdf_store_test")
-        passed, report = rs.roundtrip(rs.DatabricksStore.from_env(env, "rdf_store_test"), release_dataset())
         self.assertTrue(passed, report)
 
 

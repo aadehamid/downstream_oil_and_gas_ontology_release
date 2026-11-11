@@ -374,12 +374,12 @@ class Timeouts(unittest.TestCase):
         captured = {}
 
         def fake_run(driver, *args, **kwargs):
-            captured["timeout"] = args[-1] if len(args) >= 10 else kwargs.get("timeout")
+            captured["timeout"] = args[-1] if len(args) >= 9 else kwargs.get("timeout")
             raise lv.Failed("stop here")
         with mock.patch.dict(os.environ, {"NEO4J_PASSWORD": "pw"}), mock.patch.dict(sys.modules, {"neo4j": mock.MagicMock()}), \
                 mock.patch.object(lv, "run", side_effect=fake_run):
             run_main(lv.main, ["--config", os.path.join(TEMPLATES, "projection-config.json"), "--bolt", "bolt://h",
-                               "--import-dir", tmp, "--merged", "m", "--loadable", "l", "--inferred", "i",
+                               "--merged", "m", "--loadable", "l", "--inferred", "i",
                                "--report", os.path.join(tmp, "r.json"), "--query-timeout", "33",
                                "--shapes", os.path.join(TEMPLATES, "library-shapes.ttl"),
                                os.path.join(TEMPLATES, "library-module.ttl")])
@@ -610,8 +610,7 @@ class Secrets(unittest.TestCase):
         tmp = tempfile.mkdtemp()
         with mock.patch.dict(os.environ, {"NEO4J_PASSWORD": CANARY2}), mock.patch.dict(sys.modules, {"neo4j": leaky_neo4j()}):
             code, out = run_main(lv.main, ["--config", os.path.join(TEMPLATES, "projection-config.json"),
-                                           "--bolt", f"bolt://neo4j:{CANARY}@h", "--import-dir", tmp,
-                                           "--merged", "m.ttl", "--loadable", "l.nt", "--inferred", "i.nt",
+                                           "--bolt", f"bolt://neo4j:{CANARY}@h", "--merged", "m.ttl", "--loadable", "l.nt", "--inferred", "i.nt",
                                            "--report", os.path.join(tmp, "r.json"),
                                            "--shapes", os.path.join(TEMPLATES, "library-shapes.ttl"),
                                            os.path.join(TEMPLATES, "library-module.ttl")])
@@ -624,7 +623,7 @@ class Secrets(unittest.TestCase):
         with mock.patch.dict(os.environ, {"NEO4J_PASSWORD": CANARY2}), mock.patch.dict(sys.modules, {"neo4j": mock.MagicMock()}), \
                 mock.patch.object(lv, "run", side_effect=lv.Failed(f"check failed near {CANARY2}")):
             code, out = run_main(lv.main, ["--config", os.path.join(TEMPLATES, "projection-config.json"),
-                                           "--bolt", "bolt://h", "--import-dir", tmp, "--merged", "m.ttl",
+                                           "--bolt", "bolt://h", "--merged", "m.ttl",
                                            "--loadable", "l.nt", "--inferred", "i.nt", "--report", os.path.join(tmp, "r.json"),
                                            "--shapes", os.path.join(TEMPLATES, "library-shapes.ttl"),
                                            os.path.join(TEMPLATES, "library-module.ttl")])
@@ -786,7 +785,7 @@ class NoUserText(unittest.TestCase):
 
     def test_load_verify(self):
         tmp = tempfile.mkdtemp()
-        common = ["--bolt", "bolt://h", "--import-dir", tmp, "--merged", "m", "--loadable", "l", "--inferred", "i",
+        common = ["--bolt", "bolt://h", "--merged", "m", "--loadable", "l", "--inferred", "i",
                   "--report", os.path.join(tmp, "r.json"), "--shapes", os.path.join(TEMPLATES, "library-shapes.ttl")]
         config = os.path.join(TEMPLATES, "projection-config.json")
         module = os.path.join(TEMPLATES, "library-module.ttl")
