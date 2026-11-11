@@ -1,7 +1,7 @@
 """Tests for check_changelogs.py.
 
 Run from this folder:
-  uv run --no-project python3 -m unittest test_changelogs
+  uv run --no-project python -m unittest test_changelogs
 
 A changelog with a Known gaps section passes; each one-break test plants one failure.
 """

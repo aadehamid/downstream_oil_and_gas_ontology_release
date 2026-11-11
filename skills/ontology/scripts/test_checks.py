@@ -1,7 +1,7 @@
 """Tests for check_taxonomy.py, check_requirements.py, templates/check.sh and the shapes skeleton.
 
 Run from this folder:
-  uv run --no-project --with rdflib --with pyyaml --with pyshacl python3 -m unittest test_checks
+  uv run --no-project --with rdflib --with pyyaml --with pyshacl python -m unittest test_checks
 
 Each one-break test breaks a shipped template in one way and asserts that exactly the
 named check fires with its message, so a check that passes vacuously, or fires for the

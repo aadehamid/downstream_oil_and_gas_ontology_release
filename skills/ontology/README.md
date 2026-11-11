@@ -41,8 +41,8 @@ To add a module to an ontology that already has releases, start at `references/n
 4. From Step 3, run the checks the agent runs:
 
    ```sh skip reason="awaits-the-rewrite: the reader's own values stand in angle brackets, and no test supplies them yet"
-   uv run --with pyyaml python3 scripts/check_requirements.py requirements.yaml
-   uv run --with rdflib python3 scripts/check_taxonomy.py <your module>.ttl
+   uv run --with pyyaml python scripts/check_requirements.py requirements.yaml
+   uv run --with rdflib python scripts/check_taxonomy.py <your module>.ttl
    ```
 
    Each prints one line per failure and exits 1, or prints a pass line and exits 0.

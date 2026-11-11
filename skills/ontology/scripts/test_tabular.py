@@ -3,8 +3,8 @@
 Morph-KGC 2.10.0 needs rdflib below 7.3 and maplib 0.20.26 needs rdflib 7.6 or later, so the two engines cannot
 share an environment. Each runs in its own, and both must reproduce the same committed output,
 templates/tabular/loan-states.nt, which proves they agree:
-  TABULAR_ENGINE=morph-kgc uv run --no-project --with morph-kgc==2.10.0 --with rdflib python3 -m unittest test_tabular
-  TABULAR_ENGINE=maplib uv run --no-project --with maplib==0.20.26 --with polars --with rdflib python3 -m unittest test_tabular
+  TABULAR_ENGINE=morph-kgc uv run --no-project --with morph-kgc==2.10.0 --with rdflib python -m unittest test_tabular
+  TABULAR_ENGINE=maplib uv run --no-project --with maplib==0.20.26 --with polars --with rdflib python -m unittest test_tabular
 
 Without TABULAR_ENGINE the tests skip, so the skill's plain test run needs neither engine. With it, a missing
 engine fails instead of skipping.

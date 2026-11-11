@@ -1,7 +1,7 @@
 """Tests for run_regression.py, check_shapes.py, check_cardinality.py, check_packages.py and check_code_lists.py.
 
 Run from this folder:
-  uv run --no-project --with rdflib --with pyyaml --with pyshacl python3 -m unittest test_validation
+  uv run --no-project --with rdflib --with pyyaml --with pyshacl python -m unittest test_validation
 
 Each check gets a clean case that passes and one planted error per failure it claims, asserting the
 failure names what was planted, so a check that passes vacuously, or fails for another reason, fails here.

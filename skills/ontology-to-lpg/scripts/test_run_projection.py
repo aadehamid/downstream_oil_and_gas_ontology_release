@@ -1,6 +1,6 @@
 """Tests of run_projection.py with a stand-in for every command and request: no database or store.
 
-Run: uv run --no-project --with rdflib python3 -m unittest test_run_projection
+Run: uv run --no-project --with rdflib python -m unittest test_run_projection
 """
 import hashlib
 import json

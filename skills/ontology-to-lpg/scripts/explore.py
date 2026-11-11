@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Walk any node end to end across modules, in Neo4j and in a SPARQL store, and compare the answers.
 
-    uv run --no-project --with rdflib --with neo4j python3 explore.py walk    --config <config> (--uri U | --env E) --sparql <query URL> --iri <IRI> [--hops N] [--separator _]
-    uv run --no-project --with rdflib --with neo4j python3 explore.py compare --config <config> (--uri U | --env E) --sparql <query URL> --queries <queries.json> [--report out.json] [--separator _]
-    uv run --no-project --with rdflib python3 explore.py sparql-walk --output <walk.rq> [--hops N]   (the paste-able SPARQL walk)
+    uv run --no-project --with rdflib --with neo4j python explore.py walk    --config <config> (--uri U | --env E) --sparql <query URL> --iri <IRI> [--hops N] [--separator _]
+    uv run --no-project --with rdflib --with neo4j python explore.py compare --config <config> (--uri U | --env E) --sparql <query URL> --queries <queries.json> [--report out.json] [--separator _]
+    uv run --no-project --with rdflib python explore.py sparql-walk --output <walk.rq> [--hops N]   (the paste-able SPARQL walk)
 
 The walk (default 2 hops, --hops to change): every relationship within N hops of the start node, in
 both directions, with its predicate and its module tag, and the module tag of every node it reaches.

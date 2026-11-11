@@ -1,6 +1,6 @@
 """Tests of release_record.py with a stand-in session: no database.
 
-Run: uv run --no-project --with rdflib python3 -m unittest test_release_record
+Run: uv run --no-project --with rdflib python -m unittest test_release_record
 """
 import contextlib
 import hashlib

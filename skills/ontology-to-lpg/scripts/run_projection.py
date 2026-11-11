@@ -2,10 +2,10 @@
 """Run the projection, every store and every check from one run configuration, so no project needs
 its own scripts around this skill's.
 
-    uv run --no-project --with rdflib python3 run_projection.py --config <run.json> [--only a,b] [--skip a,b]
-    uv run --no-project --with rdflib python3 run_projection.py --config <run.json> --plan
-    uv run --no-project --with rdflib python3 run_projection.py compare-triples <rebuild out> <baseline out>
-    uv run --no-project --with rdflib python3 run_projection.py compare-reports <rebuild report> <baseline report>
+    uv run --no-project --with rdflib python run_projection.py --config <run.json> [--only a,b] [--skip a,b]
+    uv run --no-project --with rdflib python run_projection.py --config <run.json> --plan
+    uv run --no-project --with rdflib python run_projection.py compare-triples <rebuild out> <baseline out>
+    uv run --no-project --with rdflib python run_projection.py compare-reports <rebuild report> <baseline report>
 
 The steps, in this order (references/run-config.md has the run configuration and every check):
   project      check the rules and pins, validate, reason with ELK through ROBOT (its SHA-256 checked

@@ -2,7 +2,7 @@
 """Load the validated inputs into any SPARQL 1.1 store, one named graph per input file, and check
 that nothing was lost: the store's counts against the files, and against the n10s export.
 
-Run: uv run --no-project --with rdflib python3 triplestore.py --gsp <graph store URL> --query <SPARQL URL>
+Run: uv run --no-project --with rdflib python triplestore.py --gsp <graph store URL> --query <SPARQL URL>
          [--env <file>] [--graph-base <IRI>] --inferred inferred.nt [--projection-report <report.json>]
          [--cq <question.rq>]... --report <triplestore-report.json> <data.ttl>...
 

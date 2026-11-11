@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check an ontology build's requirements file against its schema and for conflicts.
 
-Run: uv run --with pyyaml python3 check_requirements.py requirements.yaml
+Run: uv run --with pyyaml python check_requirements.py requirements.yaml
 
 The schema is written at the top of templates/requirements.yaml; the rule is
 references/governance.md, rule 2. This script enforces its structure: every field present,

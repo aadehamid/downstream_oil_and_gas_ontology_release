@@ -1,7 +1,7 @@
 # Copy at Step 3 as the module's Turtle. Rules: references/domain-model.md (kinds, classes,
 # properties), references/identity-taxonomy.md (scheme, code lists), references/release.md
 # (header), references/quality.md (definitions). Check it with:
-#   uv run --with rdflib python3 <skill>/scripts/check_taxonomy.py <this file>
+#   uv run --with rdflib python <skill>/scripts/check_taxonomy.py <this file>
 # Replace the example base, terms and sources with your own; keep the shape of each block.
 
 @prefix lib:     <https://id.example.org/library/> .

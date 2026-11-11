@@ -1906,7 +1906,7 @@ projection-manifest.json is current</code></pre></dd>
 <dl class="parts">
 <dt>Prerequisites</dt><dd>A local Neo4j 2025.06.2 with the n10s and APOC jars, Java 11 or later and ROBOT 1.9.10 (<code>business_architecture/ontology/projection/README.md</code>, "Run the projection").</dd>
 <dt>Files to open, in this order</dt><dd><ol class="files"><li><code>business_architecture/ontology/projection/skill-run/README.md</code>: running it</li><li><code>business_architecture/ontology/projection/skill-run/epm-run.json, inputs.py, epm-config.json, queries.json</code>: the run configuration and the 14 saved walks</li><li><code>skills/ontology-to-lpg/references/run-config.md</code>: each step and its check</li><li><code>skills/ontology-to-lpg/references/running.md</code>: how to prepare the Neo4j server</li></ol></dd>
-<dt>Commands</dt><dd><pre data-snippet="bash run=release-copy"><code>(cd skills/ontology-to-lpg/scripts &amp;&amp; uv run -q --no-project --with rdflib python3 run_projection.py --config ../../../business_architecture/ontology/projection/skill-run/epm-run.json --plan)</code></pre><pre data-snippet="text expect"><code>project: runs
+<dt>Commands</dt><dd><pre data-snippet="bash run=release-copy"><code>(cd skills/ontology-to-lpg/scripts &amp;&amp; uv run -q --no-project --with rdflib python run_projection.py --config ../../../business_architecture/ontology/projection/skill-run/epm-run.json --plan)</code></pre><pre data-snippet="text expect"><code>project: runs
 load: skipped, 'no neo4j_env in the run configuration'
 ...
 rebuild: skipped, 'no rebuild in the run configuration'</code></pre></dd>

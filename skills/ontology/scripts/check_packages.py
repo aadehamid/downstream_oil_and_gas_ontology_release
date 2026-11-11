@@ -2,7 +2,7 @@
 """Step 9 and 10: every written release package is intact and conforms to its own shapes over its released
 closure (references/shacl.md, rule 9; references/release.md, rules 8, 10 and 12).
 
-Run: uv run --no-project --with rdflib --with pyshacl python3 check_packages.py --releases <dir> --expect <packages.txt>
+Run: uv run --no-project --with rdflib --with pyshacl python check_packages.py --releases <dir> --expect <packages.txt>
 
 Layout (release.md, rule 8): <dir>/<module>/<version>/ holds <module>.ttl, shapes.ttl and manifest.json,
 and may hold other files the manifest lists. <version> is X.Y.Z with an optional pre-release (1.0.0-rc.1);
