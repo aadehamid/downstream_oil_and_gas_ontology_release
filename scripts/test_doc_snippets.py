@@ -1,4 +1,5 @@
-"""Tests for scripts/doc_snippets.py, which tests every code block in the Markdown documents.
+"""Tests for scripts/doc_snippets.py, which tests every code block in the Markdown documents and in the HTML
+pages written by hand.
 
 Each test writes a small document by hand into a temporary folder and checks what the tool says about it. The
 last tests read this tree: its registry, its documents and their tags. scripts/check.sh runs the blocks of the
@@ -56,15 +57,23 @@ home = "real"
 """
 
 
+@pytest.fixture(autouse=True)
+def not_started_by_a_block(monkeypatch):
+    """scripts/check.sh may itself be started by a block of a document, and then the environment says so. These
+    tests check the tool as a person starts it, so each one begins without those two variables."""
+    monkeypatch.delenv(d.NESTED, raising=False)
+    monkeypatch.delenv(d.NESTED_FILE, raising=False)
+
+
 def fence(info, *body):
     return "\n".join(["```" + info, *body, "```", ""])
 
 
-def check(tmp_path, text, *, files=None, environ=None, registry=REGISTRY, **options):
+def check(tmp_path, text, *, files=None, environ=None, registry=REGISTRY, doc="guide.md", **options):
     """Check one hand-written document, guide.md, in a temporary tree."""
     root = tmp_path / "tree"
     root.mkdir(exist_ok=True)
-    (root / "guide.md").write_text(text, encoding="utf-8", newline="\n")
+    (root / doc).write_text(text, encoding="utf-8", newline="\n")
     for name, content in (files or {}).items():
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         (root / name).write_text(content, encoding="utf-8", newline="\n")
@@ -72,7 +81,17 @@ def check(tmp_path, text, *, files=None, environ=None, registry=REGISTRY, **opti
     env = {k: v for k, v in os.environ.items() if k not in (d.NESTED, d.NESTED_FILE)}
     env.update(environ or {})
     checker = d.Checker(root, d.load_registry(tmp_path / "registry.toml"), environ=env, **options)
-    return checker.check(["guide.md"])
+    return checker.check([doc])
+
+
+def page(*lines):
+    """A hand-written page, guide.html, whose body is these lines. The first of them is line 4 of the page."""
+    return "\n".join(["<!DOCTYPE html>", "<html><head><title>Guide</title></head>", "<body>", *lines,
+                      "</body></html>", ""])
+
+
+def check_page(tmp_path, *lines, **options):
+    return check(tmp_path, page(*lines), doc="guide.html", **options)
 
 
 def snapshot(root: Path):
@@ -637,6 +656,19 @@ def test_the_cypher_check_is_a_token_check_and_not_a_grammar_check(tmp_path):
         "guide.md:1: the block is not valid cypher\n    | ValueError: no statement"]
 
 
+def test_the_cypher_check_reads_this_trees_tokenizer_when_another_copy_is_loaded(tmp_path, monkeypatch):
+    # A test that unpacks the release zip leaves a package named kpi_store behind, loaded from a folder that is gone.
+    import types
+    gone = types.ModuleType("kpi_store")
+    gone.__file__, gone.__path__ = str(tmp_path / "gone" / "kpi_store" / "__init__.py"), [str(tmp_path / "gone" / "kpi_store")]
+    monkeypatch.setitem(sys.modules, "kpi_store", gone)
+    for name in [n for n in sys.modules if n.startswith("kpi_store.")]:
+        monkeypatch.delitem(sys.modules, name)
+    result = check(tmp_path, fence("cypher parse", "MATCH (n:Resource) RETURN count(n)"))
+    assert result.failures == [] and result.checked == 1
+    assert sys.modules["kpi_store"] is gone
+
+
 def test_a_command_cannot_be_parsed_instead_of_run(tmp_path):
     result = check(tmp_path, fence("bash parse", "echo hello"))
     assert result.failures == ["guide.md:1: `bash` cannot be parsed: `parse` reads json, toml, yaml, turtle, sparql, "
@@ -750,6 +782,134 @@ def test_a_nested_block_must_hold_a_block(tmp_path):
     assert result.failures == ["guide.md:1: the nested block holds no code block"]
 
 
+# -- a page written by hand
+
+
+def test_a_pre_block_with_no_attribute_fails_with_its_page_and_line(tmp_path):
+    result = check_page(tmp_path, "<h1>Guide</h1>", "<pre>echo hello</pre>", "<p>Text with <code>inline code</code>.</p>",
+                        '<pre class="cmd" data-snippet="bash">echo hello</pre>', '<pre data-snippet="">x</pre>')
+    assert result.failures == [
+        'guide.html:5: the <pre> block has no data-snippet attribute. Write data-snippet="<language> <tag>", as on a '
+        "Markdown fence",
+        "guide.html:7: the block has no tag after its language `bash`",
+        "guide.html:8: the block has no language and no tag"]
+    assert result.summary() == "3 blocks: 0 run (0 status-only), 0 checked, 0 skipped, 3 failed"
+
+
+def test_a_page_block_runs_as_the_text_its_reader_sees(tmp_path):
+    # Character references are decoded and the tags that colour the text are dropped. The line break after
+    # <pre> is not part of the block.
+    result = check_page(tmp_path,
+                        '<pre data-snippet="bash run=scratch">',
+                        '<span class="c"># a comment</span>',
+                        "test 1 -lt 2 &amp;&amp; echo &quot;5 &lt; 7 &amp; more&quot;</pre>",
+                        '<pre data-snippet="text expect">5 &lt; 7 &amp; more</pre>')
+    assert result.failures == []
+    assert result.summary() == "2 blocks: 1 run (0 status-only), 1 checked, 0 skipped"
+
+
+def test_a_page_block_whose_output_differs_fails(tmp_path):
+    result = check_page(tmp_path, '<pre data-snippet="python run=scratch">print("loaded 13 graphs")</pre>',
+                        '<pre data-snippet="text expect">loaded 12 graphs</pre>')
+    assert len(result.failures) == 1
+    assert result.failures[0].startswith("guide.html:5: the output of the block at line 4 is not what this block shows")
+    assert "-loaded 12 graphs" in result.failures[0] and "+loaded 13 graphs" in result.failures[0]
+
+
+def test_a_failing_page_block_fails_and_a_run_block_needs_its_expect_or_status_only(tmp_path):
+    result = check_page(tmp_path, '<pre data-snippet="bash run=scratch status-only">exit 3</pre>',
+                        '<pre data-snippet="bash run=other">echo unchecked</pre>')
+    assert result.failures[0].startswith("guide.html:4: the block ended with exit status 3, not 0 (context scratch)")
+    assert result.failures[1].startswith("guide.html:5: nothing checks what this block prints.")
+    assert result.summary() == "2 blocks: 0 run (0 status-only), 0 checked, 0 skipped, 2 failed"
+
+
+def test_a_page_skip_needs_an_allowed_reason_and_strict_refuses_a_temporary_one(tmp_path):
+    lines = ['<pre data-snippet="bash skip reason=&quot;needs-client-server: reads the client workspace&quot;">x</pre>',
+             '<pre data-snippet="text expect">any output</pre>',
+             '<pre data-snippet="bash skip reason=&quot;too slow: takes an hour&quot;">x</pre>',
+             "<pre data-snippet='bash skip reason=\"awaits-the-rewrite: goes with the old section\"'>x</pre>"]
+    result = check_page(tmp_path, *lines)
+    assert result.failures == ["guide.html:6: `too slow` is not an allowed reason: use one of awaits-the-rewrite, "
+                               "illustration, needs-client-server"]
+    assert result.skipped == {"needs-client-server": 2, "awaits-the-rewrite": 1}
+    strict = check_page(tmp_path, *lines, strict=True)
+    assert strict.failures[1] == "guide.html:7: the reason `awaits-the-rewrite` is temporary and must be gone at the cut"
+
+
+def test_a_page_file_excerpt_and_parse_block_are_checked(tmp_path):
+    files = {"settings.toml": '[release]\nzip = "kpi-store-1.1.zip"\nsha256 = "abc"\n'}
+    good = ['<pre data-snippet="toml file=settings.toml">[release]', 'zip = &quot;kpi-store-1.1.zip&quot;',
+            'sha256 = "abc"</pre>',
+            '<pre data-snippet="toml excerpt=settings.toml">zip = "kpi-store-1.1.zip"</pre>',
+            '<pre data-snippet="json parse">{"format": 1}</pre>']
+    result = check_page(tmp_path, *good, files=files)
+    assert result.failures == [] and result.summary() == "3 blocks: 0 run (0 status-only), 3 checked, 0 skipped"
+    bad = ['<pre data-snippet="toml file=settings.toml">[release]</pre>',
+           '<pre data-snippet="toml excerpt=settings.toml">zip = "kpi-store-1.0.zip"</pre>',
+           '<pre data-snippet="json parse">{"format": 1,}</pre>']
+    result = check_page(tmp_path, *bad, files=files)
+    assert [f.split("\n")[0] for f in result.failures] == [
+        "guide.html:4: the block differs from settings.toml",
+        "guide.html:5: the lines are not in settings.toml, in this order and next to each other",
+        "guide.html:6: the block is not valid json"]
+
+
+def test_an_unknown_tag_a_nested_block_and_an_open_block_fail_in_a_page(tmp_path):
+    result = check_page(tmp_path, '<pre data-snippet="bash test">x</pre>',
+                        '<pre data-snippet="markdown nested">x</pre>', '<pre data-snippet="json parse">{}')
+    assert result.failures == [
+        "guide.html:4: unknown tag `test`: use one of run, expect, skip, file, excerpt, parse, nested",
+        "guide.html:5: a nested block is for a Markdown document, not for a page",
+        "guide.html:6: the <pre> code block is never closed"]
+
+
+def test_only_a_pre_or_a_tagged_element_is_a_block_of_a_page(tmp_path):
+    # Text in a script or a style is not a block. An element other than <pre> is one only when it carries the tag.
+    result = check_page(tmp_path, "<script>var t = '<pre>not a block</pre>';</script>",
+                        "<style>pre { color: red } /* <pre>no</pre> */</style>",
+                        "<p>A <code>span</code> in a sentence is text.</p>",
+                        '<div class="code"><code data-snippet="json parse">{"a": [1, 2]}</code></div>',
+                        '<img data-snippet="json parse" src="x.png">',
+                        '<pre data-snippet="json parse">{"b": <b>3</b>}</pre>')
+    assert result.failures == ["guide.html:8: a <img> element holds no text, so it cannot be a code block"]
+    assert result.summary() == "3 blocks: 0 run (0 status-only), 2 checked, 0 skipped, 1 failed"
+
+
+def test_a_page_is_left_out_only_when_one_of_the_two_builders_made_it(tmp_path):
+    # Text that looks like a generator line, another tool's line, and a Markdown file of the same name do not take
+    # a hand-written page out of the check.
+    (tmp_path / "comment.html").write_text('<!-- <meta name="generator" content="scripts/build_docs_html.py"> --><pre>x</pre>',
+                                           encoding="utf-8")
+    (tmp_path / "script.html").write_text("<script>var m = '<meta name=\"generator\" content=\"scripts/build_docs_html.py\">';</script>"
+                                          "<pre>x</pre>", encoding="utf-8")
+    (tmp_path / "other-tool.html").write_text('<meta name="generator" content="some other tool"><pre>x</pre>', encoding="utf-8")
+    (tmp_path / "twin.md").write_text("# Twin\n", encoding="utf-8")
+    (tmp_path / "twin.html").write_text("<pre>written by hand beside twin.md</pre>", encoding="utf-8")
+    (tmp_path / "built.html").write_text("<meta content='scripts/build_docs_html.py' name='GENERATOR'><pre>x</pre>", encoding="utf-8")
+    assert d.html_documents(tmp_path) == ["comment.html", "other-tool.html", "script.html", "twin.html"]
+
+
+def test_the_pages_in_scope_are_those_no_markdown_file_is_the_source_of(tmp_path, capsys):
+    (tmp_path / "a.md").write_text("# A\n\n" + fence("json parse", "{}"), encoding="utf-8")
+    (tmp_path / "a.html").write_text('<META NAME=generator CONTENT=\'scripts/build_docs_html.py\'><pre>built from a.md</pre>',
+                                     encoding="utf-8")
+    (tmp_path / "built.html").write_text('<meta name="generator" content="scripts/build_playbook_html.py"><pre>built</pre>',
+                                         encoding="utf-8")
+    (tmp_path / "hand.html").write_text(page("<pre>no tag</pre>", '<pre data-snippet="json parse">{}</pre>'),
+                                        encoding="utf-8")
+    (tmp_path / "plain.html").write_text(page("<p>No block.</p>"), encoding="utf-8")
+    assert d.html_documents(tmp_path) == ["hand.html", "plain.html"]
+    assert d.main(["--root", str(tmp_path), "check"]) == 1
+    assert capsys.readouterr().out == (
+        'FAIL hand.html:4: the <pre> block has no data-snippet attribute. Write data-snippet="<language> <tag>", as '
+        "on a Markdown fence\n"
+        "3 blocks: 0 run (0 status-only), 2 checked, 0 skipped, 1 failed\n")
+    assert d.main(["--root", str(tmp_path), "list"]) == 0
+    assert capsys.readouterr().out == ("   1  a.md: parse 1\n   2  hand.html: (untagged or unreadable) 1, parse 1\n"
+                                       "   3  total: (untagged or unreadable) 1, parse 2\n")
+
+
 # -- the command
 
 
@@ -767,8 +927,10 @@ def test_the_command_prints_each_failure_and_the_count_and_exits_1(tmp_path, cap
 
 def test_the_html_command_counts_only_pages_with_no_markdown_source(tmp_path, capsys):
     (tmp_path / "a.md").write_text("# A\n", encoding="utf-8", newline="\n")
-    (tmp_path / "a.html").write_text("<pre>from a.md</pre>", encoding="utf-8", newline="\n")
-    (tmp_path / "built.html").write_text('<meta name="generator" content="x"><pre>built</pre>', encoding="utf-8", newline="\n")
+    (tmp_path / "a.html").write_text('<meta name="generator" content="scripts/build_docs_html.py"><pre>from a.md</pre>',
+                                     encoding="utf-8", newline="\n")
+    (tmp_path / "built.html").write_text('<meta name="generator" content="scripts/build_playbook_html.py"><pre>built</pre>',
+                                         encoding="utf-8", newline="\n")
     (tmp_path / "hand.html").write_text("<pre><code>one</code></pre><p><code>two</code> <code>three</code></p>"
                                         "<pre class='x'>four</pre>", encoding="utf-8", newline="\n")
     assert d.html_pages(tmp_path) == [("hand.html", 2, 2)]
@@ -822,6 +984,17 @@ def test_every_markdown_document_of_the_tree_is_in_scope():
     assert set(docs) == {p for p in on_disk if p in tracked_or_new}
 
 
+def test_the_hand_written_pages_of_the_tree_are_in_scope_and_the_generated_ones_are_not():
+    pages = d.html_documents(d.ROOT)
+    for known in ("business_architecture/ontology/epm-walkthrough.html",
+                  "business_architecture/ontology/epm-ontology-guide.html",
+                  "best-practices/EPM-BP-100-KPIs-production-deployment.html", "viewer/index.html"):
+        assert known in pages, known
+    for built in ("HOW-TO-UPDATE.html", "business_architecture/ontology/MODULES.html",
+                  "skills/ontology/references/ontology-build-playbook.html"):
+        assert built not in pages, built
+
+
 def test_a_markdown_file_git_ignores_is_outside_the_scan(tmp_path):
     """The rule of the scan: what Git tracks or would add. An ignored file does not ship. A folder with no Git
     is read whole."""
@@ -840,7 +1013,7 @@ def test_a_markdown_file_git_ignores_is_outside_the_scan(tmp_path):
 
 def test_no_part_of_the_tool_is_a_long_file():
     parts = sorted((d.ROOT / "scripts" / "doc_snippets_parts").glob("*.py")) + [d.ROOT / "scripts" / "doc_snippets.py"]
-    assert [p.name for p in parts] == ["__init__.py", "check.py", "extract.py", "match.py", "parsers.py",
+    assert [p.name for p in parts] == ["__init__.py", "check.py", "extract.py", "match.py", "pages.py", "parsers.py",
                                        "registry.py", "report.py", "run.py", "doc_snippets.py"]
     for part in parts:
         assert len(part.read_text(encoding="utf-8").split("\n")) < 500, part.name

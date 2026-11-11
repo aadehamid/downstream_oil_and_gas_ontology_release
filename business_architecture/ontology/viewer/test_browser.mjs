@@ -1,5 +1,9 @@
+// Run: node test_browser.mjs <path to viewer/index.html>
+// Needs the playwright-core package where Node can find it and a Chrome or Chromium (CHROME_PATH names it).
+import { mkdtempSync } from "node:fs";
 import { createRequire } from "node:module";
-import { resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 const { chromium } = createRequire(import.meta.url)("playwright-core");
 import assert from "node:assert/strict";
@@ -15,6 +19,9 @@ try {
   });
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+  // The system's temporary folder, so the screenshots land somewhere on Windows too.
+  const shots = mkdtempSync(join(tmpdir(), "kpi-store-viewer-"));
   let network = 0;
   await page.route(/^https?:/, (route) => {
     network++;
@@ -224,7 +231,10 @@ try {
   await page.locator("#results .term-button:visible").first().click();
   assert.ok(await page.locator("#results > details[open]").count(), "Selecting a term must retain the open hierarchy");
   await page.locator("#about").click();
-  assert.match(await page.locator("#release-pin").innerText(), /KPI Store 1\.1/);
+  assert.equal(await page.locator("#release-pin").innerText(), "KPI Store 1.1");
+  const sources = await page.locator("#sources").textContent();
+  assert.match(sources, /releases\/technical-graph\/1\.1\.0\/technical-graph\.ttl/);
+  assert.doesNotMatch(sources, /technical-graph\/1\.0\.0/);
   await page.locator("#close-about").click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator("#back").click();
@@ -487,7 +497,7 @@ try {
       } else await shell.locator('[data-action="fullscreen"]').click();
     }
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-    await page.screenshot({path:`/tmp/epm-viewer-navigation-review/navigation-${width}.png`});
+    await page.screenshot({path:join(shots,`navigation-${width}.png`)});
   }
   assert.deepEqual(errors, []);
   assert.equal(network, 0);
@@ -510,6 +520,8 @@ try {
       valueStreamOverviews: true,
       graph: true,
       mobile: true,
+      release: "KPI Store 1.1",
+      screenshots: shots,
     }),
   );
 } finally {

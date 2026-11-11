@@ -130,6 +130,7 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   business_architecture/ontology/validation/test_controlled_values.py \
   business_architecture/ontology/validation/test_release_package_shapes.py \
   business_architecture/ontology/value-stream/test_value_streams.py \
+  business_architecture/ontology/viewer/test_horoi.py \
   business_architecture/ontology/viewer/test_viewer.py \
   kpi_store/tests/test_compare.py \
   kpi_store/tests/test_cut.py \
@@ -173,7 +174,7 @@ run with_deps python scripts/epm_facts.py modules >/dev/null
 run with_deps python scripts/epm_facts.py coverage >/dev/null
 # The generated pages must equal a fresh build of their Markdown.
 run with_deps python scripts/build_docs_html.py --check
-# Every code block in the Markdown documents is run, compared, parsed or skipped for a stated reason, and the last
+# Every code block in the Markdown documents and in the HTML pages written by hand is run, compared, parsed or skipped for a stated reason, and the last
 # line counts them. scripts/DOC-SNIPPETS.md explains the tags. The cut adds --strict --all-contexts.
 run with_deps python scripts/doc_snippets.py check
 # The tree refers to nothing outside itself. scripts/standalone-pending.txt lists the paths not yet clean.

@@ -43,10 +43,6 @@ ALLOWED_PENDING = (
     "KNOWN-OPEN-ITEMS.md",
     "HOW-TO-UPDATE.md",
     "HOW-TO-UPDATE.html",
-    "business_architecture/ontology/epm-walkthrough.html",
-    "business_architecture/ontology/epm-ontology-guide.html",
-    "viewer/index.html",
-    "horoi_viewer/index.html",
 )
 # These files state the deny list, hold one failing line per rule, or quote the excepted text, so they cannot pass it.
 OWN_FILES = {"scripts/check_standalone.py", "scripts/test_check_standalone.py", "scripts/standalone-exceptions.txt"}

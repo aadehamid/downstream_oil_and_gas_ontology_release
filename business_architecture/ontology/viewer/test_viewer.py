@@ -268,3 +268,68 @@ def test_non_semver_directories_are_not_release_inputs(tmp_path):
     package(tmp_path)
     package(tmp_path, version="2.0.0-candidate", ttl="invalid RDF")
     assert viewer.build_data(tmp_path)["terms"] == 5
+
+
+ROOT = Path(__file__).resolve().parents[3]
+PAGE = ROOT / "viewer/index.html"
+
+
+def test_the_committed_page_equals_a_fresh_build():
+    # A package cut after the page was built makes the page stale; rebuild it with build.py.
+    assert viewer.is_current(ROOT, PAGE), "viewer/index.html is stale: run build.py --source . --out viewer/index.html"
+
+
+def test_the_committed_page_holds_this_tree_and_names_no_outside_commit():
+    # Written by hand from the release folders: technical-graph is at 1.1.0 and the page names KPI Store 1.1.
+    text = PAGE.read_text(encoding="utf-8")
+    payload = text.split('<script id="ontology-data" type="application/json">')[1].split("</script>")[0]
+    data = json.loads(payload)
+    assert data["release"] == "KPI Store 1.1"
+    assert "sourceCommit" not in data
+    assert "business_architecture/ontology/releases/technical-graph/1.1.0/technical-graph.ttl" in [i["path"] for i in data["inputs"]]
+    assert not any("technical-graph/1.0.0" in i["path"] for i in data["inputs"])
+    assert "EPM 1.0" not in text
+    # The header shows the release name on every view, filled from the data.
+    assert '<span id="release-name"></span> · Definitions and relationships' in text
+    assert '$("release-name").textContent = data.release;' in text
+
+
+def test_a_page_is_stale_once_a_package_changes_and_the_check_writes_nothing(tmp_path, capsys):
+    package(tmp_path)
+    out = tmp_path / "viewer/index.html"
+    assert not viewer.is_current(tmp_path, out)  # no page yet
+    viewer.build(tmp_path, out, require_clean=False)
+    assert viewer.is_current(tmp_path, out)
+    assert viewer.main(["--source", str(tmp_path), "--out", str(out), "--check"]) == 0
+    package(tmp_path, version="1.1.0", ttl=TTL + "\nx:Added a owl:Class .")
+    before = out.read_bytes()
+    assert not viewer.is_current(tmp_path, out)
+    assert viewer.main(["--source", str(tmp_path), "--out", str(out), "--check"]) == 1
+    assert "differs from a fresh build" in capsys.readouterr().err
+    assert out.read_bytes() == before
+
+
+def test_a_literal_keeps_the_text_the_package_wrote(tmp_path):
+    # rdflib's default would rewrite this time as 2026-11-02T07:27:56+00:00.
+    package(tmp_path, ttl=TTL + '\nx:Thing <http://purl.org/dc/terms/created> "2026-11-02T07:27:56Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .')
+    import rdflib
+
+    setting = rdflib.NORMALIZE_LITERALS
+    data = viewer.build_data(tmp_path)
+    assert rdflib.NORMALIZE_LITERALS == setting  # the builder restores the library's setting
+    thing = next(n for n in data["nodes"] if n["id"] == "https://example.test/Thing")
+    assert [v["v"] for v in thing["values"] if v["p"] == "http://purl.org/dc/terms/created"] == ["2026-11-02T07:27:56Z"]
+
+
+def test_input_paths_use_forward_slashes_on_every_system(tmp_path):
+    package(tmp_path)
+    assert [i["path"] for i in viewer.build_data(tmp_path)["inputs"]] == ["business_architecture/ontology/releases/core/1.0.0/core.ttl"]
+
+
+def test_the_page_is_written_as_utf8_with_lf_line_ends(tmp_path):
+    package(tmp_path, ttl=TTL + '\nx:Thing rdfs:comment "caf\\u00e9 \\u2192 d\\u00e9p\\u00f4t" .')
+    out = tmp_path / "index.html"
+    viewer.build(tmp_path, out, require_clean=False)
+    raw = out.read_bytes()
+    assert b"\r" not in raw
+    assert "café → dépôt".encode("utf-8") in raw
