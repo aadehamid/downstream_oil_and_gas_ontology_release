@@ -133,6 +133,13 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   kpi_store/tests/test_tech_graph_integration.py \
   kpi_store/tests/test_questions.py \
   kpi_store/tests/test_questions_integration.py \
+  kpi_store/tests/test_local_settings.py \
+  kpi_store/tests/test_load_fuseki.py \
+  kpi_store/tests/test_load_neo4j.py \
+  kpi_store/tests/test_copy_enterprise.py \
+  kpi_store/tests/test_sync_check.py \
+  kpi_store/tests/test_setup_check.py \
+  kpi_store/tests/test_runner.py \
   scripts/test_check_script.py \
   scripts/test_check_standalone.py \
   scripts/test_doc_snippets.py \
