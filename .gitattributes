@@ -1,0 +1,3 @@
+# Text files are stored and checked out with LF line endings on every platform, so a hash of a file is the same
+# on Windows as elsewhere.
+* text=auto eol=lf
