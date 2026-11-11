@@ -468,8 +468,39 @@ def test_a_report_that_is_not_cleared_stops_the_run_before_the_cut(setup):
 @pytest.mark.parametrize("name", ["a.person@example.org", "x" * 61, "the owner; drop", "name/with/slash"])
 def test_decided_by_must_be_a_role_or_initials_as_the_cut_tool_requires(setup, name):
     pending_report(setup, {"R001": {"decided_by": name}})
-    with pytest.raises(runner.Stop, match="decided_by of row R001 must be a short role or initials"):
+    with pytest.raises(runner.Stop, match="decided_by of row R001 is not a role or initials. There, write a role or initials, such as"):
         runner.step_cut(setup.make(hooks={"cut": lambda *a: pytest.fail("the cut ran")}))
+
+
+def test_who_may_decide_is_the_cut_tools_rule_and_no_other(setup, monkeypatch):
+    asked = []
+    monkeypatch.setattr(runner.cut_tool, "is_role", lambda text: asked.append(text) or text == "only this passes")
+    pending_report(setup, {"R001": {"decided_by": "the owner"}})
+    with pytest.raises(runner.Stop, match="decided_by of row R001 is not a role or initials"):
+        runner.step_cut(setup.make(hooks={"cut": lambda *a: pytest.fail("the cut ran")}))
+    assert asked == ["the owner"]
+    runner.shutil.rmtree(setup.pending)
+    pending_report(setup, {"R001": {"decided_by": "only this passes"}})
+    assert runner.step_cut(setup.make(hooks={"cut": lambda *a: {"status": "cut"}}))["status"] == "cut"
+
+
+def test_the_library_cut_maps_the_tools_outcome_and_its_refusals(monkeypatch):
+    cut = runner.cut_tool   # the module object the runner holds
+    seen = []
+    def made(report, release_root, decisions, ask, say):
+        seen.append((report, release_root, decisions, ask("Type yes: ")))
+        return cut.Outcome("cut", None, Path("business_architecture/ontology/discovery-runs/run-1.md"), ["a", "b"], True, "data-product-1.2.1-correction.1")
+    monkeypatch.setattr(cut, "cut", made)
+    result = runner.cut_with_library("cleared.json", "release", "run", "confirmed.csv", ask=lambda prompt: "yes", say=lambda line: None)
+    assert result == {"status": "cut", "outcome": "cut", "tag": "data-product-1.2.1-correction.1", "committed": True,
+                      "record": "business_architecture/ontology/discovery-runs/run-1.md", "files": 2}
+    assert seen == [("cleared.json", "release", "confirmed.csv", "yes")]
+    for error, why in ((cut.CutRefused("row R001 was not confirmed; nothing was changed"), "CutRefused: row R001 was not confirmed; nothing was changed"),
+                       (cut.CutFailed("the build failed"), "CutFailed: the build failed"), (EOFError(), "no answer was typed; nothing was changed")):
+        def refuse(*a, **k):
+            raise error
+        monkeypatch.setattr(cut, "cut", refuse)
+        assert runner.cut_with_library("cleared.json", "release", "run") == {"status": "failed", "why": why}
 
 
 @pytest.mark.parametrize("name", ["the owner", "H.A.", "data-platform lead", "O'Neil 2"])

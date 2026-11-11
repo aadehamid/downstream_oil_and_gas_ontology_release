@@ -31,6 +31,7 @@ Needs rdflib; databricks-sdk for databricks; neo4j for the two Neo4j databases.
 """
 import argparse
 import json
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -105,13 +106,13 @@ def read_databricks(settings, run_sql, ss):
 # ---- reading the stores ---------------------------------------------------------------------------
 
 def expected(release_root, ss, ref=WORKTREE, extra_graphs=()):
-    """What a current store holds. The worktree is read with the load's own reader, which orders correction
-    versions; another ref is read by sync_stores at that Git ref."""
-    if ref in (None, WORKTREE):
-        want = ldb.expected(release_root, ss)
-        want["jena_graphs"] = ss.jena_graphs(want["newest"])
-    else:
-        want = ss.expected_for(ref, ("jena",))
+    """What a current store holds, from the release's own sync_stores: this folder's files, or the files at a Git
+    ref. The version order is the release scripts' (newest.version_key), which orders correction versions."""
+    try:
+        want = ss.expected_for(None if ref in (None, WORKTREE) else ref, ("jena",))
+    except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as err:
+        raise ldb.ov.ReleaseError(f"the release's catalog, projection manifest or packages cannot be read at {ref}, or the "
+                                  f"catalog lists a version this code cannot order ({type(err).__name__})") from None
     return want | {"jena_apart": tuple(extra_graphs)}
 
 

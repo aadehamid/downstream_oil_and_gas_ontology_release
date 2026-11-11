@@ -33,9 +33,9 @@ Clearing a report stays a person's job. When the run stops on a report, open
 <run folder>/pending/discovery-report.to-clear.csv. Each row's decision holds the recommended one. Change it where
 you disagree, write your role or initials in decided_by on every row you decide, save, and run the same command
 again. A row that blocks needs a decision and a decided_by. A row that does not block and has no decided_by stays
-undecided. decided_by is a short role or initials: letters, digits, spaces, dots, hyphens and apostrophes, at
-most 60 characters, and no e-mail address. The next run hands the report to the cut tool, which shows its plan
-and asks you to approve it in the terminal.
+undecided. decided_by is a role or initials, such as "the ontology owner"; the cut tool holds the rule
+(kpi_store.cut.is_role), and a name with an e-mail address or a long number is refused. The next run hands the
+report to the cut tool, which shows its plan and asks you to approve it in the terminal.
 
 A store load never runs after a notebook run that did not load this release: the run then stops, with exit 3.
 --skip leaves a step out on purpose; the last line and the summary then name the steps left out, and the run
@@ -57,6 +57,7 @@ import tomllib
 import zipfile
 from pathlib import Path
 
+from . import cut as cut_tool
 from . import local_settings as ls
 from . import report as rep
 from . import settings as settings_module
@@ -67,7 +68,6 @@ NOTEBOOK = Path("kpi_store") / "notebook" / "kpi_store_load.py"
 NOTEBOOK_NAME = "kpi_store_load"
 SETTINGS_NAME = "kpi_store.toml"
 PENDING, TO_CLEAR, CONFIRMED = "pending", "discovery-report.to-clear.csv", "confirmed.csv"
-DECIDED_BY = re.compile(r"^[A-Za-z0-9 .'\-]{1,60}$")   # the cut tool's rule for who decided: a role or initials
 CHECK_PASSED = "all checks passed"
 # Never in the zip: Git's folder, caches, and anything that could be a settings file with a password.
 SKIP_FOLDERS = (".git", "__pycache__", ".pytest_cache", ".venv", ".mypy_cache", ".ruff_cache")
@@ -206,10 +206,9 @@ def cleared_report(pending):
     open_rows, undecided = [], []
     for row in rows:
         decision, name = (row.get("decision") or "").strip(), (row.get("decided_by") or "").strip()
-        if name and not DECIDED_BY.match(name):
-            raise Stop(f"correct {path}: decided_by of row {row['id']} must be a short role or initials (letters, digits, "
-                       "spaces, dots, hyphens and apostrophes; at most 60 characters; no e-mail address). Then run the "
-                       "same command again")
+        if name and not cut_tool.is_role(name):   # the cut tool's own rule, asked here so the person corrects it first
+            raise Stop(f"correct {path}: decided_by of row {row['id']} is not a role or initials. There, {cut_tool.ROLE_HELP}. "
+                       "Then run the same command again")
         if blocks.get(row.get("id")) and not (decision and name):
             open_rows.append(row["id"])
         elif decision and not name:
@@ -256,6 +255,19 @@ def step_cut(ctx):
     decided = sum(1 for row in report["rows"] if row["decision"])
     return {**result, "report": str(cleared), "decided_rows": decided, "undecided_rows": undecided,
             "line": f"cut the cleared report: {decided} row(s) decided, {len(undecided)} left undecided"}
+
+
+def cut_with_library(report_json, release_root, run_dir, decisions=None, ask=input, say=print):
+    """The same cut through the tool's library call, in this process: for a caller that answers the prompts itself,
+    such as a test. Returns the same dict as cut_with_tool, with the outcome's version tag and record."""
+    try:
+        outcome = cut_tool.cut(report_json, release_root, decisions, ask=ask, say=say)
+    except EOFError:
+        return {"status": "failed", "why": "no answer was typed; nothing was changed"}
+    except (cut_tool.CutRefused, cut_tool.CutFailed, cut_tool.CutIncomplete) as err:
+        return {"status": "failed", "why": f"{type(err).__name__}: {err}"}
+    return {"status": "cut", "outcome": outcome.status, "tag": outcome.tag, "committed": outcome.committed,
+            "record": str(outcome.record) if outcome.record else "", "files": len(outcome.files)}
 
 
 # ---- check ----------------------------------------------------------------------------------------------

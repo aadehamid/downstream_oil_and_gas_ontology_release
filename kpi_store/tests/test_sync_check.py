@@ -118,6 +118,31 @@ def test_expected_reads_the_folder_and_orders_a_correction_version(tmp_path):
     assert want["jena_apart"] == ("urn:sample:tech-graph",)
 
 
+def test_expected_at_a_git_ref_orders_a_correction_version_too(tmp_path):
+    import os
+    import subprocess
+    root = support.small_release(tmp_path / "release")
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    def git(*args):
+        subprocess.run(["git", "-C", str(root), "-c", "user.name=sample", "-c", "user.email=sample@example.org", *args],
+                       check=True, capture_output=True, stdin=subprocess.DEVNULL, env=env)
+    git("init", "-q")
+    git("add", "-A")
+    git("commit", "-q", "-m", "the release as shipped")
+    support.small_release(tmp_path / "release", versions=("1.0.0", "1.0.1-correction.1"))   # the cut, not yet committed
+    ss = ldb.import_sync_stores(root)
+    correction = DP[:-len("1.0.0")] + "1.0.1-correction.1"
+    assert sc.expected(root, ss, "worktree")["newest"] == [correction, KPI]
+    shipped = sc.expected(root, ss, "HEAD")
+    assert shipped["newest"] == [DP, KPI] and shipped["catalog_datasets"] == 2 and DP + "/sample-model" in shipped["jena_graphs"]
+    git("add", "-A")
+    git("commit", "-q", "-m", "the correction")
+    assert sc.expected(root, ss, "HEAD")["newest"] == [correction, KPI]
+    assert sc.expected(root, ss, "HEAD~1")["newest"] == [DP, KPI]
+    with pytest.raises(ldb.ov.ReleaseError, match="cannot be read at no-such-ref"):
+        sc.expected(root, ss, "no-such-ref")
+
+
 # ---- reading and judging the four stores -----------------------------------------------------------
 
 def stores(tmp_path, monkeypatch, jena=GRAPHS, databricks=None, local=None, enterprise=None, warehouse="wh123", connect=None,
