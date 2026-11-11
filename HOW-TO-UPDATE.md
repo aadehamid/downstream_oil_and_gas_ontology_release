@@ -73,7 +73,7 @@ Every change below ends with these steps. Run them once for the module you chang
 
 5. Rebuild what follows from the packages, and check:
 
-   ```sh run=slow
+   ```sh skip reason="awaits-the-rewrite: the check passes only after the same steps for each module that requires kpi, and the example shows kpi alone"
    (cd $ONT/release && py build_catalog.py --write)
    (cd $ONT/projection && py pipeline.py build)
    (cd $ONT/regression && py run.py)
