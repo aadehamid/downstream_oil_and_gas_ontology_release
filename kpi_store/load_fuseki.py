@@ -3,6 +3,15 @@
     py -m kpi_store.load_fuseki --stores <local settings file>            # start or reuse Fuseki, load, check
     py -m kpi_store.load_fuseki --stores <local settings file> --stop     # stop the Fuseki this command started
 
+Where it sits in the run: this is the runner's fuseki step (kpi_store.runner). It runs after the Databricks
+notebook loaded the release, and before the local Neo4j load. The sync check reads the same dataset afterwards.
+
+It reads the release folder (the catalog and the release packages) and the local settings. It writes to the one
+Fuseki dataset [fuseki] url names, and to <run folder>/fuseki/ (fuseki.log and fuseki.pid, only when it starts the
+server). A server it starts with [fuseki] data_folder keeps the dataset in that folder. It writes no file of the
+release, and it never starts or stops a Fuseki on another machine. Python may leave __pycache__ folders beside the
+release code it imports; the runner's zip leaves those out.
+
 --stop never signals a process on its number alone, because after a restart of the machine the saved number can
 belong to another program. The start gives Java a random token (-Dkpi_store.fuseki=<token>) and saves it with the
 process ID. --stop reads the command line of the process that has that ID now (ps on macOS and Linux, PowerShell's
@@ -49,9 +58,12 @@ from . import local_settings as ls
 
 FUSEKI_SHA256 = "2c92c598e65ab69d99820052e05f4277ed1d77980a8845f87545ad35b71a76ee"   # jena-fuseki-server-6.2.0.jar
 JAVA_MINIMUM = 21   # the jar's manifest says Java-Version: 21
+# `java -version` prints a line such as: openjdk version "21.0.4". Group 1 is the major version. Java 8 and older
+# print "1.8.0", where the major version is the second number, so group 2 is kept too (java_major).
 JAVA_VERSION = re.compile(r'version "(\d+)(?:\.(\d+))?')
+# The longest a start waits for the dataset to answer. After that the start fails and names the log file.
 START_WAIT_SECONDS = 90
-PID_FILE, LOG_FILE = "fuseki.pid", "fuseki.log"
+PID_FILE, LOG_FILE = "fuseki.pid", "fuseki.log"   # both in <run folder>/fuseki, outside the release folder
 TOKEN_PROPERTY = "kpi_store.fuseki"   # the Java system property that carries the start's token
 
 
@@ -87,6 +99,7 @@ def java_major(java, run=subprocess.run):
 
 
 def file_sha256(path):
+    """The file's SHA-256, read in pieces of 1 MB so a large jar is never held in memory whole."""
     digest = hashlib.sha256()
     with Path(path).open("rb") as f:
         for piece in iter(lambda: f.read(1 << 20), b""):
@@ -106,7 +119,8 @@ def check_java(fuseki, environ=None, which=shutil.which, run=subprocess.run):
 
 
 def check_jar(jar):
-    """Raises FusekiError unless the jar is the pinned jena-fuseki-server-6.2.0.jar."""
+    """Raises FusekiError unless the jar is the pinned jena-fuseki-server-6.2.0.jar. The checksum is compared
+    because this command runs the jar: a damaged download, or another file under that name, must not start."""
     if not Path(jar).is_file():
         raise FusekiError(f"the Fuseki jar {jar} is missing; download jena-fuseki-server-6.2.0.jar and name it in [fuseki] jar")
     found = file_sha256(jar)
@@ -117,7 +131,9 @@ def check_jar(jar):
 # ---- the server -----------------------------------------------------------------------------------
 
 def answers(fuseki, opener=urllib.request.urlopen):
-    """True when the dataset answers a query at the URL the settings name."""
+    """True when the dataset answers a query at the URL the settings name. ASK {} reads nothing, so the answer
+    says only that the server is up and the dataset exists. The 5-second limit keeps a dead address from holding
+    up the start's wait loop."""
     url = fuseki.query_url + "?" + urllib.parse.urlencode({"query": "ASK {}"})
     try:
         with opener(urllib.request.Request(url, headers={"Accept": "application/sparql-results+json"}), timeout=5) as r:
@@ -130,6 +146,7 @@ def start_command(java, fuseki, token=None):
     """The command that starts Fuseki, as an argument list. --localhost accepts requests from this machine only.
     The token, when given, marks the process as the one this command started (stop)."""
     store = ["--tdb2", "--loc", str(fuseki.data_folder)] if fuseki.data_folder else ["--mem"]
+    # The mark goes before -jar: Java reads -D there as a system property, and after the jar as Fuseki's argument.
     mark = [f"-D{TOKEN_PROPERTY}={token}"] if token else []
     return [str(java), *mark, "-jar", str(fuseki.jar), *store, "--update", "--localhost", "--port", str(fuseki.port),
             fuseki.dataset]
@@ -170,6 +187,7 @@ def start(java, fuseki, state_folder, popen=subprocess.Popen, answers=answers, s
     with (state_folder / LOG_FILE).open("ab") as log:
         process = popen(start_command(java, fuseki, token), stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
                         cwd=str(state_folder), **apart)
+    # Saved before the wait, so --stop can find the process even when the wait fails or is interrupted.
     (state_folder / PID_FILE).write_text(json.dumps({"pid": process.pid, "token": token}) + "\n", encoding="utf-8", newline="\n")
     waited = 0
     while not answers(fuseki):
@@ -196,6 +214,7 @@ def stop(state_folder, kill=os.kill, command_line=command_line):
         pid_file.unlink()   # a file of another shape proves nothing about any process
         return "stale", None
     running = command_line(pid)
+    # The file goes whatever follows: the process is either stopped below or is not this command's.
     pid_file.unlink()
     if not token or running is None or f"-D{TOKEN_PROPERTY}={token}" not in running:
         return "stale", pid
@@ -262,10 +281,13 @@ def module_bases(ss):
 # ---- the load ------------------------------------------------------------------------------------
 
 def _update(store, statement):
+    """Sends one SPARQL Update request through the rdf-store skill's own HTTP call."""
     store._request(store.update_url, "POST", statement.encode("utf-8"), {"Content-Type": "application/sparql-update"})
 
 
 def default_graph_triples(store):
+    """The number of triples in the default graph. The release keeps every triple in a named graph, so any triple
+    here was written by something else, and load() treats it as a graph that is not the KPI Store's."""
     body = urllib.parse.urlencode({"query": "SELECT (COUNT(*) AS ?n) WHERE { ?s ?p ?o }"}).encode()
     _, data = store._request(store.query_url, "POST", body, {"Content-Type": "application/x-www-form-urlencoded",
                                                              "Accept": "application/sparql-results+json"})
@@ -296,8 +318,11 @@ def load(store, dataset, rdfstore, bases, drop_unknown=False, apart=()):
     held = set(store.graphs()) - set(apart)
     in_default = default_graph_triples(store)
     result = {"dataset_hash": want_hash, "graphs": len(wanted), "triples": len(dataset)}
+    # The cheap comparisons come first: the full export and its hash run only when the graph names already agree.
     if held == wanted and not in_default and rdfstore.dataset_hash(held_dataset(store, rdfstore, apart)) == want_hash:
         return {**result, "status": "current", "store_hash": want_hash, "dropped": []}
+    # Everything the store holds beyond the dataset is sorted into two kinds before any write. An earlier version
+    # of one of this release's modules may be dropped. Anything else stops the load unless the person asked.
     stale = sorted(held - wanted)
     earlier = [g for g in stale if g.startswith(tuple(bases))]
     unknown = [g for g in stale if g not in earlier] + (["(the default graph)"] if in_default else [])
@@ -309,7 +334,9 @@ def load(store, dataset, rdfstore, bases, drop_unknown=False, apart=()):
         drops.append("DROP SILENT DEFAULT")
     if drops:
         _update(store, " ;\n".join(drops))
-    # The rdf-store skill's round trip, with the store's copy read without the graphs apart.
+    # The rdf-store skill's round trip, with the store's copy read without the graphs apart. Both checks below run
+    # before publish, so a dataset the store cannot hold exactly is refused before any of its graphs is replaced.
+    # They run after the drops above, though: a refusal here leaves the store without the graphs just dropped.
     for quad in dataset:
         rdfstore.check_term(quad)
     if rdfstore.shared_blank_nodes(dataset):
@@ -337,6 +364,8 @@ def run(local, release_root, state_folder=None, extra_graphs=None, drop_unknown=
     rdfstore, ss = ldb.import_rdfstore(release_root), ldb.import_sync_stores(release_root)
     dataset = pack(rdfstore, store_graphs(release_root, ss, extra_graphs))
     store = rdfstore.FusekiStore(fuseki.data_url, fuseki.query_url, fuseki.update_url)
+    # The technical graph's graphs are set apart before the release's load, which would otherwise read them as
+    # graphs that are not the KPI Store's and stop. They are loaded after it, and only when its hashes are equal.
     apart, tech = (), None
     if tech_graph_files:
         from . import tech_graph

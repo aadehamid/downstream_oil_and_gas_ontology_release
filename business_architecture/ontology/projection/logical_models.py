@@ -22,6 +22,14 @@ What each store gets, beside the module's vocabulary, which the projection loads
 The labels, node shapes and loader are a build choice delegated to the build's agent, under the subject matter expert's decision of 2026-10-12. The store
 addresses and the Neo4j login come from sync_stores.settings; no password is printed.
 Needs rdflib; load also needs neo4j for Neo4j and pyoxigraph for Jena, and package_rows needs pyoxigraph (uv run --with ...).
+
+In the KPI Store load only the Neo4j half of this file runs, as a library. The local Neo4j load
+(kpi_store/load_neo4j.py) and the copy to Enterprise (kpi_store/copy_enterprise.py) call models, graph_rows, digest,
+content, read_marker and drift to see whether the subgraph is current, and load_neo4j to replace it when it is not.
+The subgraph is loaded after the ontology and before the store's marker is written. The sync check
+(kpi_store/sync_check.py) reads it with the same calls. The KPI Store's Databricks and Fuseki loads put the package
+graphs in their own dataset, with the release's other graphs, so they do not call load_jena or package_rows.
+The load command above is for a run by hand, with the settings of sync_stores.settings.
 """
 import argparse
 import hashlib
@@ -210,7 +218,8 @@ def graph_rows(model_files, ref=None):
 
 def digest(model_files, ref=None):
     """The SHA-256 of the model graph files (in this tree, or at ref), each file's name and bytes in name order:
-    what a Neo4j store's LogicalModelMarker records."""
+    what a Neo4j store's LogicalModelMarker records. It says which files a store was loaded from. content says
+    what the store holds now. The drift check needs both: a hand edit in the database leaves the digest as it was."""
     h = hashlib.sha256()
     for path in sorted(p for _, *paths in model_files for p in paths):
         h.update(os.path.basename(path).encode() + b"\0" + ss.repo_bytes(path, ref) + b"\0")
@@ -314,7 +323,11 @@ def load_jena(rs, graphs, query_url):
 
 
 def load_neo4j(session, files, store="neo4j"):
-    """Replaces the subgraph and its marker in the database the session is on, in one transaction."""
+    """Replaces the subgraph and its marker in the database the session is on, in one transaction.
+
+    The commit comes only after subgraph.replace_subgraph returns, which it does only when the count of edges
+    made equals the count sent and the ontology's counts did not move. When it raises, or the commit itself is
+    not reached, the transaction is rolled back, so the database keeps the subgraph and the marker it had."""
     nodes, edges = graph_rows(files)
     marker = {"store": store, "digest": digest(files), "models": [slug for slug, _, _ in files], "nodes": len(nodes),
               "edges": len(edges), "marked_at": ss.now()}

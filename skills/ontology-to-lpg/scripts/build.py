@@ -205,7 +205,10 @@ def cypher(cfg, data, shapes):
 def relative(path, root):
     """A path as the manifest records it: relative to root, with forward slashes, so the manifest
     does not change when the whole tree moves or the command runs from another folder."""
-    return os.path.relpath(os.path.abspath(path), os.path.abspath(root)).replace(os.sep, "/")
+    try:
+        return os.path.relpath(os.path.abspath(path), os.path.abspath(root)).replace(os.sep, "/")
+    except ValueError:   # on Windows a file on another drive has no relative path: record the whole path
+        return os.path.abspath(path).replace(os.sep, "/")
 
 
 def manifest(cfg, data_paths, shape_paths, loadable_path, inferred_path, root="."):

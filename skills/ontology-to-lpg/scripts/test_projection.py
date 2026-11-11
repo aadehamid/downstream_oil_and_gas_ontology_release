@@ -318,7 +318,7 @@ class CommandLine(unittest.TestCase):
             raw = raw_config()
             raw["release_exceptions"] = {"Rule 1: lib:copyOf has no single concrete range": "never closes"}
             path = os.path.join(tmp, "config.json")
-            with open(path, "w", encoding="utf-8") as f:
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
                 json.dump(raw, f)
             code, out = run_main(cpr.main, ["--config", path, "--shapes", SHAPES, MODULE])
         self.assertEqual(code, 1, out)
@@ -334,7 +334,7 @@ class CommandLine(unittest.TestCase):
             raw = raw_config()
             raw["rule4"] = "4c"
             path = os.path.join(tmp, "config.json")
-            with open(path, "w", encoding="utf-8") as f:
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
                 json.dump(raw, f)
             code, out = run_main(cpr.main, ["--config", path, MODULE])
         self.assertEqual(code, 2, out)
@@ -347,7 +347,7 @@ class CommandLine(unittest.TestCase):
     def test_unreadable_file_is_2(self):
         with tempfile.TemporaryDirectory() as tmp:
             bad = os.path.join(tmp, "bad.ttl")
-            with open(bad, "w", encoding="utf-8") as f:
+            with open(bad, "w", encoding="utf-8", newline="\n") as f:
                 f.write("this is not turtle .")
             self.assertEqual(run_main(cpr.main, ["--config", CONFIG, bad])[0], 2)
 
@@ -519,7 +519,7 @@ class ReviewRoundOne(OneBreak, unittest.TestCase):
             raw = raw_config()
             raw["rule4"] = "4b"
             path = os.path.join(tmp, "config.json")
-            with open(path, "w", encoding="utf-8") as f:
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
                 json.dump(raw, f)
             code, out = run_main(cpr.main, ["--config", path, "--shapes", SHAPES, MODULE])
         self.assertEqual(code, 2, out)
@@ -667,12 +667,21 @@ class Build(unittest.TestCase):
         self.assertEqual(man["shapes_fingerprint"], hashlib.sha256(open(SHAPES, "rb").read()).hexdigest())
         self.assertEqual(man["rule4"], "4a")
 
+    def test_a_file_on_another_drive_is_recorded_by_its_whole_path(self):
+        # On Windows the working files may sit on another drive than the release, and there is no relative path.
+        other_drive = ValueError("path is on mount 'C:', start on mount 'D:'")
+        with mock.patch.object(build.os.path, "relpath", side_effect=other_drive):
+            recorded = build.relative(os.path.join(os.sep, "elsewhere", "loadable.nt"), ".")
+        self.assertTrue(recorded.endswith("/elsewhere/loadable.nt"), recorded)
+        self.assertNotIn("\\", recorded)
+        self.assertEqual(build.relative(os.path.join("a", "b.ttl"), "."), "a/b.ttl")
+
     def test_manifest_verify_fails_when_an_input_changes(self):
         with tempfile.TemporaryDirectory() as tmp:
             loadable, inferred_path = os.path.join(tmp, "loadable.nt"), os.path.join(tmp, "inferred.nt")
             out = os.path.join(tmp, "manifest.json")
             self.assertEqual(run_main(build.main, ["loadable", "--output", loadable, MODULE])[0], 0)
-            open(inferred_path, "w").close()
+            open(inferred_path, "w", encoding="utf-8", newline="\n").close()
             args = ["manifest", "--config", CONFIG, "--shapes", SHAPES, "--loadable", loadable,
                     "--inferred", inferred_path, "--output", out, MODULE]
             self.assertEqual(run_main(build.main, args)[0], 0)
@@ -686,7 +695,7 @@ class Build(unittest.TestCase):
             self.assertIn("is not current", text)
             with open(out, "wb") as f:
                 f.write(lf)
-            with open(inferred_path, "w") as f:
+            with open(inferred_path, "w", encoding="utf-8", newline="\n") as f:
                 f.write(f"<{LIB}work/W-0043> <{RDF.type}> <{LIB}Work> .\n")
             code, text = run_main(build.main, args + ["--verify"])
             self.assertEqual(code, 1, text)
@@ -845,8 +854,8 @@ class RoundTwo(OneBreak, unittest.TestCase):
             for src in (MODULE, SHAPES, CONFIG):
                 shutil.copy(src, os.path.join(a, "data"))
             loadable, inferred_path = os.path.join(a, "loadable.nt"), os.path.join(a, "inferred.nt")
-            open(loadable, "w").close()
-            open(inferred_path, "w").close()
+            open(loadable, "w", encoding="utf-8", newline="\n").close()
+            open(inferred_path, "w", encoding="utf-8", newline="\n").close()
 
             def args(root):
                 return ["manifest", "--config", os.path.join(root, "data", "projection-config.json"),
@@ -1092,7 +1101,7 @@ class Connection(unittest.TestCase):
     """load_verify.py reaches a server that already runs: an env file, or --bolt with the environment."""
 
     def env(self, text):
-        f = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False)
+        f = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False, encoding="utf-8", newline="\n")
         f.write(text)
         f.close()
         self.addCleanup(os.remove, f.name)
@@ -1163,7 +1172,7 @@ class RoundFour(OneBreak, unittest.TestCase):
         raw = raw_config()
         raw["rule4"] = "4b"
         path = os.path.join(tmp, "config.json")
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             json.dump(raw, f)
         return path
 
@@ -1278,7 +1287,7 @@ class RoundFive(unittest.TestCase):
         self.addCleanup(shutil.rmtree, tmp)
         path = os.path.join(tmp, "r.json")
         if existing is not None:
-            with open(path, "w", encoding="utf-8") as f:
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
                 f.write(existing)
         patch = mock.patch.object(lv, "run", side_effect=run_error) if run_error else \
             mock.patch.object(lv, "run", return_value=run_result)
@@ -1302,7 +1311,7 @@ class FinalRun(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             loadable, inferred_path = os.path.join(tmp, "loadable.nt"), os.path.join(tmp, "inferred.nt")
             self.assertEqual(run_main(build.main, ["loadable", "--output", loadable, MODULE])[0], 0)
-            with open(inferred_path, "w", encoding="utf-8") as f:
+            with open(inferred_path, "w", encoding="utf-8", newline="\n") as f:
                 f.write(f"<{LIB}work/W-0043> <{RDF.type}> <{LIB}Work> .\n")
             code, out = run_main(build.main, ["check-serialised", "--loadable", loadable, "--inferred", inferred_path])
         self.assertEqual(code, 0, out)
@@ -1740,7 +1749,7 @@ class Separator(unittest.TestCase):
             raw = raw_config()
             raw["prefixes"]["my_ns"] = "https://example.org/my-ns/"
             clashing = os.path.join(tmp, "config.json")
-            with open(clashing, "w", encoding="utf-8") as f:
+            with open(clashing, "w", encoding="utf-8", newline="\n") as f:
                 json.dump(raw, f)
             for command in ("graph-type", "data-model"):
                 target = os.path.join(tmp, command + ".out")

@@ -13,7 +13,7 @@ def package(ontology, module, version, files=None):
     folder = os.path.join(ontology, "releases", module, version)
     os.makedirs(folder)
     for name, text in {"manifest.json": "{}", **(files or {})}.items():
-        with open(os.path.join(folder, name), "w") as f:
+        with open(os.path.join(folder, name), "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
     return folder
 
@@ -81,7 +81,7 @@ class Newest(unittest.TestCase):
     def test_core_builder_is_the_highest_number(self):
         with tempfile.TemporaryDirectory() as tmp:
             for name in ("build_core.py", "build_core_next.py", "build_core_2_4.py", "build_core_2_10.py", "test_build_core_2_11.py"):
-                open(os.path.join(tmp, name), "w").close()
+                open(os.path.join(tmp, name), "w", encoding="utf-8", newline="\n").close()
             self.assertEqual(newest.core_builder(tmp), "build_core_2_10")
 
     def test_a_core_builder_name_with_a_line_end_is_not_a_builder(self):
@@ -93,7 +93,7 @@ class Newest(unittest.TestCase):
         self.assertNotIn("$", newest.VERSION.pattern)
         with tempfile.TemporaryDirectory() as tmp:
             for name in ("build_core_2_4.py", "build_core_9_9.py\n" if os.name != "nt" else "build_core_2_3.py"):
-                open(os.path.join(tmp, name), "w").close()
+                open(os.path.join(tmp, name), "w", encoding="utf-8", newline="\n").close()
             self.assertEqual(newest.core_builder(tmp), "build_core_2_4")
             self.assertTrue(re.fullmatch(r"build_core_\d+_\d+", newest.core_builder(tmp)))
 

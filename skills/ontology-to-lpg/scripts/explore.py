@@ -266,7 +266,7 @@ def main(argv):
         if command == "sparql-walk":
             if "--output" not in opts:
                 raise Refusal("give --output for the query file")
-            with open(opts["--output"], "w", encoding="utf-8") as f:
+            with open(opts["--output"], "w", encoding="utf-8", newline="\n") as f:
                 f.write(sparql_walk(hops))
             print(f"wrote {q(opts['--output'])}: the walk, {q(hops)} hop(s)")
             return 0

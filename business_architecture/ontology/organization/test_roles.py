@@ -21,7 +21,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def rows(path):
-    with open(path, newline="") as f:
+    with open(path, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
@@ -51,7 +51,7 @@ class RegisterReconciles(unittest.TestCase):
         self.assertEqual((f["deprecated roles"], f["live roles"]), (3, 57))
 
     def test_roles_ttl_is_current(self):
-        with open(br.OUTPUT) as f:
+        with open(br.OUTPUT, encoding="utf-8") as f:
             written = f.read()
         _, register, roles = br.load()
         self.assertIn(br.build(register, roles).serialize(format="turtle"), written)
@@ -69,7 +69,7 @@ class BrokenRegisterFails(unittest.TestCase):
             if edit:
                 data = edit(data)
             paths[name] = os.path.join(tmp, os.path.basename(source))
-            with open(paths[name], "w", newline="") as f:
+            with open(paths[name], "w", newline="", encoding="utf-8") as f:
                 w = csv.DictWriter(f, fieldnames=list(rows(source)[0].keys()))
                 w.writeheader()
                 w.writerows(data)

@@ -54,7 +54,7 @@ def parse(segment):
 
 
 def corrections(path):
-    with open(path, newline="") as f:
+    with open(path, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     if rows and not set(COLUMNS) <= rows[0].keys():
         sys.exit(f"{path}: needs columns {', '.join(COLUMNS)}")

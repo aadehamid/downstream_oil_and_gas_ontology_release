@@ -51,7 +51,7 @@ G_CAT = ox.NamedNode("https://example.org/catalog/2.1.0")
 
 def write(folder, name, text):
     path = os.path.join(folder, name)
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
     return path
 
@@ -677,14 +677,14 @@ class GraphStoreProtocol(unittest.TestCase):
 class CommandLine(unittest.TestCase):
     def run_cli(self, *args, env=None):
         return subprocess.run([sys.executable, os.path.join(HERE, "rdfstore.py"), *args], capture_output=True, text=True,
-                              env={**os.environ, **(env or {})})
+                              env={**os.environ, **(env or {})}, encoding="utf-8")
 
     def test_compare_exits_1_with_a_diff(self):
         folder, files = release_files()
         out = os.path.join(folder, "a.nq")
         self.assertEqual(self.run_cli("pack", "--out", out, files[0]).returncode, 0)
         changed = os.path.join(folder, "b.nq")
-        with open(out) as f, open(changed, "w") as g:
+        with open(out, encoding="utf-8") as f, open(changed, "w", encoding="utf-8", newline="\n") as g:
             g.write(f.read().replace('"plain"', '"plain "'))
         r = self.run_cli("compare", out, changed)
         self.assertEqual(r.returncode, 1)
@@ -801,7 +801,7 @@ class CommandLine(unittest.TestCase):
         path = write(folder, "g.nt", '<http://s> <http://p> "v" .\n')
         out = os.path.join(folder, "o.nq")
         self.assertEqual(self.run_cli("pack", "--out", out, "--graph", f"{path}=http://g", path).returncode, 0)
-        with open(out) as f:
+        with open(out, encoding="utf-8") as f:
             self.assertEqual(f.read(), '<http://s> <http://p> "v" <http://g> .\n')
 
     def test_a_failed_write_leaves_no_temporary_file(self):
@@ -899,7 +899,7 @@ class CommandLine(unittest.TestCase):
             close(server)
         self.assertEqual(r.returncode, 2)
         self.assertEqual(requests, [])
-        with open(out) as f:
+        with open(out, encoding="utf-8") as f:
             self.assertEqual(f.read(), "keep me\n")
 
     def test_export_takes_no_update_endpoint(self):
@@ -922,7 +922,7 @@ class CommandLine(unittest.TestCase):
         packed = os.path.join(folder, "packed.nq")
         self.run_cli("pack", "--out", packed, *files)
         self.assertEqual(self.run_cli("compare", packed, out).returncode, 0)
-        with open(os.path.join(ttl, "graphs.tsv")) as f:
+        with open(os.path.join(ttl, "graphs.tsv"), encoding="utf-8") as f:
             index = [line.rstrip("\n").split("\t") for line in f]
         self.assertEqual(sorted(g for _, g in index), [G_CAT.value, G_LIB.value])
         rebuilt = rs.pack([os.path.join(ttl, n) for n, _ in index],

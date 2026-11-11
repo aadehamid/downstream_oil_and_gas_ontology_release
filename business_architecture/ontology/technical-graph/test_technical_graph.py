@@ -86,7 +86,7 @@ class Example(unittest.TestCase):
 class Questions(unittest.TestCase):
     def test_q47_lists_the_table_that_copies_a_changed_systems_data(self):
         # a change to a system first affects the tables that copy its data.
-        with open(os.path.join(ONTOLOGY, "regression", "queries", "q47-affected-by-change.rq")) as f:
+        with open(os.path.join(ONTOLOGY, "regression", "queries", "q47-affected-by-change.rq"), encoding="utf-8") as f:
             rows = {(str(r.changed), str(r.affected)) for r in (VOCAB + EXAMPLE).query(f.read())}
         copies = {(str(s), str(t)) for t, db in EXAMPLE.subject_objects(TG.copies) for s in EXAMPLE.objects(db, TG.standsFor)}
         self.assertTrue(copies)

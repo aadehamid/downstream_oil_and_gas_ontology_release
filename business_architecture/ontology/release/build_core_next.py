@@ -101,7 +101,7 @@ def source_map():
 
 def sipoc():
     """(process IRI, inputs, outputs) for every process with a SIPOC field in the process map."""
-    with open(IDENTITY) as f:
+    with open(IDENTITY, encoding="utf-8") as f:
         iri = {row["skos_notation"]: URIRef(row["uri"]) for row in json.load(f) if row["skos_notation"]}
     data = json.loads(source_map())
     out = []
@@ -193,7 +193,7 @@ def build():
 def shapes_text():
     """1.0.0's shapes file, unchanged, followed by the 2.0.0 additions. Kept as text so the inline
     blank nodes of 1.0.0's shapes are not re-serialized in a different order on each build."""
-    with open(os.path.join(BASE, "shapes.ttl")) as f:
+    with open(os.path.join(BASE, "shapes.ttl"), encoding="utf-8") as f:
         base = f.read()
     return base + "\n# ---- Added in 2.0.0 (the decision of 2026-10-13) ----\n" + additions().serialize(format="turtle")
 
@@ -266,9 +266,9 @@ def catalog():
 def package(g, s, counts):
     files = {"core.ttl": g.serialize(format="turtle"), "core.jsonld": jsonld(g), "shapes.ttl": shapes_text(),
              "catalog.ttl": catalog(), "counts.json": json.dumps(dict(sorted(counts.items())), indent=2) + "\n"}
-    with open(CHANGELOG) as f:
+    with open(CHANGELOG, encoding="utf-8") as f:
         files["CHANGELOG.md"] = f.read()
-    with open(os.path.join(BASE, "manifest.json")) as f:
+    with open(os.path.join(BASE, "manifest.json"), encoding="utf-8") as f:
         base_manifest = f.read()
     files["manifest.json"] = json.dumps({
         "module": "core", "version": LABEL, "release_candidate": STAGE is not None,
@@ -295,14 +295,14 @@ def main():
     print(f"core {LABEL}: {len(g)} triples; shapes conform; " + ", ".join(f"{k} {v}" for k, v in sorted(counts.items())))
     if args.verify:
         stale = [n for n, t in files.items() if not os.path.exists(os.path.join(RELEASE_DIR, n))
-                 or open(os.path.join(RELEASE_DIR, n)).read() != t]
+                 or open(os.path.join(RELEASE_DIR, n), encoding="utf-8").read() != t]
         if stale:
             sys.exit(f"core {LABEL} package is not current: {stale}")
         print("release package is current")
     if args.write:
         os.makedirs(RELEASE_DIR, exist_ok=True)
         for n, t in files.items():
-            with open(os.path.join(RELEASE_DIR, n), "w") as f:
+            with open(os.path.join(RELEASE_DIR, n), "w", encoding="utf-8", newline="\n") as f:
                 f.write(t)
         print(f"wrote {RELEASE_DIR}")
 

@@ -33,7 +33,7 @@ SHEET = "Review & authoring"
 
 
 def corrections(path):
-    with open(path, newline="") as f:
+    with open(path, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     if rows and not {"scope_note_slug", "scope_note_sentence"} <= rows[0].keys():
         sys.exit(f"{path}: needs scope_note_slug and scope_note_sentence columns")

@@ -40,7 +40,7 @@ COLUMNS = ["node_slug", "row_id", "source_verb", "earlier", "later", "scope_unit
 
 
 def load(path=TABLE):
-    with open(path, newline="") as f:
+    with open(path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         return reader.fieldnames, list(reader)
 
@@ -48,7 +48,7 @@ def load(path=TABLE):
 def taxonomy_parents(path=TAXONOMY):
     """slug -> parent slug (or None), read from the taxonomy's skos:broader lines."""
     parents, subject = {}, None
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         for line in f:
             m = re.match(r"proc:(\S+) a skos:Concept", line)
             if m:
@@ -71,7 +71,7 @@ def ancestors(slug, parents):
 
 def code_list(scheme, path=VOCABULARY):
     """Local names of the skos:Concepts in one scheme of vocabulary.ttl."""
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         text = f.read()
     names = set()
     for block in text.split("\n\n"):
@@ -84,14 +84,14 @@ def code_list(scheme, path=VOCABULARY):
 def saved_answer_urls(folder=ANSWERS):
     urls = set()
     for path in glob.glob(os.path.join(folder, "*.md")):
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             urls.update(re.findall(r"verbatim from (\S+)", f.readline()))
     return urls
 
 
 def scope_labels(path=VOCABULARY):
     """Scope-unit prefLabel (lower case) -> local name, from vocabulary.ttl."""
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         text = f.read()
     return {label.lower(): name for name, label in
             re.findall(r'scope:([\w-]+) a skos:Concept ;[^.]*?skos:prefLabel "([^"]+)"@en', text, re.S)}
@@ -99,7 +99,7 @@ def scope_labels(path=VOCABULARY):
 
 def approved_ancestor_nodes(path=SHAPES):
     """Node slugs listed in shape:ApprovedAncestorLink's sh:in."""
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         m = re.search(r"shape:ApprovedAncestorLink a sh:NodeShape ;.*?sh:in \(([^)]*)\)", f.read(), re.S)
     return set(re.findall(r"seq:(\S+)", m.group(1))) if m else set()
 
@@ -110,7 +110,7 @@ def approvals():
     scope: row -> scope unit; conditional, refinement, ancestor: row sets named by Q10, Q12, Q6;
     answer: row -> saved answer URL; basis: row -> evidence basis (Q13).
     """
-    with open(DESIGN) as f:
+    with open(DESIGN, encoding="utf-8") as f:
         text = f.read()
     labels = scope_labels()
     scope = {}
@@ -125,9 +125,9 @@ def approvals():
 
     answer, basis = {}, {}
     for path in REVIEWS:
-        with open(os.path.join(ANSWERS, BATCH_ANSWER[path])) as f:
+        with open(os.path.join(ANSWERS, BATCH_ANSWER[path]), encoding="utf-8") as f:
             url = re.search(r"verbatim from (\S+)", f.readline()).group(1)
-        with open(path, newline="") as f:
+        with open(path, newline="", encoding="utf-8") as f:
             for r in csv.DictReader(f):
                 answer[r["row_id"]] = url
                 # Q13: all of batch 2, and the batch 1 answers adopted as reference-model assumptions.
@@ -151,7 +151,7 @@ def check(columns=None, rows=None):
     answers = saved_answer_urls()
     reviewed = {}
     for path in REVIEWS:
-        with open(path, newline="") as f:
+        with open(path, newline="", encoding="utf-8") as f:
             for r in csv.DictReader(f):
                 reviewed[r["row_id"]] = r
     by_slug = {}
@@ -315,11 +315,11 @@ def main(argv):
         g, tax = graph()
         text = turtle(g)
         if "--write" in argv:
-            with open(OUTPUT, "w") as f:
+            with open(OUTPUT, "w", encoding="utf-8", newline="\n") as f:
                 f.write(text)
             print(f"wrote {os.path.relpath(OUTPUT, STEP4)}")
         else:
-            with open(OUTPUT) as f:
+            with open(OUTPUT, encoding="utf-8") as f:
                 if f.read() != text:
                     print("FAIL scoped-sequences.ttl is not current; run build.py --write")
                     return 1

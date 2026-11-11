@@ -9,15 +9,17 @@ from collections import Counter
 from pathlib import Path
 
 from .check import NESTED_NOTE, Checker
-from .extract import documents, extract, tree_files
+from .extract import documents, extract
+from .pages import extract_html, html_documents, is_page
 from .registry import ROOT, RegistryError, load_registry
 
 
 def tally(root: Path, docs=None) -> dict:
     """The blocks of each document, counted by tag (a skip by its reason)."""
     out = {}
-    for doc in (docs or documents(root)):
-        blocks, problems = extract(doc, (root / doc).read_text(encoding="utf-8"))
+    for doc in (docs or documents(root) + html_documents(root)):
+        read = extract_html if is_page(doc) else extract
+        blocks, problems = read(doc, (root / doc).read_text(encoding="utf-8"))
         counts = Counter()
         for block in blocks:
             if block.tag == "skip":
@@ -35,15 +37,10 @@ def tally(root: Path, docs=None) -> dict:
 
 def html_pages(root: Path) -> list:
     """(page, <pre> blocks, <code> spans outside them) for each HTML page that no Markdown file is the source of.
-    This tool cannot reach them: a page is counted here so that someone decides how it is tested."""
-    files = set(tree_files(root))
+    The check reads the blocks of these pages; a <code> span in a sentence is text, as in Markdown."""
     out = []
-    for page in sorted(p for p in files if p.lower().endswith((".html", ".htm"))):
-        if page.rsplit(".", 1)[0] + ".md" in files:
-            continue
+    for page in html_documents(root):
         text = (root / page).read_text(encoding="utf-8", errors="replace")
-        if 'name="generator"' in text:
-            continue
         pre = re.findall(r"<pre\b.*?</pre>", text, re.S | re.I)
         rest = re.sub(r"<pre\b.*?</pre>", "", text, flags=re.S | re.I)
         out.append((page, len(pre), len(re.findall(r"<code\b", rest, re.I))))
@@ -52,7 +49,7 @@ def html_pages(root: Path) -> list:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="doc_snippets.py",
-                                     description="Test every code block in the Markdown documents.")
+                                     description="Test every code block in the documents.")
     parser.add_argument("--root", type=Path, default=ROOT, help="the top folder of the release (default: this one)")
     sub = parser.add_subparsers(dest="command", required=True)
     check = sub.add_parser("check", help="run or check every block")
@@ -65,7 +62,7 @@ def main(argv=None) -> int:
     listing = sub.add_parser("list", help="count the blocks of each document by tag")
     listing.add_argument("docs", nargs="*")
     sub.add_parser("contexts", help="the contexts, and which ones can run here")
-    sub.add_parser("html", help="the HTML pages with no Markdown source")
+    sub.add_parser("html", help="the HTML pages with no Markdown source, which the check reads too")
     args = parser.parse_args(argv)
     root = args.root.resolve()
     try:

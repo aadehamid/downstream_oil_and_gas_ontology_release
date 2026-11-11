@@ -370,7 +370,7 @@ def released_requires(dep, version):
     folder = package_folder(dep, version)
     if folder is None:
         raise FileNotFoundError(f"{dep} {version} is not on disk (releases/ or releases/previous/)")
-    with open(os.path.join(folder, "manifest.json")) as f:
+    with open(os.path.join(folder, "manifest.json"), encoding="utf-8") as f:
         return json.load(f).get("depends_on") or {}
 
 
@@ -477,7 +477,7 @@ def package(name, g):
     shapes = parse(m["shapes"][:m.get("own_shapes", 1)])
     files = {f"{name}.ttl": g.serialize(format="turtle"), f"{name}.jsonld": jsonld(g),
              "shapes.ttl": shapes.serialize(format="turtle"), "catalog.ttl": catalog(name)}
-    with open(os.path.join(ONTOLOGY, "releases", name, "CHANGELOG.md")) as f:
+    with open(os.path.join(ONTOLOGY, "releases", name, "CHANGELOG.md"), encoding="utf-8") as f:
         files["CHANGELOG.md"] = f.read()
     # "graphs": files the package carries as they are, each in its own graph beside <name>.ttl, such as a logical model's
     # export and its annotation layer (the decision of 2026-11-02). Only the logical-model module has any.
@@ -518,7 +518,7 @@ def main():
     print(f"{args.module} {label(MODULES[args.module])}: {len(g)} triples; shapes conform")
     if args.verify:
         stale = [n for n, t in files.items()
-                 if not os.path.exists(os.path.join(out, n)) or open(os.path.join(out, n)).read() != t]
+                 if not os.path.exists(os.path.join(out, n)) or open(os.path.join(out, n), encoding="utf-8").read() != t]
         if stale:
             sys.exit(f"{args.module} release package is not current: {stale}")
         print("release package is current")
@@ -527,7 +527,7 @@ def main():
             newest.refuse_overwrite(out, files, f"{args.module} {label(MODULES[args.module])}", args.rebuild_released)
         os.makedirs(out, exist_ok=True)
         for n, t in files.items():
-            with open(os.path.join(out, n), "w") as f:
+            with open(os.path.join(out, n), "w", encoding="utf-8", newline="\n") as f:
                 f.write(t)
         print(f"wrote {out}")
 

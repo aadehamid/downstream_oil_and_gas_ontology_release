@@ -32,6 +32,14 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def relpath(path, start):
+    """The path from start, written with /. A page's links and names must be the same on Windows, where
+    os.path.relpath gives \\."""
+    return os.path.relpath(path, start).replace(os.sep, "/")
+
+
 TEMPLATE = os.path.join(ROOT, "scripts", "docs_template.html")
 # Every generated page carries this mark; the template takes it from here, and scripts/epm_facts.py reads it.
 GENERATOR = "scripts/build_docs_html.py"
@@ -150,7 +158,7 @@ def all_pages():
         out.append(single(src, f"The {m} folder of the ontology build: what it holds, "
                           "how it is built and checked, and its releases.", scope="Module"))
     for path in sorted(glob.glob(os.path.join(ROOT, "business_architecture/business_process/proposals/*.md"))):
-        rel = os.path.relpath(path, ROOT)
+        rel = relpath(path, ROOT)
         out.append(single(rel, "A proposed change to the process map. A proposal is not applied until it is accepted.",
                           scope="Process-map proposal"))
     records = sorted(glob.glob(os.path.join(ROOT, DECISIONS_DIR, "DEC-*.md")))
@@ -163,7 +171,7 @@ def all_pages():
     out.append({"out": DECISIONS_PAGE, "title": source_title(f"{DECISIONS_DIR}/README.md"), "scope": "the decision records",
                 "lead": "Every decision behind the ontology and its build: context, decision, alternatives, the "
                         "decision owner's recorded words, evidence, status and date.",
-                "sources": [os.path.relpath(p, ROOT) for p in records], "intro": f"{DECISIONS_DIR}/README.md",
+                "sources": [relpath(p, ROOT) for p in records], "intro": f"{DECISIONS_DIR}/README.md",
                 "decisions": True})
     return out
 
@@ -281,7 +289,7 @@ class Page:
         target = os.path.join(ROOT, page)
         if os.path.normpath(target) == os.path.normpath(self.out):
             return ""
-        return os.path.relpath(target, self.out_dir)
+        return relpath(target, self.out_dir)
 
     def record_link(self, src, url):
         """Whether a relative Markdown link names a decision record's file."""
@@ -305,7 +313,7 @@ class Page:
         if target in self.generated:
             page = self.to(self.generated[target])
             return page + (f"#{frag}" if frag else ("" if page else "#top"))
-        return os.path.relpath(target, self.out_dir) + (f"#{frag}" if frag else "")
+        return relpath(target, self.out_dir) + (f"#{frag}" if frag else "")
 
     # ---- inline
 
@@ -603,7 +611,7 @@ def marked_pages(root=ROOT):
     if os.path.exists(os.path.join(root, ".git")):
         names = subprocess.check_output(["git", "-C", root, "ls-files", "-z", "*.html"], env=env).decode().split("\0")
     else:  # a tree without Git: every .html file in it
-        names = [os.path.relpath(os.path.join(r, f), root) for r, ds, fs in os.walk(root) for f in fs
+        names = [relpath(os.path.join(r, f), root) for r, ds, fs in os.walk(root) for f in fs
                  if f.endswith(".html") and "__pycache__" not in r]
     marked = []
     for name in filter(None, names):
@@ -639,7 +647,7 @@ def main(argv, out_root=ROOT):
                 stale.append(out)
         else:
             os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "w", encoding="utf-8") as f:
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
                 f.write(page)
             print(f"wrote {out}")
     lost = orphans(built, marked_pages(out_root)) if check else []

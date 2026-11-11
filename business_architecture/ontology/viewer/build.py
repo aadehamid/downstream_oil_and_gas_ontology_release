@@ -3,13 +3,16 @@
 import argparse
 import base64
 from collections import Counter, defaultdict
+from contextlib import contextmanager
 import hashlib
+import html
 import json
 from pathlib import Path
 import re
 import subprocess
 import sys
 
+import rdflib
 from rdflib import BNode, Graph, Literal, RDF, RDFS, OWL, SKOS
 from rdflib.namespace import DCTERMS
 from rdflib.compare import to_canonical_graph
@@ -25,6 +28,19 @@ RELEASE = "KPI Store 1.1"
 LABELS = (SKOS.prefLabel, RDFS.label, DCTERMS.title)
 PARENTS = (RDFS.subClassOf, RDFS.subPropertyOf, SKOS.broader)
 SUPPORTING_KINDS = ("Anonymous node", "Evidence", "Metadata", "Constraint")
+
+
+@contextmanager
+def literals_as_written():
+    """Keep each typed literal's text as the package wrote it. By default rdflib rewrites it into the
+    datatype's canonical form (a time ending in "Z" becomes one ending in "+00:00"), and the page must
+    show the released text."""
+    before = rdflib.NORMALIZE_LITERALS
+    rdflib.NORMALIZE_LITERALS = False
+    try:
+        yield
+    finally:
+        rdflib.NORMALIZE_LITERALS = before
 
 
 def release_files(root):
@@ -43,7 +59,7 @@ def release_files(root):
         if not versions:
             continue
         manifest_path = max(versions, key=lambda p: version_key(p.name)) / "manifest.json"
-        manifest = json.loads(manifest_path.read_text())
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if (
             manifest["module"] != module.name
             or manifest["version"] != manifest_path.parent.name
@@ -82,8 +98,7 @@ def clean_packages(root):
             "--",
             str(ONTOLOGY / "releases"),
         ],
-        text=True,
-    )
+        text=True, encoding="utf-8")
     if changed:
         raise ValueError("The release packages have local changes")
 
@@ -97,13 +112,20 @@ def short(value):
 
 
 def build_data(root):
+    """The page's data: every triple of the current packages, grouped by subject."""
+    with literals_as_written():
+        return _build_data(Path(root))
+
+
+def _build_data(root):
     graph = Graph()
     membership = defaultdict(set)
     inputs = []
     for path, module, version in release_files(root):
         part = to_canonical_graph(Graph().parse(path, format="turtle"))
         # Canonical blank IDs from different files must remain scoped to their file.
-        prefix = hashlib.sha256(str(path.relative_to(root)).encode()).hexdigest()[:16]
+        # Forward slashes on every system, so Windows builds the same page.
+        prefix = hashlib.sha256(path.relative_to(root).as_posix().encode()).hexdigest()[:16]
 
         def scoped(node):
             return BNode(prefix + str(node)) if isinstance(node, BNode) else node
@@ -115,7 +137,7 @@ def build_data(root):
                 membership[triple[0]].add((module, version))
         inputs.append(
             {
-                "path": str(path.relative_to(root)),
+                "path": path.relative_to(root).as_posix(),
                 "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
             }
         )
@@ -208,7 +230,25 @@ def build_data(root):
     }
 
 
-def build(root, output, compare=None, require_clean=True):
+def embed(data):
+    """The data as JSON that is safe inside a script element."""
+    return (
+        json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+        .replace("<", "\\u003c")
+        .replace("&", "\\u0026")
+    )
+
+
+def write_page(output, page):
+    """Write UTF-8 with LF line ends, so every system writes the same bytes."""
+    output = Path(output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with output.open("w", encoding="utf-8", newline="\n") as f:
+        f.write(page)
+
+
+def render(root, compare=None, require_clean=True):
+    """The page's text and its data, without writing a file."""
     root = Path(root).resolve()
     if require_clean:
         clean_packages(root)
@@ -217,7 +257,7 @@ def build(root, output, compare=None, require_clean=True):
         compare = Path(compare).resolve()
         expected_inputs = [
             {
-                "path": str(path.relative_to(root)),
+                "path": path.relative_to(root).as_posix(),
                 "sha256": hashlib.sha256(
                     neutral_source_description(path.read_bytes().decode("utf-8")).encode("utf-8")
                 ).hexdigest(),
@@ -226,7 +266,7 @@ def build(root, output, compare=None, require_clean=True):
         ]
         other_inputs = [
             {
-                "path": str(path.relative_to(compare)),
+                "path": path.relative_to(compare).as_posix(),
                 "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
             }
             for path, _, _ in release_files(compare)
@@ -237,11 +277,6 @@ def build(root, output, compare=None, require_clean=True):
         # with the files recipients receive. Only the exact source-title substitution
         # above may differ between the two trees, even in a metadata graph.
         data = build_data(compare)
-    payload = (
-        json.dumps(data, ensure_ascii=False, separators=(",", ":"))
-        .replace("<", "\\u003c")
-        .replace("&", "\\u0026")
-    )
     font_css = "".join(
         '@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:'
         + weight
@@ -254,29 +289,44 @@ def build(root, output, compare=None, require_clean=True):
     )
     page = (
         (HERE / "viewer.html")
-        .read_text()
+        .read_text(encoding="utf-8")
         .replace("/* EMBEDDED_FONTS */", font_css)
     )
-    import html
-
     page = page.replace(
-        "FONT_LICENSE_TEXT", html.escape((HERE / "fonts/OFL.txt").read_text())
+        "FONT_LICENSE_TEXT", html.escape((HERE / "fonts/OFL.txt").read_text(encoding="utf-8"))
     )
-    page = page.replace("/* EMBEDDED_DATA */", payload)
-    output = Path(output)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(page)
+    return page.replace("/* EMBEDDED_DATA */", embed(data)), data
+
+
+def build(root, output, compare=None, require_clean=True):
+    page, data = render(root, compare, require_clean)
+    write_page(output, page)
     return {k: data[k] for k in ("release", "counts", "terms", "triples")}
 
 
-def main():
+def is_current(root, output):
+    """True when the page at `output` equals a fresh build from the tree's packages."""
+    output = Path(output)
+    page, _ = render(root, require_clean=False)
+    return output.is_file() and output.read_bytes() == page.encode("utf-8")
+
+
+def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--source", required=True)
-    p.add_argument("--out", required=True)
+    p.add_argument("--source", required=True, help="the release folder")
+    p.add_argument("--out", required=True, help="the page to write, or with --check the page to compare")
     p.add_argument("--compare")
-    args = p.parse_args()
+    p.add_argument("--check", action="store_true", help="write nothing; fail when the page differs from a fresh build")
+    args = p.parse_args(argv)
+    if args.check:
+        if is_current(args.source, args.out):
+            print(f"{args.out} is current")
+            return 0
+        print(f"{args.out} differs from a fresh build; run this command again without --check", file=sys.stderr)
+        return 1
     print(json.dumps(build(args.source, args.out, args.compare), indent=2))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -305,7 +305,7 @@ def main(argv):
             print("usage: module_tags.py construct --output <module-map.rq>", file=sys.stderr)
             return 2
         try:
-            with open(argv[2], "w", encoding="utf-8") as f:
+            with open(argv[2], "w", encoding="utf-8", newline="\n") as f:
                 f.write(CONSTRUCT)
         except OSError as exc:
             print(f"ERROR {q(error_line('the query file was not written', exc))}", file=sys.stderr)

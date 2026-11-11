@@ -90,7 +90,7 @@ def main() -> int:
         f"aliases; scoped historical alias '{SCOPED_ALIAS}' recorded here."
     )
     IDENTITY_MAP.write_text(json.dumps(entries, indent=1, ensure_ascii=False) + "\n",
-                            encoding="utf-8")
+                            encoding="utf-8", newline="\n")
     print(f"identity map: updated {SLUG} + migration metadata")
 
     # 3. naming queue: add the late-discovered row as the 9th critical entry
@@ -124,7 +124,7 @@ def main() -> int:
     old_sec = "## Critical semantic collision (8)"
     assert old_sec in text
     text = text.replace(old_sec, "## Critical semantic collision (9)")
-    QUEUE.write_text(text, encoding="utf-8")
+    QUEUE.write_text(text, encoding="utf-8", newline="\n")
     print("naming queue: added 9th critical-collision entry, marked executed")
 
     return 0

@@ -54,7 +54,7 @@ class BuildTabular(unittest.TestCase):
         with open(path, encoding="utf-8") as f:
             text = f.read()
         self.assertIn(old, text)
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(text.replace(old, new, 1))
 
     def test_the_committed_output_equals_a_fresh_build(self):
@@ -86,7 +86,7 @@ class BuildTabular(unittest.TestCase):
         import sys
         self.assertEqual(run(self.args())[0], 0)
         result = subprocess.run([sys.executable, os.path.join(HERE, "check_taxonomy.py"), self.out],
-                                capture_output=True, text=True)
+                                capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_a_rebuild_writes_the_same_bytes(self):

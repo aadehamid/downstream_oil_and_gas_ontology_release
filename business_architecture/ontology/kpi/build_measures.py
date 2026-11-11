@@ -78,7 +78,7 @@ CHANGES = {
 
 
 def read_csv(path):
-    with open(path, newline="") as f:
+    with open(path, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
@@ -247,12 +247,12 @@ def main():
             + build(rows, details, personas, labels, procs).serialize(format="turtle"))
     print("; ".join(f"{k} {v}" for k, v in figures(rows, details, personas).items()))
     if args.verify:
-        current = os.path.exists(OUTPUT) and open(OUTPUT).read() == text
+        current = os.path.exists(OUTPUT) and open(OUTPUT, encoding="utf-8").read() == text
         if not current:
             sys.exit("measures.ttl is not current: run build_measures.py --write")
         print("measures.ttl is current")
     if args.write:
-        with open(OUTPUT, "w") as f:
+        with open(OUTPUT, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
         print(f"wrote {OUTPUT}")
 

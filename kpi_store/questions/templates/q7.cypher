@@ -6,6 +6,11 @@
 // The governance graph says which systems are sensitive: a policy whose name holds one of the terms covers the
 // system or one of its tables, or the system's or a table's class holds one of the terms. The KPI Store graph
 // gives every KPI whose chain reaches a replica of such a system. One row per KPI, metric view and system.
+//
+// Part 1, governance graph. Each system with its tables, then the reasons that make it sensitive. Each of the
+// three sources of a reason is kept only when the mapping names its roles. The header asks that one of three roles
+// has a value. That is not quite one whole source: a policy relationship with no policy name role passes the header
+// and gives no reason.
 CALL () {
   USE graph.byName($governance_graph)
   MATCH (g:{{label:system.node}})
@@ -13,6 +18,7 @@ CALL () {
   WITH DISTINCT g, t ORDER BY t.{{property:table.qualified_name}}
   WITH g, collect(t) AS tables
 //#if policy.node policy.name policy.applies_to
+  // Source 1, a policy. It counts when its name holds one of the terms and it covers the system or one of its tables.
   OPTIONAL MATCH (p:{{label:policy.node}})-[:{{relationship:policy.applies_to}}]->(covered)
   WHERE (covered = g OR covered IN tables)
     AND any(term IN $terms WHERE toLower(toString(p.{{property:policy.name}})) CONTAINS toLower(term))
@@ -26,6 +32,7 @@ CALL () {
   WITH g, tables, [] AS reasons
 //#endif
 //#if system.classification
+  // Source 2, the system's own class, when it holds one of the terms.
   WITH g, tables, reasons
        + CASE WHEN any(term IN $terms
                        WHERE toLower(toString(g.{{property:system.classification}})) CONTAINS toLower(term))
@@ -33,6 +40,7 @@ CALL () {
               ELSE [] END AS reasons
 //#endif
 //#if table.classification
+  // Source 3, the class of each of the system's tables, when it holds one of the terms.
   WITH g, reasons
        + [t IN tables
           WHERE any(term IN $terms
@@ -40,10 +48,14 @@ CALL () {
           | 'class ' + toString(t.{{property:table.classification}}) + ' on table '
             + t.{{property:table.qualified_name}}] AS reasons
 //#endif
+  // Only a system with at least one reason goes on to the second part.
   WITH g, reasons WHERE size(reasons) > 0
   RETURN collect({code: toLower(g.{{property:system.code}}), system: g.{{property:system.code}},
                   reasons: reasons}) AS sensitive
 }
+// Part 2, KPI Store graph. For each sensitive system, the system with the same code in lower case, and every KPI
+// served by a metric view whose lineage reaches a replica of it. 0 steps covers a view that itself copies the
+// system. 6 bounds the search, so a replica more than 6 steps below the view is not found.
 CALL (sensitive) {
   USE graph.byName($bpa_graph)
   UNWIND sensitive AS found

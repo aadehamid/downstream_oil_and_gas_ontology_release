@@ -55,7 +55,7 @@ class AllModules(unittest.TestCase):
         # slice (release/shapes.ttl) is part of core 2.1.0's shapes; the scoped-sequence shapes run in
         # their own build check.
         import glob
-        found = {os.path.relpath(p, ONTOLOGY) for p in glob.glob(os.path.join(ONTOLOGY, "*", "shapes.ttl"))}
+        found = {os.path.relpath(p, ONTOLOGY).replace(os.sep, "/") for p in glob.glob(os.path.join(ONTOLOGY, "*", "shapes.ttl"))}
         self.assertEqual(found - set(SHAPE_FILES), {"release/shapes.ttl"})
 
     def test_the_whole_graph_conforms(self):

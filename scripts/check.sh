@@ -3,7 +3,8 @@
 # every test file, the module map and the coverage counts, the generated pages, and the stand-alone check. Run it
 # from the release root before you change anything, and again after.
 #
-# Needs python3 and uv (https://docs.astral.sh/uv/) for the test dependencies.
+# Needs Python 3.11 or later (python3, python or the py launcher) and uv (https://docs.astral.sh/uv/) for the test
+# dependencies. On Windows run it in Git Bash.
 #
 # This script proves your copy is valid. It leaves out the tests in scripts/pinned-tests.txt, which ask whether your
 # copy still equals the release as shipped. scripts/check-pinned.sh runs those, and you may ignore it after you change
@@ -13,16 +14,27 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 while IFS= read -r var; do unset "$var"; done < <(compgen -e | grep '^GIT_' || true)
 export PYTHONDONTWRITEBYTECODE=1
+# A check's output is UTF-8 on every system. On Windows a Python whose output goes to a pipe would otherwise write
+# cp1252 and fail on a character cp1252 lacks.
+export PYTHONIOENCODING=utf-8
+# The Python that runs this script's own helpers. Windows has python.exe and the py launcher, and often no python3.exe,
+# or one that only opens the Store, so each name is tried by running it.
+PYTHON=""
+for candidate in python3 python py; do
+  if "$candidate" -c 'import sys; sys.exit(sys.version_info < (3, 11))' >/dev/null 2>&1; then PYTHON="$candidate"; break; fi
+done
+[ -n "$PYTHON" ] || { echo "no Python 3.11 or later was found: tried python3, python and py" >&2; exit 1; }
 run() { echo "--- $*"; "$@"; }
 run_tests() {  # unittest exits 0 on zero tests; a test command must have run at least one
-  echo "--- $*"; local out; out="$("$@" 2>&1)"; local rc=$?; printf '%s\n' "$out"
+  # "|| rc=$?" keeps a failed command from ending the script before its output is printed.
+  echo "--- $*"; local out rc=0; out="$("$@" 2>&1)" || rc=$?; printf '%s\n' "$out"
   [ "$rc" -eq 0 ] && grep -qE '^Ran [1-9][0-9]* tests? ' <<<"$out"
 }
 with_deps() { uv run -q --no-project --with pytest --with pytest-xdist --with rdflib --with pyshacl --with openpyxl --with jsonschema --with "markdown-it-py>=4,<5" --with pyyaml==6.0.3 --with sqlglot==30.31.0 --with pyoxigraph==0.5.13 --with neo4j "$@"; }
 
 # Snapshot the tree, so a check that writes a file is caught.
 snapshot() {
-  python3 - <<'PY'
+  "$PYTHON" - <<'PY'
 import hashlib, os
 h = hashlib.sha256()
 for root, dirs, files in os.walk("."):
@@ -39,7 +51,7 @@ before="$(snapshot)"
 
 ONT=business_architecture/ontology
 # The core package and each module's package must equal a fresh build (the newest set).
-CORE_BUILDER="$(cd $ONT/release && python3 -c 'import newest; print(newest.core_builder())')"
+CORE_BUILDER="$(cd $ONT/release && "$PYTHON" -c 'import newest; print(newest.core_builder())')"
 (cd $ONT/release && run with_deps python "$CORE_BUILDER.py" --verify)
 (cd $ONT/release && run with_deps python build_module.py organization --verify)
 (cd $ONT/release && run with_deps python build_module.py kpi --verify)
@@ -119,6 +131,7 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   business_architecture/ontology/validation/test_controlled_values.py \
   business_architecture/ontology/validation/test_release_package_shapes.py \
   business_architecture/ontology/value-stream/test_value_streams.py \
+  business_architecture/ontology/viewer/test_horoi.py \
   business_architecture/ontology/viewer/test_viewer.py \
   kpi_store/tests/test_compare.py \
   kpi_store/tests/test_cut.py \
@@ -149,22 +162,24 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   scripts/test_published_figures.py
 # The bundled skills' own checks, each with the dependencies its own check names (the list is written at the cut from
 # one table, the same one the cut's skills-tests row runs). A test command that found no test is a failure.
-(cd skills/ontology/scripts && run_tests uv run -q --no-project --with rdflib --with pyyaml --with pyshacl python3 -m unittest discover -q -p 'test_*.py')
-(cd skills/ontology && run uv run -q --no-project --with pyyaml python3 scripts/check_sssom.py templates/mappings.sssom.tsv)
-(cd skills/ontology-to-lpg/scripts && run_tests uv run -q --no-project --with rdflib --with pyshacl --with mcp-neo4j-data-modeling==0.8.2 python3 -m unittest -q test_projection test_engine_gate test_modeling test_explore test_run_projection test_release_record)
-(cd skills/rdf-store/scripts && run_tests uv run -q --no-project --with pyoxigraph python3 -m unittest -q test_rdf_store)
-(cd skills && run_tests uv run -q --no-project --with 'markdown-it-py>=4,<5' python3 scripts/test_playbook_html.py)
+# Inside uv run the program is python, never python3: the environment uv makes on Windows holds python.exe only, so
+# python3 there would be another Python, without the packages --with names.
+(cd skills/ontology/scripts && run_tests uv run -q --no-project --with rdflib --with pyyaml --with pyshacl python -m unittest discover -q -p 'test_*.py')
+(cd skills/ontology && run uv run -q --no-project --with pyyaml python scripts/check_sssom.py templates/mappings.sssom.tsv)
+(cd skills/ontology-to-lpg/scripts && run_tests uv run -q --no-project --with rdflib --with pyshacl --with mcp-neo4j-data-modeling==0.8.2 python -m unittest -q test_projection test_engine_gate test_modeling test_explore test_run_projection test_release_record)
+(cd skills/rdf-store/scripts && run_tests uv run -q --no-project --with pyoxigraph python -m unittest -q test_rdf_store)
+(cd skills && run_tests uv run -q --no-project --with 'markdown-it-py>=4,<5' python scripts/test_playbook_html.py)
 # The module map and the coverage counts run from the release folders.
 run with_deps python scripts/epm_facts.py counts >/dev/null
 run with_deps python scripts/epm_facts.py modules >/dev/null
 run with_deps python scripts/epm_facts.py coverage >/dev/null
 # The generated pages must equal a fresh build of their Markdown.
 run with_deps python scripts/build_docs_html.py --check
-# Every code block in the Markdown documents is run, compared, parsed or skipped for a stated reason, and the last
+# Every code block in the Markdown documents and in the HTML pages written by hand is run, compared, parsed or skipped for a stated reason, and the last
 # line counts them. scripts/DOC-SNIPPETS.md explains the tags. The cut adds --strict --all-contexts.
 run with_deps python scripts/doc_snippets.py check
 # The tree refers to nothing outside itself. scripts/standalone-pending.txt lists the paths not yet clean.
-run python3 scripts/check_standalone.py
+run "$PYTHON" scripts/check_standalone.py
 
 # The last load's report. A stale report means the stores are behind the packages, not that the ontology is invalid.
 if ! EPM_PINNED_ONLY=1 with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcutdir "$ROOT" business_architecture/ontology/projection/test_pipeline.py \

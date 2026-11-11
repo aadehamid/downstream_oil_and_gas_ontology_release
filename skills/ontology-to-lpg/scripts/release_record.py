@@ -213,7 +213,7 @@ def main(argv):
             with open(opts["--manifest"], encoding="utf-8") as f:
                 manifest = json.load(f)
             content = build_records(files, report, opts.get("--loaded-at") or now(), manifest)
-            with open(opts["--output"], "w", encoding="utf-8") as f:
+            with open(opts["--output"], "w", encoding="utf-8", newline="\n") as f:
                 json.dump(content, f, indent=2, sort_keys=True)
                 f.write("\n")
             print(f"wrote {q(len(content['records']))} release record(s) to {q(opts['--output'])}")

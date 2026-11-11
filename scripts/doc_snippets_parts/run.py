@@ -166,7 +166,7 @@ def _uv_environment() -> dict:
                                       ("UV_PYTHON_INSTALL_DIR", ["uv", "python", "dir"])):
                 if os.environ.get(variable):
                     continue
-                r = subprocess.run(command, capture_output=True, text=True)
+                r = subprocess.run(command, capture_output=True, text=True, encoding="utf-8")
                 if r.returncode == 0 and r.stdout.strip():
                     _uv_dirs[variable] = r.stdout.strip()
     return _uv_dirs
@@ -251,7 +251,7 @@ class Runner:
     def _nested_token(self) -> dict:
         if self._token is None:
             self._token = secrets.token_hex(16)
-            (self.tmp / "nested-token").write_text(self._token, encoding="utf-8")
+            (self.tmp / "nested-token").write_text(self._token, encoding="utf-8", newline="\n")
         return {NESTED: self._token, NESTED_FILE: str(self.tmp / "nested-token")}
 
     def env(self, instance) -> dict:

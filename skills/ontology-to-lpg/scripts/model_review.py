@@ -180,7 +180,7 @@ def write_report(path, report):
     folder = os.path.dirname(os.path.abspath(path))
     fd, tmp = tempfile.mkstemp(dir=folder, prefix=".model-review.", suffix=".tmp")
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
             json.dump(report, fh, indent=2, sort_keys=True)
             fh.write("\n")
         os.replace(tmp, path)

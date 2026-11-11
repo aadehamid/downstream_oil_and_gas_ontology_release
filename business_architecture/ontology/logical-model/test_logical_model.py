@@ -59,7 +59,7 @@ class Build(unittest.TestCase):
 
     def write(self, name, text):
         path = os.path.join(self.tmp, name)
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
         return path
 
@@ -280,7 +280,7 @@ class Questions(unittest.TestCase):
     GRAPH = VOCAB + EXPORT_GRAPH + LAYER
 
     def rows(self, name):
-        with open(os.path.join(ONTOLOGY, "regression", "queries", name)) as f:
+        with open(os.path.join(ONTOLOGY, "regression", "queries", name), encoding="utf-8") as f:
             return list(self.GRAPH.query(f.read()))
 
     def test_q53_lists_the_primary_and_the_alternate_key(self):

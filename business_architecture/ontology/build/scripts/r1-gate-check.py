@@ -67,8 +67,8 @@ def load_ttl(p):
 
 g_new = load_ttl(OUT / "step3-taxonomy.ttl")
 g_base = load_ttl(BASE_TTL)
-im_new = {r["slug"]: r for r in json.load(open(OUT / "step2-identity-map.json"))}
-im_base = {r["slug"]: r for r in json.load(open(BASE_IM))}
+im_new = {r["slug"]: r for r in json.load(open(OUT / "step2-identity-map.json", encoding="utf-8"))}
+im_base = {r["slug"]: r for r in json.load(open(BASE_IM, encoding="utf-8"))}
 
 
 def concepts(g):
@@ -253,7 +253,7 @@ for s, val in REVIEWED_PENDING_INTERFACES.items():
     check(f"reviewed interface emitted: {s}", got == [val], str(got))
 
 # ---- Gate 2: path register ----
-with open(R1 / "r1-path-compatibility-register.csv") as f:
+with open(R1 / "r1-path-compatibility-register.csv", encoding="utf-8") as f:
     rd = list(csv.DictReader(f))
 disp = [r for r in rd if "No consumer" in r.get("disposition", "")]
 check("CSV 42 data rows", len(rd) == 42, f"{len(rd)}")

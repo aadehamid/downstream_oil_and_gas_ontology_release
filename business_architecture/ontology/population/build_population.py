@@ -26,7 +26,7 @@ MEASURE = Namespace("https://w3id.org/mpc/ontology/modules/kpi/measure/")
 
 
 def load():
-    with open(TABLE, newline="") as f:
+    with open(TABLE, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     measures = {str(n) for n in Graph().parse(MEASURES).objects(None, SKOS.notation)}
     problems = [f"{m} is listed {n} times" for m, n in Counter(r["measure_id"] for r in rows).items() if n > 1]
@@ -61,11 +61,11 @@ def main():
             "# population.csv. Do not edit by hand.\n" + build(rows).serialize(format="turtle"))
     print(f"measures with a population {len(rows)} of {total}; with an exclusion {sum(1 for r in rows if r['excludes'])}")
     if args.verify:
-        if not (os.path.exists(OUTPUT) and open(OUTPUT).read() == text):
+        if not (os.path.exists(OUTPUT) and open(OUTPUT, encoding="utf-8").read() == text):
             sys.exit("population.ttl is not current: run build_population.py --write")
         print("population.ttl is current")
     if args.write:
-        with open(OUTPUT, "w") as f:
+        with open(OUTPUT, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
         print(f"wrote {OUTPUT}")
 

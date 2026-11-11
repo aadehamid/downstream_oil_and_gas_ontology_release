@@ -110,7 +110,7 @@ def main(argv):
             return 1
         print(f"{args.out} equals a fresh build ({len(text.splitlines())} triples)")
         return 0
-    with open(args.out, "w", encoding="utf-8") as f:
+    with open(args.out, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
     print(f"wrote {args.out} ({len(text.splitlines())} triples)")
     return 0

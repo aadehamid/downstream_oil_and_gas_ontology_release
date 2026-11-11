@@ -150,7 +150,7 @@ def stores(tmp_path, monkeypatch, jena=GRAPHS, databricks=None, local=None, ente
     """check()'s rows with every store a stand-in. Each argument is what that store holds."""
     monkeypatch.setattr(sc, "expected", lambda root, ss, ref="worktree", extra=(): dict(WANT))
     local_settings = stores_support.local_settings(tmp_path)
-    (tmp_path / "kpi_store.toml").write_text(support.SETTINGS_TEXT.replace('warehouse_id = ""', f'warehouse_id = "{warehouse}"'), encoding="utf-8")
+    (tmp_path / "kpi_store.toml").write_text(support.SETTINGS_TEXT.replace('warehouse_id = ""', f'warehouse_id = "{warehouse}"'), encoding="utf-8", newline="\n")
     ss = SimpleNamespace(**{k: getattr(REAL.ss, k) for k in dir(REAL.ss) if not k.startswith("__")})
     def read_jena(url):
         assert url == "http://127.0.0.1:3030/ds/query"
@@ -257,7 +257,7 @@ def test_the_technical_graph_gets_a_line_per_store_judged_by_its_own_module(tmp_
     wanted = {}
     monkeypatch.setattr(sc, "expected", lambda root, ss, ref="worktree", extra=(): wanted.update(apart=extra) or dict(WANT))
     local = stores_support.local_settings(tmp_path)
-    (tmp_path / "kpi_store.toml").write_text(support.SETTINGS_TEXT.replace('warehouse_id = ""', 'warehouse_id = "wh123"'), encoding="utf-8")
+    (tmp_path / "kpi_store.toml").write_text(support.SETTINGS_TEXT.replace('warehouse_id = ""', 'warehouse_id = "wh123"'), encoding="utf-8", newline="\n")
     ss = SimpleNamespace(**{k: getattr(REAL.ss, k) for k in dir(REAL.ss) if not k.startswith("__")})
     ss.read_jena = lambda url: dict(GRAPHS)
     code = SimpleNamespace(ss=ss, lm=SimpleNamespace(models=lambda newest: []), lv=SimpleNamespace(hash_graph=lambda s: (s.graph_hash, 0, 0, 0)))
@@ -292,9 +292,9 @@ def test_the_technical_graphs_file_is_the_one_named_or_the_one_the_runner_fetche
     assert sc.tech_graph_file(local) is None
     fetched = tmp_path / "runs" / "tech-graph" / "tech-graph.nq"
     fetched.parent.mkdir(parents=True)
-    fetched.write_text("", encoding="utf-8")
+    fetched.write_text("", encoding="utf-8", newline="\n")
     assert sc.tech_graph_file(local) == fetched
-    (tmp_path / "other.nq").write_text("", encoding="utf-8")
+    (tmp_path / "other.nq").write_text("", encoding="utf-8", newline="\n")
     assert sc.tech_graph_file(local, str(tmp_path / "other.nq")) == tmp_path / "other.nq"
     with pytest.raises(sc.ls.LocalSettingsError, match="the technical graph file .* is missing"):
         sc.tech_graph_file(local, str(tmp_path / "gone.nq"))

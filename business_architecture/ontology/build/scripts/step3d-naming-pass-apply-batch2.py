@@ -222,7 +222,7 @@ def main() -> int:
             "skos:altLabel; no identifier, hierarchy, or definition change."
         )
     IDENTITY_MAP.write_text(json.dumps(entries, indent=1, ensure_ascii=False) + "\n",
-                            encoding="utf-8")
+                            encoding="utf-8", newline="\n")
     print(f"identity map: 11 overlays updated")
 
     # 6. naming queue: mark the 11 D rows EXECUTED
@@ -253,7 +253,7 @@ def main() -> int:
                   "queue entries are still queued for the consolidated naming pass.")
     assert old_status in text, "queue execution-status line not in expected form"
     text = text.replace(old_status, new_status)
-    QUEUE.write_text(text, encoding="utf-8")
+    QUEUE.write_text(text, encoding="utf-8", newline="\n")
     print("naming queue: 11 D rows marked EXECUTED")
 
     return 0

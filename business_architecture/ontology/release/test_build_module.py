@@ -85,7 +85,7 @@ def approval_holds(name, m):
         # The builders name the review comments of a subject matter expert, a sentence and not a file, and the
         # words travel with the package (the decision of 2026-10-31).
         return "subject matter expert" in path
-    with open(os.path.join(bm.ONTOLOGY, path)) as f:
+    with open(os.path.join(bm.ONTOLOGY, path), encoding="utf-8") as f:
         # the words of a subject matter expert reviewing the documents sit in the body; the context sits in HTML comments.
         body = re.sub(r"<!--.*?-->", "", f.read(), flags=re.S)
     return words in body
@@ -106,7 +106,7 @@ class Packages(unittest.TestCase):
                 g = bm.build(name)
                 self.assertTrue(bm.check(name, g)[0])
                 for fname, text in bm.package(name, g).items():
-                    with open(os.path.join(bm.release_dir(name), fname)) as f:
+                    with open(os.path.join(bm.release_dir(name), fname), encoding="utf-8") as f:
                         self.assertEqual(f.read(), text, fname)
 
     def test_an_issued_release_carries_the_owners_recorded_approval_and_a_candidate_no_date(self):
@@ -155,7 +155,7 @@ class Packages(unittest.TestCase):
                     # The dependency's package must be on disk, not only in the builder's own table.
                     package = os.path.join(shipped(self, dep, version))
                     self.assertTrue(os.path.isfile(os.path.join(package, "manifest.json")), f"{name} names {dep} {version}")
-                    with open(os.path.join(package, "manifest.json")) as f:
+                    with open(os.path.join(package, "manifest.json"), encoding="utf-8") as f:
                         self.assertEqual(json.load(f)["version"], version)
                     self.assertIn((URIRef(bm.MODULES_NS + name), DCTERMS.requires,
                                    URIRef(f"{bm.MODULES_NS}{dep}/{version}")), bm.build(name))
@@ -321,7 +321,7 @@ class EarlierReleases(unittest.TestCase):
     def test_ref_mpc_1_2_0_is_untouched(self):
         # ref-mpc 1.3.0 is built now; the released 1.2.0 package must still match its own manifest.
         out = os.path.join(shipped(self, "ref-mpc", "1.2.0"))
-        with open(os.path.join(out, "manifest.json")) as f:
+        with open(os.path.join(out, "manifest.json"), encoding="utf-8") as f:
             manifest = json.load(f)
         self.assertEqual(manifest["version"], "1.2.0")
         for fname, digest in manifest["files"].items():
@@ -340,7 +340,7 @@ class EarlierReleases(unittest.TestCase):
         self.assertEqual(set(released), set(sources))
         for slug in ("marathon", "arco", "tesoro"):
             self.assertIn((URIRef(bm.MODULES_NS + "ref-mpc/brand/" + slug), None, None), released)
-        with open(os.path.join(shipped(self, "ref-mpc", "1.3.0"), "manifest.json")) as f:
+        with open(os.path.join(shipped(self, "ref-mpc", "1.3.0"), "manifest.json"), encoding="utf-8") as f:
             manifest = json.load(f)
         self.assertEqual(manifest["approved_by"].get("recorded_in"), bm.recorded_where(BRANDS[0]))
 

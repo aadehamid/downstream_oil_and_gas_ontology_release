@@ -126,13 +126,13 @@ def tree(tmp_path, files, pending=None, exceptions=None):
         if isinstance(text, bytes):
             path.write_bytes(text)
         else:
-            path.write_text(text, encoding="utf-8")
+            path.write_text(text, encoding="utf-8", newline="\n")
     if pending is not None:
         (tmp_path / "scripts").mkdir(exist_ok=True)
-        (tmp_path / "scripts" / "standalone-pending.txt").write_text(pending, encoding="utf-8")
+        (tmp_path / "scripts" / "standalone-pending.txt").write_text(pending, encoding="utf-8", newline="\n")
     if exceptions is not None:
         (tmp_path / "scripts").mkdir(exist_ok=True)
-        (tmp_path / "scripts" / "standalone-exceptions.txt").write_text(exceptions, encoding="utf-8")
+        (tmp_path / "scripts" / "standalone-exceptions.txt").write_text(exceptions, encoding="utf-8", newline="\n")
     return str(tmp_path)
 
 
@@ -231,15 +231,11 @@ def test_the_pending_list_cannot_grow(tmp_path, capsys, line, one_allowed):
                                               "docs/new.md:1: [pull-request] PR 12"]
 
 
-def test_the_allowed_pending_lines_are_these_six_files_and_this_trees_list_holds_no_other():
+def test_the_allowed_pending_lines_are_these_two_files_and_this_trees_list_holds_no_other():
     # Written by hand. A later change may delete a line here and in the list; it may never add or widen one.
     assert cs.ALLOWED_PENDING == (
         "README.md",
         "KNOWN-OPEN-ITEMS.md",
-        "business_architecture/ontology/epm-walkthrough.html",
-        "business_architecture/ontology/epm-ontology-guide.html",
-        "viewer/index.html",
-        "horoi_viewer/index.html",
     )
     assert not any(c in path for path in cs.ALLOWED_PENDING for c in "*?[")
     assert [path for path, _ in cs.read_pending()] == list(cs.ALLOWED_PENDING)
@@ -300,7 +296,8 @@ def test_two_exceptions_for_one_text_are_refused(tmp_path):
 
 def test_this_trees_exceptions_are_only_for_fixed_content():
     # Written by hand: an exception is for a released package and its changelog, the two taxonomy files, the
-    # decision records, a test that names a word to prove it is gone, and two run configurations. Nothing else.
+    # decision records, a test that names a word to prove it is gone, two run configurations, and the two viewer
+    # pages, which embed the released core package's text. Nothing else.
     allowed = ("business_architecture/ontology/releases/", "business_architecture/domain/kpi-store-decisions/",
                "business_architecture/ontology/build/output/step3-taxonomy.ttl",
                "business_architecture/ontology/step4/baseline/step3-taxonomy.ttl", "skills/ontology-to-lpg/scripts/test_",
@@ -308,14 +305,16 @@ def test_this_trees_exceptions_are_only_for_fixed_content():
                # the two run configurations, whose default paths under the home folder a test pins
                "business_architecture/ontology/projection/skill-run/epm-run.json",
                "skills/ontology-to-lpg/templates/run-config.json",
-               "business_architecture/ontology/projection/skill-run/test_skill_run.py")
+               "business_architecture/ontology/projection/skill-run/test_skill_run.py",
+               # the two pages built from the release packages; a test keeps each equal to a fresh build
+               "viewer/index.html", "horoi_viewer/index.html")
     assert [path for path, _, _ in cs.read_exceptions() if not path.startswith(allowed)] == []
 
 
-def test_this_release_has_38_exceptions():
+def test_this_release_has_40_exceptions():
     # A cut moves a package and adds a line for the new one, so this count is the release's as shipped
     # (scripts/pinned-tests.txt).
-    assert len(cs.read_exceptions()) == 38
+    assert len(cs.read_exceptions()) == 40
 
 
 def test_with_git_only_tracked_files_are_read(tmp_path):

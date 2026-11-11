@@ -165,6 +165,8 @@ def main(argv):
     files = []
     try:
         for path in data + [opts["--inferred"]]:
+            if not os.path.isfile(path):   # rdflib reads a missing Windows path as a URL, and its warning prints the path
+                raise FileNotFoundError("an input file is missing")
             g = Graph().parse(path, format="nt" if path.endswith(".nt") else "turtle")
             iri = base + "inferred" if path == opts["--inferred"] else graph_iri(g, path, base)
             files.append((path, iri, g))

@@ -95,7 +95,7 @@ def test_a_shipped_package_is_found_after_a_cut_moved_it_and_refused_when_its_fi
     moved = tmp_path / "previous" / "kpi" / "1.3.0"   # where a cut puts a superseded package
     shutil.copytree(shipped_package("kpi", "1.3.0"), moved)
     assert shipped_package("kpi", "1.3.0", tmp_path) == moved
-    with (moved / "kpi.ttl").open("a", encoding="utf-8") as f:
+    with (moved / "kpi.ttl").open("a", encoding="utf-8", newline="\n") as f:
         f.write("# one edit\n")
     with pytest.raises(AssertionError, match="is not kpi 1.3.0 as it was released: its SHA-256 is .* A released package never changes"):
         shipped_package("kpi", "1.3.0", tmp_path)

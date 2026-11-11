@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -13,6 +14,17 @@ import unittest
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def remove_tree(path):
+    """Delete a folder that may hold a Git repository. Git makes its object files read-only, and Windows does not
+    delete a read-only file, so each refused file is made writable and tried again."""
+    def writable(function, name, _):
+        os.chmod(name, stat.S_IWRITE)
+        function(name)
+    shutil.rmtree(path, onerror=writable)
+
+
 sys.path.insert(0, HERE)
 import run_projection as rp  # noqa: E402
 
@@ -46,7 +58,7 @@ class FakeRun:
             if flag in cmd:
                 path = cmd[cmd.index(flag) + 1]
                 os.makedirs(os.path.dirname(path), exist_ok=True)
-                with open(path, "w", encoding="utf-8") as f:
+                with open(path, "w", encoding="utf-8", newline="\n") as f:
                     if path.endswith("projection-report.json"):
                         json.dump(self.report, f)
                     elif path.endswith("loadable.nt"):
@@ -58,10 +70,10 @@ class FakeRun:
             os.makedirs(ttl)
             rows = []
             for n, (graph, text) in enumerate(self.graphs, 1):
-                with open(os.path.join(ttl, f"graph-{n}.ttl"), "w", encoding="utf-8") as f:
+                with open(os.path.join(ttl, f"graph-{n}.ttl"), "w", encoding="utf-8", newline="\n") as f:
                     f.write(text)
                 rows.append(f"graph-{n}.ttl\t{graph}\n")
-            with open(os.path.join(ttl, "graphs.tsv"), "w", encoding="utf-8") as f:
+            with open(os.path.join(ttl, "graphs.tsv"), "w", encoding="utf-8", newline="\n") as f:
                 f.writelines(rows)
         return 0, ""
 
@@ -72,7 +84,7 @@ class FakeRun:
             for i, part in enumerate(cmd):
                 if part.endswith(".py"):
                     sub = cmd[i + 1] if i + 1 < len(cmd) and not cmd[i + 1].startswith("-") and \
-                        not cmd[i + 1].startswith("/") else ""
+                        not os.path.isabs(cmd[i + 1]) else ""
                     names.append((os.path.basename(part) + " " + sub).strip())
                     break
             else:
@@ -83,7 +95,7 @@ class FakeRun:
 class Base(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self.tmp)
+        self.addCleanup(remove_tree, self.tmp)
         self.jar = self.write("robot.jar", "jar")
         patch = mock.patch.object(rp, "ROBOT_SHA256", hashlib.sha256(b"jar").hexdigest())
         patch.start()
@@ -101,7 +113,7 @@ class Base(unittest.TestCase):
     def write(self, name, text):
         path = os.path.join(self.tmp, name)
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
         return path
 
@@ -128,7 +140,7 @@ class Config(Base):
     def test_paths_are_made_absolute_against_the_configurations_folder(self):
         cfg = self.run_config()
         self.assertEqual(cfg["out"], os.path.join(self.tmp, "out"))
-        self.assertEqual(cfg["data"][0], os.path.join(self.tmp, "releases/a/1.0.0/a.ttl"))
+        self.assertEqual(cfg["data"][0], os.path.join(self.tmp, "releases", "a", "1.0.0", "a.ttl"))
         self.assertEqual(cfg["target_env"], os.path.join(self.tmp, "target.env"))
         self.assertEqual(cfg["neo4j_env"], os.path.join(self.tmp, "local.env"))
         self.assertEqual((cfg["jena"], cfg["explore_fuseki"], cfg["triplestore_fuseki"]), (JENA, EXPLORE, COUNTS))
@@ -172,7 +184,7 @@ class Config(Base):
         answered for the hook's repository. Both now run without the hook's variables."""
         outer = os.path.join(self.tmp, "outer")
         run = lambda *a, cwd=None: subprocess.run(["git", *a], cwd=cwd, env=rp.git_env(), check=True,
-                                                  capture_output=True, text=True)
+                                                  capture_output=True, text=True, encoding="utf-8")
         run("init", "-q", "-b", "main", outer)
         run("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "x", cwd=outer)
         tree = os.path.join(self.tmp, "tree")
@@ -337,7 +349,7 @@ class Steps(Base):
         fake = FakeRun()
         d = self.driver(self.run_config(), fake)
         path = os.path.join(os.path.dirname(d.data[0]), "catalog.ttl")
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write("# one\n")
         d.run_steps(["project"])
         manifest = os.path.join(d.out, "run-manifest.json")
@@ -345,18 +357,18 @@ class Steps(Base):
             ran = json.load(f)
         self.assertEqual(ran["catalogs"], [{"path": path, "sha256": rp.sha256_file(path)}])
         d.same_source()
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write("# edited\n")
         with self.assertRaisesRegex(rp.Failed, "catalogs differ"):
             d.same_source()
         os.remove(path)   # removed since the run
         with self.assertRaisesRegex(rp.Failed, "catalogs differ"):
             d.same_source()
-        with open(manifest, "w", encoding="utf-8") as f:
+        with open(manifest, "w", encoding="utf-8", newline="\n") as f:
             json.dump({**ran, "catalogs": []}, f)
         d.same_source()
         added = os.path.join(os.path.dirname(d.data[1]), "catalog.ttl")   # added since the run
-        with open(added, "w", encoding="utf-8") as f:
+        with open(added, "w", encoding="utf-8", newline="\n") as f:
             f.write("# new\n")
         with self.assertRaisesRegex(rp.Failed, "catalogs differ"):
             d.same_source()
@@ -438,7 +450,7 @@ class Rebuild(Base):
     def test_release_graphs_sit_beside_each_data_file(self):
         cfg = self.run_config()
         args = rp.release_graph_args(cfg["data"][:1], ["shapes"])
-        shapes = os.path.join(self.tmp, "releases/a/1.0.0/shapes.ttl")
+        shapes = os.path.join(self.tmp, "releases", "a", "1.0.0", "shapes.ttl")
         self.assertEqual(args, [cfg["data"][0], "--graph", f"{shapes}=https://x.org/a/1.0.0/shapes", shapes])
         with self.assertRaises(rp.Failed):
             rp.release_graph_args(cfg["data"][:1], ["catalog"])
@@ -498,7 +510,7 @@ class Rebuild(Base):
         rules = [cmd for cmd, _, _ in fake.calls if any(c.endswith("check_projection_rules.py") for c in cmd)][-1]
         shapes = [rules[i + 1] for i, c in enumerate(rules) if c == "--shapes"]
         self.assertEqual(shapes, [os.path.join(ttl, "graph-2.ttl"), os.path.join(ttl, "graph-4.ttl"),
-                                  os.path.join(self.tmp, "whole/shapes.ttl")])
+                                  os.path.join(self.tmp, "whole", "shapes.ttl")])
         # The release records read the release's own files: an export has no catalog.ttl beside each graph.
         records = [cmd for cmd, _, _ in fake.calls if "records" in cmd][-1]
         first = next(cmd for cmd, _, _ in fake.calls if any(c.endswith("build.py") for c in cmd) and "merge" in cmd)
@@ -585,7 +597,7 @@ class FilesMode(Base):
 
     def test_folders_expand_and_each_file_gets_a_graph_name(self):
         d = self.driver(self.files_config(), FakeRun())
-        t = lambda p: os.path.join(self.tmp, p)   # noqa: E731
+        t = lambda p: os.path.normpath(os.path.join(self.tmp, p))   # noqa: E731
         self.assertEqual(d.data, [t("plain/books.ttl"), t("plain/more/people.nt"), t("named.ttl"), t("releases/a/1.0.0/a.ttl")])
         self.assertEqual(d.graphs, {
             t("plain/books.ttl"): (rp.FILE_GRAPH + "plain/books.ttl", "file name"),
@@ -605,7 +617,7 @@ class FilesMode(Base):
     def test_without_shapes_default_shapes_come_from_the_data(self):
         from rdflib import Graph, Literal, Namespace, URIRef
         SH = Namespace("http://www.w3.org/ns/shacl#")
-        shapes, count = rp.default_shapes([os.path.join(self.tmp, "plain/books.ttl")])
+        shapes, count = rp.default_shapes([os.path.join(self.tmp, "plain", "books.ttl")])
         self.assertEqual(count, 1)   # Book; owl:Class is vocabulary
         node = next(shapes.subjects(SH.targetClass, URIRef("https://x.org/Book")))
         props = {str(shapes.value(p, SH.path)): (shapes.value(p, SH.minCount), shapes.value(p, SH.maxCount))
@@ -641,16 +653,16 @@ class FilesMode(Base):
         rules = next(cmd for cmd, _, _ in fake.calls if any(c.endswith("check_projection_rules.py") for c in cmd))
         self.assertNotIn("--releases", rules)
         self.assertEqual(rules[rules.index("--shapes") + 1], os.path.join(d.out, "default-shapes.ttl"))
-        books = os.path.join(self.tmp, "plain/books.ttl")
+        books = os.path.join(self.tmp, "plain", "books.ttl")
         for cmd, _, _ in fake.calls:
             if any(c.endswith("module_tags.py") for c in cmd):
                 self.assertIn(f"{books}={rp.FILE_GRAPH}plain/books.ttl", cmd)
-                self.assertNotIn(f"{os.path.join(self.tmp, 'releases/a/1.0.0/a.ttl')}=https://x.org/a/1.0.0", cmd)
+                self.assertNotIn(f"{os.path.join(self.tmp, 'releases', 'a', '1.0.0', 'a.ttl')}=https://x.org/a/1.0.0", cmd)
             if "roundtrip" in cmd:
                 self.assertIn(f"{books}={rp.FILE_GRAPH}plain/books.ttl", cmd)
             if any(c.endswith("explore.py") for c in cmd):
                 self.assertIn("--files", cmd)
-        with open(os.path.join(d.out, "run-manifest.json")) as f:
+        with open(os.path.join(d.out, "run-manifest.json"), encoding="utf-8") as f:
             manifest = json.load(f)
         self.assertEqual(manifest["mode"], "files")
         self.assertEqual(manifest["data"][0]["sha256"], rp.sha256_file(books))

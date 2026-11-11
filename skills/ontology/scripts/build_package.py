@@ -316,7 +316,7 @@ def write(answers, releases):
 
 
 def git(*args, cwd):
-    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8")
 
 
 def git_setup(path):
@@ -367,7 +367,8 @@ def verify(answers, releases):
         if git("rev-parse", "-q", "--verify", f"refs/tags/{tag}", cwd=top).returncode != 0:
             print(f"INFO no tag {tag} yet; the manifest's hashes are the check until it is tagged")
         else:
-            rel = os.path.relpath(os.path.realpath(folder), os.path.realpath(top))
+            # Git names a path with / on every system.
+            rel = os.path.relpath(os.path.realpath(folder), os.path.realpath(top)).replace(os.sep, "/")
             for name in sorted(present):
                 shown = subprocess.run(["git", "show", f"{tag}:{rel}/{name}"], cwd=top, capture_output=True)
                 with open(os.path.join(folder, name), "rb") as f:
@@ -383,7 +384,7 @@ def tag(answers, releases):
     if setup == "none":
         return 2, ["not a git repository: there is nothing to tag, and the manifest's hashes are the whole guarantee"]
     folder = os.path.join(releases, a["module"], a["version"])
-    rel = os.path.relpath(os.path.realpath(folder), os.path.realpath(top))
+    rel = os.path.relpath(os.path.realpath(folder), os.path.realpath(top)).replace(os.sep, "/")
     if git("ls-files", "--error-unmatch", f"{rel}/manifest.json", cwd=top).returncode != 0:
         return 1, [f"commit the package first: {rel} is not in git"]
     if git("status", "--porcelain", "--", rel, cwd=top).stdout.strip():

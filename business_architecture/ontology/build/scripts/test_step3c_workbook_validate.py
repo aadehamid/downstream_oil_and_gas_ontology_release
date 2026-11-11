@@ -50,14 +50,13 @@ def _register(status: str, tmp: Path) -> Path:
     path = tmp / "ptc.md"
     path.write_text(
         f"## PTC-001 — test\n\n**Status:** {status}\n",
-        encoding="utf-8",
-    )
+        encoding="utf-8", newline="\n")
     return path
 
 
 def _idmap(tmp: Path) -> Path:
     path = tmp / "idmap.json"
-    path.write_text("[]", encoding="utf-8")
+    path.write_text("[]", encoding="utf-8", newline="\n")
     return path
 
 
@@ -78,8 +77,7 @@ def _run(workbook: Path, register: Path, idmap: Path) -> tuple[int, str, str]:
         ],
         capture_output=True,
         text=True,
-        check=False,
-    )
+        check=False, encoding="utf-8")
     report = out.read_text(encoding="utf-8") if out.exists() else ""
     return proc.returncode, proc.stdout + proc.stderr, report
 

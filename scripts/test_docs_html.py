@@ -27,7 +27,7 @@ def test_every_committed_page_matches_a_fresh_build(out):
 
 def test_the_check_command_passes_on_the_committed_pages():
     r = subprocess.run([sys.executable, os.path.join(b.ROOT, "scripts", "build_docs_html.py"), "--check"],
-                       cwd=b.ROOT, capture_output=True, text=True)
+                       cwd=b.ROOT, capture_output=True, text=True, encoding="utf-8")
     assert r.returncode == 0, r.stdout + r.stderr
 
 

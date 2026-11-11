@@ -6,7 +6,8 @@
 # MAGIC It needs no token: it uses the notebook's own session.
 # MAGIC
 # MAGIC 1. It reads `kpi_store.toml` from the volume and checks the release zip beside it against the SHA-256 the
-# MAGIC    settings name. A missing or wrong settings file, or a zip that differs, stops the run before anything else.
+# MAGIC    settings name. A missing or wrong settings file, or a zip that differs, stops the run before it reads or
+# MAGIC    writes anything in the workspace's data.
 # MAGIC 2. It compares the ontology with the workspace and writes `discovery-report.json` and `discovery-report.csv`
 # MAGIC    to the volume.
 # MAGIC 3. If a row of the report blocks, it stops there. Otherwise it loads `epm_triples` through a staging table
@@ -25,6 +26,37 @@
 # MAGIC
 # MAGIC The notebook ends with a JSON summary. Its `status` is `blocked`, `checked`, `current`, `marked` or `loaded`.
 # MAGIC A hash that differs fails the run.
+# MAGIC
+# MAGIC | Status | Meaning |
+# MAGIC |---|---|
+# MAGIC | `blocked` | A row of the report blocks. Nothing was loaded. Clear the report, cut, and run again. |
+# MAGIC | `checked` | `mode` was `check` and no row blocks. Nothing was loaded. |
+# MAGIC | `current` | `epm_triples` and its marker already hold this release. Both were left as they are. |
+# MAGIC | `marked` | `epm_triples` already held this release and was left as it is. The marker row was written. |
+# MAGIC | `loaded` | `epm_triples` was replaced through the staging table, read back, and marked. |
+# MAGIC
+# MAGIC Every run that gets as far as the comparison writes its report files and `discovery.json` to the volume,
+# MAGIC whatever its status. A run that
+# MAGIC ends `current`, `marked` or `loaded` also writes the technical graph's file there and loads it.
+# MAGIC
+# MAGIC What the notebook may touch in the workspace's data: it writes to the two KPI Store schemas the settings
+# MAGIC name and to files in the volume, and nowhere else. It reads the read catalogs the settings name, the two
+# MAGIC KPI Store schemas (to read its own tables back), and three system schemas. The release's code checks the
+# MAGIC table names of every SQL statement against this rule before it runs the statement. Outside the workspace's
+# MAGIC data, the notebook installs packages into its own Python session and unpacks the zip into a temporary
+# MAGIC folder on the compute's local disk.
+# MAGIC
+# MAGIC The cells, in order:
+# MAGIC
+# MAGIC 1. Install five packages, each at the version the release was tested with, so every run installs the same
+# MAGIC    versions of these five.
+# MAGIC 2. Restart Python, so the cells after it use the packages that were just installed.
+# MAGIC 3. Define the two functions that do the work: `bootstrap` checks the zip and unpacks it, and `main` runs
+# MAGIC    the comparison and the load. This cell only defines them.
+# MAGIC 4. Run `main` and hand its summary to the caller. The runner on the Windows machine reads this summary.
+# MAGIC
+# MAGIC The notebook holds little code of its own. The comparison and the load live in the release zip, in the
+# MAGIC `kpi_store` package, so the code that runs comes from the zip that the checksum in the settings accepts.
 
 # COMMAND ----------
 
@@ -32,10 +64,15 @@
 
 # COMMAND ----------
 
+# Restart Python so the packages installed above replace any older versions the session already loaded.
+# Outside Databricks there is no dbutils, and this cell does nothing: the tests load this file as a module.
 if "dbutils" in globals():
     dbutils.library.restartPython()  # noqa: F821  the notebook supplies dbutils
 
 # COMMAND ----------
+
+# The two functions of the load. bootstrap runs before any of the release's code can: it is what decides whether
+# that code is the right code. main then hands the work to the release's kpi_store package.
 
 import hashlib
 import json
@@ -56,6 +93,8 @@ def bootstrap(settings_path, work_dir=None):
 
     This function uses the standard library only, because the release's code is inside the zip it checks."""
     path = Path(settings_path)
+    # Read only the two values needed to find and check the zip. The full validation comes after the unzip, with
+    # the release's own settings code.
     try:
         doc = tomllib.loads(path.read_bytes().decode("utf-8"))
         zip_name, want = doc["release"]["zip"], doc["release"]["sha256"]
@@ -63,11 +102,17 @@ def bootstrap(settings_path, work_dir=None):
         raise Stop(f"cannot read the settings file {path}: {type(err).__name__}") from None
     except (UnicodeDecodeError, tomllib.TOMLDecodeError, KeyError, TypeError) as err:
         raise Stop(f"the settings file {path} is wrong: {type(err).__name__}: {err}") from None
+    # A bare file name only: a name with a folder in it could point at a zip outside the settings file's folder.
     if not isinstance(zip_name, str) or Path(zip_name).name != zip_name or not zip_name.endswith(".zip"):
         raise Stop("[release] zip must be a file name ending in .zip, with no folder")
     zip_path = path.parent / zip_name
     if not zip_path.is_file():
         raise Stop(f"the release zip {zip_name} is not beside the settings file")
+    # The checksum comes first: the file is read once, in 1 MB pieces to keep a large zip out of memory, and a
+    # file whose checksum differs is not unpacked. The unpack below opens the file a second time. So the check
+    # covers the bytes that were hashed, and it holds for the code that runs only while nobody replaces the zip
+    # in the volume between the two reads. The release's own check_zip, further down, hashes the file a third
+    # time, but by then code from the unpacked zip is already running.
     digest = hashlib.sha256()
     with zip_path.open("rb") as f:
         for piece in iter(lambda: f.read(1 << 20), b""):
@@ -85,10 +130,13 @@ def bootstrap(settings_path, work_dir=None):
     if not roots:
         raise Stop("the release zip holds no kpi_store package")
     root = roots[0]
+    # A notebook session can run this twice. Drop the kpi_store modules and the import paths of an earlier
+    # unzip into a temporary folder, so this run imports kpi_store from this zip.
     for name in [m for m in sys.modules if m == "kpi_store" or m.startswith("kpi_store.")]:
         del sys.modules[name]   # a second run in one session must import the new zip's code
     sys.path[:] = [p for p in sys.path if not p.startswith(str(target.parent / "kpi_store_"))]
     sys.path.insert(0, str(root))
+    # From here on the release's own code runs. It validates the whole settings file and checks the zip again.
     from kpi_store import settings as settings_module
     try:
         settings = settings_module.load(path)
@@ -100,6 +148,8 @@ def bootstrap(settings_path, work_dir=None):
 
 def main(spark, dbutils, genie=None):
     """Runs the load with the notebook's own Spark session and returns the summary."""
+    # The three parameters. The runner sets settings_path and mode when it submits the run; a person who runs the
+    # notebook by hand sets them in the widgets at the top.
     dbutils.widgets.text("settings_path", "/Volumes/idp_sbx/kpi_store/releases/kpi_store.toml")
     dbutils.widgets.text("mode", "load")
     dbutils.widgets.text("stale_after_days", "35")
@@ -109,9 +159,13 @@ def main(spark, dbutils, genie=None):
     if genie is None:
         from databricks.sdk import WorkspaceClient
         genie = WorkspaceClient().genie   # the notebook's own sign-in; no token is read or stored
+    # The comparison, the report and the load of epm_triples. The release's code gets one function that runs a SQL
+    # statement and returns its rows, and it checks each statement before it calls that function.
     summary = load_databricks.run(settings, root, lambda statement: spark.sql(statement).collect(), genie,
                                   mode=dbutils.widgets.get("mode").strip() or "load",
                                   stale_after_days=int(days) if days else None)
+    # The technical graph is built only when Databricks holds this release: after a report that blocks, or in
+    # mode check, there is nothing for it to describe yet.
     if summary["status"] in ("current", "marked", "loaded"):
         from kpi_store import tech_graph
         run_dir = Path(summary["report_json"]).parent   # the run's folder in the volume; discovery.json is there
@@ -119,6 +173,8 @@ def main(spark, dbutils, genie=None):
         gate = load_databricks.Gate(settings, lambda statement: spark.sql(statement).collect())
         summary["tech_graph"] = tech_graph.load_delta(gate, settings, graph_files, root) | {"file": str(graph_files[0])}
     print(json.dumps(summary, indent=2))
+    # A hash that differs must fail the run, not end it quietly: the summary is printed first so the person can
+    # read the comparison, and then the run fails.
     for name, status in (("the load", summary["status"]), ("the technical graph's load", summary.get("tech_graph", {}).get("status"))):
         if status in ("staging-mismatch", "main-mismatch"):
             raise RuntimeError(f"{name} stopped: {status}. The hashes differ; see the summary above.")
@@ -126,5 +182,7 @@ def main(spark, dbutils, genie=None):
 
 # COMMAND ----------
 
+# Run the load and end the notebook with the summary as its result. A caller that submitted the run, such as the
+# runner, reads the summary from the run's output. Outside Databricks this cell does nothing.
 if "dbutils" in globals():
     dbutils.notebook.exit(json.dumps(main(spark, dbutils)))  # noqa: F821  the notebook supplies spark and dbutils

@@ -20,6 +20,16 @@ This file reads Neo4j over Bolt and Jena over its SPARQL query URL. It does not 
 writes the triple table also writes its marker (marker), and a caller that has read the table and the marker passes
 them to drift. Every expectation comes from this tree's files. --ref reads them at a Git ref instead.
 
+In the KPI Store load this file is a library, not a step of the runner. Each store load under kpi_store/ (Databricks,
+Fuseki, the local Neo4j, the copy to Enterprise) and the sync check import it from the release folder. They all take
+from it what a current store holds (expected, and the graphs and package graphs of a release) and what a marker looks
+like (marker). So the loads and the sync check start from one statement of what a store should hold. Each then applies
+its own test on top: a load compares a dataset hash or a graph hash before it calls a store current, and only the
+sync check calls drift, which compares markers and counts. Those callers bring their own settings and connections. The
+three commands above, with the settings below, are for a run by hand.
+The only write this file makes is mark's: one marker node in Neo4j. It writes no file, and nothing to Jena or
+Databricks.
+
 The settings come from one place (settings): the file EPM_STORES_ENV names, kept outside the repository, and the
 process environment, which wins. No password is printed.
 Needs rdflib; check and mark also need neo4j (uv run --with ...).
@@ -137,7 +147,12 @@ def newest_releases(datasets):
 
 
 def expected(ref=None):
-    """What a current store's marker holds (MARKER_FIELDS), and the newest release IRIs."""
+    """What a current store's marker holds (MARKER_FIELDS), and the newest release IRIs.
+
+    The two kinds of field catch two kinds of change. The catalog's count and digest move when a release is added to
+    or taken out of the catalog. The input fingerprint moves when the triples the projection loads change. A store
+    with a marker (Neo4j, Databricks) can read current only when its marker equals all three; drift then also
+    compares its count. Jena has no marker and is judged by its graphs."""
     datasets = catalog_datasets(repo_file(CATALOG, ref))
     return {"catalog_datasets": len(datasets),
             "catalog_digest": hashlib.sha256("\n".join(datasets).encode()).hexdigest(),
@@ -228,7 +243,10 @@ def drift(markers, live, want, stores=STORES):
     changed or empty, leaving out the graphs want["jena_apart"] names. Databricks is also judged per graph
     (live["databricks_graphs"], {graph: rows}): a graph missing, extra or holding another row count than the release
     files' triples reads changed, with the graph named, even when the total holds. A store with any other name is a
-    Neo4j database, so a caller can judge two of them."""
+    Neo4j database, so a caller can judge two of them.
+
+    The order of the tests is the order of what to fix first: a store that cannot be read, then one never marked,
+    then one marked from another release set, and only then a count that moved since the mark."""
     rows = []
     for store in stores:
         m = markers.get(store)
@@ -258,7 +276,7 @@ def commit():
     name and its zip's checksum, for example) passes its own text to marker."""
     if not os.path.exists(os.path.join(REPO, ".git")):
         return "unknown (not a Git checkout)"
-    return subprocess.run(["git", "-C", REPO, "rev-parse", "--short=8", "HEAD"], capture_output=True, text=True).stdout.strip()
+    return subprocess.run(["git", "-C", REPO, "rev-parse", "--short=8", "HEAD"], capture_output=True, text=True, encoding="utf-8").stdout.strip()
 
 
 def now():
@@ -334,7 +352,11 @@ def neo4j_checked(store, session, want):
 
 
 def mark_neo4j(session, store="neo4j", want=None):
-    """Checks the database against this tree (neo4j_checked), then writes its marker. Returns the marker."""
+    """Checks the database against this tree (neo4j_checked), then writes its marker. Returns the marker.
+
+    The check runs first and stops the command, so a database whose counts or release records differ from this
+    tree's last load is not marked. The check compares the two counts and the release records, not the graph's
+    content. MERGE on the store's name means a second mark replaces the first and leaves one marker per name."""
     want = want or expected()
     written = marker(want, store, neo4j_checked(store, session, want))
     session.run("MERGE (m:EpmStoreMarker {store: $s}) SET m = $p", s=store, p=written).consume()
@@ -366,7 +388,8 @@ def read_jena(query_url):
 
 def read_stores(stores, values, name="neo4j"):
     """(markers, live, logical-model markers) of the named stores, for drift and logical_models.drift. A store not
-    named is not read. A store that cannot be read, or whose setting is missing, reads as unreachable with the reason."""
+    named is not read. A store that cannot be read, or whose setting is missing, reads as unreachable with the reason.
+    An error is caught per store, so one store that is down still leaves a line for the other."""
     import logical_models as lm  # it imports this module
     markers, live, models = {}, {}, {}
     if "neo4j" in stores:

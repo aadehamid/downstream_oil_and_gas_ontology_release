@@ -12,6 +12,7 @@ import copy
 import io
 import os
 import shutil
+import stat
 import subprocess
 import tempfile
 import unittest
@@ -24,7 +25,24 @@ import check_requirements
 import check_taxonomy
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def remove_tree(path):
+    """Delete a folder that may hold a Git repository. Git makes its object files read-only, and Windows does not
+    delete a read-only file, so each refused file is made writable and tried again."""
+    def writable(function, name, _):
+        os.chmod(name, stat.S_IWRITE)
+        function(name)
+    shutil.rmtree(path, onerror=writable)
+
+
 TEMPLATES = os.path.join(HERE, "..", "templates")
+# The bash on PATH. On Windows a program started by the bare name "bash" is looked for in the system folder first,
+# and the bash.exe there starts the Linux subsystem, not Git Bash.
+BASH = shutil.which("bash") or "bash"
+# Why two tests of the guard do not run on Windows. What they prove elsewhere, that the guard works with no git
+# and stops when git fails, is not proven on Windows.
+NO_PLAIN_BASH = ("on Windows bash comes with Git for Windows, which puts its own git first, so bash without git, or with a stand-in git, cannot be set up")
 SKELETON = os.path.join(TEMPLATES, "ontology-skeleton.ttl")
 SHAPES = os.path.join(TEMPLATES, "shapes-skeleton.ttl")
 REQUIREMENTS = os.path.join(TEMPLATES, "requirements.yaml")
@@ -821,7 +839,7 @@ class RequirementsChecks(OneBreak, unittest.TestCase):
         req["competency_questions"][0]["needs"].append("fines")
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "requirements.yaml")
-            with open(path, "w", encoding="utf-8") as f:
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
                 yaml.safe_dump(req, f)
             code, out = run_main(check_requirements.main, [path])
         self.assertEqual(code, 1)
@@ -966,7 +984,7 @@ class CheckScriptSkeleton(unittest.TestCase):
         self.git("config", "user.name", "test")
 
     def tearDown(self):
-        shutil.rmtree(self.tmp)
+        remove_tree(self.tmp)
 
     def git(self, *args):
         subprocess.run(["git", *args], cwd=self.tmp, env=self.env, check=True,
@@ -980,12 +998,12 @@ class CheckScriptSkeleton(unittest.TestCase):
         path = os.path.join(self.tmp, "scripts", "check.sh")
         with open(path, encoding="utf-8") as f:
             text = f.read()
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(transform(text))
 
     def run_script(self):
-        return subprocess.run(["bash", "scripts/check.sh"], cwd=self.tmp, env=self.env,
-                              stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300)
+        return subprocess.run([BASH, "scripts/check.sh"], cwd=self.tmp, env=self.env,
+                              stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300, encoding="utf-8")
 
     @staticmethod
     def drop_todos(text):
@@ -1004,9 +1022,10 @@ class CheckScriptSkeleton(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("all checks passed", result.stdout)
 
+    @unittest.skipIf(os.name == "nt", "Windows keeps no execute bit, so there is none to drop")
     def test_write_guard_catches_a_dropped_execute_bit(self):
         tool = os.path.join(self.tmp, "tool.sh")
-        with open(tool, "w") as f:
+        with open(tool, "w", encoding="utf-8", newline="\n") as f:
             f.write("echo hi\n")
         os.chmod(tool, 0o755)
         self.edit_script(lambda t: self.drop_todos(t).replace(
@@ -1017,7 +1036,7 @@ class CheckScriptSkeleton(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("the checks changed the working tree", result.stderr)
 
-    TAXONOMY_LINES = ("# TODO: data=()", "# TODO: [ \"${#data[@]}\"", "# TODO: uv run --no-project --with rdflib python3 scripts/ontology/check_taxonomy.py")
+    TAXONOMY_LINES = ("# TODO: data=()", "# TODO: [ \"${#data[@]}\"", "# TODO: uv run --no-project --with rdflib python scripts/ontology/check_taxonomy.py")
 
     def fill_taxonomy(self, text):
         lines = []
@@ -1051,7 +1070,7 @@ class CheckScriptSkeleton(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("all checks pass", result.stdout)
 
-        with open(os.path.join(modules, "lending.ttl"), "a", encoding="utf-8") as f:
+        with open(os.path.join(modules, "lending.ttl"), "a", encoding="utf-8", newline="\n") as f:
             f.write('\nlib:Copy rdfs:comment "untagged" .\n')
         self.commit()
         result = self.run_script()
@@ -1077,7 +1096,7 @@ class CheckScriptSkeleton(unittest.TestCase):
         self.assertIn("the checks changed the working tree", result.stderr)
 
     def test_write_guard_catches_a_changed_file(self):
-        with open(os.path.join(self.tmp, "note.txt"), "w") as f:
+        with open(os.path.join(self.tmp, "note.txt"), "w", encoding="utf-8", newline="\n") as f:
             f.write("before\n")
         self.inject("echo after > note.txt")
         result = self.run_script()
@@ -1087,7 +1106,7 @@ class CheckScriptSkeleton(unittest.TestCase):
     def test_write_guard_ignores_build_output(self):
         # In a checkout the repository's own ignore file keeps build output out of git's listing; in a plain
         # folder the guard's own list does.
-        with open(os.path.join(self.tmp, ".gitignore"), "w") as f:
+        with open(os.path.join(self.tmp, ".gitignore"), "w", encoding="utf-8", newline="\n") as f:
             f.write("__pycache__/\n.pytest_cache/\n")
         self.inject("mkdir -p __pycache__ .pytest_cache && echo x > __pycache__/a.pyc && echo y > .pytest_cache/b")
         result = self.run_script()
@@ -1127,31 +1146,33 @@ class CheckScriptWithoutGit(CheckScriptSkeleton):
                 os.symlink(found, os.path.join(bin_dir, tool))
         return dict(self.env, PATH=bin_dir)
 
+    @unittest.skipIf(os.name == "nt", NO_PLAIN_BASH)
     def test_the_guard_runs_with_no_git_installed(self):
         self.edit_script(self.drop_todos)
         env = self.without_git()
         self.assertIsNone(shutil.which("git", path=env["PATH"]))
-        result = subprocess.run(["bash", "scripts/check.sh"], cwd=self.tmp, env=env,
-                                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300)
+        result = subprocess.run([BASH, "scripts/check.sh"], cwd=self.tmp, env=env,
+                                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300, encoding="utf-8")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("all checks passed", result.stdout)
         self.inject("echo made > made.txt")
-        result = subprocess.run(["bash", "scripts/check.sh"], cwd=self.tmp, env=env,
-                                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300)
+        result = subprocess.run([BASH, "scripts/check.sh"], cwd=self.tmp, env=env,
+                                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300, encoding="utf-8")
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("the checks changed the working tree", result.stderr)
 
+    @unittest.skipIf(os.name == "nt", NO_PLAIN_BASH)
     def test_a_git_that_fails_stops_the_guard(self):
         # git is present but cannot answer (a dubious owner, a broken repository): the guard must not fall
         # back to the plain-folder snapshots, which would leave out the index and status it was asked for.
         self.edit_script(self.drop_todos)
         env = self.without_git()
         fake = os.path.join(env["PATH"], "git")
-        with open(fake, "w") as f:
+        with open(fake, "w", encoding="utf-8", newline="\n") as f:
             f.write("#!/bin/sh\necho 'fatal: detected dubious ownership in repository' >&2\nexit 128\n")
         os.chmod(fake, 0o755)
-        result = subprocess.run(["bash", "scripts/check.sh"], cwd=self.tmp, env=env,
-                                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300)
+        result = subprocess.run([BASH, "scripts/check.sh"], cwd=self.tmp, env=env,
+                                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300, encoding="utf-8")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("git rev-parse failed, so the guard cannot tell whether this is a checkout: fatal: detected dubious ownership",
                       result.stderr)
@@ -1160,20 +1181,21 @@ class CheckScriptWithoutGit(CheckScriptSkeleton):
     def test_a_broken_git_directory_stops_the_guard(self):
         # git says "not a git repository" here too, but names the path: this is a broken checkout, not a plain folder.
         self.edit_script(self.drop_todos)
-        with open(os.path.join(self.tmp, ".git"), "w") as f:
+        with open(os.path.join(self.tmp, ".git"), "w", encoding="utf-8", newline="\n") as f:
             f.write("gitdir: /no/such/folder\n")
         result = self.run_script()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("git rev-parse failed, so the guard cannot tell whether this is a checkout", result.stderr)
         self.assertNotIn("all checks passed", result.stdout)
 
+    @unittest.skipIf(os.name == "nt", "on Windows chmod cannot take away the right to list a folder")
     def test_a_folder_that_cannot_be_listed_stops_the_guard(self):
         if os.geteuid() == 0:
             self.skipTest("root can list any folder")
         self.edit_script(self.drop_todos)
         locked = os.path.join(self.tmp, "locked")
         os.makedirs(locked)
-        with open(os.path.join(locked, "inside.txt"), "w") as f:
+        with open(os.path.join(locked, "inside.txt"), "w", encoding="utf-8", newline="\n") as f:
             f.write("x\n")
         os.chmod(locked, 0o100)
         try:
