@@ -77,6 +77,7 @@ class FakeWorkspace:
         self.statements = []
         self.rewrites = 0        # how often a CREATE OR REPLACE ... AS SELECT ran
         self.corrupt_staging = False
+        self.corrupt_promote = False   # alter a row as the staging table replaces the main table
 
     def writes(self):
         return [s for s in self.statements if not s.lstrip().upper().startswith(("SELECT", "DESCRIBE"))]
@@ -111,6 +112,9 @@ class FakeWorkspace:
         m = re.match(r"CREATE OR REPLACE TABLE ([\w.]+) AS SELECT \* FROM ([\w.]+)$", s)
         if m:
             self.store[m.group(1).lower()] = [dict(r) for r in self.store[m.group(2).lower()]]
+            if self.corrupt_promote:
+                self.store[m.group(1).lower()][0]["object"] += " altered"
+                self.corrupt_promote = False
             self.rewrites += 1
             return []
         m = re.match(r"CREATE OR REPLACE TABLE ([\w.]+) \(subject STRING NOT NULL", s)
@@ -343,6 +347,9 @@ m:sample-prices a skos:Concept ; skos:prefLabel "Sample Market Pricing"@en ; sko
         encoding="utf-8", newline="\n")
     projection = root / "business_architecture" / "ontology" / "projection"
     projection.mkdir(parents=True, exist_ok=True)
+    # The release's own description of what a current store holds, which the load imports from the release it loads.
+    (projection / "sync_stores.py").write_text((ROOT / "business_architecture" / "ontology" / "projection" / "sync_stores.py").read_text(encoding="utf-8"),
+                                               encoding="utf-8", newline="\n")
     (projection / "projection-manifest.json").write_text('{"input_fingerprint": "sample-fingerprint"}\n', encoding="utf-8", newline="\n")
     (root / "release.json").write_text('{"release": "KPI Store 1.1"}\n', encoding="utf-8", newline="\n")
     return root

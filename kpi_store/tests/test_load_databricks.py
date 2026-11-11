@@ -172,6 +172,42 @@ def test_an_altered_staging_row_stops_the_load_and_leaves_the_main_table_untouch
     assert load(workspace, changed)["status"] == "loaded" and workspace.rewrites == 2
 
 
+def test_a_main_table_that_differs_after_the_replace_is_not_marked(tmp_path):
+    root, workspace = support.small_release(tmp_path), support.FakeWorkspace()
+    workspace.corrupt_promote = True
+    result = load(workspace, root)
+    assert result["status"] == "main-mismatch" and result["comparison"]["published"] is True
+    assert result["comparison"]["staging"] == {"hashes_equal": True} and result["comparison"]["hashes_equal"] is False
+    assert MARKERS not in workspace.store and not [t for t in workspace.store if "__staging_" in t]
+    assert load(workspace, root)["status"] == "loaded" and len(workspace.store[MARKERS]) == 1
+
+
+def test_the_staging_steps_are_the_rdf_store_skills_and_every_statement_passes_the_gate(tmp_path):
+    root, workspace = support.small_release(tmp_path), support.FakeWorkspace()
+    g = ld.Gate(support.make_settings(), workspace.run_sql)
+    assert ld.load(g, support.make_settings(), root, "made-up", NOW, RDFSTORE)["status"] == "loaded"
+    assert g.statements == len(workspace.statements) > 6   # nothing reached the workspace beside the gate
+    # The same store, pointed at a table outside the KPI Store's schemas, is refused at its first statement.
+    for table in ("idp_sbx.gold_commercial_core.epm_triples", "synapse_dev.kpi_store.epm_triples", "epm_triples"):
+        sent = len(workspace.statements)
+        outside = RDFSTORE.SparkStore(ld.GatedSpark(g), table)
+        with pytest.raises(ld.GateRefusal, match="a write outside"):
+            RDFSTORE.roundtrip(outside, ld.build_dataset(root, RDFSTORE))
+        with pytest.raises(ld.GateRefusal, match="a read outside") if table == "epm_triples" else pytest.raises(KeyError):
+            outside.export()   # a read of another catalog's table passes the gate only when read_catalogs names it
+        assert len(workspace.statements) - sent == (0 if table == "epm_triples" else 1)
+        assert [s for s in workspace.statements[sent:] if not s.startswith("SELECT")] == []
+
+
+def test_the_graph_set_is_the_one_sync_stores_expects_for_this_release():
+    ss = ld.import_sync_stores(support.ROOT)
+    graphs = ld.release_graphs(support.ROOT)
+    assert set(graphs) == set(ss.expected_for(None, ["databricks"])["jena_graphs"])
+    assert len(graphs) == 41   # 13 releases, each with its content, shapes and catalog, and the two logical model graphs
+    assert (ss.TRIPLES_TABLE, ss.MARKER_TABLE) == ("epm_triples", "epm_store_markers")
+    assert (support.make_settings().triples_table, support.make_settings().markers_table) == (TRIPLES, MARKERS)
+
+
 def test_a_changed_release_reloads_and_a_lost_marker_is_written_again(tmp_path):
     root, workspace = support.small_release(tmp_path), support.FakeWorkspace()
     first = load(workspace, root)

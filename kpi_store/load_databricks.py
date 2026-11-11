@@ -3,13 +3,13 @@
 Every SQL statement goes through one Gate. The Gate refuses a write outside the two KPI Store schemas and a read
 outside the read catalogs and the three system schemas, so a mistake in this code cannot touch another table.
 
-The load writes a staging table of its own, reads it back and compares its RDFC-1.0 dataset hash with the hash
-of the release files. Only an equal staging table replaces epm_triples, in one statement. The staging table is
-always dropped. The main table is then read back and compared again, and only then does the marker row say which
-release the table holds. A second run on the same release finds the same hash and the same marker, and writes
-nothing.
+The load is the rdf-store skill's round trip (rdfstore.py, which ships in the release): it writes a staging
+table of its own, reads it back and compares its RDFC-1.0 dataset hash with the hash of the release files. Only
+an equal staging table replaces epm_triples, in one statement. The staging table is always dropped. The main
+table is then read back and compared again, and only then does the marker row say which release the table
+holds. A second run on the same release finds the same hash and the same marker, and writes nothing.
 
-The row format and the hash come from the rdf-store skill's rdfstore.py, which ships in the release.
+What a current store holds, and the marker's shape, come from the release's sync_stores.py.
 Needs rdflib, pyoxigraph and sqlglot.
 """
 import base64
@@ -18,7 +18,6 @@ import hashlib
 import importlib.util
 import json
 import re
-import uuid
 from pathlib import Path
 
 from . import compare as cmp
@@ -28,11 +27,8 @@ from . import ontology_view as ov
 from . import report as rep
 from .settings import SYSTEM_SCHEMAS
 
-CATALOG = ov.RELEASES / "catalog.ttl"
-MANIFEST = Path("business_architecture") / "ontology" / "projection" / "projection-manifest.json"
 RDFSTORE = Path("skills") / "rdf-store" / "scripts" / "rdfstore.py"
-RELEASE_GRAPHS = ("shapes", "catalog")
-MARKER_FIELDS = ("catalog_datasets", "catalog_digest", "input_fingerprint")
+SYNC_STORES = Path("business_architecture") / "ontology" / "projection" / "sync_stores.py"
 STORE = "databricks"
 CREATE_VOLUME = re.compile(r"^\s*CREATE\s+VOLUME\s+IF\s+NOT\s+EXISTS\s+([\w`.]+)\s*$", re.IGNORECASE)
 BATCH = 2000
@@ -119,18 +115,31 @@ class Gate:
 
 # ---- what a current store holds ------------------------------------------------------------
 
-def catalog_datasets(release_root):
-    """The version IRIs the release's catalog lists as datasets, sorted."""
-    from rdflib import Graph, URIRef
-    path = Path(release_root) / CATALOG
-    if not path.is_file():
+def _import(release_root, relative, name):
+    """A module of the release, loaded by its path: these folders are not packages."""
+    path = Path(release_root) / relative
+    spec = importlib.util.spec_from_file_location(name, path) if path.is_file() else None
+    if spec is None:
         raise ov.ReleaseError(f"{path} is missing")
-    graph = Graph().parse(path, format="turtle")
-    return sorted(str(d) for d in graph.objects(None, URIRef("http://www.w3.org/ns/dcat#dataset")))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def import_rdfstore(release_root):
+    """The rdf-store skill's module, from the release: the row format, the hash, and the staging round trip."""
+    return _import(release_root, RDFSTORE, "kpi_store_rdfstore")
+
+
+def import_sync_stores(release_root):
+    """The release's sync_stores module, which says what a current store holds. It reads the tree it sits in, so
+    loading it from the release's root makes it describe that release."""
+    return _import(release_root, SYNC_STORES, "kpi_store_sync_stores")
 
 
 def newest_releases(datasets):
     """Each module's newest version IRI, .../modules/<module>/<version>, by ontology_view.version_key."""
+    # Kept here: sync_stores.newest_releases reads each version part as a number and fails on -correction.N.
     newest = {}
     for iri in datasets:
         module, version = iri.rsplit("/", 2)[-2:]
@@ -142,75 +151,73 @@ def newest_releases(datasets):
     return sorted(iri for _, iri in newest.values())
 
 
-def expected(release_root):
-    """What a current store's marker holds, from the catalog and the projection manifest, plus "newest": the version
-    IRIs a current store holds."""
-    datasets = catalog_datasets(release_root)
-    manifest = Path(release_root) / MANIFEST
+def expected(release_root, sync_stores=None):
+    """What a current store's marker holds (sync_stores.MARKER_FIELDS), plus "newest": the version IRIs a current
+    store holds."""
+    # Kept here: sync_stores.expected calls its own newest_releases, which fails on a correction version. The
+    # catalog's datasets and the two file paths come from sync_stores.
+    ss = sync_stores or import_sync_stores(release_root)
     try:
-        fingerprint = json.loads(manifest.read_text(encoding="utf-8"))["input_fingerprint"]
-    except (OSError, ValueError, KeyError):
-        raise ov.ReleaseError(f"{manifest} is missing or holds no input_fingerprint") from None
+        datasets = ss.catalog_datasets(ss.repo_file(ss.CATALOG))
+        fingerprint = json.loads(ss.repo_file(ss.MANIFEST))["input_fingerprint"]
+    except (OSError, ValueError, KeyError) as err:
+        raise ov.ReleaseError(f"the release's catalog or projection manifest cannot be read: {type(err).__name__}: {err}") from None
     return {"catalog_datasets": len(datasets),
             "catalog_digest": hashlib.sha256("\n".join(datasets).encode()).hexdigest(),
             "input_fingerprint": fingerprint, "newest": newest_releases(datasets)}
 
 
-def release_graphs(release_root):
-    """{graph IRI: file} of what a current store holds. For each newest release: its content under the version IRI,
-    its shapes and catalog under <version IRI>/shapes and /catalog, and each further Turtle file its manifest lists
-    under <version IRI>/<file name without .ttl>. Stops when the catalog and the folders disagree on the newest
-    version of a module, because the store would then hold one and the comparison would read the other."""
-    releases = Path(release_root) / ov.RELEASES
+def release_graphs(release_root, sync_stores=None):
+    """{graph IRI: file} of what a current store holds, the graph set of sync_stores.jena_graphs with each graph's
+    file: for each newest release, its content under the version IRI, each release graph (sync_stores.RELEASE_GRAPHS)
+    under <version IRI>/<name>, and each package graph (sync_stores.package_graphs). Stops when the catalog and the
+    folders disagree on the newest version of a module, because the store would then hold one and the comparison
+    would read the other."""
+    ss = sync_stores or import_sync_stores(release_root)
+    root, releases = Path(release_root), Path(release_root) / ov.RELEASES
     graphs = {}
-    for iri in expected(release_root)["newest"]:
+    for iri in expected(release_root, ss)["newest"]:
         module, version = iri.rsplit("/", 2)[-2:]
         on_disk = ov.newest_version(module, releases)
         if on_disk != version:
             raise ov.ReleaseError(f"the catalog's newest {module} is {version}, and the newest package folder is {on_disk}")
         folder = releases / module / version
-        manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
-        own = {f"{module}.ttl", *(f"{n}.ttl" for n in RELEASE_GRAPHS)}
         graphs[iri] = folder / f"{module}.ttl"
-        for name in RELEASE_GRAPHS:
+        for name in ss.RELEASE_GRAPHS:
             graphs[f"{iri}/{name}"] = folder / f"{name}.ttl"
-        for name in sorted(n for n in manifest.get("files", {}) if n.endswith(".ttl") and n not in own):
-            graphs[f"{iri}/{name[:-len('.ttl')]}"] = folder / name
+        for graph, path in ss.package_graphs(iri).items():
+            graphs[graph] = root / path
     missing = sorted(str(p) for p in graphs.values() if not p.is_file())
     if missing:
         raise ov.ReleaseError(f"the release lacks {missing[0]}")
     return graphs
 
 
-def import_rdfstore(release_root):
-    """The rdf-store skill's module, loaded from the release by its path: its folder name is not a package name."""
-    path = Path(release_root) / RDFSTORE
-    spec = importlib.util.spec_from_file_location("kpi_store_rdfstore", path)
-    if spec is None or not path.is_file():
-        raise ov.ReleaseError(f"{path} is missing")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-def build_dataset(release_root, rdfstore):
+def build_dataset(release_root, rdfstore, sync_stores=None):
     """The dataset a current store holds: one named graph per file of release_graphs."""
     import os
-    graphs = release_graphs(release_root)
+    graphs = release_graphs(release_root, sync_stores)
     named = {os.path.realpath(path): iri for iri, path in graphs.items()}   # rdfstore.pack keys its names this way
     return rdfstore.pack([str(p) for p in graphs.values()], named)
 
 
 # ---- the load ----------------------------------------------------------------------------------
 
+class GatedSpark:
+    """The Spark session that rdfstore.SparkStore asks for, with every statement sent through the Gate. SparkStore
+    calls sql(statement) and then collect(), and reads each row as a tuple in column order."""
+
+    def __init__(self, gate):
+        self.gate = gate
+
+    def sql(self, statement):
+        rows = [tuple(row.values()) for row in self.gate.run(statement)]
+        return type("Rows", (), {"collect": lambda self: rows})()
+
+
 def _literal(text):
     """Text as a SQL expression that no quote or backslash in it can break: base64, decoded in SQL."""
     return "decode(unbase64('" + base64.b64encode(text.encode("utf-8")).decode("ascii") + "'), 'UTF-8')"
-
-
-def _export(gate, table, rdfstore):
-    rows = gate.run(f"SELECT {', '.join(rdfstore.COLUMNS)} FROM {table}")
-    return rdfstore.from_rows(tuple(r[c] for c in rdfstore.COLUMNS) for r in rows)
 
 
 def _own_tables(gate, settings):
@@ -238,7 +245,7 @@ def _write_marker(gate, settings, marker):
     gate.run(f"INSERT INTO {settings.markers_table} (store, marker) SELECT '{STORE}', {_literal(json.dumps(marker, sort_keys=True))}")
 
 
-def load(gate, settings, release_root, commit, now=None, rdfstore=None, batch=BATCH):
+def load(gate, settings, release_root, commit, now=None, rdfstore=None, batch=BATCH, sync_stores=None):
     """Loads the release into epm_triples and marks it. Returns a dict whose "status" is one of:
 
     current           the table and its marker already hold this release; nothing was written
@@ -246,45 +253,36 @@ def load(gate, settings, release_root, commit, now=None, rdfstore=None, batch=BA
     loaded            the table was replaced through the staging check, read back, and marked
     staging-mismatch  the staging table's hash differed; the main table is untouched (see "comparison")
     main-mismatch     the main table's hash differed after the replace; no marker was written
-    """
+
+    The staging table, the hash check, the replace and the read back are rdfstore.roundtrip's, on an
+    rdfstore.SparkStore whose statements all pass the Gate. Its report tells the two mismatches apart: "published"
+    is false when the staging table differed, and true when the main table differed after the replace."""
     rdfstore = rdfstore or import_rdfstore(release_root)
+    ss = sync_stores or import_sync_stores(release_root)
     now = now or dt.datetime.now(dt.timezone.utc)
-    dataset = build_dataset(release_root, rdfstore)
-    rows = rdfstore.to_rows(dataset)   # refuses what the table cannot hold, before the store is touched
-    lines = rdfstore.canonical_lines(dataset)
-    want_hash = rdfstore.lines_hash(lines)
-    want = expected(release_root)
-    marker = {**{k: want[k] for k in MARKER_FIELDS}, "store": STORE, "count": [len(rows)], "dataset_hash": want_hash}
-    result = {"table": settings.triples_table, "dataset_hash": want_hash, "count": len(rows)}
+    dataset = build_dataset(release_root, rdfstore, ss)
+    want_hash = rdfstore.dataset_hash(dataset)
+    # The marker's common fields have one source, sync_stores.marker. dataset_hash is this load's own field: it lets
+    # a second run see that the table still holds this release.
+    marker = ss.marker(expected(release_root, ss), STORE, [len(dataset)], commit_text=commit,
+                       marked_at=now.strftime("%Y-%m-%dT%H:%M:%SZ")) | {"dataset_hash": want_hash}
+    stable = {k: v for k, v in marker.items() if k not in ("marked_at", "commit")}
+    result = {"table": settings.triples_table, "dataset_hash": want_hash, "count": len(dataset)}
+    store = rdfstore.SparkStore(GatedSpark(gate), settings.triples_table)
+    store.BATCH = batch
 
-    def stamped():
-        return {**marker, "marked_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "commit": commit}
+    if ss.TRIPLES_TABLE in _own_tables(gate, settings) and rdfstore.dataset_hash(store.export()) == want_hash:
+        held = read_marker(gate, settings) or {}
+        if all(held.get(k) == v for k, v in stable.items()):
+            return {**result, "status": "current", "marker": held}
+        _write_marker(gate, settings, marker)
+        return {**result, "status": "marked", "marker": marker}
 
-    if "epm_triples" in _own_tables(gate, settings):
-        if rdfstore.dataset_hash(_export(gate, settings.triples_table, rdfstore)) == want_hash:
-            held = read_marker(gate, settings) or {}
-            if all(held.get(k) == v for k, v in marker.items()):
-                return {**result, "status": "current", "marker": held}
-            _write_marker(gate, settings, stamped())
-            return {**result, "status": "marked", "marker": stamped()}
-
-    # One staging table per run, so two runs never check or promote each other's rows.
-    staging = f"{settings.triples_table}__staging_{uuid.uuid4().hex[:12]}"
-    try:
-        gate.run(rdfstore.create_sql(staging))
-        for start in range(0, len(rows), batch):
-            gate.run(rdfstore.insert_sql(staging, rows[start:start + batch]))
-        passed, comparison = rdfstore.compare(dataset, _export(gate, staging, rdfstore), lines)
-        if not passed:
-            return {**result, "status": "staging-mismatch", "comparison": comparison}
-        gate.run(f"CREATE OR REPLACE TABLE {settings.triples_table} AS SELECT * FROM {staging}")
-    finally:
-        gate.run(f"DROP TABLE IF EXISTS {staging}")
-    passed, comparison = rdfstore.compare(dataset, _export(gate, settings.triples_table, rdfstore), lines)
+    passed, comparison = rdfstore.roundtrip(store, dataset)
     if not passed:
-        return {**result, "status": "main-mismatch", "comparison": comparison}
-    _write_marker(gate, settings, stamped())
-    return {**result, "status": "loaded", "marker": stamped()}
+        return {**result, "status": "main-mismatch" if comparison.get("published") else "staging-mismatch", "comparison": comparison}
+    _write_marker(gate, settings, marker)
+    return {**result, "status": "loaded", "marker": marker}
 
 
 # ---- the whole run -------------------------------------------------------------------------------
