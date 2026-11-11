@@ -378,6 +378,9 @@ class Git(Workspace):
         git("init", "-q", "--bare", "-b", "main", cwd=bare)
         git("init", "-q", "-b", "main", cwd=self.root)
         git("remote", "add", "origin", bare, cwd=self.root)
+        # Git for Windows checks text out with CRLF by default, and these tests change branches. A package file
+        # checked out with CRLF no longer equals its tagged copy, so a repository on Windows must pin LF.
+        git("config", "core.autocrlf", "false", cwd=self.root)
         with open(os.path.join(self.root, "README"), "w", encoding="utf-8", newline="\n") as f:
             f.write("project\n")
         self.commit_all()

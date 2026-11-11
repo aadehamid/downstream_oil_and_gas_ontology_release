@@ -1,6 +1,7 @@
-# Runs the release's check script on every pull request, on Linux and on Windows under Git Bash.
-# The Linux job must pass. The Windows job reports its result but does not block yet: some tests still assume
-# POSIX file modes and symbolic links. When those tests pass on Windows, remove continue-on-error below.
+# Runs on every pull request, and every job must pass.
+# check: the release's check script, scripts/check.sh, on Linux and on Windows under Git Bash. The job sets no
+#   encoding variable, so on Windows Python reads text as cp1252 unless the code names UTF-8, as on most machines.
+# stores: the store loads on Windows, as a person runs them, against servers the job starts on the runner.
 name: check
 on:
   pull_request:
@@ -17,7 +18,6 @@ jobs:
       matrix:
         os: [ubuntu-24.04, windows-2025]
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.os == 'windows-2025' }}
     timeout-minutes: 45
     defaults:
       run:
@@ -32,41 +32,6 @@ jobs:
         env:
           PYTEST_ADDOPTS: -rs   # name each skipped test and why, so a skip on one system is seen
         run: bash scripts/check.sh
-      # TEMPORARY while the Windows job is made green: run every check even after one fails, to list all failures.
-      - name: survey (temporary)
-        if: failure() && runner.os == 'Windows'
-        run: |
-          python -c "import locale, sys; print(sys.version); print(locale.getpreferredencoding(False), sys.getfilesystemencoding(), sys.stdout.encoding)"
-          git config --show-origin --get-regexp 'core\.(autocrlf|longpaths|symlinks)' || true
-          pwd; java -version 2>&1 || true; uv --version; bash --version | head -1
-          sed 's/^set -euo pipefail/set -uo pipefail/' scripts/check.sh > scripts/check-survey.sh
-          bash scripts/check-survey.sh 2>&1 | tee "$RUNNER_TEMP/survey.log" || true
-
-  # TEMPORARY while the Windows job is made green: the part of the check script after the pytest run, with every
-  # command run even after one fails, so its failures are seen in minutes.
-  tail-temporary:
-    runs-on: windows-2025
-    timeout-minutes: 30
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-      - uses: astral-sh/setup-uv@v7
-      - name: the check script from the skills tests on
-        run: |
-          python - <<'PY'
-          import pathlib
-          lines = pathlib.Path("scripts/check.sh").read_text(encoding="utf-8").split("\n")
-          start = next(i for i, l in enumerate(lines) if l.startswith('before="$(snapshot)"'))
-          skills = next(i for i, l in enumerate(lines) if l.startswith("# The bundled skills' own checks"))
-          text = "\n".join(lines[:start + 1] + lines[skills:]).replace("set -euo pipefail", "set -uo pipefail")
-          pathlib.Path("scripts/check-tail.sh").write_text(text, encoding="utf-8", newline="\n")
-          PY
-          bash scripts/check-tail.sh 2>&1 || true
 
   # The store loads on Windows, with the commands a person runs: the setup check, the Fuseki load, the Neo4j load,
   # the copy to a second database, and the sync check. The servers run on the runner and listen on 127.0.0.1 only.
