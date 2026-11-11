@@ -548,6 +548,14 @@ def read_delta(gate, settings):
         return None
 
 
+def read_delta_rows(gate, settings):
+    """{graph IRI: row count} of the triple table, or None when the table is missing."""
+    if TRIPLES_TABLE not in _own_tables(gate, settings):
+        return None
+    found = gate.run(f"SELECT graph, count(*) AS n FROM {delta_tables(settings)[0]} GROUP BY graph")
+    return {str(r["graph"]): int(r["n"]) for r in found}
+
+
 def status_delta(held, graph_files, table_rows=None):
     """(status, why) from the triple table's marker (read_delta) and, when given, its {graph IRI: row count}."""
     differs = None

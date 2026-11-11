@@ -468,6 +468,29 @@ def test_the_delta_load_writes_the_triple_table_and_its_marker_in_the_tech_graph
     assert [s for s in workspace.writes()[before:] if not s.startswith("CREATE SCHEMA")] == []
 
 
+def test_the_sync_check_reads_the_marker_and_the_rows_per_graph(files):
+    workspace, _ = support.sandbox()
+    settings = support.make_settings()
+
+    def run_sql(statement):
+        # The fake workspace does not count rows; this statement is answered from what it holds.
+        if statement == "SELECT graph, count(*) AS n FROM idp_sbx.tech_graph.tech_graph_triples GROUP BY graph":
+            held = workspace.store["idp_sbx.tech_graph.tech_graph_triples"]
+            return [{"graph": g, "n": sum(1 for r in held if r["graph"] == g)} for g in sorted({r["graph"] for r in held})]
+        return workspace.run_sql(statement)
+
+    gate = lb.Gate(settings, run_sql)
+    assert tg.read_delta(gate, settings) is None and tg.read_delta_rows(gate, settings) is None
+    assert tg.status_delta(tg.read_delta(gate, settings), files, tg.read_delta_rows(gate, settings))[0] == "unmarked"
+    tg.load_delta(gate, settings, files, support.ROOT)
+    assert tg.read_delta_rows(gate, settings) == {ENV + "graph": 269}
+    assert tg.status_delta(tg.read_delta(gate, settings), files, tg.read_delta_rows(gate, settings))[0] == "current"
+    # A row deleted by hand reads as changed.
+    workspace.store["idp_sbx.tech_graph.tech_graph_triples"].pop()
+    assert tg.read_delta_rows(gate, settings) == {ENV + "graph": 268}
+    assert tg.status_delta(tg.read_delta(gate, settings), files, tg.read_delta_rows(gate, settings))[0] == "changed"
+
+
 def test_a_staging_table_that_differs_leaves_the_triple_table_alone(files):
     workspace, _ = support.sandbox()
     settings = support.make_settings()
