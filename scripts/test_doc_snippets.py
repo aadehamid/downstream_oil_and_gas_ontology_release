@@ -1058,7 +1058,7 @@ def test_a_markdown_file_git_ignores_is_outside_the_scan(tmp_path):
 
 def test_no_part_of_the_tool_is_a_long_file():
     parts = sorted((d.ROOT / "scripts" / "doc_snippets_parts").glob("*.py")) + [d.ROOT / "scripts" / "doc_snippets.py"]
-    assert [p.name for p in parts] == ["__init__.py", "check.py", "extract.py", "match.py", "pages.py", "parsers.py",
+    assert [p.name for p in parts] == ["__init__.py", "check.py", "extract.py", "links.py", "match.py", "pages.py", "parsers.py",
                                        "registry.py", "report.py", "run.py", "doc_snippets.py"]
     for part in parts:
         assert len(part.read_text(encoding="utf-8").split("\n")) < 500, part.name
