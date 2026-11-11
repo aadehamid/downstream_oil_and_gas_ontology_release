@@ -24,7 +24,7 @@ run_tests() {  # unittest exits 0 on zero tests; a test command must have run at
   echo "--- $*"; local out; out="$("$@" 2>&1)"; local rc=$?; printf '%s\n' "$out"
   [ "$rc" -eq 0 ] && grep -qE '^Ran [1-9][0-9]* tests? ' <<<"$out"
 }
-with_deps() { uv run -q --no-project --with pytest --with pytest-xdist --with rdflib --with pyshacl --with openpyxl --with jsonschema --with "markdown-it-py>=4,<5" "$@"; }
+with_deps() { uv run -q --no-project --with pytest --with pytest-xdist --with rdflib --with pyshacl --with openpyxl --with jsonschema --with "markdown-it-py>=4,<5" --with neo4j "$@"; }
 
 # Snapshot the tree, so a check that writes a file is caught.
 snapshot() {
@@ -132,6 +132,8 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   business_architecture/ontology/value-stream/test_value_streams.py \
   business_architecture/ontology/viewer/test_viewer.py \
   demos/downstream-pricing-databricks-free/tests/test_demo.py \
+  kpi_store/tests/test_questions.py \
+  kpi_store/tests/test_questions_integration.py \
   scripts/test_check_script.py \
   scripts/test_docs_html.py \
   scripts/test_epm_facts.py \
