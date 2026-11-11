@@ -134,7 +134,7 @@
     "lane": "1.1.0",
     "market-data": "1.1.0",
     "integration": "2.5.0",
-    "technical-graph": "1.0.0",
+    "technical-graph": "1.1.0",
     "logical-model": "1.0.0"
   },
   "release_exceptions": {

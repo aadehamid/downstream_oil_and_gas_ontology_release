@@ -78,6 +78,21 @@ class Settings:
         catalog, _, rest = full_name.partition(".")
         return f"{self.names.get(catalog.lower(), catalog)}.{rest}"
 
+    def one_name_each(self, full_names):
+        """{environment name, lower case: ontology name} of some ontology objects. Raises SettingsError when two of
+        them get the same name here, naming both and the [names] entries that fold them together: one would
+        otherwise replace the other without a word."""
+        found = {}
+        for full_name in sorted(full_names):
+            here = self.environment_name(full_name).lower()
+            if here in found:
+                catalogs = sorted({found[here].split(".")[0].lower(), full_name.split(".")[0].lower()})
+                entries = ", ".join(f"{c} = {self.names[c]!r}" if c in self.names else f"{c} (no entry)" for c in catalogs)
+                raise SettingsError(f"the ontology's {found[here]} and {full_name} are both named {here} in this "
+                                    f"environment; [names] gives {entries}")
+            found[here] = full_name
+        return found
+
     def skipped(self, schema, table=None):
         """True when a skip rule covers the schema, or the table when one is given. Case is ignored."""
         if any(fnmatch.fnmatchcase(schema.lower(), p.lower()) for p in self.skip_schemas):
@@ -146,6 +161,10 @@ def parse(data, folder=Path(".")):
             raise SettingsError(f"[names] maps {ontology_name} to {here}, which read_catalogs does not name")
         if ontology_name.lower() in names:
             raise SettingsError(f"[names] names {ontology_name} twice")
+        twin = next((k for k, v in names.items() if v.lower() == here.lower()), None)
+        if twin:
+            # Two catalogs folded into one would give two ontology objects the same name here.
+            raise SettingsError(f"[names] maps both {twin} and {ontology_name.lower()} to {here}; each catalog needs its own")
         names[ontology_name.lower()] = here
     return Settings(
         zip_name=release["zip"], zip_sha256=release["sha256"],

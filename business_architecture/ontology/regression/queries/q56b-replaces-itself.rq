@@ -1,0 +1,6 @@
+# Q56 (must be none) A data object that replaces itself, or two that each replace the other.
+PREFIX tg: <https://w3id.org/mpc/ontology/modules/technical-graph/>
+SELECT ?object ?replaced WHERE {
+  ?object tg:replaces ?replaced .
+  FILTER (?object = ?replaced || EXISTS { ?replaced tg:replaces ?object })
+}

@@ -82,3 +82,21 @@ def test_the_zip_must_be_beside_the_settings_and_have_the_named_checksum(tmp_pat
     (tmp_path / "kpi-store-1.1.zip").write_bytes(data + b"!")
     with pytest.raises(settings.SettingsError, match="SHA-256 is .*, not the"):
         settings.check_zip(s)
+
+
+def test_a_names_map_that_folds_two_catalogs_into_one_is_refused():
+    text = support.SETTINGS_TEXT.replace('synapse_dev = "synapse_dev"\n', 'synapse_dev = "synapse_dev"\nidp = "IDP_SBX"\n')
+    with pytest.raises(settings.SettingsError, match="maps both idp_sbx and idp to IDP_SBX; each catalog needs its own"):
+        settings.parse(text.encode("utf-8"))
+    # One entry for each catalog is fine, whatever the names.
+    one_each = support.SETTINGS_TEXT.replace('idp_sbx = "idp_sbx"\n', 'idp = "idp_sbx"\n')
+    assert settings.parse(one_each.encode("utf-8")).names == {"idp": "idp_sbx", "synapse_dev": "synapse_dev"}
+
+
+def test_one_name_each_names_both_objects_and_the_entries():
+    s = settings.parse(support.SETTINGS_TEXT.replace('idp_sbx = "idp_sbx"\n', 'idp = "idp_sbx"\n').encode("utf-8"))
+    assert s.one_name_each(["IDP.gold.Fact", "synapse_dev.replica.t"]) == {"idp_sbx.gold.fact": "IDP.gold.Fact", "synapse_dev.replica.t": "synapse_dev.replica.t"}
+    with pytest.raises(settings.SettingsError) as err:
+        s.one_name_each(["idp.gold.fact", "idp_sbx.gold.FACT", "synapse_dev.replica.t"])
+    assert str(err.value) == ("the ontology's idp.gold.fact and idp_sbx.gold.FACT are both named idp_sbx.gold.fact in this environment; "
+                              "[names] gives idp = 'idp_sbx', idp_sbx (no entry)")

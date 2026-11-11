@@ -124,10 +124,12 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   kpi_store/tests/test_metric_view.py \
   kpi_store/tests/test_notebook.py \
   kpi_store/tests/test_ontology_view.py \
-  kpi_store/tests/test_questions.py \
-  kpi_store/tests/test_questions_integration.py \
   kpi_store/tests/test_report.py \
   kpi_store/tests/test_settings.py \
+  kpi_store/tests/test_tech_graph.py \
+  kpi_store/tests/test_tech_graph_integration.py \
+  kpi_store/tests/test_questions.py \
+  kpi_store/tests/test_questions_integration.py \
   scripts/test_check_script.py \
   scripts/test_check_standalone.py \
   scripts/test_docs_html.py \

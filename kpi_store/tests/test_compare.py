@@ -187,13 +187,67 @@ def test_stale_data_is_a_row_that_does_not_block_and_freshness_can_be_left_out()
     def old(workspace, genie):
         workspace.table_lineage = [(a, b, e, "2026-09-08T06:00:00" if b == GOLD else t) for a, b, e, t in workspace.table_lineage]
     result = run(old)
-    assert [(r["object"], r["found_value"], r["blocks"]) for r in of(result, "stale-data")] == [(GOLD, "2026-09-08T06:00:00", False)]
+    assert [(r["object"], r["found_value"], r["blocks"]) for r in of(result, "stale-data")] == [(GOLD, "2026-09-08T06:00:00Z", False)]
     assert "35 days" in of(result, "stale-data")[0]["evidence"]
     workspace, genie = support.sandbox()
     old(workspace, genie)
     s = support.make_settings()
     found = discovery.discover(s, workspace.run_sql, genie, {"idp_sbx.gold_commercial_core"})
     assert not of(compare.compare(ontology(), found, s, NOW, stale_after_days=None), "stale-data")
+
+
+def test_the_stale_threshold_compares_instants_across_offsets():
+    # NOW is 2026-11-11 12:00 UTC, so the 35-day limit is 2026-10-07 12:00 UTC.
+    def written(text):
+        def change(workspace, genie):
+            workspace.table_lineage = [(a, b, e, text if b == GOLD else t) for a, b, e, t in workspace.table_lineage]
+        return [(r["object"], r["found_value"]) for r in of(run(change), "stale-data")]
+
+    assert written("2026-10-07T10:00:00-05:00") == []                                   # 15:00 UTC: inside the limit
+    assert written("2026-10-07 13:00:00+02:00") == [(GOLD, "2026-10-07T11:00:00Z")]     # 11:00 UTC: outside it
+    assert written("2026-10-07 12:30:00") == []                                         # no zone is UTC
+    assert written("2026-10-07T11:59:59Z") == [(GOLD, "2026-10-07T11:59:59Z")]
+    # A reading that still holds the platform's own text is judged the same way.
+    workspace, genie = support.sandbox()
+    s = support.make_settings()
+    found = discovery.discover(s, workspace.run_sql, genie, {"idp_sbx.gold_commercial_core"})
+    for (source, target), edge in found.table_edges.items():
+        if target == GOLD.lower():
+            edge["last_event"] = "2026-10-07T10:00:00-05:00"
+    assert not [r for r in of(compare.compare(ontology(), found, s, NOW), "stale-data") if r["object"] == GOLD]
+    naive_now = dt.datetime(2026, 11, 11, 12, 0)
+    assert not [r for r in of(compare.compare(ontology(), found, s, naive_now), "stale-data") if r["object"] == GOLD]
+
+
+def test_the_stale_threshold_is_judged_by_the_full_instant_within_one_second():
+    # The limit is 35 days before now: 2026-10-07 12:00:00.5 UTC.
+    now = NOW + dt.timedelta(microseconds=500000)
+    s = support.make_settings()
+
+    def stale(text):
+        workspace, genie = support.sandbox()
+        workspace.table_lineage = [(a, b, e, text if b == GOLD else t) for a, b, e, t in workspace.table_lineage]
+        found = discovery.discover(s, workspace.run_sql, genie, {"idp_sbx.gold_commercial_core"})
+        return [r["found_value"] for r in of(compare.compare(ontology(), found, s, now), "stale-data") if r["object"] == GOLD]
+
+    assert stale("2026-10-07T12:00:00.900000Z") == []                          # 0.4 s inside the limit
+    assert stale("2026-10-07T12:00:00.400000Z") == ["2026-10-07T12:00:00Z"]    # 0.1 s outside; the report shows seconds
+
+
+def test_two_ontology_objects_with_one_name_here_stop_the_comparison():
+    import pytest
+    from kpi_store import settings as settings_module
+    view = ontology()
+    twin = next(o for o in view.objects.values() if o.full_name.startswith("idp_sbx.gold_commercial_core."))
+    other = "idp." + twin.full_name.split(".", 1)[1]
+    view.objects[other.lower()] = ov.PlatformObject("urn:made-up:design/twin", other, "gold", ())
+    s = settings_module.parse(support.SETTINGS_TEXT.replace('idp_sbx = "idp_sbx"\n', 'idp = "idp_sbx"\n').encode("utf-8"))
+    workspace, genie = support.sandbox()
+    found = discovery.discover(s, workspace.run_sql, genie, ())
+    with pytest.raises(settings_module.SettingsError) as err:
+        compare.compare(view, found, s, NOW)
+    assert other in str(err.value) and twin.full_name in str(err.value)
+    assert "idp = 'idp_sbx'" in str(err.value) and "idp_sbx (no entry)" in str(err.value)
 
 
 def test_a_filter_whose_table_is_not_clear_is_a_question_and_the_telling_words_are_singular():

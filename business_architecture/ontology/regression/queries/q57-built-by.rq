@@ -1,0 +1,8 @@
+# Q57 Which job or pipeline builds it: each data object with every builder that writes it, the builder's kind and its name.
+PREFIX tg: <https://w3id.org/mpc/ontology/modules/technical-graph/>
+SELECT ?object ?builder ?kind ?builderName WHERE {
+  ?object tg:builtBy ?builder .
+  ?builder a ?kind ;
+           tg:name ?builderName .
+  FILTER (?kind IN (tg:Job, tg:Pipeline))
+}

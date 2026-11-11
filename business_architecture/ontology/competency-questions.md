@@ -1,6 +1,6 @@
 # Competency Questions — Baseline
 
-**Status:** Locked 2026-09-18. *2026-11-02:* questions 45 to 50, the technical-graph module's, added and locked by the decision owner (the decision of 2026-11-02). *2026-11-02:* questions 51 to 55, the logical-model module's, added and locked by the decision owner (the decision of 2026-11-02).
+**Status:** Locked 2026-09-18. *2026-11-02:* questions 45 to 50, the technical-graph module's, added and locked by the decision owner (the decision of 2026-11-02). *2026-11-02:* questions 51 to 55, the logical-model module's, added and locked by the decision owner (the decision of 2026-11-02). *2026-11-11:* questions 56 and 57, added with technical-graph 1.1.0, decided under the delegation of KPI-DEC-0001 (`../domain/kpi-store-decisions/KPI-DEC-0001.md`); the owner can reverse them.
 **Purpose:** the acceptance test for the ontology. If the model cannot
 answer a question here, the model is incomplete — not the question.
 The Step 11 SPARQL regression in `regression/` tests them.
@@ -150,3 +150,13 @@ which holds it.
 53. Which attributes identify a customer in each system (primary and alternate keys)?
 54. Which attributes stand for a business term, and which have none?
 55. Which data product or platform table implements each entity, and which have none?
+
+## XIII. The technical graph: migration and builders (added 2026-11-11, decided under the delegation of KPI-DEC-0001)
+The questions technical-graph 1.1.0 adds. Each is asked of a data object on the data platform. As in
+section XI, the regression runs them on the module plus its example graph, and the same queries run on a
+technical graph built from a live platform.
+56. Which data object on an earlier platform does this data object replace?
+57. Which job or pipeline builds this data object?
+
+Question 56 needs `tg:replaces`. Question 57 needs `tg:builtBy` and the classes `tg:Builder`, `tg:Job` and
+`tg:Pipeline`. No other question needs them.

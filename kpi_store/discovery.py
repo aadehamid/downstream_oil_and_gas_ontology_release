@@ -4,11 +4,15 @@ Everything arrives through two injected objects: run_sql(statement), which retur
 Spark rows), and a Genie client with list_spaces and get_space, as databricks-sdk's WorkspaceClient().genie has.
 This module imports neither Spark nor the SDK, so the tests run it against made-up rows.
 
+Every time the platform reports is read once, here, into UTC text with its full precision (utc_precise), and
+compared as a full instant. Only what a person is shown is cut to the second (utc_text).
+
 Lineage rules: an edge is kept only when both of its tables exist today and no skip rule covers either; an edge
 from a table to itself is dropped; the lineage's entity_type is not read. A column edge is kept when both of its
 tables exist today, whether or not the columns do, because an old column name in the lineage is the evidence of
 a rename.
 """
+import datetime as dt
 import json
 from dataclasses import asdict, dataclass, field
 
@@ -61,8 +65,12 @@ class Discovery:
         return {(st, sc) for st, sc, tt, tc in self.column_edges if tt == table.lower() and tc == column.lower()}
 
     def last_written(self, name):
-        """The newest lineage event that wrote the table, as ISO text, or ""."""
-        return max((e["last_event"] for (s, t), e in self.table_edges.items() if t == name.lower() and e["last_event"]), default="")
+        """The newest lineage event that wrote the table, as a person is shown it (utc_text), or ""."""
+        return utc_text(self.last_written_at(name))
+
+    def last_written_at(self, name):
+        """The instant of the newest lineage event that wrote the table, or None. Compare with this one."""
+        return instant(newest(e["last_event"] for (s, t), e in self.table_edges.items() if t == name.lower()))
 
     def to_json(self):
         """The whole reading as JSON text, for the tools that build on it outside the notebook."""
@@ -101,8 +109,43 @@ def _text(value):
     return "" if value is None else str(value)
 
 
-def _iso(value):
-    return value.isoformat() if hasattr(value, "isoformat") else ("" if value is None else str(value))
+def instant(value):
+    """A platform time as a timezone-aware UTC datetime, or None when the value is empty or is no time.
+
+    Takes a datetime, or text with a T or a space between date and time, with an offset, a trailing Z or neither.
+    A time with no zone is UTC, which is what the system tables record."""
+    if isinstance(value, dt.datetime):
+        when = value
+    elif isinstance(value, dt.date):
+        when = dt.datetime(value.year, value.month, value.day)
+    else:
+        try:
+            when = dt.datetime.fromisoformat(str(value or "").strip())
+        except ValueError:
+            return None
+    return (when.replace(tzinfo=dt.timezone.utc) if when.tzinfo is None else when).astimezone(dt.timezone.utc)
+
+
+def utc_text(value):
+    """A platform time as a person is shown it, in the report and the technical graph: YYYY-MM-DDTHH:MM:SSZ, in
+    UTC, to the second. "" when the value is empty or is no time. Never order times by this text: it drops the
+    part of a second, so order instants (instant) or the reading's own text (utc_precise)."""
+    when = instant(value)
+    return when.strftime("%Y-%m-%dT%H:%M:%SZ") if when else ""
+
+
+def utc_precise(value):
+    """A platform time as the reading and its JSON hold it: YYYY-MM-DDTHH:MM:SS.ffffffZ, in UTC, always with six
+    digits, so nothing the platform reported is lost and a tool that reads the JSON orders times as this code
+    does. "" when the value is empty or is no time."""
+    when = instant(value)
+    return when.strftime("%Y-%m-%dT%H:%M:%S.%fZ") if when else ""
+
+
+def newest(values):
+    """The newest of some platform times, compared as full instants, as utc_precise; "" when none is a time."""
+    found = [when for when in map(instant, values) if when]
+    return utc_precise(max(found)) if found else ""
 
 
 def migration_pair(source, target):
@@ -165,7 +208,7 @@ def discover(settings, run_sql, genie=None, schemas=()):
         if str(row["table_catalog"]).lower() not in in_scope:
             continue
         info = TableInfo(f"{row['table_catalog']}.{row['table_schema']}.{row['table_name']}", row["table_catalog"],
-                         row["table_schema"], row["table_name"], str(row.get("table_type") or ""), _iso(row.get("last_altered")))
+                         row["table_schema"], row["table_name"], str(row.get("table_type") or ""), utc_precise(row.get("last_altered")))
         if not settings.skipped(info.schema, info.name):
             found.tables[info.full_name.lower()] = info
 
@@ -219,7 +262,7 @@ def discover(settings, run_sql, genie=None, schemas=()):
         edge = found.table_edges.setdefault((source.lower(), target.lower()), {"entities": [], "last_event": ""})
         if row.get("entity_id") and str(row["entity_id"]) not in edge["entities"]:
             edge["entities"] = sorted(edge["entities"] + [str(row["entity_id"])])
-        edge["last_event"] = max(edge["last_event"], _iso(row.get("last_event")))
+        edge["last_event"] = newest([edge["last_event"], row.get("last_event")])
     found.migration_pairs = sorted(e for e in found.table_edges if migration_pair(*e))
 
     if scope:
@@ -246,9 +289,12 @@ def discover(settings, run_sql, genie=None, schemas=()):
                 found.notes.append(f"{table} could not be read ({type(err).__name__})")
                 continue
             for row in map(as_dict, rows):
-                entity, changed = str(row[key]), _iso(row.get("change_time"))
-                # The table keeps every name an ID has had: the newest row holds the current one.
-                if entity.lower() in {e.lower() for e in entities} and (entity not in latest or changed >= latest[entity][0]):
+                # An ID is kept exactly as the platform gives it: two IDs that differ in case are two builders.
+                # The time is ordered in full: two versions saved within one second are still two instants.
+                entity, changed = str(row[key]), utc_precise(row.get("change_time"))
+                # The table keeps every name an ID has had: the newest row holds the current one. Rows of exactly
+                # the same instant are settled by name, so the order the rows arrive in never decides.
+                if entity in entities and (entity not in latest or (changed, str(row.get("name") or "")) > latest[entity]):
                     latest[entity] = (changed, str(row.get("name") or ""))
             for entity, (_, name) in latest.items():
                 found.builders[entity] = {"kind": kind, "name": name}

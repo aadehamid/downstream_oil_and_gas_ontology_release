@@ -3,6 +3,8 @@
 # module's tests check it against the module's shapes. It is kept as committed; no script rebuilds it.
 # Every identifier is made up, in the scheme urn:kpi-store-example:, and every name is an example name
 # (the host example-sources, the steps example_pipeline.*).
+# 1.1.0 adds made-up records for questions 56 and 57: two tables on an earlier platform, each replaced by a silver
+# table, and one job and one pipeline that write those silver tables.
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix dp: <https://w3id.org/mpc/ontology/modules/data-product/> .
 @prefix layer: <https://w3id.org/mpc/ontology/modules/data-product/layer/> .
@@ -381,7 +383,9 @@
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/silver-mips-price-batch-dim> ;
     tg:lastRefresh "2026-11-03T07:24:04+00:00"^^xsd:dateTime ;
     tg:layer layer:silver ;
+    tg:builtBy <urn:kpi-store-example:tech:builder/job-nightly-pricing-build> ;
     tg:name "silver_mdm_core.mips_price_batch_dim" ;
+    tg:replaces <urn:kpi-store-example:tech:earlier/mdm_core.mips_price_batch_dim> ;
     tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
     tg:readsFrom <urn:kpi-store-example:tech:object/replica_price_assessment.mips_pricebatch> ;
     tg:rows 748.0 .
@@ -435,7 +439,10 @@
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/silver-mpr-price-detail-fact> ;
     tg:lastRefresh "2026-11-03T07:24:15+00:00"^^xsd:dateTime ;
     tg:layer layer:silver ;
+    tg:builtBy <urn:kpi-store-example:tech:builder/job-nightly-pricing-build>,
+        <urn:kpi-store-example:tech:builder/pipeline-price-detail-refresh> ;
     tg:name "silver_udm_core.mpr_price_detail_fact" ;
+    tg:replaces <urn:kpi-store-example:tech:earlier/udm_core.mpr_price_detail_fact> ;
     tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
     tg:readsFrom <urn:kpi-store-example:tech:object/replica_price_reference.pricedetail> ;
     tg:rows 599148.0 .
@@ -468,3 +475,15 @@
     tg:next <urn:kpi-store-example:tech:step/genie> ;
     tg:order 5 .
 
+
+<urn:kpi-store-example:tech:builder/job-nightly-pricing-build> a tg:Job ;
+    tg:name "Nightly pricing build (made up)" .
+
+<urn:kpi-store-example:tech:builder/pipeline-price-detail-refresh> a tg:Pipeline ;
+    tg:name "Price detail refresh (made up)" .
+
+<urn:kpi-store-example:tech:earlier/mdm_core.mips_price_batch_dim> a tg:Table ;
+    tg:name "earlier_warehouse.mdm_core.mips_price_batch_dim" .
+
+<urn:kpi-store-example:tech:earlier/udm_core.mpr_price_detail_fact> a tg:Table ;
+    tg:name "earlier_warehouse.udm_core.mpr_price_detail_fact" .

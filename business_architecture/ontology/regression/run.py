@@ -1,6 +1,6 @@
 """Step 11 regression: run the competency-question queries against a release (the decision of 2026-10-05).
 
-expected.csv gives each of the 55 questions in competency-questions.md a status:
+expected.csv gives each of the 57 questions in competency-questions.md a status:
 answerable (its queries must run), partial (the graph part's queries must run;
 waits_for names the rest), waits:<step or decision> (no query yet), or
 parked:<decision> (parked by a recorded decision, which counts as green; no query). A query
