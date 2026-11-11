@@ -122,10 +122,10 @@ def test_a_platform_time_is_read_once_into_utc_and_compared_as_an_instant():
     assert discovery.instant("2026-11-02 09:00:00") == dt.datetime(2026, 11, 2, 9, tzinfo=utc)
     # As text the first sorts below the second; as instants 09:00 is the newer.
     assert "2026-11-02 09:00:00" < "2026-11-02T06:00:00+00:00"
-    assert discovery.newest(["2026-11-02 09:00:00", "2026-11-02T06:00:00+00:00"]) == "2026-11-02T09:00:00Z"
+    assert discovery.newest(["2026-11-02 09:00:00", "2026-11-02T06:00:00+00:00"]) == "2026-11-02T09:00:00.000000Z"
     # Two offsets that name one instant are one time; the later instant wins whatever its offset.
-    assert discovery.newest(["2026-11-02T10:00:00+04:00", "2026-11-02T01:00:00-05:00"]) == "2026-11-02T06:00:00Z"
-    assert discovery.newest(["2026-11-02T23:30:00-05:00", "2026-11-03T03:00:00+00:00"]) == "2026-11-03T04:30:00Z"
+    assert discovery.newest(["2026-11-02T10:00:00+04:00", "2026-11-02T01:00:00-05:00"]) == "2026-11-02T06:00:00.000000Z"
+    assert discovery.newest(["2026-11-02T23:30:00-05:00", "2026-11-03T03:00:00+00:00"]) == "2026-11-03T04:30:00.000000Z"
     assert discovery.newest(["", None, "not a time"]) == ""
 
 
@@ -138,9 +138,9 @@ def test_the_newest_write_is_chosen_by_instant_across_formats():
     for rows in (workspace.table_lineage, list(reversed(workspace.table_lineage))):
         workspace.table_lineage = rows
         found = discovery.discover(support.make_settings(), workspace.run_sql, None, ())
-        assert found.table_edges[("synapse_dev.replica_sample.source_table", target)]["last_event"] == "2026-11-02T09:00:00Z"
+        assert found.table_edges[("synapse_dev.replica_sample.source_table", target)]["last_event"] == "2026-11-02T09:00:00.000000Z"
         assert found.last_written(target) == "2026-11-02T09:00:00Z"
-        assert found.tables[target].last_altered == "2026-11-02T06:00:00Z"
+        assert found.tables[target].last_altered == "2026-11-02T06:00:00.000000Z"
 
 
 def test_a_builders_current_name_is_its_newest_by_instant_and_ids_keep_their_case():
@@ -156,3 +156,36 @@ def test_a_builders_current_name_is_its_newest_by_instant_and_ids_keep_their_cas
         found = discovery.discover(support.make_settings(), workspace.run_sql, None, ())
         # Two IDs that differ only in case are two builders. The newer name wins by instant; a tie goes to the name.
         assert found.builders == {"ABC-1": {"kind": "job", "name": "Alpha"}, "abc-1": {"kind": "job", "name": "Beta_Tie"}}
+
+
+def test_two_versions_of_a_job_within_one_second_are_ordered_by_the_full_instant():
+    workspace = support.small_workspace()
+    jobs = [("9001", "Zulu_old", "2026-10-20T12:00:00.100000Z"), ("9001", "Alpha_new", "2026-10-20T12:00:00.900000Z")]
+    for rows in (jobs, list(reversed(jobs))):
+        workspace.jobs = rows
+        found = discovery.discover(support.make_settings(), workspace.run_sql, None, ())
+        # The later version wins, though its name sorts first and both fall in one second.
+        assert found.builders == {"9001": {"kind": "job", "name": "Alpha_new"}}
+
+
+def test_two_lineage_events_within_one_second_keep_their_order_in_the_reading_and_its_json():
+    import datetime as dt
+    import json
+    workspace = support.small_workspace()
+    source, other, target = "synapse_dev.replica_sample.source_table", "idp_sbx.gold_sample.sample_fact", "idp_sbx.silver_sample.middle_dim"
+    lineage = [(source, target, "9001", "2026-11-02T06:00:00.200000Z"), (source, target, "9002", "2026-11-02 06:00:00.700000"),
+               (other, target, None, "2026-11-02T06:00:00.900000+00:00")]
+    for rows in (lineage, list(reversed(lineage))):
+        workspace.table_lineage = rows
+        found = discovery.discover(support.make_settings(), workspace.run_sql, None, ())
+        # The reading carries the time in full, in one UTC form.
+        assert found.table_edges[(source, target)]["last_event"] == "2026-11-02T06:00:00.700000Z"
+        assert found.table_edges[(other, target)]["last_event"] == "2026-11-02T06:00:00.900000Z"
+        assert found.last_written_at(target) == dt.datetime(2026, 11, 2, 6, 0, 0, 900000, tzinfo=dt.timezone.utc)
+        assert found.last_written(target) == "2026-11-02T06:00:00Z"      # what a person is shown: to the second
+        # The JSON keeps the full time, so a tool that reads it orders the events the same way.
+        edges = {(e["source"], e["target"]): e["last_event"] for e in json.loads(found.to_json())["table_edges"]}
+        assert edges == {(source, target): "2026-11-02T06:00:00.700000Z", (other, target): "2026-11-02T06:00:00.900000Z"}
+        assert discovery.instant(edges[(other, target)]) > discovery.instant(edges[(source, target)])
+    assert discovery.utc_precise("2026-11-02 09:00:00") == "2026-11-02T09:00:00.000000Z"
+    assert discovery.newest(["2026-11-02T06:00:00.100Z", "2026-11-02T06:00:00.9Z"]) == "2026-11-02T06:00:00.900000Z"

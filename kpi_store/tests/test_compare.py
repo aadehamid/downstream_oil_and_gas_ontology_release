@@ -219,6 +219,21 @@ def test_the_stale_threshold_compares_instants_across_offsets():
     assert not [r for r in of(compare.compare(ontology(), found, s, naive_now), "stale-data") if r["object"] == GOLD]
 
 
+def test_the_stale_threshold_is_judged_by_the_full_instant_within_one_second():
+    # The limit is 35 days before now: 2026-10-07 12:00:00.5 UTC.
+    now = NOW + dt.timedelta(microseconds=500000)
+    s = support.make_settings()
+
+    def stale(text):
+        workspace, genie = support.sandbox()
+        workspace.table_lineage = [(a, b, e, text if b == GOLD else t) for a, b, e, t in workspace.table_lineage]
+        found = discovery.discover(s, workspace.run_sql, genie, {"idp_sbx.gold_commercial_core"})
+        return [r["found_value"] for r in of(compare.compare(ontology(), found, s, now), "stale-data") if r["object"] == GOLD]
+
+    assert stale("2026-10-07T12:00:00.900000Z") == []                          # 0.4 s inside the limit
+    assert stale("2026-10-07T12:00:00.400000Z") == ["2026-10-07T12:00:00Z"]    # 0.1 s outside; the report shows seconds
+
+
 def test_two_ontology_objects_with_one_name_here_stop_the_comparison():
     import pytest
     from kpi_store import settings as settings_module

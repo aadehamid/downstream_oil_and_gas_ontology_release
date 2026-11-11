@@ -198,6 +198,33 @@ def test_a_writer_the_platform_keeps_no_name_for_is_no_builder(reading, graph):
     assert tg.build(doc, view, settings).nquads() == graph.nquads()
 
 
+def test_the_json_path_keeps_sub_second_order_and_the_graph_shows_seconds(tmp_path):
+    workspace = support.small_workspace()
+    settings = support.make_settings()
+    target = "idp_sbx.silver_sample.middle_dim"
+    workspace.table_lineage = [("synapse_dev.replica_sample.source_table", target, "9001", "2026-11-02T06:00:59.200000Z"),
+                               ("idp_sbx.gold_sample.sample_fact", target, "9001", "2026-11-02T06:00:59.900000Z")]
+    jobs = [("9001", "Zulu_old", "2026-10-20T12:00:00.100000Z"), ("9001", "Alpha_new", "2026-10-20T12:00:00.900000Z")]
+    view = ov.OntologyView(objects={target: ov.PlatformObject("urn:made-up:design/middle", target, "silver", ())})
+    built = []
+    for rows in (jobs, list(reversed(jobs))):
+        workspace.jobs = rows
+        found = disc.discover(settings, workspace.run_sql, None, ())
+        text = found.to_json()
+        assert '"last_event": "2026-11-02T06:00:59.900000Z"' in text and '"last_event": "2026-11-02T06:00:59.200000Z"' in text
+        built.append(tg.build(text, view, settings))
+    assert built[0].nquads() == built[1].nquads()
+    subject = ENV + "object/" + target
+    job = ENV + "builder/job-9001"
+    assert values(built[0], job, "name") == ['"Alpha_new"']
+    # tg:lastRefresh is written to the second, in UTC.
+    assert values(built[0], subject, "lastRefresh") == ['"2026-11-02T06:00:59Z"^^<http://www.w3.org/2001/XMLSchema#dateTime>']
+    # Inside the build the newest write is still chosen by the full instant.
+    doc = json.loads(found.to_json())
+    doc["table_edges"][0]["last_event"], doc["table_edges"][1]["last_event"] = "2026-11-02T06:00:59.999999Z", "2026-11-02T06:01:00.000000+00:00"
+    assert values(tg.build(doc, view, settings), subject, "lastRefresh") == ['"2026-11-02T06:01:00Z"^^<http://www.w3.org/2001/XMLSchema#dateTime>']
+
+
 def test_two_builder_ids_that_differ_only_in_case_are_two_builders(reading):
     found, view, settings = reading
     silver, other = "idp_sbx.silver_udm_core.mips_price_assessment_fact", "idp_sbx.silver_udm_core.mpr_price_detail_fact"

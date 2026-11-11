@@ -230,8 +230,8 @@ def compare(ontology, found, settings, now=None, stale_after_days=STALE_AFTER_DA
         for key in sorted(present):
             if not ontology.upstream(key):
                 continue   # a source table is written outside Databricks, so lineage says nothing about it
-            last = found.last_written(present[key])
-            if last and disc.instant(last) < limit:
+            at, last = found.last_written_at(present[key]), found.last_written(present[key])
+            if at and at < limit:   # judged by the full instant; the row shows it to the second
                 out.rows.append(_row("stale-data", found.spelled(present[key]), "", last,
                                      f"table lineage shows no write in the last {stale_after_days} days"))
     return out

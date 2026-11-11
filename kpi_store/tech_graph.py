@@ -176,7 +176,8 @@ def build(discovery, view, settings, every_object=False):
             continue
         reads.setdefault(target, set()).add(source)
         if edge.get("last_event"):
-            # Times are compared as instants, whatever form the reading holds them in.
+            # Times are compared as full instants, whatever form the reading holds them in. Only the value
+            # written below, tg:lastRefresh, is cut to the second.
             when = disc.instant(edge["last_event"])
             if when is None:
                 unread[target] = str(edge["last_event"])
