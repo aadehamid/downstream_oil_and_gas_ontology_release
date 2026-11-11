@@ -276,7 +276,7 @@ def commit():
     name and its zip's checksum, for example) passes its own text to marker."""
     if not os.path.exists(os.path.join(REPO, ".git")):
         return "unknown (not a Git checkout)"
-    return subprocess.run(["git", "-C", REPO, "rev-parse", "--short=8", "HEAD"], capture_output=True, text=True).stdout.strip()
+    return subprocess.run(["git", "-C", REPO, "rev-parse", "--short=8", "HEAD"], capture_output=True, text=True, encoding="utf-8").stdout.strip()
 
 
 def now():

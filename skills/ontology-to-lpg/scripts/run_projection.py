@@ -2,10 +2,10 @@
 """Run the projection, every store and every check from one run configuration, so no project needs
 its own scripts around this skill's.
 
-    uv run --no-project --with rdflib python3 run_projection.py --config <run.json> [--only a,b] [--skip a,b]
-    uv run --no-project --with rdflib python3 run_projection.py --config <run.json> --plan
-    uv run --no-project --with rdflib python3 run_projection.py compare-triples <rebuild out> <baseline out>
-    uv run --no-project --with rdflib python3 run_projection.py compare-reports <rebuild report> <baseline report>
+    uv run --no-project --with rdflib python run_projection.py --config <run.json> [--only a,b] [--skip a,b]
+    uv run --no-project --with rdflib python run_projection.py --config <run.json> --plan
+    uv run --no-project --with rdflib python run_projection.py compare-triples <rebuild out> <baseline out>
+    uv run --no-project --with rdflib python run_projection.py compare-reports <rebuild report> <baseline report>
 
 The steps, in this order (references/run-config.md has the run configuration and every check):
   project      check the rules and pins, validate, reason with ELK through ROBOT (its SHA-256 checked
@@ -221,7 +221,7 @@ def git_env():
 def inside_repository(out, base):
     try:
         top = subprocess.run(["git", "-C", base, "rev-parse", "--show-toplevel"], capture_output=True,
-                             text=True, check=True, stdin=subprocess.DEVNULL, env=git_env()).stdout.strip()
+                             text=True, check=True, stdin=subprocess.DEVNULL, env=git_env(), encoding="utf-8").stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         return False
     top = os.path.realpath(top)
@@ -327,7 +327,8 @@ def graph_names(files, mapping, base):
         elif path in mapping:
             names[path] = (mapping[path], "graphs")
         else:
-            names[path] = (FILE_GRAPH + urllib.parse.quote(os.path.relpath(path, base), safe="/"), "file name")
+            # Written with /, so a file has the same graph name on Windows, where the relative path holds \\.
+            names[path] = (FILE_GRAPH + urllib.parse.quote(os.path.relpath(path, base).replace(os.sep, "/"), safe="/"), "file name")
     taken = [g for g, _ in names.values()]
     if len(set(taken)) != len(taken):
         raise Failed("two files would have the same graph name; name one in graphs")
@@ -501,7 +502,7 @@ def compare_reports(rebuild, baseline):
 def run_command(cmd, cwd=None, env=None, capture=False):
     """Runs one command with stdin closed; returns (exit code, captured stdout or None)."""
     result = subprocess.run(cmd, cwd=cwd, env=env, stdin=subprocess.DEVNULL, text=True,
-                            capture_output=capture)
+                            capture_output=capture, encoding="utf-8")
     return result.returncode, (result.stdout if capture else None)
 
 
@@ -624,7 +625,7 @@ class Driver:
                     "shapes": [{"path": p, "sha256": sha256_file(p)} for p in self.shapes],
                     "catalogs": [{"path": c, "sha256": sha256_file(c)} for c in self.catalogs()],
                     "default_shapes": self.default_shapes, "notes": notes}
-        with open(self.out_file("run-manifest.json"), "w", encoding="utf-8") as f:
+        with open(self.out_file("run-manifest.json"), "w", encoding="utf-8", newline="\n") as f:
             json.dump(manifest, f, indent=2)
             f.write("\n")
         for note in notes:

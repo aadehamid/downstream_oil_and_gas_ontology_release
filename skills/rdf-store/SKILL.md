@@ -10,7 +10,7 @@ Load releases into a store in **gated** steps; each step ends on its "Done when"
 
 Scope: RDF files into a store and back out. Building the ontology belongs to the `ontology` skill; projecting it into a labelled property graph (Neo4j) belongs to `ontology-to-lpg`, whose multi-store plan uses this skill for its triple-store hops.
 
-The script is `scripts/rdfstore.py`; run it with `uv run --no-project --with pyoxigraph python3 scripts/rdfstore.py <command>`, or on Windows, after `py -m pip install pyoxigraph`, with `py scripts\rdfstore.py <command>`. Its docstring lists every command and option; it refuses an option a command does not take, before touching any file or store.
+The script is `scripts/rdfstore.py`; run it with `uv run --no-project --with pyoxigraph python scripts/rdfstore.py <command>`, or on Windows, after `py -m pip install pyoxigraph`, with `py scripts\rdfstore.py <command>`. Its docstring lists every command and option; it refuses an option a command does not take, before touching any file or store.
 
 ## The steps
 

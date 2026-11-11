@@ -32,11 +32,11 @@ def tree(tmp, versions):
     for path, text in (("release/build_module.py", BUILDER), ("projection/pipeline.py", PIPELINE),
                        ("projection/skill-run/epm-config.json", CONFIG), ("releases/kpi/CHANGELOG.md", "# kpi changelog\n\n## 1.3.0 (2026-10-28)\n\nFirst.\n\n### Known gaps\n\n- One gap.\n")):
         os.makedirs(os.path.dirname(os.path.join(tmp, path)), exist_ok=True)
-        with open(os.path.join(tmp, path), "w", encoding="utf-8") as f:
+        with open(os.path.join(tmp, path), "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
     for version in versions:
         os.makedirs(os.path.join(tmp, "releases", "kpi", version))
-        with open(os.path.join(tmp, "releases", "kpi", version, "manifest.json"), "w", encoding="utf-8") as f:
+        with open(os.path.join(tmp, "releases", "kpi", version, "manifest.json"), "w", encoding="utf-8", newline="\n") as f:
             f.write("{}")
 
 
@@ -100,7 +100,7 @@ class Finish(unittest.TestCase):
             tree(tmp, ["1.3.1-correction.1", "1.3.1-correction.2"])
             for path in ("projection/pipeline.py", "projection/skill-run/epm-config.json"):
                 text = read(tmp, path).replace("1.3.0", "1.3.1-correction.1")
-                with open(os.path.join(tmp, path), "w", encoding="utf-8") as f:
+                with open(os.path.join(tmp, path), "w", encoding="utf-8", newline="\n") as f:
                     f.write(text)
             self.finish(tmp, "1.3.1-correction.1")
             self.assertTrue(os.path.isdir(os.path.join(tmp, "releases", "previous", "kpi", "1.3.1-correction.1")))

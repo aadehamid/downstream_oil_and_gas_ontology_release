@@ -131,7 +131,7 @@ def main():
             lines.append(f"- `{sid}` cited from: {', '.join(slugs)}")
         lines.append("")
 
-    with open(OUT, "w") as f:
+    with open(OUT, "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(lines))
     print(f"wrote {OUT}: {len(cited)} cited sources, {len(uncited)} uncited, "
           f"{sum(len(v) for v in unknown.values())} unknown citations")

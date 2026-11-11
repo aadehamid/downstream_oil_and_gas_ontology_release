@@ -75,7 +75,7 @@ def test_write_and_read_round_trip_with_lf_line_endings(tmp_path):
     assert lines[1].startswith('R001,column-renamed,true,idp_sbx.gold_sample.sample_fact,OldName,New_Name,"made up, with a comma","{""action"": ""rename-column""')
     with pytest.raises(report.ReportError, match="cannot read the report"):
         report.read(tmp_path / "missing.json")
-    (tmp_path / "bad.json").write_text(json.dumps({"format": 1}), encoding="utf-8")
+    (tmp_path / "bad.json").write_text(json.dumps({"format": 1}), encoding="utf-8", newline="\n")
     with pytest.raises(report.ReportError, match="rows is not a list"):
         report.read(tmp_path / "bad.json")
 
@@ -87,14 +87,14 @@ def test_a_report_is_cleared_when_every_blocking_row_has_a_decision(tmp_path):
     text = csv_path.read_text(encoding="utf-8")
     lines = text.split("\n")
     lines[1] = lines[1][: -len(",,,")] + ",accept,the owner,checked against the view"
-    csv_path.write_text("﻿" + "\r\n".join(lines), encoding="utf-8")   # as a spreadsheet saves it
+    csv_path.write_text("﻿" + "\r\n".join(lines), encoding="utf-8", newline="\n")   # as a spreadsheet saves it
     half = report.apply_csv_decisions(r, csv_path)
     assert (half["rows"][0]["decision"], half["rows"][0]["decided_by"], half["rows"][0]["note"]) == ("accept", "the owner", "checked against the view")
     assert not report.is_cleared(half)
     lines[3] = lines[3][: -len(",,,")] + ",environment setting,the owner,"
-    csv_path.write_text("\n".join(lines), encoding="utf-8")
+    csv_path.write_text("\n".join(lines), encoding="utf-8", newline="\n")
     assert report.is_cleared(report.apply_csv_decisions(r, csv_path))
     lines[2] = lines[2].replace("R002", "R009")
-    csv_path.write_text("\n".join(lines), encoding="utf-8")
+    csv_path.write_text("\n".join(lines), encoding="utf-8", newline="\n")
     with pytest.raises(report.ReportError, match="R009"):
         report.apply_csv_decisions(r, csv_path)

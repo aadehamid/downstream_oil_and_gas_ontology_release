@@ -219,7 +219,7 @@ def test_save_and_load(tmp_path):
     M.save(tmp_path / "m.json", confirmed())
     assert M.load(tmp_path / "m.json") == confirmed()
     assert b"\r" not in (tmp_path / "m.json").read_bytes()
-    (tmp_path / "bad.json").write_text('{"format": 2, "roles": {}}', encoding="utf-8")
+    (tmp_path / "bad.json").write_text('{"format": 2, "roles": {}}', encoding="utf-8", newline="\n")
     with pytest.raises(M.MappingError, match="not a role mapping of format 1"):
         M.load(tmp_path / "bad.json")
 
@@ -453,7 +453,7 @@ def settings_file(folder, **changes):
               "governance_alias": "gov", "bpa_alias": "kpi", **changes}
     path = folder / "questions.toml"
     path.write_text("[neo4j]\n" + "".join(f'{k} = "{v}"\n' for k, v in values.items() if v is not None),
-                    encoding="utf-8")
+                    encoding="utf-8", newline="\n")
     return path
 
 

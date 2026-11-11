@@ -302,12 +302,12 @@ class Cli(unittest.TestCase):
     def test_an_unwritable_report_exits_2_and_keeps_the_old_one(self):
         folder = tempfile.mkdtemp()
         report = os.path.join(folder, "r.json")
-        with open(report, "w") as f:
+        with open(report, "w", encoding="utf-8", newline="\n") as f:
             f.write("OLD")
         with mock.patch.object(mr.json, "dump", side_effect=OSError("disk full")):
             code, out = self.main(FakeSession(), "--report", report)
         self.assertEqual(code, 2, out)
-        with open(report) as f:
+        with open(report, encoding="utf-8") as f:
             self.assertEqual(f.read(), "OLD")
         self.assertEqual(os.listdir(folder), ["r.json"])
 
@@ -320,7 +320,7 @@ class Cli(unittest.TestCase):
         report = os.path.join(tempfile.mkdtemp(), "r.json")
         code, _ = self.main(FakeSession(), "--report", report)
         self.assertEqual(code, 0)
-        with open(report) as f:
+        with open(report, encoding="utf-8") as f:
             self.assertEqual(json.load(f), {"errors": 0, "findings": [], "offenders_capped": False})
 
     def test_the_separator_reaches_every_cypher_analysis_and_a_bad_one_exits_2(self):
@@ -358,7 +358,7 @@ class Timeouts(unittest.TestCase):
         self.assertEqual(lv.query_timeout({}), 120)
 
     def test_copy_graph_wraps_both_sessions(self):
-        env = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False)
+        env = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False, encoding="utf-8", newline="\n")
         env.write("NEO4J_URI=bolt://h\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD=x\n")
         env.close()
         self.addCleanup(os.remove, env.name)
@@ -594,7 +594,7 @@ class Secrets(unittest.TestCase):
         self.assertIn("the review query failed (Exception)", out)
 
     def test_copy_graph_prints_no_credential(self):
-        env = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False)
+        env = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False, encoding="utf-8", newline="\n")
         env.write(f"NEO4J_URI=neo4j+s://neo4j:{CANARY}@x.io\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD={CANARY}\n")
         env.close()
         self.addCleanup(os.remove, env.name)
@@ -635,7 +635,7 @@ class Secrets(unittest.TestCase):
         import urllib.error  # noqa: F401
         tmp = tempfile.mkdtemp()
         nt = os.path.join(tmp, "inferred.nt")
-        open(nt, "w").close()
+        open(nt, "w", encoding="utf-8", newline="\n").close()
         report = os.path.join(tmp, "ts.json")
         module = os.path.join(TEMPLATES, "library-module.ttl")
         graph = ts.graph_iri(Graph().parse(module), module, ts.DEFAULT_BASE)
@@ -662,10 +662,10 @@ class Secrets(unittest.TestCase):
     def test_triplestore_setup_errors_print_no_credential(self):
         tmp = tempfile.mkdtemp()
         env = os.path.join(tmp, "store.env")
-        with open(env, "w") as f:
+        with open(env, "w", encoding="utf-8", newline="\n") as f:
             f.write(f"SPARQL_USER=storeuser\nSPARQL_PASSWORD={CANARY2}\n")
         nt = os.path.join(tmp, "inferred.nt")
-        open(nt, "w").close()
+        open(nt, "w", encoding="utf-8", newline="\n").close()
         gsp = f"http://storeuser:{CANARY}@h/ds?token={CANARY2}"
         # An input path that holds the URL and the password, so the open error carries them.
         missing = f"/nonexistent/{gsp}/{CANARY2}.ttl"
@@ -681,14 +681,14 @@ class Secrets(unittest.TestCase):
         tmp = tempfile.mkdtemp()
         url = f"https://{CANARY}@h/ds?token={CANARY2}"
         nt = os.path.join(tmp, "inferred.nt")
-        open(nt, "w").close()
+        open(nt, "w", encoding="utf-8", newline="\n").close()
         # 1. The env file fails to parse on a line that holds the URL.
         bad = os.path.join(tmp, "bad.env")
-        with open(bad, "w") as f:
+        with open(bad, "w", encoding="utf-8", newline="\n") as f:
             f.write(f"{url}\n")
         # 2. The env file parses, and an input path that holds its URL fails to open.
         good = os.path.join(tmp, "good.env")
-        with open(good, "w") as f:
+        with open(good, "w", encoding="utf-8", newline="\n") as f:
             f.write(f"SPARQL_GSP={url}\nSPARQL_QUERY={url}\n")
         for env, data in ((bad, nt), (good, f"/nonexistent/{url}.ttl")):
             with self.subTest(env=os.path.basename(env)):
@@ -697,7 +697,7 @@ class Secrets(unittest.TestCase):
                 self.assertNotIn(CANARY, out)
                 self.assertNotIn(CANARY2, out)
         env = os.path.join(tmp, "neo.env")
-        with open(env, "w") as f:
+        with open(env, "w", encoding="utf-8", newline="\n") as f:
             f.write(f"NEO4J_URI={url}\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD={CANARY2}\n")
         with mock.patch.dict(sys.modules, {"neo4j": leaky_neo4j()}):
             code, out = run_main(mr.main, ["--env", env])
@@ -736,7 +736,7 @@ class NoUserText(unittest.TestCase):
         os.mkdir(folder)
         path = os.path.join(folder, TOKEN + suffix)
         if content is not None:
-            with open(path, "w") as f:
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
                 f.write(content)
         return path
 
@@ -759,7 +759,7 @@ class NoUserText(unittest.TestCase):
     def test_triplestore(self):
         tmp = tempfile.mkdtemp()
         nt = os.path.join(tmp, "inferred.nt")
-        open(nt, "w").close()
+        open(nt, "w", encoding="utf-8", newline="\n").close()
         module = os.path.join(TEMPLATES, "library-module.ttl")
         unearned = self.tokenpath(json.dumps({"passed": False}), ".json")
         base = ["--gsp", "http://h/ds", "--query", "http://h/q", "--inferred", nt, "--report", os.path.join(tmp, "r.json")]

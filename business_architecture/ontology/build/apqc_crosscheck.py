@@ -199,8 +199,7 @@ into out over under between within without within""".split()
             indent=1,
         )
         + "\n",
-        encoding="utf-8",
-    )
+        encoding="utf-8", newline="\n")
     print("\nResults saved.", file=sys.stderr)
 
 

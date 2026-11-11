@@ -58,7 +58,7 @@ def previous_version(name, version, ontology=ONTOLOGY):
     """The version before `version`, a module's newest, read from that package's own CHANGELOG.md (its second
     heading), not from the folders on disk; None when the changelog names no earlier version."""
     # The argument is not called newest: that name is the release scripts' module, whose pattern is read here.
-    with open(os.path.join(ontology, "releases", name, version, "CHANGELOG.md")) as f:
+    with open(os.path.join(ontology, "releases", name, version, "CHANGELOG.md"), encoding="utf-8") as f:
         versions = re.findall(rf"^## ({newest.VERSION_PATTERN})", f.read(), re.M)
     return versions[1] if versions[:1] == [version] and len(versions) > 1 else None
 
@@ -135,7 +135,7 @@ class ReleaseInventory(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             folder = os.path.join(tmp, "releases", "x", "1.0.0")
             os.makedirs(folder)
-            with open(os.path.join(folder, "CHANGELOG.md"), "w") as f:
+            with open(os.path.join(folder, "CHANGELOG.md"), "w", encoding="utf-8", newline="\n") as f:
                 f.write("# x\n\n## 1.0.0 (2026-10-01)\n\nFirst.\n")
             self.assertIsNone(previous_version("x", "1.0.0", tmp))
 

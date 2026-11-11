@@ -46,7 +46,7 @@ QUESTIONS = os.path.join(HERE, "..", "competency-questions.md")
 
 
 def load_expected():
-    with open(os.path.join(HERE, "expected.csv"), newline="") as f:
+    with open(os.path.join(HERE, "expected.csv"), newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
@@ -64,7 +64,7 @@ def check(graph, rows):
         if status.startswith("parked:") and queries:
             failures.append(f"Q{row['question']}: parked but lists queries")
         for name in queries:
-            with open(os.path.join(HERE, "queries", name)) as f:
+            with open(os.path.join(HERE, "queries", name), encoding="utf-8") as f:
                 text = f.read()
             n = len(list(graph.query(text)))
             must_be_none = "(must be none)" in text.splitlines()[0]

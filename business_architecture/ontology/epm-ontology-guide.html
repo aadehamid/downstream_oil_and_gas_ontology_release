@@ -484,14 +484,15 @@ ORDER BY ?hop ?label
 RQ</code></pre>
 <p><strong>This query is SPARQL, so it does not run in Neo4j.</strong> Run it on the Turtle releases with this script, which prints 37,233 triples and 14 rows:</p>
 <pre data-snippet="bash run=release-copy"><code>uv run -q --no-project --with rdflib python - crack.rq &lt;&lt;'EOF'
-import glob, os, re, sys
+import re, sys
+from pathlib import Path
 from rdflib import Graph
-g, q = Graph(), open(sys.argv[1]).read()
-for d in glob.glob("business_architecture/ontology/releases/*/"):
-    versions = [v for v in os.listdir(d) if re.fullmatch(r"\d+\.\d+\.\d+", v)]
+g, q = Graph(), Path(sys.argv[1]).read_text(encoding="utf-8")
+for d in sorted(Path("business_architecture/ontology/releases").iterdir()):
+    versions = [v.name for v in d.iterdir() if re.fullmatch(r"\d+\.\d+\.\d+", v.name)] if d.is_dir() else []
     if versions:
         v = max(versions, key=lambda s: tuple(map(int, s.split("."))))
-        g.parse(os.path.join(d, v, os.path.basename(d.rstrip("/")) + ".ttl"))
+        g.parse(str(d / v / (d.name + ".ttl")))
 print(len(g), "triples")
 for row in g.query(q):
     print(row.hop, "|", row.label)

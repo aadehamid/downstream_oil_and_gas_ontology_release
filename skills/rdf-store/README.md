@@ -12,7 +12,7 @@ This README is for people. Agents read `SKILL.md` and the files it points to.
 2. Round-trip your releases:
 
    ```sh skip reason="awaits-the-rewrite: the reader's own values stand in angle brackets, and no test supplies them yet"
-   uv run --no-project --with pyoxigraph python3 scripts/rdfstore.py roundtrip --store fuseki \
+   uv run --no-project --with pyoxigraph python scripts/rdfstore.py roundtrip --store fuseki \
      --gsp http://127.0.0.1:3030/ds/data --query http://127.0.0.1:3030/ds/query \
      --update http://127.0.0.1:3030/ds/update --report report.json <release>.ttl ...
    ```

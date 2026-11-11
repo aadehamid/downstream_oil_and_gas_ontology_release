@@ -1,7 +1,7 @@
 """Tests for module_tags.py and explore.py (add-on F), with no database or store.
 
 Run from this folder:
-  uv run --no-project --with rdflib python3 -m unittest test_explore
+  uv run --no-project --with rdflib python -m unittest test_explore
 
 The store side runs explore.py's real SPARQL on an rdflib Dataset holding the fixture packages, one
 named graph each. The Neo4j side is a fake session that answers explore.py's and module_tags.py's
@@ -44,7 +44,7 @@ base:p1 skos:broader base:p0 .
 
 def write(folder, name, text):
     path = os.path.join(folder, name)
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
     return path
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The load and verify steps against a running Neo4j with n10s and APOC, ending in the report.
 
-Run: uv run --no-project --with rdflib --with neo4j python3 load_verify.py \
+Run: uv run --no-project --with rdflib --with neo4j python load_verify.py \
          --config <config.json> --shapes <shapes.ttl>... (--env <file> | --bolt bolt://<host>:<port>) \
          [--database <name>] --merged merged.ttl --loadable loadable.nt \
          --inferred inferred.nt --report projection-report.json [--plugins-dir <folder>]

@@ -41,7 +41,7 @@ GUIDE = os.path.join(ROOT, "business_architecture", "ontology", "epm-ontology-gu
 
 @pytest.fixture(scope="module")
 def facts():
-    out = subprocess.check_output([sys.executable, os.path.join(HERE, "epm_facts.py"), "--json", "counts"], text=True)
+    out = subprocess.check_output([sys.executable, os.path.join(HERE, "epm_facts.py"), "--json", "counts"], text=True, encoding="utf-8")
     return json.loads(out)
 
 
@@ -65,7 +65,7 @@ def facts_0025(tmp_path_factory):
     os.makedirs(tree / "scripts", exist_ok=True)
     shutil.copy(os.path.join(HERE, "epm_facts.py"), tree / "scripts" / "epm_facts.py")
     out = subprocess.check_output([sys.executable, str(tree / "scripts" / "epm_facts.py"), "--json", "counts"],
-                                  text=True, stderr=subprocess.DEVNULL)
+                                  text=True, stderr=subprocess.DEVNULL, encoding="utf-8")
     result = json.loads(out)
     result["backlog"] = str(tree / os.path.relpath(epm_facts.BACKLOG, ROOT))
     return result
@@ -73,7 +73,7 @@ def facts_0025(tmp_path_factory):
 
 def flat(path):
     """The document's text with all whitespace runs collapsed, so wrapped sentences match."""
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         return re.sub(r"\s+", " ", f.read())
 
 
@@ -83,7 +83,7 @@ def num(s):
 
 def pairs_table(backlog=None):
     """(G1b row, reverse row) pairs from the backlog's "G1b pairs held on both sides" table."""
-    with open(backlog or epm_facts.BACKLOG) as f:
+    with open(backlog or epm_facts.BACKLOG, encoding="utf-8") as f:
         text = f.read()
     section = text.split("## G1b pairs held on both sides", 1)[1].split("\n## ", 1)[0]
     return re.findall(r"^\|\s*(REL-\d{5})\s*\|\s*(REL-\d{5})\s*\|", section, re.M)
@@ -151,7 +151,7 @@ INDEX_SECTIONS = {
 def batch_rows(n):
     """Rows in the batch n review file."""
     path = os.path.join(epm_facts.REVIEWS, f"precedes-follows-batch{n}-review.csv")
-    with open(path, newline="") as f:
+    with open(path, newline="", encoding="utf-8") as f:
         return sum(1 for r in csv.DictReader(f) if r["row_id"].startswith("REL-"))
 
 
@@ -161,7 +161,7 @@ def section_count(prefix):
 
 def guide_text():
     """The ontology guide's displayed text: tags dropped, character references decoded, whitespace collapsed."""
-    with open(GUIDE) as f:
+    with open(GUIDE, encoding="utf-8") as f:
         return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", f.read())))
 
 

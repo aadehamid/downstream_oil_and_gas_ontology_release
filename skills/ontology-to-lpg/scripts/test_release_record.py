@@ -1,6 +1,6 @@
 """Tests of release_record.py with a stand-in session: no database.
 
-Run: uv run --no-project --with rdflib python3 -m unittest test_release_record
+Run: uv run --no-project --with rdflib python -m unittest test_release_record
 """
 import contextlib
 import hashlib
@@ -126,7 +126,7 @@ class Records(unittest.TestCase):
 
     def write(self, name, text):
         path = os.path.join(self.tmp, name)
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
         return path
 
@@ -154,7 +154,7 @@ class Records(unittest.TestCase):
     def test_a_file_edited_after_the_load_makes_no_record(self):
         for name, text in (("shapes.ttl", SHAPES + "# edited\n"), ("catalog.ttl", CATALOG + "# edited\n"), ("m.ttl", MODULE + "# edited\n")):
             with self.subTest(name=name):
-                before = open(os.path.join(self.tmp, name)).read()
+                before = open(os.path.join(self.tmp, name), encoding="utf-8").read()
                 self.write(name, text)
                 with self.assertRaisesRegex(rr.Refusal, "not the file the run read"):
                     rr.build_records([self.path], earned_report(), "t", manifest(self.tmp))
@@ -204,7 +204,7 @@ class Records(unittest.TestCase):
         second_module = MODULE.replace(f"<{BASE}> a", "<https://x.org/modules/n> a")
         second_catalog = CATALOG.replace(f"dcterms:isVersionOf <{BASE}>", "dcterms:isVersionOf <https://x.org/modules/n>").replace("m.ttl", "n.ttl")
         for name, text in (("n.ttl", second_module), ("catalog.ttl", second_catalog), ("shapes.ttl", SHAPES)):
-            with open(os.path.join(other, name), "w", encoding="utf-8") as f:
+            with open(os.path.join(other, name), "w", encoding="utf-8", newline="\n") as f:
                 f.write(text)
         row = lambda name, text: {"path": os.path.join(other, name), "sha256": sha_of(text)}   # noqa: E731
         first = manifest(self.tmp)

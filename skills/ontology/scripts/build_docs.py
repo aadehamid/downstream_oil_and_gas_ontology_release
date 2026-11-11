@@ -58,11 +58,11 @@ def build(jar, releases, docs, module, version):
     try:
         run = subprocess.run(["java", "-jar", jar, "-ontFile", os.path.join(package, f"{module}.ttl"), "-outFolder",
                               staging, "-rewriteAll", "-noPlaceHolderText", "-lang", "en"],
-                             capture_output=True, text=True, stdin=subprocess.DEVNULL)
+                             capture_output=True, text=True, stdin=subprocess.DEVNULL, encoding="utf-8")
         if run.returncode != 0 or not os.path.isfile(os.path.join(staging, "index-en.html")):
             print(f"FAIL widoco: {module} {version}: {(run.stdout + run.stderr).strip()[-500:]}")
             return False
-        with open(os.path.join(staging, "docs-source.json"), "w", encoding="utf-8") as f:
+        with open(os.path.join(staging, "docs-source.json"), "w", encoding="utf-8", newline="\n") as f:
             json.dump({"module": module, "version": version,
                        "manifest_sha256": sha256(os.path.join(package, "manifest.json")),
                        "built_with": os.path.basename(jar)}, f, indent=2, sort_keys=True)

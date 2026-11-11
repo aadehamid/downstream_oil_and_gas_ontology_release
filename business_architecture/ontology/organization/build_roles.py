@@ -65,13 +65,13 @@ def raci_entries(node, out):
 
 
 def read_csv(path):
-    with open(path, newline="") as f:
+    with open(path, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
 def load():
     """Return the register rows and roles, keyed, after checking each against the source."""
-    with open(SOURCE) as f:
+    with open(SOURCE, encoding="utf-8") as f:
         entries = raci_entries(json.load(f), [])
     source_texts = Counter(text for _, _, text in entries)
     register, roles = read_csv(REGISTER), read_csv(ROLES)
@@ -192,12 +192,12 @@ def main():
             + build(register, roles).serialize(format="turtle"))
     print("; ".join(f"{k} {v}" for k, v in figures(entries, register, roles).items()))
     if args.verify:
-        current = os.path.exists(OUTPUT) and open(OUTPUT).read() == text
+        current = os.path.exists(OUTPUT) and open(OUTPUT, encoding="utf-8").read() == text
         if not current:
             sys.exit("roles.ttl is not current: run build_roles.py --write")
         print("roles.ttl is current")
     if args.write:
-        with open(OUTPUT, "w") as f:
+        with open(OUTPUT, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
         print(f"wrote {OUTPUT}")
 

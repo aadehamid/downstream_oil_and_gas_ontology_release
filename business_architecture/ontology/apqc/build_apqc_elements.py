@@ -91,11 +91,11 @@ def main():
             + build(rows).serialize(format="turtle"))
     print(f"elements {len(rows)}; referenced by the newest core {len(referenced)}; not referenced {len(rows) - len(referenced)}")
     if args.verify:
-        if not (os.path.exists(OUTPUT) and open(OUTPUT).read() == text):
+        if not (os.path.exists(OUTPUT) and open(OUTPUT, encoding="utf-8").read() == text):
             sys.exit("apqc-elements.ttl is not current: run build_apqc_elements.py --write")
         print("apqc-elements.ttl is current")
     if args.write:
-        with open(OUTPUT, "w") as f:
+        with open(OUTPUT, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
         print(f"wrote {OUTPUT}")
 

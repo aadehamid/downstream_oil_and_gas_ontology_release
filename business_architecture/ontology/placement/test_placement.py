@@ -46,7 +46,7 @@ class Kinds(unittest.TestCase):
         vs = Namespace("https://w3id.org/mpc/ontology/modules/value-stream/")
         g.add((URIRef(str(vs) + "process/performance-tracking-analysis"), vs.produces,
                URIRef("https://w3id.org/mpc/ontology/modules/kpi/measure/crack-spreads")))
-        with open(os.path.join(ONTOLOGY, "regression", "queries", "q38a-no-measure-certified.rq")) as f:
+        with open(os.path.join(ONTOLOGY, "regression", "queries", "q38a-no-measure-certified.rq"), encoding="utf-8") as f:
             self.assertEqual(len(list(g.query(f.read()))), 1)
 
     def test_every_annotated_property_exists(self):

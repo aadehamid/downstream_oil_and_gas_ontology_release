@@ -31,8 +31,8 @@ With the skill folder in `$SKILLS`:
 
 ```bash skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
 cd "$SKILLS/ontology-to-lpg/scripts"
-uv run --no-project --with rdflib python3 run_projection.py --config <your copy of epm-run.json> --plan
-uv run --no-project --with rdflib python3 run_projection.py --config <your copy of epm-run.json>
+uv run --no-project --with rdflib python run_projection.py --config <your copy of epm-run.json> --plan
+uv run --no-project --with rdflib python run_projection.py --config <your copy of epm-run.json>
 ```
 
 `--plan` lists the steps and why any is skipped, and runs nothing. The run needs uv, Java 11 or later and ROBOT 1.9.10 at the path `robot_jar` names. It starts and stops no server: the Neo4j servers and the Fuseki datasets the copy names must already run. The skill's `references/running.md`, rule 5, says how to prepare the local Neo4j, and the `rdf-store` skill's `references/stores.md` says how to start Fuseki from the Apache jar. The driver reads no password: it passes each env file to the skill's scripts by path (`load_verify.py --env`, `copy_graph.py --source-env` and `--target-env`).

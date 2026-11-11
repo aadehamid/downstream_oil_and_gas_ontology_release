@@ -3,8 +3,8 @@
 Morph-KGC 2.10.0 needs rdflib below 7.3 and maplib 0.20.26 needs rdflib 7.6 or later, so the two engines cannot
 share an environment. Each runs in its own, and both must reproduce the same committed output,
 templates/tabular/loan-states.nt, which proves they agree:
-  TABULAR_ENGINE=morph-kgc uv run --no-project --with morph-kgc==2.10.0 --with rdflib python3 -m unittest test_tabular
-  TABULAR_ENGINE=maplib uv run --no-project --with maplib==0.20.26 --with polars --with rdflib python3 -m unittest test_tabular
+  TABULAR_ENGINE=morph-kgc uv run --no-project --with morph-kgc==2.10.0 --with rdflib python -m unittest test_tabular
+  TABULAR_ENGINE=maplib uv run --no-project --with maplib==0.20.26 --with polars --with rdflib python -m unittest test_tabular
 
 Without TABULAR_ENGINE the tests skip, so the skill's plain test run needs neither engine. With it, a missing
 engine fails instead of skipping.
@@ -54,7 +54,7 @@ class BuildTabular(unittest.TestCase):
         with open(path, encoding="utf-8") as f:
             text = f.read()
         self.assertIn(old, text)
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(text.replace(old, new, 1))
 
     def test_the_committed_output_equals_a_fresh_build(self):
@@ -86,7 +86,7 @@ class BuildTabular(unittest.TestCase):
         import sys
         self.assertEqual(run(self.args())[0], 0)
         result = subprocess.run([sys.executable, os.path.join(HERE, "check_taxonomy.py"), self.out],
-                                capture_output=True, text=True)
+                                capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_a_rebuild_writes_the_same_bytes(self):

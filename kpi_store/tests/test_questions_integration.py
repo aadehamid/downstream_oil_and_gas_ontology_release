@@ -173,7 +173,7 @@ def test_the_four_questions_on_a_composite_database(tmp_path, monkeypatch):
         settings.write_text(
             f'[neo4j]\nuri = "{connection.uri}"\nuser = "{connection.user}"\npassword = "{connection.password}"\n'
             f'composite = "{connection.composite}"\ngovernance_alias = "governance"\nbpa_alias = "bpa"\n',
-            encoding="utf-8")
+            encoding="utf-8", newline="\n")
         shown = io.StringIO()
 
         def command(*argv):

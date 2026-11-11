@@ -40,7 +40,7 @@ class Catalog(unittest.TestCase):
         self.g = bc.build()
 
     def test_the_written_catalog_is_current(self):
-        with open(bc.OUT) as f:
+        with open(bc.OUT, encoding="utf-8") as f:
             self.assertEqual(f.read(), self.g.serialize(format="turtle"))
 
     def test_one_dataset_per_release_package(self):
@@ -90,7 +90,7 @@ class Catalog(unittest.TestCase):
         finally:
             bc.package_catalogs = real
         self.assertNotIn(URIRef(MODULES_NS + "lane/1.0.0"), set(stale.objects(bc.CATALOG, bc.DCAT.dataset)))
-        with open(bc.OUT) as f:
+        with open(bc.OUT, encoding="utf-8") as f:
             self.assertNotEqual(f.read(), stale.serialize(format="turtle"))
 
 

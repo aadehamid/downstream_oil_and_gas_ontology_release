@@ -355,7 +355,7 @@ def main():
     wb.save(a.workbook_out)
 
     # ---- 6. cell diff ----
-    with open(a.cell_diff, "w", encoding="utf-8") as f:
+    with open(a.cell_diff, "w", encoding="utf-8", newline="\n") as f:
         f.write("# R1 workbook cell diff — `Review & authoring`\n\n")
         f.write(f"Rows before: {n_rows_before - 1} data rows; "
                 f"rows after: {ws.max_row - 1} data rows "

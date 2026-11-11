@@ -6,7 +6,7 @@
 
 The lists come from ../pipeline.py, so the committed CI pipeline and these scripts read one list.
 Importing pipeline.py runs nothing: its main() runs only under __main__. It imports rdflib and
-pyshacl, so run this with both (uv run --no-project --with rdflib --with pyshacl python3 inputs.py).
+pyshacl, so run this with both (uv run --no-project --with rdflib --with pyshacl python inputs.py).
 """
 import os
 import sys

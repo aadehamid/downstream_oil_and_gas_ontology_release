@@ -11,7 +11,7 @@ If your copy includes `viewer/index.html`, that page shows the ontology as you r
 Commands below start from the top folder of your copy unless they say otherwise. They use this shorthand, so define it first:
 
 ```sh run=release-git,slow define status-only
-py() { uv run -q --no-project --with rdflib --with pyshacl --with openpyxl --with jsonschema --with pytest --with "markdown-it-py>=4,<5" python3 -B "$@"; }
+py() { uv run -q --no-project --with rdflib --with pyshacl --with openpyxl --with jsonschema --with pytest --with "markdown-it-py>=4,<5" python -B "$@"; }
 ONT=business_architecture/ontology
 ```
 

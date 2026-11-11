@@ -363,7 +363,7 @@ test they read the tags and stop there.
 The parsers need three packages. When they are not installed, start the check through `uv`:
 
 ```bash run=release-copy
-uv run --no-project --with rdflib --with pyyaml --with sqlglot python3 scripts/doc_snippets.py check scripts/DOC-SNIPPETS.md
+uv run -q --no-project --with rdflib --with pyyaml --with sqlglot python scripts/doc_snippets.py check scripts/DOC-SNIPPETS.md
 ```
 
 ```text expect
@@ -375,7 +375,7 @@ To run a context that is off, set its variable. **The slow context takes many mi
 `HOW-TO-UPDATE.md` run the whole of `scripts/check.sh`.
 
 ```bash run=release-copy
-DOC_SNIPPETS_SLOW=1 uv run --no-project --with rdflib --with pyyaml --with sqlglot python3 scripts/doc_snippets.py check HOW-TO-UPDATE.md
+DOC_SNIPPETS_SLOW=1 uv run -q --no-project --with rdflib --with pyyaml --with sqlglot python scripts/doc_snippets.py check HOW-TO-UPDATE.md
 ```
 
 ```text expect

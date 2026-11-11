@@ -29,7 +29,7 @@ def conforms(data):
 
 class Build(unittest.TestCase):
     def test_build_is_current(self):
-        r = subprocess.run([sys.executable, os.path.join(HERE, "build_systems.py"), "--verify"], capture_output=True, text=True)
+        r = subprocess.run([sys.executable, os.path.join(HERE, "build_systems.py"), "--verify"], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
     def test_figures(self):
@@ -163,7 +163,7 @@ class Build(unittest.TestCase):
     def test_mpc_p11_links_are_in_the_process_map(self):
         # the decision of 2026-10-26: the 21 accepted links, as the map's systems field names them, pinned by hand; the weak three are not.
         import json
-        with open(bs.MAP) as f:
+        with open(bs.MAP, encoding="utf-8") as f:
             roots = json.load(f)
         fields = {}
 

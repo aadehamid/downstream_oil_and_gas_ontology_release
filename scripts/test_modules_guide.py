@@ -52,8 +52,8 @@ def test_each_quoted_triple_is_in_the_newest_release_of_its_module(module, turtl
 def test_a_triple_the_release_no_longer_holds_fails(tmp_path):
     folder = tmp_path / "lane" / "1.0.0"
     folder.mkdir(parents=True)
-    (folder / "manifest.json").write_text("{}")
-    (folder / "lane.ttl").write_text("<urn:p> <urn:officeLane> <urn:front> .\n")
+    (folder / "manifest.json").write_text("{}", encoding="utf-8", newline="\n")
+    (folder / "lane.ttl").write_text("<urn:p> <urn:officeLane> <urn:front> .\n", encoding="utf-8", newline="\n")
     assert missing_triples("lane", "<urn:p> <urn:officeLane> <urn:front> .\n", str(tmp_path)) == []
     assert missing_triples("lane", "<urn:p> <urn:officeLane> <urn:back> .\n", str(tmp_path)) != []
 

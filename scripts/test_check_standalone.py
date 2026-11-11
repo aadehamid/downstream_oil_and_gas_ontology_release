@@ -126,13 +126,13 @@ def tree(tmp_path, files, pending=None, exceptions=None):
         if isinstance(text, bytes):
             path.write_bytes(text)
         else:
-            path.write_text(text, encoding="utf-8")
+            path.write_text(text, encoding="utf-8", newline="\n")
     if pending is not None:
         (tmp_path / "scripts").mkdir(exist_ok=True)
-        (tmp_path / "scripts" / "standalone-pending.txt").write_text(pending, encoding="utf-8")
+        (tmp_path / "scripts" / "standalone-pending.txt").write_text(pending, encoding="utf-8", newline="\n")
     if exceptions is not None:
         (tmp_path / "scripts").mkdir(exist_ok=True)
-        (tmp_path / "scripts" / "standalone-exceptions.txt").write_text(exceptions, encoding="utf-8")
+        (tmp_path / "scripts" / "standalone-exceptions.txt").write_text(exceptions, encoding="utf-8", newline="\n")
     return str(tmp_path)
 
 

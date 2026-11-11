@@ -240,7 +240,7 @@ def main() -> int:
         print("point --workbook at the semantic-intake xlsx, not an earlier copy", file=sys.stderr)
         return 1
 
-    idmap = {r["slug"]: r for r in json.load(open(a.identity_map))}
+    idmap = {r["slug"]: r for r in json.load(open(a.identity_map, encoding="utf-8"))}
     pref_labels = {r["name"].lower() for r in idmap.values()}
     registered_sources = load_reference_ids(wb)
     horizon_ok = load_allowed_values(
@@ -563,7 +563,7 @@ def main() -> int:
 
     # cross-row: two approved siblings with near-identical definitions
     # (light heuristic; reviewer does the real boundary check)
-    with open(a.out, "w") as f:
+    with open(a.out, "w", encoding="utf-8", newline="\n") as f:
         f.write("# Step 3c workbook review findings\n\n")
         f.write(
             f"Rows: {stats['rows']} | approved: {stats['approved']} | "

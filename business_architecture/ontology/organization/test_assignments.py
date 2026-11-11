@@ -49,7 +49,7 @@ class Assignments(unittest.TestCase):
 
     def test_the_written_files_are_current(self):
         for path, text in ba.render(ENTRIES, REGISTER, GRAPH).items():
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 self.assertEqual(f.read(), text, path)
 
     def test_the_assignments_conform(self):

@@ -23,7 +23,7 @@ DCAT = Namespace("http://www.w3.org/ns/dcat#")
 VOCAB = Graph().parse(os.path.join(HERE, "vocabulary.ttl"))
 SHAPES = Graph().parse(os.path.join(HERE, "shapes.ttl"))
 PRODUCTS = Graph().parse(os.path.join(HERE, "data-products.ttl"))
-with open(bd.PORTFOLIO) as f:
+with open(bd.PORTFOLIO, encoding="utf-8") as f:
     PORTFOLIO = json.load(f)
 
 
@@ -53,7 +53,7 @@ class Vocabulary(unittest.TestCase):
 class Build(unittest.TestCase):
     def test_build_is_current(self):
         r = subprocess.run([sys.executable, os.path.join(HERE, "build_data_products.py"), "--verify"],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
     def test_figures(self):
@@ -176,7 +176,7 @@ PROV = Namespace("http://www.w3.org/ns/prov#")
 class Pricing(unittest.TestCase):
     # data-product 1.2.0 (the decision of 2026-10-25, items 7 to 16; the decision of 2026-10-25, items 4 to 6). Counts by hand from pricing/.
     def test_the_build_is_current(self):
-        r = subprocess.run([sys.executable, os.path.join(HERE, "build_pricing.py"), "--verify"], capture_output=True, text=True)
+        r = subprocess.run([sys.executable, os.path.join(HERE, "build_pricing.py"), "--verify"], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
     def test_kinds_by_layer(self):

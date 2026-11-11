@@ -52,11 +52,11 @@ def main():
     text = g.serialize(format="turtle")
     print(f"catalog: {len(set(g.objects(CATALOG, DCAT.dataset)))} releases from {len(package_catalogs())} packages")
     if args.verify:
-        if not os.path.exists(OUT) or open(OUT).read() != text:
+        if not os.path.exists(OUT) or open(OUT, encoding="utf-8").read() != text:
             sys.exit("releases/catalog.ttl is not current: run build_catalog.py --write")
         print("releases/catalog.ttl is current")
     if args.write:
-        with open(OUT, "w") as f:
+        with open(OUT, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
         print(f"wrote {OUT}")
 

@@ -100,25 +100,26 @@ before="$(snapshot)"
 #    build_catalog.py for section 3, and check_shapes.py, check_cardinality.py, check_code_lists.py,
 #    check_packages.py, check_changelogs.py, check_docs.py and run_regression.py for sections 4, 4b, 4c
 #    and 5 below.
-# TODO: uv run --no-project --with pyyaml python3 scripts/ontology/check_requirements.py requirements.yaml
+#    Inside uv run the program is python, not python3: the environment uv makes on Windows holds python.exe only.
+# TODO: uv run --no-project --with pyyaml python scripts/ontology/check_requirements.py requirements.yaml
 
 # 2. Taxonomy, classes and properties: the mechanical checks (identity-taxonomy.md, Step 3, rule 13), on
 #    data files only: shapes files (*-shapes.ttl) may hold blank nodes (identity-taxonomy.md, Step 2, rule 5).
 # TODO: data=(); while IFS= read -r -d '' f; do data+=("$f"); done < <(find modules -name '*.ttl' ! -name '*-shapes.ttl' -print0)
 # TODO: [ "${#data[@]}" -gt 0 ] || { echo "no data Turtle under modules/" >&2; exit 1; }   # an empty set must fail, not pass
-# TODO: uv run --no-project --with rdflib python3 scripts/ontology/check_taxonomy.py "${data[@]}"
+# TODO: uv run --no-project --with rdflib python scripts/ontology/check_taxonomy.py "${data[@]}"
 
 # 2b. Mappings: every SSSOM mapping set the project keeps (external-ontologies.md, rules 9 to 12). A project
 #     with no mapping set yet runs nothing here.
 # TODO: mappings=(); while IFS= read -r -d '' f; do mappings+=("$f"); done < <(find modules -name '*.sssom.tsv' -print0)
-# TODO: [ "${#mappings[@]}" -eq 0 ] || uv run --no-project --with pyyaml python3 scripts/ontology/check_sssom.py "${mappings[@]}"
+# TODO: [ "${#mappings[@]}" -eq 0 ] || uv run --no-project --with pyyaml python scripts/ontology/check_sssom.py "${mappings[@]}"
 
 # 3. Generated files: every builder rebuilds into a temporary directory and its verify command compares
 #    (release.md, rules 9 and 19). One line per module package, then the combined catalog, which
 #    build_catalog.py builds from the packages' own catalog.ttl files plus the title and description
 #    given here.
-# TODO: uv run --no-project --with rdflib --with pyyaml --with pyshacl python3 scripts/ontology/build_package.py verify release/<module>-<version>.yaml --releases releases   # one per release (packaging-walkthrough.md)
-# TODO: uv run --no-project --with rdflib --with pyshacl python3 scripts/ontology/build_catalog.py verify --releases releases --title "<the catalog's title>" --description "<one sentence>"
+# TODO: uv run --no-project --with rdflib --with pyyaml --with pyshacl python scripts/ontology/build_package.py verify release/<module>-<version>.yaml --releases releases   # one per release (packaging-walkthrough.md)
+# TODO: uv run --no-project --with rdflib --with pyshacl python scripts/ontology/build_catalog.py verify --releases releases --title "<the catalog's title>" --description "<one sentence>"
 
 # 4. Shapes: every module's shapes, the whole-graph gate, a cardinality on every property, and the
 #    release-package test (shacl.md), against the pinned shape version only (governance rule 17). The
@@ -127,10 +128,10 @@ before="$(snapshot)"
 #    code-list value there, and the check fails rather than pass with nothing to test.
 # TODO: shapes=(); while IFS= read -r -d '' f; do shapes+=("$f"); done < <(find modules -name '*-shapes.ttl' -print0)
 # TODO: [ "${#shapes[@]}" -gt 0 ] || { echo "no *-shapes.ttl under modules/" >&2; exit 1; }   # an empty set must fail, not pass
-# TODO: uv run --no-project --with rdflib --with pyshacl python3 scripts/ontology/check_shapes.py --shapes "${shapes[@]}" --data "${data[@]}" --every-shapes-file-under modules
-# TODO: uv run --no-project --with rdflib python3 scripts/ontology/check_cardinality.py --shapes "${shapes[@]}" --data "${data[@]}"
-# TODO: uv run --no-project --with rdflib --with pyshacl python3 scripts/ontology/check_code_lists.py --shapes "${shapes[@]}" --data "${data[@]}" tests/illustration.ttl   # add --not-code-list=<scheme IRI> for each taxonomy scheme
-# TODO: uv run --no-project --with rdflib --with pyshacl python3 scripts/ontology/check_packages.py --releases releases --expect releases/packages.txt
+# TODO: uv run --no-project --with rdflib --with pyshacl python scripts/ontology/check_shapes.py --shapes "${shapes[@]}" --data "${data[@]}" --every-shapes-file-under modules
+# TODO: uv run --no-project --with rdflib python scripts/ontology/check_cardinality.py --shapes "${shapes[@]}" --data "${data[@]}"
+# TODO: uv run --no-project --with rdflib --with pyshacl python scripts/ontology/check_code_lists.py --shapes "${shapes[@]}" --data "${data[@]}" tests/illustration.ttl   # add --not-code-list=<scheme IRI> for each taxonomy scheme
+# TODO: uv run --no-project --with rdflib --with pyshacl python scripts/ontology/check_packages.py --releases releases --expect releases/packages.txt
 
 # 4b. Release notes: every package's changelog states its known gaps (release.md, rule 18). Add one --exempt
 #     <module>/<version> for each package released before the project adopted the rule.
@@ -141,7 +142,7 @@ before="$(snapshot)"
 
 # 5. Regression: every competency question on the released packages, plus the example graph of each module under
 #    new-module.md, rule 9 (regression.md, rule 13).
-# TODO: uv run --no-project --with rdflib python3 scripts/ontology/run_regression.py --expected regression/expected.csv --queries regression/queries <the newest release of each module's Turtle> <each new-module.md rule 9 example graph>
+# TODO: uv run --no-project --with rdflib python scripts/ontology/run_regression.py --expected regression/expected.csv --queries regression/queries <the newest release of each module's Turtle> <each new-module.md rule 9 example graph>
 
 # 6. Every test file (governance rule 15).
 # TODO: python3 -m pytest -q -p no:cacheprovider tests/

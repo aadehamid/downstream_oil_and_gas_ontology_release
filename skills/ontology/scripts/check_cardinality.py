@@ -2,7 +2,7 @@
 """Step 9: every property has a cardinality, and no node shape is empty (references/shacl.md, rules 5
 and 8).
 
-Run: uv run --no-project --with rdflib python3 check_cardinality.py --shapes <s.ttl>... --data <d.ttl>...
+Run: uv run --no-project --with rdflib python check_cardinality.py --shapes <s.ttl>... --data <d.ttl>...
 
 A property is any subject the data types owl:ObjectProperty, owl:DatatypeProperty or
 owl:AnnotationProperty. Its cardinality is stated by a property shape (a node whose sh:path is the

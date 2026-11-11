@@ -51,7 +51,7 @@ UNDEFINED = ("The process map names this system but no source in the repository 
 
 
 def read_csv(path):
-    with open(path, newline="") as f:
+    with open(path, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
@@ -61,7 +61,7 @@ def split(text):
 
 def map_uses():
     """(process id, system string) for every entry of every node's systems field."""
-    with open(MAP) as f:
+    with open(MAP, encoding="utf-8") as f:
         roots = json.load(f)
     uses = []
 
@@ -213,12 +213,12 @@ def main():
             + build(register, slugs, uses, procs, sources).serialize(format="turtle"))
     print("; ".join(f"{k} {v}" for k, v in figures(register, slugs, uses, procs).items()))
     if args.verify:
-        current = os.path.exists(OUTPUT) and open(OUTPUT).read() == text
+        current = os.path.exists(OUTPUT) and open(OUTPUT, encoding="utf-8").read() == text
         if not current:
             sys.exit("systems.ttl is not current: run build_systems.py --write")
         print("systems.ttl is current")
     if args.write:
-        with open(OUTPUT, "w") as f:
+        with open(OUTPUT, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
         print(f"wrote {OUTPUT}")
 

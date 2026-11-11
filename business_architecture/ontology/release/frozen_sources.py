@@ -30,7 +30,11 @@ def read(commit, path):
     """The bytes of `path` as the builder that names `commit` read it: the frozen copy."""
     frozen = frozen_path(commit, path)
     if not os.path.exists(frozen):
-        raise FileNotFoundError(f"no frozen copy of {path} for {commit[:12]}: {os.path.relpath(frozen, HERE)} is missing")
+        try:
+            shown = os.path.relpath(frozen, HERE)
+        except ValueError:  # on Windows, a folder on another drive has no relative path
+            shown = frozen
+        raise FileNotFoundError(f"no frozen copy of {path} for {commit[:12]}: {shown} is missing")
     with open(frozen, "rb") as f:
         return f.read()
 

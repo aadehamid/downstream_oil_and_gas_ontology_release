@@ -48,6 +48,11 @@ ROBOT_SHA256 = "16a73c074f3df359a7338a84b4e0788785fe06117f931bb9796e9619ea776105
 NEO4J_VERSION, N10S_VERSION, APOC_VERSION = "2025.06.2", "2025.06.1", "2025.06.2"
 # Where Git for Windows puts bash.exe. C:\Windows\System32\bash.exe is not a bash: it starts the Linux subsystem.
 GIT_BASH_FOLDERS = ("{ProgramFiles}/Git/bin", "{ProgramFiles(x86)}/Git/bin", "{LOCALAPPDATA}/Programs/Git/bin")
+# What scripts/check.sh does to find its Python, then uv. Prints "<name> <major> <minor>" and uv's version line.
+CHECK_SCRIPT_TOOLS = ("for p in python3 python py; do "
+                      "if \"$p\" -c 'import sys; sys.exit(sys.version_info < (3, 11))' >/dev/null 2>&1; then "
+                      "\"$p\" -c 'import sys; print(sys.argv[1], sys.version_info[0], sys.version_info[1])' \"$p\"; "
+                      "uv --version; exit; fi; done; exit 1")
 # The one fix for every check that could not read the local settings file.
 SETTINGS_FIX = ("Copy kpi_store/stores.example.toml to a folder outside the release folder, fill it in, and pass "
                 "its path with --stores or set KPI_STORE_LOCAL to it")
@@ -246,15 +251,18 @@ def uv(ctx):
 
 
 def check_script_tools(ctx):
-    """scripts/check.sh calls python3 and uv from inside bash, so both must be found there."""
+    """scripts/check.sh calls Python and uv from inside bash, so both must be found there. It takes the first of
+    python3, python and py that runs and is 3.11 or later; this check does the same. Windows often has no
+    python3.exe, or one that only opens the Store, so a name counts only when it runs."""
     found = find_bash(ctx.local.bash if ctx.local else None, ctx.environ, ctx.which)
     if found is None:
         return failed("bash was not found, so the check script cannot run", "Fix the bash check first")
-    code, out = ctx.call([found, "-c", "python3 -c 'import sys; print(sys.version_info[0], sys.version_info[1])' && uv --version"])
-    if code != 0:
-        return failed("inside bash, python3 or uv was not found; scripts/check.sh calls both",
-                      "Run py -m pip install uv, then add the folder of python3.exe and the folder of uv.exe to PATH and open a new terminal")
-    return passed("inside bash: python3 " + ".".join(out.split()[:2]) + " and " + " ".join(out.split()[2:4]))
+    code, out = ctx.call([found, "-c", CHECK_SCRIPT_TOOLS])
+    words = out.split()
+    if code != 0 or len(words) < 5:
+        return failed("inside bash, Python 3.11 or later (python3, python or py) or uv was not found; scripts/check.sh calls both",
+                      "Run py -m pip install uv, then add the folder of python.exe and the folder of uv.exe to PATH and open a new terminal")
+    return passed(f"inside bash: {words[0]} {words[1]}.{words[2]} and {words[3]} {words[4]}")
 
 
 def databricks_cli(ctx):

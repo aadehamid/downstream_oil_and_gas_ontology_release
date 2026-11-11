@@ -26,6 +26,13 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def relpath(path, start):
+    """The path from start, written with /. A page must be the same on Windows, where os.path.relpath gives \\."""
+    return os.path.relpath(path, start).replace(os.sep, "/")
+
+
 TEMPLATE = os.path.join(ROOT, "scripts", "playbook_template.html")
 
 # Each page: its output, its title, one sentence on what it is, and its sources in reading order.
@@ -158,7 +165,7 @@ class Page:
             if frag:
                 return f"#{pre}--{frag}" if pre else f"#{frag}"
             return f"#{pre}" if pre else "#top"
-        rel = os.path.relpath(target, self.out_dir)
+        rel = relpath(target, self.out_dir)
         return rel + (f"#{frag}" if frag else "")
 
     # ---- inline
@@ -345,7 +352,7 @@ class Page:
                 lines = [x for x in lines if not (HEADING.match(x) and HEADING.match(x).group(1) == "#")]
                 self.used.add(pre)
                 self.toc.append((2, pre, title))
-                label = os.path.relpath(src, os.path.join(ROOT, os.path.dirname(os.path.dirname(src_rel))))
+                label = relpath(src, os.path.join(ROOT, os.path.dirname(os.path.dirname(src_rel))))
                 body = (f'<section class="src" id="{pre}"><h2>{self.inline(src, title)}'
                         f'<a class="hl" href="#{pre}" aria-label="Link to this section">#</a></h2>'
                         f'<p class="from">From <code>{html.escape(label)}</code></p>\n'
@@ -356,7 +363,7 @@ class Page:
             sections.append(body)
         toc = "\n".join(f'<li class="l{lvl}"><a href="#{aid}">{self.inline_plain(text)}</a></li>'
                         for lvl, aid, text in self.toc if lvl <= 2 or len(self.spec["sources"]) == 1)
-        srcs = ", ".join(f"<code>{html.escape(os.path.relpath(os.path.join(ROOT, s), self.out_dir))}</code>"
+        srcs = ", ".join(f"<code>{html.escape(relpath(os.path.join(ROOT, s), self.out_dir))}</code>"
                          for s in self.spec["sources"])
         with open(TEMPLATE, encoding="utf-8") as f:
             page = f.read()
@@ -399,7 +406,7 @@ def main(argv, out_root=ROOT):
                 stale.append(spec["out"])
         else:
             os.makedirs(os.path.dirname(out), exist_ok=True)
-            with open(out, "w", encoding="utf-8") as f:
+            with open(out, "w", encoding="utf-8", newline="\n") as f:
                 f.write(page)
             print(f"wrote {spec['out']}")
     if stale:

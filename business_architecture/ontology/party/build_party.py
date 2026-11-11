@@ -105,7 +105,7 @@ def value_iri(scheme, notation):
 
 
 def load():
-    with open(TABLE, newline="") as f:
+    with open(TABLE, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     problems = [f"{r['scheme']}/{r['notation']}: unknown scheme" for r in rows if r["scheme"] not in SCHEMES]
     problems += [f"{r['scheme']}/{r['notation']}: no definition" for r in rows if not r["definition"]]
@@ -209,7 +209,7 @@ def load_products(rows):
 
 
 def read(name):
-    with open(os.path.join(HERE, name), newline="") as f:
+    with open(os.path.join(HERE, name), newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
@@ -492,19 +492,19 @@ def main():
           f"flows {len(flows)}; sourcings {len(sources)}; attributes {len(attrs)} (create {cat['create']}, enrich {cat['enrich']}); "
           f"lifecycle links {len(lrows)}; product mappings {len(mappings)}; PIDX families {len(pidx)}")
     if args.verify:
-        if not (os.path.exists(OUTPUT) and open(OUTPUT).read() == text):
+        if not (os.path.exists(OUTPUT) and open(OUTPUT, encoding="utf-8").read() == text):
             sys.exit("code-lists.ttl is not current: run build_party.py --write")
-        if not (os.path.exists(SYSTEMS_OUTPUT) and open(SYSTEMS_OUTPUT).read() == stext):
+        if not (os.path.exists(SYSTEMS_OUTPUT) and open(SYSTEMS_OUTPUT, encoding="utf-8").read() == stext):
             sys.exit("systems.ttl is not current: run build_party.py --write")
-        if not (os.path.exists(LIFECYCLE_OUTPUT) and open(LIFECYCLE_OUTPUT).read() == ltext):
+        if not (os.path.exists(LIFECYCLE_OUTPUT) and open(LIFECYCLE_OUTPUT, encoding="utf-8").read() == ltext):
             sys.exit("lifecycle.ttl is not current: run build_party.py --write")
         print("code-lists.ttl, systems.ttl and lifecycle.ttl are current")
     if args.write:
-        with open(OUTPUT, "w") as f:
+        with open(OUTPUT, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
-        with open(SYSTEMS_OUTPUT, "w") as f:
+        with open(SYSTEMS_OUTPUT, "w", encoding="utf-8", newline="\n") as f:
             f.write(stext)
-        with open(LIFECYCLE_OUTPUT, "w") as f:
+        with open(LIFECYCLE_OUTPUT, "w", encoding="utf-8", newline="\n") as f:
             f.write(ltext)
         print(f"wrote {OUTPUT}, {SYSTEMS_OUTPUT} and {LIFECYCLE_OUTPUT}")
 

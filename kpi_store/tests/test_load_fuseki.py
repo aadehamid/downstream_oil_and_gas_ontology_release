@@ -32,7 +32,7 @@ def test_java_is_found_in_the_settings_then_java_home_then_the_path(tmp_path):
     exe = "java.exe" if lf.os.name == "nt" else "java"
     (tmp_path / "home" / "bin").mkdir(parents=True)
     for path in (tmp_path / "own-java", tmp_path / "home" / "bin" / exe, tmp_path / "path-java"):
-        path.write_text("", encoding="utf-8")
+        path.write_text("", encoding="utf-8", newline="\n")
     which = lambda name: str(tmp_path / "path-java")   # noqa: E731
     environ = {"JAVA_HOME": str(tmp_path / "home")}
     assert lf.find_java(tmp_path / "own-java", environ, which) == tmp_path / "own-java"
@@ -137,7 +137,7 @@ OURS = "/sample/java -Dkpi_store.fuseki=ab12 -jar jena-fuseki-server-6.2.0.jar -
 
 
 def saved(tmp_path, text='{"pid": 4242, "token": "ab12"}'):
-    (tmp_path / "fuseki.pid").write_text(text + "\n", encoding="utf-8")
+    (tmp_path / "fuseki.pid").write_text(text + "\n", encoding="utf-8", newline="\n")
 
 
 def test_stop_ends_the_process_start_wrote_and_only_once(tmp_path):
@@ -220,8 +220,8 @@ def test_the_dataset_holds_every_graph_of_the_release(tmp_path):
 def test_an_extra_graph_joins_the_dataset_and_may_not_take_a_release_graphs_name(tmp_path):
     root, ss, _ = release(tmp_path)
     (tmp_path / "tech").mkdir()
-    (tmp_path / "tech" / "objects.ttl").write_text("<urn:sample:table> a <urn:sample:Table> .\n", encoding="utf-8")
-    (tmp_path / "tech" / "graphs.json").write_text(json.dumps({"urn:sample:tech-graph": "objects.ttl"}), encoding="utf-8")
+    (tmp_path / "tech" / "objects.ttl").write_text("<urn:sample:table> a <urn:sample:Table> .\n", encoding="utf-8", newline="\n")
+    (tmp_path / "tech" / "graphs.json").write_text(json.dumps({"urn:sample:tech-graph": "objects.ttl"}), encoding="utf-8", newline="\n")
     extra = lf.read_extra_graphs(tmp_path / "tech" / "graphs.json")
     assert extra == {"urn:sample:tech-graph": tmp_path / "tech" / "objects.ttl"}
     dataset = lf.pack(RDFSTORE, lf.store_graphs(root, ss, extra))
@@ -234,7 +234,7 @@ def test_an_extra_graph_joins_the_dataset_and_may_not_take_a_release_graphs_name
     ('{"urn:sample:g": "gone.ttl"}', "which is missing"), ('["urn:sample:g"]', "must map each graph IRI to a file"),
     ('{"no-colon": "objects.ttl"}', "must map each graph IRI to a file"), ("{", "cannot read the extra graphs file")])
 def test_a_wrong_extra_graphs_file_is_refused(tmp_path, text, message):
-    (tmp_path / "graphs.json").write_text(text, encoding="utf-8")
+    (tmp_path / "graphs.json").write_text(text, encoding="utf-8", newline="\n")
     with pytest.raises(lf.FusekiError, match=message):
         lf.read_extra_graphs(tmp_path / "graphs.json")
 

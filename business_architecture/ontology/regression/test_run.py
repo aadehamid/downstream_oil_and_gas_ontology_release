@@ -18,7 +18,7 @@ MOD = URIRef("https://w3id.org/mpc/ontology/modules/core")
 
 class Coverage(unittest.TestCase):
     def test_one_row_per_locked_question(self):
-        with open(run.QUESTIONS) as f:
+        with open(run.QUESTIONS, encoding="utf-8") as f:
             numbers = [int(n) for n in re.findall(r"^(\d+)\. ", f.read(), re.M)]
         self.assertEqual(numbers, list(range(1, 58)))
         self.assertEqual([int(r["question"]) for r in run.load_expected()], numbers)
@@ -37,12 +37,12 @@ class Coverage(unittest.TestCase):
 class Release(unittest.TestCase):
     def test_q7_lists_loss_control_produced_by_its_process(self):
         # the decision of 2026-10-19: CM 1.1.3.7.13 produces Loss Control, a link core 2.2.0 made possible (the decision of 2026-10-22).
-        with open(os.path.join(HERE, "queries", "q07a-produces-consumes.rq")) as f:
+        with open(os.path.join(HERE, "queries", "q07a-produces-consumes.rq"), encoding="utf-8") as f:
             rows = {(str(r.process), str(r.relation), str(r.item)) for r in GRAPH.query(f.read())}
         self.assertIn(("https://w3id.org/mpc/ontology/process/CM-1-1-3-7-13",
                        "https://w3id.org/mpc/ontology/modules/value-stream/produces",
                        "https://w3id.org/mpc/ontology/modules/data-product/product/loss-control"), rows)
-        with open(os.path.join(HERE, "queries", "q07-no-owning-process.rq")) as f:
+        with open(os.path.join(HERE, "queries", "q07-no-owning-process.rq"), encoding="utf-8") as f:
             orphans = {str(r.product).rsplit("/", 1)[1] for r in GRAPH.query(f.read())}
         self.assertNotIn("loss-control", orphans)
 
@@ -54,7 +54,7 @@ class Release(unittest.TestCase):
     def test_q15b_reports_the_systems_in_two_modules_as_one(self):
         # the decision of 2026-10-21 item 1: three party systems are the system module's nodes of the same name;
         # the decision of 2026-10-21: the Terminal Margin Ranking System is its TMR, which the party node carries as an alternative label.
-        with open(os.path.join(HERE, "queries", "q15b-same-word-linked.rq")) as f:
+        with open(os.path.join(HERE, "queries", "q15b-same-word-linked.rq"), encoding="utf-8") as f:
             found = [r for r in GRAPH.query(f.read()) if r.link == SKOS.exactMatch]
         party, system = "https://w3id.org/mpc/ontology/modules/party/system/", "https://w3id.org/mpc/ontology/modules/system/system/"
         # Since party 2.0.0 the query also finds Dealer Master's dealer class 2, Sub-jobber, matched to the sub-jobber role

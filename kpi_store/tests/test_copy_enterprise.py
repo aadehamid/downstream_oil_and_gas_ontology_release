@@ -225,7 +225,7 @@ def test_the_replace_deletes_the_kpi_stores_nodes_and_leaves_other_nodes():
 # ---- the checks after the copy ---------------------------------------------------------------------
 
 def test_release_records_that_do_not_write_or_read_back_stop_the_copy(tmp_path):
-    (tmp_path / "release-records.json").write_text(json.dumps({"graph_hash": "hash-1", "records": [{}, {}]}), encoding="utf-8")
+    (tmp_path / "release-records.json").write_text(json.dumps({"graph_hash": "hash-1", "records": [{}, {}]}), encoding="utf-8", newline="\n")
     good = SimpleNamespace(rr=SimpleNamespace(write=lambda s, c: ([], 2), check=lambda s, c: []))
     assert ce.write_records(None, tmp_path, good) == 2
     for rr, message in ((SimpleNamespace(write=lambda s, c: (["1 of 2 records found their owl:Ontology node"], 1), check=lambda s, c: []), "1 of 2 records"),
@@ -238,8 +238,8 @@ def test_release_records_that_do_not_write_or_read_back_stop_the_copy(tmp_path):
 
 def test_a_tag_that_differs_stops_the_copy_before_the_module_graph(tmp_path, local_and_out):
     local, out = local_and_out
-    (out / "run-manifest.json").write_text(json.dumps({"data": [{"path": "a.ttl"}]}), encoding="utf-8")
-    (out / "inferred.nt").write_text("", encoding="utf-8")
+    (out / "run-manifest.json").write_text(json.dumps({"data": [{"path": "a.ttl"}]}), encoding="utf-8", newline="\n")
+    (out / "inferred.nt").write_text("", encoding="utf-8", newline="\n")
     sent = []
     target = SimpleNamespace(run=lambda statement, params: sent.append(statement) or SimpleNamespace(data=lambda: []))
     def code(problems):
@@ -262,7 +262,7 @@ def local_and_out(tmp_path, monkeypatch):
     monkeypatch.setattr(ce.ldb, "expected", lambda root, ss=None: dict(WANT))
     out = tmp_path / "lpg-out"
     out.mkdir()
-    (out / "projection-report.json").write_text(json.dumps(REPORT), encoding="utf-8")
+    (out / "projection-report.json").write_text(json.dumps(REPORT), encoding="utf-8", newline="\n")
     return stores_support.local_settings(tmp_path), out
 
 
@@ -338,7 +338,7 @@ def test_the_copy_is_refused_before_any_write(local_and_out, monkeypatch):
         run_copy(local, graph(), held, monkeypatch)
     for db in (same, target, foreign, held):
         assert db.writes() == []
-    (out / "projection-report.json").write_text(json.dumps({**REPORT, "input_fingerprint": "fingerprint-0"}), encoding="utf-8")
+    (out / "projection-report.json").write_text(json.dumps({**REPORT, "input_fingerprint": "fingerprint-0"}), encoding="utf-8", newline="\n")
     with pytest.raises(ce.Refused, match="is of other release files"):
         run_copy(local, graph(), empty_target(), monkeypatch)
 

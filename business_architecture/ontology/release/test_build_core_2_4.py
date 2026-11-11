@@ -163,7 +163,7 @@ class Package(unittest.TestCase):
 
     def test_the_written_package_equals_a_fresh_build(self):
         for name, text in self.FILES.items():
-            with open(os.path.join(b.RELEASE_DIR, name)) as f:
+            with open(os.path.join(b.RELEASE_DIR, name), encoding="utf-8") as f:
                 self.assertEqual(f.read(), text, name)
 
     def test_the_approval_is_the_delegation_and_the_manifest_carries_its_words(self):
@@ -178,7 +178,7 @@ class Package(unittest.TestCase):
 
     def test_shapes_and_mapping_are_2_3_0s(self):
         for name in ("shapes.ttl", "canonical-facts.csv"):
-            with open(os.path.join(b.BASE, name)) as f:
+            with open(os.path.join(b.BASE, name), encoding="utf-8") as f:
                 self.assertEqual(self.FILES[name], f.read(), name)
 
     def test_the_map_is_read_at_its_pinned_commit(self):
@@ -191,7 +191,7 @@ class Package(unittest.TestCase):
 
 class EarlierRelease(unittest.TestCase):
     def test_2_3_0_is_untouched(self):
-        with open(os.path.join(b.BASE, "manifest.json")) as f:
+        with open(os.path.join(b.BASE, "manifest.json"), encoding="utf-8") as f:
             manifest = json.load(f)
         for name, digest in manifest["files"].items():
             with open(os.path.join(b.BASE, name), "rb") as f:

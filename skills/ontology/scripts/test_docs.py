@@ -1,7 +1,7 @@
 """Tests for check_docs.py and build_docs.py.
 
 Run from this folder:
-  uv run --no-project python3 -m unittest test_docs
+  uv run --no-project python -m unittest test_docs
 The build test runs Widoco and needs Java; it runs only when WIDOCO_JAR names a Widoco jar, for example
   WIDOCO_JAR=/path/to/widoco-1.4.25-jar-with-dependencies_JDK-17.jar python3 -m unittest test_docs
 
@@ -20,6 +20,11 @@ from unittest import mock
 import build_docs
 import check_docs
 
+# The stand-in for java is a shell script. Windows starts a program named java only from java.exe, so the real
+# Java runs and refuses the empty jar. How build_docs.py swaps the new pages in, and puts the old pages back
+# when that fails, is therefore not proven on Windows.
+NO_STAND_IN = "Windows cannot start a shell script as java, so no stand-in for Widoco can run"
+
 LENDING_TTL = """@prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 <https://id.example.org/library/lending> a owl:Ontology ; rdfs:label "Library lending"@en .
@@ -35,9 +40,9 @@ class Docs(unittest.TestCase):
         for version in ("1.0.0", "1.1.0"):
             package = os.path.join(self.releases, "lending", version)
             os.makedirs(package)
-            with open(os.path.join(package, "lending.ttl"), "w") as f:
+            with open(os.path.join(package, "lending.ttl"), "w", encoding="utf-8", newline="\n") as f:
                 f.write(LENDING_TTL)
-            with open(os.path.join(package, "manifest.json"), "w") as f:
+            with open(os.path.join(package, "manifest.json"), "w", encoding="utf-8", newline="\n") as f:
                 json.dump({"module": "lending", "version": version,
                            "files": {"lending.ttl": hashlib.sha256(LENDING_TTL.encode()).hexdigest()}}, f)
             self.write_source("lending", version)
@@ -45,14 +50,14 @@ class Docs(unittest.TestCase):
         self.bin = os.path.join(self.root, "bin")
         os.makedirs(self.bin)
         fake = os.path.join(self.bin, "java")
-        with open(fake, "w") as f:
+        with open(fake, "w", encoding="utf-8", newline="\n") as f:
             f.write('#!/bin/sh\necho called >> "$FAKE_JAVA_LOG"\n[ "$FAKE_JAVA" = ok ] || exit 1\n'
                     'while [ $# -gt 0 ]; do [ "$1" = -outFolder ] && out=$2; shift; done\n'
                     'echo NEW > "$out/index-en.html"\n')
         os.chmod(fake, 0o755)
         self.java_log = os.path.join(self.root, "java.log")
         self.jar = os.path.join(self.root, "widoco.jar")
-        open(self.jar, "w").close()
+        open(self.jar, "w", encoding="utf-8", newline="\n").close()
 
     def tearDown(self):
         shutil.rmtree(self.root)
@@ -66,7 +71,7 @@ class Docs(unittest.TestCase):
         os.makedirs(folder, exist_ok=True)
         record = {"module": mod, "version": ver, "manifest_sha256": self.manifest_hash(mod, ver)}
         record.update(override)
-        with open(os.path.join(folder, "docs-source.json"), "w") as f:
+        with open(os.path.join(folder, "docs-source.json"), "w", encoding="utf-8", newline="\n") as f:
             json.dump(record, f)
 
     def assertOnly(self, name, fragment):
@@ -95,14 +100,14 @@ class Docs(unittest.TestCase):
         self.assertOnly("source", "does not name module, version and manifest_sha256")
 
     def test_docs_built_from_another_manifest(self):
-        with open(os.path.join(self.releases, "lending", "1.0.0", "manifest.json"), "a") as f:
+        with open(os.path.join(self.releases, "lending", "1.0.0", "manifest.json"), "a", encoding="utf-8", newline="\n") as f:
             f.write(" ")
         self.assertOnly("stale", "lending 1.0.0: built from manifest")
 
     def test_a_folder_that_is_not_a_version_is_not_a_package(self):
         notes = os.path.join(self.releases, "lending", "notes")
         os.makedirs(notes)
-        with open(os.path.join(notes, "manifest.json"), "w") as f:
+        with open(os.path.join(notes, "manifest.json"), "w", encoding="utf-8", newline="\n") as f:
             f.write("{}")
         self.assertEqual(check_docs.check(self.releases, self.docs), [])
 
@@ -132,14 +137,14 @@ class Docs(unittest.TestCase):
         return code, out.getvalue()
 
     def write_old_pages(self):
-        with open(os.path.join(self.docs, "lending", "1.1.0", "index-en.html"), "w") as f:
+        with open(os.path.join(self.docs, "lending", "1.1.0", "index-en.html"), "w", encoding="utf-8", newline="\n") as f:
             f.write("OLD")
 
     def leftovers(self):
         return [n for n in os.listdir(os.path.join(self.docs, "lending")) if n.startswith(".")]
 
     def test_a_turtle_changed_after_release_stops_the_build_before_widoco(self):
-        with open(os.path.join(self.releases, "lending", "1.1.0", "lending.ttl"), "a") as f:
+        with open(os.path.join(self.releases, "lending", "1.1.0", "lending.ttl"), "a", encoding="utf-8", newline="\n") as f:
             f.write("<https://id.example.org/library/Extra> a <http://www.w3.org/2002/07/owl#Class> .\n")
         code, out = self.build_with_fake_java("ok", "lending/1.1.0")
         self.assertEqual(code, 1, out)
@@ -147,7 +152,7 @@ class Docs(unittest.TestCase):
         self.assertFalse(os.path.exists(self.java_log), "Widoco ran on a package that does not match its manifest")
 
     def test_a_manifest_that_lists_no_turtle_stops_the_build(self):
-        with open(os.path.join(self.releases, "lending", "1.1.0", "manifest.json"), "w") as f:
+        with open(os.path.join(self.releases, "lending", "1.1.0", "manifest.json"), "w", encoding="utf-8", newline="\n") as f:
             json.dump({"module": "lending", "version": "1.1.0", "files": {}}, f)
         code, out = self.build_with_fake_java("ok", "lending/1.1.0")
         self.assertEqual(code, 1, out)
@@ -157,20 +162,22 @@ class Docs(unittest.TestCase):
         self.write_old_pages()
         code, out = self.build_with_fake_java("fail", "lending/1.1.0")
         self.assertEqual(code, 1, out)
-        with open(os.path.join(self.docs, "lending", "1.1.0", "index-en.html")) as f:
+        with open(os.path.join(self.docs, "lending", "1.1.0", "index-en.html"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "OLD")
         self.assertEqual(check_docs.check(self.releases, self.docs), [])
         self.assertEqual(self.leftovers(), [])
 
+    @unittest.skipIf(os.name == "nt", NO_STAND_IN)
     def test_a_successful_run_replaces_the_previous_pages(self):
         self.write_old_pages()
         code, out = self.build_with_fake_java("ok", "lending/1.1.0")
         self.assertEqual(code, 0, out)
-        with open(os.path.join(self.docs, "lending", "1.1.0", "index-en.html")) as f:
+        with open(os.path.join(self.docs, "lending", "1.1.0", "index-en.html"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "NEW\n")
         self.assertEqual(check_docs.check(self.releases, self.docs), [])
         self.assertEqual(self.leftovers(), [])
 
+    @unittest.skipIf(os.name == "nt", NO_STAND_IN)
     def test_a_failed_promotion_puts_the_previous_pages_back(self):
         self.write_old_pages()
         real_rename = os.rename
@@ -184,11 +191,12 @@ class Docs(unittest.TestCase):
             code, out = self.build_with_fake_java("ok", "lending/1.1.0")
         self.assertEqual(code, 1, out)
         self.assertIn("FAIL promote: lending 1.1.0: injected failure", out)
-        with open(os.path.join(self.docs, "lending", "1.1.0", "index-en.html")) as f:
+        with open(os.path.join(self.docs, "lending", "1.1.0", "index-en.html"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "OLD")
         self.assertEqual(check_docs.check(self.releases, self.docs), [])
         self.assertEqual(self.leftovers(), [])
 
+    @unittest.skipIf(os.name == "nt", NO_STAND_IN)
     def test_a_failed_restore_keeps_the_previous_pages_and_names_where_they_are(self):
         self.write_old_pages()
         real_rename = os.rename
@@ -208,7 +216,7 @@ class Docs(unittest.TestCase):
         self.assertEqual(len(old), 1, self.leftovers())
         old_path = os.path.join(self.docs, "lending", old[0])
         self.assertIn(f"they are at {old_path}: move that folder back to", out)
-        with open(os.path.join(old_path, "index-en.html")) as f:
+        with open(os.path.join(old_path, "index-en.html"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "OLD")
 
     @unittest.skipUnless(os.environ.get("WIDOCO_JAR"), "set WIDOCO_JAR to a Widoco jar to run Widoco")

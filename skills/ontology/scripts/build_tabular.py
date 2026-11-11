@@ -4,9 +4,9 @@
 maplib is for a source that is already a dataframe in Python.
 
 Run, with the engine's packages:
-  uv run --no-project --with morph-kgc==2.10.0 --with rdflib python3 build_tabular.py \
+  uv run --no-project --with morph-kgc==2.10.0 --with rdflib python build_tabular.py \
       --engine morph-kgc --mapping <folder>/<name>.rml.ttl --out <file.nt> [--verify]
-  uv run --no-project --with maplib==0.20.26 --with polars --with rdflib python3 build_tabular.py \
+  uv run --no-project --with maplib==0.20.26 --with polars --with rdflib python build_tabular.py \
       --engine maplib --mapping <folder>/<name>.maplib.py --out <file.nt> [--verify]
 
 morph-kgc runs an RML mapping file; its rml:source paths are read relative to the mapping's folder. maplib runs a
@@ -110,7 +110,7 @@ def main(argv):
             return 1
         print(f"{args.out} equals a fresh build ({len(text.splitlines())} triples)")
         return 0
-    with open(args.out, "w", encoding="utf-8") as f:
+    with open(args.out, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
     print(f"wrote {args.out} ({len(text.splitlines())} triples)")
     return 0

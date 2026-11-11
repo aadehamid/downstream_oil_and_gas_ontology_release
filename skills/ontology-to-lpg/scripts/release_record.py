@@ -2,9 +2,9 @@
 """One release record per module in a loaded projection: which release the graph holds, whether it
 passed, and which rules loaded it.
 
-    uv run --no-project --with rdflib python3 release_record.py records --report <projection-report.json> --manifest <run-manifest.json> --output <release-records.json> [--loaded-at <time>] <package.ttl>...
-    uv run --no-project --with rdflib --with neo4j python3 release_record.py write --records <release-records.json> (--uri U | --env E)
-    uv run --no-project --with rdflib --with neo4j python3 release_record.py check --records <release-records.json> (--uri U | --env E)
+    uv run --no-project --with rdflib python release_record.py records --report <projection-report.json> --manifest <run-manifest.json> --output <release-records.json> [--loaded-at <time>] <package.ttl>...
+    uv run --no-project --with rdflib --with neo4j python release_record.py write --records <release-records.json> (--uri U | --env E)
+    uv run --no-project --with rdflib --with neo4j python release_record.py check --records <release-records.json> (--uri U | --env E)
 
 Each package file sits beside its release's shapes.ttl and catalog.ttl. `records` reads no database. It
 refuses a report that did not earn its pass (build.report_earned, as copy_graph.py does), and any package,
@@ -213,7 +213,7 @@ def main(argv):
             with open(opts["--manifest"], encoding="utf-8") as f:
                 manifest = json.load(f)
             content = build_records(files, report, opts.get("--loaded-at") or now(), manifest)
-            with open(opts["--output"], "w", encoding="utf-8") as f:
+            with open(opts["--output"], "w", encoding="utf-8", newline="\n") as f:
                 json.dump(content, f, indent=2, sort_keys=True)
                 f.write("\n")
             print(f"wrote {q(len(content['records']))} release record(s) to {q(opts['--output'])}")

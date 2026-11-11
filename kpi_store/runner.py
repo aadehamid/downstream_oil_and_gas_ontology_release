@@ -309,7 +309,7 @@ def cut_with_library(report_json, release_root, run_dir, decisions=None, ask=inp
     except (cut_tool.CutRefused, cut_tool.CutFailed, cut_tool.CutIncomplete) as err:
         return {"status": "failed", "why": f"{type(err).__name__}: {err}"}
     return {"status": "cut", "outcome": outcome.status, "tag": outcome.tag, "committed": outcome.committed,
-            "record": str(outcome.record) if outcome.record else "", "files": len(outcome.files)}
+            "record": Path(outcome.record).as_posix() if outcome.record else "", "files": len(outcome.files)}
 
 
 # ---- check ----------------------------------------------------------------------------------------------
