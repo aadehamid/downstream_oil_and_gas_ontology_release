@@ -88,7 +88,7 @@ The steps are the runbook's, from "The first run" to "The sync check". Two thing
 1. Run the runner, as in the runbook's "The first run". If it ends with `every step passed`, nothing differs and you are done.
 2. If it stops on a report, clear the report, as in the runbook's "Clear the report".
 3. Run the runner again and answer the cut's prompts, as in the runbook's "The second run".
-4. If the `enterprise` step stops because the database holds KPI Store nodes of the earlier release, run the step again with the replace allowed. **The replace deletes every node in that database that carries the KPI Store's marks, before it copies.** The runbook's "The limits" lists the marks.
+4. If the `enterprise` step stops because the database holds KPI Store nodes of the earlier release, run the step again with the replace allowed. **The replace deletes every node in that database that carries the KPI Store's marks, before it copies.** The runbook's "The limits" lists the marks. If the copy still stops and names nodes, the new release dropped a model, class or label that those nodes belong to; the runbook's "Replace what Enterprise holds" says what to do.
 
    ```powershell skip reason="needs-client-server: replaces the KPI Store's nodes in the client's Enterprise database"
    py -m kpi_store.runner --from enterprise --replace-enterprise

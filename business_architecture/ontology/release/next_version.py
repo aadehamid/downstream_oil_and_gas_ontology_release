@@ -124,8 +124,11 @@ def carry_exceptions(ontology, module, old, new):
         fresh = os.path.join(ontology, "releases", module, new, name)
         if os.path.isfile(fresh) and str(read(fresh).count(parts[2])) == parts[3]:
             out.append(" :: ".join([f"{here}/{module}/{new}/{name}", *parts[1:]]))
-    with open(path, "w", encoding="utf-8", newline="\n") as f:
+    # Written beside the list and then moved over it: a stop halfway leaves the whole old list, never a part of it,
+    # so a rerun still finds every line it has to move.
+    with open(path + ".new", "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(out) + "\n")
+    os.replace(path + ".new", path)
 
 
 def finish(a, ontology=ONTOLOGY):
