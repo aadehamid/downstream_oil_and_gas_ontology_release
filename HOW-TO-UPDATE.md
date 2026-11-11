@@ -278,7 +278,7 @@ The versions in the commands are those of the release as you received it. Read t
    7 modules released. Now rebuild the catalog and the projection manifest, and run the check.
    ```
 
-   The lines that say "Now run" are `start`'s own. `cascade` has already run that command for each module. If `cascade` stops halfway, fix what it names and run it again. It leaves a package that is already written as it is.
+   The lines that say "Now run" are `start`'s own. `cascade` has already run that command for each module. `cascade` verifies each package against a fresh build before it finishes the module. If it stops halfway, fix what it names and run it again. It keeps its plan in `release\cascade-in-progress.json` until it ends, so the next run leaves a finished module alone and builds what is missing. If it names a folder that is not a whole package, delete that folder first. A build that failed midway leaves such a folder.
 
 7. Rebuild the catalog, then the projection manifest, then run the competency questions.
 

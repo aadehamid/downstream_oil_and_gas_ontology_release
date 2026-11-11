@@ -319,7 +319,7 @@ technical-graph 1.1.0 moved to releases/previous/; the projection's lists name 1
 value-stream 1.2.0 moved to releases/previous/; the projection's lists name 1.2.1
 integration 2.5.0 moved to releases/previous/; the projection's lists name 2.5.1
 7 modules released. Now rebuild the catalog and the projection manifest, and run the check.</code></pre>
-<p>The lines that say "Now run" are <code>start</code>'s own. <code>cascade</code> has already run that command for each module. If <code>cascade</code> stops halfway, fix what it names and run it again. It leaves a package that is already written as it is.</p></li></ol>
+<p>The lines that say "Now run" are <code>start</code>'s own. <code>cascade</code> has already run that command for each module. <code>cascade</code> verifies each package against a fresh build before it finishes the module. If it stops halfway, fix what it names and run it again. It keeps its plan in <code>release\cascade-in-progress.json</code> until it ends, so the next run leaves a finished module alone and builds what is missing. If it names a folder that is not a whole package, delete that folder first. A build that failed midway leaves such a folder.</p></li></ol>
 <ol start="7"><li>Rebuild the catalog, then the projection manifest, then run the competency questions.
 <pre><code class="lang-powershell">py build_catalog.py --write
 cd ../projection

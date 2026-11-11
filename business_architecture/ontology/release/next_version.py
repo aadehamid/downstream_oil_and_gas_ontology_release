@@ -14,11 +14,14 @@ changes the version in projection/pipeline.py and projection/skill-run/epm-confi
 
 `cascade` does the rest of a release once the changed module's own new package is written. It gives each module that
 depends on the changed one the next patch version (start), writes its package (build_module.py --write), and then
-finishes every module, the changed one first. Run again after a failure, it leaves a module whose new package is
-already written as it is and goes on with the next.
+finishes every module, the changed one first. It verifies each package against a fresh build before it finishes
+the module. It keeps its plan in cascade-in-progress.json until it ends. Run again after a failure, it takes the
+plan up where it stopped: it leaves a finished module alone and builds what is missing. A version folder that a
+failed build left half written stops it, with the folder to delete.
 """
 import argparse
 import datetime
+import json
 import os
 import re
 import shutil
@@ -189,32 +192,68 @@ def run_script(args, ontology=ONTOLOGY):
     return done.stdout
 
 
-def cascade(a, ontology=ONTOLOGY, order=None, build=None):
-    """The rest of a release, after the changed module's own new package is written."""
-    order = order if order is not None else run_script(["dependents.py", a.module], ontology).split()
-    build = build or (lambda module: run_script(["build_module.py", module, "--write"], ontology))
-    moved = []
+CASCADE_PLAN = "cascade-in-progress.json"
+
+
+def cascade_plan(a, ontology, order):
+    """{module: [old version, new version]} for the changed module and each module that depends on it, in release
+    order. It is worked out once and kept in release/cascade-in-progress.json until the cascade ends, so a run that
+    stopped halfway is taken up where it stopped: a finished module holds one package again, and without the plan
+    it could not be told from a module that was never started."""
+    path = os.path.join(ontology, "release", CASCADE_PLAN)
+    if os.path.isfile(path):
+        kept = json.loads(read(path))
+        if kept.get("module") != a.module:
+            raise SystemExit(f"a cascade of {kept.get('module')} stopped halfway. Finish it first: run cascade "
+                             f"{kept.get('module')} again")
+        return kept["versions"], path
+    versions = {}
     if a.module != "core":   # core is released by hand first, and its list holds only the modules that depend on it
         held = packages(a.module, ontology)
         if len(held) != 2:
             raise SystemExit(f"write {a.module}'s new package first: releases/{a.module}/ must hold the old package and "
                              f"the new one, and it holds {', '.join(held) or 'none'}")
-        moved.append((a.module, held[0]))
-        order = [m for m in order if m != a.module]
+        versions[a.module] = held
     for module in order:
+        if module != a.module:
+            old = current_version(module, ontology)
+            versions[module] = [old, next_patch(old)]
+    write(path, json.dumps({"module": a.module, "versions": versions}, indent=2) + "\n")
+    return versions, path
+
+
+def cascade(a, ontology=ONTOLOGY, order=None, build=None, verify=None, finish_one=None):
+    """The rest of a release, after the changed module's own new package is written. Every package is verified
+    against a fresh build (build_module.py --verify) before its module is finished: a folder that a failed build
+    left half written is never taken for a package."""
+    order = order if order is not None else run_script(["dependents.py", a.module], ontology).split()
+    build = build or (lambda module: run_script(["build_module.py", module, "--write"], ontology))
+    verify = verify or (lambda module: run_script(["build_module.py", module, "--verify"], ontology))
+    finish_one = finish_one or (lambda module, old: finish(argparse.Namespace(module=module, old=old), ontology))
+    versions, plan = cascade_plan(a, ontology, order)
+    to_finish = []
+    for module, (old, new) in versions.items():
         held = packages(module, ontology)
-        if len(held) == 2:   # written by an earlier run of this command that stopped later
-            print(f"{module} {held[1]} is written already")
-            moved.append((module, held[0]))
+        if held == [new] and os.path.isdir(os.path.join(ontology, "releases", "previous", module, old)):
+            print(f"{module} {new} is finished already")
             continue
-        old = current_version(module, ontology)
-        start(argparse.Namespace(module=module, version=next_patch(old), kind="patch", date=a.date, why=a.why,
-                                 approver=a.approver, where=a.where, words=a.words), ontology)
-        build(module)
-        moved.append((module, old))
-    for module, old in moved:
-        finish(argparse.Namespace(module=module, old=old), ontology)
-    print(f"{len(moved)} modules released. Now rebuild the catalog and the projection manifest, and run the check.")
+        if new not in held:
+            if module == a.module:
+                raise SystemExit(f"releases/{module}/ no longer holds {new}. Write {module}'s package again, then run cascade again")
+            if current_version(module, ontology) != new:   # an earlier run may have set the version and stopped in the build
+                start(argparse.Namespace(module=module, version=new, kind="patch", date=a.date, why=a.why,
+                                         approver=a.approver, where=a.where, words=a.words), ontology)
+            build(module)
+        try:
+            verify(module)
+        except SystemExit as err:
+            raise SystemExit(f"releases/{module}/{new} is not a whole package: it does not equal a fresh build. Delete "
+                             f"that folder, then run cascade again{'' if module != a.module else ' after you have written the package again'}.\n{err}") from None
+        to_finish.append((module, old))
+    for module, old in to_finish:
+        finish_one(module, old)
+    os.remove(plan)
+    print(f"{len(versions)} modules released. Now rebuild the catalog and the projection manifest, and run the check.")
 
 
 def main(argv=None):
