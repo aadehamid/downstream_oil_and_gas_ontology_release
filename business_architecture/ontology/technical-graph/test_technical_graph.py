@@ -93,7 +93,7 @@ class Questions(unittest.TestCase):
         self.assertLessEqual(copies, rows)
 
 
-DEMO = "urn:pricing-demo:tech:"
+DEMO = "urn:kpi-store-example:tech:"
 DESIGN = "https://w3id.org/mpc/ontology/modules/data-product/table/"
 BATCH, DETAIL = "silver_mdm_core.mips_price_batch_dim", "silver_udm_core.mpr_price_detail_fact"
 JOB, PIPELINE = DEMO + "builder/job-nightly-pricing-build", DEMO + "builder/pipeline-price-detail-refresh"
