@@ -19,6 +19,7 @@ from rdflib.collection import Collection
 from rdflib.namespace import OWL, RDF, SH, XSD
 
 import build
+import check_plugins as cp
 import copy_graph as cg
 import in_graph_shapes as igs
 import load_verify as lv
@@ -307,8 +308,7 @@ class FailClosedReport(unittest.TestCase):
                 f.write('{"passed": true, "manual_cases": [{"cypher": "old"}]}')
 
     def main(self, run_result=None, run_error=None, extra=()):
-        args = ["--config", CONFIG, "--shapes", SHAPES, "--bolt", "bolt://127.0.0.1:1", "--import-dir", self.tmp,
-                "--merged", MODULE, "--loadable", MODULE, "--inferred", MODULE, "--report", self.path, *extra, MODULE]
+        args = ["--config", CONFIG, "--shapes", SHAPES, "--bolt", "bolt://127.0.0.1:1", "--merged", MODULE, "--loadable", MODULE, "--inferred", MODULE, "--report", self.path, *extra, MODULE]
         patch = mock.patch.object(lv, "run", side_effect=run_error) if run_error else \
             mock.patch.object(lv, "run", return_value=run_result)
         self.neo4j = mock.MagicMock()
@@ -351,8 +351,7 @@ class FailClosedReport(unittest.TestCase):
         config = os.path.join(self.tmp, "config.json")
         with open(config, "w", encoding="utf-8") as f:
             json.dump(raw, f)
-        args = ["--config", config, "--shapes", SHAPES, "--bolt", "bolt://127.0.0.1:1", "--import-dir", self.tmp,
-                "--merged", MODULE, "--loadable", MODULE, "--inferred", MODULE, "--report", self.path, MODULE]
+        args = ["--config", config, "--shapes", SHAPES, "--bolt", "bolt://127.0.0.1:1", "--merged", MODULE, "--loadable", MODULE, "--inferred", MODULE, "--report", self.path, MODULE]
         neo4j = mock.MagicMock()
         with mock.patch.dict(os.environ, {"NEO4J_PASSWORD": "x"}), \
                 mock.patch.dict(sys.modules, {"neo4j": neo4j}), mock.patch.object(lv, "run") as run:
@@ -457,7 +456,7 @@ class CopyGraph(unittest.TestCase):
         return f.name
 
     def test_env_file_and_no_password_printed(self):
-        path = self.env("# Aura\nNEO4J_URI=neo4j+s://x.databases.neo4j.io\nNEO4J_USERNAME=neo4j\n"
+        path = self.env("# the target\nNEO4J_URI=neo4j+s://graph.example.org\nNEO4J_USERNAME=neo4j\n"
                         "NEO4J_PASSWORD='s3cret'\nNEO4J_DATABASE=neo4j\n")
         values = cg.read_env_file(path)
         self.assertEqual(values["NEO4J_PASSWORD"], "s3cret")
@@ -500,6 +499,175 @@ class CopyGraph(unittest.TestCase):
             self.assertIn("not a verified report", out)
             copy.assert_not_called()
             fake.GraphDatabase.driver.assert_not_called()
+
+
+class CopyTarget:
+    """A target session with no plugin: it keeps what plain Cypher writes and records every statement."""
+
+    def __init__(self, ident, nodes=()):
+        self.ident, self.statements = ident, []
+        self.nodes, self.edges = list(nodes), []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def run(self, query, **params):
+        query = getattr(query, "text", query)
+        self.statements.append(query)
+        if "n10s." in query or "apoc." in query.lower():
+            raise RuntimeError("There is no procedure with that name registered for this database instance")
+        if "db.info()" in query:
+            return FakeResult([{"id": self.ident}])
+        if "count(n) AS n" in query:
+            return FakeResult([{"n": len(self.nodes)}])
+        if "DETACH DELETE" in query:
+            self.nodes, self.edges = [], []
+        elif query == cg.WRITE_NODES:
+            self.nodes += [{"uri": r["props"]["uri"], "labels": r["labels"], "props": r["props"]} for r in params["rows"]]
+        elif query == cg.WRITE_EDGES:
+            self.edges += [{"s": r["s"], "t": r["t"], "o": r["o"], "u": r["props"].get("uri"), "props": r["props"]}
+                           for r in params["rows"]]
+        elif query == cg.NODES:
+            return FakeResult(sorted(self.nodes, key=lambda n: n["uri"])[params["skip"]:params["skip"] + params["limit"]])
+        elif query == cg.EDGES:
+            return FakeResult(self.edges[params["skip"]:params["skip"] + params["limit"]])
+        elif "RETURN n.uri AS uri, labels(n)" in query:
+            return FakeResult(self.nodes)
+        elif "type(r) AS t" in query:
+            return FakeResult(self.edges)
+        return FakeResult([])
+
+
+class CopyToANamedDatabase(unittest.TestCase):
+    """The copy goes over the driver to a named database on a server that has no plugin."""
+
+    NODES = [{"uri": "u1", "labels": ["Resource", "lib_Work"], "props": {"uri": "u1", "lib_title": "t"}},
+             {"uri": "u2", "labels": ["Resource", "lib_Person"], "props": {"uri": "u2"}},
+             {"uri": "u3", "labels": ["Resource"], "props": {"uri": "u3"}}]
+    EDGES = [{"s": "u1", "t": "lib_author", "o": "u2", "u": None, "props": {}},
+             {"s": "u1", "t": "lib_about", "o": "u3", "u": None, "props": {}}]
+    def env(self, text):
+        f = tempfile.NamedTemporaryFile("w", suffix=".env", delete=False)
+        f.write(text)
+        f.close()
+        self.addCleanup(os.remove, f.name)
+        return f.name
+
+    def servers(self, target_nodes=()):
+        source = CopyTarget("source-db", self.NODES)
+        source.edges = list(self.EDGES)
+        target = CopyTarget("target-db", target_nodes)
+        opened = []
+
+        class Driver:
+            def __init__(self, uri, auth):
+                self.uri, self.auth = uri, auth
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def session(self, database=None):
+                opened.append((self.uri, self.auth[0], database))
+                return source if self.uri == "bolt://desktop:7687" else target
+
+        import types
+        fake = types.ModuleType("neo4j")
+        fake.GraphDatabase = types.SimpleNamespace(driver=lambda uri, auth: Driver(uri, auth))
+        return fake, source, target, opened
+
+    def run_copy(self, args, target_nodes=(), environ=None, file_database=""):
+        fake, source, target, opened = self.servers(target_nodes)
+        src = self.env("NEO4J_URI=bolt://desktop:7687\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD=local-pw\n")
+        dst = self.env("NEO4J_URI=bolt://enterprise:7687\nNEO4J_USERNAME=loader\nNEO4J_PASSWORD=s3cret\n" + file_database)
+        report = passing_report(self, determinism_hash_sorted=lv.graph_hash(self.NODES, self.EDGES),
+                                determinism_hash_shuffled=lv.graph_hash(self.NODES, self.EDGES))
+        argv = [a.replace("SRC", src).replace("DST", dst) for a in args] + ["--report", report]
+        with mock.patch.dict(os.environ, environ or {}), mock.patch.dict(sys.modules, {"neo4j": fake}):
+            code, out = run_main(cg.main, argv)
+        return code, out, source, target, opened
+
+    def test_the_copy_writes_the_named_database_with_plain_cypher_only(self):
+        code, out, source, target, opened = self.run_copy(
+            ["--source-env", "SRC", "--target-env", "DST", "--target-database", "businessgraph", "--batch", "2"])
+        self.assertEqual(code, 0, out)
+        self.assertEqual(opened, [("bolt://desktop:7687", "neo4j", None), ("bolt://enterprise:7687", "loader", "businessgraph")])
+        self.assertIn("copied 3 nodes and 2 relationships to bolt://enterprise:7687 as loader (database businessgraph)", out)
+        self.assertIn("the target hash equals the source hash", out)
+        for secret in ("s3cret", "local-pw"):
+            self.assertNotIn(secret, out)
+        # Every statement the target received, in order: no procedure of n10s or APOC among them.
+        self.assertEqual(target.statements, [
+            "CALL db.info() YIELD id RETURN id",
+            "MATCH (n) RETURN count(n) AS n",
+            "CREATE CONSTRAINT n10s_unique_uri IF NOT EXISTS FOR (r:Resource) REQUIRE r.uri IS UNIQUE",
+            "UNWIND $rows AS row CREATE (n:$(row.labels)) SET n = row.props",
+            "UNWIND $rows AS row CREATE (n:$(row.labels)) SET n = row.props",
+            "UNWIND $rows AS row MATCH (a:Resource {uri: row.s}), (b:Resource {uri: row.o}) CREATE (a)-[r:$(row.t)]->(b) SET r = row.props",
+            "MATCH (n:Resource) RETURN n.uri AS uri, labels(n) AS labels, properties(n) AS props",
+            "MATCH (a:Resource)-[r]->(b:Resource) RETURN a.uri AS s, type(r) AS t, b.uri AS o, r.uri AS u, properties(r) AS props"])
+        for statement in target.statements + source.statements:
+            self.assertNotRegex(statement, r"(?i)\b(n10s|apoc)\.")
+        self.assertEqual(lv.graph_hash(target.nodes, target.edges), lv.graph_hash(self.NODES, self.EDGES))
+
+    def test_a_target_without_plugins_would_refuse_a_plugin_call(self):
+        # The stand-in target is strict: this is what makes the test above a proof.
+        with self.assertRaises(RuntimeError):
+            CopyTarget("t").run("CALL n10s.rdf.export.cypher('x')")
+        with self.assertRaises(RuntimeError):
+            CopyTarget("t").run("RETURN apoc.version()")
+
+    def test_the_databases_come_from_the_options_then_the_files(self):
+        cases = ((["--source-env", "SRC", "--target-env", "DST"], "", (None, None)),
+                 (["--source-env", "SRC", "--target-env", "DST"], "NEO4J_DATABASE=filedb\n", (None, "filedb")),
+                 (["--source-env", "SRC", "--target-env", "DST", "--target-database", "named"], "NEO4J_DATABASE=filedb\n", (None, "named")),
+                 (["--source-env", "SRC", "--source-database", "built", "--target-env", "DST", "--target-database", "named"], "", ("built", "named")))
+        for args, file_database, want in cases:
+            with self.subTest(args=args[4:], file=file_database):
+                code, out, _, _, opened = self.run_copy(args, file_database=file_database)
+                self.assertEqual(code, 0, out)
+                self.assertEqual((opened[0][2], opened[1][2]), want)
+
+    def test_source_with_the_environment(self):
+        code, out, _, _, opened = self.run_copy(["--source", "bolt://desktop:7687", "--target-env", "DST"],
+                                                environ={"NEO4J_PASSWORD": "pw", "NEO4J_USERNAME": "builder"})
+        self.assertEqual(code, 0, out)
+        self.assertEqual(opened[0], ("bolt://desktop:7687", "builder", None))
+
+    def test_one_source_exactly(self):
+        for args in (["--target-env", "DST"], ["--source", "bolt://desktop:7687", "--source-env", "SRC", "--target-env", "DST"]):
+            with self.subTest(args=len(args)):
+                code, out, _, target, _ = self.run_copy(args, environ={"NEO4J_PASSWORD": "pw"})
+                self.assertEqual(code, 2, out)
+                self.assertIn("exactly one of --source and --source-env", out)
+                self.assertEqual(target.statements, [])
+
+    def test_a_target_that_holds_nodes_is_kept_without_replace_and_emptied_with_it(self):
+        old = [{"uri": "old", "labels": ["Resource"], "props": {"uri": "old"}}]
+        code, out, _, target, _ = self.run_copy(["--source-env", "SRC", "--target-env", "DST", "--target-database", "g"], old)
+        self.assertEqual(code, 1, out)
+        self.assertIn("holds 1 nodes", out)
+        self.assertEqual(target.nodes, old)
+        code, out, _, target, _ = self.run_copy(["--source-env", "SRC", "--target-env", "DST", "--target-database", "g", "--replace"], old)
+        self.assertEqual(code, 0, out)
+        self.assertEqual(sorted(n["uri"] for n in target.nodes), ["u1", "u2", "u3"])
+        self.assertIn("MATCH (n) CALL (n) { DETACH DELETE n } IN TRANSACTIONS OF 1000 ROWS", target.statements)
+
+    def test_copying_onto_the_source_database_is_refused(self):
+        fake, source, target, _ = self.servers()
+        target.ident = "source-db"   # the same database, reached under another address
+        src = self.env("NEO4J_URI=bolt://desktop:7687\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD=p\n")
+        dst = self.env("NEO4J_URI=bolt://localhost:7687\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD=p\n")
+        with mock.patch.dict(sys.modules, {"neo4j": fake}):
+            code, out = run_main(cg.main, ["--source-env", src, "--target-env", dst, "--replace", "--report", passing_report(self)])
+        self.assertEqual(code, 1, out)
+        self.assertIn("the target is the source database", out)
+        self.assertEqual(target.statements, ["CALL db.info() YIELD id RETURN id"])
 
 
 class TripleStore(unittest.TestCase):
@@ -566,45 +734,66 @@ class TripleStore(unittest.TestCase):
         self.assertNotIn("s3cret", out)
 
 
-class DockerPins(unittest.TestCase):
-    """docker/compose.yaml and docker/fuseki/Dockerfile use the pins the references give."""
+class PluginPins(unittest.TestCase):
+    """check_plugins.py holds the jar pins references/running.md gives, and checks a folder by checksum."""
 
-    def read(self, *parts):
-        with open(os.path.join(HERE, "..", *parts), encoding="utf-8") as f:
-            return f.read()
+    N10S = "4c461087e08405c7cb472ecfefc043e9e8ed93628ed74988e4fda1f1bac54b3e"
+    APOC = "4df40cea7444ea193d08f8a679aa998c498196fe149c8c02badb998f1c9580fb"
 
-    def test_neo4j_and_n10s_pins_match_running_md(self):
-        import re
-        running, compose = self.read("references", "running.md"), self.read("docker", "compose.yaml")
-        digest = re.search(r"it was `(sha256:[0-9a-f]{64})`", running).group(1)
-        self.assertIn(f"neo4j:2025.06.2@{digest}", compose)
-        row = next(line for line in running.splitlines() if line.startswith("   | n10s 2025.06.1 |"))
-        url, sha = re.findall(r"(https://\S+\.jar)", row)[0], re.findall(r"`([0-9a-f]{64})`", row)[0]
-        self.assertIn(f"N10S_URL: {url}", compose)
-        self.assertIn(f"N10S_SHA256: {sha}", compose)
+    def test_the_pins_are_the_tested_jars(self):
+        self.assertEqual(cp.PINS, {"n10s 2025.06.1": ("neosemantics-2025.06.1.jar", self.N10S),
+                                   "APOC Core 2025.06.2": ("apoc-2025.06.2-core.jar", self.APOC)})
 
-    def test_fuseki_pin_matches_add_on_j(self):
-        import re
-        sha = re.search(r"SHA-256 `([0-9a-f]{64})`", self.read("references", "add-ons.md")).group(1)
-        self.assertIn(f"PACKAGE_SHA256={sha}", self.read("docker", "fuseki", "Dockerfile"))
+    def test_running_md_gives_the_same_pins(self):
+        with open(os.path.join(HERE, "..", "references", "running.md"), encoding="utf-8") as f:
+            running = f.read()
+        for row, sha in (("   | n10s 2025.06.1 |", self.N10S), ("   | APOC Core 2025.06.2 |", self.APOC)):
+            line = next(line for line in running.splitlines() if line.startswith(row))
+            self.assertIn(f"`{sha}`", line)
 
-    def test_every_download_and_base_image_is_pinned(self):
-        # Review 8, an earlier change: the JDK layer, the server jar and the manual Neo4j recipe are pinned too.
-        docker = self.read("docker", "fuseki", "Dockerfile")
-        self.assertRegex(docker, r"TEMURIN_IMAGE=eclipse-temurin:21-alpine@sha256:[0-9a-f]{64}")
-        self.assertRegex(docker, r"FUSEKI_JAR_SHA256=[0-9a-f]{64}")
-        self.assertEqual(docker.count("sha256sum -c"), 2)
-        self.assertNotIn("download.sh", docker)
-        self.assertTrue(all("@sha256:" in line for line in docker.splitlines() if line.startswith("FROM ") and "$" not in line))
-        self.assertIn("sha256sum -c", self.read("docker", "compose.yaml"))
-        running = self.read("references", "running.md")
-        self.assertRegex(running, r"neo4j:2025\.06\.2@sha256:[0-9a-f]{64}\n")
+    def folder(self, files):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(lambda: __import__("shutil").rmtree(tmp))
+        for name, data in files.items():
+            with open(os.path.join(tmp, name), "wb") as f:
+                f.write(data)
+        return tmp
 
-    def test_ports_are_local_and_no_password_is_written(self):
-        compose = self.read("docker", "compose.yaml")
-        ports = [line.strip() for line in compose.splitlines() if line.strip().startswith('- "') and ":" in line]
-        self.assertTrue(ports and all(p.startswith('- "127.0.0.1:') for p in ports))
-        self.assertIn("NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-}", compose)
+    def test_a_folder_is_checked_by_checksum_not_by_name(self):
+        # sha256(b"abc") and sha256(b"") are the published test vectors (FIPS 180-2).
+        abc = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        empty = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        tmp = self.folder({"renamed.jar": b"abc", "apoc-2025.06.2-core.jar": b"", "notes.txt": b"abc"})
+        self.assertEqual(cp.checksums(tmp), {"apoc-2025.06.2-core.jar": empty, "renamed.jar": abc})
+        with mock.patch.object(cp, "PINS", {"one": ("one.jar", abc), "two": ("apoc-2025.06.2-core.jar", "0" * 64)}):
+            present, missing = cp.check(cp.checksums(tmp))
+            self.assertEqual(present, [("one", "renamed.jar")])                     # found under another name
+            self.assertEqual(missing, [("two", "apoc-2025.06.2-core.jar", "0" * 64)])   # the right name, another jar
+            code, out = run_main(cp.main, [tmp])
+            self.assertEqual(code, 1, out)
+            self.assertIn("OK one: renamed.jar has the pinned SHA-256", out)
+            self.assertIn("FAIL two: no jar in the folder has SHA-256", out)
+            with mock.patch.object(cp, "PINS", {"one": ("one.jar", abc)}):
+                self.assertEqual(run_main(cp.main, [tmp])[0], 0)
+
+    def test_a_folder_that_cannot_be_read_or_a_missing_argument_exits_2(self):
+        self.assertEqual(run_main(cp.main, [os.path.join(tempfile.gettempdir(), "no-such-plugins-folder")])[0], 2)
+        self.assertEqual(run_main(cp.main, [])[0], 2)
+
+
+class NoContainers(unittest.TestCase):
+    """The skill starts no server: no container file, and no script that runs or names one."""
+
+    def test_no_container_files_or_commands_remain(self):
+        import glob
+        self.assertFalse(os.path.exists(os.path.join(HERE, "..", "docker")))
+        for path in sorted(glob.glob(os.path.join(HERE, "*.py"))):
+            if os.path.basename(path).startswith("test_"):
+                continue
+            with open(path, encoding="utf-8") as f:
+                text = f.read().lower()
+            for word in ("docker", "compose", "container", "import.fetch", "file:///"):
+                self.assertNotIn(word, text, os.path.basename(path))
 
 
 GOOD_REPORT = {"shacl_violations_in_graph": 0, "in_graph_mutant_violations": 1,
@@ -714,6 +903,7 @@ class FakeEngine:
         self.second_load_extra, self.loads = second_load_extra, 0
         self.rollbacks, self.removed = 0, False
         self.statements, self.nodes = [], []
+        self.sent, self.databases = [], []   # (parameter, text) per import request; the database of each session
         self.paths = sorted({LIB + local for local in ("notInTheShape",)} |
                             {str(lv.iri_of(r["path"], cfg())) for r in listed if r["path"]})
 
@@ -755,7 +945,8 @@ class FakeEngine:
             self.load_graph()
         return None
 
-    def session(self):
+    def session(self, database=None):
+        self.databases.append(database)
         return self
 
     def __enter__(self):
@@ -788,6 +979,8 @@ class FakeEngine:
     def run(self, query, **params):
         query = getattr(query, "text", query)   # the driver's neo4j.Query, when the driver is installed
         self.statements.append(query)
+        if ".import.inline(" in query:
+            self.sent += list(params.items())
         answered = self.graph_query(query, params)
         if answered is not None:
             return FakeResult(answered)
@@ -814,7 +1007,8 @@ class FakeEngine:
         if "shacl.import" in query:
             return FakeResult([{"target": "x"}] * len(self.listed))
         if "rdf.import" in query or "onto.import" in query:
-            return FakeResult([{"terminationStatus": "OK"}])
+            (text,) = params.values()
+            return FakeResult([{"terminationStatus": "OK", "triplesLoaded": text.count("\n")}])
         if query.startswith("CALL n10s.rdf.export"):
             return FakeResult(self.export_rows)
         if "type(r) AS t" in query:
@@ -850,7 +1044,7 @@ class RunWiring(unittest.TestCase):
 
     def run_with(self, engine, sep=None):
         extra = {"sep": sep} if sep else {}
-        return lv.run(engine, cfg(), [MODULE], [SHAPES], self.tmp, MODULE, self.loadable, self.inferred, **extra)
+        return lv.run(engine, cfg(), [MODULE], [SHAPES], MODULE, self.loadable, self.inferred, **extra)
 
     def test_run_reads_the_engine_and_tests_every_row(self):
         engine = FakeEngine(self.rows, self.export)
@@ -867,6 +1061,35 @@ class RunWiring(unittest.TestCase):
         self.assertEqual((report["separator"], report["renamed"], report["rename_lossless"]), (SEP, {}, True))
         self.assertFalse(any(s.startswith("CALL apoc.refactor") for s in engine.statements))
         self.assertEqual(engine.nodes[0]["labels"], ["Resource", "lib" + SEP + "Work"])
+
+    def test_the_triples_travel_in_the_request_and_no_file_is_written(self):
+        engine = FakeEngine(self.rows, self.export)
+        before = sorted(os.listdir(self.tmp))
+        with mock.patch.object(lv, "BATCH_BYTES", 2000):   # small enough to need several requests
+            report = self.run_with(engine)
+        self.assertEqual(sorted(os.listdir(self.tmp)), before)                      # nothing copied anywhere
+        self.assertFalse(any("fetch" in s or "file:" in s for s in engine.statements))
+        with open(self.loadable, encoding="utf-8") as f:
+            lines = f.read().split("\n")[:-1]
+        loads = [text for name, text in engine.sent if name == "loadable"]
+        first, second = loads[:len(loads) // 2], loads[len(loads) // 2:]             # the sorted load, then the shuffled one
+        self.assertGreater(len(first), 1)
+        self.assertEqual("".join(first), "".join(line + "\n" for line in lines))
+        self.assertNotEqual("".join(second), "".join(first))
+        self.assertEqual(sorted("".join(second).split("\n")), sorted("".join(first).split("\n")))
+        with open(MODULE, encoding="utf-8") as f:
+            self.assertEqual([text for name, text in engine.sent if name == "ontology"], [f.read()] * 2)
+        self.assertEqual(len([1 for name, _ in engine.sent if name == "shapes"]), 2)
+        self.assertEqual(report["import_requests"], {"inferred": 0, "loadable": len(first), "ontology": 1, "shapes": 1})
+        self.assertTrue(report["passed"])
+
+    def test_the_named_database_is_the_one_every_session_opens(self):
+        engine = FakeEngine(self.rows, self.export)
+        self.run_with(engine)
+        self.assertEqual(engine.databases, [None])
+        engine = FakeEngine(self.rows, self.export)
+        lv.run(engine, cfg(), [MODULE], [SHAPES], MODULE, self.loadable, self.inferred, database="projection")
+        self.assertEqual(engine.databases, ["projection"])
 
     def test_run_fails_when_a_case_does_not_fire(self):
         report = self.run_with(FakeEngine(self.rows, self.export, fire=False))
@@ -933,7 +1156,7 @@ class RoundEight(unittest.TestCase):
                "raw": "x\n$(touch pwned)", "shape": "lib:S"}
         rep = dict(GOOD_REPORT, shapes_import_rows=1, in_graph_shape_constraints=1, nodes=1, relationships=0,
                    not_compiled=[bad], passed=True)
-        args = ["--config", CONFIG, "--shapes", SHAPES, "--bolt", "bolt://x", "--import-dir", d, "--merged", MODULE,
+        args = ["--config", CONFIG, "--shapes", SHAPES, "--bolt", "bolt://x", "--merged", MODULE,
                 "--loadable", MODULE, "--inferred", MODULE, "--report", path, MODULE]
         with mock.patch.dict(os.environ, {"NEO4J_PASSWORD": "x"}), \
                 mock.patch.dict(sys.modules, {"neo4j": mock.MagicMock()}), mock.patch.object(lv, "run", return_value=rep):
@@ -1091,12 +1314,7 @@ class RoundEight(unittest.TestCase):
         strs = lv.file_constraints(shape_graph((lib("S-p"), SH.datatype, XSD.string)), cfg())
         self.assertIn('"xxxx"', lv.case_for(row("lib__Copy", "lib__barcode", "sh:minLength", 5), strs, set(), cfg())[2])
 
-    # 31: the clean-up line matches a compose start
-    def test_compose_project_cleanup(self):
-        self.assertEqual(lv.remove_command({"--compose-project": "p q"}),
-                         "docker compose -p 'p q' --profile neo4j --profile fuseki down -v")
-
-    # 15 and the two Aura findings: GRAPH TYPE
+    # 15 and two findings from applying a statement: GRAPH TYPE
     def test_graph_type_omits_empty_node_types_and_keeps_endpoints(self):
         g = shape_graph()
         g.remove((lib("S-p"), SH.path, lib("barcode")))
@@ -1140,7 +1358,7 @@ class PrintedValues(unittest.TestCase):
     print's file= may only name sys.stdout or sys.stderr."""
 
     # Helpers that build a printed line; each one's return values are checked by the same rule.
-    HELPERS = ("describe_target", "remove_command", "check_report_command")
+    HELPERS = ("describe_target", "check_report_command")
 
     @staticmethod
     def safe(node, helpers=()):
@@ -1230,14 +1448,14 @@ class PrintedValues(unittest.TestCase):
         hostile = "a b;$(touch x)`y`<z>\n"
         self.assertEqual(shell.q("a b"), "'a b'")
         self.assertEqual(len(shlex.split(shell.comment("x\n`y` $(z) <w>")[3:])), 1)
-        self.assertEqual(shlex.split(lv.remove_command({"--compose-project": hostile})),
-                         ["docker", "compose", "-p", hostile, "--profile", "neo4j", "--profile", "fuseki", "down", "-v"])
-        self.assertEqual(shlex.split(lv.remove_command({"--container": hostile})), ["docker", "rm", "-f", "-v", hostile])
         self.assertEqual(shlex.split(lv.check_report_command(hostile))[-1], hostile)
         described = cg.describe_target({"NEO4J_URI": hostile, "NEO4J_USERNAME": hostile, "NEO4J_DATABASE": hostile,
                                         "NEO4J_PASSWORD": "s3cret"})
         self.assertEqual(shlex.split(described), [hostile, "as", hostile, "(database", hostile + ")"])
         self.assertNotIn("s3cret", described)
+        named = cg.describe_target({"NEO4J_URI": "bolt://h", "NEO4J_USERNAME": "u", "NEO4J_DATABASE": "file-db",
+                                    "NEO4J_PASSWORD": "s3cret"}, hostile)
+        self.assertEqual(shlex.split(named), ["bolt://h", "as", "u", "(database", hostile + ")"])
 
 class RoundNine(unittest.TestCase):
     """Review 9 of 8648028 and cb6c005: one test per behaviour change; each fails on cb6c005."""

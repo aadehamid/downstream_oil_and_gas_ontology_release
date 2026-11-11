@@ -1,12 +1,24 @@
 #!/usr/bin/env python3
 """The load and verify steps against a running Neo4j with n10s and APOC, ending in the report.
 
-Run: NEO4J_PASSWORD=... uv run --no-project --with rdflib --with neo4j python3 load_verify.py \
-         --config <config.json> --shapes <shapes.ttl>... --bolt bolt://127.0.0.1:<port> \
-         --import-dir <folder mounted at /import> --merged merged.ttl --loadable loadable.nt \
+Run: uv run --no-project --with rdflib --with neo4j python3 load_verify.py \
+         --config <config.json> --shapes <shapes.ttl>... (--env <file> | --bolt bolt://<host>:<port>) \
+         [--database <name>] --merged merged.ttl --loadable loadable.nt \
          --inferred inferred.nt --report projection-report.json [--plugins-dir <folder>]
-         [--manual-cases <cases.json>] [--container <name> | --compose-project <name>]
-         [--query-timeout <seconds>] [--separator <underscores>] <data.ttl>...
+         [--manual-cases <cases.json>] [--query-timeout <seconds>] [--separator <underscores>] <data.ttl>...
+     On Windows, after `py -m pip install rdflib neo4j`: py load_verify.py ...
+
+The server is one that already runs, such as a local Neo4j Desktop DBMS. --env names a file outside
+the repository with NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD and optionally NEO4J_DATABASE. With
+--bolt, the user and password come from the environment instead: NEO4J_PASSWORD, and NEO4J_USERNAME
+(default neo4j). --database names the database and overrides the file's; without one the server's
+default database is used. The password is never printed. The run EMPTIES that database first.
+
+The RDF travels in the request (n10s's import.inline procedures), so the server reads no file and
+needs no import folder. The ontology (merged.ttl) and the shapes go in one request each: n10s's
+ontology import reads a declaration and the triples that use it together, and shapes hold blank
+nodes. Each must be under WHOLE_BYTES. loadable.nt and inferred.nt hold one triple per line and no
+blank node, so they go in batches of whole lines, each batch at most BATCH_BYTES (batches()).
 
 Every statement runs with a server-side timeout, --query-timeout seconds (default 120); raise it for
 a graph whose import takes longer.
@@ -17,18 +29,17 @@ relationship type and property key is renamed with APOC and the rename proven lo
 pipeline.md, rule 11); the two hashes are of the renamed graph. A prefix that holds the separator is
 refused before the load (exit 2): a renamed name could not be split back into prefix and local name.
 
-The container name only goes into the printed clean-up line: with --compose-project (the -p name the
-services were started under from docker/compose.yaml) it is `docker compose -p <name> ... down -v`;
-else `docker rm -f -v` of --container, $LPG_CONTAINER or lpg-projection. Every value printed for
-pasting is shell-quoted; a NOT COMPILED line is one quoted JSON object.
+Every value printed for pasting is shell-quoted; a NOT COMPILED line is one quoted JSON object.
 
 The gate is what n10s says it compiled. What it does, in order (references/pipeline.md, rules 8 to 17):
-  1. Writes the import-safe shapes (in_graph_shapes.subset) and copies merged.ttl, loadable.nt and
-     inferred.nt into the import folder.
+  1. Builds the import-safe shapes (in_graph_shapes.subset) and reads merged.ttl, loadable.nt and
+     inferred.nt into the requests it will send.
   2. Empties the database: every node, then every constraint; checks both are gone.
-  3. Runs the load script build.py generates, one statement at a time. onto.import and both
-     rdf.import calls must return terminationStatus OK; the shapes import must return as many rows as
-     n10s.validation.shacl.listShapes() lists, and more than zero.
+  3. Runs the load script build.py generates, one statement at a time, an import statement once per
+     request. Every onto.import and rdf.import request must return terminationStatus OK, and the
+     rdf.import requests of a file must report as many triples loaded as the file has lines; the
+     shapes import must return as many rows as n10s.validation.shacl.listShapes() lists, and more
+     than zero.
   4. Reads listShapes() back (columns target, propertyOrRelationshipPath, param, value) and compares
      it with the shapes file by target, path, param and value: every constraint the file states that
      n10s did not compile is printed and listed in the report (not_compiled). It does not fail the
@@ -49,9 +60,9 @@ The gate is what n10s says it compiled. What it does, in order (references/pipel
   9. With a --separator other than n10s's, renames every label, relationship type and property key
      (rename_separator: a dump of every node and relationship before, with the planned renames applied,
      must equal the dump after, property types included; a collision, a failed APOC batch or an unequal
-     dump stops the run with no report and empties the graph). Hashes the graph, empties it, overwrites
-     the import copy of loadable.nt with its lines shuffled (random.Random(12)), loads again, renames
-     again the same way, hashes again, and puts the sorted file back.
+     dump stops the run with no report and empties the graph). Hashes the graph, empties it, loads
+     again with the lines of loadable.nt shuffled (random.Random(12)) and batched afresh, renames
+     again the same way, and hashes again.
  10. Writes the report. It deletes any report at --report when it starts, writes a temporary file,
      and renames it to --report only when every check passed (exit 0). It deletes <report>.failed
      at the start too. Any other outcome leaves no report at --report: a failed check writes its
@@ -74,7 +85,6 @@ import json
 import os
 import random
 import re
-import shutil
 import sys
 import tempfile
 
@@ -188,10 +198,57 @@ def graph_hash(nodes, edges):
     return build.sha_bytes(text.encode("utf-8"))
 
 
+def nt_lines(text):
+    """The lines of N-Triples text, each with its newline. Only a line feed ends a triple: str.splitlines
+    would also cut at characters a literal may hold unescaped, such as U+2028 or U+0085."""
+    lines = text.split("\n")
+    if lines[-1] == "":
+        lines.pop()
+    return [line + "\n" for line in lines]
+
+
 def shuffled(text, seed=12):
-    lines = text.splitlines()
+    lines = nt_lines(text)
     random.Random(seed).shuffle(lines)
-    return "".join(line + "\n" for line in lines)
+    return "".join(lines)
+
+
+# A request holds at most this much N-Triples text. The driver and the server set no small limit on a
+# request, so the size is chosen to keep one request's parse and transaction small beside a default heap.
+BATCH_BYTES = 1_000_000
+# The ontology and the shapes each go in one request (see the module docstring); larger text is refused.
+WHOLE_BYTES = 32 * 1024 * 1024
+
+
+def batches(text, limit=None):
+    """N-Triples text as a list of requests: whole lines, in order, each request at most limit bytes of
+    UTF-8 (BATCH_BYTES when none is given). A single line longer than the limit is a request of its own,
+    never cut. Joined, the requests are the text, so every line travels exactly once."""
+    limit = BATCH_BYTES if limit is None else limit
+    out, current, size = [], [], 0
+    for line in nt_lines(text):
+        n = len(line.encode("utf-8"))
+        if current and size + n > limit:
+            out.append("".join(current))
+            current, size = [], 0
+        current.append(line)
+        size += n
+    if current:
+        out.append("".join(current))
+    return out
+
+
+def whole(text, what):
+    """Text that must travel in one request, refused above WHOLE_BYTES."""
+    if len(text.encode("utf-8")) > WHOLE_BYTES:
+        raise Failed(f"{what} is larger than {WHOLE_BYTES} bytes and cannot be split; it must go in one request")
+    return [text]
+
+
+def payloads(ontology, shapes, loadable, inferred):
+    """{parameter name of the load script: the requests that carry it}."""
+    return {"ontology": whole(ontology, "the ontology (merged.ttl)"), "shapes": whole(shapes, "the import-safe shapes"),
+            "loadable": batches(loadable), "inferred": batches(inferred)}
 
 
 # Each listShapes param's components; a case passes on any one of them. n10s 2025.06.1 names the
@@ -548,18 +605,38 @@ def wipe(session):
         raise Failed(f"the database is not empty after the wipe: {left} nodes, {constraints} constraints")
 
 
-def load(session, statements):
-    """Run the load script; check each import. Returns (shapes import rows, listShapes count)."""
+# The parameter of an import statement; a "$" inside a namespace or a property key is not one.
+PARAMETER = re.compile(r"\.import\.inline\(\$([A-Za-z_]+)")
+
+
+def load(session, statements, requests):
+    """Run the load script; check each import. A statement that names a parameter runs once per request
+    in requests[parameter], which carries the RDF text inline. Returns (shapes import rows, listShapes
+    count)."""
     shapes_rows = None
     for stmt in statements:
-        result = session.run(stmt)
-        rows = result.data()
-        if "n10s.validation.shacl.import" in stmt:
-            shapes_rows = len(rows)
-        elif "n10s.rdf.import" in stmt or "n10s.onto.import" in stmt:
-            status = rows[0].get("terminationStatus") if rows else None
-            if status != "OK":
-                raise Failed(f"{stmt} returned terminationStatus {status!r}: {rows[:1]}")
+        named = PARAMETER.search(stmt)
+        if named is None:
+            session.run(stmt).data()
+            continue
+        name = named.group(1)
+        if name not in requests:
+            raise Failed(f"the load script names a parameter this run does not supply: {name}")
+        loaded = 0
+        for text in requests[name]:
+            rows = session.run(stmt, **{name: text}).data()
+            if "n10s.validation.shacl.import" in stmt:
+                shapes_rows = (shapes_rows or 0) + len(rows)
+            else:
+                status = rows[0].get("terminationStatus") if rows else None
+                if status != "OK":
+                    raise Failed(f"{stmt} returned terminationStatus {status!r}: {rows[:1]}")
+                loaded += rows[0].get("triplesLoaded") or 0
+        if "n10s.rdf.import" in stmt:
+            lines = sum(text.count("\n") for text in requests[name])
+            if loaded != lines:
+                raise Failed(f"{stmt} loaded {loaded} triples in {len(requests[name])} request(s), but the file has "
+                             f"{lines} lines")
     listed = session.run("CALL n10s.validation.shacl.listShapes() YIELD target RETURN count(*) AS n").single()["n"]
     if not shapes_rows or shapes_rows != listed:
         raise Failed(f"the shapes import returned {shapes_rows} rows but listShapes() lists {listed}")
@@ -834,17 +911,22 @@ def query_timeout(opts):
     return seconds
 
 
-def run(driver, cfg, data_paths, shape_paths, import_dir, merged, loadable, inferred, plugins_dir=None, manual=(),
-        timeout=DEFAULT_QUERY_TIMEOUT, sep=N10S_SEP):
+def read_text(path):
+    with open(path, encoding="utf-8", newline="") as f:   # newline="": the file's own line ends, on any system
+        return f.read()
+
+
+def run(driver, cfg, data_paths, shape_paths, merged, loadable, inferred, plugins_dir=None, manual=(),
+        timeout=DEFAULT_QUERY_TIMEOUT, sep=N10S_SEP, database=None):
     sep = build.separator({"--separator": sep})   # the one rule, for a caller that skips main()
     data, shapes = build.parse(data_paths), build.parse(shape_paths)
     safe, left_out = igs.subset(shapes)
-    safe.serialize(os.path.join(import_dir, "shapes-in-graph.ttl"), format="turtle")
-    for src, name in ((merged, "merged.ttl"), (loadable, "loadable.nt"), (inferred, "inferred.nt")):
-        shutil.copyfile(src, os.path.join(import_dir, name))
     statements = [line for line in build.cypher(cfg, data, shapes).splitlines() if line.strip()]
-    loadable_text = open(loadable, encoding="utf-8").read()
-    inferred_text = open(inferred, encoding="utf-8").read()
+    loadable_text, inferred_text = read_text(loadable), read_text(inferred)
+    requests = payloads(read_text(merged), safe.serialize(format="turtle"), loadable_text, inferred_text)
+
+    def open_session():
+        return driver.session(database=database) if database else driver.session()
     literal_preds = {p for _, p, o in data if isinstance(o, Literal)} | set(data.subjects(RDF.type, OWL.DatatypeProperty))
     constraints = file_constraints(safe, cfg)
     report = {
@@ -854,10 +936,11 @@ def run(driver, cfg, data_paths, shape_paths, import_dir, merged, loadable, infe
         "versions": cfg.versions,
         "plugin_jars_sha256": plugin_checksums(plugins_dir),
     }
-    with driver.session() as raw_session:
+    report["import_requests"] = {name: len(texts) for name, texts in sorted(requests.items())}
+    with open_session() as raw_session:
         session = Timed(raw_session, timeout)
         wipe(session)
-        report["shapes_import_rows"], report["in_graph_shape_constraints"] = load(session, statements)
+        report["shapes_import_rows"], report["in_graph_shape_constraints"] = load(session, statements, requests)
         rows = listed_rows(session)
         report["compiled"] = rows
         report["not_compiled"] = not_compiled(constraints, rows)
@@ -889,22 +972,17 @@ def run(driver, cfg, data_paths, shape_paths, import_dir, merged, loadable, infe
         # case every check above ran on n10s's names and the kept graph, hashed here, carries the renamed
         # ones. rename_separator raises on anything short of a proven lossless rename, so rename_lossless
         # is true in every report this run writes; passed() and build.report_earned still require it.
-        renamed = {} if sep == N10S_SEP else rename_separator(session, sep, fresh_session=driver.session, timeout=timeout)
+        renamed = {} if sep == N10S_SEP else rename_separator(session, sep, fresh_session=open_session, timeout=timeout)
         report.update({"separator": sep, "renamed": renamed, "rename_lossless": True})
         sorted_hash, nodes, rels, schema = hash_graph(session, sep)
         report.update({"determinism_hash_sorted": sorted_hash, "nodes": nodes, "relationships": rels,
                        "schema_relationships": schema})
         wipe(session)
-        target_file = os.path.join(import_dir, "loadable.nt")
-        try:
-            with open(target_file, "w", encoding="utf-8") as f:
-                f.write(shuffled(loadable_text))
-            load(session, statements)
-            if sep != N10S_SEP:   # the same data renames the same names, or the stage fails and empties the graph
-                rename_separator(session, sep, expected=renamed, fresh_session=driver.session, timeout=timeout)
-            report["determinism_hash_shuffled"] = hash_graph(session, sep)[0]
-        finally:
-            shutil.copyfile(loadable, target_file)
+        # The second load: the same lines in another order, so in other batches too.
+        load(session, statements, dict(requests, loadable=batches(shuffled(loadable_text))))
+        if sep != N10S_SEP:   # the same data renames the same names, or the stage fails and empties the graph
+            rename_separator(session, sep, expected=renamed, fresh_session=open_session, timeout=timeout)
+        report["determinism_hash_shuffled"] = hash_graph(session, sep)[0]
     report["samples"] = {"violations": found[:5], "lost": lost[:10], "added": added[:10],
                          "failed_cases": [c for c in report["fail_cases"] if c["status"] in ("failed", "no case")][:10]}
     report["passed"] = passed(report)
@@ -934,9 +1012,6 @@ def check_report_command(report_path):
     return f"build.py check-report --manifest projection-manifest.json --report {q(report_path)}"
 
 
-DEFAULT_CONTAINER = "lpg-projection"
-
-
 def separator(opts):
     """--separator: what sits between a prefix and a local name in the kept graph. n10s writes two underscores;
     another value, such as one underscore, renames every label, type and key after the checks (rename_separator).
@@ -944,17 +1019,28 @@ def separator(opts):
     return build.separator(opts)
 
 
-def container_name(opts):
-    """The container the printed next steps name: --container, else $LPG_CONTAINER, else lpg-projection."""
-    return opts.get("--container") or os.environ.get("LPG_CONTAINER") or DEFAULT_CONTAINER
+KNOWN = {"--config", "--shapes", "--env", "--bolt", "--database", "--merged", "--loadable", "--inferred", "--report",
+         "--plugins-dir", "--manual-cases", "--query-timeout", "--separator"}
 
 
-def remove_command(opts):
-    """The clean-up line: `docker compose -p <project> ... down -v` when --compose-project names the
-    project the services were started under (docker/compose.yaml), else `docker rm -f -v`."""
-    if opts.get("--compose-project"):
-        return f"docker compose -p {q(opts['--compose-project'])} --profile neo4j --profile fuseki down -v"
-    return f"docker rm -f -v {q(container_name(opts))}"
+def connection(opts, environ=None):
+    """(uri, (user, password), database) from --env, or from --bolt with NEO4J_USERNAME (default neo4j)
+    and NEO4J_PASSWORD in the environment. --database overrides the file's or the environment's
+    NEO4J_DATABASE; None means the server's default database."""
+    environ = os.environ if environ is None else environ
+    if ("--env" in opts) == ("--bolt" in opts):
+        raise Refusal("give exactly one of --env and --bolt")
+    if "--env" in opts:
+        from copy_graph import read_env_file   # copy_graph imports this module, so the import waits until here
+        values = read_env_file(opts["--env"])
+        uri, user, password = values["NEO4J_URI"], values["NEO4J_USERNAME"], values["NEO4J_PASSWORD"]
+        database = values.get("NEO4J_DATABASE")
+    else:
+        uri, user, password = opts["--bolt"], environ.get("NEO4J_USERNAME") or "neo4j", environ.get("NEO4J_PASSWORD")
+        database = environ.get("NEO4J_DATABASE")
+        if not password:
+            raise Refusal("set NEO4J_PASSWORD for --bolt, or give --env")
+    return uri, (user, password), opts.get("--database") or database or None
 
 
 def write_atomically(path, report):
@@ -962,10 +1048,11 @@ def write_atomically(path, report):
     folder = os.path.dirname(os.path.abspath(path))
     fd, tmp = tempfile.mkstemp(prefix=".report-", suffix=".tmp", dir=folder)
     try:
-        umask = os.umask(0)
-        os.umask(umask)
-        os.fchmod(fd, 0o666 & ~umask)
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
+        if hasattr(os, "fchmod"):   # not on Windows, where a new file already takes the folder's permissions
+            umask = os.umask(0)
+            os.umask(umask)
+            os.fchmod(fd, 0o666 & ~umask)
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
             f.write(json.dumps(report, indent=2, sort_keys=True, default=str) + "\n")
         os.replace(tmp, path)
     finally:
@@ -996,12 +1083,15 @@ def main(argv):
         return 2
     try:
         opts, data = build.options(argv)
-        build.need(opts, "--config", "--bolt", "--import-dir", "--merged", "--loadable", "--inferred", "--report")
+        unknown = sorted(set(opts) - KNOWN)
+        if unknown:
+            # Counted, never shown: an unknown option is text the user supplied.
+            raise Refusal(f"unknown option(s): {len(unknown)}; the options are {', '.join(sorted(KNOWN))}")
+        build.need(opts, "--config", "--merged", "--loadable", "--inferred", "--report")
         if not data or not opts.get("--shapes"):
             raise Refusal("give the data files and at least one --shapes file")
-        password = os.environ.get("NEO4J_PASSWORD")
-        if not password:
-            raise Refusal("set NEO4J_PASSWORD")
+        uri, auth, database = connection(opts)
+        password = auth[1]
         cfg = build.load_config(opts["--config"])
         manual = read_manual_cases(opts.get("--manual-cases"))
         timeout = query_timeout(opts)
@@ -1010,7 +1100,7 @@ def main(argv):
         sep = separator(opts)
         build.check_prefixes(cfg.prefixes, sep)
     except (OSError, ValueError) as exc:
-        print(f"ERROR {q(error_line('the arguments, the configuration or the manual cases could not be read', exc))}",
+        print(f"ERROR {q(error_line('the arguments, the configuration, the --env file or the manual cases could not be read', exc))}",
               file=sys.stderr)
         return 2
     if cfg.rule4 == "4b":
@@ -1019,11 +1109,11 @@ def main(argv):
     report_path = opts["--report"]
     try:
         from neo4j import GraphDatabase
-        driver = GraphDatabase.driver(opts["--bolt"], auth=("neo4j", password))
+        driver = GraphDatabase.driver(uri, auth=auth)
         try:
-            report = run(driver, cfg, data, opts["--shapes"], opts["--import-dir"], opts["--merged"],
+            report = run(driver, cfg, data, opts["--shapes"], opts["--merged"],
                          opts["--loadable"], opts["--inferred"], opts.get("--plugins-dir"), manual, timeout,
-                         sep=sep)
+                         sep=sep, database=database)
         finally:
             driver.close()
     except Exception as exc:  # Failed, a driver error or a file error: no report
@@ -1035,8 +1125,7 @@ def main(argv):
         else:
             print(f"FAIL {q(error_line('the run stopped on a driver or file error', exc))}")
         print(f"Stop: no report was written at {q(report_path)}. "
-              "Fix the cause and rerun this command while the container is up: it empties the database itself. "
-              f"If you stop instead, remove the container ({remove_command(opts)}).")
+              "Fix the cause and rerun this command: it empties the database itself.")
         return 1
     summary = {k: report[k] for k in ("shapes_import_rows", "in_graph_shape_constraints", "shacl_violations_in_graph",
                                       "in_graph_mutant_violations", "roundtrip_lost", "roundtrip_added", "nodes",
@@ -1054,12 +1143,10 @@ def main(argv):
         write_atomically(failed_path, report)
         print(f"FAIL the verify step did not pass. No report was written at {q(report_path)}; the details are in "
               f"{q(failed_path)}. A row with status 'no case' needs a case in --manual-cases. "
-              "Fix the cause and rerun this command while the container is up: it empties the database itself. "
-              f"If you stop instead, remove the container ({remove_command(opts)}).")
+              "Fix the cause and rerun this command: it empties the database itself.")
         return 1
     write_atomically(report_path, report)
-    print(f"wrote {q(report_path)}: every check passed. Next: run {check_report_command(report_path)}, "
-          f"then remove the container ({remove_command(opts)}) (running.md, rule 5).")
+    print(f"wrote {q(report_path)}: every check passed. Next: run {check_report_command(report_path)}.")
     return 0
 
 

@@ -1,4 +1,4 @@
-"""Write data-flow.excalidraw: one release through triple stores, Neo4j and Aura (references/multi-store.md)."""
+"""Write data-flow.excalidraw: one release through triple stores, the local Neo4j and its copy (references/multi-store.md)."""
 import json, random, sys
 
 random.seed(7)
@@ -76,13 +76,11 @@ arrow(b3, sk)
 
 group(1010, -330, 420, 400, "Triple stores", "#6741d9")
 jena = box(1030, -280, 380, 90, "Apache Jena Fuseki\nGraph Store Protocol, one named graph per package", PURPLE, 15)
-dbx = box(1030, -160, 380, 80, "Databricks: Delta triple table\nin Unity Catalog (planned)", PURPLE)
-dfree = box(1030, -60, 180, 100, "Free Edition:\ntransfers run\nfrom your machine", "#eebefa", 14)
-dent = box(1230, -60, 180, 100, "Enterprise: your\nmachine, or a job\nin the workspace", "#eebefa", 14)
-arrow(sk, jena, "load, export back,\ncompare", side=("t", "l"))
+dbx = box(1030, -160, 380, 80, "Databricks: Delta triple table\nin Unity Catalog", PURPLE)
+dnb = box(1030, -60, 380, 100, "Written and read by a notebook's\nown Spark session, through\na staging table", "#eebefa", 14)
+arrow(sk, jena, "load, export back,\ncompare hashes", side=("t", "l"))
 arrow(sk, dbx, "triple for triple", side=("t", "l"))
-arrow(dfree, dbx, side=("t", "b"))
-arrow(dent, dbx, side=("t", "b"))
+arrow(dnb, dbx, side=("t", "b"))
 
 group(1010, 130, 420, 400, "ontology-to-lpg skill", "#e8590c")
 s1 = box(1030, 180, 380, 70, "Check: design rules, data shapes, refusals", ORANGE, 15)
@@ -92,22 +90,22 @@ arrow(sk, s1, side=("r", "l"))
 arrow(s1, s2, side=("b", "t"))
 arrow(s2, s3, side=("b", "t"))
 
-group(1490, 130, 420, 400, "Neo4j, local (Docker + n10s)", "#2f9e44")
-n1 = box(1510, 180, 380, 80, "n10s load (SHORTEN, fixed order)", GREEN, 15)
+group(1490, 130, 420, 400, "Neo4j, local (n10s + APOC)", "#2f9e44")
+n1 = box(1510, 180, 380, 80, "n10s load (SHORTEN, fixed order),\ntriples sent in the request", GREEN, 15)
 n2 = box(1510, 310, 380, 170, "Gate: n10s listShapes() readback,\none fail case per compiled\nconstraint, round trip,\ndeterminism hash", GREEN, 15)
 arrow(s3, n1, side=("r", "l"))
 arrow(n1, n2, side=("b", "t"))
 arrow(jena, n2, "three-way counts\n(--projection-report):\nfiles, store, Neo4j", side=("r", "t"), dashed=True)
 
-group(1490, 590, 420, 260, "Neo4j Aura", "#2f9e44")
-a1 = box(1510, 640, 380, 80, "Copy over the driver;\nhash must match the local graph", GREEN, 15)
+group(1490, 590, 420, 260, "Neo4j, another server (no plugins)", "#2f9e44")
+a1 = box(1510, 640, 380, 80, "Copy over the driver to a named\ndatabase; hash must match the local graph", GREEN, 15)
 a2 = box(1510, 750, 380, 80, "GRAPH TYPE: schema enforced\nby the database", GREEN, 15)
 arrow(n2, a1, "validated graph", side=("b", "t"))
 arrow(a1, a2, side=("b", "t"))
 
 group(1010, 590, 420, 260, "Rebuild test", "#c92a2a")
-r1 = box(1030, 640, 380, 180, "Empty local Neo4j and Aura,\nrebuild both from the\nDatabricks export, compare\nwith the released files:\nno loss end to end", "#ffc9c9", 15)
-arrow(dbx, r1, side=("l", "l"), dashed=True)
+r1 = box(1030, 640, 380, 180, "Empty the local Neo4j and\nthe copy, rebuild both from\nthe Jena export, compare\nwith the released files:\nno loss end to end", "#ffc9c9", 15)
+arrow(jena, r1, side=("l", "l"), dashed=True)
 arrow(r1, s1, side=("t", "b"), dashed=True)
 
 group(320, 590, 630, 260, "Later: Unity Catalog", "#495057")

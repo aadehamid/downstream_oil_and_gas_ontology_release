@@ -1,4 +1,4 @@
-"""Tests of run_projection.py with a stand-in for every command: no Docker, database or store.
+"""Tests of run_projection.py with a stand-in for every command and request: no database or store.
 
 Run: uv run --no-project --with rdflib python3 -m unittest test_run_projection
 """
@@ -20,11 +20,13 @@ HEAD = ("<https://x.org/{m}> a <http://www.w3.org/2002/07/owl#Ontology> ; "
         "<http://www.w3.org/2002/07/owl#versionIRI> <https://x.org/{m}/1.0.0> .\n")
 TRIPLE = '<https://x.org/s> <https://x.org/p> "v" .\n'
 REPORT = {"passed": True, "determinism_hash_sorted": "h", "determinism_hash_shuffled": "h"}
+# The three Fuseki datasets a run configuration names, each its own.
+JENA, EXPLORE, COUNTS = "http://127.0.0.1:3030/ds", "http://127.0.0.1:3031/ds", "http://127.0.0.1:3032/ds"
 
 
 class FakeRun:
-    """Records each command and plays its part: writes the files the real command would, answers
-    docker logs with Neo4j's start line, and exits with the code set for a command name."""
+    """Records each command and plays its part: writes the files the real command would, and exits
+    with the code set for a command name."""
 
     GRAPHS = [("a", ""), ("a", "/shapes"), ("b", ""), ("b", "/shapes")]
 
@@ -40,8 +42,6 @@ class FakeRun:
         for name, code in self.fail.items():
             if name in text:
                 return code, ""
-        if cmd[:2] == ["docker", "compose"] and "logs" in cmd:
-            return 0, "Started.\n"
         for flag in ("--output", "--report", "--out"):
             if flag in cmd:
                 path = cmd[cmd.index(flag) + 1]
@@ -76,10 +76,7 @@ class FakeRun:
                     names.append((os.path.basename(part) + " " + sub).strip())
                     break
             else:
-                if cmd[:2] == ["docker", "compose"]:
-                    names.append("docker " + " ".join(c for c in cmd if c in ("up", "down", "logs")))
-                elif cmd[0] == "java":
-                    names.append("robot")
+                names.append("robot" if cmd[0] == "java" else " ".join(cmd[:2]))
         return names
 
 
@@ -98,7 +95,8 @@ class Base(unittest.TestCase):
         self.write("config.json", "{}")
         self.write("queries.json", "[]")
         self.write("target.env", "")
-        self.write("dbx.env", "")
+        self.write("local.env", "")
+        self.updates = []   # (URL, SPARQL Update text) the driver sent
 
     def write(self, name, text):
         path = os.path.join(self.tmp, name)
@@ -107,17 +105,23 @@ class Base(unittest.TestCase):
             f.write(text)
         return path
 
-    def run_config(self, **extra):
+    def run_config(self, drop=(), **extra):
         cfg = {"mode": "releases", "projection_config": "config.json", "out": "out", "releases": "releases", "robot_jar": "robot.jar",
                "data": ["releases/a/1.0.0/a.ttl", "releases/b/1.0.0/b.ttl"],
                "shapes": ["releases/a/1.0.0/shapes.ttl", "releases/b/1.0.0/shapes.ttl", "whole/shapes.ttl"],
-               "release_graphs": ["shapes"], "queries": "queries.json", "target_env": "target.env", **extra}
+               "release_graphs": ["shapes"], "queries": "queries.json", "neo4j_env": "local.env", "target_env": "target.env",
+               "jena": JENA, "explore_fuseki": EXPLORE, "triplestore_fuseki": COUNTS, **extra}
+        cfg = {k: v for k, v in cfg.items() if k not in drop}
         path = self.write("run.json", json.dumps(cfg))
         with mock.patch.object(rp, "inside_repository", return_value=False):
             return rp.read_config(path)
 
-    def driver(self, cfg, fake):
-        return rp.Driver(cfg, run=fake, ready=lambda url: True, sleep=lambda s: None, log=lambda line: None)
+    def update(self, url, text):
+        self.updates.append((url, text))
+        return True
+
+    def driver(self, cfg, fake, ready=lambda url: True, update=None):
+        return rp.Driver(cfg, run=fake, ready=ready, update=update or self.update, log=lambda line: None)
 
 
 class Config(Base):
@@ -126,18 +130,32 @@ class Config(Base):
         self.assertEqual(cfg["out"], os.path.join(self.tmp, "out"))
         self.assertEqual(cfg["data"][0], os.path.join(self.tmp, "releases/a/1.0.0/a.ttl"))
         self.assertEqual(cfg["target_env"], os.path.join(self.tmp, "target.env"))
-        self.assertEqual(cfg["neo4j"], {"compose_project": "lpg-local", "bolt_port": 17711})
+        self.assertEqual(cfg["neo4j_env"], os.path.join(self.tmp, "local.env"))
+        self.assertEqual((cfg["jena"], cfg["explore_fuseki"], cfg["triplestore_fuseki"]), (JENA, EXPLORE, COUNTS))
+        self.assertEqual(self.run_config(jena=JENA + "/")["jena"], JENA)
 
     def test_bad_configurations_are_refused(self):
-        for extra in ({"other": 1}, {"inputs_script": "x.py"}, {"mode": "both"}, {"databricks": {"env": "dbx.env"}},
+        for extra in ({"other": 1}, {"inputs_script": "x.py"}, {"mode": "both"},
                       {"rebuild": {"source": "s3", "out": "re"}}, {"rebuild": {"source": "jena", "out": "out"}},
                       {"release_graphs": ["a/b"]}, {"rebuild": {"source": "databricks", "out": "re"}},
+                      {"jena": "127.0.0.1:3030/ds"}, {"jena": {"port": 3030}},          # a URL, not a host or an object
+                      {"explore_fuseki": JENA}, {"triplestore_fuseki": EXPLORE + "/"},  # one dataset, two steps
+                      {"target_env": "local.env"},                                       # the copy onto its source
                       {"separator": None}, {"separator": 1}, {"separator": ["_"]}, {"separator": ""},
                       {"separator": "-"}, {"separator": "x"}, {"separator": "_x"}):
             with self.subTest(extra), self.assertRaises(rp.Refusal):
                 self.run_config(**extra)
         for sep in ("_", "__", "___"):
             self.assertEqual(self.run_config(separator=sep)["separator"], sep)
+        with self.assertRaisesRegex(rp.Refusal, "a rebuild from jena needs the jena key"):
+            self.run_config(drop=("jena",), rebuild={"source": "jena", "out": "re"})
+
+    def test_the_keys_of_the_removed_stores_are_refused(self):
+        # No server is started and no table is written from this machine, so their keys are unknown now.
+        for extra in ({"keep_neo4j": True}, {"keep_jena": True}, {"databricks": {"env": "x.env", "table": "c.s.t"}},
+                      {"neo4j": {"compose_project": "lpg-local", "bolt_port": 17711}}):
+            with self.subTest(extra), self.assertRaises(rp.Refusal):
+                self.run_config(**extra)
 
     def test_an_output_folder_inside_the_repository_is_refused(self):
         # Without the hook's variables: inherited from a pre-push hook run in a linked worktree, `git init`
@@ -179,8 +197,18 @@ class Config(Base):
         self.assertIsNone(rows["project"])
         self.assertIsNone(rows["copy"])
         self.assertEqual(rows["triplestore"], "--skip")
-        self.assertEqual(rows["databricks"], "no databricks in the run configuration")
+        self.assertNotIn("databricks", rows)
         self.assertEqual(rows["rebuild"], "no rebuild in the run configuration")
+        bare = dict(rp.plan(self.run_config(drop=("neo4j_env", "jena", "explore_fuseki", "target_env"))))
+        for step in ("load", "review", "tags", "release-record"):
+            self.assertEqual(bare[step], "no neo4j_env in the run configuration")
+        self.assertEqual(bare["copy"], "no neo4j_env in the run configuration")
+        self.assertEqual(bare["jena"], "no jena in the run configuration")
+        self.assertEqual(bare["explore"], "no explore_fuseki in the run configuration")
+        self.assertIsNone(bare["triplestore"])
+        self.assertEqual(dict(rp.plan(self.run_config(drop=("target_env",))))["copy"], "no target_env in the run configuration")
+        self.assertEqual(rp.STEPS, ("project", "load", "review", "tags", "release-record", "graph-type", "triplestore",
+                                    "copy", "jena", "explore", "rebuild"))
         self.assertEqual(dict(rp.plan(cfg, {"load"}))["project"], "not in --only")
         with self.assertRaises(rp.Refusal):
             rp.step_names("load,nope")
@@ -210,58 +238,100 @@ class Config(Base):
 
 
 class Steps(Base):
-    def test_a_full_run_calls_every_script_in_order_and_removes_the_containers(self):
+    def test_a_full_run_calls_every_script_in_order_and_starts_no_server(self):
         fake = FakeRun()
         d = self.driver(self.run_config(), fake)
-        d.run_steps(["project", "load", "review", "tags", "release-record", "copy", "jena", "explore"])
+        d.run_steps(["project", "load", "review", "tags", "release-record", "triplestore", "copy", "jena", "explore"])
         self.assertEqual(fake.scripts(), [
             "check_projection_rules.py", "validate_data.py", "build.py merge", "robot", "build.py inferred",
             "build.py loadable", "build.py check-serialised", "validate_data.py", "build.py manifest",
             "in_graph_shapes.py",
-            "docker down", "docker up", "docker logs", "load_verify.py", "build.py check-report",
+            "load_verify.py", "build.py check-report",
             "model_review.py",
             "module_tags.py tag", "module_tags.py check", "module_tags.py modules",
             "release_record.py records", "release_record.py write", "release_record.py check",
+            "triplestore.py",
             "copy_graph.py", "module_tags.py check", "module_tags.py modules",
             "release_record.py write", "release_record.py check", "model_review.py",
-            "docker down", "docker up", "rdfstore.py roundtrip",
-            "docker down", "docker up", "rdfstore.py roundtrip", "explore.py compare", "explore.py compare",
-            "docker down",                            # explore's Fuseki
-            "docker down", "docker down"])            # then Jena's Fuseki and the local Neo4j
-        self.assertEqual(d.passed, ["project", "load", "review", "tags", "release-record", "copy", "jena", "explore"])
+            "rdfstore.py roundtrip",
+            "rdfstore.py roundtrip", "explore.py compare", "explore.py compare"])
+        self.assertEqual(d.passed, ["project", "load", "review", "tags", "release-record", "triplestore", "copy", "jena", "explore"])
+        # Only uv and Java are ever run: nothing starts, stops or removes a server.
+        self.assertEqual({cmd[0] for cmd, _, _ in fake.calls}, {"uv", "java"})
+        # Each Fuseki step empties its own dataset, once, before it loads.
+        self.assertEqual(self.updates, [(COUNTS + "/update", "DROP ALL"), (JENA + "/update", "DROP ALL"),
+                                        (EXPLORE + "/update", "DROP ALL")])
 
-    def test_keep_jena_leaves_the_jena_fuseki_up_and_removes_the_others(self):
+    def test_every_neo4j_script_gets_the_env_file_by_path_and_no_password(self):
         fake = FakeRun()
-        d = self.driver(self.run_config(keep_jena=True), fake)
-        d.run_steps(["project", "load", "jena", "explore"])
-        downs = [cmd for cmd, _, _ in fake.calls if "down" in cmd]
-        jena = [cmd for cmd in downs if "lpg-jena" in cmd]
-        self.assertEqual(len(jena), 1)   # only the clean start before its own load, never after the round trip
-        self.assertLess(fake.calls.index(next(c for c in fake.calls if c[0] == jena[0])),
-                        fake.calls.index(next(c for c in fake.calls if "up" in c[0] and "lpg-jena" in c[0])))
-        self.assertEqual(d.fusekis, [])
-        self.assertEqual(sum("lpg-explore" in cmd for cmd in downs), 2)   # the transient Fuseki still goes
+        d = self.driver(self.run_config(), fake)
+        d.run_steps(["project", "load", "review", "tags", "release-record", "copy", "explore"])
+        local, target = os.path.join(self.tmp, "local.env"), os.path.join(self.tmp, "target.env")
+        seen = {}
+        for cmd, _, env in fake.calls:
+            self.assertIsNone(env)                       # nothing is put in a script's environment
+            script = next((os.path.basename(c) for c in cmd if c.endswith(".py")), None)
+            if "--env" in cmd:
+                seen.setdefault(script, []).append(cmd[cmd.index("--env") + 1])
+        self.assertEqual(seen, {"load_verify.py": [local], "model_review.py": [local, target],
+                                "module_tags.py": [local, local, local, target, target],
+                                "release_record.py": [local, local, target, target], "explore.py": [local, target]})
+        copy = next(cmd for cmd, _, _ in fake.calls if any(c.endswith("copy_graph.py") for c in cmd))
+        self.assertEqual(copy[copy.index("--source-env") + 1], local)
+        self.assertEqual(copy[copy.index("--target-env") + 1], target)
+        load = next(cmd for cmd, _, _ in fake.calls if any(c.endswith("load_verify.py") for c in cmd))
+        for gone in ("--bolt", "--import-dir", "--compose-project", "--container", "--plugins-dir"):
+            self.assertNotIn(gone, load)
 
-    def test_only_jena_makes_its_output_folder_first_and_keeps_jena_up(self):
+    def test_a_plugins_folder_is_checked_before_the_load_and_recorded_by_it(self):
+        fake = FakeRun()
+        d = self.driver(self.run_config(plugins_dir="plugins"), fake)
+        d.run_steps(["project", "load"])
+        names = fake.scripts()
+        self.assertEqual(names[names.index("in_graph_shapes.py") + 1:], ["check_plugins.py", "load_verify.py", "build.py check-report"])
+        plugins = os.path.join(self.tmp, "plugins")
+        check = next(cmd for cmd, _, _ in fake.calls if any(c.endswith("check_plugins.py") for c in cmd))
+        self.assertEqual(check[-1], plugins)
+        load = next(cmd for cmd, _, _ in fake.calls if any(c.endswith("load_verify.py") for c in cmd))
+        self.assertEqual(load[load.index("--plugins-dir") + 1], plugins)
+        fake = FakeRun(fail={"check_plugins.py": 1})
+        d = self.driver(self.run_config(plugins_dir="plugins"), fake)
+        with self.assertRaisesRegex(rp.Failed, "check_plugins.py exited 1"):
+            d.run_steps(["project", "load"])
+        self.assertNotIn("load_verify.py", fake.scripts())
+
+    def test_a_fuseki_that_does_not_answer_or_refuses_the_update_stops_the_step(self):
+        fake = FakeRun()
+        d = self.driver(self.run_config(), fake, ready=lambda url: False)
+        with self.assertRaisesRegex(rp.Failed, "Fuseki does not answer at the URL the run configuration gives for jena"):
+            d.run_steps(["jena"])
+        self.assertEqual((fake.calls, self.updates), ([], []))
+        d = self.driver(self.run_config(), fake, update=lambda url, text: False)
+        with self.assertRaisesRegex(rp.Failed, "could not be emptied"):
+            d.run_steps(["jena"])
+        self.assertEqual(fake.calls, [])
+
+    def test_the_readiness_check_asks_the_named_dataset(self):
+        asked = []
+        d = self.driver(self.run_config(), FakeRun(), ready=lambda url: asked.append(url) or True)
+        d.run_steps(["jena"])
+        self.assertEqual(asked, [JENA + "/query?query=ASK+%7B%7D"])
+        roundtrip = next(cmd for cmd, _, _ in d.run.calls if "roundtrip" in cmd)
+        for flag, url in (("--gsp", JENA + "/data"), ("--query", JENA + "/query"), ("--update", JENA + "/update")):
+            self.assertEqual(roundtrip[roundtrip.index(flag) + 1], url)
+        self.assertEqual(roundtrip[roundtrip.index("--store") + 1], "fuseki")
+
+    def test_only_jena_makes_its_output_folder_first(self):
         class Strict(FakeRun):   # as rdfstore.py: the report's folder must exist before any store is touched
             def __call__(self, cmd, cwd=None, env=None, capture=False):
                 if "--report" in cmd and "roundtrip" in cmd and not os.path.isdir(os.path.dirname(cmd[cmd.index("--report") + 1])):
                     return 2, ""
                 return super().__call__(cmd, cwd=cwd, env=env, capture=capture)
         fake = Strict()
-        cfg = self.run_config(keep_jena=True)
-        d = self.driver(cfg, fake)
+        d = self.driver(self.run_config(), fake)
         self.assertFalse(os.path.isdir(d.out))
         d.run_steps(["jena"])
         self.assertEqual(d.passed, ["jena"])
-        self.assertEqual(d.fusekis, [])
-
-    def test_only_databricks_makes_its_output_folder_first(self):
-        fake = FakeRun()
-        d = self.driver(self.run_config(databricks={"env": "dbx.env", "table": "c.s.t"}), fake)
-        self.assertFalse(os.path.isdir(d.out))
-        d.run_steps(["databricks"])
-        self.assertTrue(os.path.isdir(d.out))
 
     def test_a_catalog_changed_since_the_run_stops_a_rebuild(self):
         fake = FakeRun()
@@ -291,19 +361,6 @@ class Steps(Base):
         with self.assertRaisesRegex(rp.Failed, "catalogs differ"):
             d.same_source()
 
-    def test_keep_jena_removes_a_fuseki_whose_round_trip_failed(self):
-        fake = FakeRun(fail={"rdfstore.py roundtrip": 1})
-        d = self.driver(self.run_config(keep_jena=True), fake)
-        with self.assertRaises(rp.Failed):
-            d.run_steps(["project", "load", "jena"])
-        self.assertEqual(sum("lpg-jena" in cmd and "down" in cmd for cmd, _, _ in fake.calls), 2)
-
-    def test_without_keep_jena_the_jena_fuseki_is_removed(self):
-        fake = FakeRun()
-        d = self.driver(self.run_config(), fake)
-        d.run_steps(["project", "load", "jena"])
-        self.assertEqual(sum("lpg-jena" in cmd and "down" in cmd for cmd, _, _ in fake.calls), 2)
-
     def test_a_new_load_drops_the_last_runs_release_records(self):
         fake = FakeRun()
         d = self.driver(self.run_config(), fake)
@@ -317,31 +374,27 @@ class Steps(Base):
         cfg = {**self.run_config(), "mode": "files"}
         self.assertEqual(dict(rp.plan(cfg))["release-record"], "files mode has no catalog.ttl to read")
 
-    def test_the_triplestore_fuseki_comes_from_the_skills_compose_profile(self):
+    def test_the_triplestore_step_uses_its_own_dataset(self):
         fake = FakeRun()
         d = self.driver(self.run_config(), fake)
         d.run_steps(["project", "load", "triplestore"])
-        up = next(cmd for cmd, _, _ in fake.calls if "up" in cmd and "lpg-triplestore" in cmd)
-        self.assertEqual(up[up.index("--profile") + 1], "fuseki")
+        counts = next(cmd for cmd, _, _ in fake.calls if any(c.endswith("triplestore.py") for c in cmd))
+        self.assertEqual((counts[counts.index("--gsp") + 1], counts[counts.index("--query") + 1]), (COUNTS, COUNTS + "/query"))
+        self.assertEqual(self.updates, [(COUNTS + "/update", "DROP ALL")])
 
-    def test_no_command_carries_the_password_and_every_path_is_absolute(self):
+    def test_every_path_is_absolute_and_the_copy_replaces_only_when_told(self):
         fake = FakeRun()
         d = self.driver(self.run_config(), fake)
         d.run_steps(["project", "load", "tags", "copy"])
-        password = d.password()
-        with open(os.path.join(d.out, "neo4j-run", "run.env")) as f:
-            self.assertIn(password, f.read())
-        self.assertEqual(oct(os.stat(os.path.join(d.out, "neo4j-run", "run.env")).st_mode & 0o777), "0o600")
-        for cmd, _, env in fake.calls:
-            self.assertNotIn(password, " ".join(cmd))
+        for cmd, _, _ in fake.calls:
             for i, part in enumerate(cmd[:-1]):
-                if part in ("--config", "--report", "--output", "--target-env", "--env", "--inferred", "--releases"):
+                if part in ("--config", "--report", "--output", "--source-env", "--target-env", "--env", "--inferred", "--releases"):
                     self.assertTrue(os.path.isabs(cmd[i + 1]), cmd)
-        load = next(env for cmd, _, env in fake.calls if any(c.endswith("load_verify.py") for c in cmd))
-        self.assertEqual(load["NEO4J_PASSWORD"], password)
         copy = next(cmd for cmd, _, _ in fake.calls if any(c.endswith("copy_graph.py") for c in cmd))
-        self.assertEqual(copy[copy.index("--target-env") + 1], os.path.join(self.tmp, "target.env"))
         self.assertNotIn("--replace", copy)
+        fake = FakeRun()
+        self.driver(self.run_config(replace_target=True), fake).run_steps(["project", "load", "copy"])
+        self.assertIn("--replace", next(cmd for cmd, _, _ in fake.calls if any(c.endswith("copy_graph.py") for c in cmd)))
 
     def test_a_robot_jar_with_another_checksum_stops_before_any_command(self):
         self.write("robot.jar", "other")
@@ -350,99 +403,18 @@ class Steps(Base):
             self.driver(self.run_config(), fake).run_steps(["project"])
         self.assertEqual(fake.calls, [])
 
-    def test_a_failed_load_removes_the_local_neo4j(self):
+    def test_a_failed_load_stops_the_run_and_later_steps_do_not_run(self):
         fake = FakeRun(fail={"load_verify.py": 1})
         d = self.driver(self.run_config(), fake)
-        d.run_steps(["project"])
-        with self.assertRaises(rp.Failed):
-            d.run_steps(["load"])
-        self.assertEqual(fake.scripts()[-2:], ["load_verify.py", "docker down"])
-        self.assertFalse(d.local_up)
-
-    def test_one_failed_removal_does_not_stop_the_others(self):
-        class Breaking(FakeRun):
-            def __call__(self, cmd, cwd=None, env=None, capture=False):
-                if "down" in cmd and "lpg-jena" in cmd and any("roundtrip" in c for c, _, _ in self.calls):
-                    self.calls.append((list(cmd), cwd, None))
-                    raise OSError("docker went away")
-                return super().__call__(cmd, cwd, env, capture)
-        fake = Breaking()
-        d = self.driver(self.run_config(), fake)
-        with self.assertRaises(rp.Failed):   # every step passed, but a container was left up
-            d.run_steps(["project", "load", "jena"])
-        last = [cmd for cmd, _, _ in fake.calls[-2:]]
-        self.assertIn("lpg-jena", last[0])
-        self.assertIn("lpg-local", last[1])   # the local Neo4j still removed
-        self.assertFalse(d.local_up)
-
-    def test_a_failed_step_whose_clean_up_fails_keeps_its_own_failure_and_retries(self):
-        class Breaking(FakeRun):
-            downs = 0
-
-            def __call__(self, cmd, cwd=None, env=None, capture=False):
-                if "explore.py" in " ".join(cmd):
-                    return 1, ""
-                if "down" in cmd and "lpg-explore" in cmd and any("roundtrip" in c for c, _, _ in self.calls):
-                    self.downs += 1
-                    self.calls.append((list(cmd), cwd, None))
-                    raise OSError("docker went away")
-                return super().__call__(cmd, cwd, env, capture)
-        fake, logged = Breaking(), []
-        d = rp.Driver(self.run_config(), run=fake, ready=lambda url: True, sleep=lambda s: None, log=logged.append)
-        with self.assertRaises(rp.Failed) as caught:
-            d.run_steps(["project", "load", "explore"])
-        self.assertIn("explore.py compare", str(caught.exception))
-        self.assertEqual(fake.downs, 2)   # the step's own removal, then finish()'s retry
-        self.assertEqual(sum("could not be removed" in line for line in logged), 2)
-        self.assertIn("lpg-local", fake.calls[-1][0])   # the local Neo4j still removed
-        self.assertEqual(len(d.fusekis), 1)               # still tracked: it was never removed
-
-    def test_a_removal_that_exits_non_zero_fails_the_run_and_stays_tracked(self):
-        fake = FakeRun()
-        d = self.driver(self.run_config(), fake)
-        d.run_steps(["project", "load"])
-        fake.fail = {"down": 7}
-        d.local_up = True
-        d.rdf_store_fuseki = lambda key: None
-        d.fusekis.append((["docker", "compose", "-p", "lpg-jena"], {}))
-        with self.assertRaises(rp.Failed) as caught:
-            d.run_steps([])
-        self.assertIn("2 container removal(s) failed", str(caught.exception))
-        self.assertTrue(d.local_up)
-        self.assertEqual(len(d.fusekis), 1)
-
-    def test_a_second_call_retries_what_the_first_left_and_counts_afresh(self):
-        fake = FakeRun()
-        d = self.driver(self.run_config(), fake)
-        d.run_steps(["project", "load"])
-        fake.fail = {"down": 7}
-        d.local_up = True
-        with self.assertRaises(rp.Failed):
-            d.run_steps([])
-        fake.fail = {}
-        d.run_steps([])   # the retry succeeds; the earlier count does not linger
-        self.assertFalse(d.local_up)
-
-    def test_the_rebuild_hands_back_what_its_child_could_not_remove(self):
-        class Sticky(FakeRun):
-            # the child's last removal of its Neo4j (run folder under re/, after its walks) fails
-            def __call__(self, cmd, cwd=None, env=None, capture=False):
-                child_run = env and os.sep + "re" + os.sep in env.get("LPG_RUN", "")
-                walked = any("explore.py" in " ".join(c) for c, _, _ in self.calls)
-                if "down" in cmd and child_run and walked:
-                    self.calls.append((list(cmd), cwd, dict(env)))
-                    return 7, ""
-                return super().__call__(cmd, cwd, env, capture)
-        fake = Sticky()
-        d = self.driver(self.run_config(rebuild={"source": "repo", "out": "re"}), fake)
-        d.run_steps(["project", "load", "rebuild"])   # the parent's own removal succeeds on retry
-        self.assertFalse(d.local_up)
-        self.assertNotIn(os.sep + "re" + os.sep, fake.calls[-1][2]["LPG_RUN"])
+        with self.assertRaisesRegex(rp.Failed, "load_verify.py exited 1"):
+            d.run_steps(["project", "load", "review"])
+        self.assertEqual(fake.scripts()[-1], "load_verify.py")
+        self.assertEqual(d.passed, ["project"])
 
     def test_a_step_that_needs_the_local_neo4j_says_so(self):
-        d = self.driver(self.run_config(), FakeRun())
-        with self.assertRaises(rp.Failed):
-            d.run_steps(["tags"])
+        d = self.driver(self.run_config(drop=("neo4j_env", "target_env")), FakeRun())
+        with self.assertRaisesRegex(rp.Failed, "no neo4j_env in the run configuration"):
+            d.run_steps(["review"])
 
     def test_the_inputs_script_supplies_the_lists(self):
         script = self.write("inputs.py", "")
@@ -453,7 +425,7 @@ class Steps(Base):
         cfg = self.run_config()
         del cfg["data"], cfg["shapes"]
         cfg["inputs_script"] = script
-        d = rp.Driver(cfg, run=run, ready=lambda u: True, sleep=lambda s: None, log=lambda line: None)
+        d = rp.Driver(cfg, run=run, ready=lambda u: True, log=lambda line: None)
         self.assertEqual((d.data, d.shapes), ([a], [b]))
 
         def relative(cmd, cwd=None, env=None, capture=False):
@@ -512,16 +484,16 @@ class Rebuild(Base):
         d.run_steps(["project", "load", "rebuild"])
         return d
 
-    def test_a_rebuild_from_databricks_exports_compares_and_projects_the_export(self):
+    def test_a_rebuild_from_jena_exports_compares_and_projects_the_export(self):
         fake = FakeRun()
-        self.rebuild("databricks", fake, databricks={"env": "dbx.env", "table": "c.s.t"})
+        self.rebuild("jena", fake)
         names = fake.scripts()
         start = names.index("rdfstore.py export")
         self.assertEqual(names[start:start + 3], ["rdfstore.py export", "rdfstore.py pack", "rdfstore.py compare"])
         export = next(cmd for cmd, _, _ in fake.calls if "export" in cmd)
-        self.assertEqual(export[export.index("--env") + 1], os.path.join(self.tmp, "dbx.env"))
+        self.assertEqual((export[export.index("--store") + 1], export[export.index("--gsp") + 1]), ("fuseki", JENA + "/data"))
         merge = [cmd for cmd, _, _ in fake.calls if "merge" in cmd][-1]
-        ttl = os.path.join(self.tmp, "re", "databricks-export", "ttl")
+        ttl = os.path.join(self.tmp, "re", "jena-export", "ttl")
         self.assertEqual(merge[-2:], [os.path.join(ttl, "graph-1.ttl"), os.path.join(ttl, "graph-3.ttl")])
         rules = [cmd for cmd, _, _ in fake.calls if any(c.endswith("check_projection_rules.py") for c in cmd)][-1]
         shapes = [rules[i + 1] for i, c in enumerate(rules) if c == "--shapes"]
@@ -539,13 +511,23 @@ class Rebuild(Base):
                           "release_record.py write", "release_record.py check"])
         copy = [cmd for cmd, _, _ in fake.calls if any(c.endswith("copy_graph.py") for c in cmd)][-1]
         self.assertIn("--replace", copy)
-        self.assertEqual(names[-4:], ["explore.py compare", "explore.py compare", "docker down", "docker down"])
+        self.assertEqual(names[-2:], ["explore.py compare", "explore.py compare"])
+        # The rebuild loads the same local Neo4j again, through the same env file.
+        loads = [cmd for cmd, _, _ in fake.calls if any(c.endswith("load_verify.py") for c in cmd)]
+        self.assertEqual([cmd[cmd.index("--env") + 1] for cmd in loads], [os.path.join(self.tmp, "local.env")] * 2)
+        self.assertEqual({cmd[0] for cmd, _, _ in fake.calls}, {"uv", "java"})
 
-    def test_a_rebuild_from_jena_loads_jena_first(self):
+    def test_a_rebuild_from_jena_loads_jena_first_and_only_once(self):
         fake = FakeRun()
         self.rebuild("jena", fake)
         names = fake.scripts()
         self.assertLess(names.index("rdfstore.py roundtrip"), names.index("rdfstore.py export"))
+        self.assertEqual([url for url, _ in self.updates].count(JENA + "/update"), 1)   # emptied once, then exported
+        fake = FakeRun()
+        self.updates.clear()
+        d = self.driver(self.run_config(rebuild={"source": "jena", "out": "re"}, replace_target=True), fake)
+        d.run_steps(["project", "load", "jena", "rebuild"])
+        self.assertEqual([url for url, _ in self.updates].count(JENA + "/update"), 1)
 
     def test_a_rebuild_whose_graph_hash_differs_fails(self):
         class Drifting(FakeRun):
@@ -596,7 +578,7 @@ class FilesMode(Base):
     def files_config(self, **extra):
         cfg = {"mode": "files", "projection_config": "config.json", "out": "out", "robot_jar": "robot.jar",
                "files": ["plain", "named.ttl", "releases/a/1.0.0/a.ttl"], "graphs": {"named.ttl": "https://x.org/named"},
-               "queries": "queries.json", **extra}
+               "queries": "queries.json", "neo4j_env": "local.env", "jena": JENA, "explore_fuseki": EXPLORE, **extra}
         path = self.write("run.json", json.dumps(cfg))
         with mock.patch.object(rp, "inside_repository", return_value=False):
             return rp.read_config(path)

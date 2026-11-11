@@ -1,10 +1,10 @@
 # Running the projection: where each step runs, pins, reports and scale
 
-Serves the load step (rule 5, the container) and the running step. Read it before the first load, when setting up the projection in a repository or its CI, and before each rerun. The scripts named here are in this skill's `scripts/`.
+Serves the load step (rule 5, the local Neo4j) and the running step. Read it before the first load, when setting up the projection in a repository or its CI, and before each rerun. The scripts named here are in this skill's `scripts/`.
 
 ## Rules
 
-1. **Split the steps by what they need.** CI runs only what needs no Java and no Docker (each line is `uv run --no-project --with rdflib python3 <script> ...`, with `--with pyshacl` for `validate_data.py`):
+1. **Split the steps by what they need.** CI runs only what needs no Java and no database (each line is `uv run --no-project --with rdflib python3 <script> ...`, with `--with pyshacl` for `validate_data.py`):
 
    ```bash
    check_projection_rules.py --config <config> --shapes <shapes>... --releases <folder> <data>...
@@ -17,16 +17,17 @@ Serves the load step (rule 5, the container) and the running step. Read it befor
    build.py check-report --manifest projection-manifest.json --report projection-report.json
    ```
 
-   A workstation runs reason (ROBOT needs Java 11 or later), then load and verify with `load_verify.py` against a Neo4j container (rule 5). *Why:* CI images rarely run Java and Docker together, and the committed report (rule 3) carries the workstation's result into CI.
+   A workstation runs reason (ROBOT needs Java 11 or later), then load and verify with `load_verify.py` against a local Neo4j (rule 5). *Why:* CI images rarely have Java and a Neo4j with plugins, and the committed report (rule 3) carries the workstation's result into CI.
 
 2. **Pin every tool by version, and every downloaded jar by its SHA-256, and check the checksums before each run.** Record the versions in the configuration's `versions`, which the manifest copies. For the tested versions:
 
    | Jar | Download URL | SHA-256 |
    |---|---|---|
    | n10s 2025.06.1 | https://github.com/neo4j-labs/neosemantics/releases/download/2025.06.1/neosemantics-2025.06.1.jar | `4c461087e08405c7cb472ecfefc043e9e8ed93628ed74988e4fda1f1bac54b3e` |
+   | APOC Core 2025.06.2 | https://github.com/neo4j/apoc/releases/download/2025.06.2/apoc-2025.06.2-core.jar | `4df40cea7444ea193d08f8a679aa998c498196fe149c8c02badb998f1c9580fb` |
    | ROBOT 1.9.10 | https://github.com/ontodev/robot/releases/download/v1.9.10/robot.jar | `16a73c074f3df359a7338a84b4e0788785fe06117f931bb9796e9619ea776105` |
 
-   Check with `shasum -a 256 <jar>`. If a checksum differs, stop: the file is not the one these rules were tested with. Take the n10s jar that matches the Neo4j version (n10s 2025.06.1 is built for Neo4j 2025.06). APOC is not downloaded: with `NEO4J_PLUGINS='["apoc"]'` the image copies the APOC jar it bundles into `/plugins` as `apoc.jar` (for `neo4j:2025.06.2`, SHA-256 `4df40cea7444ea193d08f8a679aa998c498196fe149c8c02badb998f1c9580fb`, from `apoc-2025.06.2-core.jar`). So pin the image instead: record its digest (`docker inspect --format '{{index .RepoDigests 0}}' neo4j:2025.06.2`; on 2026-10-23 it was `sha256:0347fe5b1126dd328cc68a54449c2cf83636e348e2da1547abf62b2dbfad67f2`), and let `load_verify.py --plugins-dir` record every jar's SHA-256 in the report. *Why:* a different jar changes which constraints run in the graph and how values round-trip.
+   Check the two plugin jars with `check_plugins.py <plugins folder>` (on Windows, `py check_plugins.py <plugins folder>`). It reads every `.jar` in the folder and compares its SHA-256 with the two pins, so a jar passes under any file name and a jar of another version fails. Check ROBOT with `shasum -a 256 <jar>`, or on Windows `certutil -hashfile <jar> SHA256`; `run_projection.py` checks it before it runs. If a checksum differs, stop: the file is not the one these rules were tested with. Take the n10s jar that matches the Neo4j version (n10s 2025.06.1 is built for Neo4j 2025.06). `load_verify.py --plugins-dir` records every jar's SHA-256 in the report. *Why:* a different jar changes which constraints run in the graph and how values round-trip.
 
 3. **Commit a manifest and a report that go stale on their own.** `build.py manifest` writes the manifest: the SHA-256 of each data and shape file, the triple counts, the input fingerprint (`pipeline.md`, rule 5), the shapes fingerprint (the SHA-256 of every shape file's bytes, concatenated in the order given), the Rule 4 option and its reason, the release exceptions and the versions; with `--verify` it fails when the committed manifest differs. `load_verify.py` writes the report, in the shape of `templates/projection-report.json`. Its fields:
 
@@ -52,67 +53,31 @@ Serves the load step (rule 5, the container) and the running step. Read it befor
 
 4. **Commit `inferred.nt`, the manifest and the report together, after one full workstation run.** Keep `loadable.nt`, `merged.ttl` and the downloads out of the repository; they are rebuilt from the Turtle files. *Why:* the three describe one run, and CI compares them with each other.
 
-5. **Run Neo4j in a container bound to localhost, with the pinned plugins, and remove it once `check-report` has passed, or when you stop.** Use the `neo4j:2025.06.2` image (Community edition), mount a plugins folder holding the checked n10s jar at `/plugins` and the import folder at `/import`, let the image install APOC, allow both procedure namespaces, and bind Bolt to `127.0.0.1` on a non-default port, with a password made for this run.
+5. **Load into a local Neo4j that already runs, with the two pinned plugins, and send the triples in the request.** The skill starts and stops no server. Use Neo4j 2025.06.2 on the same machine: on Windows, a local DBMS in Neo4j Desktop. The server needs three things:
 
-   **The default way to start it is the skill's compose file**, `docker/compose.yaml`, which pins the image by digest, fetches the n10s jar into the plugins folder and checks its SHA-256 before Neo4j starts, binds Bolt to `127.0.0.1`, and takes the password from `NEO4J_PASSWORD` (never written in the file). It needs the same run folder as below (`LPG_RUN`, holding `plugins/` and `import/`). From the `docker/` folder, with the run folder made as below:
+   - the n10s and APOC Core jars of rule 2 in its `plugins` folder (`check_plugins.py <plugins folder>` must exit 0);
+   - the line `dbms.security.procedures.unrestricted=apoc.*,n10s.*` in its `neo4j.conf`;
+   - a restart after either change.
 
-   ```bash
-   . "<run folder>/run.env"
-   LPG_RUN="$RUN" NEO4J_PASSWORD="$PASSWORD" LPG_BOLT_PORT="$PORT" \
-     docker compose -p "$CONTAINER" --profile neo4j up -d   # add --profile fuseki --build for add-on J
-   ```
+   Keep the address and the login in an env file outside the repository, readable by you alone: `NEO4J_URI` (such as `bolt://127.0.0.1:7687`), `NEO4J_USERNAME`, `NEO4J_PASSWORD` and optionally `NEO4J_DATABASE`. Every script that reads the graph takes that file as `--env <file>` and never prints the password.
 
-   Wait for the start with `docker compose -p "$CONTAINER" logs neo4j` showing `Started.`, run steps 1 to 3 below, then remove everything with `docker compose -p "$CONTAINER" --profile neo4j --profile fuseki down -v`, which removes the containers and their anonymous `/data` and `/logs` volumes, as `docker rm -f -v` does. Pass `--compose-project "$CONTAINER"` to `load_verify.py` (in place of `--container`), so the clean-up line it prints is that `down -v` line. The manual recipe that follows is the reference for what the compose file does.
+   **The load empties the database it is pointed at:** every node, then every constraint. Give it a database that holds nothing else. Community edition has one user database, so there the DBMS itself must be the projection's own.
 
-   The plugins folder must be writable: the image changes its owner and writes `apoc.jar` into it, so a read-only mount (`:ro`) stops the container. Make new folders for each run, and copy the checked n10s jar into the plugins folder, so the image never writes into the folder that holds your downloads.
+   Then, in this order:
+   1. run `load_verify.py` as its docstring shows, with `--env <file>` (or `--bolt <URI>` with `NEO4J_PASSWORD` and `NEO4J_USERNAME` in the environment), `--database <name>` when the file names none and the default is not the one you want, `--plugins-dir <plugins folder>`, and the configuration, shape, data, `merged.ttl`, `loadable.nt`, `inferred.nt` and `--report` arguments, and `--separator` when the kept graph should use another separator than n10s's (`pipeline.md`, rule 11; give the same value to every later command that reads the names back; `copy_graph.py` takes none);
+   2. if it exits 1 or 2, stop here and do not run `check-report`. No report exists then; on exit 1 after the database checks, `<report>.failed` holds the values. The run deleted the report path when it started, so if that path is the committed report, restore it (`git restore projection-report.json`) and never stage `<report>.failed`. To try again after a fix (a case with status `no case` needs a manual case in a `--manual-cases` file, `pipeline.md`, rule 14), rerun step 1; `load_verify.py` empties the database itself. Every rerun runs every case again;
+   3. run `build.py check-report --manifest projection-manifest.json --report projection-report.json`, as in rule 1; if you copy the graph to another Neo4j (`add-ons.md`, add-on I), do it now, before anything else writes to the local graph.
 
-   Agent tools often start a fresh shell for every command, so keep the run's settings in a file, not in shell variables: a mode-600 `run.env` in a new run folder, read at the start of each later command and deleted with the folder after removal. Pick a container name and a free host port for this run; the examples use `lpg-projection` and 17687.
-
-   ```bash
-   RUN=$(mktemp -d); chmod 711 "$RUN"; echo "$RUN"          # note this path; every later command starts from it
-   mkdir -m 755 "$RUN/plugins" "$RUN/import"
-   cp <downloads>/neosemantics-2025.06.1.jar "$RUN/plugins/"
-   ( umask 077; printf 'CONTAINER=%q\nPORT=%q\nPASSWORD=%q\nRUN=%q\n' lpg-projection 17687 "$(openssl rand -hex 12)" "$RUN" > "$RUN/run.env" )
-   . "$RUN/run.env"
-   docker run -d --name "$CONTAINER" -p "127.0.0.1:$PORT:7687" \
-     -e NEO4J_AUTH="neo4j/$PASSWORD" -e NEO4J_PLUGINS='["apoc"]' \
-     -e NEO4J_dbms_security_procedures_unrestricted='apoc.*,n10s.*' \
-     -v "$RUN/import":/import -v "$RUN/plugins":/plugins \
-     neo4j:2025.06.2@sha256:0347fe5b1126dd328cc68a54449c2cf83636e348e2da1547abf62b2dbfad67f2
-   ```
-
-   The `chmod 711` on the run folder and `755` on the two mounted folders matter: a folder only its owner can open (what `mktemp -d` makes) stops the container at once ("Folder /plugins is not accessible for user: neo4j"), while `run.env` itself stays readable by you alone.
-
-   Then wait for the start, and stop on a failure. The check is a function that returns, so a failure ends the command and not your shell:
-
-   ```bash
-   . "<run folder>/run.env"
-   wait_for_neo4j() {
-     for i in $(seq 1 60); do
-       docker logs "$CONTAINER" 2>&1 | grep -q 'Started.' && return 0
-       [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER")" = true ] || { docker logs "$CONTAINER" 2>&1 | tail -20; return 1; }
-       docker logs "$CONTAINER" 2>&1 | grep -q ' ERROR ' && { docker logs "$CONTAINER" 2>&1 | tail -20; return 1; }
-       sleep 3
-     done
-     echo 'Neo4j did not start in 180 seconds'; return 1
-   }
-   wait_for_neo4j
-   ```
-
-   Then, in this order, each command starting with `. "<run folder>/run.env"`:
-   1. run `load_verify.py` as its docstring shows, with `NEO4J_PASSWORD="$PASSWORD"`, `--bolt "bolt://127.0.0.1:$PORT"`, `--import-dir "$RUN/import"`, `--plugins-dir "$RUN/plugins"`, `--container "$CONTAINER"` (or `--compose-project "$CONTAINER"` when you started it with the compose file) and the configuration, shape, data, `merged.ttl`, `loadable.nt`, `inferred.nt` and `--report` arguments, and `--separator` when the kept graph should use another separator than n10s's (`pipeline.md`, rule 11; give the same value to every later command that reads the names back; `copy_graph.py` takes none). It prints its next step with that container name;
-   2. if it exits 1 or 2, stop here and do not run `check-report`. No report exists then; on exit 1 after the database checks, `<report>.failed` holds the values. The run deleted the report path when it started, so if that path is the committed report, restore it (`git restore projection-report.json`) and never stage `<report>.failed`. To try again after a fix (a case with status `no case` needs a manual case in a `--manual-cases` file, `pipeline.md`, rule 14), rerun step 1 while the container is still up; `load_verify.py` empties the database itself. If you stop instead, go to step 4. Every rerun runs every case again;
-   3. run `build.py check-report --manifest projection-manifest.json --report projection-report.json`, as in rule 1; if you copy the graph to another Neo4j, such as Aura (`add-ons.md`, add-on I), do it now, while the container is up;
-   4. only then `docker rm -f -v "$CONTAINER"` (with the compose file, `docker compose -p "$CONTAINER" --profile neo4j --profile fuseki down -v`), then delete the run folder with its `run.env`. If you stop before `check-report` passes, do the same anyway; `docker ps -a` then lists no projection container. The `-v` removes the container's anonymous `/data` and `/logs` volumes; without it each run leaves them behind, and after a few runs Docker's disk fills and Neo4j fails to start ("Database name 'system' is invalid"). *Why:* the load script reads `file:///import/...`; Community edition has one user database, so the determinism check empties it between loads (`pipeline.md`, rule 17); and a forgotten container with a known password is an open database on the workstation.
+   *Why:* the triples travel in the request (n10s's `import.inline` procedures), so the server reads no file: it needs no import folder, no file-access setting and no shared disk, and the same command works against a server on another machine. The ontology and the shapes go in one request each, because n10s's ontology import reads a declaration and the triples that use it together (split into requests of seven lines, it loaded 38 of the template's 51 ontology triples) and shapes hold blank nodes. `loadable.nt` and `inferred.nt` hold one triple per line and no blank node (`design-rules.md`, Rule 3), so they go in batches of whole lines, at most 1,000,000 bytes each; every request must return `OK`, and the triples loaded must add up to the file's lines. The determinism check empties the database between its two loads (`pipeline.md`, rule 17).
 
 6. **Change only the loader as the graph grows:**
 
    | Size | Loader | What changes |
    |---|---|---|
-   | Up to about 10M triples | n10s `rdf.import.fetch` | Nothing |
+   | Up to about 10M triples | n10s `rdf.import.inline`, in batches of lines | Nothing |
    | About 10M to 1B+ triples | Generate node and relationship CSVs from `loadable.nt` and `inferred.nt` with the same mapping, then `neo4j-admin database import` | Only the load step |
    | Incremental updates | Load each delta with n10s (MERGE by `uri`); delete with `n10s.rdf.delete` | Add a periodic full rebuild and compare hashes |
 
    *Why:* the mapping rules do not depend on size, so the checks and the verify step stay valid.
 
-7. **Explore a graph read-only through the official Neo4j MCP server.** Neo4j's MCP server (https://github.com/neo4j/mcp, README at commit `1210b0e8f0`, read 2026-10-24) gives an agent `get-schema`, `read-cypher`, `write-cypher` and `list-gds-procedures` on a running Neo4j. Point it at the verified local graph or its Aura copy with `NEO4J_MCP_READ_ONLY=true`, which disables `write-cypher`. That is a guard, not a boundary: the README warns that `read-cypher` relies on Neo4j classifying each query as read-only, and "custom procedures or functions incorrectly classified as read-only by Neo4j may bypass this check". For a hard boundary, give the server a database user with read-only privileges (on Aura, a read-only role), and do not install custom procedures you have not reviewed. *Why:* the graph is a projection of the Turtle release; a fix made through the server would be lost at the next rebuild and would break the hash that proves the copy (`add-ons.md`, add-on I).
+7. **Explore a graph read-only through the official Neo4j MCP server.** Neo4j's MCP server (https://github.com/neo4j/mcp, README at commit `1210b0e8f0`, read 2026-10-24) gives an agent `get-schema`, `read-cypher`, `write-cypher` and `list-gds-procedures` on a running Neo4j. Point it at the verified local graph or its copy with `NEO4J_MCP_READ_ONLY=true`, which disables `write-cypher`. That is a guard, not a boundary: the README warns that `read-cypher` relies on Neo4j classifying each query as read-only, and "custom procedures or functions incorrectly classified as read-only by Neo4j may bypass this check". For a hard boundary, give the server a database user with read-only privileges, and do not install custom procedures you have not reviewed. *Why:* the graph is a projection of the Turtle release; a fix made through the server would be lost at the next rebuild and would break the hash that proves the copy (`add-ons.md`, add-on I).

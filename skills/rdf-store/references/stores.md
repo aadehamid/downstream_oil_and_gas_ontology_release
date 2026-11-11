@@ -2,7 +2,13 @@
 
 ## Jena Fuseki, and any Graph Store Protocol store
 
-Jena Fuseki is the default store. From `docker/`, `docker compose -p <project> up -d --build` builds Fuseki 6.2.0 from the pinned, checksummed package and jar (the Dockerfile says how), with an in-memory dataset `/ds`; `docker compose -p <project> down -v` removes it. `RDF_FUSEKI_PORT` sets the port (default 13031). The endpoints:
+Jena Fuseki is the default store. Use the plain Apache download, one jar, started with Java:
+
+1. Download `jena-fuseki-server-6.2.0.jar` from `https://repo1.maven.org/maven2/org/apache/jena/jena-fuseki-server/6.2.0/`.
+2. Check its SHA-256. It must be `2c92c598e65ab69d99820052e05f4277ed1d77980a8845f87545ad35b71a76ee`. On Windows run `certutil -hashfile jena-fuseki-server-6.2.0.jar SHA256`; on macOS or Linux run `shasum -a 256 jena-fuseki-server-6.2.0.jar`.
+3. Start it: `java -jar jena-fuseki-server-6.2.0.jar --mem --update --localhost --port 3030 /ds`. Leave the window open; Ctrl+C stops the server.
+
+`--mem` keeps the dataset `/ds` in memory, `--update` allows writes, and `--localhost` accepts requests from this machine only. The server answers `http://127.0.0.1:3030/$/ping` when it is up. The endpoints:
 
 - Graph Store Protocol: `http://127.0.0.1:<port>/ds/data`
 - SPARQL query: `http://127.0.0.1:<port>/ds/query`
@@ -16,15 +22,22 @@ Jena Fuseki is the default store. From `docker/`, `docker compose -p <project> u
 
 An in-memory dataset starts empty on every restart, which makes "nothing you have not loaded" (SKILL.md, step 3) a restart away.
 
-The `ontology-to-lpg` skill keeps a copy of `docker/fuseki/Dockerfile` for its own count checks. The two differ only in their opening comments; a test fails when their build steps differ, so update both together.
-
 ## Databricks: a Delta triple table
 
-`roundtrip --store databricks --env <file> [--table <name>]` writes the dataset to a Delta table in Unity Catalog and reads it back, from this machine over the Databricks SQL connector. The env file, outside any repository, holds `DATABRICKS_HOST`, `DATABRICKS_TOKEN`, `DATABRICKS_HTTP_PATH` (the SQL warehouse's), `DATABRICKS_CATALOG` and `DATABRICKS_SCHEMA`. The schema must exist. The run touches two tables: `<table>` (default `rdf_quads`) and a staging table of its own, `<table>__staging_<random>`, so two runs on one table never verify or promote each other's rows.
+Spark is the only Databricks path. A Databricks notebook already has a Spark session, `spark`, so the load needs no host name, no warehouse and no credential. There is no command for it, because there is no Spark outside the notebook. The notebook imports `rdfstore.py` and calls it:
 
-- **Staging, then one replace.** The rows go into the run's staging table, which the script exports and compares first. Only a staging copy with the same hash replaces `<table>`, in one `CREATE OR REPLACE TABLE <table> AS SELECT * FROM <staging>`, a single Delta transaction; the staging table is dropped whatever happens, and the live table is read back and compared again, since that is what consumers see. When two runs target one table, the last to replace it wins. A failure or a mismatch before the replace leaves the previous `<table>` as it was (the report says `"published": false`).
-- **Unsupported terms are refused first.** RDF 1.2 triple terms and literals with a base direction stop the run with exit 2 before any statement runs.
-- **The token** is removed from every message the script prints and from the report, including the connector's own errors and any data value that holds it; errors about the env file name the setting, never its value.
+```python
+import rdfstore as rs
+dataset = rs.pack(files)                      # one named graph per file
+store = rs.SparkStore(spark, "<catalog>.<schema>.<table>")
+passed, report = rs.roundtrip(store, dataset)
+```
+
+`SparkStore` calls one method of the session, `spark.sql(<statement>)`, and reads rows with `.collect()` on its result. The schema must exist. The table name is one to three parts of letters, digits and `_`; any other name is refused before a statement runs. The run touches two tables: `<table>` and a staging table of its own, `<table>__staging_<random>`, so two runs on one table never verify or promote each other's rows.
+
+- **Staging, then one replace.** The rows go into the run's staging table, which `roundtrip` exports and compares first. Only a staging copy with the same hash replaces `<table>`, in one `CREATE OR REPLACE TABLE <table> AS SELECT * FROM <staging>`, a single Delta transaction. The staging table is dropped whatever happens. The live table is then read back and compared again, since that is what consumers see. When two runs target one table, the last to replace it wins. A failure or a mismatch before the replace leaves the previous `<table>` as it was (the report says `"published": false`).
+- **Unsupported terms are refused first.** RDF 1.2 triple terms and literals with a base direction raise `BadInput` before any statement runs.
+- **Reading it back.** `store.export()` returns the live table as a dataset. `rs.dataset_hash(dataset)` gives its RDFC-1.0 hash, and `rs.nquads_text(dataset)` its sorted N-Quads.
 
 The table is N-Quads as columns:
 
@@ -40,6 +53,4 @@ The table is N-Quads as columns:
 
 Every value travels base64-encoded inside the INSERT and is decoded in SQL (`decode(unbase64(...), 'UTF-8')`), so no text from the data is ever read as SQL, whatever quotes or backslashes it holds. Rows go in batches of 2,000 per statement.
 
-**Both editions.** Free Edition gives one small serverless SQL warehouse and limits outbound internet to trusted domains, so every transfer runs from this machine; never push from a notebook to an outside service. Enterprise runs the same path; a job in the workspace can do the same work where its network policy allows the destination, and its result counts only when its hash equals this script's.
-
-The table is a store, not a reasoner or a SPARQL endpoint: query it with SQL, or `export` it to N-Quads (and Turtle, one file per graph) to rebuild a triple store or a property graph.
+The table is a store, not a reasoner or a SPARQL endpoint: query it with SQL, or export it from the notebook to rebuild a triple store or a property graph.
