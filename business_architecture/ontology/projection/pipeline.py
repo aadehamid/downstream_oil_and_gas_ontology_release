@@ -31,7 +31,7 @@ ONTOLOGY = os.path.join(HERE, "..")
 # while data-product, value-stream, market-data and integration still require kpi 1.2.0.
 PACKAGES = [("core", "2.4.0"), ("organization", "2.2.0"), ("ref-mpc", "1.3.0"), ("kpi", "1.3.0"), ("party", "2.1.0"),
             ("data-product", "1.2.0"), ("value-stream", "1.2.0"), ("system", "1.5.0"), ("lane", "1.1.0"),
-            ("market-data", "1.1.0"), ("integration", "2.5.0"), ("technical-graph", "1.0.0"), ("logical-model", "1.0.0")]
+            ("market-data", "1.1.0"), ("integration", "2.5.0"), ("technical-graph", "1.1.0"), ("logical-model", "1.0.0")]
 INPUTS = [f"releases/{m}/{v}/{m}.ttl" for m, v in PACKAGES]
 # Each package's own shapes. core 2.4.0's, as 2.3.0's, 2.2.0's and 2.1.0's, carry the controlled-value shapes
 # (the decision of 2026-10-18), so validation/controlled-values.ttl is not listed again.

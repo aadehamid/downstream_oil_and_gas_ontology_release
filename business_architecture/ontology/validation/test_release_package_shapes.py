@@ -26,7 +26,7 @@ import newest  # noqa: E402
 core = importlib.import_module(newest.core_builder())  # the newest core builder: its version and the version it builds from
 
 # Pinned by hand: each module's newest package and the one before it (the decision of 2026-10-31). A new release
-# must join this list, so its package is checked here. technical-graph and logical-model have one release each.
+# must join this list, so its package is checked here. logical-model has one release.
 PACKAGES = [
     ("core", "2.3.0"), ("core", "2.4.0"),
     ("data-product", "1.1.0"), ("data-product", "1.2.0"), ("integration", "2.4.0"), ("integration", "2.5.0"),
@@ -34,7 +34,7 @@ PACKAGES = [
     ("logical-model", "1.0.0"), ("market-data", "1.0.0"), ("market-data", "1.1.0"),
     ("organization", "2.1.0"), ("organization", "2.2.0"), ("party", "2.0.0"), ("party", "2.1.0"),
     ("ref-mpc", "1.2.0"), ("ref-mpc", "1.3.0"), ("system", "1.4.0"), ("system", "1.5.0"),
-    ("technical-graph", "1.0.0"), ("value-stream", "1.1.0"), ("value-stream", "1.2.0"),
+    ("technical-graph", "1.0.0"), ("technical-graph", "1.1.0"), ("value-stream", "1.1.0"), ("value-stream", "1.2.0"),
 ]
 
 
@@ -144,8 +144,8 @@ class ReleaseInventory(unittest.TestCase):
         self.assertTrue(newest <= expected)
         self.assertIn(("core", "2.3.0"), expected)
         self.assertIn(("kpi", "1.2.0"), expected)
-        # every module has a version before its newest, except technical-graph, whose 1.0.0 is its only release (the decision of 2026-11-02)
-        self.assertEqual(len(expected), 2 * len(newest) - 2)
+        # every module has a version before its newest, except logical-model, whose 1.0.0 is its only release (the decision of 2026-11-02)
+        self.assertEqual(len(expected), 2 * len(newest) - 1)
         self.assertTrue(expected <= packages_on_disk())
 
     def test_a_tree_missing_a_previous_package_is_found_out(self):

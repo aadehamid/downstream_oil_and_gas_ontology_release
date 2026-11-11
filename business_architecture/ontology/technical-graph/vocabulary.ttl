@@ -3,6 +3,9 @@
 # nodes, row counts, refresh times and check results stay in the technical graph and its Delta copy,
 # never in the ontology (the decision of 2026-10-31, decision 14). Designed lineage stays in data-product;
 # this vocabulary links a built thing to its design by IRI. Its six competency questions are 45 to 50.
+# 1.1.0 adds what a graph built from a live platform needs: the data object on an earlier platform that a data
+# object replaces, and the job or pipeline that writes a data object (KPI-DEC-0001, decided under its delegation).
+# Its competency questions are 56 and 57.
 @prefix tg: <https://w3id.org/mpc/ontology/modules/technical-graph/> .
 @prefix result: <https://w3id.org/mpc/ontology/modules/technical-graph/check-result/> .
 @prefix dp: <https://w3id.org/mpc/ontology/modules/data-product/> .
@@ -18,7 +21,7 @@
 
 tg:TechnicalObject a owl:Class ;
     rdfs:label "technical object"@en ;
-    skos:definition "A thing built or run on a data platform, or feeding it, that the technical graph records as it is: a host, a source database, a table, a view, a pipeline step, a quality check or an agent. A record of what was built, never its design: the design is in data-product."@en ;
+    skos:definition "A thing built or run on a data platform, or feeding it, that the technical graph records as it is: a host, a source database, a table, a view, a pipeline step, a builder, a quality check or an agent. A record of what was built, never its design: the design is in data-product."@en ;
     dcterms:bibliographicCitation "the decision of 2026-11-02, items 2 and 4; the decision of 2026-10-28"@en .
 
 tg:Host a owl:Class ;
@@ -68,6 +71,24 @@ tg:PipelineStep a owl:Class ;
     rdfs:label "pipeline step"@en ;
     skos:definition "One step of the pipeline that builds or loads the platform, in the order it runs."@en ;
     dcterms:bibliographicCitation "the decision of 2026-11-02, item 2"@en .
+
+tg:Builder a owl:Class ;
+    rdfs:subClassOf tg:TechnicalObject ;
+    rdfs:label "builder"@en ;
+    skos:definition "A technical object that the data platform runs to write data objects: a job or a pipeline, identified by the ID the platform gives it. The platform's own lineage names it as the writer. It differs from a pipeline step, which is one ordered step of the pipeline that builds the platform itself."@en ;
+    dcterms:bibliographicCitation "KPI-DEC-0001, decided under its delegation (the technical graph is built from the platform's builders); Databricks, Lineage system tables reference, entity_type and entity_id, last updated 2026-11-04, https://docs.databricks.com/aws/en/admin/system-tables/lineage"@en .
+
+tg:Job a owl:Class ;
+    rdfs:subClassOf tg:Builder ;
+    rdfs:label "job"@en ;
+    skos:definition "A builder that runs a set of tasks, on a schedule or when asked."@en ;
+    dcterms:bibliographicCitation "KPI-DEC-0001, decided under its delegation; Databricks, Jobs system table reference, the jobs table, last updated 2026-11-06, https://docs.databricks.com/aws/en/admin/system-tables/jobs"@en .
+
+tg:Pipeline a owl:Class ;
+    rdfs:subClassOf tg:Builder ;
+    rdfs:label "pipeline"@en ;
+    skos:definition "A builder that keeps a declared set of data objects up to date, and that the data platform runs as one unit."@en ;
+    dcterms:bibliographicCitation "KPI-DEC-0001, decided under its delegation; Databricks, Jobs system table reference, the pipelines table, last updated 2026-11-06, https://docs.databricks.com/aws/en/admin/system-tables/jobs"@en .
 
 tg:QualityCheck a owl:Class ;
     rdfs:subClassOf tg:TechnicalObject ;
@@ -129,6 +150,18 @@ tg:producedBy a owl:ObjectProperty ;
     rdfs:domain tg:TechnicalObject ; rdfs:range tg:PipelineStep ;
     skos:definition "The pipeline step that last built, loaded or recorded the technical object."@en ;
     dcterms:bibliographicCitation "the decision of 2026-11-02, item 2"@en .
+
+tg:builtBy a owl:ObjectProperty ;
+    rdfs:label "built by"@en ;
+    rdfs:domain tg:DataObject ; rdfs:range tg:Builder ;
+    skos:definition "A builder that writes the data object, as the platform's lineage records it. A data object that several builders write has one link to each."@en ;
+    dcterms:bibliographicCitation "KPI-DEC-0001, decided under its delegation (the technical graph is built from the platform's builders); Databricks, Lineage system tables reference, entity_type and entity_id, last updated 2026-11-04, https://docs.databricks.com/aws/en/admin/system-tables/lineage"@en .
+
+tg:replaces a owl:ObjectProperty ;
+    rdfs:label "replaces"@en ;
+    rdfs:domain tg:DataObject ; rdfs:range tg:DataObject ;
+    skos:definition "The data object on an earlier platform whose place the subject takes on the data platform, such as the warehouse table a lakehouse table is migrated from. Both are recorded as built, so the two can stand side by side while the migration runs."@en ;
+    dcterms:bibliographicCitation "KPI-DEC-0001, decided under its delegation (the technical graph records the table on the earlier platform that a table replaces)"@en .
 
 tg:next a owl:ObjectProperty ;
     rdfs:label "next"@en ;

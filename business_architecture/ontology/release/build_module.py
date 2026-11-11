@@ -223,15 +223,18 @@ MODULES = {
     # The follow-up release's new module. 1.0.0 is its first release, a major the subject matter expert approved
     # (the decision of 2026-11-02, amendment of 2026-11-02, later). Its example graph is test data and never joins the package
     # (the ontology skill's new-module rule 9).
+    # 1.1.0 is a minor decided under the delegation of KPI-DEC-0001: tg:replaces, tg:builtBy and the builder classes,
+    # for a technical graph built from a live platform.
     "technical-graph": {
         "title": "MPC Technical Graph Module",
-        "description": "The kinds of thing a technical graph records about a data platform as built: hosts, source databases, tables, views, metric views, pipeline steps, quality checks and agents, and the links between them; each built thing points to its design in data-product, the measure it computes in kpi and the system it copies from in system. Definitions only, never the graph's records.",
-        "version": "1.0.0", "stage": None, "issued": "2026-11-02",
-        "approval": ("(the review comments of a subject matter expert reviewing the documents)", "1. approve 1.0.0"),
+        "description": "The kinds of thing a technical graph records about a data platform as built: hosts, source databases, tables, views, metric views, pipeline steps, the jobs and pipelines that build data objects, quality checks and agents, and the links between them, among them the data object on an earlier platform that a data object replaces; each built thing points to its design in data-product, the measure it computes in kpi and the system it copies from in system. Definitions only, never the graph's records.",
+        "version": "1.1.0", "stage": None,
+        "approver": "The build's agent, delegated under KPI-DEC-0001", "issued": "2026-11-11",
+        "approval": ("../domain/kpi-store-decisions/KPI-DEC-0001.md", "Decide anything inside the plan yourself and log it."),
         "parts": ["technical-graph/vocabulary.ttl"],
         "shapes": ["technical-graph/shapes.ttl"],
         "depends_on": ["data-product", "kpi", "system"],
-        "decisions": ["the decision of 2026-11-02"],
+        "decisions": ["the decision of 2026-11-02", "KPI-DEC-0001"],
     },
     # The integration package's first release, a major the subject matter expert approved with the release plan
     # (the decision of 2026-10-22). It packages three small vocabularies, each keeping its own namespace; the package

@@ -54,3 +54,5 @@ question,status,queries,waits_for
 53,answerable,q53-customer-keys.rq,
 54,answerable,q54-business-term.rq;q54b-no-business-term.rq,
 55,answerable,q55-implemented-by.rq;q55b-not-implemented.rq,
+56,answerable,q56-replaces.rq;q56b-replaces-itself.rq,
+57,answerable,q57-built-by.rq,

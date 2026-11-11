@@ -1,0 +1,8 @@
+# Q56 What does it replace: each data object that takes the place of a data object on an earlier platform, with both names and the design of the new one where it has one.
+PREFIX tg: <https://w3id.org/mpc/ontology/modules/technical-graph/>
+SELECT ?object ?name ?replaced ?replacedName ?design WHERE {
+  ?object tg:replaces ?replaced ;
+          tg:name ?name .
+  ?replaced tg:name ?replacedName .
+  OPTIONAL { ?object tg:designedAs ?design }
+}

@@ -268,7 +268,7 @@ proc:CM-1-2-4 lane:officeLane lanev:back-office .
 
 ### technical-graph: what was built on the data platform
 
-The module defines the kinds of thing a technical graph records about a data platform as built: hosts, source databases, tables, views, metric views, pipeline steps, quality checks and agents. It holds definitions only; the graph's nodes, row counts and check results stay in the technical graph (the decision of 2026-11-02). Its links reach three modules by IRI: a metric view `implements` a `kpi` measure, a source database `standsFor` a `system` system, and a built thing is `designedAs` its design in `data-product`, with its `layer` from data-product's layer code list. Here the definitions state the first two links.
+The module defines the kinds of thing a technical graph records about a data platform as built: hosts, source databases, tables, views, metric views, pipeline steps, quality checks and agents. *2026-11-11:* 1.1.0 adds the jobs and pipelines that build a data object (`tg:builtBy`) and the data object on an earlier platform that a data object replaces (`tg:replaces`). It holds definitions only; the graph's nodes, row counts and check results stay in the technical graph (the decision of 2026-11-02). Its links reach three modules by IRI: a metric view `implements` a `kpi` measure, a source database `standsFor` a `system` system, and a built thing is `designedAs` its design in `data-product`, with its `layer` from data-product's layer code list. Here the definitions state the first two links.
 
 <!-- module: technical-graph -->
 ```turtle

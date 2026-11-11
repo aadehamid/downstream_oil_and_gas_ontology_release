@@ -63,12 +63,14 @@ class Vocabulary(unittest.TestCase):
 class Example(unittest.TestCase):
     def test_the_example_holds_its_committed_figures(self):
         # The example is kept as committed. These figures were counted by hand from the file, so a changed file fails here.
-        self.assertEqual(len(EXAMPLE), 409)
+        # 1.1.0 added 13 triples to the 409: two earlier tables (2 each), a job and a pipeline (2 each), two
+        # replaces links and three builtBy links.
+        self.assertEqual(len(EXAMPLE), 422)
         kinds = {cls: len(set(EXAMPLE.subjects(RDF.type, TG[cls]))) for cls in
-                 ("Agent", "DefinitionsView", "Host", "MetricView", "Orchestrator", "PipelineStep", "QualityCheck",
-                  "SourceDatabase", "Table")}
-        self.assertEqual(kinds, {"Agent": 2, "DefinitionsView": 3, "Host": 1, "MetricView": 3, "Orchestrator": 1,
-                                 "PipelineStep": 5, "QualityCheck": 7, "SourceDatabase": 2, "Table": 19})
+                 ("Agent", "DefinitionsView", "Host", "Job", "MetricView", "Orchestrator", "Pipeline", "PipelineStep",
+                  "QualityCheck", "SourceDatabase", "Table")}
+        self.assertEqual(kinds, {"Agent": 2, "DefinitionsView": 3, "Host": 1, "Job": 1, "MetricView": 3, "Orchestrator": 1,
+                                 "Pipeline": 1, "PipelineStep": 5, "QualityCheck": 7, "SourceDatabase": 2, "Table": 21})
 
     def test_the_example_uses_only_the_vocabulary(self):
         defined = set(VOCAB.subjects())
@@ -91,8 +93,170 @@ class Questions(unittest.TestCase):
         self.assertLessEqual(copies, rows)
 
 
+DEMO = "urn:pricing-demo:tech:"
+DESIGN = "https://w3id.org/mpc/ontology/modules/data-product/table/"
+BATCH, DETAIL = "silver_mdm_core.mips_price_batch_dim", "silver_udm_core.mpr_price_detail_fact"
+JOB, PIPELINE = DEMO + "builder/job-nightly-pricing-build", DEMO + "builder/pipeline-price-detail-refresh"
+
+
+def rows(name, graph):
+    with open(os.path.join(ONTOLOGY, "regression", "queries", name), encoding="utf-8") as f:
+        return {tuple(None if v is None else str(v) for v in r) for r in graph.query(f.read())}
+
+
+class Release_1_1_0(unittest.TestCase):
+    """What 1.1.0 adds, pinned by hand from its changelog, and what it keeps of 1.0.0."""
+
+    ADDED = {"Builder", "Job", "Pipeline", "builtBy", "replaces"}
+
+    def previous(self):
+        # 1.0.0 is the newest package until 1.1.0 is written, and the one before it afterwards.
+        for folder in (("releases", "previous"), ("releases",)):
+            path = os.path.join(ONTOLOGY, *folder, "technical-graph", "1.0.0", "technical-graph.ttl")
+            if os.path.exists(path):
+                return Graph().parse(path)
+        self.fail("technical-graph 1.0.0 is not on disk")
+
+    def declared(self, g):
+        return {s for s in g.subjects(RDF.type, None) if str(s).startswith(str(TG))}
+
+    def test_the_counts_of_each_kind_of_term(self):
+        self.assertEqual(len(set(VOCAB.subjects(RDF.type, OWL.Class))), 15)
+        self.assertEqual(len(set(VOCAB.subjects(RDF.type, OWL.ObjectProperty))), 15)
+        self.assertEqual(len(set(VOCAB.subjects(RDF.type, OWL.DatatypeProperty))), 9)
+        self.assertEqual(len(set(VOCAB.subjects(RDF.type, SKOS.Concept))), 3)
+
+    def test_it_declares_every_term_of_1_0_0_and_exactly_five_more(self):
+        before, now = self.declared(self.previous()), self.declared(VOCAB)
+        self.assertEqual(len(before), 38)   # 12 classes, 22 properties, the code list and its 3 values
+        self.assertEqual(before - now, set())
+        self.assertEqual({str(s)[len(str(TG)):] for s in now - before}, self.ADDED)
+
+    def test_nothing_is_deprecated(self):
+        self.assertEqual(list(VOCAB.subject_objects(OWL.deprecated)), [])
+
+    def test_every_statement_of_1_0_0_is_kept_but_one_definition(self):
+        module = URIRef(str(TG).rstrip("/"))
+        lost = {t for t in self.previous() if t[0] != module and t not in VOCAB}
+        # The one changed statement: the definition of a technical object now lists a builder among its examples.
+        self.assertEqual({(s, p) for s, p, _ in lost}, {(TG.TechnicalObject, SKOS.definition)})
+        self.assertIn("a pipeline step, a builder, a quality check", str(VOCAB.value(TG.TechnicalObject, SKOS.definition)))
+
+    def test_each_new_property_has_one_domain_one_range_and_a_cardinality(self):
+        from rdflib.namespace import RDFS
+        for name, domain, rng in (("replaces", TG.DataObject, TG.DataObject), ("builtBy", TG.DataObject, TG.Builder)):
+            self.assertEqual(list(VOCAB.objects(TG[name], RDF.type)), [OWL.ObjectProperty])
+            self.assertEqual(list(VOCAB.objects(TG[name], RDFS.domain)), [domain])
+            self.assertEqual(list(VOCAB.objects(TG[name], RDFS.range)), [rng])
+            shapes = [s for s in SHAPES.subjects(SH.path, TG[name]) if (None, SH.property, s) in SHAPES]
+            self.assertEqual(len(shapes), 1, name)
+            self.assertEqual(SHAPES.value(shapes[0], SH.minCount).toPython(), 0)
+            self.assertIsNone(SHAPES.value(shapes[0], SH.maxCount))
+            self.assertIn((next(SHAPES.subjects(SH.property, shapes[0])), SH.targetClass, TG.DataObject), SHAPES)
+
+    def test_a_job_and_a_pipeline_are_builders_and_a_builder_is_a_technical_object(self):
+        from rdflib.namespace import RDFS
+        self.assertEqual(list(VOCAB.objects(TG.Job, RDFS.subClassOf)), [TG.Builder])
+        self.assertEqual(list(VOCAB.objects(TG.Pipeline, RDFS.subClassOf)), [TG.Builder])
+        self.assertEqual(list(VOCAB.objects(TG.Builder, RDFS.subClassOf)), [TG.TechnicalObject])
+
+    def test_q56_names_what_each_table_replaces(self):
+        # Written by hand from the example graph's two made-up links.
+        self.assertEqual(rows("q56-replaces.rq", VOCAB + EXAMPLE), {
+            (DEMO + "object/" + BATCH, BATCH, DEMO + "earlier/mdm_core.mips_price_batch_dim",
+             "earlier_warehouse.mdm_core.mips_price_batch_dim", DESIGN + "silver-mips-price-batch-dim"),
+            (DEMO + "object/" + DETAIL, DETAIL, DEMO + "earlier/udm_core.mpr_price_detail_fact",
+             "earlier_warehouse.udm_core.mpr_price_detail_fact", DESIGN + "silver-mpr-price-detail-fact")})
+
+    def test_q56_finds_nothing_without_the_links(self):
+        g = Graph()
+        g += EXAMPLE
+        g.remove((None, TG.replaces, None))
+        self.assertEqual(rows("q56-replaces.rq", VOCAB + g), set())
+
+    def test_q56b_is_empty_and_fires_on_a_table_that_replaces_itself_or_its_replacement(self):
+        self.assertEqual(rows("q56b-replaces-itself.rq", VOCAB + EXAMPLE), set())
+        new, old = URIRef(DEMO + "object/" + BATCH), URIRef(DEMO + "earlier/mdm_core.mips_price_batch_dim")
+        own = Graph()
+        own += EXAMPLE
+        own.add((new, TG.replaces, new))
+        self.assertEqual(rows("q56b-replaces-itself.rq", own), {(str(new), str(new))})
+        back = Graph()
+        back += EXAMPLE
+        back.add((old, TG.replaces, new))
+        self.assertEqual(rows("q56b-replaces-itself.rq", back), {(str(new), str(old)), (str(old), str(new))})
+
+    def test_q57_names_each_tables_builders(self):
+        self.assertEqual(rows("q57-built-by.rq", VOCAB + EXAMPLE), {
+            (DEMO + "object/" + BATCH, JOB, str(TG.Job), "Nightly pricing build (made up)"),
+            (DEMO + "object/" + DETAIL, JOB, str(TG.Job), "Nightly pricing build (made up)"),
+            (DEMO + "object/" + DETAIL, PIPELINE, str(TG.Pipeline), "Price detail refresh (made up)")})
+
+    def test_q57_finds_nothing_without_the_links(self):
+        g = Graph()
+        g += EXAMPLE
+        g.remove((None, TG.builtBy, None))
+        self.assertEqual(rows("q57-built-by.rq", VOCAB + g), set())
+
+
 class Shapes(unittest.TestCase):
     """Each shape rejects what it forbids (the ontology skill's negative tests)."""
+
+    def violations(self, change):
+        """{(focus node, path, message)} of the report on the example after one change."""
+        g = Graph()
+        g += EXAMPLE
+        change(g)
+        _, report, _ = validate(VOCAB + LINKED + g, shacl_graph=SHAPES, inference="none")
+        return {(str(report.value(r, SH.focusNode)), str(report.value(r, SH.resultPath)), str(report.value(r, SH.resultMessage)),
+                 str(report.value(r, SH.resultSeverity))) for r in report.subjects(RDF.type, SH.ValidationResult)}
+
+    def test_replacing_something_that_is_not_a_data_object_fails_on_that_link(self):
+        table, step = URIRef(DEMO + "object/" + BATCH), self.first(TG.PipelineStep)
+        self.assertEqual(self.violations(lambda g: g.add((table, TG.replaces, step))),
+                         {(str(table), str(TG.replaces), "A data object replaces only other data objects.", str(SH.Violation))})
+
+    def test_a_builder_that_is_not_a_job_or_a_pipeline_fails_on_that_link(self):
+        table, step = URIRef(DEMO + "object/" + BATCH), self.first(TG.PipelineStep)
+        self.assertEqual(self.violations(lambda g: g.add((table, TG.builtBy, step))),
+                         {(str(table), str(TG.builtBy), "A data object is built only by builders: jobs and pipelines.", str(SH.Violation))})
+
+    def test_a_builder_with_no_name_fails(self):
+        job = URIRef(JOB)
+        self.assertEqual(self.violations(lambda g: g.remove((job, TG.name, None))),
+                         {(JOB, str(TG.name), "A technical object has one name.", str(SH.Violation))})
+
+    def test_a_check_with_two_details_fails(self):
+        check = self.first(TG.QualityCheck)
+        self.assertEqual(self.violations(lambda g: g.add((check, TG.detail, Literal("a second detail")))),
+                         {(str(check), str(TG.detail), "A quality check reports at most one detail, as text.", str(SH.Violation))})
+
+    def test_a_database_with_two_table_counts_or_two_row_counts_fails(self):
+        from decimal import Decimal
+        db = self.first(TG.SourceDatabase)
+        self.assertEqual(self.violations(lambda g: g.add((db, TG.tables, Literal(Decimal("99"))))),
+                         {(str(db), str(TG.tables), "A source database has at most one count of tables, a decimal.", str(SH.Violation))})
+        self.assertEqual(self.violations(lambda g: g.add((db, TG.rows, Literal(Decimal("99"))))),
+                         {(str(db), str(TG.rows), "A technical object has at most one row count, a decimal.", str(SH.Violation))})
+
+    def test_a_table_with_two_row_counts_still_fails(self):
+        from decimal import Decimal
+        table = URIRef(DEMO + "object/" + BATCH)
+        self.assertEqual(self.violations(lambda g: g.add((table, TG.rows, Literal(Decimal("99"))))),
+                         {(str(table), str(TG.rows), "A technical object has at most one row count, a decimal.", str(SH.Violation))})
+
+    def test_every_property_states_a_cardinality(self):
+        stated = {SHAPES.value(s, SH.path) for s in SHAPES.subjects(SH.path, None)
+                  if (s, SH.minCount, None) in SHAPES or (s, SH.maxCount, None) in SHAPES}
+        props = set(VOCAB.subjects(RDF.type, OWL.ObjectProperty)) | set(VOCAB.subjects(RDF.type, OWL.DatatypeProperty))
+        self.assertEqual(len(props), 24)
+        self.assertEqual(props - stated, set())
+
+    def test_a_table_may_replace_two_tables_and_have_two_builders(self):
+        table = URIRef(DEMO + "object/" + BATCH)
+        self.assertEqual(self.violations(lambda g: (
+            g.add((table, TG.replaces, URIRef(DEMO + "earlier/udm_core.mpr_price_detail_fact"))),
+            g.add((table, TG.builtBy, URIRef(PIPELINE))))), set())
 
     def broken(self, change):
         g = Graph()
