@@ -25,9 +25,21 @@ The run keeps three limits. Code enforces each one.
 |---|---|
 | The notebook writes only to `idp_sbx.kpi_store` and `idp_sbx.tech_graph`. | `kpi_store/load_databricks.py`, the class `Gate`. Every SQL statement of the notebook passes `Gate.check`, which refuses a write outside the two schemas that `kpi_store.toml` names (`write_schemas` in `kpi_store/settings.py`). A refused statement is never sent. `kpi_store/tests/test_load_databricks.py` tests it. |
 | The notebook reads only the catalogs in `kpi_store.toml`. | The same `Gate.check`. It refuses a read outside `read_catalogs`. It also allows three system schemas, which discovery needs: `system.information_schema`, `system.access` and `system.lakeflow`. |
-| The Neo4j load writes only to `businessprocessarchitecturegraph`. | `kpi_store/copy_enterprise.py`. `open_target` opens every session on that one name, and the server must confirm the name. It refuses the `system` database, a missing database and an alias. `check_statement` refuses any statement that creates, alters or drops a database, a user or a role. `decide` stops when the database holds a node that is not the KPI Store's. `kpi_store/tests/test_copy_enterprise.py` tests it. |
+| The Neo4j load writes only to `businessprocessarchitecturegraph`. | `kpi_store/copy_enterprise.py`. `open_target` opens every session on that one name, and the server must confirm the name. It refuses the `system` database, a missing database and an alias. `check_statement` refuses any statement that creates, alters or drops a database, a user or a role. `decide` stops when the database holds a node that does not carry the KPI Store's marks, which the paragraph below lists. `kpi_store/tests/test_copy_enterprise.py` tests it. |
 
 The second limit names the catalogs of the sandbox's settings: `idp_sbx` and `synapse_dev`.
+
+The third limit has one condition. The copy judges a node by the marks on it, not by who wrote it. It has no other way: a writer's mark on every node would change the graph hash that proves the copy. `OWN_RULES` in `kpi_store/copy_enterprise.py` holds the marks for each label.
+
+| Label | A node counts as the KPI Store's when |
+|---|---|
+| `Resource` | It has a `uri`, its `graph` is the version of one of this release's modules, and its other labels are the projection's own. |
+| `ModuleRelease`, `Module` | Its version or its `uri` is under one of this release's modules. |
+| `LogicalModel` | Its `uri` is under a base that this release's models use, it has only the labels that the load gives, and its slug or its models are this release's. |
+| `Tech` | Its `uri` is in the technical graph's own scheme, and its other labels are classes of the `technical-graph` module. |
+| `EpmStoreMarker`, `LogicalModelMarker`, `TechGraphMarker` | It names this store and holds a digest. |
+
+A node that another writer made with all the marks of one row counts as the KPI Store's, and a replace deletes it. So `businessprocessarchitecturegraph` must be a database into which no other writer puts ontology nodes of this release's shape. Any node without these marks stops the copy.
 
 ### What the run writes
 
@@ -471,7 +483,7 @@ If the run stops after the cut, do not clear the report again. The cut is done. 
 
 The copy stops when `businessprocessarchitecturegraph` already holds KPI Store nodes of another release. It then says how many, and changes nothing. This happens after any later change to the ontology, and after a copy that was cut off halfway.
 
-**The replace deletes every KPI Store node in that database before it copies.** It deletes no other node. When the database holds a node that is not the KPI Store's, the copy stops whatever you decided.
+**The replace deletes every node in that database that carries the KPI Store's marks, before it copies.** "The limits" lists the marks. It deletes no node without them. When the database holds such a node, the copy stops whatever you decided.
 
 If the `enterprise` step stops for that reason, run the step again with the replace allowed:
 
@@ -723,7 +735,7 @@ the steps that ran passed; left out: <the other steps> (not run, so not checked)
 
 It calls `kpi_store/copy_enterprise.py`. That code checks that the local graph is the one the load verified. It reads the local graph and writes it to `businessprocessarchitecturegraph` with plain Cypher, because the Enterprise server has no plugin. It then compares the copy's graph hash with the local graph's, checks the counts and each release tag, and writes the marker last.
 
-It reads the local database and the load's report. It writes only to the one Enterprise database. When that database already holds this release, it writes nothing.
+It reads the local database and the load's report. It writes only to the one Enterprise database. When that database already holds this release, it writes nothing. It tells its own nodes from others by the marks that "The limits" lists, not by who wrote a node. So the database must be one that no other writer fills with ontology nodes of this release's shape.
 
 ```powershell run=first-run
 py -m kpi_store.runner --only enterprise
