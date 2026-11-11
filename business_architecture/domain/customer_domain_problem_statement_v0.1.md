@@ -28,7 +28,7 @@ The outcome is fragmented lineage, uncertain O2C association, degraded data qual
 
 The same party may perform multiple roles in one transaction. Conversely, roles within one O2C transaction can be performed by different legal entities or accounts in a corporate hierarchy.
 
-```text
+```text skip reason="illustration: a sketch in text, not a command or a file"
 Party / legal entity
   → customer account
   → party role in a commercial, financial, logistics, or operational context
@@ -68,7 +68,7 @@ The initial conceptual model must be able to distinguish at minimum:
 
 Use a role-based pattern rather than modeling every role as a permanent subtype of `Customer`:
 
-```text
+```text skip reason="illustration: a sketch in text, not a command or a file"
 Party
   ├── LegalEntity
   ├── Organization
@@ -88,7 +88,7 @@ The initial Customer-domain model must support the following role distinctions.
 
 ### Release 0.1 — mandatory O2C and commercial roles
 
-```text
+```text skip reason="illustration: a sketch in text, not a command or a file"
 Legal entity
 Corporate parent
 Customer account
@@ -107,7 +107,7 @@ Source cross-reference / match candidate
 
 ### Release 0.2 — financial, title, tax, and exception roles
 
-```text
+```text skip reason="illustration: a sketch in text, not a command or a file"
 Ordering party / order requester
 Delivery party / receiving party
 Title-transfer party
@@ -121,7 +121,7 @@ Collection-responsible party
 
 ### Release 0.3 — advanced downstream commercial and logistics roles
 
-```text
+```text skip reason="illustration: a sketch in text, not a command or a file"
 Broker / agent / marketer
 Exchange counterparty
 Forwarder / transport coordinator
@@ -134,7 +134,7 @@ Nominee / beneficial owner
 
 ## Illustrative O2C role pattern
 
-```text
+```text skip reason="illustration: a sketch in text, not a command or a file"
 Terminal custody ticket: TKT-2026-004812
 
 Legal entity / corporate parent → GulfCo Holdings Corp.
@@ -167,7 +167,7 @@ Customer identity and role fragmentation affects:
 
 The first proof is the unbilled-O2C use case:
 
-```text
+```text skip reason="illustration: a sketch in text, not a command or a file"
 Customer identity and role fragmentation
   → uncertain order / release / contract / invoice association
   → uncertain billing, title, credit, and tax context
@@ -180,7 +180,7 @@ Customer identity and role fragmentation
 
 The Customer-domain pilot follows the Enterprise Performance Model separation of concerns:
 
-```text
+```text skip reason="illustration: a sketch in text, not a command or a file"
 MEANING — no KPI computation
   Customer domain model + process architecture
   → ontology modules and controlled vocabulary
@@ -217,7 +217,7 @@ The Customer domain is a shared domain concept, not a KPI. A customer-related ca
 
 The Customer-domain pilot is the business-domain entry point to an integrated Enterprise Performance Model demonstration. Its purpose is to show how a governed business problem moves through domain modeling, semantic meaning, physical implementation, performance measurement, lineage, quality controls, graph context, and agent-assisted consumption.
 
-```text
+```text skip reason="illustration: a sketch in text, not a command or a file"
 Customer-domain problem
   → Sirius conceptual/logical/physical model
   → synthetic multi-system source records

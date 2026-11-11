@@ -166,7 +166,9 @@ def all_pages():
 
 
 LIST_ITEM = re.compile(r"^( *)([-*]|\d+\.) (.*)$")
-FENCE = re.compile(r"^( *)```(\S*)\s*$")
+# After its language an opening fence may carry a tag for scripts/doc_snippets.py (```bash run=scratch). The tag
+# tells the test what to do with the block; the page shows the block as before, without the tag.
+FENCE = re.compile(r"^( *)```(\S*)(?:[ \t]+\S.*)?\s*$")
 HEADING = re.compile(r"^(#{1,6}) (.+?)\s*#*\s*$")
 
 

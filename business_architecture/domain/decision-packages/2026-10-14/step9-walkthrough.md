@@ -23,7 +23,7 @@ Each shape takes every value of one property and requires it to be a concept in 
 
 I tested this. I changed the operating mode of CM 1.1.1.1.1 to the cadence "Monthly". The 2.0.0 release shapes accept the change. `validation/controlled-values.ttl` rejects it with this report:
 
-```
+```text skip reason="illustration: a validation message quoted from a run"
 Constraint Violation in HasValueConstraintComponent
   Focus Node: cad:monthly
   Result Path: skos:inScheme
@@ -70,13 +70,13 @@ The first Step 9 shape is "every relationship fact links to its source evidence"
 
 Today, in `releases/core/2.0.0/core.ttl` (line 371), the graph holds only the triple:
 
-```turtle
+```turtle parse
 proc:CM-1-1-1-1-1 core:precedes proc:CM-1-1-1-1-2 .
 ```
 
 Under option 2a, the triple stays and one node is added:
 
-```turtle
+```turtle parse
 proc:CM-1-1-1-1-1 core:precedes proc:CM-1-1-1-1-2 .
 
 fact:CM-1-1-1-1-1--precedes--CM-1-1-1-1-2 a core:CanonicalFact ;

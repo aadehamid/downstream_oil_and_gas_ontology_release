@@ -40,7 +40,7 @@ To add a module to an ontology that already has releases, start at `references/n
 3. It then works through Steps 0 to 12 in `SKILL.md`. Each step names the reference to read, the template to fill and the "Done when" gate. Expect a question from the agent at every decision; answer "not yet" when you are unsure, and the agent marks the item as assumed and keeps it reversible.
 4. From Step 3, run the checks the agent runs:
 
-   ```sh
+   ```sh skip reason="awaits-the-rewrite: the reader's own values stand in angle brackets, and no test supplies them yet"
    uv run --with pyyaml python3 scripts/check_requirements.py requirements.yaml
    uv run --with rdflib python3 scripts/check_taxonomy.py <your module>.ttl
    ```

@@ -10,7 +10,7 @@ If your copy includes `viewer/index.html`, that page shows the ontology as you r
 
 Commands below start from the top folder of your copy unless they say otherwise. They use this shorthand, so define it first:
 
-```sh
+```sh run=release-git,slow define
 py() { uv run -q --no-project --with rdflib --with pyshacl --with openpyxl --with jsonschema --with pytest --with "markdown-it-py>=4,<5" python3 -B "$@"; }
 ONT=business_architecture/ontology
 ```
@@ -22,7 +22,7 @@ The versions in the worked commands are those of this release as you received it
 1. Make your own copy. A Git clone keeps your history; an unpacked export works too. The process-map section says what changes without Git.
 2. Check that the copy works before you change it. The script takes about 10 minutes:
 
-   ```sh
+   ```sh run=slow
    bash scripts/check.sh
    ```
 
@@ -48,14 +48,14 @@ Every change below ends with these steps. Run them once for the module you chang
 
 1. List the modules to release, in order. The first line is the one you changed. `core` is the exception: its list holds only the modules that depend on it, because you release `core` by hand first ("Change a process"):
 
-   ```sh
+   ```sh run=release-git
    (cd $ONT/release && py dependents.py kpi)
    ```
 
 2. Save the approval. Create the folder `$ONT/approvals/` if you have none, and write the sentence that approved the release in a file there, such as `$ONT/approvals/2026-11-01-kpi.md`. One file can cover all the modules of one change. That file is your decision record unless your team keeps its own.
 3. For each module in that order, set its version, write its package, and move its old package. `next_version.py` does the edits; `pins` has no effect in this release, so leave it. A module that only takes the new version of what it requires gets a patch.
 
-   ```sh
+   ```sh run=slow
    cd $ONT/release
    py next_version.py start kpi 1.3.1 patch --why "Reworded Unit Utilization's definition; the meaning is the same." \
        --approver "The kpi module owner" --where "approvals/2026-11-01-kpi.md" --words "Approved as a patch."
@@ -67,13 +67,13 @@ Every change below ends with these steps. Run them once for the module you chang
 
 4. When every module in the list is written, finish each one. This moves the old package to `$ONT/releases/previous/<module>/`, which keeps every earlier package, and changes the version in `$ONT/projection/pipeline.py` (`PACKAGES`) and `$ONT/projection/skill-run/epm-config.json` (`packages`):
 
-   ```sh
+   ```sh run=slow
    (cd $ONT/release && py next_version.py finish kpi 1.3.0)
    ```
 
 5. Rebuild what follows from the packages, and check:
 
-   ```sh
+   ```sh run=slow
    (cd $ONT/release && py build_catalog.py --write)
    (cd $ONT/projection && py pipeline.py build)
    (cd $ONT/regression && py run.py)
@@ -93,21 +93,21 @@ The worked example changes the definition of the measure Unit Utilization in `kp
 
 1. Find where the definition lives. A release is built from its sources, never edited in `releases/`. Most sources are tables and Turtle files in the module's folder, so search there for the text. A file that starts "Built by" is generated: edit the source it names. For `lane`, that is `business_architecture/business_process/office_lanes.json`, and rewording a lane there is still a release of `lane`.
 
-   ```sh
+   ```sh run=release-git
    grep -n "unit-utilization" $ONT/kpi/measure-details.csv
    ```
 
 2. Edit the text in that file. Keep the citation of its source. If the new wording rests on a new source, cite it.
 3. Rebuild the module's source file. Each module has its own builder in its folder, listed in `scripts/check.sh`:
 
-   ```sh
+   ```sh run=release-git
    (cd $ONT/kpi && py build_measures.py --write)
    ```
 
 4. Follow the release steps for `kpi`.
 5. Search the whole copy for the old wording, and update each document that quotes it. No check catches a copy of a sentence. This command leaves out this guide, which quotes the wording as its example, and the packages, which never change. In a plain folder with no Git, use `grep -rn` and skip the same paths. For this example:
 
-   ```sh
+   ```sh run=release-git
    git grep -n "as a share of its constrained capacity" -- . ':!HOW-TO-UPDATE.*' ':!business_architecture/ontology/releases/'
    ```
 
@@ -132,7 +132,7 @@ The process map is the source of the taxonomy in `core`. Every module depends on
 3. Save the approval, as the release steps say, because the builder below names it. Commit, and note the commit before your change and the commit of the change. `scripts/check.sh` does not pass on this commit, because the map has a node that `core` lacks yet, so do not share it. The builder compares the two copies of the map. In a plain folder with no Git, choose a label for each instead, at least 12 letters or digits long.
 4. Save both copies under `$ONT/release/frozen/`. Each file's name starts with the first 12 characters of its commit or label:
 
-   ```sh
+   ```sh skip reason="awaits-the-rewrite: the reader's own values stand in angle brackets, and no test supplies them yet"
    M=business_architecture/business_process/downstream_process_map.json
    git show <earlier commit>:$M > $ONT/release/frozen/<first 12 of earlier>-downstream_process_map.json
    git show <your commit>:$M > $ONT/release/frozen/<first 12 of yours>-downstream_process_map.json
@@ -140,7 +140,7 @@ The process map is the source of the taxonomy in `core`. Every module depends on
 
 5. Copy the core builder and fill in the block it marks. `build_core_template.py` follows `build_core_2_3.py`, the builder that added a node. To change an existing node's ID or description, read `build_core_2_2.py`, which applies those changes.
 
-   ```sh
+   ```sh run=release-git
    cp $ONT/release/build_core_template.py $ONT/release/build_core_2_5.py
    ```
 
@@ -150,7 +150,7 @@ The process map is the source of the taxonomy in `core`. Every module depends on
 7. Add a short test, `$ONT/release/test_build_core_2_5.py`, that says what the release adds and that it removes no IRI. Add it to the test list in `scripts/check.sh`.
 8. Write the package and move the old one:
 
-   ```sh
+   ```sh skip reason="awaits-the-rewrite: works only after the edits to the new builder that the step before describes"
    (cd $ONT/release && py build_core_2_5.py --write)
    mkdir -p $ONT/releases/previous/core && mv $ONT/releases/core/2.4.0 $ONT/releases/previous/core/2.4.0
    ```
@@ -187,7 +187,7 @@ Register the module in every place below. A place you miss fails a check or leav
 
 Then build, in this order, starting with the module's own builder:
 
-```sh
+```sh skip reason="awaits-the-rewrite: the reader's own values stand in angle brackets, and no test supplies them yet"
 (cd $ONT/<module> && py build_<your builder>.py --write)
 (cd $ONT/release && py build_module.py <module> --write)
 # Only if you added a row to source-tiers.csv: rebuild the table and release integration, as the release steps say.
@@ -210,7 +210,7 @@ bash scripts/check.sh
 
 1. Build the model's graphs. The builder writes `<model>.layer.ttl` beside the export, and fails on an IRI that your model and a model already in `models/` both define:
 
-   ```sh
+   ```sh skip reason="awaits-the-rewrite: the reader's own values stand in angle brackets, and no test supplies them yet"
    (cd $ONT/logical-model && py build_logical_model.py --export models/<model>.erstudio.ttl --links models/<model>.links.csv \
        --model <model> --title "<Model title>" --out models --write)
    ```
@@ -237,7 +237,7 @@ This release's logical models were built that way. When the release was made, th
 
 A package names the exact version of each module it requires. So a new version of a module means a new version of every module that depends on it. `dependents.py` lists them, each after what it requires. Raise each version before you write its package, and write them in that order. A module that only takes the new version of what it requires gets a patch, with a changelog line that says so. A change to `core` reaches every module, so use a loop. It patches each module on the list and then finishes them all, and it stops at the first failing step. For any other module, change the list to `py dependents.py <module>`, and start the loop with `for m in $(echo "$list" | tail -n +2)`, which leaves out the module you released yourself.
 
-```sh
+```sh skip reason="awaits-the-rewrite: moves every module to a new version, and no test starts from a changed core yet"
 (
   set -e
   cd $ONT/release
@@ -266,7 +266,7 @@ The packages are the source. Neo4j and Jena are copies that you can empty and re
 
 1. Copy the environment file outside your copy, and let only yourself read it. The script refuses a file that others can read. Every key has a default, so for these two stores you can leave the file as it is.
 
-   ```sh
+   ```sh skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
    mkdir -p ~/.config/epm
    cp $ONT/projection/skill-run/environment.example ~/.config/epm/qa.env
    chmod 600 ~/.config/epm/qa.env
@@ -274,13 +274,13 @@ The packages are the source. Neo4j and Jena are copies that you can empty and re
 
 2. List the steps. This changes nothing. Name the two stores, because the default is all four, and the other two need logins:
 
-   ```sh
+   ```sh skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
    python3 $ONT/projection/rebuild_stores.py --env ~/.config/epm/qa.env --store driver --store jena --plan
    ```
 
 3. Load the stores. **`--empty` replaces what the two stores hold.** Without it, the script refuses a store that holds data.
 
-   ```sh
+   ```sh skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
    python3 $ONT/projection/rebuild_stores.py --env ~/.config/epm/qa.env --store driver --store jena --empty
    ```
 
@@ -288,7 +288,7 @@ The packages are the source. Neo4j and Jena are copies that you can empty and re
 4. Commit `inferred.nt`, `projection-manifest.json` and `projection-report.json` from `$ONT/projection/`. `scripts/check.sh` then stops printing its note, and `python3 scripts/epm_facts.py projection` prints the new figures.
 5. To see later which store is behind your newest packages, or holds other technical-graph files than the demo's (the line that starts `tech:`):
 
-   ```sh
+   ```sh skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
    (cd $ONT/projection && uv run -q --no-project --with rdflib --with neo4j python sync_stores.py check --ref worktree --store driver --store jena)
    ```
 

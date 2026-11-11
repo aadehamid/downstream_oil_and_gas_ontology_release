@@ -47,7 +47,7 @@ Run it after any input or shape changes. You need [uv](https://docs.astral.sh/uv
 
 1. Download ROBOT 1.9.10 (it runs the ELK reasoner), and check its SHA-256. Run these commands in a folder outside the repository; the jar never goes into this tree. If the checksum differs, stop: the driver refuses another file. On Windows, check it with `certutil -hashfile robot.jar SHA256`.
 
-   ```bash
+   ```bash skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
    cd <a folder outside the repository>
    curl -L -o robot.jar https://github.com/ontodev/robot/releases/download/v1.9.10/robot.jar
    shasum -a 256 robot.jar
@@ -56,7 +56,7 @@ Run it after any input or shape changes. You need [uv](https://docs.astral.sh/uv
 
 2. Copy `skill-run/epm-run.json` to a folder outside the repository, set `robot_jar` to the jar's path and `out` to your output folder, and add the keys that name your stores (`skill-run/README.md` lists them). Then run the driver with the copy. It checks, reasons, empties and loads the local Neo4j, writes the release records, and runs each further step whose key the copy holds: the copy to the named database, the Jena round trip, the walks and the rebuild. `--plan` lists the steps first and runs nothing.
 
-   ```bash
+   ```bash skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
    cd "$SKILLS/ontology-to-lpg/scripts"
    uv run --no-project --with rdflib python3 run_projection.py --config <your copy of epm-run.json> --plan
    uv run --no-project --with rdflib python3 run_projection.py --config <your copy of epm-run.json>
@@ -64,13 +64,13 @@ Run it after any input or shape changes. You need [uv](https://docs.astral.sh/uv
 
 3. Take the result into this folder, from this folder. It refuses a run that read other inputs than this tree's, or whose report did not pass. Commit `inferred.nt`, the manifest and the report together.
 
-   ```bash
+   ```bash skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
    uv run --with rdflib --with pyshacl python pipeline.py record --run <your output folder>
    ```
 
 4. Load the logical models, then write the Neo4j marker. `mark` checks the database against this tree first and stops, writing nothing, when it does not match.
 
-   ```bash
+   ```bash skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
    uv run --with rdflib --with neo4j --with pyoxigraph python logical_models.py load
    uv run --with rdflib --with neo4j python sync_stores.py mark
    ```
@@ -79,7 +79,7 @@ The Databricks table is not loaded from here. A notebook loads `epm_triples` wit
 
 ## Check the stores
 
-```bash
+```bash skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
 uv run --with rdflib python sync_stores.py expected
 uv run --with rdflib --with neo4j python sync_stores.py check
 ```

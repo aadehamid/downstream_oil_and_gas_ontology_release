@@ -12,7 +12,7 @@ assets — the owning team must.
 **Scope of the change (what to search for):** any asset referencing these old paths or the
 concepts beneath them:
 
-```text
+```text skip reason="illustration: two search strings, not a command or a file"
 Downstream Operations > Commercial & Marketing > Planning & Scheduling > Refinery Planning
 Downstream Operations > Commercial & Marketing > Planning & Scheduling > Refinery Scheduling
 ```
@@ -74,7 +74,7 @@ Old-breadcrumb queries must be repointed or retired deliberately — not left to
 
 For each asset class above, the owner signs that the search was performed:
 
-```text
+```text skip reason="illustration: a form to fill in by hand"
 Asset class: _______________  Owner: _______________  Date: _______________
 Search method: _______________
 Result: [ ] hits dispositioned above  [ ] no references found

@@ -70,7 +70,7 @@ Some releases read files that may never enter the repository, such as an export 
 
 ## The ontology header
 
-```turtle
+```turtle parse
 <https://w3id.org/example/ontology/modules/lending>
     a owl:Ontology, skos:ConceptScheme ;
     dcterms:title "Example Library Lending Ontology"@en ;

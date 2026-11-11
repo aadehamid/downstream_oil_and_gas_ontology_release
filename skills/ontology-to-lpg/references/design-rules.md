@@ -28,7 +28,7 @@ Neo4j's `neo4j-modeling-skill` (version 1.0.7, read 2026-10-24) is written for g
 
 ## Mental model
 
-```
+```text skip reason="illustration: a sketch in text, not a command or a file"
 literal object            -> node property
 IRI object                -> relationship
 rdf:type                  -> label
@@ -43,7 +43,7 @@ Each rule can be checked by a script; `scripts/check_projection_rules.py` checks
 
 1. **Give every property you own exactly one kind, and every object or datatype property one concrete range.** The kinds are `owl:ObjectProperty`, `owl:DatatypeProperty` and `owl:AnnotationProperty`. n10s itself decides from each value, not from the kind: an IRI value loads as a relationship and a literal as a node property, so an annotation property with IRI values (`rdfs:seeAlso <...>`) loads as relationships. The kind and range are what the checks, the multivalued list and the XSD to Cypher table read. A concrete range is one IRI: for a datatype property, a datatype in the XSD to Cypher table below (an unlisted XSD type, `rdf:HTML` or a custom `rdfs:Datatype` fails); for an object property, a class; never `rdfs:Literal` or `rdfs:Resource`, never a bare `rdf:Property`. An annotation property needs no range. A property counts as yours when its IRI is in one of your namespaces and it is used as a predicate, declared with a property kind, or given a domain, a range or a parent property. Prefer zoned `xsd:dateTimeStamp` for timestamps. *Why:* the checks, the multivalued list and the XSD to Cypher table read the kind and the range; with one of each, every value of the property is either an IRI (a relationship) or a literal of one type (a property of one Cypher type, table below). A vague range lets values of both sorts in, and the property then loads as relationships for some subjects and properties for others.
 
-   ```turtle
+   ```turtle parse
    lib:barcode   a owl:DatatypeProperty ; rdfs:range xsd:string .   # literal values: a node property
    lib:copyOf    a owl:ObjectProperty   ; rdfs:range lib:Work .     # IRI values: a relationship
    lib:shelfNote a owl:AnnotationProperty .                         # literal values here: a node property
@@ -51,7 +51,7 @@ Each rule can be checked by a script; `scripts/check_projection_rules.py` checks
 
 2. **State a cardinality for every property you own in SHACL:** `sh:maxCount 1` for a single value; `sh:minCount` with no `sh:maxCount` for a list (write `sh:minCount 0` for an optional list, so the choice is stated). Annotation properties too. The cardinality counts only on a property shape that an applied shape uses: one with any target (`sh:targetClass`, `sh:targetNode`, `sh:targetSubjectsOf`, `sh:targetObjectsOf`, a SHACL-SPARQL `sh:target`), one that is itself a class, or one reached from those through `sh:node`, `sh:and`, `sh:or` or `sh:xone`. A loose shape with the same `sh:path`, or a deactivated one (`sh:deactivated true`), states nothing. The check covers the properties the data uses; a property declared but not yet used loads nothing, so it needs its cardinality only once data uses it (the `ontology` skill's shape rules still ask for it at release). *Why:* `sh:maxCount 1` loads one value and anything else loads a sorted array; the loader's list of multi-valued properties is generated from the shapes, so an unstated cardinality is a guess.
 
-   ```turtle
+   ```turtle parse
    lib:CopyShape a sh:NodeShape ; sh:targetClass lib:Copy ;
      sh:property [ sh:path lib:barcode ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] ;
      sh:property [ sh:path lib:copyOf  ; sh:class lib:Work ; sh:minCount 1 ; sh:maxCount 1 ] .
@@ -65,7 +65,7 @@ Each rule can be checked by a script; `scripts/check_projection_rules.py` checks
 
    **4a, the default: qualified-relation nodes.** The link becomes a node with its own IRI that points at both ends, the pattern of W3C ORG's `org:Membership` and PROV-O's qualified relations. It is plain RDF, so rdflib, pySHACL, Jena, RDF4J and n10s all read it, and it needs no flatten step.
 
-   ```turtle
+   ```turtle parse
    <https://id.example.org/library/authorship/W-0042-P-17> a lib:Authorship ;
        lib:authorshipAgent <https://id.example.org/library/person/P-17> ;
        lib:creatorRole lib:illustrator ;
@@ -84,7 +84,7 @@ Each rule can be checked by a script; `scripts/check_projection_rules.py` checks
 
    **4b: RDF 1.2 reifiers.** Use it only when every tool that reads and validates the data reads RDF 1.2 triple terms: Apache Jena 6.1.0 or later, or Eclipse RDF4J 6.0.0 or later. Jena 5.4.0 to 6.0.x was an experimental preview. rdflib and pySHACL do not read RDF 1.2, so a Python pipeline built on them uses 4a. n10s cannot load triple terms, so 4b needs the flatten step in `pipeline.md`. RDF 1.2 Concepts is a W3C Candidate Recommendation (Snapshot, 7 April 2026), not yet a Recommendation.
 
-   ```turtle
+   ```turtle skip reason="illustration: RDF 1.2 Turtle with a reifier, which the parser here does not read"
    <https://id.example.org/library/work/W-0042> lib:createdBy <https://id.example.org/library/person/P-17>
        ~ <https://id.example.org/library/authorship/W-0042-P-17> {| lib:position 2 |} .
    ```

@@ -38,7 +38,7 @@ Logins go in `~/.config/databricks/epm.env`, `~/.config/neo4j/aura.env` and the 
 
 ## Run the checks
 
-```sh
+```sh run=slow
 bash scripts/check.sh
 ```
 
