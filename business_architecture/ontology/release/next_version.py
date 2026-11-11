@@ -19,6 +19,9 @@ import shutil
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import newest as newest_on_disk  # noqa: E402
+
 ONTOLOGY = os.path.dirname(HERE)
 
 
@@ -35,7 +38,9 @@ def set_entry(text, module, version, date, approver, where, words):
     fields = re.search(r'^( *)"version": .*$', entry, re.M)
     line = re.sub(r'\s*"(?:issued|approver)": "[^"]*",?', "", fields.group(0)).rstrip(" ,") + ","
     entry = entry.replace(fields.group(0), line, 1)
-    entry = re.sub(r'^ *"(?:approver|issued)": "[^"]*",\n', "", entry, flags=re.M)
+    # A line that holds only these two fields, one or both: start writes both on one line, so a second start
+    # must remove that line, or the entry would hold each key twice and Python would keep the old value.
+    entry = re.sub(r'^ *(?:"(?:approver|issued)": "(?:[^"\\]|\\.)*",? *)+\n', "", entry, flags=re.M)
     entry = re.sub(r'^ *"approval": \((?:[^()]|\([^()]*\))*\),\n', "", entry, flags=re.M)
     pad = fields.group(1)
     added = (f'{line}\n{pad}"approver": {quoted(approver)}, "issued": "{date}",\n'
@@ -89,8 +94,8 @@ def start(a, ontology=ONTOLOGY):
 
 
 def finish(a, ontology=ONTOLOGY):
-    newest = [v for v in os.listdir(os.path.join(ontology, "releases", a.module)) if re.match(r"^\d+\.\d+\.\d+$", v)]
-    new = max(newest, key=lambda v: tuple(int(x) for x in v.split(".")))
+    newest = [v for v in os.listdir(os.path.join(ontology, "releases", a.module)) if newest_on_disk.version_key(v)]
+    new = max(newest, key=newest_on_disk.version_key)
     if new == a.old:
         raise SystemExit(f"{a.module} {a.old} is still the newest package: write the new one first")
     folder = os.path.join(ontology, "releases", "previous", a.module)

@@ -34,6 +34,8 @@ import urllib.parse
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "release"))
+import newest as release_newest  # noqa: E402  (the one version order; standard library only)
 REPO = os.path.normpath(os.path.join(HERE, "..", "..", ".."))
 CATALOG = "business_architecture/ontology/releases/catalog.ttl"
 MANIFEST = "business_architecture/ontology/projection/projection-manifest.json"
@@ -121,11 +123,14 @@ def catalog_datasets(text):
 
 
 def newest_releases(datasets):
-    """Each module's newest release IRI: .../modules/<module>/<major>.<minor>.<patch>."""
+    """Each module's newest release IRI, .../modules/<module>/<version>, by the release scripts' version_key, so a
+    correction version is read as newer than the version it corrects. A version it cannot order is a ValueError."""
     newest = {}
     for iri in datasets:
         module, version = iri.rsplit("/", 2)[-2:]
-        key = tuple(int(p) for p in version.split("."))
+        key = release_newest.version_key(version)
+        if key is None:
+            raise ValueError(f"the catalog lists {iri}, whose version this code cannot order")
         if module not in newest or key > newest[module][0]:
             newest[module] = (key, iri)
     return sorted(iri for _, iri in newest.values())

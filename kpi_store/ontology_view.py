@@ -3,8 +3,9 @@
 The data-product package names every table, view and metric view as a dp:PlatformTable. The comparison with the
 workspace needs only the facts below, so this module reduces the package to them. Needs rdflib.
 """
+import functools
 import json
-import re
+import types
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -13,20 +14,34 @@ DP = "https://w3id.org/mpc/ontology/modules/data-product/"
 PROV_DERIVED = "http://www.w3.org/ns/prov#wasDerivedFrom"
 SKOS = "http://www.w3.org/2004/02/skos/core#"
 RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
-VERSION = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:-correction\.(\d+))?$")
+NEWEST = Path("business_architecture") / "ontology" / "release" / "newest.py"
 
 
 class ReleaseError(Exception):
     """The release folder does not hold what a load needs."""
 
 
+def release_scripts_newest(release_root=None):
+    """The release scripts' newest.py, loaded from a release's root: by default the release this package sits in.
+    It holds the one version order of the whole tree and needs only the standard library."""
+    return _load_newest(Path(release_root or Path(__file__).resolve().parents[1]) / NEWEST)
+
+
+@functools.lru_cache(maxsize=None)
+def _load_newest(path):
+    if not path.is_file():
+        raise ReleaseError(f"{path} is missing")
+    # Compiled here, not imported: an import would write a __pycache__ folder into the release it only reads.
+    module = types.ModuleType("kpi_store_release_newest")
+    module.__file__ = str(path)
+    exec(compile(path.read_text(encoding="utf-8"), str(path), "exec"), module.__dict__)
+    return module
+
+
 def version_key(version):
-    """The order of a version folder's name. A correction version, <major>.<minor>.<patch>-correction.<n>, is newer
-    than the plain version of the same three numbers and older than the next patch: 1.2.0, 1.2.1, 1.2.1-correction.1,
-    1.2.1-correction.2, 1.2.2. This is not SemVer's order, where a suffix after a hyphen sorts before the plain
-    version. Returns None for any other name."""
-    m = VERSION.match(version)
-    return tuple(int(n or 0) for n in m.groups()) if m else None
+    """The order of a version folder's name, from the release scripts (newest.version_key): 1.2.0, 1.2.1,
+    1.2.1-correction.1, 1.2.1-correction.2, 1.2.2. Returns None for any other name."""
+    return release_scripts_newest().version_key(version)
 
 
 def newest_version(module, releases):
