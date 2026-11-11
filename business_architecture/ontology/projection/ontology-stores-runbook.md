@@ -33,8 +33,9 @@ The third limit has one condition. The copy judges a node by the marks on it, no
 
 | Label | A node counts as the KPI Store's when |
 |---|---|
-| `Resource` | It has a `uri`, its `graph` is the version of one of this release's modules, and its other labels are the projection's own. |
-| `ModuleRelease`, `Module` | Its version or its `uri` is under one of this release's modules. |
+| `Resource` | It has a `uri`, its `graph` starts with the address of one of this release's modules, whatever the version, and its other labels are the projection's own. |
+| `ModuleRelease` | Its `version_iri` starts with the address of one of this release's modules. |
+| `Module` | Its `uri` starts with the address of one of this release's modules. |
 | `LogicalModel` | Its `uri` is under a base that this release's models use, it has only the labels that the load gives, and its slug or its models are this release's. |
 | `Tech` | Its `uri` is in the technical graph's own scheme, and its other labels are classes of the `technical-graph` module. |
 | `EpmStoreMarker`, `LogicalModelMarker`, `TechGraphMarker` | It names this store and holds a digest. |
@@ -484,6 +485,8 @@ If the run stops after the cut, do not clear the report again. The cut is done. 
 The copy stops when `businessprocessarchitecturegraph` already holds KPI Store nodes of another release. It then says how many, and changes nothing. This happens after any later change to the ontology, and after a copy that was cut off halfway.
 
 **The replace deletes every node in that database that carries the KPI Store's marks, before it copies.** "The limits" lists the marks. It deletes no node without them. When the database holds such a node, the copy stops whatever you decided.
+
+One case needs a person. The marks are those of the release you copy. When that release no longer holds a model, a class of the technical graph or a label that the earlier release had, the earlier release's nodes of that kind no longer carry the marks. The copy then stops and names them, also with the replace allowed. Ask the database's administrator to remove those nodes, then run the step again.
 
 If the `enterprise` step stops for that reason, run the step again with the replace allowed:
 
