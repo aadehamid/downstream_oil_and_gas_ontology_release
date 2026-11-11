@@ -198,6 +198,44 @@ def test_a_writer_the_platform_keeps_no_name_for_is_no_builder(reading, graph):
     assert tg.build(doc, view, settings).nquads() == graph.nquads()
 
 
+def test_two_builder_ids_that_differ_only_in_case_are_two_builders(reading):
+    found, view, settings = reading
+    silver, other = "idp_sbx.silver_udm_core.mips_price_assessment_fact", "idp_sbx.silver_udm_core.mpr_price_detail_fact"
+
+    def built(order):
+        doc = json.loads(found.to_json())
+        doc["builders"] = {key: value for key, value in order}
+        for edge in doc["table_edges"]:
+            edge["entities"] = {silver: ["ABC-1"], other: ["abc-1"]}.get(edge["target"], [])
+        return tg.build(doc, view, settings)
+
+    pair = [("ABC-1", {"kind": "job", "name": "Alpha"}), ("abc-1", {"kind": "pipeline", "name": "Beta"})]
+    first, second = built(pair), built(list(reversed(pair)))
+    assert first.nquads() == second.nquads()
+    assert first.subjects("Job") == [ENV + "builder/job-ABC-1"] and first.subjects("Pipeline") == [ENV + "builder/pipeline-abc-1"]
+    assert values(first, ENV + "builder/job-ABC-1", "name") == ['"Alpha"']
+    assert values(first, ENV + "builder/pipeline-abc-1", "name") == ['"Beta"']
+    assert first.links("builtBy") == [(OBJECT + silver, ENV + "builder/job-ABC-1"), (OBJECT + other, ENV + "builder/pipeline-abc-1")]
+    # An ID in another case than the lineage row's is another builder's: it writes nothing here.
+    assert built([("Abc-1", {"kind": "job", "name": "Gamma"})]).links("builtBy") == []
+
+
+def test_two_designs_with_one_name_in_this_environment_stop_the_build(reading):
+    from kpi_store import settings as settings_module
+    found, view, _ = reading
+    twin = view.objects[GOLD_SUMMARY]
+    other = "idp." + GOLD_SUMMARY.split(".", 1)[1]
+    clash = ov.OntologyView(versions=view.versions, objects={**view.objects, other: ov.PlatformObject("urn:made-up:design/twin", other, "gold", ())},
+                            measures=view.measures)
+    folded = settings_module.parse(support.SETTINGS_TEXT.replace('idp_sbx = "idp_sbx"\n', 'idp = "idp_sbx"\n').encode("utf-8"))
+    with pytest.raises(settings_module.SettingsError) as err:
+        tg.build(found, clash, folded)
+    assert str(err.value) == (f"the ontology's {other} and {twin.full_name} are both named {GOLD_SUMMARY} in this environment; "
+                              "[names] gives idp = 'idp_sbx', idp_sbx (no entry)")
+    # Without the twin the same settings build, and the design is found.
+    assert (OBJECT + GOLD_SUMMARY, twin.iri) in tg.build(found, view, folded).links("designedAs")
+
+
 def test_the_genie_spaces_and_what_they_bind(graph):
     pricing, spread = ENV + "agent/genie-01aa", ENV + "agent/genie-01bb"
     assert graph.subjects("Agent") == [pricing, spread]
@@ -234,8 +272,8 @@ def test_a_metric_view_with_no_named_measure_is_a_view_and_a_note_says_so(graph)
 def test_freshness_is_the_newest_write_the_lineage_records(graph):
     stamp = '"%s"^^<http://www.w3.org/2001/XMLSchema#dateTime>'
     # The migration wrote this table in August; the job wrote it again in November.
-    assert values(graph, OBJECT + "idp_sbx.silver_mdm_core.mips_price_batch_dim", "lastRefresh") == [stamp % "2026-11-02T06:00:00"]
-    assert values(graph, OBJECT + "idp_sbx.silver_mdm_core.sample_location_dim", "lastRefresh") == [stamp % "2026-10-01T06:00:00"]
+    assert values(graph, OBJECT + "idp_sbx.silver_mdm_core.mips_price_batch_dim", "lastRefresh") == [stamp % "2026-11-02T06:00:00Z"]
+    assert values(graph, OBJECT + "idp_sbx.silver_mdm_core.sample_location_dim", "lastRefresh") == [stamp % "2026-10-01T06:00:00Z"]
     assert values(graph, OBJECT + "synapse_dev.replica_mpr.pricedetail", "lastRefresh") == []
     assert values(graph, OBJECT + SEMANTIC + "mips_mpr_executive_summary_fact_vw", "lastRefresh") == []
 
@@ -249,7 +287,26 @@ def test_a_write_time_that_is_no_date_is_left_out_with_a_note(reading):
     built = tg.build(doc, view, settings)
     assert values(built, OBJECT + GOLD_SUMMARY, "lastRefresh") == []
     assert any("'last Tuesday'" in note and GOLD_SUMMARY in note for note in built.notes)
-    assert tg._date_time("2026-11-02 06:00:00+00:00") == "2026-11-02T06:00:00+00:00"
+
+
+def test_the_newest_write_is_chosen_by_instant_whatever_form_the_reading_holds(reading):
+    found, view, settings = reading
+    stamp = '"%s"^^<http://www.w3.org/2001/XMLSchema#dateTime>'
+
+    def refreshed(first, second):
+        doc = json.loads(found.to_json())
+        into = [edge for edge in doc["table_edges"] if edge["target"] == GOLD_SUMMARY]
+        for edge in into:
+            edge["last_event"] = first
+        into[0]["last_event"] = second
+        return values(tg.build(doc, view, settings), OBJECT + GOLD_SUMMARY, "lastRefresh")
+
+    # As text the 09:00 value sorts below the 06:00 one; it is the newer write.
+    assert refreshed("2026-11-02T06:00:00+00:00", "2026-11-02 09:00:00") == [stamp % "2026-11-02T09:00:00Z"]
+    assert refreshed("2026-11-02 09:00:00", "2026-11-02T06:00:00+00:00") == [stamp % "2026-11-02T09:00:00Z"]
+    # Two offsets that name one instant give one time, written in UTC.
+    assert refreshed("2026-11-02T10:00:00+04:00", "2026-11-02T01:00:00-05:00") == [stamp % "2026-11-02T06:00:00Z"]
+    assert refreshed("2026-11-02T23:30:00-05:00", "2026-11-03T03:00:00Z") == [stamp % "2026-11-03T04:30:00Z"]
 
 
 def test_every_object_takes_what_the_default_scope_leaves_out(reading):
@@ -312,7 +369,7 @@ def test_the_file_holds_no_time_but_the_platforms(graph, tmp_path):
     text = files[0].read_bytes()
     assert b"\r" not in text and text.count(b"\n") == 269
     stamps = {line.split(b'"')[1] for line in text.splitlines() if b"lastRefresh" in line}
-    assert stamps == {b"2026-11-02T06:00:00", b"2026-10-01T06:00:00"}
+    assert stamps == {b"2026-11-02T06:00:00Z", b"2026-10-01T06:00:00Z"}
     assert b"2026-" not in b"".join(line for line in text.splitlines() if b"lastRefresh" not in line)
     summary = json.loads((tmp_path / "tech-graph-summary.json").read_text(encoding="utf-8"))
     assert summary["graph"] == ENV + "graph" and summary["environment"] == "idp_sbx+synapse_dev" and summary["triples"] == 269
@@ -400,7 +457,7 @@ def test_the_neo4j_rows(files):
     assert all("Tech" in n["labels"] and "Resource" not in n["labels"] for n in nodes)
     by_uri = {n["props"]["uri"]: n for n in nodes}
     assert by_uri[OBJECT + GOLD_SUMMARY] == {"labels": ["Table", "Tech"], "props": {
-        "uri": OBJECT + GOLD_SUMMARY, "name": GOLD_SUMMARY, "layer": "gold", "lastRefresh": "2026-11-02T06:00:00"}}
+        "uri": OBJECT + GOLD_SUMMARY, "name": GOLD_SUMMARY, "layer": "gold", "lastRefresh": "2026-11-02T06:00:00Z"}}
     assert by_uri[OBJECT + SEMANTIC + "mips_mpr_executive_summary_fact_vw"]["labels"] == ["MetricView", "Tech"]
     assert by_uri[OBJECT + SEMANTIC + "mips_mpr_executive_summary_fact_vw"]["props"]["layer"] == "metric-view"
     assert by_uri[JOB] == {"labels": ["Job", "Tech"], "props": {"uri": JOB, "name": "Sample_Master_Pipeline"}}
@@ -425,19 +482,12 @@ def test_the_digest_and_the_marker_follow_the_files(files, graph, tmp_path):
     assert tg.digest([changed]) != tg.digest(files)
 
 
-def test_the_statuses(files, graph, tmp_path):
+def test_a_marker_is_judged_against_the_files(files):
     held = tg.marker(files, "neo4j")
     assert tg._judge(held, files)[0] == "current"
     assert tg._judge(None, files)[0] == "unmarked"
     assert tg._judge({**held, "digest": "0" * 64}, files)[0] == "behind"
     assert tg._judge(held, files, "its content differs")[0] == "changed"
-    graph_iri = ENV + "graph"
-    assert tg.status_jena({graph_iri: 269, "urn:another:graph": 5}, files)[0] == "current"
-    assert tg.status_jena({"urn:another:graph": 5}, files) == ("behind", f"1 technical-graph graph(s) missing, e.g. {graph_iri}")
-    assert tg.status_jena({graph_iri: 268}, files)[0] == "changed"
-    assert tg.status_delta(held, files, {graph_iri: 269})[0] == "current"
-    assert tg.status_delta(held, files, {graph_iri: 100})[0] == "changed"
-    assert tg.status_delta(None, files)[0] == "unmarked"
 
 
 # ---- Databricks, on the fake workspace -------------------------------------------------------------------
@@ -455,7 +505,7 @@ def test_the_delta_load_writes_the_triple_table_and_its_marker_in_the_tech_graph
             "graph": ENV + "graph"} in held
     marker = json.loads(workspace.store["idp_sbx.tech_graph.tech_graph_markers"][0]["marker"])
     assert marker["digest"] == tg.digest(files) and marker["triples"] == 269 and marker["store"] == "databricks"
-    assert tg.status_delta(tg.read_delta(gate, settings), files, {ENV + "graph": len(held)})[0] == "current"
+    assert tg.status_delta(gate, settings, files, support.ROOT)[0] == "current"
     # Every write went to the tech_graph schema, and no staging table is left.
     written = [s for s in workspace.writes() if not s.startswith("CREATE SCHEMA")]
     assert written and all("idp_sbx.tech_graph." in s for s in written)
@@ -468,27 +518,36 @@ def test_the_delta_load_writes_the_triple_table_and_its_marker_in_the_tech_graph
     assert [s for s in workspace.writes()[before:] if not s.startswith("CREATE SCHEMA")] == []
 
 
-def test_the_sync_check_reads_the_marker_and_the_rows_per_graph(files):
+def test_the_delta_status_proves_content_not_counts(files, graph, tmp_path):
     workspace, _ = support.sandbox()
     settings = support.make_settings()
-
-    def run_sql(statement):
-        # The fake workspace does not count rows; this statement is answered from what it holds.
-        if statement == "SELECT graph, count(*) AS n FROM idp_sbx.tech_graph.tech_graph_triples GROUP BY graph":
-            held = workspace.store["idp_sbx.tech_graph.tech_graph_triples"]
-            return [{"graph": g, "n": sum(1 for r in held if r["graph"] == g)} for g in sorted({r["graph"] for r in held})]
-        return workspace.run_sql(statement)
-
-    gate = lb.Gate(settings, run_sql)
-    assert tg.read_delta(gate, settings) is None and tg.read_delta_rows(gate, settings) is None
-    assert tg.status_delta(tg.read_delta(gate, settings), files, tg.read_delta_rows(gate, settings))[0] == "unmarked"
+    gate = lb.Gate(settings, workspace.run_sql)
+    table = "idp_sbx.tech_graph.tech_graph_triples"
+    assert tg.status_delta(gate, settings, files, support.ROOT)[0] == "unmarked"
     tg.load_delta(gate, settings, files, support.ROOT)
-    assert tg.read_delta_rows(gate, settings) == {ENV + "graph": 269}
-    assert tg.status_delta(tg.read_delta(gate, settings), files, tg.read_delta_rows(gate, settings))[0] == "current"
-    # A row deleted by hand reads as changed.
-    workspace.store["idp_sbx.tech_graph.tech_graph_triples"].pop()
-    assert tg.read_delta_rows(gate, settings) == {ENV + "graph": 268}
-    assert tg.status_delta(tg.read_delta(gate, settings), files, tg.read_delta_rows(gate, settings))[0] == "changed"
+    assert tg.status_delta(gate, settings, files, support.ROOT)[0] == "current"
+
+    # One row's object is edited: the row count does not move.
+    row = next(r for r in workspace.store[table] if r["object"] == "Sample_Master_Pipeline")
+    row["object"] = "Sample_Tampered_Pipeline"
+    assert len(workspace.store[table]) == 269
+    assert tg.status_delta(gate, settings, files, support.ROOT) == (
+        "changed", "tech_graph_triples holds other triples than the graph files although its marker matches: load the technical graph again")
+    row["object"] = "Sample_Master_Pipeline"
+    assert tg.status_delta(gate, settings, files, support.ROOT)[0] == "current"
+
+    # The triple table is dropped and the marker is left.
+    dropped = workspace.store.pop(table)
+    assert tg.read_delta(gate, settings)["digest"] == tg.digest(files)
+    assert tg.status_delta(gate, settings, files, support.ROOT) == (
+        "changed", "tech_graph_triples is missing although its marker matches: load the technical graph again")
+    workspace.store[table] = dropped
+
+    # Other graph files read as behind, whatever the table holds.
+    newer = tmp_path / "tech-graph.nq"
+    newer.write_text(graph.nquads().replace("Sample_Master_Pipeline", "Sample_Renamed_Pipeline"), encoding="utf-8", newline="\n")
+    assert tg.status_delta(gate, settings, [newer], support.ROOT)[0] == "behind"
+    assert not workspace.writes()[-1].startswith("DROP") and tg.status_delta(gate, settings, files, support.ROOT)[0] == "current"
 
 
 def test_a_staging_table_that_differs_leaves_the_triple_table_alone(files):

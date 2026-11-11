@@ -130,6 +130,16 @@ def test_the_neo4j_load(session, built):
     assert tg.load_neo4j(session, files)["status"] == "loaded"
     assert tg.status_neo4j(session, files)[0] == "current"
 
+    # An edit that moves no count reads as changed too: one name, then every node gone with the marker left.
+    session.run("MATCH (j:Tech:Job) SET j.name = 'Sample_Tampered_Pipeline'").consume()
+    assert count(session, "MATCH (n:Tech) RETURN count(n) AS n") == 53
+    assert tg.status_neo4j(session, files)[0] == "changed"
+    assert tg.load_neo4j(session, files)["status"] == "loaded" and tg.status_neo4j(session, files)[0] == "current"
+    session.run("MATCH (n:Tech) DETACH DELETE n").consume()
+    assert tg.read_neo4j(session)["digest"] == tg.digest(files)
+    assert tg.status_neo4j(session, files)[0] == "changed"
+    assert tg.load_neo4j(session, files)["status"] == "loaded" and tg.status_neo4j(session, files)[0] == "current"
+
     # Other graph files read as behind until they are loaded.
     newer = files[0].parent / "newer" / "tech-graph.nq"
     newer.parent.mkdir()
@@ -177,13 +187,13 @@ def test_the_jena_load(query_url, built):
     files, _, _ = built
     ss = sync_stores()
     update(query_url, f"INSERT DATA {{ GRAPH <{OTHER_GRAPH}> {{ <urn:made-up:s> <urn:made-up:p> <urn:made-up:o> }} }}")
-    assert tg.status_jena(ss.read_jena(query_url), files)[0] == "behind"
+    assert tg.status_jena(query_url, files) == ("behind", f"1 technical-graph graph(s) missing, e.g. {GRAPH}")
 
     loaded = tg.load_jena(files, query_url)
     assert loaded["status"] == "loaded" and loaded["graphs"] == {GRAPH: 269}
     held = ss.read_jena(query_url)
     assert held == {GRAPH: 269, OTHER_GRAPH: 1}                 # the other load's graph is untouched
-    assert tg.status_jena(held, files) == ("current", "1 graph(s), 269 triples, each equal to the graph files")
+    assert tg.status_jena(query_url, files) == ("current", "1 graph(s), 269 triples, equal to the graph files by hash")
     # The ontology's own check leaves the technical graph out when it is told the graph's name.
     assert ss.judge_jena(held, {OTHER_GRAPH: 1}, apart=tg.jena_apart(files))[0] == "current"
     assert ss.judge_jena(held, {OTHER_GRAPH: 1})[0] == "behind"
@@ -193,7 +203,21 @@ def test_the_jena_load(query_url, built):
     # A triple removed by hand reads as changed, and a load repairs it.
     old = OBJECT + "synapse_dev.mdm_core.mips_price_batch_dim"
     update(query_url, f"DELETE WHERE {{ GRAPH <{GRAPH}> {{ ?new <{tg.TG}replaces> <{old}> }} }}")
-    assert tg.status_jena(ss.read_jena(query_url), files) == ("changed", f"{GRAPH} holds 268 triples, not the graph files' 269")
+    assert tg.status_jena(query_url, files)[0] == "changed"
+    assert tg.load_jena(files, query_url)["status"] == "loaded"
+
+    # One object edited by hand: the graph still holds 269 triples, and it reads as changed.
+    job = ENV + "builder/job-9001"
+    update(query_url, f'DELETE DATA {{ GRAPH <{GRAPH}> {{ <{job}> <{tg.TG}name> "Sample_Master_Pipeline" }} }} ; '
+                      f'INSERT DATA {{ GRAPH <{GRAPH}> {{ <{job}> <{tg.TG}name> "Sample_Tampered_Pipeline" }} }}')
+    assert ss.read_jena(query_url)[GRAPH] == 269
+    assert tg.status_jena(query_url, files) == (
+        "changed", "its technical graph holds 269 triples that are not the graph files' 269: load it again")
+    assert tg.load_jena(files, query_url)["status"] == "loaded" and tg.status_jena(query_url, files)[0] == "current"
+
+    # The graph dropped: behind, with nothing held.
+    update(query_url, f"DROP GRAPH <{GRAPH}>")
+    assert tg.status_jena(query_url, files)[0] == "behind"
     assert tg.load_jena(files, query_url)["status"] == "loaded"
     assert ss.read_jena(query_url) == {GRAPH: 269, OTHER_GRAPH: 1}
 

@@ -14,7 +14,9 @@ run's folder.
     load_neo4j(session, files)                             # Neo4j: a subgraph labelled Tech, beside the ontology
 
 Every load is checked against the file it was given, and each store keeps a marker, so the sync check can say
-whether a store's technical graph is current or behind (status_neo4j, status_jena, status_delta).
+whether a store's technical graph is current or behind (status_neo4j, status_jena, status_delta). Each status
+function proves content, never only a count: it reads the store's copy back and compares a hash of it with the
+files'.
 
 The same discovery reading always gives the same bytes: the lines are sorted, every IRI comes from a name, and
 the only times in the file are the ones the platform reported.
@@ -26,7 +28,6 @@ import datetime as dt
 import hashlib
 import importlib.util
 import json
-import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -46,7 +47,6 @@ SUMMARY_FILE = "tech-graph-summary.json"
 SCHEMA_LAYERS = {"replica": "replica", "silver": "silver", "gold": "gold", "semantic": "metric-view"}
 # Links whose value is one entry of a code list. In Neo4j each becomes a property that holds the entry's code.
 CODE_LINKS = (TG + "layer", TG + "result")
-DATE_TIME = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?$")
 
 # The Neo4j subgraph: every node carries LABEL, never Resource, which is the ontology's.
 LABEL = "Tech"
@@ -119,9 +119,11 @@ def _text(value, datatype=None):
     return '"' + "".join(out) + '"' + (f"^^<{datatype}>" if datatype else "")
 
 
-def _key(name):
-    """A name as the last part of an IRI. Everything but letters, digits, dot, dash and underscore is escaped."""
-    return urllib.parse.quote(str(name).lower(), safe="._-")
+def _key(name, exact=False):
+    """A name as the last part of an IRI. Everything but letters, digits, dot, dash and underscore is escaped.
+    A name is lower-cased, because names are compared without case. An ID is kept exactly (exact=True): two IDs
+    that differ only in case are two things."""
+    return urllib.parse.quote(str(name) if exact else str(name).lower(), safe="._-")
 
 
 def environment(settings):
@@ -147,23 +149,19 @@ def _reading(discovery):
     return discovery
 
 
-def _date_time(value):
-    """The platform's time as an xsd:dateTime, or None when it is not one."""
-    text = str(value or "").strip().replace(" ", "T", 1)
-    return text if DATE_TIME.match(text) else None
-
-
 def build(discovery, view, settings, every_object=False):
     """The technical graph of one environment.
 
     discovery is a discovery.Discovery, or the JSON it writes. view is the ontology_view.OntologyView of the
-    release. Every name is compared without case.
+    release. Every name is compared without case; an ID (a job, a pipeline, a Genie space) is kept exactly. Raises
+    settings.SettingsError when two designs of the ontology get one name in this environment.
 
     Which objects are in the graph: the objects in a schema that holds a designed object, the objects a Genie
     space is bound to, both ends of every migration pair, and everything those are built from or that is built
     from them, by the platform's lineage and the metric views' own definitions. every_object=True takes every
     object the discovery read instead.
     """
+    from . import discovery as disc
     found = _reading(discovery)
     env = environment(settings)
     g = TechGraph(graph=f"{BASE}{env}:graph", environment=env)
@@ -171,14 +169,19 @@ def build(discovery, view, settings, every_object=False):
     metric_views = found.get("metric_views") or {}
 
     # What each object reads: the lineage the platform observed, and the tables a metric view's definition names.
-    reads, written, writers = {}, {}, {}
+    reads, written, unread, writers = {}, {}, {}, {}
     for edge in found.get("table_edges") or []:
         source, target = edge["source"].lower(), edge["target"].lower()
         if source == target or source not in tables or target not in tables:
             continue
         reads.setdefault(target, set()).add(source)
         if edge.get("last_event"):
-            written[target] = max(written.get(target, ""), str(edge["last_event"]))
+            # Times are compared as instants, whatever form the reading holds them in.
+            when = disc.instant(edge["last_event"])
+            if when is None:
+                unread[target] = str(edge["last_event"])
+            elif target not in written or when > written[target]:
+                written[target] = when
         writers.setdefault(target, set()).update(str(e) for e in edge.get("entities") or [])
     for name, definition in metric_views.items():
         for source in definition.get("tables") or []:
@@ -187,11 +190,8 @@ def build(discovery, view, settings, every_object=False):
     pairs = sorted({(s.lower(), t.lower()) for s, t in found.get("migration_pairs") or []
                     if s.lower() in tables and t.lower() in tables and s.lower() != t.lower()})
 
-    designs = {}
-    for design in view.objects.values():
-        name = settings.environment_name(design.full_name).lower()
-        if name in tables:
-            designs[name] = design
+    by_name = {o.full_name: o for o in view.objects.values()}
+    designs = {name: by_name[full_name] for name, full_name in settings.one_name_each(by_name).items() if name in tables}
     spaces = sorted(found.get("genie_spaces") or [], key=lambda s: str(s.get("space_id")))
 
     if every_object:
@@ -207,8 +207,9 @@ def build(discovery, view, settings, every_object=False):
                 read_by.setdefault(source, set()).add(target)
         scope = _reach(seeds, reads) | _reach(seeds, read_by)
 
-    def node(kind, key):
-        return f"{BASE}{env}:{kind}/{_key(key)}"
+    def node(kind, key, prefix=""):
+        """An object's IRI from its name, or a builder's or a space's from its ID, which follows the prefix."""
+        return f"{BASE}{env}:{kind}/{prefix}{_key(key, exact=bool(prefix))}"
 
     def add(subject, name, value):
         g.triples.add((subject, RDF_TYPE if name == "a" else TG + name, value))
@@ -227,11 +228,10 @@ def build(discovery, view, settings, every_object=False):
                 g.notes.append(f"{info['full_name']} is a metric view the ontology names no measure for; it is recorded as a view")
         else:
             add(subject, "a", _iri(TG + "Table"))
-            when = _date_time(written.get(name))
-            if when:
-                add(subject, "lastRefresh", _text(when, XSD + "dateTime"))
-            elif written.get(name):
-                g.notes.append(f"{info['full_name']}: its last write, {written[name]!r}, is not a date and time; it is left out")
+            if name in written:
+                add(subject, "lastRefresh", _text(disc.utc_text(written[name]), XSD + "dateTime"))
+            elif name in unread:
+                g.notes.append(f"{info['full_name']}: its last write, {unread[name]!r}, is not a date and time; it is left out")
         add(subject, "name", _text(info["full_name"]))
         layer = schema_layer(str(info.get("schema") or name.split(".")[1]))
         if layer:
@@ -242,21 +242,20 @@ def build(discovery, view, settings, every_object=False):
             if source in scope:
                 add(subject, "readsFrom", _iri(node("object", source)))
 
-    builders = found.get("builders") or {}
-    by_id = {str(i).lower(): (str(i), b) for i, b in builders.items()}
+    builders = {str(i): b for i, b in (found.get("builders") or {}).items()}
     for name in sorted(scope):
         for entity in sorted(writers.get(name, ())):
-            if entity.lower() not in by_id:
+            if entity not in builders:
                 continue   # a notebook or a query wrote it: the platform keeps no name for those
-            entity_id, builder = by_id[entity.lower()]
+            builder = builders[entity]
             kind = "Pipeline" if str(builder.get("kind")).lower() == "pipeline" else "Job"
-            subject = node("builder", f"{kind}-{entity_id}")
+            subject = node("builder", entity, prefix=f"{kind.lower()}-")
             add(subject, "a", _iri(TG + kind))
-            add(subject, "name", _text(builder.get("name") or entity_id))
+            add(subject, "name", _text(builder.get("name") or entity))
             add(node("object", name), "builtBy", _iri(subject))
 
     for space in spaces:
-        subject = node("agent", f"genie-{space['space_id']}")
+        subject = node("agent", space["space_id"], prefix="genie-")
         add(subject, "a", _iri(TG + "Agent"))
         add(subject, "name", _text(space.get("title") or f"Genie space {space['space_id']}"))
         for table in sorted({t.lower() for t in space.get("tables") or []}):
@@ -347,11 +346,13 @@ def rows(graph_files, release_root=None):
     """(nodes, edges) of the Neo4j subgraph, in the form subgraph.replace_subgraph takes.
 
     A node is every subject with a type: its labels are Tech and the local name of each type, and its properties
-    are uri and one per literal, named by the property's local name (name, lastRefresh, checkedAt). A value from
+    are uri and one per literal, named by the property's local name (name, lastRefresh, checkedAt); a time is text
+    in UTC, as in the file. A value from
     a code list becomes a property that holds the value's code (layer: "gold", result: "pass"). Every other link
     becomes a relationship named in capitals (READS_FROM, DESIGNED_AS, BUILT_BY, BINDS, REPLACES, IMPLEMENTS,
     CHECKS). A link to a node of this graph is a tech edge; a link to anything else ends at an ontology node."""
     from rdflib import Literal, URIRef
+    from . import discovery as disc
     sg = _module(release_root, SUBGRAPH, "kpi_store_subgraph")
     data = _quads(graph_files)
     triples = {(s, p, o) for s, p, o, _ in data.quads((None, None, None, None))}
@@ -365,7 +366,9 @@ def rows(graph_files, release_root=None):
         if p == URIRef(RDF_TYPE):
             n["labels"].add(sg.local_name(o))
         elif isinstance(o, Literal):
-            n["values"].setdefault(sg.local_name(p), set()).add(str(o))
+            # A time keeps the one UTC form the file gives it; rdflib would rewrite its Z as an offset.
+            when = disc.utc_text(str(o)) if str(o.datatype) == XSD + "dateTime" else ""
+            n["values"].setdefault(sg.local_name(p), set()).add(when or str(o))
         elif str(p) in CODE_LINKS:
             n["values"].setdefault(sg.local_name(p), set()).add(sg.local_name(o))
         else:
@@ -508,18 +511,20 @@ def load_jena(graph_files, query_url, release_root=None, rdfstore=None):
     return {**result, "status": "loaded"}
 
 
-def status_jena(held, graph_files):
-    """(status, why) from {graph IRI: triple count} of what Jena holds (sync_stores.read_jena) and the files. Jena
-    keeps no marker, so the graph names and counts are compared: current, behind (a graph is missing) or changed
-    (a count differs)."""
+def status_jena(query_url, graph_files, release_root=None, rdfstore=None):
+    """(status, why) of a Fuseki dataset's technical graph. Jena keeps no marker, so its content is the proof: the
+    named graphs are read back and their RDFC-1.0 hash is compared with the files'. current; behind (a graph of the
+    files is missing); or changed (the graphs are there and hold other triples, even when the count is the same)."""
+    rs = _rdfstore(release_root, rdfstore)
     want = graph_counts(graph_files)
-    missing = sorted(g for g in want if g not in held)
+    held = read_jena(rs, query_url, sorted(want))
+    there = {g for g in want if any(True for _ in held.quads_for_graph_name(rs.ox.NamedNode(g)))}
+    missing = sorted(set(want) - there)
     if missing:
         return "behind", f"{len(missing)} technical-graph graph(s) missing, e.g. {missing[0]}"
-    moved = sorted(g for g in want if held[g] != want[g])
-    if moved:
-        return "changed", f"{moved[0]} holds {held[moved[0]]} triples, not the graph files' {want[moved[0]]}"
-    return "current", f"{len(want)} graph(s), {sum(want.values())} triples, each equal to the graph files"
+    if rs.dataset_hash(held) != rs.dataset_hash(_dataset(rs, graph_files)):
+        return "changed", f"its technical graph holds {len(held)} triples that are not the graph files' {sum(want.values())}: load it again"
+    return "current", f"{len(want)} graph(s), {sum(want.values())} triples, equal to the graph files by hash"
 
 
 # ---- Databricks ------------------------------------------------------------------------------------
@@ -548,19 +553,25 @@ def read_delta(gate, settings):
         return None
 
 
-def read_delta_rows(gate, settings):
-    """{graph IRI: row count} of the triple table, or None when the table is missing."""
-    if TRIPLES_TABLE not in _own_tables(gate, settings):
-        return None
-    found = gate.run(f"SELECT graph, count(*) AS n FROM {delta_tables(settings)[0]} GROUP BY graph")
-    return {str(r["graph"]): int(r["n"]) for r in found}
+def status_delta(gate, settings, graph_files, release_root=None, rdfstore=None):
+    """(status, why) of the technical graph in Databricks, proved by content: the triple table is read back through
+    the Gate and its RDFC-1.0 hash is compared with the files'.
 
-
-def status_delta(held, graph_files, table_rows=None):
-    """(status, why) from the triple table's marker (read_delta) and, when given, its {graph IRI: row count}."""
+    unmarked  no marker row
+    behind    the marker names other graph files
+    changed   the marker names these files, and the triple table is missing or holds other triples, even when
+              its row count is the same
+    current   the marker names these files and the table holds exactly their triples"""
+    from . import load_databricks as lb
+    held = read_delta(gate, settings)
     differs = None
-    if table_rows is not None and table_rows != graph_counts(graph_files):
-        differs = f"{TRIPLES_TABLE} holds other graphs or row counts than the graph files"
+    if held and held.get("digest") == digest(graph_files):
+        rs = _rdfstore(release_root, rdfstore)
+        if TRIPLES_TABLE not in _own_tables(gate, settings):
+            differs = f"{TRIPLES_TABLE} is missing"
+        elif rs.dataset_hash(rs.SparkStore(lb.GatedSpark(gate), delta_tables(settings)[0]).export()) \
+                != rs.dataset_hash(_dataset(rs, graph_files)):
+            differs = f"{TRIPLES_TABLE} holds other triples than the graph files"
     return _judge(held, graph_files, differs)
 
 

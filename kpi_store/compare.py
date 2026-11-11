@@ -11,6 +11,7 @@ import datetime as dt
 import re
 from dataclasses import dataclass, field
 
+from . import discovery as disc
 from . import metric_view as mv
 
 BLOCKING = ("object-missing", "object-renamed", "column-missing", "column-renamed", "edge-missing")
@@ -95,6 +96,7 @@ def _readers(table, column, found):
 def compare(ontology, found, settings, now=None, stale_after_days=STALE_AFTER_DAYS):
     """A Comparison of an OntologyView with a Discovery. stale_after_days None leaves freshness out."""
     out = Comparison()
+    settings.one_name_each(obj.full_name for obj in ontology.objects.values())
     here = {key: settings.environment_name(obj.full_name) for key, obj in ontology.objects.items()}
     names_here = {name.lower(): key for key, name in here.items()}
 
@@ -224,12 +226,12 @@ def compare(ontology, found, settings, now=None, stale_after_days=STALE_AFTER_DA
     # 7. Freshness.
     if stale_after_days is not None:
         now = now or dt.datetime.now(dt.timezone.utc)
-        limit = (now - dt.timedelta(days=stale_after_days)).isoformat()
+        limit = disc.instant(now) - dt.timedelta(days=stale_after_days)
         for key in sorted(present):
             if not ontology.upstream(key):
                 continue   # a source table is written outside Databricks, so lineage says nothing about it
             last = found.last_written(present[key])
-            if last and last[:19] < limit[:19]:
+            if last and disc.instant(last) < limit:
                 out.rows.append(_row("stale-data", found.spelled(present[key]), "", last,
                                      f"table lineage shows no write in the last {stale_after_days} days"))
     return out

@@ -4,11 +4,14 @@ Everything arrives through two injected objects: run_sql(statement), which retur
 Spark rows), and a Genie client with list_spaces and get_space, as databricks-sdk's WorkspaceClient().genie has.
 This module imports neither Spark nor the SDK, so the tests run it against made-up rows.
 
+Every time the platform reports is read once, here, into UTC text (utc_text), and compared as an instant.
+
 Lineage rules: an edge is kept only when both of its tables exist today and no skip rule covers either; an edge
 from a table to itself is dropped; the lineage's entity_type is not read. A column edge is kept when both of its
 tables exist today, whether or not the columns do, because an old column name in the lineage is the evidence of
 a rename.
 """
+import datetime as dt
 import json
 from dataclasses import asdict, dataclass, field
 
@@ -61,8 +64,8 @@ class Discovery:
         return {(st, sc) for st, sc, tt, tc in self.column_edges if tt == table.lower() and tc == column.lower()}
 
     def last_written(self, name):
-        """The newest lineage event that wrote the table, as ISO text, or ""."""
-        return max((e["last_event"] for (s, t), e in self.table_edges.items() if t == name.lower() and e["last_event"]), default="")
+        """The newest lineage event that wrote the table, as UTC text (utc_text), or ""."""
+        return newest(e["last_event"] for (s, t), e in self.table_edges.items() if t == name.lower())
 
     def to_json(self):
         """The whole reading as JSON text, for the tools that build on it outside the notebook."""
@@ -101,8 +104,34 @@ def _text(value):
     return "" if value is None else str(value)
 
 
-def _iso(value):
-    return value.isoformat() if hasattr(value, "isoformat") else ("" if value is None else str(value))
+def instant(value):
+    """A platform time as a timezone-aware UTC datetime, or None when the value is empty or is no time.
+
+    Takes a datetime, or text with a T or a space between date and time, with an offset, a trailing Z or neither.
+    A time with no zone is UTC, which is what the system tables record."""
+    if isinstance(value, dt.datetime):
+        when = value
+    elif isinstance(value, dt.date):
+        when = dt.datetime(value.year, value.month, value.day)
+    else:
+        try:
+            when = dt.datetime.fromisoformat(str(value or "").strip())
+        except ValueError:
+            return None
+    return (when.replace(tzinfo=dt.timezone.utc) if when.tzinfo is None else when).astimezone(dt.timezone.utc)
+
+
+def utc_text(value):
+    """A platform time in the one form the reading, the report and the technical graph hold: YYYY-MM-DDTHH:MM:SSZ,
+    in UTC, to the second. "" when the value is empty or is no time. Two such texts sort as their instants do."""
+    when = instant(value)
+    return when.strftime("%Y-%m-%dT%H:%M:%SZ") if when else ""
+
+
+def newest(values):
+    """The newest of some platform times, compared as instants, as utc_text; "" when none is a time."""
+    found = [when for when in map(instant, values) if when]
+    return utc_text(max(found)) if found else ""
 
 
 def migration_pair(source, target):
@@ -165,7 +194,7 @@ def discover(settings, run_sql, genie=None, schemas=()):
         if str(row["table_catalog"]).lower() not in in_scope:
             continue
         info = TableInfo(f"{row['table_catalog']}.{row['table_schema']}.{row['table_name']}", row["table_catalog"],
-                         row["table_schema"], row["table_name"], str(row.get("table_type") or ""), _iso(row.get("last_altered")))
+                         row["table_schema"], row["table_name"], str(row.get("table_type") or ""), utc_text(row.get("last_altered")))
         if not settings.skipped(info.schema, info.name):
             found.tables[info.full_name.lower()] = info
 
@@ -219,7 +248,7 @@ def discover(settings, run_sql, genie=None, schemas=()):
         edge = found.table_edges.setdefault((source.lower(), target.lower()), {"entities": [], "last_event": ""})
         if row.get("entity_id") and str(row["entity_id"]) not in edge["entities"]:
             edge["entities"] = sorted(edge["entities"] + [str(row["entity_id"])])
-        edge["last_event"] = max(edge["last_event"], _iso(row.get("last_event")))
+        edge["last_event"] = newest([edge["last_event"], row.get("last_event")])
     found.migration_pairs = sorted(e for e in found.table_edges if migration_pair(*e))
 
     if scope:
@@ -246,9 +275,11 @@ def discover(settings, run_sql, genie=None, schemas=()):
                 found.notes.append(f"{table} could not be read ({type(err).__name__})")
                 continue
             for row in map(as_dict, rows):
-                entity, changed = str(row[key]), _iso(row.get("change_time"))
-                # The table keeps every name an ID has had: the newest row holds the current one.
-                if entity.lower() in {e.lower() for e in entities} and (entity not in latest or changed >= latest[entity][0]):
+                # An ID is kept exactly as the platform gives it: two IDs that differ in case are two builders.
+                entity, changed = str(row[key]), utc_text(row.get("change_time"))
+                # The table keeps every name an ID has had: the newest row holds the current one. Rows of the same
+                # time are settled by name, so the order the rows arrive in never decides.
+                if entity in entities and (entity not in latest or (changed, str(row.get("name") or "")) > latest[entity]):
                     latest[entity] = (changed, str(row.get("name") or ""))
             for entity, (_, name) in latest.items():
                 found.builders[entity] = {"kind": kind, "name": name}
