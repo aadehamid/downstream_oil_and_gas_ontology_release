@@ -22,6 +22,11 @@ EXAMPLE = os.path.join(ss.REPO, "business_architecture", "ontology", "logical-mo
 SLUG = "example-logical-model"
 VERSION_IRI = "https://w3id.org/mpc/ontology/modules/logical-model/1.0.0"
 ER = "https://www.erstudio.com/semanticmodel/"
+# Pinned by hand with shell tools, from the two files in logical-model/example: for each, in name order (the export,
+# then the layer), the file's name, a NUL byte, the file's bytes and a NUL byte, all through `shasum -a 256`:
+#   (printf 'example-logical-model.erstudio.ttl\0'; cat example-logical-model.erstudio.ttl;
+#    printf '\0example-logical-model.layer.ttl\0'; cat example-logical-model.layer.ttl; printf '\0') | shasum -a 256
+EXAMPLE_DIGEST = "2854bc6cacebf3a33b02d836aed23f8a4f970d76bc96142a2c3ec7ddcb38da64"
 
 
 class Package(unittest.TestCase):
@@ -137,10 +142,22 @@ class Subgraph(Package):
 
     def test_the_digest_covers_each_model_file_by_name_and_content(self):
         files = lm.models([VERSION_IRI])
-        first = lm.digest(files)
-        with open(os.path.join(self.folder, f"{SLUG}.layer.ttl"), "a") as f:
-            f.write("\n# changed\n")
-        self.assertNotEqual(lm.digest(files), first)
+        self.assertEqual(lm.digest(files), EXAMPLE_DIGEST)
+        for kind in ("layer", "erstudio"):  # a change to either file moves it, and each moves it differently
+            path = os.path.join(self.folder, f"{SLUG}.{kind}.ttl")
+            with open(path, "rb") as f:
+                before = f.read()
+            with open(path, "ab") as f:
+                f.write(b"\n# changed\n")
+            changed = lm.digest(files)
+            with open(path, "wb") as f:
+                f.write(before)
+            self.assertNotIn(changed, (EXAMPLE_DIGEST, getattr(self, "seen", None)), kind)
+            self.seen = changed
+        self.assertEqual(lm.digest(files), EXAMPLE_DIGEST)
+        renamed = [(SLUG, files[0][1], files[0][2].replace(".layer.ttl", ".other.ttl"))]
+        shutil.copy(os.path.join(self.folder, f"{SLUG}.layer.ttl"), os.path.join(self.folder, f"{SLUG}.other.ttl"))
+        self.assertNotEqual(lm.digest(renamed), EXAMPLE_DIGEST)  # the same bytes under another name
 
 
 class Tx:
@@ -192,7 +209,7 @@ class Loading(Package):
         marker = tx.queries[-1]
         self.assertEqual(marker[0], "CREATE (m:LogicalModelMarker) SET m = $p")
         self.assertEqual((marker[1]["p"]["digest"], marker[1]["p"]["models"], marker[1]["p"]["store"], marker[1]["p"]["nodes"]),
-                         (lm.digest(lm.models([VERSION_IRI])), [SLUG], "neo4j", 14))
+                         (EXAMPLE_DIGEST, [SLUG], "neo4j", 14))
 
     def test_an_edge_with_no_target_rolls_back_and_writes_no_marker(self):
         tx = Tx()

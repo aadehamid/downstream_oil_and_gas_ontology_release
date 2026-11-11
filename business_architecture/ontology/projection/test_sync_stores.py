@@ -14,15 +14,57 @@ sys.path.insert(0, HERE)
 import sync_stores as ss  # noqa: E402
 
 
+LM = "https://w3id.org/mpc/ontology/modules/logical-model/1.0.0"
+
+
 class Expected(unittest.TestCase):
-    def test_the_working_tree_gives_every_catalog_dataset_and_the_manifest_fingerprint(self):
+    def test_this_tree_gives_its_13_catalog_datasets_their_digest_and_the_manifest_fingerprint(self):
+        # Pinned by hand, with shell tools only. The count and the digest: the 13 IRIs after dcat:dataset in
+        # releases/catalog.ttl, sorted, joined by newlines with none at the end, through `shasum -a 256`. The
+        # fingerprint: the "input_fingerprint" line of projection-manifest.json. A new release changes all three.
         want = ss.expected()
-        datasets = ss.catalog_datasets(ss.repo_file(ss.CATALOG))
-        self.assertEqual(want["catalog_datasets"], len(datasets))
-        self.assertEqual(want["catalog_datasets"], len(set(datasets)))
-        with open(os.path.join(ss.REPO, ss.MANIFEST), encoding="utf-8") as f:
-            manifest = json.load(f)
-        self.assertEqual(want["input_fingerprint"], manifest["input_fingerprint"])
+        self.assertEqual(want["catalog_datasets"], 13)
+        self.assertEqual(want["catalog_digest"], "804d78647c14762a2b42618c103a9f08fff9c9cf873881cecd06ec50c8724a53")
+        self.assertEqual(want["input_fingerprint"], "8526554d8c5a773d855033d23d7ebc689733f705c7fc397e8b83392e030427b2")
+        self.assertEqual(len(want["newest"]), 13)
+        self.assertEqual(sorted(want), ["catalog_datasets", "catalog_digest", "input_fingerprint", "newest"])
+
+    def test_a_catalog_of_three_datasets_gives_this_count_digest_and_newest_set(self):
+        # The digest is by hand: the three IRIs below in sorted order, joined by newlines with none at the end, through
+        # `shasum -a 256`. The catalog lists them out of order, so the digest must not depend on the file's order.
+        base = "https://example.org/modules/"
+        catalog = (f"<{base}catalog> <http://www.w3.org/ns/dcat#dataset> <{base}b/2.0.0>, <{base}a/1.1.0>, <{base}a/1.0.0> .\n")
+        files = {ss.CATALOG: catalog, ss.MANIFEST: '{"input_fingerprint": "f00d"}'}
+        refs = []
+        with mock.patch.object(ss, "repo_file", lambda path, ref=None: refs.append(ref) or files[path]):
+            self.assertEqual(ss.expected("v1"), {
+                "catalog_datasets": 3, "catalog_digest": "a822a31457ee0e3ecd61fbdd120a0aee37bd835fe87ce48eb33e10b959aa43ea",
+                "input_fingerprint": "f00d", "newest": [base + "a/1.1.0", base + "b/2.0.0"]})
+        self.assertEqual(refs, ["v1", "v1"])
+
+    def test_the_graph_counts_are_read_only_when_jena_or_databricks_is_named(self):
+        base = {"catalog_datasets": 1, "catalog_digest": "d", "input_fingerprint": "f", "newest": ["urn:example:a/1.0.0"]}
+        asked = []
+
+        def counts(newest, ref=None):
+            asked.append((newest, ref))
+            return {"urn:example:a/1.0.0": 3}
+        with mock.patch.object(ss, "expected", lambda ref=None: dict(base)), mock.patch.object(ss, "jena_graphs", counts):
+            self.assertEqual(ss.expected_for("v1", ("neo4j",)), base)
+            self.assertEqual(asked, [])  # no release file is parsed for a Neo4j-only check
+            for stores in (("jena",), ("databricks",), ("neo4j", "jena")):
+                self.assertEqual(ss.expected_for("v1", stores), base | {"jena_graphs": {"urn:example:a/1.0.0": 3}}, stores)
+        self.assertEqual(asked, [(["urn:example:a/1.0.0"], "v1")] * 3)
+
+    def test_this_trees_stores_hold_41_graphs_with_these_counts(self):
+        # By hand: 13 releases, three graphs each, and the logical-model package's two model graphs. The three counts
+        # are the logical-model release's files, counted apart from this code (its manifest says 30 too).
+        self.assertNotIn("jena_graphs", ss.expected_for("worktree", ("neo4j",)))
+        graphs = ss.expected_for("worktree", ("databricks",))["jena_graphs"]
+        self.assertEqual(len(graphs), 41)
+        self.assertEqual((graphs[LM], graphs[LM + "/shapes"], graphs[LM + "/catalog"]), (30, 70, 27))
+        self.assertIn(LM + "/customer-logical-model.erstudio", graphs)
+        self.assertIn(LM + "/customer-logical-model.layer", graphs)
 
     def test_newest_takes_each_modules_highest_version_numerically(self):
         base = "https://w3id.org/mpc/ontology/modules/"
@@ -189,6 +231,66 @@ class Reading(unittest.TestCase):
             self.assertEqual(ss.read_jena("http://jena.example/ds/query"), {"a": 3, "a/shapes": 2, "(the default graph)": 4})
         self.assertEqual(set(asked), {"http://jena.example/ds/query"})
 
+    def test_a_select_is_one_get_with_the_query_encoded_and_the_json_results_asked_for(self):
+        import http.server
+        import threading
+        seen = []
+        count = b'{"head": {"vars": ["n"]}, "results": {"bindings": [{"n": {"type": "literal", "value": "4"}}]}}'
+        graphs = (b'{"head": {"vars": ["g", "n"]}, "results": {"bindings": ['
+                  b'{"g": {"type": "uri", "value": "urn:example:a"}, "n": {"type": "literal", "value": "3"}}]}}')
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                seen.append((self.command, self.path, self.headers["Accept"]))
+                body = graphs if "GRAPH" in self.path else count
+                self.send_response(200)
+                self.send_header("Content-Type", "application/sparql-results+json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *a):
+                pass
+        server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            url = f"http://127.0.0.1:{server.server_address[1]}/ds/query"
+            bindings = ss.jena_select(url, "SELECT (COUNT(*) AS ?n) WHERE { ?s ?p ?o }")
+            self.assertEqual(bindings, [{"n": {"type": "literal", "value": "4"}}])
+            self.assertEqual(seen, [("GET", "/ds/query?query=SELECT+%28COUNT%28%2A%29+AS+%3Fn%29+WHERE+%7B+%3Fs+%3Fp+%3Fo+%7D",
+                                     "application/sparql-results+json")])
+            del seen[:]
+            self.assertEqual(ss.read_jena(url), {"urn:example:a": 3, "(the default graph)": 4})
+            self.assertEqual([path for _, path, _ in seen], [
+                "/ds/query?query=SELECT+%3Fg+%28COUNT%28%2A%29+AS+%3Fn%29+WHERE+%7B+GRAPH+%3Fg+%7B+%3Fs+%3Fp+%3Fo+%7D+%7D+GROUP+BY+%3Fg",
+                "/ds/query?query=SELECT+%28COUNT%28%2A%29+AS+%3Fn%29+WHERE+%7B+%3Fs+%3Fp+%3Fo+%7D"])
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
+
+    def test_expected_prints_the_expectation_as_json_at_the_ref_given_and_opens_no_store(self):
+        def touched(*a, **k):
+            raise AssertionError("a store or the settings were read")
+        want = {"catalog_datasets": 2, "catalog_digest": "d", "input_fingerprint": "f", "newest": ["urn:example:a/1.0.0"]}
+        for argv, ref in ((["expected"], "worktree"), (["expected", "--ref", "v1"], "v1")):
+            refs, out = [], io.StringIO()
+            with mock.patch.object(ss, "settings", touched), mock.patch.object(ss, "neo4j_session_from", touched), \
+                    mock.patch.object(ss, "expected", lambda r=None: refs.append(r) or want), mock.patch("sys.stdout", out):
+                self.assertEqual(ss.main(argv), 0)
+            self.assertEqual((refs, json.loads(out.getvalue())), ([ref], want))
+            self.assertTrue(out.getvalue().startswith('{\n  "catalog_datasets": 2,\n'))
+
+    def test_the_expected_command_prints_this_trees_13_datasets(self):
+        out = io.StringIO()
+        with mock.patch("sys.stdout", out):
+            self.assertEqual(ss.main(["expected"]), 0)
+        printed = json.loads(out.getvalue())
+        self.assertEqual((printed["catalog_datasets"], printed["catalog_digest"]),
+                         (13, "804d78647c14762a2b42618c103a9f08fff9c9cf873881cecd06ec50c8724a53"))
+        self.assertIn("https://w3id.org/mpc/ontology/modules/kpi/1.3.0", printed["newest"])
+
     def run_main(self, argv, read):
         want = {"catalog_datasets": 50, "catalog_digest": "d", "input_fingerprint": "f", "newest": [], "jena_graphs": {"g": 1}}
         refs, out = [], io.StringIO()
@@ -268,6 +370,12 @@ class Session:
     def __init__(self, nodes, edges, records, marker=None):
         self.nodes, self.edges, self.records, self.marker, self.written = nodes, edges, records, marker, []
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
     def run(self, query, **params):
         if query.startswith("MERGE"):
             self.written.append((query, params))
@@ -286,13 +394,16 @@ class Neo4jMarker(unittest.TestCase):
     def setUp(self):
         with open(ss.REPORT, encoding="utf-8") as f:
             self.report = json.load(f)
+        self.counts = [self.report["nodes"], self.report["relationships"]]  # the fixture's file, read apart from the code
 
     def session(self, nodes=0, edges=0, records=("b", "a"), marker=None):
         return Session(self.report["nodes"] + nodes, self.report["relationships"] + edges, list(records), marker)
 
+    def test_the_committed_report_holds_this_releases_counts(self):
+        self.assertEqual(self.counts, [4237, 22312])  # projection-report.json as shipped
+
     def test_counts_equal_to_the_committed_report_and_one_record_per_release_pass(self):
-        self.assertEqual((self.report["nodes"], self.report["relationships"]), (4237, 22312))
-        self.assertEqual(ss.neo4j_checked("neo4j", self.session(), self.want), [4237, 22312])
+        self.assertEqual(ss.neo4j_checked("neo4j", self.session(), self.want), self.counts)
 
     def test_other_counts_or_records_are_refused(self):
         with self.assertRaisesRegex(SystemExit, "relationships"):
@@ -305,7 +416,7 @@ class Neo4jMarker(unittest.TestCase):
         with mock.patch.object(ss, "now", lambda: "2026-11-11T00:00:00Z"), mock.patch.object(ss, "commit", lambda: "abc12345"):
             written = ss.mark_neo4j(session, "enterprise", self.want)
         marker = {"catalog_datasets": 50, "catalog_digest": "d", "input_fingerprint": "f", "marked_at": "2026-11-11T00:00:00Z",
-                  "commit": "abc12345", "store": "enterprise", "count": [4237, 22312]}
+                  "commit": "abc12345", "store": "enterprise", "count": self.counts}
         self.assertEqual(written, marker)
         self.assertEqual(session.written, [("MERGE (m:EpmStoreMarker {store: $s}) SET m = $p", {"s": "enterprise", "p": marker})])
         refused = self.session(nodes=1)
@@ -313,10 +424,29 @@ class Neo4jMarker(unittest.TestCase):
             ss.mark_neo4j(refused, "enterprise", self.want)
         self.assertEqual(refused.written, [])
 
+    def test_the_mark_command_marks_under_the_name_given_from_this_trees_expectation_and_prints_its_line(self):
+        session, opened, refs, out = self.session(), [], [], io.StringIO()
+
+        def open_session(values):
+            opened.append(values)
+            return contextlib.nullcontext(), session
+        with mock.patch.object(ss, "settings", lambda: {"NEO4J_URI": "bolt://db.example:7687"}), \
+                mock.patch.object(ss, "neo4j_session_from", open_session), mock.patch("sys.stdout", out), \
+                mock.patch.object(ss, "expected", lambda ref=None: refs.append(ref) or self.want), \
+                mock.patch.object(ss, "now", lambda: "2026-11-11T00:00:00Z"), mock.patch.object(ss, "commit", lambda: "abc12345"):
+            self.assertEqual(ss.main(["mark", "--name", "enterprise", "--ref", "v1"]), 0)
+        self.assertEqual(refs, [None])  # a marker records this tree's catalog, whatever --ref says
+        self.assertEqual(opened, [{"NEO4J_URI": "bolt://db.example:7687"}])
+        self.assertEqual(session.written, [("MERGE (m:EpmStoreMarker {store: $s}) SET m = $p", {"s": "enterprise", "p": {
+            "catalog_datasets": 50, "catalog_digest": "d", "input_fingerprint": "f",
+            "marked_at": "2026-11-11T00:00:00Z", "commit": "abc12345", "store": "enterprise", "count": self.counts}})])
+        self.assertEqual(out.getvalue(), f"enterprise: marked, holding {self.counts}, from 50 catalog datasets\n")
+
     def test_the_marker_is_read_by_its_name_with_the_live_counts(self):
-        held = {"store": "enterprise", "count": [4237, 22312]}
-        self.assertEqual(ss.read_neo4j(self.session(marker=held), "enterprise"), (held, [4237, 22312]))
-        self.assertEqual(ss.read_neo4j(self.session(marker=held)), (None, [4237, 22312]))  # the default name is neo4j
+        held = {"store": "enterprise", "count": [7, 9]}
+        session = Session(7, 9, [], held)
+        self.assertEqual(ss.read_neo4j(session, "enterprise"), (held, [7, 9]))
+        self.assertEqual(ss.read_neo4j(session), (None, [7, 9]))  # the default name is neo4j
 
     def test_the_neo4j_marker_is_never_a_resource(self):
         source = inspect.getsource(ss)
