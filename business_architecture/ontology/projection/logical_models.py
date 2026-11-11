@@ -1,28 +1,27 @@
-"""Loads a release's logical models into the four ontology stores, when its newest releases hold the logical-model
-module (the decision of 2026-11-02, amendment "the stores"). Where the releases hold no such package, every command here finds
+"""Loads a release's logical models into the ontology stores, when its newest releases hold the logical-model module
+(the decision of 2026-11-02, amendment "the stores"). Where the releases hold no such package, every command here finds
 nothing to load and changes nothing.
 
-    python3 logical_models.py load --store driver --store jena ... [--skills <folder>]   # what the newest releases hold
-    python3 logical_models.py rows                                                    # the subgraph's nodes and edges, as JSON
+    python3 logical_models.py load [--store neo4j] [--store jena] [--skills <folder>]   # what the newest releases hold
+    python3 logical_models.py rows                                                     # the subgraph's nodes and edges, as JSON
 
 What each store gets, beside the module's vocabulary, which the projection loads like every package's:
-- Jena and Delta: every package graph of the newest releases, each as a named graph, <version IRI>/<file name without
-  .ttl>. A package graph is a Turtle file the package's manifest.json lists beside its content and its release graphs
-  (build_module.py's "graphs"): for logical-model, each model's ER Studio export (<slug>.erstudio.ttl) and annotation
-  layer (<slug>.layer.ttl). Jena takes them in one SPARQL Update request, Delta as rows of the triple table in the
-  rdf-store skill's columns, from that skill's own rdfstore.py (under --skills), so the rows read back as its rows do.
-  sync_stores.py's drift check counts them with the release graphs (jena_graphs).
-- The local Neo4j and AuraDB: each model in full as its own subgraph, apart from the ontology's Resource nodes, as the
-  technical graph's Tech nodes are (graph_rows has the nodes and edges). The load replaces it in one transaction with
-  its marker, a digest of the model graph files, and commits only when every edge found its target and the ontology's
-  counts did not move (the demo's tech_graph.replace_subgraph, which the technical graph loads through too). The
-  projection's counts, hash and round trip read Resource nodes only, so they never read the subgraph; sync_stores.py
-  check compares it with the package's graphs on an lm:<store> line, by marker and content fingerprint.
+- Jena and the Delta triple table: every package graph of the newest releases, each as a named graph,
+  <version IRI>/<file name without .ttl>. A package graph is a Turtle file the package's manifest.json lists beside
+  its content and its release graphs (build_module.py's "graphs"): for logical-model, each model's ER Studio export
+  (<slug>.erstudio.ttl) and annotation layer (<slug>.layer.ttl). Jena takes them in one SPARQL Update request
+  (load_jena). This file does not connect to Databricks: package_rows returns the graphs, their triple counts and the
+  rows of the triple table, in the rdf-store skill's columns, for the load that writes the table.
+  sync_stores.py's drift check counts the package graphs with the release graphs (jena_graphs).
+- Neo4j: each model in full as its own subgraph, apart from the ontology's Resource nodes (graph_rows has the nodes
+  and edges). The load replaces it in one transaction with its marker, a digest of the model graph files, and commits
+  only when every edge found its target and the ontology's counts did not move (subgraph.replace_subgraph). The
+  projection's counts, hash and round trip read Resource nodes only, so they never read the subgraph. sync_stores.py
+  check compares it with the package's graphs on an lm:neo4j line, by marker and content fingerprint.
 
-The labels, node shapes and loader are a build choice delegated to the build's agent, under the subject matter expert's decision of 2026-10-12. Logins come from the
-files sync_stores.py reads (EPM_STORES_JSON names another environment's); none is printed.
-Needs rdflib; load also needs neo4j for the Neo4j stores, pyoxigraph for Jena and Delta, and databricks-sql-connector
-for Delta (uv run --with ...).
+The labels, node shapes and loader are a build choice delegated to the build's agent, under the subject matter expert's decision of 2026-10-12. The store
+addresses and the Neo4j login come from sync_stores.settings; no password is printed.
+Needs rdflib; load also needs neo4j for Neo4j and pyoxigraph for Jena, and package_rows needs pyoxigraph (uv run --with ...).
 """
 import argparse
 import hashlib
@@ -31,24 +30,25 @@ import json
 import os
 import sys
 
+import subgraph as sg
 import sync_stores as ss
 
 MODULE = "logical-model"
 LABEL = "LogicalModel"  # every node of the subgraph; never Resource
 MARKER_LABEL = "LogicalModelMarker"
-KIND = "model"  # an edge between two nodes of the subgraph, as tech_graph's "tech"
-NEO4J_NODES = f"MATCH (n:{LABEL}) RETURN labels(n) AS labels, properties(n) AS p"
-NEO4J_EDGES = (f"MATCH (a:{LABEL})-[r]->(b) RETURN a.uri AS s, type(r) AS t, b.uri AS o, b:Resource AS ontology, "
-               "properties(r) AS p")
+KIND = "model"  # an edge between two nodes of the subgraph
+NEO4J_NODES = sg.node_query(LABEL)
+NEO4J_EDGES = sg.edge_query(LABEL)
 RELEASES = os.path.join(ss.REPO, "business_architecture", "ontology", "releases")
 BUILDER = os.path.join(ss.REPO, "business_architecture", "ontology", "logical-model")
+SKILLS = os.path.join(ss.REPO, "skills")  # the release ships the rdf-store skill here
 
 
 # ---------- what the newest releases hold ----------
 
 def held(releases=None):
     """True when the newest version folder of some module holds package graphs, read from its manifest.json with the
-    standard library only, so rebuild_stores.py can plan the load without rdflib. load reads the catalog itself."""
+    standard library only, so a caller can plan the load without rdflib. load reads the catalog itself."""
     releases = releases or RELEASES
     if not os.path.isdir(releases):
         return False
@@ -58,13 +58,16 @@ def held(releases=None):
         if not versions:
             continue
         manifest = os.path.join(folder, max(versions, key=lambda v: tuple(int(p) for p in v.split("."))), "manifest.json")
-        if os.path.isfile(manifest) and ss.extra_graph_files(module, json.load(open(manifest, encoding="utf-8"))):
-            return True
+        if not os.path.isfile(manifest):
+            continue
+        with open(manifest, encoding="utf-8") as f:
+            if ss.extra_graph_files(module, json.load(f)):
+                return True
     return False
 
 
 def newest(ref=None):
-    """The newest releases of the catalog in the working tree, or at a git ref (sync_stores.repo_file)."""
+    """The newest releases of the catalog in this tree, or at a Git ref (sync_stores.repo_file)."""
     return ss.newest_releases(ss.catalog_datasets(ss.repo_file(ss.CATALOG, ref)))
 
 
@@ -98,7 +101,7 @@ def models(releases=None, ref=None):
 
 def builder():
     """The module's builder, whose namespaces and entity rule (an owl:Class of the export with a dcterms:identifier) the
-    subgraph shares, so the share release's IRI rewrite reaches both."""
+    subgraph shares, so both read one definition."""
     if BUILDER not in sys.path:
         sys.path.insert(0, BUILDER)
     import build_logical_model as blm
@@ -110,13 +113,12 @@ def literals(g, *subjects, names=None):
     description, and any other literal its predicate's local name. A key with two values holds a sorted list."""
     from rdflib import Literal
     from rdflib.namespace import DCTERMS, RDFS
-    tg = ss.demo_graph()
     names = {RDFS.label: "name", DCTERMS.identifier: "erstudio_id", DCTERMS.description: "description", **(names or {})}
     found = {}
     for s in subjects:
         for p, o in g.predicate_objects(s):
             if isinstance(o, Literal):
-                found.setdefault(names.get(p, tg.local_name(p)), set()).add(tg.neo4j_value(o.toPython()))
+                found.setdefault(names.get(p, sg.local_name(p)), set()).add(sg.neo4j_value(o.toPython()))
     return {k: next(iter(v)) if len(v) == 1 else sorted(map(str, v)) for k, v in found.items()}
 
 
@@ -139,7 +141,7 @@ def graph_rows(model_files, ref=None):
     one node, with both slugs in models."""
     from rdflib import Graph, URIRef
     from rdflib.namespace import DCTERMS, OWL, RDF, RDFS
-    blm, tg = builder(), ss.demo_graph()
+    blm = builder()
     sh = "http://www.w3.org/ns/shacl#"
     nodes, edges = {}, set()
 
@@ -164,7 +166,7 @@ def graph_rows(model_files, ref=None):
                 continue
             sources = list(export.objects(prop, blm.ER.sourceAttribute))
             props = literals(export, *sources, prop)
-            ranges = sorted(tg.local_name(r) for r in export.objects(prop, RDFS.range))
+            ranges = sorted(sg.local_name(r) for r in export.objects(prop, RDFS.range))
             if ranges:
                 props["datatype"] = ranges[0] if len(ranges) == 1 else ranges
             terms = sorted(str(t) for s in sources for t in export.objects(s, blm.ER.businessTerm))
@@ -175,8 +177,8 @@ def graph_rows(model_files, ref=None):
             for d in owners:
                 edges.add((str(d), "HAS_ATTRIBUTE", str(prop), False, ()))
         for key in sorted(export.subjects(blm.ER.keyType, None)):
-            props = {"name": tg.local_name(key), **{k: v for k, v in literals(export, key).items() if k != "name"}}
-            types = sorted(tg.local_name(t) for t in export.objects(key, blm.ER.keyType))
+            props = {"name": sg.local_name(key), **{k: v for k, v in literals(export, key).items() if k != "name"}}
+            types = sorted(sg.local_name(t) for t in export.objects(key, blm.ER.keyType))
             props["key_type"] = types[0] if len(types) == 1 else types
             node(key, "Key", props, slug)
             for target in export.objects(key, URIRef(sh + "targetClass")):
@@ -198,16 +200,16 @@ def graph_rows(model_files, ref=None):
                     if d in entities and e in entities:
                         edges.add((str(d), "RELATES_TO", str(e), False, p))
         for e, m in layer.subject_objects(blm.LM.inModel):
-            edges.add((str(e), tg.edge_type(blm.LM.inModel), str(m), False, ()))
+            edges.add((str(e), sg.edge_type(blm.LM.inModel), str(m), False, ()))
         for link in (blm.LM.sourceSystem, blm.LM.describes, blm.LM.implementedBy):
             for e, target in layer.subject_objects(link):
-                edges.add((str(e), tg.edge_type(link), str(target), True, ()))
+                edges.add((str(e), sg.edge_type(link), str(target), True, ()))
     return ([nodes[u] for u in sorted(nodes)],
             [{"s": s, "t": t, "o": o, "ontology": ont, "p": dict(p)} for s, t, o, ont, p in sorted(edges)])
 
 
 def digest(model_files, ref=None):
-    """The SHA-256 of the model graph files (in the working tree, or at ref), each file's name and bytes in name order:
+    """The SHA-256 of the model graph files (in this tree, or at ref), each file's name and bytes in name order:
     what a Neo4j store's LogicalModelMarker records."""
     h = hashlib.sha256()
     for path in sorted(p for _, *paths in model_files for p in paths):
@@ -216,66 +218,60 @@ def digest(model_files, ref=None):
 
 
 def content(nodes, edges):
-    """The subgraph reduced to one SHA-256 (tech_graph.neo4j_fingerprint), from graph_rows or from a store's rows."""
-    return ss.demo_graph().neo4j_fingerprint(nodes, edges)
+    """The subgraph reduced to one SHA-256 (subgraph.fingerprint), from graph_rows or from a store's rows."""
+    return sg.fingerprint(nodes, edges)
 
 
 # ---------- the drift check ----------
 
-def read_markers(stores):
-    """Each named Neo4j store's LogicalModelMarker, with the store's live content fingerprint as "content": a dict,
-    None when it has none, or "unreachable (<error>)"."""
-    markers = {}
-    for store in [s for s in stores if s in ss.NEO4J_STORES]:
-        try:
-            driver, session = ss.neo4j_session(store)
-            with driver, session:
-                rec = session.run(f"MATCH (m:{MARKER_LABEL}) RETURN properties(m) AS p").single()
-                markers[store] = dict(rec["p"]) if rec else None
-                if markers[store]:
-                    markers[store]["content"] = content(list(session.run(NEO4J_NODES)), list(session.run(NEO4J_EDGES)))
-        except Exception as err:  # as sync_stores' readers: a store that can't be read says so, with the reason
-            markers[store] = f"unreachable ({type(err).__name__})"
-    return markers
+def read_marker(session):
+    """A Neo4j database's LogicalModelMarker with its live content fingerprint as "content"; None when it has none."""
+    rec = session.run(f"MATCH (m:{MARKER_LABEL}) RETURN properties(m) AS p").single()
+    if not rec:
+        return None
+    found = dict(rec["p"])
+    found["content"] = content(list(session.run(NEO4J_NODES)), list(session.run(NEO4J_EDGES)))
+    return found
 
 
-def drift(markers, want_digest, want_content, stores):
-    """Each named Neo4j store's status for the subgraph: current only when its marker names the package's model files
-    and its content equals them; behind (other model files), changed (the content differs while the marker matches: a
-    hand edit, say), unmarked (no marker: a reload wiped it, or it was never loaded) or unreachable."""
+def drift(markers, want_digest, want_content):
+    """Each Neo4j database's status for the subgraph, from {store: its marker (read_marker), None, or a string that
+    says why it could not be read}. current only when its marker names the package's model files and its content
+    equals them; behind (other model files), changed (the content differs while the marker matches: a hand edit,
+    say), unmarked (no marker: a reload wiped it, or it was never loaded) or unreachable."""
     rows = []
-    for store in [s for s in stores if s in ss.NEO4J_STORES]:
-        m = markers.get(store)
+    for store, m in markers.items():
         if isinstance(m, str):
             rows.append((store, "unreachable", m))
         elif not m:
-            rows.append((store, "unmarked", f"no logical-model marker: run logical_models.py load --store {store}, or sync"))
+            rows.append((store, "unmarked", "no logical-model marker: run logical_models.py load --store neo4j"))
         elif m.get("digest") != want_digest:
             rows.append((store, "behind", f"marked {m.get('marked_at')} from other model files ({str(m.get('digest'))[:12]}, "
                                           f"not {want_digest[:12]})"))
         elif m.get("content") != want_content:
             rows.append((store, "changed", "its logical models differ from the package's graphs although its marker matches; "
-                                           f"run logical_models.py load --store {store}, or sync"))
+                                           "run logical_models.py load --store neo4j"))
         else:
             rows.append((store, "current", f"marked {m.get('marked_at')} with the model files' digest {want_digest[:12]}"))
     return rows
 
 
-def check(stores, ref=None):
-    """The lm:<store> rows of sync_stores.py check, judged against the package at the same ref as the rest of the check
-    (worktree, or None, reads the working tree): none when that ref's newest releases hold no logical-model module."""
+def check(markers, ref=None):
+    """The lm:<store> rows of sync_stores.py check, from each database's marker (drift), judged against the package at
+    the same ref as the rest of the check (worktree, or None, reads this tree): none when that ref's newest releases
+    hold no logical-model module."""
     files = models(ref=ref)
     if not files:
         return []
     nodes, edges = graph_rows(files, ref)
-    return drift(read_markers(stores), digest(files, ref), content(nodes, edges), stores)
+    return drift(markers, digest(files, ref), content(nodes, edges))
 
 
 # ---------- loading ----------
 
-def rdfstore(skills):
-    """The rdf-store skill's rdfstore.py, whose dataset, row and insert functions the driver's loads use too."""
-    path = os.path.join(os.path.expanduser(skills), "rdf-store", "scripts", "rdfstore.py")
+def rdfstore(skills=None):
+    """The rdf-store skill's rdfstore.py, whose dataset and row functions every load of the triple table uses."""
+    path = os.path.join(os.path.expanduser(skills or SKILLS), "rdf-store", "scripts", "rdfstore.py")
     spec = importlib.util.spec_from_file_location("rdfstore", path)
     module = importlib.util.module_from_spec(spec)
     sys.path.insert(0, os.path.dirname(path))
@@ -292,82 +288,76 @@ def dataset(rs, graphs):
     return rs.pack(paths, {os.path.realpath(os.path.join(ss.REPO, p)): iri for iri, p in graphs.items()})
 
 
-def load_jena(rs, graphs):
-    """Replaces each package graph in Jena in one SPARQL Update request (rdfstore's FusekiStore.publish)."""
-    base = ss.JENA_QUERY.rsplit("/", 1)[0]
-    rs.FusekiStore(base + "/data", ss.JENA_QUERY, base + "/update").publish(dataset(rs, graphs))
+def package_rows(rs=None, releases=None):
+    """What a load of the triple table adds for the logical models, with no connection made:
+    {"graphs": {graph IRI: path under the repository}, "counts": {graph IRI: triple count of its file},
+     "rows": the graphs' rows in rdfstore.COLUMNS order (rdfstore.to_rows)}.
+    The loader replaces the rows whose graph is one of "graphs" with "rows", then compares the table's rows per graph
+    with "counts". Every value is empty when the newest releases hold no package graph. rs is the rdf-store skill's
+    rdfstore module (default: the one under this release's skills folder)."""
+    from rdflib import Graph
+    graphs = package_graphs(releases)
+    if not graphs:
+        return {"graphs": {}, "counts": {}, "rows": []}
+    rs = rs or rdfstore()
+    return {"graphs": graphs,
+            "counts": {iri: len(Graph().parse(os.path.join(ss.REPO, p), format="turtle")) for iri, p in graphs.items()},
+            "rows": rs.to_rows(dataset(rs, graphs))}
+
+
+def load_jena(rs, graphs, query_url):
+    """Replaces each package graph in Jena in one SPARQL Update request (rdfstore's FusekiStore.publish). query_url is
+    the dataset's SPARQL query URL; its data and update URLs sit beside it."""
+    base = query_url.rsplit("/", 1)[0]
+    rs.FusekiStore(base + "/data", query_url, base + "/update").publish(dataset(rs, graphs))
     print(f"jena: {len(graphs)} package graph(s) loaded")
 
 
-def load_databricks(rs, graphs):
-    """Replaces the package graphs' rows of the triple table, then refuses a table whose count of any of them differs
-    from the files' (the marker's check reads the same counts)."""
-    from rdflib import Graph
-    rows = rs.to_rows(dataset(rs, graphs))
-    conn, schema = ss.databricks()
-    table = f"{schema}.{ss.TRIPLES_TABLE}"
-    with conn, conn.cursor() as cur:
-        cur.execute(f"DELETE FROM {table} WHERE graph IN ({', '.join('?' for _ in graphs)})", list(graphs))
-        for start in range(0, len(rows), rs.DatabricksStore.BATCH):
-            cur.execute(rs.insert_sql(table, rows[start:start + rs.DatabricksStore.BATCH]))
-        cur.execute(f"SELECT graph, count(*) FROM {table} WHERE graph IN ({', '.join('?' for _ in graphs)}) GROUP BY graph",
-                    list(graphs))
-        counts = {r[0]: r[1] for r in cur.fetchall()}
-    want = {iri: len(Graph().parse(os.path.join(ss.REPO, p), format="turtle")) for iri, p in graphs.items()}
-    if counts != want:
-        raise SystemExit(f"databricks: {ss.TRIPLES_TABLE} holds {counts} rows of the package graphs, not the files' {want}")
-    print(f"databricks: {len(graphs)} package graph(s), {sum(counts.values())} rows")
-
-
-def load_neo4j(store, files):
+def load_neo4j(session, files, store="neo4j"):
+    """Replaces the subgraph and its marker in the database the session is on, in one transaction."""
     nodes, edges = graph_rows(files)
     marker = {"store": store, "digest": digest(files), "models": [slug for slug, _, _ in files], "nodes": len(nodes),
               "edges": len(edges), "marked_at": ss.now()}
-    driver, session = ss.neo4j_session(store)
-    with driver, session:
-        tx = session.begin_transaction()
-        try:
-            made, after = ss.demo_graph().replace_subgraph(tx, store, LABEL, MARKER_LABEL, nodes, edges, marker, KIND,
-                                                           edge_props=True)
-            tx.commit()
-        finally:
-            if not tx.closed():
-                tx.rollback()
+    tx = session.begin_transaction()
+    try:
+        made, after = sg.replace_subgraph(tx, store, LABEL, MARKER_LABEL, nodes, edges, marker, KIND, edge_props=True)
+        tx.commit()
+    finally:
+        if not tx.closed():
+            tx.rollback()
     print(f"{store}: {len(files)} logical model(s), {len(nodes)} {LABEL} nodes, {made[KIND]} edges between them, "
           f"{made['ontology']} to ontology nodes; ontology unchanged at {after[0]} nodes and {after[1]} relationships; "
           f"marked {marker['digest'][:12]}")
 
 
-def load(stores, skills):
-    """Loads what the newest releases hold into each named store; nothing, with a line that says so, when they hold
-    no package graph."""
+def load(stores, values, skills=None):
+    """Loads what the newest releases hold into each named store (neo4j, jena), at the addresses in values
+    (sync_stores.settings); nothing, with a line that says so, when they hold no package graph."""
     releases = newest()
     graphs, files = package_graphs(releases), models(releases)
     if not graphs:
         print("the newest releases hold no package graph, so no logical model: nothing to load")
         return
-    rs = rdfstore(skills) if {"jena", "databricks"} & set(stores) else None
-    for store in stores:
-        if store == "jena":
-            load_jena(rs, graphs)
-        elif store == "databricks":
-            load_databricks(rs, graphs)
-        elif files:
-            load_neo4j(store, files)
+    if "jena" in stores:
+        load_jena(rdfstore(skills), graphs, ss.need(values, "EPM_JENA_QUERY"))
+    if "neo4j" in stores and files:
+        driver, session = ss.neo4j_session_from(values)
+        with driver, session:
+            load_neo4j(session, files)
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("command", choices=("load", "rows"))
-    ap.add_argument("--store", action="append", choices=ss.STORES, help="load: these stores (default: all four)")
-    ap.add_argument("--skills", default=os.environ.get("EPM_SKILLS", "skills"),
-                    help="load: the folder holding the rdf-store skill (default $EPM_SKILLS or skills)")
+    ap.add_argument("--store", action="append", choices=ss.READ_HERE, help="load: these stores (default: both)")
+    ap.add_argument("--skills", default=os.environ.get("EPM_SKILLS"),
+                    help="load: the folder holding the rdf-store skill (default $EPM_SKILLS, else this release's skills folder)")
     args = ap.parse_args(argv)
     if args.command == "rows":
         nodes, edges = graph_rows(models())
         print(json.dumps({"nodes": nodes, "edges": edges}, indent=1, default=str))
     else:
-        load(tuple(s for s in ss.STORES if s in (args.store or ss.STORES)), args.skills)
+        load(tuple(args.store or ss.READ_HERE), ss.settings(), args.skills)
 
 
 if __name__ == "__main__":

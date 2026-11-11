@@ -95,15 +95,9 @@ class Rules(unittest.TestCase):
         self.assertEqual(pl.lpg_name("http://purl.org/dc/terms/identifier", sep="__"), "dcterms__identifier")
         self.assertEqual(pl.lpg_name(str(RDFS.label), sep="_"), "rdfs_label")
 
-    def test_the_separator_is_n10s_two_underscores_on_main_and_one_in_the_share_release(self):
-        # Read from the two inputs themselves, so a wrong separator on main fails here (the decision of 2026-10-31).
-        marker = os.path.isfile(os.path.join(pl.ONTOLOGY, "..", "..", "release.json"))
-        variable = bool(os.environ.get("EPM_SHARE_RELEASE"))
-        self.assertEqual(pl.N10S_SEP, "__")
-        self.assertEqual(pl.SHARE_RELEASE, marker or variable)
-        self.assertEqual(pl.SEP, "_" if marker or variable else "__")
-        if not (marker or variable):
-            self.assertEqual(pl.lpg_name(str(RDFS.label)), "rdfs__label")
+    def test_the_graph_names_terms_with_one_underscore_and_n10s_with_two(self):
+        self.assertEqual((pl.SEP, pl.N10S_SEP), ("_", "__"))
+        self.assertEqual(pl.lpg_name(str(RDFS.label)), "rdfs_label")
 
     def test_a_term_without_an_lpg_name_fails_rule_5(self):
         # In the core namespace (so Rule 3 passes) but with a slash in the local part, so SHORTEN
@@ -160,7 +154,7 @@ class Build(unittest.TestCase):
         for d in glob.glob(os.path.join(pl.ONTOLOGY, "releases", "*", "*", "")):
             module, version = d.rstrip(os.sep).split(os.sep)[-2:]
             if module == "previous":
-                continue  # the share release keeps each module's previous package here; nothing loads it
+                continue  # each module's previous package is kept here; nothing loads it
             if module not in newest or tuple(map(int, version.split("."))) > tuple(map(int, newest[module].split("."))):
                 newest[module] = version
         self.assertEqual(dict(pl.PACKAGES), newest)
@@ -212,9 +206,7 @@ class Report(unittest.TestCase):
         self.assertEqual((report["roundtrip_lost"], report["roundtrip_added"]), (0, 0))
         self.assertEqual(report["determinism_hash_sorted"], report["determinism_hash_shuffled"])
         self.assertIs(report["rename_lossless"], True)
-        self.assertEqual(report["separator"], pl.SEP)
-        if not pl.SHARE_RELEASE:
-            self.assertEqual((report["separator"], report["renamed"]), ("__", {}))  # main keeps the n10s names
+        self.assertEqual(report["separator"], "_")
 
 
 class Record(unittest.TestCase):

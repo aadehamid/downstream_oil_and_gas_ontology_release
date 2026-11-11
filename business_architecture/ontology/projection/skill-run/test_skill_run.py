@@ -1,7 +1,8 @@
 """The ontology-to-lpg skill's run_projection.py reads the same inputs as ../pipeline.py: inputs.py lists
 exactly its INPUTS and SHAPES, each file exists, and epm-config.json pins the same packages. epm-run.json,
 the run configuration, names this folder's files, keeps every output outside the repository and names
-each release's shapes and catalog, which sit beside every data file.
+each release's shapes and catalog, which sit beside every data file. It names no store address or login file:
+sync_stores.settings holds those.
 
 Run: python3 -m pytest test_skill_run.py (needs rdflib, pyshacl).
 """
@@ -65,13 +66,16 @@ class RunConfig(unittest.TestCase):
         for key in ("inputs_script", "projection_config", "queries"):
             self.assertTrue(os.path.isfile(self.path(self.cfg[key])), key)
 
-    def test_outputs_and_credentials_live_outside_the_repository(self):
-        # Machine paths (ROBOT, the env files, the outputs) cannot exist in CI, so they must sit under the
-        # home folder, which the driver expands; the repository's own files are checked above.
-        for key in ("out", "robot_jar", "target_env"):
+    def test_outputs_and_tools_live_outside_the_repository(self):
+        # Machine paths (ROBOT, the outputs) cannot exist in CI, so they must sit under the home folder, which the
+        # driver expands; the repository's own files are checked above.
+        for key in ("out", "robot_jar"):
             self.assertTrue(self.cfg[key].startswith("~/"), key)
-        self.assertTrue(self.cfg["rebuild"]["out"].startswith("~/"))
-        self.assertTrue(self.cfg["databricks"]["env"].startswith("~/"))
+
+    def test_it_names_no_store_address_or_login_file(self):
+        self.assertEqual(sorted(self.cfg), ["inputs_script", "mode", "out", "projection_config", "queries", "release_graphs",
+                                            "releases", "robot_jar", "separator"])
+        self.assertEqual((self.cfg["separator"], self.cfg["release_graphs"]), ("_", ["shapes", "catalog"]))
 
     def test_every_release_has_the_graphs_the_stores_hold(self):
         for data in listed("data"):

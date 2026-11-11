@@ -1,7 +1,7 @@
 """Step 12's checks and committed record: the projection's inputs, checked with no database, and the result of the last load.
 
 The one loader is the ontology-to-lpg skill's run_projection.py (skill-run/README.md). What stays here runs in CI and
-needs neither Docker nor Java:
+needs no database:
 
     python3 pipeline.py build                    # check the rules, validate, write projection-manifest.json
     python3 pipeline.py build --verify           # fail unless the manifest matches a fresh build
@@ -111,12 +111,10 @@ def sha(*texts):
 
 
 # n10s writes every label, relationship type and property key as the fixed prefix, two underscores and the local
-# name (its SHORTEN setting). The graph keeps that on main. In the share release the separator is one underscore
-# (the decision of 2026-10-31): the driver renames each name after every check has passed on the n10s names (the run
-# configuration's separator).
+# name (its SHORTEN setting). The graph names them with one underscore: the driver renames each name after every
+# check has passed on the n10s names (the run configuration's separator).
 N10S_SEP = "_" * 2
-SHARE_RELEASE = bool(os.environ.get("EPM_SHARE_RELEASE")) or os.path.isfile(os.path.join(ONTOLOGY, "..", "..", "release.json"))
-SEP = "_" if SHARE_RELEASE else N10S_SEP
+SEP = "_"
 
 
 def lpg_name(iri, sep=None):

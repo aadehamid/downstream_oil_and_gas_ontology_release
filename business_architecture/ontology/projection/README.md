@@ -26,16 +26,14 @@ Each module package has three graphs: `<module>.ttl` (the content), `shapes.ttl`
 | `projection-manifest.json` | Input and shape hashes, triple counts, the input fingerprint, the pinned versions, the listed release gaps (none since `integration` 2.0.0, the decision of 2026-10-23) |
 | `projection-report.json` | A summary of the last load's report, for the fingerprint it names. The full report stays in the driver's output folder |
 | `skill-run/` | The driver's run configuration, its input list and the saved walks (`skill-run/README.md`) |
-| `ontology-stores-runbook.html` | A standalone page for a person: the end-to-end workflow with diagrams, and how to check, stop, start, purge and reload each store, and how to keep them in step with the releases |
 | `test_pipeline.py` | The rule checks, the build, the record, and that the report is current and passed |
-| `rebuild_stores.py` | One command from an environment file to loaded, validated stores, with no prompt: `python3 rebuild_stores.py --env <file> [--store ...] [--empty] [--plan]`. It writes a report and a log per step, and exits non-zero with the failing step named. The walkthrough's "Connect and load every store" explains each step |
-| `empty_stores.py` | Counts what each store holds and, with `--yes`, empties it; in Databricks only this tool's two tables |
-| `test_rebuild_stores.py` | The offline tests of those two |
-| `skill-run/environment.example` | Every key of an environment file, with its default |
-| `sync_stores.py` | Marks the local Neo4j, AuraDB and Databricks with the release set each was loaded from, after checking it against the repository; the drift check against main's newest catalog, which judges Jena from its graph names and triple counts; and `sync`, which reloads what is behind with the driver (AuraDB and Databricks only with `--cloud`), takes the result into this folder, loads the demo's technical graph back where a reload wiped it or its marker is not current, copies it to Delta when that copy is behind, and marks what it reloaded. The drift check also reports each store's technical graph on a `tech:<store>` line, from its marker and from a fingerprint of the content it holds, compared with the graph files. The runbook's "Keeping the stores in step" gives the commands |
-| `logical_models.py` | Loads a release's logical models into the four stores when the newest releases hold the `logical-model` module, and nothing in `main`: the models' graphs into Jena and `epm_triples`, each model as a `LogicalModel` subgraph into the Neo4j stores. Its docstring lists the labels, node shapes and edges |
+| `empty_stores.py` | Counts what a Neo4j database or a Jena dataset holds and, with `--yes`, empties it before a clean reload. `test_empty_stores.py` holds its offline tests |
+| `skill-run/environment.example` | Every setting `sync_stores.py`, `empty_stores.py` and `logical_models.py` read: the Neo4j address, login and database, and the Jena query URL |
+| `sync_stores.py` | Says what a current store holds (`expected`), judges a Neo4j database and a Jena dataset against this tree's newest catalog (`check`), and writes the Neo4j marker after checking the database (`mark`). Its functions also judge the Delta table `epm_triples` from rows and a marker that a caller has read |
+| `logical_models.py` | Loads a release's logical models when the newest releases hold the `logical-model` module: the models' graphs into Jena, and each model as a `LogicalModel` subgraph into Neo4j. `package_rows` returns the rows the load of `epm_triples` adds. Its docstring lists the labels, node shapes and edges |
 | `test_logical_models.py` | The offline tests of `logical_models.py`, on a package built in a temporary folder from the module's made-up example |
-| `test_sync_stores.py` | The offline tests of `sync_stores.py` and of `.github/workflows/sync-stores.yml`, the release-tag workflow that runs the driver for AuraDB and Databricks, then loads the technical graph into AuraDB and Delta, and a release's logical models when the releases hold the module, marks and checks both, inactive until its repository secrets exist |
+| `test_sync_stores.py` | The offline tests of `sync_stores.py` |
+| `subgraph.py` | Replaces and fingerprints a subgraph that shares a Neo4j database with the ontology and stays apart from it. `test_subgraph.py` holds its offline tests |
 
 `scripts/check.sh` runs `pipeline.py build --verify` and the tests. The load needs Docker and Java, so it runs on a workstation, not in CI.
 
