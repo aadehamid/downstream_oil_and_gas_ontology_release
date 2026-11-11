@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .check import NESTED_NOTE, Checker
 from .extract import documents, extract
+from .links import broken_links
 from .pages import extract_html, html_documents, is_page
 from .registry import ROOT, RegistryError, load_registry
 
@@ -63,6 +64,8 @@ def main(argv=None) -> int:
     listing.add_argument("docs", nargs="*")
     sub.add_parser("contexts", help="the contexts, and which ones can run here")
     sub.add_parser("html", help="the HTML pages with no Markdown source, which the check reads too")
+    links = sub.add_parser("links", help="check that every relative link of the documents points into the tree")
+    links.add_argument("docs", nargs="*", help="documents, relative to the top folder (default: every one)")
     args = parser.parse_args(argv)
     root = args.root.resolve()
     try:
@@ -84,6 +87,12 @@ def main(argv=None) -> int:
         if result.nested:
             print(NESTED_NOTE)
         return 1 if result.failures else 0
+    if args.command == "links":
+        failures = broken_links(root, relative(args.docs) or None)
+        for failure in failures:
+            print("FAIL " + failure)
+        print(f"{len(failures)} broken link(s)" if failures else "every relative link points at a file or a folder of the tree")
+        return 1 if failures else 0
     if args.command == "list":
         total = Counter()
         for doc, counts in tally(root, relative(args.docs)).items():

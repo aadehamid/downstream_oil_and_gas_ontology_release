@@ -18,14 +18,18 @@ ONTOLOGY = os.path.dirname(HERE)
 CORE_BUILDER = re.compile(r"build_core_(\d+)_(\d+)\.py")   # applied with fullmatch, so no name with a line end passes
 # A version as a pattern, for a builder or test that finds one inside a longer text.
 VERSION_PATTERN = r"\d+\.\d+\.\d+(?:-correction\.\d+)?"
-VERSION = re.compile(r"(\d+)\.(\d+)\.(\d+)(?:-correction\.(\d+))?")
+# Each number is written one way only: ASCII digits and no leading zero, and a correction counts from 1. Two
+# spellings of one number would otherwise get the same place in the order, and two folders could tie for newest.
+_N = r"(0|[1-9][0-9]*)"
+VERSION = re.compile(_N + r"\." + _N + r"\." + _N + r"(?:-correction\.([1-9][0-9]*))?")
 
 
 def version_key(version):
     """The order of a version, and the one place that decides it. A correction version,
     <major>.<minor>.<patch>-correction.<n>, is newer than the plain version of the same three numbers and older than
     the next patch: 1.2.0, 1.2.1, 1.2.1-correction.1, 1.2.1-correction.2, 1.2.2. This is not SemVer's order, where a
-    suffix after a hyphen sorts before the plain version. Returns None for any other text."""
+    suffix after a hyphen sorts before the plain version. Returns None for any other text, and for a number with a
+    leading zero, a correction numbered 0, or a digit that is not ASCII."""
     m = VERSION.fullmatch(version)   # fullmatch: with match and "$", a version with a final line end would pass
     return tuple(int(n or 0) for n in m.groups()) if m else None
 

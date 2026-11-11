@@ -609,7 +609,8 @@ def test_the_cut_tool_is_called_as_a_module_with_the_report_and_the_release(setu
                           "--release", str(setup.root)]]
     assert run.options[0] == {"cwd": str(setup.root)}   # nothing captured or redirected: the tool asks in this terminal
     refused = runner.cut_with_tool("cleared.json", setup.root, setup.run_dir, "confirmed.csv", Recorder(lambda cmd: (1, "", "")))
-    assert refused == {"status": "failed", "why": "the cut tool exited 1: it refused or failed, and changed nothing"}
+    assert refused == {"status": "failed", "why": "the cut tool exited 1: it refused or failed. Its last lines, above, say why and "
+                                                    "what state the release is in"}
     assert runner.cut_command("cleared.json", "release") == [sys.executable, "-m", "kpi_store.cut", "--report", "cleared.json", "--release", "release"]
 
 

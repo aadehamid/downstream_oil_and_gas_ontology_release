@@ -1058,7 +1058,7 @@ def test_a_markdown_file_git_ignores_is_outside_the_scan(tmp_path):
 
 def test_no_part_of_the_tool_is_a_long_file():
     parts = sorted((d.ROOT / "scripts" / "doc_snippets_parts").glob("*.py")) + [d.ROOT / "scripts" / "doc_snippets.py"]
-    assert [p.name for p in parts] == ["__init__.py", "check.py", "extract.py", "match.py", "pages.py", "parsers.py",
+    assert [p.name for p in parts] == ["__init__.py", "check.py", "extract.py", "links.py", "match.py", "pages.py", "parsers.py",
                                        "registry.py", "report.py", "run.py", "doc_snippets.py"]
     for part in parts:
         assert len(part.read_text(encoding="utf-8").split("\n")) < 500, part.name
@@ -1070,3 +1070,76 @@ def test_every_block_of_the_tree_has_a_valid_tag():
     result = d.Checker(static=True).check()
     assert result.failures == []
     assert result.total > 80
+
+
+# ---- the links of the documents ----
+
+def tree(tmp_path, files):
+    for name, text in files.items():
+        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / name).write_text(text, encoding="utf-8", newline="\n")
+    return tmp_path
+
+
+def test_a_markdown_link_to_a_missing_file_fails_with_its_document_and_line(tmp_path):
+    root = tree(tmp_path, {"guide.md": "# Guide\n\nRead [the runbook](docs/runbook.md) and [the notes](docs/notes.md).\n",
+                           "docs/runbook.md": "Back to [the guide](../guide.md#top).\n"})
+    assert d.broken_links(root) == ["guide.md:3: the link docs/notes.md is not a file or a folder of the tree"]
+
+
+def test_a_link_whose_target_stands_on_the_next_line_is_read():
+    # A target may start on the line after "](". The link belongs to the line that opens it.
+    assert d.markdown_links("see [the guide](\n  not-there.md) and\n[two](a.md) [three](\nb.md \"title\")\n") == [
+        (1, "not-there.md"), (3, "a.md"), (3, "b.md")]
+    # A code line after "](" is not a target.
+    assert d.markdown_links("an open [bracket](\n\n    indented.md)\n") == []
+
+
+def test_links_with_a_scheme_and_anchors_are_not_checked_and_the_path_before_an_anchor_is(tmp_path):
+    root = tree(tmp_path, {"a.md": "[site](https://example.org/x.md) [mail](mailto:someone@example.org) [part](#part)\n"
+                                   "[other](b.md#part) [gone](c.md#part) [query](b.md?x=1)\n", "b.md": ""})
+    assert d.broken_links(root) == ["a.md:2: the link c.md#part is not a file or a folder of the tree"]
+
+
+def test_a_link_inside_code_is_not_a_link_and_an_image_and_a_reference_definition_are(tmp_path):
+    text = "\n".join(["Write `[text](missing-1.md)` for a link.", "", "```text skip reason=\"x\"", "[text](missing-2.md)", "```", "",
+                      "![a picture](missing-3.png)", "", "[name]: missing-4.md", ""])
+    root = tree(tmp_path, {"a.md": text})
+    assert d.broken_links(root) == ["a.md:7: the link missing-3.png is not a file or a folder of the tree",
+                                    "a.md:9: the link missing-4.md is not a file or a folder of the tree"]
+
+
+def test_a_link_may_name_a_folder_a_title_and_a_name_with_a_space_or_brackets(tmp_path):
+    root = tree(tmp_path, {"a.md": "[folder](docs/) [same](docs) [title](docs/b.md \"The title\") [space](docs/my%20file.md)\n"
+                                   "[angle](<docs/my file.md>) [round](docs/c_(1).md) [up](../outside.md)\n",
+                           "docs/b.md": "", "docs/my file.md": "", "docs/c_(1).md": ""})
+    assert d.broken_links(root) == ["a.md:2: the link ../outside.md points outside the tree"]
+
+
+def test_a_link_that_differs_from_the_file_name_only_in_case_fails(tmp_path):
+    root = tree(tmp_path, {"a.md": "[readme](docs/readme.md)\n", "docs/README.md": ""})
+    assert d.broken_links(root) == ["a.md:1: the link docs/readme.md is not a file or a folder of the tree"]
+
+
+def test_an_html_page_s_href_and_src_are_checked_and_its_script_text_is_not(tmp_path):
+    page_text = "\n".join(['<html><head><link rel="stylesheet" href="style.css"><script src="app.js"></script></head><body>',
+                           '<a href="guide.md">guide</a> <a href="gone.html#x">gone</a> <a href="https://example.org/">site</a>',
+                           '<img src="pictures/missing.png">',
+                           '<script>var data = {"href": "not-a-file.json"}; var s = \'<a href="also-not.html">\';</script>',
+                           '</body></html>'])
+    root = tree(tmp_path, {"page.html": page_text, "guide.md": "", "style.css": "", "app.js": ""})
+    assert d.broken_links(root) == ["page.html:2: the link gone.html#x is not a file or a folder of the tree",
+                                    "page.html:3: the link pictures/missing.png is not a file or a folder of the tree"]
+
+
+def test_the_links_command_exits_1_on_a_broken_link_and_0_on_none(tmp_path, capsys):
+    root = tree(tmp_path, {"a.md": "[b](b.md)\n"})
+    assert d.main(["--root", str(root), "links"]) == 1
+    assert capsys.readouterr().out == "FAIL a.md:1: the link b.md is not a file or a folder of the tree\n1 broken link(s)\n"
+    (root / "b.md").write_text("", encoding="utf-8", newline="\n")
+    assert d.main(["--root", str(root), "links"]) == 0
+    assert capsys.readouterr().out == "every relative link points at a file or a folder of the tree\n"
+
+
+def test_this_tree_s_documents_hold_no_broken_link():
+    assert d.broken_links(d.ROOT) == []

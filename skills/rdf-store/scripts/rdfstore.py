@@ -457,8 +457,9 @@ def roundtrip(store, dataset):
     When they are equal, the staging table replaces the live table, and the live table is read back and
     compared again. The drop of the staging table is tried on every way out, a failure included. A
     process that is stopped before the drop, or a drop that fails, leaves the staging table, under
-    the name of its own that each run gives it. A drop that fails after the replace also ends the
-    function before the live table is compared.
+    the name of its own that each run gives it. A drop that fails does not end the function: the
+    report then names the table under "staging_not_dropped", for a person to drop, and the live
+    table is still compared.
     Any other store has no staging step: the dataset is published, then exported and compared, so a
     False result there means the store already holds the copy that differs."""
     started = time.time()
@@ -476,7 +477,10 @@ def roundtrip(store, dataset):
                 return False, report
             store.promote()
         finally:
-            store.drop_staging()
+            try:
+                store.drop_staging()
+            except Exception:   # the leftover table is named; it must not hide the comparison or an earlier error
+                report["staging_not_dropped"] = store.staging
     else:
         for q in dataset:
             check_term(q)

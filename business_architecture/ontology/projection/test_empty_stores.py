@@ -109,6 +109,20 @@ class Main(unittest.TestCase):
             self.assertEqual(self.run_main(["--store", "neo4j", "--database", "one", "--yes"]),
                              (1, [{"store": "neo4j", "unreachable": "ConnectionError"}]))
 
+    def test_a_neo4j_refusal_comes_before_any_store_is_emptied(self):
+        sent = []
+        for argv, values, said in (
+                (["--store", "jena", "--store", "neo4j", "--database", "two", "--yes"], SETTINGS | {"NEO4J_DATABASE": "one"},
+                 "neo4j: --database two is not the database the settings name; nothing was changed"),
+                (["--store", "jena", "--store", "neo4j", "--yes"], SETTINGS,
+                 "neo4j: --yes deletes every node of one database; name it with --database")):
+            with self.subTest(argv), mock.patch.object(es.ss, "read_jena", lambda url: {"a": 3}), \
+                    mock.patch.object(es, "jena_update", lambda url, statement: sent.append(statement)), \
+                    self.assertRaises(SystemExit) as stop:
+                self.run_main(argv, values)
+            self.assertEqual(str(stop.exception), said)
+            self.assertEqual(sent, [])   # Jena, named first, was not dropped
+
     def test_a_missing_setting_is_named(self):
         self.assertEqual(self.run_main(["--store", "jena"], {}), (0, [{"store": "jena", "unreachable": "Unset: EPM_JENA_QUERY"}]))
 

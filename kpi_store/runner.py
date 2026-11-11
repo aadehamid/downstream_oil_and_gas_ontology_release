@@ -210,14 +210,15 @@ def cut_with_tool(report_json, release_root, run_dir, decisions=None, run=subpro
     tool shows its plan and asks the person who runs it to approve, so it gets this terminal: nothing is captured.
     Its exit 0 means cut, recorded or already cut. Its exit 1 means refused or failed. The release folder is then
     unchanged in all but two cases, which the tool's own message names: the cut was committed and Git could not
-    tag it, or a write failed and a file could not be put back. This function cannot tell those cases apart: it
-    sees only the exit code, so its "why" text does not mention them."""
+    tag it, or a write failed and a file could not be put back. This function sees only the exit code, so its
+    "why" text points to the tool's message and does not say what state the release is in."""
     if not (Path(release_root) / "kpi_store" / "cut.py").is_file():
         return {"status": "failed", "why": "this release has no cut tool (kpi_store/cut.py)"}
     done = run(cut_command(report_json, release_root, decisions), cwd=str(release_root))
     if done.returncode == 0:
         return {"status": "cut"}
-    return {"status": "failed", "why": f"the cut tool exited {done.returncode}: it refused or failed, and changed nothing"}
+    return {"status": "failed", "why": f"the cut tool exited {done.returncode}: it refused or failed. Its last lines, above, say why and "
+                                       "what state the release is in"}
 
 
 def cleared_report(pending):

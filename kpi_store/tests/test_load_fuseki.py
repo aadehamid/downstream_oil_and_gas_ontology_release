@@ -280,13 +280,49 @@ def test_the_technical_graphs_graphs_are_left_alone_and_out_of_the_hash(tmp_path
     apart = ["urn:kpi-store:tech:idp_sbx+synapse_dev:graph"]
     store = stores_support.FakeFuseki(RDFSTORE)
     store.add(apart[0], 5)
-    with pytest.raises(lf.FusekiError, match="that are not the KPI Store's"):   # unknown unless it is named apart
-        lf.load(store, dataset, RDFSTORE, BASES)
     first = lf.load(store, dataset, RDFSTORE, BASES, apart=apart)
     assert first["status"] == "loaded" and first["store_hash"] == first["dataset_hash"] and first["dropped"] == []
     assert store.graphs() == sorted(GRAPHS + apart) and len(store.dataset) == 37   # its five triples are still there
     assert lf.load(store, dataset, RDFSTORE, BASES, apart=apart)["status"] == "current" and store.writes == ["publish"]
     assert len(lf.held_dataset(store, RDFSTORE, apart)) == 32 and len(lf.held_dataset(store, RDFSTORE)) == 37
+
+
+def test_a_load_run_alone_leaves_the_technical_graph_a_runner_load_left(tmp_path):
+    """The command run alone gets no technical-graph file, so nothing names the graph apart. It knows the graph by
+    its name's form and leaves it, with --drop-unknown too."""
+    _, _, dataset = release(tmp_path)
+    tech = "urn:kpi-store:tech:idp_sbx+synapse_dev:graph"
+    store = stores_support.FakeFuseki(RDFSTORE)
+    store.add(tech, 5)
+    first = lf.load(store, dataset, RDFSTORE, BASES)
+    assert first["status"] == "loaded" and first["store_hash"] == first["dataset_hash"] and first["dropped"] == []
+    assert store.graphs() == sorted(GRAPHS + [tech]) and len(store.dataset) == 37
+    assert lf.load(store, dataset, RDFSTORE, BASES)["status"] == "current" and store.writes == ["publish"]
+    assert lf.load(store, dataset, RDFSTORE, BASES, drop_unknown=True)["status"] == "current" and len(store.dataset) == 37
+
+
+@pytest.mark.parametrize("graph", ["urn:kpi-store:tech:idp_sbx:other", "urn:kpi-store:tech:graph",
+                                   "urn:other:tech:idp_sbx:graph", "urn:kpi-store:tech:idp_sbx:graph/more"])
+def test_a_name_that_only_looks_like_the_technical_graphs_still_stops_the_load(tmp_path, graph):
+    _, _, dataset = release(tmp_path)
+    store = stores_support.FakeFuseki(RDFSTORE)
+    store.add(graph, 2)
+    with pytest.raises(lf.FusekiError, match="1 graph\\(s\\) that are not the KPI Store's"):
+        lf.load(store, dataset, RDFSTORE, BASES)
+    assert store.writes == []
+
+
+def test_a_dataset_the_store_cannot_hold_is_refused_before_an_earlier_version_is_dropped(tmp_path):
+    _, _, dataset = release(tmp_path)
+    ox = RDFSTORE.ox
+    shared = ox.BlankNode("shared")
+    for graph in (DP + "1.0.0", KPI + "1.0.0"):   # one blank node in two graphs
+        dataset.add(ox.Quad(shared, ox.NamedNode("urn:sample:p"), ox.Literal("made up"), ox.NamedNode(graph)))
+    store = stores_support.FakeFuseki(RDFSTORE)
+    store.add(DP + "0.9.0", 3)
+    with pytest.raises(lf.FusekiError, match="a blank node occurs in more than one graph"):
+        lf.load(store, dataset, RDFSTORE, BASES)
+    assert store.writes == [] and store.graphs() == [DP + "0.9.0"] and len(store.dataset) == 3
 
 
 def test_a_store_that_alters_a_triple_reads_as_a_mismatch(tmp_path):

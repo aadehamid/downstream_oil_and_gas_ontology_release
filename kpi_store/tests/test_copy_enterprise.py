@@ -45,7 +45,9 @@ def test_the_target_is_opened_by_name_and_the_server_must_confirm_it():
     "ALTER DATABASE other SET ACCESS READ ONLY", "CREATE ALIAS bpa FOR DATABASE other", "DROP ALIAS bpa FOR DATABASE",
     "ALTER USER neo4j SET PASSWORD 'x'", "CREATE ROLE writer", "GRANT ALL ON DATABASE other TO writer",
     "USE otherwork MATCH (n) DETACH DELETE n", "  use otherwork CREATE (:Note)", "DROP CONSTRAINT n10s_unique_uri",
-    "DROP INDEX some_index", "TERMINATE TRANSACTIONS 'x'", 12345])
+    "DROP INDEX some_index", "TERMINATE TRANSACTIONS 'x'", 12345,
+    "CYPHER 5 USE otherwork MATCH (n) DETACH DELETE n", "MATCH (n) CALL { USE otherwork RETURN 1 AS x } RETURN x",
+    "// a comment\nUSE `other work` MATCH (n) RETURN n", "CALL () { use graph.byName('other') MATCH (n) DETACH DELETE n }"])
 def test_administration_another_database_and_every_drop_are_refused(statement):
     with pytest.raises(ce.Refused, match="was not sent to Enterprise"):
         ce.check_statement(statement)
@@ -378,3 +380,10 @@ def test_a_copy_whose_hash_differs_writes_no_marker(local_and_out, monkeypatch):
 def test_the_command_refuses_bad_settings_before_anything_else(tmp_path, capsys):
     assert ce.main(["--stores", str(tmp_path / "missing.toml")]) == 2
     assert "cannot read the local settings file" in capsys.readouterr().err
+
+
+def test_a_logical_model_the_release_cannot_list_refuses_the_copy_and_is_no_exit():
+    def models(newest):   # as logical_models.models stops: with an exit
+        raise SystemExit("logical-model: model sample lacks its export in the package's manifest")
+    with pytest.raises(ce.Refused, match="^logical-model: model sample lacks its export in the package's manifest; nothing was changed$"):
+        ce.logical_model_marks([], SimpleNamespace(lm=SimpleNamespace(models=models)))

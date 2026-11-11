@@ -178,6 +178,8 @@ run with_deps python scripts/build_docs_html.py --check
 # Every code block in the Markdown documents and in the HTML pages written by hand is run, compared, parsed or skipped for a stated reason, and the last
 # line counts them. scripts/DOC-SNIPPETS.md explains the tags. The cut adds --strict --all-contexts.
 run with_deps python scripts/doc_snippets.py check
+# Every relative link in a Markdown document or an HTML page points at a file or a folder of the tree.
+run "$PYTHON" scripts/doc_snippets.py links
 # The tree refers to nothing outside itself. scripts/standalone-pending.txt lists the paths not yet clean.
 run "$PYTHON" scripts/check_standalone.py
 

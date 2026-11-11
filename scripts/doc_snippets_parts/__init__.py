@@ -7,5 +7,6 @@ match      an `expect` block against an output
 parsers    the `parse` tag, one parser per language
 run        a block at work: its folder, its environment, its process
 check      what each tag means, and the count
+links      the relative links of the documents, each of which must point into the tree
 report     the command line
 """

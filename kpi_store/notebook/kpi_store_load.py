@@ -75,6 +75,7 @@ if "dbutils" in globals():
 # that code is the right code. main then hands the work to the release's kpi_store package.
 
 import hashlib
+import io
 import json
 import sys
 import tempfile
@@ -108,20 +109,20 @@ def bootstrap(settings_path, work_dir=None):
     zip_path = path.parent / zip_name
     if not zip_path.is_file():
         raise Stop(f"the release zip {zip_name} is not beside the settings file")
-    # The checksum comes first: the file is read once, in 1 MB pieces to keep a large zip out of memory, and a
-    # file whose checksum differs is not unpacked. The unpack below opens the file a second time. So the check
-    # covers the bytes that were hashed, and it holds for the code that runs only while nobody replaces the zip
-    # in the volume between the two reads. The release's own check_zip, further down, hashes the file a third
-    # time, but by then code from the unpacked zip is already running.
+    # The zip is read once, into memory. Its checksum is taken from those bytes, and the unpack below reads the
+    # same bytes and not the file again. So the files that are unpacked are the ones that were hashed, also when
+    # someone replaces the zip in the volume while this runs. A file whose checksum differs is not unpacked.
+    try:
+        data = zip_path.read_bytes()
+    except OSError as err:
+        raise Stop(f"cannot read the release zip {zip_name}: {type(err).__name__}") from None
     digest = hashlib.sha256()
-    with zip_path.open("rb") as f:
-        for piece in iter(lambda: f.read(1 << 20), b""):
-            digest.update(piece)
+    digest.update(data)
     if digest.hexdigest() != want:
         raise Stop(f"the release zip's SHA-256 is {digest.hexdigest()}, not the {want} the settings name")
     target = Path(work_dir) if work_dir else Path(tempfile.mkdtemp(prefix="kpi_store_"))
     try:
-        with zipfile.ZipFile(zip_path) as z:
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
             z.extractall(target)
     except (zipfile.BadZipFile, OSError) as err:
         raise Stop(f"the release zip cannot be opened: {type(err).__name__}") from None

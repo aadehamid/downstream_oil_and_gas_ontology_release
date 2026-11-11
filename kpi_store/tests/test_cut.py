@@ -1052,3 +1052,107 @@ def test_free_text_as_who_decided_or_as_the_approver_stops_the_cut_and_a_note_ne
     # The measure links' own note, which the comparison writes, is not copied either.
     assert "The Genie space's creator confirms" not in record
 
+
+
+def test_a_file_named_like_an_ignored_folder_is_not_listed_as_removed(tmp_path):
+    """In a Git worktree .git is a file. The copy to the temporary folder leaves it out, so the difference must too."""
+    root, staging = tmp_path / "root", tmp_path / "staging"
+    (root / "sub").mkdir(parents=True)
+    (root / ".git").write_text("gitdir: /made/up/worktrees/x\n", encoding="utf-8", newline="\n")
+    (root / "sub" / ".venv").write_text("a file, not a folder\n", encoding="utf-8", newline="\n")
+    (root / "a.txt").write_text("old\n", encoding="utf-8", newline="\n")
+    shutil.copytree(root, staging, ignore=shutil.ignore_patterns(*cut.IGNORED))
+    (staging / "a.txt").write_text("new\n", encoding="utf-8", newline="\n")
+    assert cut._difference(root, staging) == ["a.txt"]
+
+
+@as_shipped
+@pytest.mark.skipif(shutil.which("git") is None, reason="Git is not installed")
+def test_a_cut_in_a_git_worktree_commits_and_tags(tmp_path, no_global_git, monkeypatch):
+    main = small_git_release(tmp_path)
+    with_author(main)
+    root = tmp_path / "worktree"
+    git(main, "worktree", "add", "-q", "-b", "cut-here", str(root))
+    assert (root / ".git").is_file()
+    monkeypatch.setattr(cut, "_build", stub_build)
+    outcome = cut.cut(cleared(tmp_path, {"R002": "accept"}), root, ask=Answers("Change_Value_Amount", "yes"), say=quiet, now=NOW)
+    assert (outcome.status, outcome.committed, outcome.tag) == ("cut", True, "data-product-1.2.1-correction.1")
+    assert (root / ".git").is_file() and git(root, "status", "--porcelain") == ""
+    assert git(root, "log", "-1", "--format=%s").strip() == f"Cut data-product 1.2.1-correction.1 from discovery run {RUN}"
+
+
+def test_an_empty_folder_that_cannot_be_removed_does_not_fail_a_release_that_is_fully_written(tmp_path, monkeypatch):
+    root, staging = tmp_path / "root", tmp_path / "staging"
+    for folder, text in ((root, "old"), (staging, "new")):
+        folder.mkdir()
+        (folder / "a.txt").write_text(text, encoding="utf-8", newline="\n")
+    monkeypatch.setattr(cut, "_prune", lambda root_, files: (_ for _ in ()).throw(PermissionError("made-up: a folder is open")))
+    cut._Steps(quiet, None)("write the release", lambda: cut._apply(root, staging, ["a.txt"], tmp_path / "backup"))
+    assert (root / "a.txt").read_text(encoding="utf-8") == "new"
+
+
+def pricing_only(tmp_path):
+    """A folder that holds only what plan() reads before it looks for the run's record: the pricing tables."""
+    root = tmp_path / "release"
+    shutil.copytree(support.ROOT / cut.PRICING, root / cut.PRICING)
+    return root
+
+
+def test_a_run_that_was_cut_with_other_decisions_is_refused_and_the_same_decisions_read_as_cut(tmp_path):
+    root = pricing_only(tmp_path)
+    report, sums = cut.load_report(cleared(tmp_path, {"R002": "accept"}))
+    record = root / RECORD
+    record.parent.mkdir(parents=True)
+    record.write_text(f"| Report checksum (SHA-256) | {sums['report']} |\n| Decisions file checksum (SHA-256) | {'a' * 64} |\n",
+                      encoding="utf-8", newline="\n")
+    assert cut.plan(report, root, {**sums, "decisions": "a" * 64}).already_cut is True
+    assert cut.plan(report, root, sums).already_cut is True   # the JSON alone: its checksum is the recorded one
+    with pytest.raises(cut.CutRefused) as refused:
+        cut.plan(report, root, {**sums, "decisions": "b" * 64})
+    assert str(refused.value) == (f"{RECORD.as_posix()} records a cut of this run with another decisions file. A run is cut once, and "
+                                  "these decisions were not applied: run the discovery again to get a new report.")
+
+
+@as_shipped
+def test_a_rename_onto_another_objects_name_is_refused_and_a_rename_already_made_is_not(tmp_path):
+    crack = "idp_sbx.gold_commercial_core.mpr_mips_crack_spread_price_fact"
+    fix = {"action": "rename-object", "module": "data-product", "from": crack, "to": GOLD}
+    report, sums = cut.load_report(cleared(tmp_path, {}, rows=[row(1, "object-renamed", crack, fix, crack, GOLD)]))
+    with pytest.raises(cut.CutRefused) as refused:
+        cut.plan(report, support.ROOT, sums)
+    assert str(refused.value) == f"row R001 cannot be applied: the ontology already names another object {GOLD}"
+    # The same object under this environment's catalog name is the rename already made.
+    tables = cut.Tables(support.ROOT)
+    assert cut._rename_object(tables, {}, {"from": "prod_cat." + GOLD.split(".", 1)[1], "to": GOLD}) is None
+    assert cut._rename_object(tables, {}, {"from": "idp_sbx.gold_commercial_core.gone_fact", "to": GOLD}) is None
+
+
+@as_shipped
+def test_an_object_the_tables_name_twice_is_not_read_as_removed():
+    tables = cut.Tables(support.ROOT)
+    first = next(t for t in tables.rows["tables"] if t["name"] == GOLD)
+    tables.rows["tables"].append({**first, "slug": "made-up-twin", "name": "other_cat." + GOLD.split(".", 1)[1]})
+    with pytest.raises(cut.Unappliable, match="2 times"):
+        cut._remove_object(tables, {}, {"object": "prod_cat." + GOLD.split(".", 1)[1]})
+    assert cut._remove_object(tables, {}, {"object": "idp_sbx.gold_commercial_core.gone_fact"}) is None
+
+
+@as_shipped
+@pytest.mark.skipif(shutil.which("git") is None, reason="Git is not installed")
+def test_a_commit_stopped_by_the_person_puts_the_release_back(tmp_path, no_global_git, monkeypatch):
+    root = small_git_release(tmp_path)
+    with_author(root)
+    before = digest(root, skip=("__pycache__", ".git"))
+    monkeypatch.setattr(cut, "_build", stub_build)
+    real = cut._git
+
+    def stopped(root_, *args, **more):
+        if args and args[0] == "commit":
+            raise KeyboardInterrupt
+        return real(root_, *args, **more)
+    monkeypatch.setattr(cut, "_git", stopped)
+    with pytest.raises(cut.CutFailed) as failed:
+        cut.cut(cleared(tmp_path, {"R002": "accept"}), root, ask=Answers("Change_Value_Amount", "yes"), say=quiet, now=NOW)
+    assert str(failed.value) == "the cut was stopped while Git committed it. The release is as it was."
+    assert digest(root, skip=("__pycache__", ".git")) == before
+    assert real(root, "status", "--porcelain").stdout == "" and git(root, "rev-list", "--count", "HEAD").strip() == "1"

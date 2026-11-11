@@ -57,7 +57,7 @@ NO_FILE = ("no tech-graph.nq was named or fetched, so its content was not compar
 NEO4J_STORES = ("neo4j", "enterprise")
 WORKTREE = "worktree"   # the --ref that reads the folder's files as they are
 # How long a statement is polled after the first call's own 30 seconds. A warehouse that was stopped may have to
-# start first. When the time is over the check gives up on the statement; it does not cancel it.
+# start first. When the time is over the check gives up on the statement and asks Databricks to cancel it.
 STATEMENT_WAIT_SECONDS = 300
 
 
@@ -86,6 +86,10 @@ def statement_runner(client, warehouse_id, wait_seconds=STATEMENT_WAIT_SECONDS, 
         waited = 0
         while _state(response) in ("PENDING", "RUNNING"):
             if waited >= wait_seconds:
+                try:   # the statement must not go on running on the warehouse; a cancel that fails changes nothing here
+                    client.statement_execution.cancel_execution(response.statement_id)
+                except Exception:
+                    pass
                 raise RuntimeError(f"the statement did not finish within {wait_seconds} seconds")
             sleep(2)
             waited += 2
@@ -130,8 +134,8 @@ def expected(release_root, ss, ref=WORKTREE, extra_graphs=()):
 
 def _why(err, ss):
     """The reason a store could not be read, as the line shows it."""
-    if isinstance(err, (ls.LocalSettingsError, copy_enterprise.Refused, settings_module.SettingsError)):
-        return str(err)   # this code's own words
+    if isinstance(err, (ls.LocalSettingsError, copy_enterprise.Refused, settings_module.SettingsError, SystemExit)):
+        return str(err)   # this code's own words, or the release code's own when it stopped with an exit
     return ss.reason(err)   # the error's name, never its message, which can carry an address
 
 
@@ -195,7 +199,9 @@ def read_stores(stores, local, newest, code, connect=local_load.connect, client_
                 with connect(neo4j) as driver, copy_enterprise.open_target(driver, neo4j.database) as session:
                     markers[store], live[store], hashes[store], row = read_neo4j(session, store, newest, code, quick)
                 models += [row] if row else []
-        except Exception as err:   # an error becomes this store's line; an exit (SystemExit) is not caught here
+        # An error becomes this store's line. So does an exit: the release's logical_models.models stops with
+        # SystemExit when a package manifest lacks a model's file, and that must not end the whole check.
+        except (Exception, SystemExit) as err:
             markers[store], live[store] = None, _why(err, ss)
     return markers, live, models, hashes
 
@@ -257,7 +263,7 @@ def tech_rows(stores, local, graph_files, release_root, code, connect=local_load
                 neo4j = local.need("neo4j_enterprise")
                 with connect(neo4j) as driver, copy_enterprise.open_target(driver, neo4j.database) as session:
                     status, why = tech_graph.status_neo4j(session, graph_files, release_root)
-        except Exception as err:
+        except (Exception, SystemExit) as err:
             status, why = "unreachable", _why(err, code.ss)
         rows.append(("tech:" + store, status, why))
     return rows

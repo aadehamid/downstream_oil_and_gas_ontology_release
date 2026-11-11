@@ -617,3 +617,11 @@ def test_answers_are_never_written_inside_the_release(tmp_path, monkeypatch):
         assert reader.asked == []                                                    # stopped before any query
     assert not (C.RELEASE_ROOT / "q1.json").exists() and not (C.RELEASE_ROOT / "q1.csv").exists()
     assert not (FIXTURES / "answers").exists()
+
+
+def test_a_name_with_a_backslash_is_refused_and_a_backtick_is_doubled():
+    assert T.quote("odd`name") == "`odd``name`"
+    with pytest.raises(T.RenderError) as refused:
+        T.quote("Table\\u0060) DETACH DELETE (n")
+    assert str(refused.value) == ("not a usable name: 'Table\\\\u0060) DETACH DELETE (n' holds a backslash, which could be read as "
+                                  "the start of an escape")

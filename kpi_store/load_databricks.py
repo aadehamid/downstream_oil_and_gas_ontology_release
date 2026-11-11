@@ -303,6 +303,8 @@ def load(gate, settings, release_root, commit, now=None, rdfstore=None, batch=BA
     if not passed:
         return {**result, "status": "main-mismatch" if comparison.get("published") else "staging-mismatch", "comparison": comparison}
     _write_marker(gate, settings, marker)
+    if comparison.get("staging_not_dropped"):   # the load passed; a person drops the table the round trip could not
+        result["staging_not_dropped"] = comparison["staging_not_dropped"]
     return {**result, "status": "loaded", "marker": marker}
 
 

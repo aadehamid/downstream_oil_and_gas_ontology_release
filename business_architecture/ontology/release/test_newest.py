@@ -47,6 +47,17 @@ class Newest(unittest.TestCase):
                      "1.2.1\n", "1.2.1\r\n", " 1.2.1", "1.2.1-correction.1\n"):
             self.assertIsNone(newest.version_key(name), name)
 
+    def test_two_spellings_never_get_one_place_in_the_order(self):
+        # Each of these would tie with a plain version: correction 0 with 1.2.0, a leading zero with the same number
+        # without it, and digits of another script with the ASCII ones.
+        for name in ("1.2.0-correction.0", "1.2.0-correction.01", "01.2.0", "1.02.0", "1.2.00", "1.2.\u0663", "\u0661.2.0",
+                     "1.2.0-correction.\u0661"):
+            self.assertIsNone(newest.version_key(name), name)
+        for name, key in (("0.1.0", (0, 1, 0, 0)), ("10.20.30", (10, 20, 30, 0)), ("1.0.0-correction.10", (1, 0, 0, 10))):
+            self.assertEqual(newest.version_key(name), key)
+        with self.assertRaisesRegex(ValueError, "is not a version"):
+            newest.correction_version("1.2.0-correction.0")
+
     def test_the_newest_folder_may_be_a_correction(self):
         with tempfile.TemporaryDirectory() as tmp:
             for version in ("1.2.0", "1.2.1-correction.1", "1.2.1-correction.2"):

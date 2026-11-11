@@ -276,7 +276,10 @@ def mark(session, store, want, report, ss, commit):
 def models_status(session, store, newest, code):
     """(the release's logical-model files, the subgraph's status in this database). No files means the release
     holds no logical model, and the status is then "none"."""
-    files = code.lm.models(newest)
+    try:
+        files = code.lm.models(newest)
+    except SystemExit as stop:   # the release's own refusal, such as a model with no export in its manifest
+        raise LoadError(str(stop)) from None
     if not files:
         return files, "none"
     nodes, edges = code.lm.graph_rows(files)
@@ -363,7 +366,9 @@ def load(local, release_root, run_dir=None, force=False, code=None, connect=conn
             except code.rp.Failed as err:
                 raise LoadError(f"the local load stopped: {err}. The detail is in {run_dir / LOG_FILE}") from None
             except (OSError, ValueError) as err:
-                raise LoadError(f"the local load stopped ({type(err).__name__}): {err if isinstance(err, ValueError) else ''}") from None
+                # An OSError's own text can name a path on this machine, so only its kind is shown; the log has the rest.
+                said = f": {err}" if isinstance(err, ValueError) else ""
+                raise LoadError(f"the local load stopped ({type(err).__name__}){said}. The log is {run_dir / LOG_FILE}") from None
             # The marker comes last, after the report passed and every subgraph loaded. The skill's load step
             # empties the database, marker included. So a load that stops after that point leaves the database
             # unmarked, and the sync check reads it as not current. A load that stops before it, in the project

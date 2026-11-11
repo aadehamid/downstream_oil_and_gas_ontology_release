@@ -99,11 +99,12 @@ QUERY_TIMEOUT = 600
 # an administration verb followed, in the same statement, by the kind of thing it administers, so CREATE DATABASE
 # and ALTER USER are refused while CREATE CONSTRAINT and CREATE (n) pass. The match is on words, so it also
 # refuses a harmless statement that holds both, such as a CREATE with the text 'user' in it: the guard errs
-# towards refusing. USE is matched only as a statement's first word, where it would send the statement to
-# another database. DROP and TERMINATE are refused wherever they stand.
+# towards refusing. USE followed by a name is refused wherever it stands, at the start, after a CYPHER prefix or
+# inside a subquery, because there it would send the statement, or a part of it, to another database. DROP and
+# TERMINATE are refused wherever they stand.
 FORBIDDEN = re.compile(
     r"\b(CREATE|ALTER|START|STOP|RENAME|GRANT|DENY|REVOKE|ENABLE|DEALLOCATE|REALLOCATE)\b[^;]*?"
-    r"\b(DATABASE|ALIAS|SERVER|USER|ROLE|PRIVILEGE)S?\b|^\s*USE\b|\bDROP\b|\bTERMINATE\b", re.IGNORECASE)
+    r"\b(DATABASE|ALIAS|SERVER|USER|ROLE|PRIVILEGE)S?\b|\bUSE\s+[\w`]|\bDROP\b|\bTERMINATE\b", re.IGNORECASE)
 
 
 class Refused(Exception):
@@ -207,7 +208,10 @@ def logical_model_marks(newest, code):
     """What only this release's logical-model load writes on its nodes: the models' slugs, each label it gives, and
     the base of each node's uri (the uri up to its last / or #). Read from the release's own models, so a new model
     is known without a code change. Empty when the release holds no logical model."""
-    files = code.lm.models(newest)
+    try:
+        files = code.lm.models(newest)
+    except SystemExit as stop:   # the release's own refusal, such as a model with no export in its manifest
+        raise Refused(f"{stop}; nothing was changed") from None
     if not files:
         return {"slugs": [], "bases": [], "labels": []}
     nodes, _ = code.lm.graph_rows(files)

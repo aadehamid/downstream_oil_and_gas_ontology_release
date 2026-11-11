@@ -21,9 +21,8 @@ The limits:
 - When a file cannot be put back, the error names each path that is not as it was.
 - When the commit is made and Git cannot tag it, the commit stays (CutIncomplete). The same command again makes
   the tag.
-- Ctrl+C while the files are written puts them back. Ctrl+C during the commit leaves them written and not
-  committed. A process ended from outside (a closed terminal, a kill, a power cut) puts nothing back, and the
-  backup then stays in the temporary folder.
+- Ctrl+C while the files are written, or while Git commits them, puts them back. A process ended from outside
+  (a closed terminal, a kill, a power cut) puts nothing back, and the backup then stays in the temporary folder.
 A report that was cut before changes no file. When its tag is missing in a Git copy, the tool makes the tag.
 
 What it reads and writes:
@@ -87,9 +86,9 @@ MODULE = "data-product"
 # these and rebuilds. The cut's own code writes no Turtle and no package content: the release's build scripts do.
 # Its one direct change to such a file is to set CRLF line ends back to LF in the temporary copy (_difference).
 TABLES = ("tables", "lineage", "columns", "agents", "view-systems")
-# Names that are not part of the release. A folder with one of these names, at any depth, is neither copied to
-# the temporary copy nor compared. A file with one of these names is not copied either, but it is compared, so
-# the cut would list it as removed. The .git of a Git worktree is such a file.
+# Names that are not part of the release. A folder or a file with one of these names, at any depth, is neither
+# copied to the temporary copy nor compared, so the cut never writes or removes it. The .git of a Git worktree is
+# such a file.
 IGNORED = {".git", "__pycache__", ".venv", ".pytest_cache"}
 # Files whose line ends are set to LF before the cut compares them (_difference).
 TEXT_SUFFIXES = {".ttl", ".json", ".jsonld", ".md", ".py", ".csv", ".nt", ".txt"}
@@ -106,8 +105,8 @@ NEEDS_MINOR = {"add-measure-link": "a measure link with its filter needs a new p
 # A column name is letters, digits, underscores and dollar signs. An object name is one to three such parts, which
 # may also hold a hyphen, joined by dots. A table type is capital letters and underscores.
 # Every form is applied with fullmatch: with match, a "$" would let a final line end through.
-# A row's ID is the exception: the report's format asks only that it is text and not used twice, and the cut
-# copies it into the record and into the new version's reason as it stands.
+# A row's ID has its form from the report's own format (report.ROW_ID: an R and digits), which the read of the
+# report checks, so the cut copies it into the record and into the new version's reason as it stands.
 COLUMN_NAME = re.compile(r"[\w$]{1,255}")
 PART = r"[\w$-]{1,255}"
 NAME_PART = re.compile(PART)
@@ -233,14 +232,19 @@ class Tables:
         for name in TABLES:
             _write(Path(release_root) / PRICING / f"{name}.csv", self.text(name))
 
-    def slug(self, full_name):
-        """The table's slug from its full name. The catalog is left out when the full name matches none, because
-        a report names the object as this environment spells its catalog."""
+    def matches(self, full_name):
+        """The slugs of the tables that have the full name; when none has, of those that have it under another catalog."""
         tables = self.rows["tables"]
         found = [t["slug"] for t in tables if t["name"].lower() == full_name.lower()]
         if not found:
             rest = full_name.lower().split(".", 1)[-1]
             found = [t["slug"] for t in tables if t["name"].lower().split(".", 1)[-1] == rest]
+        return found
+
+    def slug(self, full_name):
+        """The table's slug from its full name. The catalog is left out when the full name matches none, because
+        a report names the object as this environment spells its catalog."""
+        found = self.matches(full_name)
         if len(found) != 1:
             raise Unappliable(f"the ontology's tables name {full_name} {len(found)} times")
         return found[0]
@@ -298,8 +302,16 @@ def _add_serves_measure(tables, row, fix):
 
 
 def _rename_object(tables, row, fix):
-    if any(t["name"].lower() == fix["to"].lower() for t in tables.rows["tables"]):
-        return None
+    named = [t["slug"] for t in tables.rows["tables"] if t["name"].lower() == fix["to"].lower()]
+    if named:
+        # The new name is there. That is this rename already made, unless the old name still names another object.
+        try:
+            still = tables.slug(fix["from"])
+        except Unappliable:
+            return None
+        if still in named:
+            return None
+        raise Unappliable(f"the ontology already names another object {fix['to']}")
     slug = tables.slug(fix["from"])
     table = next(t for t in tables.rows["tables"] if t["slug"] == slug)
     old, table["name"] = table["name"], fix["to"]
@@ -333,10 +345,9 @@ def _remove_edge(tables, row, fix):
 
 
 def _remove_object(tables, row, fix):
-    try:
-        slug = tables.slug(fix["object"])
-    except Unappliable:
-        return None
+    if not tables.matches(fix["object"]):
+        return None   # no table has the name: the removal is already made
+    slug = tables.slug(fix["object"])   # raises when the name fits more than one table
     name, changes = tables.name(slug), []
     # Each of the five tables loses its rows that name the object, so none is left that points at a removed object.
     for table, keys in (("tables", ("slug",)), ("lineage", ("table", "derived_from")), ("columns", ("table", "from_table")),
@@ -412,12 +423,18 @@ def plan(report, release_root, sums=None):
     # A record of this run means the run was cut. The same report file then changes no file. Another JSON file
     # with the same run ID is refused, because its decisions may differ from the ones the release already holds.
     # The test compares the JSON file's checksum with the one in the record, so it needs a record that holds that
-    # line, and it does not see another decisions CSV given with the same JSON file.
+    # line. A decisions CSV given with the same JSON file is compared the same way, when the record holds the
+    # checksum of the CSV the cut was made with; a cut made from the JSON file alone recorded none.
     if record.is_file():
-        cut_from = re.search(r"^\| Report checksum \(SHA-256\) \| ([0-9a-f]{64}) \|$", record.read_text(encoding="utf-8"), re.M)
+        text = record.read_text(encoding="utf-8")
+        cut_from = re.search(r"^\| Report checksum \(SHA-256\) \| ([0-9a-f]{64}) \|$", text, re.M)
         if sums and cut_from and cut_from.group(1) != sums["report"]:
             raise CutRefused(f"{record_path(report).as_posix()} records a cut of this run from another report file. "
                              "A run is cut once: run the discovery again to get a new report.")
+        decided = re.search(r"^\| Decisions file checksum \(SHA-256\) \| ([0-9a-f]{64}) \|$", text, re.M)
+        if sums and decided and "decisions" in sums and decided.group(1) != sums["decisions"]:
+            raise CutRefused(f"{record_path(report).as_posix()} records a cut of this run with another decisions file. "
+                             "A run is cut once, and these decisions were not applied: run the discovery again to get a new report.")
         return Plan(report, [], {}, tables, already_cut=True)
     try:
         release = ov.release_name(root)
@@ -887,11 +904,13 @@ def _record(plan_, sums, approver, now, files):
 # ---------- from the staging copy to the release ----------
 
 def _files(root):
-    """{path relative to root, with forward slashes: the file} for every file under root but the ignored folders."""
+    """{path relative to root, with forward slashes: the file} for every file under root but the ignored names."""
     out = {}
     for folder, dirs, names in os.walk(root):
         dirs[:] = sorted(d for d in dirs if d not in IGNORED)
         for name in names:
+            if name in IGNORED:   # the copy to the temporary folder leaves such a file out too
+                continue
             path = Path(folder) / name
             out[path.relative_to(root).as_posix()] = path
     return out
@@ -943,7 +962,10 @@ def _apply(root, staging, files, backup):
         if state != AS_IT_WAS:
             raise CutFailed(f"the cut was stopped while it wrote the release. {state}") from err
         raise
-    _prune(root, files)
+    try:
+        _prune(root, files)
+    except OSError:
+        pass   # every file is written; an empty folder that stays behind is no reason to call the write failed
 
 
 AS_IT_WAS = "The release is as it was."
@@ -1064,8 +1086,8 @@ def _git_ready(root, plan_):
 
 def _commit(root, git, plan_, outcome, backup):
     """Commits the paths the cut wrote and tags the commit. A failed commit puts the release back from the backup
-    (_undo). A failed tag leaves the commit and raises CutIncomplete: the same command again finishes the tag
-    (_finish_tag)."""
+    (_undo), and so does Ctrl+C before the commit is made. A failed tag leaves the commit and raises CutIncomplete:
+    the same command again finishes the tag (_finish_tag)."""
     if git == "none":
         return
     run, tag = plan_.report["run"]["id"], _tag(plan_)
@@ -1073,8 +1095,16 @@ def _commit(root, git, plan_, outcome, backup):
                else f"Record the decisions of discovery run {run}")
     # Only the cut's own paths are named to git add and git commit, so no other path enters the commit.
     spec = ["--pathspec-from-file=-", "--pathspec-file-nul"]
+    head = _git(root, "rev-parse", "-q", "--verify", "HEAD").stdout.strip()
     for args in (["add", "-A", *spec], ["commit", "-q", "-m", subject, "-m", f"The record is {outcome.record.as_posix()}.", *spec]):
-        done = _git(root, *args, stdin=_paths(outcome.files))
+        try:
+            done = _git(root, *args, stdin=_paths(outcome.files))
+        except KeyboardInterrupt:
+            # Ctrl+C while Git worked. When no commit was made, the files go back as after a failed commit. When
+            # the commit is there, it stays, and the stop goes on as it came.
+            if _git(root, "rev-parse", "-q", "--verify", "HEAD").stdout.strip() != head:
+                raise
+            raise CutFailed("the cut was stopped while Git committed it. " + _undo(root, outcome.files, backup)) from None
         if done.returncode != 0:
             raise CutFailed(f"git {args[0]} failed: {(done.stderr or done.stdout).strip()}. " + _undo(root, outcome.files, backup))
     outcome.committed = True
@@ -1108,7 +1138,8 @@ def _make_tag(root, tag, commit):
 
 def _finish_tag(root, report, outcome, say):
     """For a run that was cut before: makes the cut's tag when the Git copy lacks it, on the commit that added the
-    run's record. A cut whose tag failed is finished this way. Returns True when it made the tag."""
+    run's record. A cut whose tag failed is finished this way. Returns True when it made the tag, and None when
+    there was no tag to make: a plain folder, no Git, a cut that wrote no version, or a tag that is there already."""
     if _git_state(root) in ("none", "no git"):
         return
     # The record's "Versions written" table gives the version, so the tag's name does not depend on the release's

@@ -460,13 +460,30 @@ class DeltaTable(unittest.TestCase):
             rs.roundtrip(rs.SparkStore(spark, "c.s.t"), release_dataset())
         self.assertEqual(spark.tables, {"c.s.t": OLD_ROWS})
 
-    def test_a_failed_staging_drop_or_live_read_fails_the_run(self):
-        for name, fail in (("drop", lambda sql, _n: sql.startswith("DROP TABLE")),
-                           ("live read", lambda sql, _n: sql.startswith("SELECT") and "__staging_" not in sql)):
-            with self.subTest(name):
-                spark = FakeSpark(fail_on=fail, tables={"c.s.t": OLD_ROWS})
-                with self.assertRaises(RuntimeError):
-                    rs.roundtrip(rs.SparkStore(spark, "c.s.t"), release_dataset())
+    def test_a_failed_live_read_fails_the_run(self):
+        spark = FakeSpark(fail_on=lambda sql, _n: sql.startswith("SELECT") and "__staging_" not in sql, tables={"c.s.t": OLD_ROWS})
+        with self.assertRaises(RuntimeError):
+            rs.roundtrip(rs.SparkStore(spark, "c.s.t"), release_dataset())
+
+    def test_a_failed_staging_drop_does_not_hide_the_comparison_of_the_live_table(self):
+        spark = FakeSpark(fail_on=lambda sql, _n: sql.startswith("DROP TABLE"), tables={"c.s.t": OLD_ROWS})
+        store = rs.SparkStore(spark, "c.s.t")
+        passed, report = rs.roundtrip(store, release_dataset())
+        self.assertTrue(passed)
+        self.assertEqual((report["published"], report["hashes_equal"], report["staging_not_dropped"]), (True, True, store.staging))
+        self.assertTrue(spark.statements[-1].startswith("SELECT") and "__staging_" not in spark.statements[-1])   # the live read came after
+        self.assertEqual(sorted(spark.tables), ["c.s.t", store.staging])
+
+    def test_a_failed_staging_drop_does_not_hide_a_failed_promotion(self):
+        spark = FakeSpark(fail_on=lambda sql, n: " AS SELECT * FROM " in sql or sql.startswith("DROP TABLE"), tables={"c.s.t": OLD_ROWS})
+        with self.assertRaisesRegex(RuntimeError, "Spark error while running statement"):
+            rs.roundtrip(rs.SparkStore(spark, "c.s.t"), release_dataset())
+        self.assertTrue(" AS SELECT * FROM " in spark.statements[-2] and spark.statements[-1].startswith("DROP TABLE"))
+        self.assertEqual(spark.tables["c.s.t"], OLD_ROWS)
+
+    def test_a_clean_run_reports_no_staging_table_left(self):
+        _, report = rs.roundtrip(rs.SparkStore(FakeSpark(tables={"c.s.t": OLD_ROWS}), "c.s.t"), release_dataset())
+        self.assertNotIn("staging_not_dropped", report)
 
     def test_two_runs_on_one_table_never_promote_each_others_rows(self):
         spark = FakeSpark(tables={"c.s.t": OLD_ROWS})
