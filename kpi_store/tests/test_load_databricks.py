@@ -288,3 +288,18 @@ def test_a_release_whose_catalog_is_behind_its_folders_stops_before_databricks_i
     with pytest.raises(ov.ReleaseError, match="the catalog's newest data-product"):
         run(workspace, root, tmp_path / "volume")
     assert workspace.statements == []
+
+
+def test_a_staging_table_that_could_not_be_dropped_is_named_in_the_result(tmp_path):
+    root, workspace = support.small_release(tmp_path), support.FakeWorkspace()
+    run_sql = workspace.run_sql
+
+    def no_drop(statement):
+        if statement.startswith("DROP TABLE"):
+            raise RuntimeError("the warehouse stopped")
+        return run_sql(statement)
+
+    result = ld.load(ld.Gate(support.make_settings(), no_drop), support.make_settings(), root, "made-up", NOW, RDFSTORE, batch=10)
+    left = [t for t in workspace.store if "__staging_" in t]
+    assert result["status"] == "loaded" and len(left) == 1 and result["staging_not_dropped"] == left[0]
+    assert "staging_not_dropped" not in load(support.FakeWorkspace(), root)   # a clean load says nothing of it

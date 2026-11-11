@@ -225,3 +225,33 @@ def test_a_zip_with_the_wrong_checksum_is_never_opened(tmp_path):
     with pytest.raises(notebook().Stop, match="the release zip's SHA-256 is"):
         notebook().bootstrap(folder / "kpi_store.toml", work_dir=tmp_path / "work")
     assert not (tmp_path / "work").exists()   # its code was not unpacked, so it could not run
+
+
+def test_the_unpacked_files_are_the_bytes_that_were_hashed(tmp_path, monkeypatch):
+    """A zip replaced in the volume between the checksum and the unpack must not be the one unpacked."""
+    folder, nb = volume(tmp_path), notebook()
+    other = tmp_path / "other.zip"
+    with zipfile.ZipFile(other, "w") as z:
+        z.writestr("kpi_store/__init__.py", "")
+        z.writestr("swapped.txt", "not the release")
+
+    class SwapAfterHash:
+        """hashlib, except that the zip in the volume is replaced as soon as its checksum is asked for."""
+        @staticmethod
+        def sha256(*args):
+            real = hashlib.sha256(*args)
+
+            class Digest:
+                update = real.update
+
+                @staticmethod
+                def hexdigest():
+                    (folder / "kpi-store-1.1.zip").write_bytes(other.read_bytes())
+                    return real.hexdigest()
+            return Digest()
+
+    monkeypatch.setattr(nb, "hashlib", SwapAfterHash)
+    with import_state_kept(), pytest.raises(nb.Stop, match="the release zip's SHA-256 is"):
+        nb.bootstrap(folder / "kpi_store.toml", work_dir=tmp_path / "work")   # the release's own second check sees the swap
+    assert not (tmp_path / "work" / "swapped.txt").exists()
+    assert (tmp_path / "work" / "release.json").is_file()   # the hashed zip's own file
