@@ -1261,6 +1261,9 @@ class RoundFour(OneBreak, unittest.TestCase):
             pinned = lambda version: cpr.check(module(), shapes(), config(lambda r: r["packages"].update({"lending": version})), tmp)
             self.assertEqual(pinned("1.2.1-correction.2"), [])
             self.assertEqual(pinned("1.2.0"), [("inputs", "Inputs: lending is pinned at 1.2.0 but its newest release is 1.2.1-correction.2")])
+            # A pin with a final line end is no release: the form is applied to the whole text.
+            self.assertEqual(pinned("1.2.1-correction.2\n"),
+                             [("inputs", "Inputs: lending is pinned at 1.2.1-correction.2\n, which is not a release (X.Y.Z)")])
 
 
 class RoundFive(unittest.TestCase):

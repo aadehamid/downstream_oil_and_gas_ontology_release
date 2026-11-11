@@ -84,6 +84,19 @@ class Newest(unittest.TestCase):
                 open(os.path.join(tmp, name), "w").close()
             self.assertEqual(newest.core_builder(tmp), "build_core_2_10")
 
+    def test_a_core_builder_name_with_a_line_end_is_not_a_builder(self):
+        # With match and "$", "build_core_9_9.py\n" would pass and give the module name "build_core_9_9.".
+        import re
+        self.assertIsNone(newest.CORE_BUILDER.fullmatch("build_core_9_9.py\n"))
+        self.assertIsNotNone(newest.CORE_BUILDER.fullmatch("build_core_9_9.py"))
+        self.assertNotIn("$", newest.CORE_BUILDER.pattern)
+        self.assertNotIn("$", newest.VERSION.pattern)
+        with tempfile.TemporaryDirectory() as tmp:
+            for name in ("build_core_2_4.py", "build_core_9_9.py\n" if os.name != "nt" else "build_core_2_3.py"):
+                open(os.path.join(tmp, name), "w").close()
+            self.assertEqual(newest.core_builder(tmp), "build_core_2_4")
+            self.assertTrue(re.fullmatch(r"build_core_\d+_\d+", newest.core_builder(tmp)))
+
 
 class RefuseOverwrite(unittest.TestCase):
     def test_a_new_package_passes(self):

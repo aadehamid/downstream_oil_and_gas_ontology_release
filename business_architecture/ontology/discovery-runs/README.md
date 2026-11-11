@@ -24,7 +24,7 @@ py -m kpi_store.cut --report discovery-report.json --approver "the ontology owne
 ```
 
 - `--report` names the report's JSON file. To use decisions written in the CSV file, add `--decisions discovery-report.csv`, or give the CSV file as `--report` when the JSON file lies beside it.
-- `--approver` is optional. Write the role or the initials of the person who cleared the report, such as "the ontology owner". The tool refuses anything else: it takes letters, digits, spaces, dots, hyphens and apostrophes, at most 60 characters, and no number of four digits or more. The same rule holds for the "decided by" of each row in the report. The record is committed, so it must hold no address and no phone number.
+- `--approver` is optional. Write the role or the initials of the person who cleared the report, such as "the ontology owner". The tool refuses anything else: it takes letters, digits, spaces, dots, hyphens and apostrophes, at most 60 characters, at least one letter, and no number of four digits or more. The same rule holds for the "decided by" of each row in the report. The record is committed, so it must hold no address and no phone number.
 - `--plan` shows what the cut would do and changes nothing.
 
 The tool shows each row and what it will change. It then asks two things:

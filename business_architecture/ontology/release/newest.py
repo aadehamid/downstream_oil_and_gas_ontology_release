@@ -7,7 +7,7 @@ import re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ONTOLOGY = os.path.dirname(HERE)
-CORE_BUILDER = re.compile(r"^build_core_(\d+)_(\d+)\.py$")
+CORE_BUILDER = re.compile(r"build_core_(\d+)_(\d+)\.py")   # applied with fullmatch, so no name with a line end passes
 # A version as a pattern, for a builder or test that finds one inside a longer text.
 VERSION_PATTERN = r"\d+\.\d+\.\d+(?:-correction\.\d+)?"
 VERSION = re.compile(r"(\d+)\.(\d+)\.(\d+)(?:-correction\.(\d+))?")
@@ -52,7 +52,7 @@ def core_file(name="core.ttl", ontology=ONTOLOGY):
 def core_builder(release=HERE):
     """The module name of the newest numbered core builder, build_core_<major>_<minor>; importing it gives its VERSION
     and BASE. A patch of core is a new builder too, named for its major and minor."""
-    found = [(int(m.group(1)), int(m.group(2)), f) for f in os.listdir(release) for m in [CORE_BUILDER.match(f)] if m]
+    found = [(int(m.group(1)), int(m.group(2)), f) for f in os.listdir(release) for m in [CORE_BUILDER.fullmatch(f)] if m]
     if not found:
         raise FileNotFoundError(f"{release} holds no build_core_<major>_<minor>.py")
     return max(found)[2][:-3]

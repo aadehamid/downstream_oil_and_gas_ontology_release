@@ -98,10 +98,11 @@ KEPT = "(kept in the report)"
 SHA256 = re.compile(r"[0-9a-f]{64}")
 RUN_AT = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ")
 # Who decided a row, and who cleared the report: a role or initials. The record is committed, so it takes no free
-# text: letters, digits, spaces, dots, hyphens and apostrophes, at most 60 characters, and no run of four digits.
+# text: letters, digits, spaces, dots, hyphens and apostrophes, at most 60 characters, at least one letter, and no
+# run of four digits.
 ROLE = re.compile(r"(?:[^\W_]|[ .'-]){1,60}")
 ROLE_HELP = ("write a role or initials, such as \"the ontology owner\": letters, digits, spaces, dots, hyphens and "
-             "apostrophes, at most 60 characters, and no number of four digits or more")
+             "apostrophes, at most 60 characters, at least one letter, and no number of four digits or more")
 DEFAULT_APPROVER = "The person who ran the cut"
 CHECK_COMMAND = "bash scripts/check.sh"
 GIT_PLACE = {"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR", "GIT_PREFIX", "GIT_NAMESPACE"}
@@ -327,7 +328,8 @@ def load_report(report_path, decisions=None):
 
 def is_role(text):
     """True when the text names who decided in the form the record may hold: a role or initials."""
-    return isinstance(text, str) and bool(ROLE.fullmatch(text)) and text == text.strip() and not re.search(r"\d{4}", text)
+    return (isinstance(text, str) and bool(ROLE.fullmatch(text)) and text == text.strip() and not re.search(r"\d{4}", text)
+            and any(c.isalpha() for c in text))
 
 
 def record_path(report):
@@ -799,7 +801,7 @@ def _difference(root, staging):
 
 def _apply(root, staging, files, backup):
     """Writes the changed files into the release, keeping a copy of each file it replaces or removes in `backup`.
-    A failure puts every file back."""
+    A failure puts every file back and raises CutFailed, which says what state the release is in."""
     done = []
     try:
         for rel in files:
@@ -813,19 +815,28 @@ def _apply(root, staging, files, backup):
                 shutil.copy2(source, target)
             else:
                 target.unlink()
-    except BaseException:
-        _restore(root, done, backup)
+    except BaseException as err:
+        state = _state(_restore(root, done, backup))
+        if isinstance(err, Exception):
+            raise CutFailed(f"writing the release failed at {done[-1] if done else files[0]}: {type(err).__name__}: {err}. {state}") from err
+        if state != AS_IT_WAS:
+            raise CutFailed(f"the cut was stopped while it wrote the release. {state}") from err
         raise
     _prune(root, files)
 
 
+AS_IT_WAS = "The release is as it was."
+
+
 def _restore(root, files, backup):
     """Puts back exactly the paths the cut wrote: a file the cut changed or removed is copied back from the backup,
-    and a file the cut created is deleted. No other path is touched. Returns the paths it could not put back, each
-    with its state; an empty list means the release's files are as they were."""
+    and a file the cut created is deleted. No other path is touched. It never raises. It then reads each path again
+    and returns those that are not as they were, each with its state, so the answer rests on the files' own bytes
+    and not on whether a copy raised an error. An empty list means the release's files are as they were."""
     failed = []
     for rel in files:
         target, kept = root / rel, backup / rel
+        error = ""
         try:
             if kept.is_file():
                 target.parent.mkdir(parents=True, exist_ok=True)
@@ -833,10 +844,31 @@ def _restore(root, files, backup):
             elif target.exists():
                 target.unlink()
         except OSError as err:
-            state = "still holds the cut's content" if kept.is_file() else "is a file the cut created and could not be deleted"
-            failed.append(f"{rel} ({state}: {type(err).__name__})")
-    _prune(root, files)
+            error = f": {type(err).__name__}"
+        try:
+            if not kept.is_file():
+                state = "is a file the cut created and could not be deleted" if target.exists() else ""
+            elif not target.is_file():
+                state = "is missing; the release held it before the cut"
+            else:
+                state = "" if target.read_bytes() == kept.read_bytes() else "does not hold what it held before the cut"
+        except OSError as err:
+            state = f"could not be read to see what it holds ({type(err).__name__})"
+        if state:
+            failed.append(f"{rel} ({state}{error})")
+    try:
+        _prune(root, files)
+    except OSError as err:
+        failed.append(f"an empty folder that the cut made could not be removed ({type(err).__name__})")
     return failed
+
+
+def _state(failed):
+    """The sentence that says what _restore left: the release as it was, or the paths that are not."""
+    if not failed:
+        return AS_IT_WAS
+    return (f"The release could NOT be put back in full. These {len(failed)} are not as they were: " + "; ".join(failed)
+            + ". Every other path is as it was.")
 
 
 def _prune(root, files):
@@ -924,18 +956,13 @@ def _commit(root, git, plan_, outcome, backup):
 
 def _undo(root, files, backup):
     """After a failed commit: puts back the paths the cut wrote, from the backup, and takes them out of Git's index.
-    It touches no other path, so a file Git was told to ignore or to assume unchanged keeps its content. Returns
-    the sentence that says what state the release is in."""
+    It touches no other path, so a file Git was told to ignore or to assume unchanged keeps its content. The index
+    reset is always tried, whatever the restore left. Returns the sentence that says what state the release is in."""
     failed = _restore(root, files, backup)
-    unstage = _git(root, "reset", "-q", *["--pathspec-from-file=-", "--pathspec-file-nul"], stdin=_paths(files))
+    unstage = _git(root, "reset", "-q", "--pathspec-from-file=-", "--pathspec-file-nul", stdin=_paths(files))
     if not failed and unstage.returncode == 0:
-        return "The release is as it was."
-    said = []
-    if failed:
-        said.append(f"The release could NOT be put back in full. These {len(failed)} paths are not as they were: "
-                    + "; ".join(failed) + ". Every other path is as it was.")
-    else:
-        said.append("The release's files are as they were.")
+        return AS_IT_WAS
+    said = [_state(failed) if failed else "The release's files are as they were."]
     if unstage.returncode != 0:
         said.append(f"Git could not take the cut's paths out of its index (git reset failed: "
                     f"{(unstage.stderr or unstage.stdout).strip()}), so some may still be staged: look at git status.")

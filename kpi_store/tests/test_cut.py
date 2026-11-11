@@ -25,13 +25,28 @@ SUMMARY_VIEW = "idp_sbx.semantic_sem_commercial.mips_mpr_executive_summary_fact_
 EXTRAS = ("R004", "R005", "R006", "R007", "R008", "R009", "R010")
 NOW = dt.datetime(2026, 11, 12, 8, 30, tzinfo=dt.timezone.utc)
 CORRECTED = {"data-product": ("1.2.0", "1.2.1-correction.1"), "logical-model": ("1.0.0", "1.0.1-correction.1"),
-             "technical-graph": ("1.0.0", "1.0.1-correction.1"), "value-stream": ("1.2.0", "1.2.1-correction.1"),
+             "technical-graph": ("1.1.0", "1.1.1-correction.1"), "value-stream": ("1.2.0", "1.2.1-correction.1"),
              "integration": ("2.5.0", "2.5.1-correction.1")}
 
-# The report fixture and the versions above are those of the release as shipped. After the first cut of a copy its
-# data-product module has moved on, and these tests no longer describe it: they are skipped there.
-as_shipped = pytest.mark.skipif(ov.newest_versions(support.ROOT / ov.RELEASES).get("data-product") != "1.2.0",
-                                reason="this tree's data-product is no longer 1.2.0; the test cuts the release as shipped")
+# The report fixture and the versions above are those of the release as shipped: BASELINE is what every test
+# below cuts. On a tree where any of the five modules has another version, those tests are skipped, and
+# test_the_baseline_is_this_trees_or_data_product_has_moved_on says whether that is expected.
+BASELINE = {module: old for module, (old, new) in CORRECTED.items()}
+HELD = {module: version for module, version in ov.newest_versions(support.ROOT / ov.RELEASES).items() if module in BASELINE}
+as_shipped = pytest.mark.skipif(HELD != BASELINE, reason=f"this tree holds {HELD}, and the cut tests cut {BASELINE}")
+
+
+def test_the_baseline_is_this_trees_or_data_product_has_moved_on():
+    """The cut tests skip on a tree that is not at their baseline. That is right after a cut or a release of
+    data-product, which moves all five modules on. It is wrong when data-product is still at the baseline and a
+    module that depends on it was released alone: the tests would then skip without a word."""
+    if HELD["data-product"] != BASELINE["data-product"]:
+        return
+    assert HELD == BASELINE, ("a module that depends on data-product was released, so the cut tests are skipped: write this tree's "
+                              "versions in CORRECTED in this file. In a copy that has moved on from the release for good, add this "
+                              "test to scripts/pinned-tests.txt instead.")
+    # The report fixture reads the same versions.
+    assert {m: v for m, v in json.loads(REPORT.read_text(encoding="utf-8"))["ontology"].items() if m in BASELINE} == BASELINE
 
 
 def release_copy(tmp_path):
@@ -482,7 +497,7 @@ def test_a_failure_leaves_the_tree_untouched_and_a_cut_in_local_git_commits_and_
     assert digest(root) == before and git(root, "status", "--porcelain") == "" and git(root, "rev-parse", "HEAD") == head
     with pytest.raises(cut.CutFailed, match=r"the step 'list the modules to release' failed \(dependents.py data-product\)"):
         cut._run("list the modules to release", ["dependents.py", "data-product"], root)   # the script is not in this folder
-    with pytest.raises(cut.CutFailed, match="the step 'write the release' failed"):
+    with pytest.raises(cut.CutFailed, match="writing the release failed at b.txt: FileNotFoundError: .* The release is as it was."):
         (tmp_path / "staging").mkdir()
         (tmp_path / "staging" / "a.txt").write_text("new", encoding="utf-8")
         (tmp_path / "target").mkdir()
@@ -666,9 +681,72 @@ def test_when_git_cannot_reset_nothing_is_deleted_and_the_message_says_what_stat
     with pytest.raises(cut.CutFailed) as failed:
         cut._commit(root, "ready", plan, cut.Outcome("recorded", plan, Path(CREATED), files), backup)
     monkeypatch.undo()
-    assert str(failed.value) == ("git commit failed: made-up commit failure. The release could NOT be put back in full. These 1 paths "
-                                 "are not as they were: release.json (still holds the cut's content: PermissionError). Every other path is as it was.")
+    assert str(failed.value) == ("git commit failed: made-up commit failure. The release could NOT be put back in full. These 1 "
+                                 "are not as they were: release.json (does not hold what it held before the cut: PermissionError). "
+                                 "Every other path is as it was.")
+    assert git(root, "diff", "--cached", "--name-only") == ""   # the index reset ran all the same
     assert (root / REMOVED).is_file() and not (root / CREATED).exists() and "made-up" in (root / CHANGED).read_text(encoding="utf-8")
+
+
+def test_a_write_failure_followed_by_a_restore_failure_names_the_paths_that_are_not_as_they_were(tmp_path, monkeypatch):
+    root, staging, backup = tmp_path / "root", tmp_path / "staging", tmp_path / "backup"
+    for folder, texts in ((root, {"a.txt": "old a", "b.txt": "old b", "c.txt": "old c"}), (staging, {"a.txt": "new a", "b.txt": "new b", "c.txt": "new c"})):
+        folder.mkdir()
+        for name, text in texts.items():
+            (folder / name).write_text(text, encoding="utf-8")
+    real_copy = shutil.copy2
+
+    def copy(source, target, **more):
+        source, target = Path(source), Path(target)
+        if (source, target) == (staging / "c.txt", root / "c.txt"):
+            raise OSError("made-up: the disk is full")            # the write of the third file fails
+        if (source, target) == (backup / "a.txt", root / "a.txt"):
+            raise PermissionError("made-up: the file is open")    # and the first file cannot be put back
+        if (source, target) == (backup / "b.txt", root / "b.txt"):
+            target.write_text("ol", encoding="utf-8")             # and the second is put back only in part, with no error
+            return target
+        return real_copy(source, target, **more)
+    monkeypatch.setattr(cut.shutil, "copy2", copy)
+    with pytest.raises(cut.CutFailed) as failed:
+        cut._Steps(quiet, None)("write the release", lambda: cut._apply(root, staging, ["a.txt", "b.txt", "c.txt"], backup))
+    assert str(failed.value) == (
+        "writing the release failed at c.txt: OSError: made-up: the disk is full. The release could NOT be put back in full. "
+        "These 2 are not as they were: a.txt (does not hold what it held before the cut: PermissionError); "
+        "b.txt (does not hold what it held before the cut). Every other path is as it was.")
+    assert [(root / n).read_text(encoding="utf-8") for n in ("a.txt", "b.txt", "c.txt")] == ["new a", "ol", "old c"]
+    # A write failure with a whole restore says the release is as it was, once.
+    monkeypatch.setattr(cut.shutil, "copy2", lambda s, t, **more: (_ for _ in ()).throw(OSError("made-up: the disk is full"))
+                        if (Path(s), Path(t)) == (staging / "c.txt", root / "c.txt") else real_copy(s, t, **more))
+    for name in ("a.txt", "b.txt"):
+        (root / name).write_text(f"old {name[0]}", encoding="utf-8")
+    with pytest.raises(cut.CutFailed) as failed:
+        cut._Steps(quiet, None)("write the release", lambda: cut._apply(root, staging, ["a.txt", "b.txt", "c.txt"], tmp_path / "backup-2"))
+    assert str(failed.value) == "writing the release failed at c.txt: OSError: made-up: the disk is full. The release is as it was."
+    assert [(root / n).read_text(encoding="utf-8") for n in ("a.txt", "b.txt", "c.txt")] == ["old a", "old b", "old c"]
+
+
+def test_the_restore_reports_each_state_from_the_files_and_an_error_in_the_folders_does_not_stop_it(tmp_path, monkeypatch):
+    root, backup = tmp_path / "root", tmp_path / "backup"
+    (root / "made").mkdir(parents=True)
+    backup.mkdir()
+    (root / "changed.txt").write_text("the cut's", encoding="utf-8")
+    (backup / "changed.txt").write_text("before", encoding="utf-8")
+    (backup / "removed.txt").write_text("before", encoding="utf-8")       # the cut removed it
+    (root / "made" / "created.txt").write_text("the cut's", encoding="utf-8")
+    (root / "stuck.txt").write_text("the cut's", encoding="utf-8")          # created by the cut; cannot be deleted below
+    real_unlink = Path.unlink
+    monkeypatch.setattr(Path, "unlink", lambda self, **more: (_ for _ in ()).throw(PermissionError("made-up")) if self.name == "stuck.txt"
+                        else real_unlink(self, **more))
+    monkeypatch.setattr(cut.shutil, "copy2", lambda s, t, **more: (_ for _ in ()).throw(OSError("made-up")) if Path(t).name == "removed.txt"
+                        else shutil.copyfile(s, t))
+    monkeypatch.setattr(cut, "_prune", lambda root_, files: (_ for _ in ()).throw(OSError("made-up")))
+    failed = cut._restore(root, ["changed.txt", "removed.txt", "made/created.txt", "stuck.txt"], backup)
+    assert failed == ["removed.txt (is missing; the release held it before the cut: OSError)",
+                      "stuck.txt (is a file the cut created and could not be deleted: PermissionError)",
+                      "an empty folder that the cut made could not be removed (OSError)"]
+    assert (root / "changed.txt").read_text(encoding="utf-8") == "before" and not (root / "made" / "created.txt").exists()
+    assert cut._state([]) == "The release is as it was."
+    assert cut._state(failed).startswith("The release could NOT be put back in full. These 3 are not as they were: removed.txt (")
 
 
 def stub_build(plan_, staging, approver, now, step):
@@ -933,7 +1011,7 @@ def test_who_decided_is_a_role_or_initials():
     for good in ("the ontology owner", "J.D.", "the owner's deputy", "Team 12", "data-platform lead", "Ö", "x" * 60):
         assert cut.is_role(good), good
     for bad in ("jane.doe@example.com", "Jane Doe 555-0100", "call 5550100", "x" * 61, "a_b", "", "owner; see e-mail", "owner (acting)",
-                "a/b", "line one\nline two", 7, None):
+                "a/b", "line one\nline two", 7, None, "123", "12 34", "1.2", "- -", "."):
         assert not cut.is_role(bad), bad
 
 
@@ -950,7 +1028,8 @@ def test_free_text_as_who_decided_or_as_the_approver_stops_the_cut_and_a_note_ne
             cut.cut(path, root, ask=never, say=quiet)
         assert str(refused.value) == (
             "row R002: its 'decided by' is not a role or initials. In the report, write a role or initials, such as \"the ontology owner\": "
-            "letters, digits, spaces, dots, hyphens and apostrophes, at most 60 characters, and no number of four digits or more.")
+            "letters, digits, spaces, dots, hyphens and apostrophes, at most 60 characters, at least one letter, and no number of "
+            "four digits or more.")
         with pytest.raises(cut.CutRefused, match="--approver is not a role or initials: write a role or initials"):
             cut.cut(cleared(tmp_path, {"R002": "reject"}, name=f"approver-{n}"), root, approver=who, ask=never, say=quiet)
     assert cut.main(["--report", str(path), "--release", str(root), "--approver", "jane.doe@example.com"]) == 1
