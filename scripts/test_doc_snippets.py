@@ -56,6 +56,14 @@ home = "real"
 """
 
 
+@pytest.fixture(autouse=True)
+def not_started_by_a_block(monkeypatch):
+    """scripts/check.sh may itself be started by a block of a document, and then the environment says so. These
+    tests check the tool as a person starts it, so each one begins without those two variables."""
+    monkeypatch.delenv(d.NESTED, raising=False)
+    monkeypatch.delenv(d.NESTED_FILE, raising=False)
+
+
 def fence(info, *body):
     return "\n".join(["```" + info, *body, "```", ""])
 
