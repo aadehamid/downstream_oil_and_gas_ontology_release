@@ -38,6 +38,10 @@ CASES = [
     ("pull-request", "See PR 361, https://github.com/some-owner/x/pull/361.", "PR 361",
      "Issue 237, https://github.com/neo4j-labs/neosemantics/issues/237, and PR 361, https://github.com/neo4j-labs/neosemantics/pull/361"),
     ("pull-request", "It broke after issue 237.", "issue 237", "MAP mode breaks in-graph SHACL (neosemantics issue 237, open)."),
+    ("pull-request", "Issue 45, https://github.com/apache/jena/issues/7 is another one.", "Issue 45",
+     "Issue 45, https://github.com/apache/jena/issues/45, is open."),
+    ("pull-request", "PR 36, https://github.com/neo4j-labs/neosemantics/pull/361", "PR 36",
+     "PR 361, https://github.com/neo4j-labs/neosemantics/pull/361"),
     ("decision-record", "Recorded as EPM-DEC-001-0028.", "EPM-DEC-", "The decision of 2026-10-31 records it; see EPM-GLOS-001."),
     ("session", "The plan is in ~/.claude/handoffs.", "~/.claude", "The claim is in the file claude.md."),
     ("session", "Read handoffs/epm/notes.md first.", "handoffs/", "The shift handoff is at 06:00."),
@@ -45,6 +49,8 @@ CASES = [
     ("session", "Settings live in .claude/settings.json.", ".claude/", "The file notes.claude is not read."),
     ("removed-demo", "Run demos/downstream-pricing/tests.", "demos/", "The memos/ folder holds the notes."),
     ("removed-demo", "The pricing demo uses it.", "pricing demo", "Pricing demonstrates the margin."),
+    ("removed-demo", "<urn:pricing-demo:tech:check/x> a tg:QualityCheck .", "pricing-demo", "The pricing-demonstration page."),
+    ("removed-demo", "python -m pricing_demo.tech_graph load", "pricing_demo", "repricing_demos = 2"),
     ("removed-aura", "Copy the graph to AuraDB.", "AuraDB", "Laura reviewed the aural test."),
     ("removed-aura", "Neo4j and Aura hold it.", "Aura", "The restaurant brand is not a store."),
     ("removed-docker", "Start the store with docker compose up.", "docker", "The dock worker loads the barge."),
@@ -52,6 +58,23 @@ CASES = [
     ("removed-token", "Set DATABRICKS_TOKEN first.", "DATABRICKS_TOKEN", "DATABRICKS_HOST names the workspace."),
     ("removed-token", "Paste a personal access token.", "access token", "Access to tokens of appreciation is open."),
     ("github-link", "See https://github.com/some-owner/private-repo.", "github.com/some-owner", "See https://github.com/apache/jena."),
+    ("github-link", "See https://www.github.com/some-owner/private-repo.", "www.github.com/some-owner",
+     "See https://www.github.com/apache/jena."),
+    ("github-link", "git clone git@github.com:some-owner/private-repo.git", "github.com:some-owner",
+     "git clone git@github.com:apache/jena.git"),
+    ("github-link", "git remote add up ssh://git@github.com/some-owner/private-repo.git", "github.com/some-owner",
+     "git remote add up ssh://git@github.com/neo4j/apoc.git"),
+    ("github-link", "See https://gist.github.com/some-owner/0123abcd.", "gist.github.com/some-owner",
+     "See https://gist.github.com/jbarrasa/0123abcd."),
+    ("github-link", "curl https://api.github.com/repos/some-owner/private-repo/contents/x", "api.github.com/repos/some-owner",
+     "curl https://api.github.com/repos/ontodev/robot/releases and https://api.github.com/rate_limit"),
+    ("user-path", "The file is /Users/somebody/work/notes.md.", "/Users/somebody", "See https://example.org/Users/somebody/ and /Users/<name>/."),
+    ("user-path", "cd /home/somebody/kpi-store", "/home/somebody", "https://www.aspentech.com/-/media/aspentech/home/resources/x.pdf"),
+    ("user-path", "Open C:\\Users\\somebody\\kpi-store in Explorer.", "C:\\Users\\somebody", "Open C:\\Users\\<name>\\kpi-store or C:\\kpi-store."),
+    ("home-path", "Read ~/private-repository/README.md first.", "~/private-repository/README.md", "https://www.api.org/~/media/files/x.pdf"),
+    ("home-path", "The output goes to ~/lpg-out/epm.", "~/lpg-out/epm", "Write it to <your output folder>, about ~40 MB."),
+    ("home-path", "export OUT=$HOME/lpg-out", "$HOME/lpg-out", "The variable HOME names the home folder; $HOMEPAGE does not."),
+    ("home-path", "cd %USERPROFILE%\\kpi-store", "%USERPROFILE%", "Usage is 40% of the USERPROFILE quota."),
     ("github-link", "curl https://raw.githubusercontent.com/someone/x/y.txt", "raw.githubusercontent.com/someone",
      "See https://docs.github.com/en/actions and https://github.com/neo4j-labs/neosemantics."),
 ]
@@ -65,7 +88,7 @@ def test_each_rule_finds_its_line_and_passes_its_near_miss(rule, bad, reported, 
 
 def test_every_rule_has_a_case():
     assert {rule for rule, _, _ in cs.RULES} == {rule for rule, _, _, _ in CASES}
-    assert len(cs.RULES) == 11
+    assert len(cs.RULES) == 13
 
 
 def test_a_finding_names_its_line():
@@ -121,43 +144,72 @@ def test_the_checks_own_files_are_not_read(tmp_path):
 
 
 def test_a_pending_path_is_skipped_and_counted(tmp_path, capsys):
-    root = tree(tmp_path, {"skills/x/a.md": "PR 12 and PR 13\n", "skills/x/clean.md": "fine\n", "b.md": "fine\n"},
-                pending="# why\nskills/** :: being cleaned\n")
+    root = tree(tmp_path, {"HOW-TO-UPDATE.md": "PR 12 and PR 13\n", "HOW-TO-UPDATE.html": "fine\n", "b.md": "fine\n"},
+                pending="# why\nHOW-TO-UPDATE.* :: awaits its rewrite\n")
     findings, stale, summary = cs.check(root)
     assert (findings, stale) == ([], [])
-    assert summary == ["pending `skills/**`: 2 findings in 1 files (being cleaned)"]
+    assert summary == ["pending `HOW-TO-UPDATE.*`: 2 findings in 1 files (awaits its rewrite)"]
     assert cs.main(["--root", root]) == 0
     assert capsys.readouterr().out.endswith("stand-alone, except the 1 pending paths above\n")
 
 
 def test_strict_ignores_the_pending_list(tmp_path):
-    root = tree(tmp_path, {"skills/x/a.md": "PR 12\n"}, pending="skills/** :: being cleaned\n")
-    assert cs.check(root, strict=True) == (["skills/x/a.md:1: [pull-request] PR 12"], [], [])
+    root = tree(tmp_path, {"README.md": "PR 12\n"}, pending="README.md :: awaits its rewrite\n")
+    assert cs.check(root, strict=True) == (["README.md:1: [pull-request] PR 12"], [], [])
     assert cs.main(["--root", root, "--strict"]) == 1
 
 
 def test_a_pending_line_that_matches_no_file_fails(tmp_path):
-    root = tree(tmp_path, {"a.md": "fine\n"}, pending="gone/** :: was removed\n")
-    assert cs.check(root)[1] == ["scripts/standalone-pending.txt: `gone/**` matches no file; remove the line"]
+    root = tree(tmp_path, {"a.md": "fine\n"}, pending="README.md :: awaits its rewrite\n")
+    assert cs.check(root)[1] == ["scripts/standalone-pending.txt: `README.md` matches no file; remove the line"]
     assert cs.main(["--root", root]) == 1
 
 
 def test_a_pending_line_whose_files_are_all_clean_fails(tmp_path):
-    root = tree(tmp_path, {"docs/a.md": "fine\n"}, pending="docs/** :: awaits its rewrite\n")
-    assert cs.check(root)[1] == ["scripts/standalone-pending.txt: every file under `docs/**` is clean; remove the line"]
+    root = tree(tmp_path, {"HOW-TO-UPDATE.md": "fine\n"}, pending="HOW-TO-UPDATE.* :: awaits its rewrite\n")
+    assert cs.check(root)[1] == ["scripts/standalone-pending.txt: every file under `HOW-TO-UPDATE.*` is clean; remove the line"]
     assert cs.main(["--root", root]) == 1
 
 
 def test_a_finding_outside_the_pending_paths_still_fails(tmp_path):
-    root = tree(tmp_path, {"skills/a.md": "PR 12\n", "docs/b.md": "PR 13\n"}, pending="skills/** :: being cleaned\n")
+    root = tree(tmp_path, {"README.md": "PR 12\n", "docs/b.md": "PR 13\n"}, pending="README.md :: awaits its rewrite\n")
     assert cs.check(root)[0] == ["docs/b.md:1: [pull-request] PR 13"]
 
 
 def test_a_pending_line_without_a_reason_is_refused(tmp_path, capsys):
-    root = tree(tmp_path, {"skills/a.md": "PR 12\n"}, pending="skills/**\n")
+    root = tree(tmp_path, {"README.md": "PR 12\n"}, pending="README.md\n")
     with pytest.raises(ValueError, match="standalone-pending.txt:1: write `<glob> :: <reason>`"):
         cs.check(root)
     assert cs.main(["--root", root]) == 1
+
+
+@pytest.mark.parametrize("line", [
+    "docs/** :: awaits rewrite",                 # a new folder
+    "* :: everything",                           # the whole tree
+    "README.* :: awaits the documents rewrite",  # an allowed path, widened
+    "docs/new.md :: awaits rewrite",             # a new file
+])
+def test_the_pending_list_cannot_grow(tmp_path, capsys, line):
+    root = tree(tmp_path, {"docs/new.md": "PR 12\n", "README.md": "PR 13\n", "README.html": "PR 14\n"}, pending=line + "\n")
+    with pytest.raises(ValueError, match="standalone-pending.txt:1: .* is not a path the list may hold"):
+        cs.check(root)
+    assert cs.main(["--root", root]) == 1
+    assert cs.check(root, strict=True)[0] == ["README.html:1: [pull-request] PR 14", "README.md:1: [pull-request] PR 13",
+                                              "docs/new.md:1: [pull-request] PR 12"]
+
+
+def test_the_allowed_pending_lines_are_these_seven_and_this_trees_list_holds_no_other():
+    # Written by hand. A later change may delete a line here and in the list; it may never add or widen one.
+    assert cs.ALLOWED_PENDING == (
+        "README.md",
+        "KNOWN-OPEN-ITEMS.md",
+        "HOW-TO-UPDATE.*",
+        "business_architecture/ontology/epm-walkthrough.html",
+        "business_architecture/ontology/epm-ontology-guide.html",
+        "viewer/index.html",
+        "horoi_viewer/index.html",
+    )
+    assert [glob for glob, _ in cs.read_pending()] == list(cs.ALLOWED_PENDING)
 
 
 CHANGELOG = "releases/kpi/1.3.0/CHANGELOG.md"
@@ -215,13 +267,16 @@ def test_two_exceptions_for_one_text_are_refused(tmp_path):
 
 def test_this_trees_exceptions_are_only_for_fixed_content():
     # Written by hand: an exception is for a released package and its changelog, the two taxonomy files, the
-    # decision records, and a test that names a word to prove it is gone. Nothing else may be excepted.
+    # decision records, a test that names a word to prove it is gone, and two run configurations. Nothing else.
     allowed = ("business_architecture/ontology/releases/", "business_architecture/domain/kpi-store-decisions/",
                "business_architecture/ontology/build/output/step3-taxonomy.ttl",
                "business_architecture/ontology/step4/baseline/step3-taxonomy.ttl", "skills/ontology-to-lpg/scripts/test_",
-               "skills/rdf-store/scripts/test_")
+               "skills/rdf-store/scripts/test_",
+               # the two run configurations, whose default paths under the home folder a test pins
+               "business_architecture/ontology/projection/skill-run/epm-run.json",
+               "skills/ontology-to-lpg/templates/run-config.json")
     entries = cs.read_exceptions()
-    assert len(entries) == 30
+    assert len(entries) == 37
     assert [path for path, _, _ in entries if not path.startswith(allowed)] == []
 
 

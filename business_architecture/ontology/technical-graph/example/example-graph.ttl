@@ -12,127 +12,127 @@
 @prefix tg: <https://w3id.org/mpc/ontology/modules/technical-graph/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<urn:pricing-demo:tech:check/built-objects-hold-rows> a tg:QualityCheck ;
+<urn:kpi-store-example:tech:check/built-objects-hold-rows> a tg:QualityCheck ;
     rdfs:label "Every silver and gold table, metric view and definitions view exists and holds rows"@en ;
     tg:checkedAt "2026-11-03T07:44:12+00:00"^^xsd:dateTime ;
-    tg:checks <urn:pricing-demo:tech:object/gold_commercial_core.mips_mpr_executive_summary_fact>,
-        <urn:pricing-demo:tech:object/gold_commercial_core.mpr_mips_crack_spread_price_fact>,
-        <urn:pricing-demo:tech:object/ontology_definitions.crack_spread_definitions_vw>,
-        <urn:pricing-demo:tech:object/ontology_definitions.executive_summary_definitions_vw>,
-        <urn:pricing-demo:tech:object/ontology_definitions.measure_definitions_vw>,
-        <urn:pricing-demo:tech:object/semantic_sem_commercial.mips_mpr_benchmark_prices_fact_vw>,
-        <urn:pricing-demo:tech:object/semantic_sem_commercial.mips_mpr_executive_summary_fact_vw>,
-        <urn:pricing-demo:tech:object/semantic_sem_commercial.mpr_mips_crack_spread_price_fact_metrics_vw>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mips_price_assessment_group_dim>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mips_price_batch_dim>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mips_price_group_dim>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mips_price_sheet_dim>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mpr_price_master_dim>,
-        <urn:pricing-demo:tech:object/silver_udm_core.mips_price_assessment_fact>,
-        <urn:pricing-demo:tech:object/silver_udm_core.mpr_price_detail_fact> ;
+    tg:checks <urn:kpi-store-example:tech:object/gold_commercial_core.mips_mpr_executive_summary_fact>,
+        <urn:kpi-store-example:tech:object/gold_commercial_core.mpr_mips_crack_spread_price_fact>,
+        <urn:kpi-store-example:tech:object/ontology_definitions.crack_spread_definitions_vw>,
+        <urn:kpi-store-example:tech:object/ontology_definitions.executive_summary_definitions_vw>,
+        <urn:kpi-store-example:tech:object/ontology_definitions.measure_definitions_vw>,
+        <urn:kpi-store-example:tech:object/semantic_sem_commercial.mips_mpr_benchmark_prices_fact_vw>,
+        <urn:kpi-store-example:tech:object/semantic_sem_commercial.mips_mpr_executive_summary_fact_vw>,
+        <urn:kpi-store-example:tech:object/semantic_sem_commercial.mpr_mips_crack_spread_price_fact_metrics_vw>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_assessment_group_dim>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_batch_dim>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_group_dim>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_sheet_dim>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mpr_price_master_dim>,
+        <urn:kpi-store-example:tech:object/silver_udm_core.mips_price_assessment_fact>,
+        <urn:kpi-store-example:tech:object/silver_udm_core.mpr_price_detail_fact> ;
     tg:detail "no problem found" ;
     tg:name "built-objects-hold-rows" ;
-    tg:producedBy <urn:pricing-demo:tech:step/tech_graph-collect> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/tech_graph-collect> ;
     tg:result result:pass .
 
-<urn:pricing-demo:tech:check/databricks-reaches-neo4j> a tg:QualityCheck ;
+<urn:kpi-store-example:tech:check/databricks-reaches-neo4j> a tg:QualityCheck ;
     rdfs:label "A Databricks job reaches the Neo4j copy with the login in secret scope epm-neo4j"@en ;
     tg:checkedAt "2026-11-03T07:42:58+00:00"^^xsd:dateTime ;
-    tg:checks <urn:pricing-demo:tech:triples/epm_triples> ;
+    tg:checks <urn:kpi-store-example:tech:triples/epm_triples> ;
     tg:detail "bolt_query: ok; dns: ok; tcp_7687: ok" ;
     tg:name "databricks-reaches-neo4j" ;
-    tg:producedBy <urn:pricing-demo:tech:step/tech_graph-collect> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/tech_graph-collect> ;
     tg:result result:pass .
 
-<urn:pricing-demo:tech:check/designed-vs-observed-lineage> a tg:QualityCheck ;
+<urn:kpi-store-example:tech:check/designed-vs-observed-lineage> a tg:QualityCheck ;
     rdfs:label "Designed lineage matches Unity Catalog's observed lineage"@en ;
     tg:checkedAt "2026-11-03T07:44:24+00:00"^^xsd:dateTime ;
-    tg:checks <urn:pricing-demo:tech:object/gold_commercial_core.mips_mpr_executive_summary_fact>,
-        <urn:pricing-demo:tech:object/gold_commercial_core.mpr_mips_crack_spread_price_fact>,
-        <urn:pricing-demo:tech:object/replica_price_assessment.mips_currency>,
-        <urn:pricing-demo:tech:object/replica_price_assessment.mips_priceassessment>,
-        <urn:pricing-demo:tech:object/replica_price_assessment.mips_priceassessmentgroup>,
-        <urn:pricing-demo:tech:object/replica_price_assessment.mips_pricebatch>,
-        <urn:pricing-demo:tech:object/replica_price_assessment.mips_pricegroup>,
-        <urn:pricing-demo:tech:object/replica_price_assessment.mips_pricesheet>,
-        <urn:pricing-demo:tech:object/replica_price_assessment.mips_unitofmeasure>,
-        <urn:pricing-demo:tech:object/replica_price_reference.pricedetail>,
-        <urn:pricing-demo:tech:object/replica_price_reference.pricemaster>,
-        <urn:pricing-demo:tech:object/semantic_sem_commercial.mips_mpr_benchmark_prices_fact_vw>,
-        <urn:pricing-demo:tech:object/semantic_sem_commercial.mips_mpr_executive_summary_fact_vw>,
-        <urn:pricing-demo:tech:object/semantic_sem_commercial.mpr_mips_crack_spread_price_fact_metrics_vw>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mips_price_assessment_group_dim>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mips_price_batch_dim>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mips_price_group_dim>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mips_price_sheet_dim>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mpr_price_master_dim>,
-        <urn:pricing-demo:tech:object/silver_udm_core.mips_price_assessment_fact>,
-        <urn:pricing-demo:tech:object/silver_udm_core.mpr_price_detail_fact> ;
+    tg:checks <urn:kpi-store-example:tech:object/gold_commercial_core.mips_mpr_executive_summary_fact>,
+        <urn:kpi-store-example:tech:object/gold_commercial_core.mpr_mips_crack_spread_price_fact>,
+        <urn:kpi-store-example:tech:object/replica_price_assessment.mips_currency>,
+        <urn:kpi-store-example:tech:object/replica_price_assessment.mips_priceassessment>,
+        <urn:kpi-store-example:tech:object/replica_price_assessment.mips_priceassessmentgroup>,
+        <urn:kpi-store-example:tech:object/replica_price_assessment.mips_pricebatch>,
+        <urn:kpi-store-example:tech:object/replica_price_assessment.mips_pricegroup>,
+        <urn:kpi-store-example:tech:object/replica_price_assessment.mips_pricesheet>,
+        <urn:kpi-store-example:tech:object/replica_price_assessment.mips_unitofmeasure>,
+        <urn:kpi-store-example:tech:object/replica_price_reference.pricedetail>,
+        <urn:kpi-store-example:tech:object/replica_price_reference.pricemaster>,
+        <urn:kpi-store-example:tech:object/semantic_sem_commercial.mips_mpr_benchmark_prices_fact_vw>,
+        <urn:kpi-store-example:tech:object/semantic_sem_commercial.mips_mpr_executive_summary_fact_vw>,
+        <urn:kpi-store-example:tech:object/semantic_sem_commercial.mpr_mips_crack_spread_price_fact_metrics_vw>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_assessment_group_dim>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_batch_dim>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_group_dim>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_sheet_dim>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mpr_price_master_dim>,
+        <urn:kpi-store-example:tech:object/silver_udm_core.mips_price_assessment_fact>,
+        <urn:kpi-store-example:tech:object/silver_udm_core.mpr_price_detail_fact> ;
     tg:detail "26 edges match; 5 designed only; 0 observed only; 9 designed edges touch a table the demo does not build" ;
     tg:name "designed-vs-observed-lineage" ;
-    tg:producedBy <urn:pricing-demo:tech:step/tech_graph-collect> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/tech_graph-collect> ;
     tg:result result:differs .
 
-<urn:pricing-demo:tech:check/metric-views-tagged> a tg:QualityCheck ;
+<urn:kpi-store-example:tech:check/metric-views-tagged> a tg:QualityCheck ;
     rdfs:label "Every metric view carries its epm_measure_identifiers tag"@en ;
     tg:checkedAt "2026-11-03T07:44:12+00:00"^^xsd:dateTime ;
-    tg:checks <urn:pricing-demo:tech:object/semantic_sem_commercial.mips_mpr_benchmark_prices_fact_vw>,
-        <urn:pricing-demo:tech:object/semantic_sem_commercial.mips_mpr_executive_summary_fact_vw>,
-        <urn:pricing-demo:tech:object/semantic_sem_commercial.mpr_mips_crack_spread_price_fact_metrics_vw> ;
+    tg:checks <urn:kpi-store-example:tech:object/semantic_sem_commercial.mips_mpr_benchmark_prices_fact_vw>,
+        <urn:kpi-store-example:tech:object/semantic_sem_commercial.mips_mpr_executive_summary_fact_vw>,
+        <urn:kpi-store-example:tech:object/semantic_sem_commercial.mpr_mips_crack_spread_price_fact_metrics_vw> ;
     tg:detail "no problem found" ;
     tg:name "metric-views-tagged" ;
-    tg:producedBy <urn:pricing-demo:tech:step/tech_graph-collect> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/tech_graph-collect> ;
     tg:result result:pass .
 
-<urn:pricing-demo:tech:check/replica-matches-manifest> a tg:QualityCheck ;
+<urn:kpi-store-example:tech:check/replica-matches-manifest> a tg:QualityCheck ;
     rdfs:label "Each replica table holds the replica manifest's rows, all from its run"@en ;
     tg:checkedAt "2026-11-03T07:44:03+00:00"^^xsd:dateTime ;
-    tg:checks <urn:pricing-demo:tech:object/replica_price_assessment.mips_currency>,
-        <urn:pricing-demo:tech:object/replica_price_assessment.mips_priceassessment>,
-        <urn:pricing-demo:tech:object/replica_price_assessment.mips_priceassessmentgroup>,
-        <urn:pricing-demo:tech:object/replica_price_assessment.mips_pricebatch>,
-        <urn:pricing-demo:tech:object/replica_price_assessment.mips_pricegroup>,
-        <urn:pricing-demo:tech:object/replica_price_assessment.mips_pricesheet>,
-        <urn:pricing-demo:tech:object/replica_price_assessment.mips_unitofmeasure>,
-        <urn:pricing-demo:tech:object/replica_price_reference.pricedetail>,
-        <urn:pricing-demo:tech:object/replica_price_reference.pricemaster> ;
+    tg:checks <urn:kpi-store-example:tech:object/replica_price_assessment.mips_currency>,
+        <urn:kpi-store-example:tech:object/replica_price_assessment.mips_priceassessment>,
+        <urn:kpi-store-example:tech:object/replica_price_assessment.mips_priceassessmentgroup>,
+        <urn:kpi-store-example:tech:object/replica_price_assessment.mips_pricebatch>,
+        <urn:kpi-store-example:tech:object/replica_price_assessment.mips_pricegroup>,
+        <urn:kpi-store-example:tech:object/replica_price_assessment.mips_pricesheet>,
+        <urn:kpi-store-example:tech:object/replica_price_assessment.mips_unitofmeasure>,
+        <urn:kpi-store-example:tech:object/replica_price_reference.pricedetail>,
+        <urn:kpi-store-example:tech:object/replica_price_reference.pricemaster> ;
     tg:detail "no problem found" ;
     tg:name "replica-matches-manifest" ;
-    tg:producedBy <urn:pricing-demo:tech:step/tech_graph-collect> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/tech_graph-collect> ;
     tg:result result:pass .
 
-<urn:pricing-demo:tech:check/rows-labelled> a tg:QualityCheck ;
+<urn:kpi-store-example:tech:check/rows-labelled> a tg:QualityCheck ;
     rdfs:label "Every silver and gold row with a provenance column says real, spot-anchored or synthesized"@en ;
     tg:checkedAt "2026-11-03T07:44:17+00:00"^^xsd:dateTime ;
-    tg:checks <urn:pricing-demo:tech:object/gold_commercial_core.mips_mpr_executive_summary_fact>,
-        <urn:pricing-demo:tech:object/gold_commercial_core.mpr_mips_crack_spread_price_fact>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mips_price_assessment_group_dim>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mips_price_batch_dim>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mips_price_group_dim>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mips_price_sheet_dim>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mpr_price_master_dim>,
-        <urn:pricing-demo:tech:object/silver_udm_core.mips_price_assessment_fact>,
-        <urn:pricing-demo:tech:object/silver_udm_core.mpr_price_detail_fact> ;
+    tg:checks <urn:kpi-store-example:tech:object/gold_commercial_core.mips_mpr_executive_summary_fact>,
+        <urn:kpi-store-example:tech:object/gold_commercial_core.mpr_mips_crack_spread_price_fact>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_assessment_group_dim>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_batch_dim>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_group_dim>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_sheet_dim>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mpr_price_master_dim>,
+        <urn:kpi-store-example:tech:object/silver_udm_core.mips_price_assessment_fact>,
+        <urn:kpi-store-example:tech:object/silver_udm_core.mpr_price_detail_fact> ;
     tg:detail "no problem found" ;
     tg:name "rows-labelled" ;
-    tg:producedBy <urn:pricing-demo:tech:step/tech_graph-collect> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/tech_graph-collect> ;
     tg:result result:pass .
 
-<urn:pricing-demo:tech:check/source-systems-agree> a tg:QualityCheck ;
+<urn:kpi-store-example:tech:check/source-systems-agree> a tg:QualityCheck ;
     rdfs:label "Each replica schema's epm_source_system tag names the system README.md maps its database to"@en ;
     tg:checkedAt "2026-11-03T07:44:17+00:00"^^xsd:dateTime ;
-    tg:checks <urn:pricing-demo:tech:database/price_assessment>,
-        <urn:pricing-demo:tech:database/price_reference> ;
+    tg:checks <urn:kpi-store-example:tech:database/price_assessment>,
+        <urn:kpi-store-example:tech:database/price_reference> ;
     tg:detail "no problem found" ;
     tg:name "source-systems-agree" ;
-    tg:producedBy <urn:pricing-demo:tech:step/tech_graph-collect> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/tech_graph-collect> ;
     tg:result result:pass .
 
-<urn:pricing-demo:tech:orchestrator> a tg:Orchestrator ;
-    tg:name "Orchestrator (pricing_demo/supervisor.py)" ;
-    tg:producedBy <urn:pricing-demo:tech:step/supervisor-ask> ;
-    tg:routesTo <urn:pricing-demo:tech:agent/crack-spread-price-analytics>,
-        <urn:pricing-demo:tech:agent/executive-summary-kpis-analytics> .
+<urn:kpi-store-example:tech:orchestrator> a tg:Orchestrator ;
+    tg:name "Orchestrator (example_pipeline/supervisor.py)" ;
+    tg:producedBy <urn:kpi-store-example:tech:step/supervisor-ask> ;
+    tg:routesTo <urn:kpi-store-example:tech:agent/crack-spread-price-analytics>,
+        <urn:kpi-store-example:tech:agent/executive-summary-kpis-analytics> .
 
 <urn:example:technical-graph:product/example-data-product> a skos:Concept,
         dp:DataProduct ;
@@ -149,205 +149,205 @@
     dcterms:title "the decision of 2026-11-02, item 4: the technical-graph module's example graph, test data"@en ;
     ns1:evidenceTier <https://w3id.org/mpc/ontology/modules/authority/tier/process-authority> .
 
-<urn:pricing-demo:tech:agent/crack-spread-price-analytics> a tg:Agent ;
-    tg:binds <urn:pricing-demo:tech:object/ontology_definitions.crack_spread_definitions_vw>,
-        <urn:pricing-demo:tech:object/semantic_sem_commercial.mpr_mips_crack_spread_price_fact_metrics_vw> ;
+<urn:kpi-store-example:tech:agent/crack-spread-price-analytics> a tg:Agent ;
+    tg:binds <urn:kpi-store-example:tech:object/ontology_definitions.crack_spread_definitions_vw>,
+        <urn:kpi-store-example:tech:object/semantic_sem_commercial.mpr_mips_crack_spread_price_fact_metrics_vw> ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/agent/crack-spread-price-analytics> ;
     tg:name "Crack Spread Price Analytics" ;
-    tg:producedBy <urn:pricing-demo:tech:step/genie> .
+    tg:producedBy <urn:kpi-store-example:tech:step/genie> .
 
-<urn:pricing-demo:tech:agent/executive-summary-kpis-analytics> a tg:Agent ;
-    tg:binds <urn:pricing-demo:tech:object/ontology_definitions.executive_summary_definitions_vw>,
-        <urn:pricing-demo:tech:object/semantic_sem_commercial.mips_mpr_benchmark_prices_fact_vw>,
-        <urn:pricing-demo:tech:object/semantic_sem_commercial.mips_mpr_executive_summary_fact_vw> ;
+<urn:kpi-store-example:tech:agent/executive-summary-kpis-analytics> a tg:Agent ;
+    tg:binds <urn:kpi-store-example:tech:object/ontology_definitions.executive_summary_definitions_vw>,
+        <urn:kpi-store-example:tech:object/semantic_sem_commercial.mips_mpr_benchmark_prices_fact_vw>,
+        <urn:kpi-store-example:tech:object/semantic_sem_commercial.mips_mpr_executive_summary_fact_vw> ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/agent/executive-summary-kpis-analytics> ;
     tg:name "Executive Summary KPIs Analytics" ;
-    tg:producedBy <urn:pricing-demo:tech:step/genie> .
+    tg:producedBy <urn:kpi-store-example:tech:step/genie> .
 
-<urn:pricing-demo:tech:step/supervisor-ask> a tg:PipelineStep ;
-    tg:name "pricing_demo.supervisor ask" ;
+<urn:kpi-store-example:tech:step/supervisor-ask> a tg:PipelineStep ;
+    tg:name "example_pipeline.supervisor ask" ;
     tg:order 9 .
 
-<urn:pricing-demo:tech:host/pricing-demo-sources> a tg:Host ;
+<urn:kpi-store-example:tech:host/example-sources> a tg:Host ;
     rdfs:label "local database server"@en ;
-    tg:name "pricing-demo-sources" .
+    tg:name "example-sources" .
 
-<urn:pricing-demo:tech:object/ontology_definitions.crack_spread_definitions_vw> a tg:DefinitionsView ;
+<urn:kpi-store-example:tech:object/ontology_definitions.crack_spread_definitions_vw> a tg:DefinitionsView ;
     tg:definedIn "sql/06_definitions.sql" ;
     tg:lastRefresh "2026-11-03T07:25:21+00:00"^^xsd:dateTime ;
     tg:name "ontology_definitions.crack_spread_definitions_vw" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
-    tg:readsFrom <urn:pricing-demo:tech:object/ontology_definitions.measure_definitions_vw> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
+    tg:readsFrom <urn:kpi-store-example:tech:object/ontology_definitions.measure_definitions_vw> ;
     tg:rows 1.0 .
 
-<urn:pricing-demo:tech:object/ontology_definitions.executive_summary_definitions_vw> a tg:DefinitionsView ;
+<urn:kpi-store-example:tech:object/ontology_definitions.executive_summary_definitions_vw> a tg:DefinitionsView ;
     tg:definedIn "sql/06_definitions.sql" ;
     tg:lastRefresh "2026-11-03T07:25:22+00:00"^^xsd:dateTime ;
     tg:name "ontology_definitions.executive_summary_definitions_vw" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
-    tg:readsFrom <urn:pricing-demo:tech:object/ontology_definitions.measure_definitions_vw> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
+    tg:readsFrom <urn:kpi-store-example:tech:object/ontology_definitions.measure_definitions_vw> ;
     tg:rows 6.0 .
 
-<urn:pricing-demo:tech:step/load_postgres> a tg:PipelineStep ;
-    tg:name "pricing_demo.load_postgres" ;
+<urn:kpi-store-example:tech:step/load_postgres> a tg:PipelineStep ;
+    tg:name "example_pipeline.load_postgres" ;
     tg:order 1 .
 
-<urn:pricing-demo:tech:triples/epm_triples> a tg:Table ;
+<urn:kpi-store-example:tech:triples/epm_triples> a tg:Table ;
     tg:name "workspace.epm_ontology.epm_triples" .
 
-<urn:pricing-demo:tech:database/price_reference> a tg:SourceDatabase ;
+<urn:kpi-store-example:tech:database/price_reference> a tg:SourceDatabase ;
     tg:hidden false ;
-    tg:hostedOn <urn:pricing-demo:tech:host/pricing-demo-sources> ;
+    tg:hostedOn <urn:kpi-store-example:tech:host/example-sources> ;
     tg:name "price_reference" ;
-    tg:producedBy <urn:pricing-demo:tech:step/load_postgres> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/load_postgres> ;
     tg:rows 599280.0 ;
     tg:standsFor <https://w3id.org/mpc/ontology/modules/system/system/mpr> ;
     tg:tables 2.0 .
 
-<urn:pricing-demo:tech:object/ontology_definitions.measure_definitions_vw> a tg:DefinitionsView ;
+<urn:kpi-store-example:tech:object/ontology_definitions.measure_definitions_vw> a tg:DefinitionsView ;
     tg:definedIn "sql/06_definitions.sql" ;
     tg:lastRefresh "2026-11-03T07:25:20+00:00"^^xsd:dateTime ;
     tg:name "ontology_definitions.measure_definitions_vw" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
-    tg:readsFrom <urn:pricing-demo:tech:triples/epm_triples> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
+    tg:readsFrom <urn:kpi-store-example:tech:triples/epm_triples> ;
     tg:rows 33.0 .
 
-<urn:pricing-demo:tech:object/replica_price_assessment.mips_priceassessment> a tg:Table ;
-    tg:copies <urn:pricing-demo:tech:database/price_assessment> ;
+<urn:kpi-store-example:tech:object/replica_price_assessment.mips_priceassessment> a tg:Table ;
+    tg:copies <urn:kpi-store-example:tech:database/price_assessment> ;
     tg:definedIn "sql/02_replica.sql" ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/replica-mips-priceassessment> ;
     tg:lastRefresh "2026-11-03T07:22:36+00:00"^^xsd:dateTime ;
     tg:layer layer:replica ;
     tg:name "replica_price_assessment.mips_priceassessment" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
     tg:rows 266288.0 .
 
-<urn:pricing-demo:tech:object/replica_price_assessment.mips_priceassessmentgroup> a tg:Table ;
-    tg:copies <urn:pricing-demo:tech:database/price_assessment> ;
+<urn:kpi-store-example:tech:object/replica_price_assessment.mips_priceassessmentgroup> a tg:Table ;
+    tg:copies <urn:kpi-store-example:tech:database/price_assessment> ;
     tg:definedIn "sql/02_replica.sql" ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/replica-mips-priceassessmentgroup> ;
     tg:lastRefresh "2026-11-03T07:22:33+00:00"^^xsd:dateTime ;
     tg:layer layer:replica ;
     tg:name "replica_price_assessment.mips_priceassessmentgroup" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
     tg:rows 188.0 .
 
-<urn:pricing-demo:tech:object/replica_price_assessment.mips_pricebatch> a tg:Table ;
-    tg:copies <urn:pricing-demo:tech:database/price_assessment> ;
+<urn:kpi-store-example:tech:object/replica_price_assessment.mips_pricebatch> a tg:Table ;
+    tg:copies <urn:kpi-store-example:tech:database/price_assessment> ;
     tg:definedIn "sql/02_replica.sql" ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/replica-mips-pricebatch> ;
     tg:lastRefresh "2026-11-03T07:22:23+00:00"^^xsd:dateTime ;
     tg:layer layer:replica ;
     tg:name "replica_price_assessment.mips_pricebatch" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
     tg:rows 748.0 .
 
-<urn:pricing-demo:tech:object/replica_price_assessment.mips_pricegroup> a tg:Table ;
-    tg:copies <urn:pricing-demo:tech:database/price_assessment> ;
+<urn:kpi-store-example:tech:object/replica_price_assessment.mips_pricegroup> a tg:Table ;
+    tg:copies <urn:kpi-store-example:tech:database/price_assessment> ;
     tg:definedIn "sql/02_replica.sql" ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/replica-mips-pricegroup> ;
     tg:lastRefresh "2026-11-03T07:22:30+00:00"^^xsd:dateTime ;
     tg:layer layer:replica ;
     tg:name "replica_price_assessment.mips_pricegroup" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
     tg:rows 66.0 .
 
-<urn:pricing-demo:tech:object/replica_price_assessment.mips_pricesheet> a tg:Table ;
-    tg:copies <urn:pricing-demo:tech:database/price_assessment> ;
+<urn:kpi-store-example:tech:object/replica_price_assessment.mips_pricesheet> a tg:Table ;
+    tg:copies <urn:kpi-store-example:tech:database/price_assessment> ;
     tg:definedIn "sql/02_replica.sql" ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/replica-mips-pricesheet> ;
     tg:lastRefresh "2026-11-03T07:22:26+00:00"^^xsd:dateTime ;
     tg:layer layer:replica ;
     tg:name "replica_price_assessment.mips_pricesheet" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
     tg:rows 7.0 .
 
-<urn:pricing-demo:tech:object/replica_price_reference.pricedetail> a tg:Table ;
-    tg:copies <urn:pricing-demo:tech:database/price_reference> ;
+<urn:kpi-store-example:tech:object/replica_price_reference.pricedetail> a tg:Table ;
+    tg:copies <urn:kpi-store-example:tech:database/price_reference> ;
     tg:definedIn "sql/02_replica.sql" ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/replica-mpr-pricedetail> ;
     tg:lastRefresh "2026-11-03T07:22:44+00:00"^^xsd:dateTime ;
     tg:layer layer:replica ;
     tg:name "replica_price_reference.pricedetail" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
     tg:rows 599148.0 .
 
-<urn:pricing-demo:tech:object/replica_price_reference.pricemaster> a tg:Table ;
-    tg:copies <urn:pricing-demo:tech:database/price_reference> ;
+<urn:kpi-store-example:tech:object/replica_price_reference.pricemaster> a tg:Table ;
+    tg:copies <urn:kpi-store-example:tech:database/price_reference> ;
     tg:definedIn "sql/02_replica.sql" ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/replica-mpr-pricemaster> ;
     tg:lastRefresh "2026-11-03T07:22:40+00:00"^^xsd:dateTime ;
     tg:layer layer:replica ;
     tg:name "replica_price_reference.pricemaster" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
     tg:rows 132.0 .
 
-<urn:pricing-demo:tech:step/genie> a tg:PipelineStep ;
-    tg:name "pricing_demo.genie" ;
+<urn:kpi-store-example:tech:step/genie> a tg:PipelineStep ;
+    tg:name "example_pipeline.genie" ;
     tg:order 6 .
 
-<urn:pricing-demo:tech:object/gold_commercial_core.mips_mpr_executive_summary_fact> a tg:Table ;
+<urn:kpi-store-example:tech:object/gold_commercial_core.mips_mpr_executive_summary_fact> a tg:Table ;
     tg:definedIn "sql/04_gold.sql" ;
     tg:designedAs <urn:example:technical-graph:product/example-data-product> ;
     tg:lastRefresh "2026-11-03T07:25:03+00:00"^^xsd:dateTime ;
     tg:layer layer:gold ;
     tg:name "gold_commercial_core.mips_mpr_executive_summary_fact" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
-    tg:readsFrom <urn:pricing-demo:tech:object/silver_mdm_core.mips_price_assessment_group_dim>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mips_price_batch_dim>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mips_price_group_dim>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mips_price_sheet_dim>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mpr_price_master_dim>,
-        <urn:pricing-demo:tech:object/silver_udm_core.mips_price_assessment_fact> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
+    tg:readsFrom <urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_assessment_group_dim>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_batch_dim>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_group_dim>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_sheet_dim>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mpr_price_master_dim>,
+        <urn:kpi-store-example:tech:object/silver_udm_core.mips_price_assessment_fact> ;
     tg:rows 266288.0 .
 
-<urn:pricing-demo:tech:object/gold_commercial_core.mpr_mips_crack_spread_price_fact> a tg:Table ;
+<urn:kpi-store-example:tech:object/gold_commercial_core.mpr_mips_crack_spread_price_fact> a tg:Table ;
     tg:definedIn "sql/04_gold.sql" ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/gold-mpr-mips-crack-spread-price-fact> ;
     tg:lastRefresh "2026-11-03T07:24:59+00:00"^^xsd:dateTime ;
     tg:layer layer:gold ;
     tg:name "gold_commercial_core.mpr_mips_crack_spread_price_fact" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
-    tg:readsFrom <urn:pricing-demo:tech:object/silver_mdm_core.mips_price_assessment_group_dim>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mips_price_group_dim>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mips_price_sheet_dim>,
-        <urn:pricing-demo:tech:object/silver_mdm_core.mpr_price_master_dim>,
-        <urn:pricing-demo:tech:object/silver_udm_core.mpr_price_detail_fact> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
+    tg:readsFrom <urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_assessment_group_dim>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_group_dim>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_sheet_dim>,
+        <urn:kpi-store-example:tech:object/silver_mdm_core.mpr_price_master_dim>,
+        <urn:kpi-store-example:tech:object/silver_udm_core.mpr_price_detail_fact> ;
     tg:rows 569976.0 .
 
-<urn:pricing-demo:tech:object/replica_price_assessment.mips_currency> a tg:Table ;
-    tg:copies <urn:pricing-demo:tech:database/price_assessment> ;
+<urn:kpi-store-example:tech:object/replica_price_assessment.mips_currency> a tg:Table ;
+    tg:copies <urn:kpi-store-example:tech:database/price_assessment> ;
     tg:definedIn "sql/02_replica.sql" ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/replica-mips-currency> ;
     tg:lastRefresh "2026-11-03T07:22:16+00:00"^^xsd:dateTime ;
     tg:layer layer:replica ;
     tg:name "replica_price_assessment.mips_currency" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
     tg:rows 1.0 .
 
-<urn:pricing-demo:tech:object/replica_price_assessment.mips_unitofmeasure> a tg:Table ;
-    tg:copies <urn:pricing-demo:tech:database/price_assessment> ;
+<urn:kpi-store-example:tech:object/replica_price_assessment.mips_unitofmeasure> a tg:Table ;
+    tg:copies <urn:kpi-store-example:tech:database/price_assessment> ;
     tg:definedIn "sql/02_replica.sql" ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/replica-mips-unitofmeasure> ;
     tg:lastRefresh "2026-11-03T07:22:20+00:00"^^xsd:dateTime ;
     tg:layer layer:replica ;
     tg:name "replica_price_assessment.mips_unitofmeasure" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
     tg:rows 6.0 .
 
-<urn:pricing-demo:tech:object/semantic_sem_commercial.mips_mpr_benchmark_prices_fact_vw> a tg:MetricView ;
+<urn:kpi-store-example:tech:object/semantic_sem_commercial.mips_mpr_benchmark_prices_fact_vw> a tg:MetricView ;
     tg:definedIn "sql/05_metric_views.sql" ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/view-mips-mpr-benchmark-prices-fact-vw> ;
     tg:implements measure:crude-prices ;
     tg:lastRefresh "2026-11-03T07:25:17+00:00"^^xsd:dateTime ;
     tg:layer layer:metric-view ;
     tg:name "semantic_sem_commercial.mips_mpr_benchmark_prices_fact_vw" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
-    tg:readsFrom <urn:pricing-demo:tech:object/silver_mdm_core.mpr_price_master_dim>,
-        <urn:pricing-demo:tech:object/silver_udm_core.mpr_price_detail_fact> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
+    tg:readsFrom <urn:kpi-store-example:tech:object/silver_mdm_core.mpr_price_master_dim>,
+        <urn:kpi-store-example:tech:object/silver_udm_core.mpr_price_detail_fact> ;
     tg:rows 4056.0 .
 
-<urn:pricing-demo:tech:object/semantic_sem_commercial.mips_mpr_executive_summary_fact_vw> a tg:MetricView ;
+<urn:kpi-store-example:tech:object/semantic_sem_commercial.mips_mpr_executive_summary_fact_vw> a tg:MetricView ;
     tg:definedIn "sql/05_metric_views.sql" ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/view-mips-mpr-executive-summary-fact-vw> ;
     tg:implements measure:additional-market-prices,
@@ -359,110 +359,110 @@
     tg:lastRefresh "2026-11-03T07:25:16+00:00"^^xsd:dateTime ;
     tg:layer layer:metric-view ;
     tg:name "semantic_sem_commercial.mips_mpr_executive_summary_fact_vw" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
-    tg:readsFrom <urn:pricing-demo:tech:object/gold_commercial_core.mips_mpr_executive_summary_fact> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
+    tg:readsFrom <urn:kpi-store-example:tech:object/gold_commercial_core.mips_mpr_executive_summary_fact> ;
     tg:rows 266288.0 .
 
-<urn:pricing-demo:tech:object/semantic_sem_commercial.mpr_mips_crack_spread_price_fact_metrics_vw> a tg:MetricView ;
+<urn:kpi-store-example:tech:object/semantic_sem_commercial.mpr_mips_crack_spread_price_fact_metrics_vw> a tg:MetricView ;
     tg:definedIn "sql/05_metric_views.sql" ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/view-mpr-mips-crack-spread-price-fact-metrics-vw> ;
     tg:implements measure:crack-spreads ;
     tg:lastRefresh "2026-11-03T07:25:15+00:00"^^xsd:dateTime ;
     tg:layer layer:metric-view ;
     tg:name "semantic_sem_commercial.mpr_mips_crack_spread_price_fact_metrics_vw" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
-    tg:readsFrom <urn:pricing-demo:tech:object/gold_commercial_core.mpr_mips_crack_spread_price_fact> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
+    tg:readsFrom <urn:kpi-store-example:tech:object/gold_commercial_core.mpr_mips_crack_spread_price_fact> ;
     tg:rows 569976.0 .
 
-<urn:pricing-demo:tech:object/silver_mdm_core.mips_price_batch_dim> a tg:Table ;
+<urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_batch_dim> a tg:Table ;
     tg:definedIn "sql/03_silver.sql" ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/silver-mips-price-batch-dim> ;
     tg:lastRefresh "2026-11-03T07:24:04+00:00"^^xsd:dateTime ;
     tg:layer layer:silver ;
     tg:name "silver_mdm_core.mips_price_batch_dim" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
-    tg:readsFrom <urn:pricing-demo:tech:object/replica_price_assessment.mips_pricebatch> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
+    tg:readsFrom <urn:kpi-store-example:tech:object/replica_price_assessment.mips_pricebatch> ;
     tg:rows 748.0 .
 
-<urn:pricing-demo:tech:object/silver_udm_core.mips_price_assessment_fact> a tg:Table ;
+<urn:kpi-store-example:tech:object/silver_udm_core.mips_price_assessment_fact> a tg:Table ;
     tg:definedIn "sql/03_silver.sql" ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/silver-mips-price-assessment-fact> ;
     tg:lastRefresh "2026-11-03T07:24:17+00:00"^^xsd:dateTime ;
     tg:layer layer:silver ;
     tg:name "silver_udm_core.mips_price_assessment_fact" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
-    tg:readsFrom <urn:pricing-demo:tech:object/replica_price_assessment.mips_priceassessment> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
+    tg:readsFrom <urn:kpi-store-example:tech:object/replica_price_assessment.mips_priceassessment> ;
     tg:rows 266288.0 .
 
-<urn:pricing-demo:tech:object/silver_mdm_core.mips_price_assessment_group_dim> a tg:Table ;
+<urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_assessment_group_dim> a tg:Table ;
     tg:definedIn "sql/03_silver.sql" ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/silver-mips-price-assessment-group-dim> ;
     tg:lastRefresh "2026-11-03T07:24:12+00:00"^^xsd:dateTime ;
     tg:layer layer:silver ;
     tg:name "silver_mdm_core.mips_price_assessment_group_dim" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
-    tg:readsFrom <urn:pricing-demo:tech:object/replica_price_assessment.mips_currency>,
-        <urn:pricing-demo:tech:object/replica_price_assessment.mips_priceassessmentgroup>,
-        <urn:pricing-demo:tech:object/replica_price_assessment.mips_unitofmeasure> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
+    tg:readsFrom <urn:kpi-store-example:tech:object/replica_price_assessment.mips_currency>,
+        <urn:kpi-store-example:tech:object/replica_price_assessment.mips_priceassessmentgroup>,
+        <urn:kpi-store-example:tech:object/replica_price_assessment.mips_unitofmeasure> ;
     tg:rows 188.0 .
 
-<urn:pricing-demo:tech:object/silver_mdm_core.mips_price_group_dim> a tg:Table ;
+<urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_group_dim> a tg:Table ;
     tg:definedIn "sql/03_silver.sql" ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/silver-mips-price-group-dim> ;
     tg:lastRefresh "2026-11-03T07:24:09+00:00"^^xsd:dateTime ;
     tg:layer layer:silver ;
     tg:name "silver_mdm_core.mips_price_group_dim" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
-    tg:readsFrom <urn:pricing-demo:tech:object/replica_price_assessment.mips_pricegroup> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
+    tg:readsFrom <urn:kpi-store-example:tech:object/replica_price_assessment.mips_pricegroup> ;
     tg:rows 66.0 .
 
-<urn:pricing-demo:tech:object/silver_mdm_core.mips_price_sheet_dim> a tg:Table ;
+<urn:kpi-store-example:tech:object/silver_mdm_core.mips_price_sheet_dim> a tg:Table ;
     tg:definedIn "sql/03_silver.sql" ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/silver-mips-price-sheet-dim> ;
     tg:lastRefresh "2026-11-03T07:24:07+00:00"^^xsd:dateTime ;
     tg:layer layer:silver ;
     tg:name "silver_mdm_core.mips_price_sheet_dim" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
-    tg:readsFrom <urn:pricing-demo:tech:object/replica_price_assessment.mips_currency>,
-        <urn:pricing-demo:tech:object/replica_price_assessment.mips_pricesheet>,
-        <urn:pricing-demo:tech:object/replica_price_assessment.mips_unitofmeasure> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
+    tg:readsFrom <urn:kpi-store-example:tech:object/replica_price_assessment.mips_currency>,
+        <urn:kpi-store-example:tech:object/replica_price_assessment.mips_pricesheet>,
+        <urn:kpi-store-example:tech:object/replica_price_assessment.mips_unitofmeasure> ;
     tg:rows 7.0 .
 
-<urn:pricing-demo:tech:object/silver_udm_core.mpr_price_detail_fact> a tg:Table ;
+<urn:kpi-store-example:tech:object/silver_udm_core.mpr_price_detail_fact> a tg:Table ;
     tg:definedIn "sql/03_silver.sql" ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/silver-mpr-price-detail-fact> ;
     tg:lastRefresh "2026-11-03T07:24:15+00:00"^^xsd:dateTime ;
     tg:layer layer:silver ;
     tg:name "silver_udm_core.mpr_price_detail_fact" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
-    tg:readsFrom <urn:pricing-demo:tech:object/replica_price_reference.pricedetail> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
+    tg:readsFrom <urn:kpi-store-example:tech:object/replica_price_reference.pricedetail> ;
     tg:rows 599148.0 .
 
-<urn:pricing-demo:tech:object/silver_mdm_core.mpr_price_master_dim> a tg:Table ;
+<urn:kpi-store-example:tech:object/silver_mdm_core.mpr_price_master_dim> a tg:Table ;
     tg:definedIn "sql/03_silver.sql" ;
     tg:designedAs <https://w3id.org/mpc/ontology/modules/data-product/table/silver-mpr-price-master-dim> ;
     tg:lastRefresh "2026-11-03T07:24:02+00:00"^^xsd:dateTime ;
     tg:layer layer:silver ;
     tg:name "silver_mdm_core.mpr_price_master_dim" ;
-    tg:producedBy <urn:pricing-demo:tech:step/databricks-build> ;
-    tg:readsFrom <urn:pricing-demo:tech:object/replica_price_reference.pricemaster> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/databricks-build> ;
+    tg:readsFrom <urn:kpi-store-example:tech:object/replica_price_reference.pricemaster> ;
     tg:rows 132.0 .
 
-<urn:pricing-demo:tech:step/tech_graph-collect> a tg:PipelineStep ;
-    tg:name "pricing_demo.tech_graph collect" ;
+<urn:kpi-store-example:tech:step/tech_graph-collect> a tg:PipelineStep ;
+    tg:name "example_pipeline.tech_graph collect" ;
     tg:order 13 .
 
-<urn:pricing-demo:tech:database/price_assessment> a tg:SourceDatabase ;
+<urn:kpi-store-example:tech:database/price_assessment> a tg:SourceDatabase ;
     tg:hidden false ;
-    tg:hostedOn <urn:pricing-demo:tech:host/pricing-demo-sources> ;
+    tg:hostedOn <urn:kpi-store-example:tech:host/example-sources> ;
     tg:name "price_assessment" ;
-    tg:producedBy <urn:pricing-demo:tech:step/load_postgres> ;
+    tg:producedBy <urn:kpi-store-example:tech:step/load_postgres> ;
     tg:rows 267304.0 ;
     tg:standsFor <https://w3id.org/mpc/ontology/modules/system/system/mips> ;
     tg:tables 7.0 .
 
-<urn:pricing-demo:tech:step/databricks-build> a tg:PipelineStep ;
-    tg:name "pricing_demo.databricks build" ;
-    tg:next <urn:pricing-demo:tech:step/genie> ;
+<urn:kpi-store-example:tech:step/databricks-build> a tg:PipelineStep ;
+    tg:name "example_pipeline.databricks build" ;
+    tg:next <urn:kpi-store-example:tech:step/genie> ;
     tg:order 5 .
 

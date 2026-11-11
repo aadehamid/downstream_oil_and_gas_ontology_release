@@ -216,7 +216,7 @@ class Config(Base):
 
     def test_the_template_reads(self):
         cfg = rp.read_config(os.path.join(os.path.dirname(HERE), "templates", "run-config.json"))
-        self.assertEqual(cfg["out"], os.path.expanduser("~/lpg-out/library"))
+        self.assertEqual(cfg["out"], os.path.join(os.path.expanduser("~"), "lpg-out", "library"))
         self.assertEqual((cfg["mode"], cfg["rebuild"]["source"]), ("files", "jena"))
 
     def test_without_a_mode_the_user_is_asked_to_choose(self):

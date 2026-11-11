@@ -45,16 +45,15 @@ Each module package has three graphs: `<module>.ttl` (the content), `shapes.ttl`
 
 Run it after any input or shape changes. You need [uv](https://docs.astral.sh/uv/), Java 11 or later ([ROBOT's Getting Started](https://robot.obolibrary.org/): "make sure you have Java 11 or later installed"), and a local Neo4j 2025.06.2 that already runs with the n10s and APOC Core jars in its `plugins` folder. The driver starts and stops no server. It is in the `ontology-to-lpg` skill, in the `scripts/` folder of `$SKILLS/ontology-to-lpg`; the skill's `references/running.md`, rule 5, says how to prepare the Neo4j server, and the `rdf-store` skill's `references/stores.md` says how to start Fuseki from the Apache jar.
 
-1. Download ROBOT 1.9.10 (it runs the ELK reasoner), and check its SHA-256. If the checksum differs, stop: the driver refuses another file.
+1. Download ROBOT 1.9.10 (it runs the ELK reasoner) into a folder outside the repository, and check its SHA-256. If the checksum differs, stop: the driver refuses another file. On Windows, check it with `certutil -hashfile robot.jar SHA256`.
 
    ```bash
-   mkdir -p ~/epm-lpg; ROBOT=~/epm-lpg/robot.jar
-   curl -L -o "$ROBOT" https://github.com/ontodev/robot/releases/download/v1.9.10/robot.jar
-   shasum -a 256 "$ROBOT"
+   curl -L -o robot.jar https://github.com/ontodev/robot/releases/download/v1.9.10/robot.jar
+   shasum -a 256 robot.jar
    # expect 16a73c074f3df359a7338a84b4e0788785fe06117f931bb9796e9619ea776105
    ```
 
-2. Copy `skill-run/epm-run.json` to a folder outside the repository and add the keys that name your stores (`skill-run/README.md` lists them). Then run the driver with the copy. It checks, reasons, empties and loads the local Neo4j, writes the release records, and runs each further step whose key the copy holds: the copy to the named database, the Jena round trip, the walks and the rebuild. `--plan` lists the steps first and runs nothing.
+2. Copy `skill-run/epm-run.json` to a folder outside the repository, set `robot_jar` to the jar's path and `out` to your output folder, and add the keys that name your stores (`skill-run/README.md` lists them). Then run the driver with the copy. It checks, reasons, empties and loads the local Neo4j, writes the release records, and runs each further step whose key the copy holds: the copy to the named database, the Jena round trip, the walks and the rebuild. `--plan` lists the steps first and runs nothing.
 
    ```bash
    cd "$SKILLS/ontology-to-lpg/scripts"
@@ -65,7 +64,7 @@ Run it after any input or shape changes. You need [uv](https://docs.astral.sh/uv
 3. Take the result into this folder, from this folder. It refuses a run that read other inputs than this tree's, or whose report did not pass. Commit `inferred.nt`, the manifest and the report together.
 
    ```bash
-   uv run --with rdflib --with pyshacl python pipeline.py record --run ~/lpg-out/epm
+   uv run --with rdflib --with pyshacl python pipeline.py record --run <your output folder>
    ```
 
 4. Load the logical models, then write the Neo4j marker. `mark` checks the database against this tree first and stops, writing nothing, when it does not match.

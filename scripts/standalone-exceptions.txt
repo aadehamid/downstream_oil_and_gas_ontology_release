@@ -34,3 +34,10 @@ skills/ontology-to-lpg/scripts/test_engine_gate.py :: removed-docker :: docker :
 skills/ontology-to-lpg/scripts/test_projection.py :: removed-aura :: aura :: 1 :: the test names the word to prove the skill no longer holds it
 skills/ontology-to-lpg/scripts/test_projection.py :: removed-docker :: docker :: 1 :: the test names the word to prove the skill no longer holds it
 skills/rdf-store/scripts/test_rdf_store.py :: removed-docker :: docker :: 1 :: the test names the word to prove the skill no longer holds it
+business_architecture/ontology/projection/skill-run/epm-run.json :: home-path :: ~/lpg-out/epm :: 1 :: the run configuration's default output folder, which must sit outside the repository; a test pins it and each user's copy replaces it
+business_architecture/ontology/projection/skill-run/epm-run.json :: home-path :: ~/epm-lpg/robot.jar :: 1 :: the run configuration's default place for the ROBOT jar, outside the repository; a test pins it and each user's copy replaces it
+skills/ontology-to-lpg/templates/run-config.json :: home-path :: ~/lpg-out/library :: 1 :: the skill template's example output folder; the driver expands it on any system and a test pins it
+skills/ontology-to-lpg/templates/run-config.json :: home-path :: ~/lpg-out/library-rebuild :: 1 :: the skill template's example rebuild folder
+skills/ontology-to-lpg/templates/run-config.json :: home-path :: ~/tools/robot-1.9.10.jar :: 1 :: the skill template's example place for the ROBOT jar
+skills/ontology-to-lpg/templates/run-config.json :: home-path :: ~/.config/neo4j/local.env :: 1 :: the skill template's example env file, kept outside the repository
+skills/ontology-to-lpg/templates/run-config.json :: home-path :: ~/.config/neo4j/target.env :: 1 :: the skill template's example env file for the copy's target

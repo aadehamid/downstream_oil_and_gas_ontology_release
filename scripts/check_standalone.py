@@ -10,8 +10,9 @@ documents must no longer mention. Public sources and licences stay; GitHub links
 list of the public projects the tree cites (GITHUB_OWNERS).
 
 scripts/standalone-pending.txt lists the paths that are not clean yet, one glob and its reason per line. The
-check skips those paths, and it fails when a glob matches no file or matches only clean files, so the list can
-only shrink. --strict ignores the list; the final cut must pass with --strict.
+check skips those paths. The list can only shrink: a line must be one of ALLOWED_PENDING below, and the check
+fails when a line matches no file or matches only clean files. --strict ignores the list; the final cut must pass
+with --strict.
 
 scripts/standalone-exceptions.txt lists the matches that stay, each with its reason: text in a released package,
 which never changes after its release, and a word a file must name in order to forbid or record it. An exception
@@ -31,6 +32,17 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PENDING = os.path.join("scripts", "standalone-pending.txt")
 EXCEPTIONS = os.path.join("scripts", "standalone-exceptions.txt")
+# The only lines the pending list may hold. A change may delete a line of the list, and then deletes it here too.
+# No line may be added or widened: a new document must be clean when it arrives.
+ALLOWED_PENDING = (
+    "README.md",
+    "KNOWN-OPEN-ITEMS.md",
+    "HOW-TO-UPDATE.*",
+    "business_architecture/ontology/epm-walkthrough.html",
+    "business_architecture/ontology/epm-ontology-guide.html",
+    "viewer/index.html",
+    "horoi_viewer/index.html",
+)
 # These files state the deny list, hold one failing line per rule, or quote the excepted text, so they cannot pass it.
 OWN_FILES = {"scripts/check_standalone.py", "scripts/test_check_standalone.py", "scripts/standalone-exceptions.txt"}
 
@@ -49,7 +61,15 @@ _COLOUR = re.compile(r"""(?:(?<=[:"'=])|(?<=:\s)|(?<=\bsolid\s)|(?<=\bdashed\s)|
 # A grade of fuel oil or diesel is written with a number sign (#2 diesel, diesel #2, No. #6 fuel oil).
 _FUEL_GRADE = re.compile(r"\#[1-6](?=\s+(?:diesel|fuel|heating|oil|distillate)\b)|(?<=diesel\s)\#[1-6]\b|(?<=oil\s)\#[1-6]\b", re.I)
 _NUMBER_SIGN = re.compile(r"(?<![&\w/#])\#\d+\b(?![\w-])")
-_GITHUB = re.compile(r"(?<![\w.-])(?:raw\.githubusercontent|github)\.com/([A-Za-z0-9_.-]+)", re.I)
+# Every way a line names a GitHub owner: a web link (with or without www), a raw or gist link, the API's repos
+# path, and an SSH remote (git@github.com:<owner>/..., ssh://git@github.com/<owner>/...). docs.github.com is the
+# public manual and names no owner.
+_GITHUB = re.compile(r"(?<![\w.-])(?:(?:www\.|gist\.)?github\.com[/:]|(?:raw|gist)\.githubusercontent\.com/"
+                     r"|api\.github\.com/repos/)([A-Za-z0-9_.-]+)", re.I)
+# A path under one person's account. An absolute one names the person; a home path leads outside the tree.
+_USER_PATH = re.compile(r"(?<![\w./~-])/(?:Users|home)/[A-Za-z0-9._-]+(?=/|\b)|\b[A-Za-z]:\\{1,2}Users\\{1,2}[A-Za-z0-9._-]+")
+_HOME_PATH = re.compile(r"""(?<![\w/.-])~/(?:[^\s"'`<>)\],;]*[^\s"'`<>)\],;.:])?"""
+                        r"""|\$HOME\b(?:[^\s"'`<>)\],;]*[^\s"'`<>)\],;.:])?|\$\{HOME\}|%USERPROFILE%""")
 
 
 def _number_sign(line):
@@ -65,16 +85,17 @@ def _github(line):
 
 
 # A public project's own issue or pull request, cited as a source, is named with the project ("OEO issue 1958",
-# "rdflib issue 3524") or is followed at once by its link on an allowed owner's GitHub ("PR 361, https://github.com/...").
+# "rdflib issue 3524") or is followed at once by the link to that same number on an allowed owner's GitHub
+# ("PR 361, https://github.com/<owner>/<repository>/pull/361").
 _NUMBERED = re.compile(r"\b(?:PRs?|[Pp]ull [Rr]equests?|[Ii]ssues?)\s+\#?\d+\b")
 _PUBLIC_ISSUE = re.compile(r"\b(?:OEO|rdflib|neosemantics) (issue \d+)\b")
-_LINKED_ISSUE = re.compile(r"\b((?:PR|[Ii]ssue) \d+), https://github\.com/([A-Za-z0-9_.-]+)/")
+_LINKED_ISSUE = re.compile(r"\b((?:PR|[Ii]ssue) (\d+)), https://github\.com/([A-Za-z0-9_.-]+)/[A-Za-z0-9_.-]+/(?:issues|pull)/\2(?!\d)")
 
 
 def _numbered_item(line):
     """Each "PR 123", "pull request 123" or "issue 45", except a public project's issue cited as a source."""
     spared = [m.span(1) for m in _PUBLIC_ISSUE.finditer(line)]
-    spared += [m.span(1) for m in _LINKED_ISSUE.finditer(line) if m.group(2).lower() in GITHUB_OWNERS]
+    spared += [m.span(1) for m in _LINKED_ISSUE.finditer(line) if m.group(3).lower() in GITHUB_OWNERS]
     return [m for m in _NUMBERED.finditer(line) if not any(a <= m.start() < b for a, b in spared)]
 
 
@@ -95,7 +116,9 @@ RULES = [
      _numbered_item),
     ("decision-record", "a decision record kept elsewhere", _regex(r"EPM-DEC-")),
     ("session", "a session or a handoff folder", _regex(r"~/\.claude|(?<![\w-])\.claude/|\bhandoffs?/|\bhandoff folder", re.I)),
-    ("removed-demo", "the removed demo", _regex(r"(?<![\w-])demos/|\bpricing demo\b", re.I)),
+    ("user-path", "a path under one person's account: /Users/<name>, /home/<name>, C:\\Users\\<name>", _regex(_USER_PATH.pattern)),
+    ("home-path", "a path under the home folder (~/, $HOME, %USERPROFILE%), which leads outside the tree", _regex(_HOME_PATH.pattern)),
+    ("removed-demo", "the removed demo", _regex(r"(?<![\w-])demos/|\bpricing[ _-]demo\b|(?<![A-Za-z])pricing_demo(?![A-Za-z])", re.I)),
     ("removed-aura", "the removed AuraDB copy", _regex(r"\baura(?:db)?\b", re.I)),
     ("removed-docker", "the removed Docker stores", _regex(r"docker", re.I)),
     ("removed-token", "the removed token connector", _regex(r"\baccess tokens?\b|DATABRICKS_TOKEN", re.I)),
@@ -156,6 +179,8 @@ def read_pending(root=ROOT):
             glob, sep, reason = (part.strip() for part in line.partition(" :: "))
             if not sep or not glob or not reason:
                 problems.append(f"{PENDING}:{number}: write `<glob> :: <reason>`")
+            elif glob not in ALLOWED_PENDING:
+                problems.append(f"{PENDING}:{number}: `{glob}` is not a path the list may hold; the list can only shrink")
             else:
                 entries.append((glob, reason))
     if problems:

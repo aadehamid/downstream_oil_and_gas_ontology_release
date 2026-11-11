@@ -5,7 +5,7 @@ needs no database:
 
     python3 pipeline.py build                    # check the rules, validate, write projection-manifest.json
     python3 pipeline.py build --verify           # fail unless the manifest matches a fresh build
-    python3 pipeline.py record --run ~/lpg-out/epm   # after a driver run on these inputs: take its inferred.nt and a summary
+    python3 pipeline.py record --run <output folder>   # after a driver run on these inputs: take its inferred.nt and a summary
                                                  # of its report into this folder, then rewrite the manifest
 
 Commit inferred.nt, projection-manifest.json and projection-report.json together. Turtle stays the master copy; Neo4j

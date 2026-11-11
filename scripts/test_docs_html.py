@@ -206,7 +206,7 @@ def test_each_credential_shape_is_caught(canary):
     assert credentials(canary) != []
 
 
-@pytest.mark.parametrize("text", ["the password is in ~/epm-lpg/run.env", "--password <password>",
+@pytest.mark.parametrize("text", ["the password is in <settings folder>/run.env", "--password <password>",
                                   "NEO4J_PASSWORD=%s", "token: see the env file", "a skill-version"])
 def test_prose_and_placeholders_are_not_credentials(text):
     assert credentials(text) == []

@@ -6,7 +6,7 @@ The `ontology-to-lpg` skill's `run_projection.py` (version 2.3 of its method) ru
 
 | File | What it is |
 |---|---|
-| `epm-run.json` | The run configuration: releases mode, the inputs from `inputs.py`, each release's `shapes` and `catalog` graphs, the saved walks, and one underscore as the separator. Outputs go to `~/lpg-out/`, outside the repository. It names no store address: `environment.example` lists those settings. |
+| `epm-run.json` | The run configuration: releases mode, the inputs from `inputs.py`, each release's `shapes` and `catalog` graphs, the saved walks, and one underscore as the separator. Its `out` and `robot_jar` are defaults under the home folder, outside the repository; set both in your copy. It names no store address: `environment.example` lists those settings. |
 | `inputs.py` | The one input list. It imports `INPUTS`, `SHAPES` and `PACKAGES` from `../pipeline.py` and prints them as absolute paths (`data`, `shapes`, `releases`). Importing `pipeline.py` runs nothing: its `main()` runs only when the file is run as a script. |
 | `epm-config.json` | The skill's projection configuration for these inputs: Rule 4a, the module namespaces and prefixes, the qualified-relation classes, the package versions (equal to `PACKAGES`) and one release exception: `tg:designedAs` has no range, on purpose (technical-graph 1.0.0, 2026-11-02; the decision of 2026-11-02). |
 | `queries.json` | The 14 saved walks the explore step compares in Neo4j and Jena: one from each kind of node a module holds as instances (technical-graph holds none: its vocabulary has no instances), plus a process across modules, a value stream end to end and a measure back to its processes. |
