@@ -44,17 +44,18 @@ class Result:
         return None
 
 
-def owns(labels, props, bases):
+def owns(labels, props, params):
     """Whether a node is the KPI Store's, written out by hand for the stand-in database: the label and what only
     the KPI Store's load writes on such a node."""
     def under(value):
-        return isinstance(value, str) and any(value.startswith(b) for b in bases)
-    return bool(("Resource" in labels and props.get("uri") is not None and under(props.get("graph")))
+        return isinstance(value, str) and any(value.startswith(b) for b in params["bases"])
+    projected = all(label == "Resource" or label.startswith(tuple(params["prefixes"])) for label in labels)
+    return bool(("Resource" in labels and props.get("uri") is not None and under(props.get("graph")) and projected)
                 or ("ModuleRelease" in labels and under(props.get("version_iri")))
                 or ("Module" in labels and under(props.get("uri")))
-                or ("EpmStoreMarker" in labels and props.get("store") is not None and props.get("catalog_digest") is not None)
+                or ("EpmStoreMarker" in labels and props.get("store") == params["store"] and props.get("catalog_digest") is not None)
                 or ("LogicalModel" in labels and props.get("uri") is not None and (props.get("models") is not None or props.get("slug") is not None))
-                or ("LogicalModelMarker" in labels and props.get("digest") is not None and props.get("store") is not None))
+                or ("LogicalModelMarker" in labels and props.get("store") == params["store"] and props.get("digest") is not None))
 
 
 class FakeNeo4j:
@@ -97,14 +98,14 @@ class FakeNeo4j:
         if text.startswith("MATCH (n) WITH labels(n) AS labels, coalesce((n:Resource AND ") and text.endswith("RETURN own, labels, count(*) AS n"):
             groups = {}
             for labels, props in self.nodes:
-                key = (owns(labels, props, params["bases"]), tuple(labels))
+                key = (owns(labels, props, params), tuple(labels))
                 groups[key] = groups.get(key, 0) + 1
             return Result([{"own": own, "labels": list(labels), "n": n} for (own, labels), n in groups.items()])
         if text.startswith("MATCH (n) WHERE NOT coalesce((n:Resource AND ") and text.endswith("LIMIT 5"):
-            foreign = [(l, p) for l, p in self.nodes if not owns(l, p, params["bases"])]
+            foreign = [(l, p) for l, p in self.nodes if not owns(l, p, params)]
             return Result([{"labels": list(l), "uri": p.get("uri")} for l, p in foreign[:5]])
         if text.startswith("MATCH (n) WHERE coalesce((n:Resource AND ") and text.endswith("CALL (n) { DETACH DELETE n } IN TRANSACTIONS OF 1000 ROWS"):
-            self.nodes = [(l, p) for l, p in self.nodes if not owns(l, p, params["bases"])]
+            self.nodes = [(l, p) for l, p in self.nodes if not owns(l, p, params)]
             return Result([])
         if text == "MATCH (n) RETURN count(n) AS n":
             return Result([{"n": len(self.nodes)}])

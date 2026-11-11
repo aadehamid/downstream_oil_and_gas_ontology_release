@@ -89,18 +89,32 @@ def test_a_refused_statement_never_reaches_the_session_or_a_transaction():
 # ---- what the target holds, and the decision -------------------------------------------------------
 
 BASES = ["https://w3id.org/mpc/ontology/modules/data-product/", "https://w3id.org/mpc/ontology/modules/kpi/"]
+PARAMS = {"bases": BASES, "store": "enterprise", "prefixes": ["dp_", "n4sch_", "owl_", "skos_"]}
+KPI_TAG = "https://w3id.org/mpc/ontology/modules/kpi/1.0.0"
+
+
+def held_target(hash_="hash-1"):
+    """The target database as an earlier copy left it: the graph, and this copy's own marker."""
+    db = graph(hash_=hash_, store="enterprise")
+    db.name, db.ident = TARGET, "db-2"
+    return db
+
+
+def test_the_rules_read_the_module_iris_the_store_name_and_the_projections_label_prefixes():
+    assert ce.own_params(BASES, ["skos", "owl", "dp"]) == PARAMS
 
 
 def test_holdings_tell_the_kpi_stores_nodes_from_the_others():
-    db = graph()
+    db = held_target()
+    db.add(["Resource", "skos_Concept", "n4sch_Class"], uri="urn:sample:concept", graph=KPI_TAG)   # a projected node's labels
     db.add(["LogicalModel", "Entity"], 4, uri="urn:sample:entity", models=["sample-model"])
-    assert ce.holdings(db, BASES) == {"nodes": 12, "own": {"Resource": 5, "ModuleRelease": 2, "EpmStoreMarker": 1, "LogicalModel": 4},
+    assert ce.holdings(db, PARAMS) == {"nodes": 13, "own": {"Resource": 6, "ModuleRelease": 2, "EpmStoreMarker": 1, "LogicalModel": 4},
                                       "foreign": {}, "foreign_nodes": 0, "foreign_examples": []}
     db.add(["Invoice"], 2)
     db.add(["Invoice", "Paid"])
     db.add([])
-    held = ce.holdings(db, BASES)
-    assert (held["nodes"], held["foreign_nodes"]) == (16, 4)
+    held = ce.holdings(db, PARAMS)
+    assert (held["nodes"], held["foreign_nodes"]) == (17, 4)
     assert held["foreign"] == {"Invoice": 3, "Paid": 1, "(no label)": 1}
 
 
@@ -114,26 +128,46 @@ def test_holdings_tell_the_kpi_stores_nodes_from_the_others():
     (["EpmStoreMarker"], {"store": "enterprise"}),
     (["LogicalModel"], {"name": "someone else's model"}),
     (["LogicalModelMarker"], {"store": "enterprise"}),
+    # A marker of another store, although it has a marker's fields.
+    (["EpmStoreMarker"], {"store": "neo4j", "catalog_digest": "abc"}),
+    (["LogicalModelMarker"], {"store": "neo4j", "digest": "abc"}),
+    # The release's own tag and a uri, on a node with a label the projection never gives.
+    (["Resource", "Customer"], {"uri": "urn:external:item", "graph": KPI_TAG}),
+    (["Resource", "skos_Concept", "Customer"], {"uri": "urn:external:item", "graph": KPI_TAG}),
 ])
 def test_a_node_that_only_shares_a_label_with_the_kpi_store_is_foreign_and_survives_a_replace(labels, props):
-    db = graph()
+    db = held_target()
     db.add(labels, **props)
     db.add(["Account"], id=7)   # the foreign node's neighbour
-    held = ce.holdings(db, BASES)
+    held = ce.holdings(db, PARAMS)
     assert held["foreign_nodes"] == 2 and held["own"] == {"Resource": 5, "ModuleRelease": 2, "EpmStoreMarker": 1}
     assert held["foreign_examples"][0].startswith(":".join(labels))
     with pytest.raises(ce.Refused, match=r"holds 2 node\(s\) that are not the KPI Store's"):
         ce.decide(held, TARGET, replace=True)
-    ce.remove_own(db, BASES)   # even a delete that did run takes the KPI Store's nodes only
+    ce.remove_own(db, PARAMS)   # even a delete that did run takes the KPI Store's nodes only
     assert db.nodes == [(labels, props), (["Account"], {"id": 7})]
+
+
+def test_the_limit_of_the_rule_is_pinned():
+    # A node with the release's tag, a uri and only projection labels is treated as the KPI Store's, whoever wrote
+    # it: the module's text and the refusal say so, and the target database must be the KPI Store's alone.
+    db = held_target()
+    db.add(["Resource", "skos_Concept"], uri="urn:external:item", graph=KPI_TAG)
+    assert ce.holdings(db, PARAMS)["foreign_nodes"] == 0
+    assert "the target database is dedicated" in " ".join(ce.__doc__.split())
+    with pytest.raises(ce.Refused, match="so the database must be the KPI Store's alone"):
+        ce.decide(ce.holdings(db, PARAMS), TARGET)
 
 
 def test_the_check_and_the_delete_use_one_rule():
     rule = ce.own_predicate()
-    assert rule.startswith("coalesce((n:Resource AND n.uri IS NOT NULL AND any(b IN $bases WHERE toStringOrNull(n.graph) STARTS WITH b))")
-    db = graph()
-    ce.holdings(db, BASES)
-    ce.remove_own(db, BASES)
+    assert rule.startswith("coalesce((n:Resource AND n.uri IS NOT NULL AND any(b IN $bases WHERE toStringOrNull(n.graph) STARTS WITH b) "
+                           "AND all(l IN labels(n) WHERE l = 'Resource' OR any(p IN $prefixes WHERE l STARTS WITH p)))")
+    assert "(n:EpmStoreMarker AND n.store = $store AND n.catalog_digest IS NOT NULL)" in rule
+    assert "(n:LogicalModelMarker AND n.store = $store AND n.digest IS NOT NULL)" in rule
+    db = held_target()
+    ce.holdings(db, PARAMS)
+    ce.remove_own(db, PARAMS)
     assert all(rule in statement for statement in db.statements) and len(db.statements) == 2
     assert "MATCH (n) WHERE " + rule + " CALL (n) { DETACH DELETE n }" in db.statements[1]
     assert not any(statement.startswith("MATCH (n) CALL") or "MATCH (n) DETACH" in statement for statement in db.statements)
@@ -145,7 +179,8 @@ def test_the_replace_needs_a_decision_and_foreign_nodes_always_stop_it():
     mixed = {"nodes": 9, "own": {"Resource": 5}, "foreign": {"Invoice": 3, "Note": 1}, "foreign_nodes": 4,
              "foreign_examples": ["Invoice", "Note"]}
     assert ce.decide(empty, TARGET) == "empty"
-    with pytest.raises(ce.Refused, match=r"holds 7 node\(s\) of the KPI Store, by label: 2 ModuleRelease, 5 Resource. Nothing was changed"):
+    with pytest.raises(ce.Refused, match=r"holds 7 node\(s\) that carry the KPI Store's own marks \(its release tags, release records, "
+                                         r"logical models and markers\), by label: 2 ModuleRelease, 5 Resource. Nothing was changed"):
         ce.decide(own, TARGET)
     assert ce.decide(own, TARGET, replace=True) == "replace"
     asked = []
@@ -159,9 +194,9 @@ def test_the_replace_needs_a_decision_and_foreign_nodes_always_stop_it():
 
 
 def test_the_replace_deletes_the_kpi_stores_nodes_and_leaves_other_nodes():
-    db = graph()
+    db = held_target()
     db.add(["Invoice"], 3)
-    ce.remove_own(db, BASES)
+    ce.remove_own(db, PARAMS)
     assert db.nodes == [(["Invoice"], {})] * 3 and len(db.statements) == 1
 
 
@@ -270,15 +305,13 @@ def test_the_copy_is_refused_before_any_write(local_and_out, monkeypatch):
     foreign.add(["Invoice"], 3)
     with pytest.raises(ce.Refused, match=r"3 node\(s\) that are not the KPI Store's, by label: 3 Invoice"):
         run_copy(local, graph(), foreign, monkeypatch, replace=True)
-    shared = graph(hash_="hash-0")   # the KPI Store's old graph, and one node of someone else's that is also labelled Resource
-    shared.name, shared.ident = TARGET, "db-2"
+    shared = held_target("hash-0")   # the KPI Store's old graph, and one node of someone else's that is also labelled Resource
     shared.add(["Resource", "Customer"], uri="https://other.example/x")
     with pytest.raises(ce.Refused, match=r"1 node\(s\) that are not the KPI Store's, by label: 1 Customer, 1 Resource; "
                                          r"for example Resource:Customer https://other.example/x"):
         run_copy(local, graph(), shared, monkeypatch, replace=True)
     assert shared.count("Resource") == 6 and shared.writes() == []
-    held = graph(hash_="hash-0")
-    held.name, held.ident = TARGET, "db-2"
+    held = held_target("hash-0")
     with pytest.raises(ce.Refused, match="Run the command again with --replace"):
         run_copy(local, graph(), held, monkeypatch)
     for db in (same, target, foreign, held):
@@ -290,8 +323,7 @@ def test_the_copy_is_refused_before_any_write(local_and_out, monkeypatch):
 
 def test_a_decided_replace_removes_the_old_graph_first(local_and_out, monkeypatch):
     local, _ = local_and_out
-    held = graph(hash_="hash-0")
-    held.name, held.ident = TARGET, "db-2"
+    held = held_target("hash-0")
     result, _, order = run_copy(local, graph(), held, monkeypatch, replace=True)
     assert result["status"] == "copied" and result["replaced"] is True and result["held_before"]["own"]["Resource"] == 5
     assert held.count("Resource") == 5 and held.count("EpmStoreMarker") == 1

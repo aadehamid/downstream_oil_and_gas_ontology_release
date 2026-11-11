@@ -19,7 +19,7 @@ REPORT = {"passed": True, "input_fingerprint": "fingerprint-1", "nodes": 5, "rel
 SECRET = "pw-Only-In-Settings"
 
 
-def graph(marked=True, hash_="hash-1"):
+def graph(marked=True, hash_="hash-1", store="neo4j"):
     """A database that holds the verified graph: 5 Resource nodes, 7 relationships, the two release records."""
     db = stores_support.FakeNeo4j()
     db.add(["Resource"], 5, uri=DP + "/sample-node", graph=DP)   # tagged with its release, as the load tags every node
@@ -27,7 +27,7 @@ def graph(marked=True, hash_="hash-1"):
     db.add(["ModuleRelease"], version_iri=DP)
     db.add(["ModuleRelease"], version_iri=KPI)
     if marked:
-        db.add(["EpmStoreMarker"], store="neo4j", catalog_datasets=2, catalog_digest="digest-1",
+        db.add(["EpmStoreMarker"], store=store, catalog_datasets=2, catalog_digest="digest-1",
                input_fingerprint="fingerprint-1", count=[5, 7], graph_hash="hash-1", marked_at="2026-11-10T08:00:00Z")
     return db
 
@@ -52,7 +52,8 @@ def stub_code(calls, fails=None, report=REPORT):
         rp=SimpleNamespace(read_config=lambda path: json.loads(Path(path).read_text(encoding="utf-8")), Driver=Driver,
                            Failed=REAL.rp.Failed, PY=REAL.rp.PY, RS=REAL.rp.RS),
         lv=SimpleNamespace(hash_graph=lambda session, sep=None: (session.graph_hash, 0, 0, 0), N10S_SEP="__"),
-        build=SimpleNamespace(report_earned=lambda rep: [] if rep.get("passed") else ["report passed is false"]),
+        build=SimpleNamespace(report_earned=lambda rep: [] if rep.get("passed") else ["report passed is false"],
+                              load_config=REAL.build.load_config),
         lm=SimpleNamespace(models=lambda newest: []), ss=REAL.ss)
 
 

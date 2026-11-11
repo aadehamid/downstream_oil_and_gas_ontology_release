@@ -19,6 +19,11 @@ What this command may touch on Enterprise, enforced in code:
   node, for example, must carry the release tag of one of this release's modules; a node that is merely
   labelled Resource is someone else's. The check of what the database holds and the delete of a replace use
   the same rule, so the replace cannot delete a node the check did not count as the KPI Store's.
+- The rule has a limit. A node that carries a release tag of one of this release's modules, a uri, and no label
+  but Resource and the projection's own prefixed labels is treated as the KPI Store's, whoever wrote it. So is
+  a node that has the shape of a release record, a module or a logical-model node. The copy cannot tell such a
+  node from its own, and a replace deletes it. This is acceptable only because the target database is dedicated
+  to the KPI Store; do not point [neo4j.enterprise] database at a database other work also writes to.
 
 After the copy, in the target database: the graph hash must equal the local graph's, the counts must equal the
 load report's, the release records are written and read back, each node's and relationship's release tag is
@@ -42,22 +47,27 @@ from . import local_settings as ls
 from . import ontology_view as ov
 
 STORE = "enterprise"   # the name the target database's marker carries
-# What makes a node the KPI Store's: its label AND what only the KPI Store's own load writes on it. $bases holds
-# the IRI every version of each module of the release starts with (load_fuseki.module_bases).
-#   Resource            module_tags.py tags every projected node with its release's version IRI, in `graph`
+# What makes a node the KPI Store's: its label AND what only the KPI Store's own load writes on it. The conditions
+# read three parameters (own_params): $bases, the IRI every version of each module of the release starts with;
+# $store, the store name this copy writes on its markers; $prefixes, what every label of a projected node starts
+# with (each prefix of the projection configuration, and the ontology import's own, followed by an underscore).
+#   Resource            module_tags.py tags every projected node with its release's version IRI, in `graph`; and the
+#                       projection gives a node no label but Resource and prefixed ones (skos_Concept, owl_Class)
 #   ModuleRelease       release_record.py writes the release's version IRI
 #   Module              module_tags.py's module graph: the node's uri is a version IRI
-#   EpmStoreMarker      the marker's store name and catalog digest
+#   EpmStoreMarker      this copy's own marker: its store name, and the catalog digest
 #   LogicalModel        logical_models.py: a uri, and the model's slug or the models the node belongs to
-#   LogicalModelMarker  the digest of the model files, and the store name
+#   LogicalModelMarker  this copy's own marker: its store name, and the digest of the model files
 OWN_RULES = {
-    "Resource": "n.uri IS NOT NULL AND any(b IN $bases WHERE toStringOrNull(n.graph) STARTS WITH b)",
+    "Resource": ("n.uri IS NOT NULL AND any(b IN $bases WHERE toStringOrNull(n.graph) STARTS WITH b) "
+                 "AND all(l IN labels(n) WHERE l = 'Resource' OR any(p IN $prefixes WHERE l STARTS WITH p))"),
     "ModuleRelease": "any(b IN $bases WHERE toStringOrNull(n.version_iri) STARTS WITH b)",
     "Module": "any(b IN $bases WHERE toStringOrNull(n.uri) STARTS WITH b)",
-    "EpmStoreMarker": "n.store IS NOT NULL AND n.catalog_digest IS NOT NULL",
+    "EpmStoreMarker": "n.store = $store AND n.catalog_digest IS NOT NULL",
     "LogicalModel": "n.uri IS NOT NULL AND (n.models IS NOT NULL OR n.slug IS NOT NULL)",
-    "LogicalModelMarker": "n.digest IS NOT NULL AND n.store IS NOT NULL",
+    "LogicalModelMarker": "n.store = $store AND n.digest IS NOT NULL",
 }
+SCHEMA_PREFIX = "n4sch"   # the ontology import's own labels: n4sch_Class and the like
 OWN_LABELS = tuple(OWN_RULES)
 BATCH = 1000
 QUERY_TIMEOUT = 600
@@ -148,13 +158,19 @@ def own_predicate(rules=OWN_RULES):
     return "coalesce(" + " OR ".join(f"(n:{label} AND {condition})" for label, condition in rules.items()) + ", false)"
 
 
-def holdings(session, bases, rules=OWN_RULES):
+def own_params(bases, label_prefixes, store=STORE):
+    """The parameters the conditions of OWN_RULES read. label_prefixes are the projection's prefixes, without the
+    underscore: a projected node's labels are Resource and <prefix>_<name>."""
+    return {"bases": list(bases), "store": store, "prefixes": sorted({f"{p}_" for p in (*label_prefixes, SCHEMA_PREFIX)})}
+
+
+def holdings(session, params, rules=OWN_RULES):
     """What the database holds: {"nodes", "own": {own label: nodes}, "foreign": {label or "(no label)": nodes},
     "foreign_nodes", "foreign_examples"}. A node is foreign unless own_predicate holds for it, whatever its
     labels are. foreign_examples names up to five foreign nodes by their labels and uri."""
     held = {"nodes": 0, "own": {}, "foreign": {}, "foreign_nodes": 0, "foreign_examples": []}
     rows = session.run(f"MATCH (n) WITH labels(n) AS labels, {own_predicate(rules)} AS own "
-                       "RETURN own, labels, count(*) AS n", bases=list(bases)).data()
+                       "RETURN own, labels, count(*) AS n", **params).data()
     for row in rows:
         labels, n = row["labels"], row["n"]
         held["nodes"] += n
@@ -167,7 +183,7 @@ def holdings(session, bases, rules=OWN_RULES):
                 held["foreign"][label] = held["foreign"].get(label, 0) + n
     if held["foreign_nodes"]:
         found = session.run(f"MATCH (n) WHERE NOT {own_predicate(rules)} "
-                            "RETURN labels(n) AS labels, n.uri AS uri ORDER BY toStringOrNull(n.uri) LIMIT 5", bases=list(bases)).data()
+                            "RETURN labels(n) AS labels, n.uri AS uri ORDER BY toStringOrNull(n.uri) LIMIT 5", **params).data()
         held["foreign_examples"] = [":".join(r["labels"]) + (f" {r['uri']}" if r["uri"] else "") for r in found]
     return held
 
@@ -187,18 +203,20 @@ def decide(held, database, replace=False, confirm=None):
                       f"by label: {describe(held['foreign'])}; for example {', '.join(held.get('foreign_examples') or ['(none read)'])}. "
                       "Nothing was changed, and this command will not delete them. Check [neo4j.enterprise] database, "
                       "or ask the owner of those nodes")
-    what = f"the database {database} holds {held['nodes']} node(s) of the KPI Store, by label: {describe(held['own'])}"
+    what = (f"the database {database} holds {held['nodes']} node(s) that carry the KPI Store's own marks (its release "
+            f"tags, release records, logical models and markers), by label: {describe(held['own'])}")
     if replace:
         return "replace"
     if confirm is not None and confirm(f"{what}.\nType the database's name to replace them, or press Enter to stop: ").strip() == database:
         return "replace"
-    raise Refused(f"{what}. Nothing was changed. Run the command again with --replace to replace them")
+    raise Refused(f"{what}. Nothing was changed. Run the command again with --replace to replace them. The replace "
+                  "deletes every node that carries those marks, so the database must be the KPI Store's alone")
 
 
-def remove_own(session, bases, rules=OWN_RULES, batch=BATCH):
+def remove_own(session, params, rules=OWN_RULES, batch=BATCH):
     """Deletes the KPI Store's nodes, in batches: exactly the nodes own_predicate holds for, never every node."""
     session.run(f"MATCH (n) WHERE {own_predicate(rules)} CALL (n) {{ DETACH DELETE n }} IN TRANSACTIONS OF {int(batch)} ROWS",
-                bases=list(bases)).consume()
+                **params).consume()
 
 
 # ---- the checks after the copy ----------------------------------------------------------------------
@@ -273,15 +291,16 @@ def copy(local, release_root, replace=False, confirm=None, code=None, connect=lo
         if source_hash != report["determinism_hash_sorted"]:
             raise Refused("the local graph is not the graph the load report verified; nothing was changed on "
                           "Enterprise. Run the local Neo4j load again")
-        bases = load_fuseki.module_bases(code.ss)
-        held = holdings(target, bases, own_rules)
+        prefixes = code.build.load_config(cfg_doc["projection_config"]).prefixes
+        params = own_params(load_fuseki.module_bases(code.ss), prefixes)
+        held = holdings(target, params, own_rules)
         if held["nodes"] and not held["foreign_nodes"] and local_load.is_current(target, STORE, want, report, code, sep) \
                 and local_load.models_status(target, STORE, want["newest"], code)[1] in ("current", "none"):
             return {**result, "status": "current", "nodes": report["nodes"], "relationships": report["relationships"],
                     "graph_hash": source_hash, "held_before": held, "marker": code.ss.read_neo4j(target, STORE)[0]}
         action = decide(held, database, replace, confirm)
         if action == "replace":
-            remove_own(target, bases, own_rules)
+            remove_own(target, params, own_rules)
         copied = code.cg.copy(source, target, BATCH)
         target_hash = code.cg.graph_hash(target)
         if target_hash != source_hash:

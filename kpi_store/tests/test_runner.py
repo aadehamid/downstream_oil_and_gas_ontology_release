@@ -109,12 +109,53 @@ PASSWORD_FILE = '[neo4j.enterprise]\npassword = "pw-That-Must-Not-Travel"\n'
 def test_a_plain_folder_with_a_password_file_of_any_name_is_not_zipped(setup, name):
     (setup.root / name).parent.mkdir(parents=True, exist_ok=True)
     (setup.root / name).write_text(PASSWORD_FILE if name.endswith(".toml") else "NEO4J_PASSWORD=pw-That-Must-Not-Travel\n", encoding="utf-8")
-    with pytest.raises(runner.StepFailed, match=f"{name} in the release folder sets a password") as err:
+    with pytest.raises(runner.StepFailed, match=f"{name} in the release folder sets a password or another secret") as err:
         runner.build_zip(setup.root, setup.tmp / "a.zip")
     assert "pw-That-Must-Not-Travel" not in str(err.value) and not (setup.tmp / "a.zip").exists()
     with pytest.raises(runner.StepFailed):
         runner.step_zip(setup.make(runner.subprocess.run))
     assert not (setup.run_dir / "upload").exists()
+
+
+@pytest.mark.parametrize("name, text, keys", [
+    ("credentials.toml", '"password" = "secret"\n', "password"),                                   # a quoted key
+    ("conf/local.env", "export NEO4J_PASSWORD=secret\n", "NEO4J_PASSWORD"),                       # an exported variable
+    ("deep.toml", '[stores]\n[[stores.neo4j]]\nname = "a"\n[stores.neo4j.login]\nPassWord = "secret"\n', "PassWord"),
+    ("inline.toml", 'login = { user = "a", "api-token" = "secret" }\n', "api-token"),
+    ("conf/db.ini", "[db]\npassword : 'secret'\n", "password"),
+    ("conf/app.properties", '  client.secret = "secret"\n', "client.secret"),
+    (".env", "set DB_PWD=secret\n", "DB_PWD"),
+    ("broken.toml", 'password = "secret\n', "the file is not valid TOML, so it cannot be checked"),
+    ("kpi_store/stores.example.toml", '[neo4j.local]\npassword = "a-real-one"\n', "password"),     # no file is exempt by its name
+])
+def test_a_secret_is_found_by_parsing_the_file_not_by_its_spelling(setup, name, text, keys):
+    (setup.root / name).parent.mkdir(parents=True, exist_ok=True)
+    (setup.root / name).write_text(text, encoding="utf-8")
+    assert runner.secret_keys(setup.root / name) == [keys]
+    with pytest.raises(runner.StepFailed, match="sets a password or another secret") as err:
+        runner.build_zip(setup.root, setup.tmp / "a.zip")
+    assert '"secret' not in str(err.value) and "a-real-one" not in str(err.value) and not (setup.tmp / "a.zip").exists()
+
+
+@pytest.mark.parametrize("name, text", [
+    ("a.toml", 'password_env = "KPI_STORE_PW"\n'),              # names an environment variable; the real files use it
+    ("b.toml", 'password = "<the Enterprise password>"\n'),     # a placeholder
+    ("c.toml", 'password = ""\ntoken = "  "\n'),
+    ("d.toml", 'tokens_per_page = "40"\nsecretary = "a name"\npasswords = "many"\n'),
+    ("e.toml", "password = 12\n"),                             # not text
+    ("f.env", "# NEO4J_PASSWORD=secret\nNEO4J_URI=bolt://127.0.0.1:7687\nNEO4J_PASSWORD=\n"),
+    ("g.ini", "; password = secret\n[section]\nuser = neo4j\n"),
+])
+def test_a_near_miss_is_not_a_secret(setup, name, text):
+    (setup.root / name).write_text(text, encoding="utf-8")
+    assert runner.secret_keys(setup.root / name) == []
+
+
+@pytest.mark.parametrize("key, secret", [
+    ("password", True), ("NEO4J_PASSWORD", True), ("api-token", True), ("client.secret", True), ("db_pwd", True), ("Passwd", True),
+    ("password_env", False), ("tokens_per_page", False), ("secretary", False), ("passwords", False), ("path", False), ("", False)])
+def test_which_names_say_secret(key, secret):
+    assert runner.is_secret_key(key) is secret
 
 
 def test_the_example_settings_file_and_a_commented_password_line_may_travel(setup):
@@ -141,7 +182,7 @@ def test_in_a_git_checkout_the_zip_holds_only_the_files_git_tracks(setup):
         assert z.namelist() == ["README.md", "data/sample.ttl", "kpi_store/__init__.py", "release.json"]
         assert not any(b"pw-That-Must-Not-Travel" in z.read(name) for name in z.namelist())
     git(setup.root, "add", "machine-stores.toml")   # a tracked password file is refused, not zipped
-    with pytest.raises(runner.StepFailed, match="machine-stores.toml in the release folder sets a password"):
+    with pytest.raises(runner.StepFailed, match="machine-stores.toml in the release folder sets a password or another secret"):
         runner.build_zip(setup.root, setup.tmp / "b.zip")
     def no_git(cmd, **options):
         raise OSError("git is not installed")

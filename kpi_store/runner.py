@@ -49,6 +49,7 @@ import shutil
 import subprocess
 import sys
 import time
+import tomllib
 import zipfile
 from pathlib import Path
 
@@ -66,10 +67,11 @@ CHECK_PASSED = "all checks passed"
 # Never in the zip: Git's folder, caches, and anything that could be a settings file with a password.
 SKIP_FOLDERS = (".git", "__pycache__", ".pytest_cache", ".venv", ".mypy_cache", ".ruff_cache")
 SKIP_FILES = (".DS_Store", "Thumbs.db", SETTINGS_NAME)
-# A file of these kinds that is about to be zipped may not set a password. The one example file may: it holds none.
+# A file of these kinds that is about to be zipped is parsed, and may not give a secret a value (secret_keys).
 SECRET_SUFFIXES = (".toml", ".env", ".ini", ".cfg", ".conf", ".properties")
-SECRET_LINE = re.compile(rb"(?im)^\s*[\w.\-]*(password|passwd|secret)[\w.\-]*\s*[=:]\s*\S")
-SECRET_EXAMPLES = ("kpi_store/stores.example.toml",)
+SECRET_WORDS = ("password", "passwd", "pwd", "secret", "token")
+KEY_PARTS = re.compile(r"[A-Za-z0-9]+")
+PLACEHOLDER = re.compile(r"^<[^<>]*>$")
 SKIP_SUFFIXES = (".pyc", ".pyo")
 # Text files travel with LF line ends, so a checkout that turned them into CRLF still gives the same zip.
 TEXT_SUFFIXES = (".py", ".md", ".ttl", ".rq", ".json", ".csv", ".html", ".jsonld", ".yaml", ".yml", ".cypher", ".txt",
@@ -254,6 +256,57 @@ def step_check(ctx):
 
 # ---- zip ------------------------------------------------------------------------------------------------
 
+def is_secret_key(key):
+    """True when a setting's name says its value is a secret: one of its words is password, passwd, pwd, secret
+    or token. Words are split at anything but letters and digits, so NEO4J_PASSWORD and api-token are secrets and
+    tokens_per_page is not. A name whose last word is env names an environment variable, not a secret
+    (password_env)."""
+    parts = [part.lower() for part in KEY_PARTS.findall(str(key))]
+    return bool(parts) and parts[-1] != "env" and any(part in SECRET_WORDS for part in parts)
+
+
+def is_secret_value(value):
+    """True for a value that could be a real secret: text that is not empty and not a <placeholder>."""
+    return isinstance(value, str) and bool(value.strip()) and not PLACEHOLDER.match(value.strip())
+
+
+def _toml_secrets(node, found):
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if is_secret_key(key) and is_secret_value(value):
+                found.append(str(key))
+            _toml_secrets(value, found)
+    elif isinstance(node, list):
+        for item in node:
+            _toml_secrets(item, found)
+    return found
+
+
+def secret_keys(path):
+    """The names of the settings in a file that give a secret a value. The file is parsed, not searched: a TOML
+    file with the TOML parser, through every table; any other file as KEY=VALUE or KEY: VALUE lines, with an
+    optional `export`, quotes and spaces. A TOML file that does not parse cannot be cleared, so it counts as
+    holding a secret. The values themselves are never returned."""
+    data = Path(path).read_bytes()
+    if Path(path).suffix.lower() == ".toml":
+        try:
+            return _toml_secrets(tomllib.loads(data.decode("utf-8")), [])
+        except (UnicodeDecodeError, tomllib.TOMLDecodeError):
+            return ["the file is not valid TOML, so it cannot be checked"]
+    found = []
+    for line in data.decode("utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if not line or line[0] in "#;[":
+            continue
+        if line.lower().startswith(("export ", "set ")):
+            line = line.split(None, 1)[1]
+        key, sep, value = re.split(r"\s*([=:])\s*", line, maxsplit=1) if re.search(r"[=:]", line) else (line, "", "")
+        key, value = key.strip().strip("\"'"), value.strip().strip("\"'")
+        if sep and is_secret_key(key) and is_secret_value(value):
+            found.append(key)
+    return found
+
+
 def tracked_files(root, run=subprocess.run):
     """The files Git tracks in a checkout, as paths relative to it. Raises StepFailed when Git cannot say."""
     try:
@@ -271,8 +324,9 @@ def release_files(root, run=subprocess.run):
 
     In a Git checkout these are the files Git tracks, and no other: a file someone left in the folder is not in
     the zip. A plain folder has no such list, so there every file counts except caches. In both cases a
-    settings-like file (SECRET_SUFFIXES, or a name that starts with .env) that sets a password stops the step:
-    the zip is uploaded, and a password must not travel in it."""
+    settings-like file (SECRET_SUFFIXES, or a name that starts with .env) that gives a secret a value stops the
+    step (secret_keys): the zip is uploaded, and a password must not travel in it. The example settings file
+    passes for the same reason any file would: its password values are placeholders."""
     root = Path(root)
     if (root / ".git").exists():
         candidates = tracked_files(root, run)
@@ -286,10 +340,11 @@ def release_files(root, run=subprocess.run):
         if path.name in SKIP_FILES or path.suffix in SKIP_SUFFIXES or relative.parts[0] in SKIP_FOLDERS:
             continue
         name = relative.as_posix()
-        if (path.suffix.lower() in SECRET_SUFFIXES or path.name.lower().startswith(".env")) and name not in SECRET_EXAMPLES \
-                and SECRET_LINE.search(path.read_bytes()):
-            raise StepFailed(f"{name} in the release folder sets a password. The zip is uploaded, so nothing was zipped. "
-                             "Move the file outside the release folder")
+        if path.suffix.lower() in SECRET_SUFFIXES or path.name.lower().startswith(".env"):
+            keys = secret_keys(path)
+            if keys:
+                raise StepFailed(f"{name} in the release folder sets a password or another secret ({', '.join(keys[:3])}). "
+                                 "The zip is uploaded, so nothing was zipped. Move the file outside the release folder")
         found.append((name, path))
     return sorted(found)
 
