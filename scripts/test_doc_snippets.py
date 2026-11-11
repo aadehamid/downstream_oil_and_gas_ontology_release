@@ -638,6 +638,19 @@ def test_the_cypher_check_is_a_token_check_and_not_a_grammar_check(tmp_path):
         "guide.md:1: the block is not valid cypher\n    | ValueError: no statement"]
 
 
+def test_the_cypher_check_reads_this_trees_tokenizer_when_another_copy_is_loaded(tmp_path, monkeypatch):
+    # A test that unpacks the release zip leaves a package named kpi_store behind, loaded from a folder that is gone.
+    import types
+    gone = types.ModuleType("kpi_store")
+    gone.__file__, gone.__path__ = str(tmp_path / "gone" / "kpi_store" / "__init__.py"), [str(tmp_path / "gone" / "kpi_store")]
+    monkeypatch.setitem(sys.modules, "kpi_store", gone)
+    for name in [n for n in sys.modules if n.startswith("kpi_store.")]:
+        monkeypatch.delitem(sys.modules, name)
+    result = check(tmp_path, fence("cypher parse", "MATCH (n:Resource) RETURN count(n)"))
+    assert result.failures == [] and result.checked == 1
+    assert sys.modules["kpi_store"] is gone
+
+
 def test_a_command_cannot_be_parsed_instead_of_run(tmp_path):
     result = check(tmp_path, fence("bash parse", "echo hello"))
     assert result.failures == ["guide.md:1: `bash` cannot be parsed: `parse` reads json, toml, yaml, turtle, sparql, "

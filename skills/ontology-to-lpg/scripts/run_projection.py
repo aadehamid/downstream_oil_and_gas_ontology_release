@@ -264,7 +264,7 @@ def has_releases(folder):
         return False
     for module in os.listdir(folder):
         path = os.path.join(folder, module)
-        if os.path.isdir(path) and any(re.fullmatch(r"\d+\.\d+\.\d+", v) and os.path.isdir(os.path.join(path, v))
+        if os.path.isdir(path) and any(re.fullmatch(r"\d+\.\d+\.\d+(-correction\.\d+)?", v) and os.path.isdir(os.path.join(path, v))
                                        for v in os.listdir(path)):
             return True
     return False

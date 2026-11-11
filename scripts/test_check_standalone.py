@@ -304,9 +304,13 @@ def test_this_trees_exceptions_are_only_for_fixed_content():
                "business_architecture/ontology/projection/skill-run/test_skill_run.py",
                # the two pages built from the release packages; a test keeps each equal to a fresh build
                "viewer/index.html", "horoi_viewer/index.html")
-    entries = cs.read_exceptions()
-    assert len(entries) == 40
-    assert [path for path, _, _ in entries if not path.startswith(allowed)] == []
+    assert [path for path, _, _ in cs.read_exceptions() if not path.startswith(allowed)] == []
+
+
+def test_this_release_has_40_exceptions():
+    # A cut moves a package and adds a line for the new one, so this count is the release's as shipped
+    # (scripts/pinned-tests.txt).
+    assert len(cs.read_exceptions()) == 40
 
 
 def test_with_git_only_tracked_files_are_read(tmp_path):

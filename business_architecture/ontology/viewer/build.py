@@ -20,6 +20,8 @@ from rdflib.compare import to_canonical_graph
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parents[2] / "scripts"))
 from epm_source_descriptions import neutral_source_description
+sys.path.insert(0, str(HERE.parent / "release"))
+from newest import version_key  # the one version order, which reads a correction version
 
 ONTOLOGY = Path("business_architecture/ontology")
 RELEASE = "KPI Store 1.1"
@@ -52,13 +54,11 @@ def release_files(root):
         versions = [
             p
             for p in module.iterdir()
-            if p.is_dir() and re.fullmatch(r"\d+\.\d+\.\d+", p.name)
+            if p.is_dir() and version_key(p.name)
         ]
         if not versions:
             continue
-        manifest_path = max(
-            versions, key=lambda p: tuple(map(int, p.name.split(".")))
-        ) / "manifest.json"
+        manifest_path = max(versions, key=lambda p: version_key(p.name)) / "manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if (
             manifest["module"] != module.name

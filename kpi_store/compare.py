@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 
 from . import discovery as disc
 from . import metric_view as mv
+from . import report as rep
 
 BLOCKING = ("object-missing", "object-renamed", "column-missing", "column-renamed", "edge-missing")
 STALE_AFTER_DAYS = 35
@@ -93,8 +94,9 @@ def _readers(table, column, found):
     return sorted(v.name for v in found.metric_views.values() if table.lower() in v.tables and v.reads_column(column))
 
 
-def compare(ontology, found, settings, now=None, stale_after_days=STALE_AFTER_DAYS):
-    """A Comparison of an OntologyView with a Discovery. stale_after_days None leaves freshness out."""
+def compare(ontology, found, settings, now=None, stale_after_days=STALE_AFTER_DAYS, standing=()):
+    """A Comparison of an OntologyView with a Discovery. stale_after_days None leaves freshness out. `standing` holds
+    the keys of the rows a cleared report rejected (report.read_standing): the comparison leaves those rows out."""
     out = Comparison()
     settings.one_name_each(obj.full_name for obj in ontology.objects.values())
     here = {key: settings.environment_name(obj.full_name) for key, obj in ontology.objects.items()}
@@ -234,6 +236,8 @@ def compare(ontology, found, settings, now=None, stale_after_days=STALE_AFTER_DA
             if at and at < limit:   # judged by the full instant; the row shows it to the second
                 out.rows.append(_row("stale-data", found.spelled(present[key]), "", last,
                                      f"table lineage shows no write in the last {stale_after_days} days"))
+    if standing:
+        out.rows = [r for r in out.rows if rep.standing_key(r) not in standing]
     return out
 
 

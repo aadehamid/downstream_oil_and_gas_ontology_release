@@ -581,6 +581,23 @@ details.fm:not([open])>:not(summary){display:none}
     <figcaption>All dates are from the record of the original build and the decisions in the table below (2026).</figcaption>
   </figure>
 
+  <h3 class="rise" data-ss-id="what-this-release-adds">What KPI Store 1.1 adds</h3>
+  <p class="rise">The steps above built the ontology. KPI Store 1.1 keeps all of it and adds what one platform needs. The table says what is new and where each part is explained.</p>
+  <div class="tbl rise"><table>
+    <thead><tr><th>What is new</th><th>What it is</th><th>Read</th></tr></thead>
+    <tbody>
+      <tr><td>A stand-alone release</td><td>The release refers to nothing outside itself except public sources and licences. A check in <code>scripts/check.sh</code> keeps it so. It carries every module, the skills, both viewers and the guides</td><td><code>business_architecture/domain/kpi-store-decisions/KPI-DEC-0001.md</code>; <code>scripts/check_standalone.py</code></td></tr>
+      <tr><td>One build mode</td><td>Each module's builder builds against the newest package of every module it requires, and the Neo4j projection names labels, relationship types and property keys with one underscore</td><td><code>release.json</code></td></tr>
+      <tr><td><code>technical-graph</code> 1.1.0</td><td>A minor release of 2026-11-11: 15 classes and 24 properties, where 1.0.0 had 12 and 22. It adds <code>tg:Builder</code> with <code>tg:Job</code> and <code>tg:Pipeline</code>, <code>tg:builtBy</code> from a data object to what builds it, and <code>tg:replaces</code> from a data object to the one it replaces on an earlier platform</td><td><code>business_architecture/ontology/technical-graph/README.md</code> and its changelog</td></tr>
+      <tr><td>Questions 56 and 57</td><td>Which data object on an earlier platform a data object replaces, and which job or pipeline builds it. The regression answers both on the module's example graph, so the list holds 57 questions</td><td><code>business_architecture/ontology/competency-questions.md</code>, section XIII</td></tr>
+      <tr><td>The comparison before the load</td><td>A reading of the workspace is compared with the 33 objects, their columns and the 40 edges that <code>data-product</code> names. A difference in structure stops the load</td><td><a href="#load">Load the three stores</a></td></tr>
+      <tr><td>Correction versions</td><td>A cleared report becomes a version such as <code>1.2.1-correction.1</code>, written by the cut tool with a record of the run. It is the only way the ontology changes to follow the platform</td><td><a href="#load">Load the three stores</a>, "Correct, cut, reload"; <code>business_architecture/ontology/discovery-runs/README.md</code></td></tr>
+      <tr><td>A technical graph of real objects</td><td>Built from the same reading of the workspace, in the terms of <code>technical-graph</code>, and loaded into all three stores</td><td><a href="#tech-build">The technical graph</a></td></tr>
+      <tr><td>Questions across two graphs</td><td>Four query templates that join the KPI Store graph to the client's governance graph on values</td><td><a href="#ask">Ask the ontology a question</a></td></tr>
+      <tr><td>The stores as they are now</td><td>A Delta triple table loaded by a notebook with no token, Fuseki from the Apache jar, a local Neo4j with n10s and APOC, and its copy in a named database on Neo4j Enterprise</td><td><a href="#store-holds">What each store holds</a></td></tr>
+    </tbody>
+  </table></div>
+
   <h3 class="rise" data-ss-id="the-decisions-that-shaped-it">The decisions that shaped it</h3>
   <p class="rise">The original build recorded 109 decisions. Those records are not part of this release, so the table keeps what each one settled, by its date. This release has a record of its own, <code>business_architecture/domain/kpi-store-decisions/KPI-DEC-0001.md</code>, which says why it stands alone and what it removed.</p>
   <div class="tbl rise"><table class="dec">
@@ -1021,7 +1038,58 @@ spaces = []                        # space IDs to read; empty means every space 
   <p class="rise">A person clears a row by writing a <code>decision</code>: <code>accept</code>, <code>reject</code> or <code>environment setting</code>. The last one means the difference belongs to this environment, such as a catalog name, and goes into <code>kpi_store.toml</code>, not into the ontology. The report is cleared when every row that blocks has a decision.</p>
 
   <h3 class="rise" data-ss-id="load-loop">Correct, cut, reload</h3>
-  <p class="rise">The ontology changes only through this loop. The load stops and writes a report. A person clears it. <code>py -m kpi_store.cut</code> applies the accepted rows and writes a correction version, whose version carries a marker such as <code>1.2.1-correction.1</code>, with a record of the discovery run it came from: what changed, why, who cleared it and when. The next run loads that version, and its comparison passes (<code>business_architecture/domain/kpi-store-decisions/KPI-DEC-0001.md</code>). Nobody edits a released package by hand.</p>
+  <p class="rise">The ontology changes to follow the platform only through this loop. The load stops and writes a report. A person clears it. The cut tool, <code>kpi_store/cut.py</code>, turns the cleared report into a correction version. The next run loads that version, and its comparison passes. Nobody edits a released package by hand.</p>
+  <p class="rise"><code>--plan</code> shows what a cut would do and changes nothing. The release holds a made-up report in the client platform's shapes, which the tool's tests use. No row of it has a decision yet, so the tool refuses it:</p>
+<pre data-snippet="powershell run=release-copy exit=1"><code>py -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --plan</code></pre>
+<pre data-snippet="text expect"><code>CutRefused: the report is not cleared. Rows that block the load and have no decision: R002</code></pre>
+  <p class="rise">This script clears the one row that blocks, as a person would, and saves the cleared copy in a folder beside the release:</p>
+<pre data-snippet="python run=release-copy status-only"><code>import json
+from pathlib import Path
+
+report = json.loads(Path("kpi_store/tests/fixtures/cut/discovery-report.json").read_text(encoding="utf-8"))
+for row in report["rows"]:
+    if row["id"] == "R002":
+        row["decision"], row["decided_by"] = "accept", "the ontology owner"
+Path("../cleared").mkdir(exist_ok=True)
+Path("../cleared/discovery-report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8", newline="\n")</code></pre>
+  <p class="rise">The plan now names the change, the rows it leaves, and the versions it would write:</p>
+<pre data-snippet="powershell run=release-copy"><code>py -m kpi_store.cut --report ../cleared/discovery-report.json --plan</code></pre>
+<pre data-snippet="text expect"><code>Discovery run &lt;run id&gt; of KPI Store 1.1: 28 rows.
+The cut applies (1):
+  R002 column-renamed: column ChangeValue of idp_sbx.gold_commercial_core.mips_mpr_executive_summary_fact becomes Change_Value_Amount  BREAKING
+...
+Versions the cut writes:
+  data-product 1.2.0 -&gt; 1.2.1-correction.1
+  logical-model 1.0.0 -&gt; 1.0.1-correction.1
+  technical-graph 1.1.0 -&gt; 1.1.1-correction.1
+  value-stream 1.2.0 -&gt; 1.2.1-correction.1
+  integration 2.5.0 -&gt; 2.5.1-correction.1</code></pre>
+  <p class="rise">Without <code>--plan</code>, the tool shows each row and what it will change, asks for a typed confirmation of each breaking change, and asks for a <code>yes</code>. Then, in a temporary copy of the release, it does all of this, and your folder changes only after every step has passed:</p>
+  <ol class="rise">
+    <li>It changes the <code>data-product</code> module's tables in <code>data-product/pricing/</code> and rebuilds the module.</li>
+    <li>It writes the package at the correction version. A correction to 1.2.0 is <code>1.2.1-correction.1</code>, and the next one is <code>1.2.1-correction.2</code>.</li>
+    <li>It gives every module that requires the corrected module a correction version too, because a package names the exact version of each module it requires.</li>
+    <li>It rebuilds the catalog and the projection manifest, runs the competency questions and verifies each written package against a fresh build.</li>
+    <li>It writes the discovery-run record in <code>business_architecture/ontology/discovery-runs/</code>: the run, the versions written, every row with its decision, and each change with its value before and after. The record holds names only; evidence text and notes stay in the report.</li>
+    <li>In a Git copy it commits and tags the cut. In a plain folder it writes the same files and needs no Git.</li>
+  </ol>
+  <div class="tbl rise"><table class="gapt"><thead><tr><th>Decision</th><th>What the cut does</th></tr></thead><tbody>
+<tr><td><code>accept</code></td><td data-k="What the cut does">Applies the row's proposed fix: a renamed column, a spelling that differs in case, a renamed object, a second view that serves a measure, or the removal of a column, an object or a table edge</td></tr>
+<tr><td><code>accept</code>, when the fix adds a concept</td><td data-k="What the cut does">Nothing. A measure link with its filter, a new object or a new table edge needs a minor version, made with the release steps in <code>HOW-TO-UPDATE.md</code>. The tool lists the row</td></tr>
+<tr><td><code>reject</code></td><td data-k="What the cut does">Changes nothing in the ontology. The row becomes a standing decision in <code>standing-decisions.json</code>, so the next comparison leaves it out and a person decides each finding once</td></tr>
+<tr><td><code>environment setting</code></td><td data-k="What the cut does">Changes nothing in the ontology. The tool prints what to write in <code>kpi_store.toml</code></td></tr>
+</tbody></table></div>
+  <p class="rise">After a cut, run <code>bash scripts/check.sh</code> before you load any store.</p>
+
+  <h3 class="rise" data-ss-id="load-rehearsal">What a rehearsal showed</h3>
+  <p class="rise">The client's run has not happened yet. On 2026-11-11 the loop ran on a made-up workspace in the client platform's shapes, on Databricks:</p>
+  <ul class="rise">
+    <li>The first run stopped on one blocking row: the column <code>ChangeValue</code> is now <code>Change_Value_Amount</code>.</li>
+    <li>The cut wrote <code>data-product</code> <code>1.2.1-correction.1</code>, and correction versions of the four modules that require it.</li>
+    <li>The second run, on that made-up workspace, loaded 58,300 triples, and the table's hash equalled the release files'.</li>
+    <li>A third run changed nothing.</li>
+  </ul>
+  <p class="rise">On the same day a local Neo4j load of this release gave 4,242 nodes and 22,331 relationships, with 0 SHACL violations over 816 constraints in the graph.</p>
 
   <h3 class="rise" data-ss-id="load-proof">What the Databricks load proves</h3>
   <ul class="rise">
@@ -1871,11 +1939,11 @@ rebuild: skipped, 'no rebuild in the run configuration'</code></pre></dd>
 <p class="why">The release loads into Databricks, then Fuseki, then Neo4j. The Databricks load compares the ontology with the workspace first, and a difference in structure becomes a report, a correction and a second run (<code>business_architecture/domain/kpi-store-decisions/KPI-DEC-0001.md</code>).</p>
 <dl class="parts">
 <dt>Prerequisites</dt><dd>The release, checked (build step 23); a Windows machine with Python, Java, the Fuseki jar, a local Neo4j with n10s and APOC, and the Databricks command line; a Databricks workspace; a Neo4j Enterprise database.</dd>
-<dt>Files to open, in this order</dt><dd><ol class="files"><li><code>business_architecture/ontology/projection/ontology-stores-runbook.html</code>: the steps, in order</li><li><code>kpi_store/kpi_store.example.toml</code>: the settings of one environment</li><li><code>kpi_store/notebook/kpi_store_load.py</code>: the Databricks load</li><li><code>kpi_store/discovery.py, compare.py, report.py</code>: the reading of the workspace, the comparison and the report</li><li><code>kpi_store/load_databricks.py</code>: the load of <code>epm_triples</code> and its proof by a hash</li><li><code>kpi_store/tech_graph.py</code>: the technical graph, built from the same reading</li><li><code>kpi_store/tests/</code>: the tests, on made-up fixtures with the real shapes</li></ol></dd>
+<dt>Files to open, in this order</dt><dd><ol class="files"><li><code>business_architecture/ontology/projection/ontology-stores-runbook.html</code>: the steps, in order</li><li><code>kpi_store/kpi_store.example.toml</code>: the settings of one environment</li><li><code>kpi_store/notebook/kpi_store_load.py</code>: the Databricks load</li><li><code>kpi_store/discovery.py, compare.py, report.py</code>: the reading of the workspace, the comparison and the report</li><li><code>kpi_store/load_databricks.py</code>: the load of <code>epm_triples</code> and its proof by a hash</li><li><code>kpi_store/cut.py</code> and <code>business_architecture/ontology/discovery-runs/README.md</code>: the cut tool and the record it writes</li><li><code>kpi_store/tech_graph.py</code>: the technical graph, built from the same reading</li><li><code>kpi_store/tests/</code>: the tests, on made-up fixtures with the real shapes</li></ol></dd>
 <dt>Commands</dt><dd><pre data-snippet="powershell skip reason=&quot;needs-client-server: loads the client's Databricks workspace, Fuseki and Neo4j&quot;"><code>py -m kpi_store.setup_check
 py -m kpi_store.runner
 py -m kpi_store.sync_check</code></pre></dd>
-<dt>What you should see</dt><dd>The first run either loads all three stores or stops with a discovery report. After a person clears the report and the cut tool writes a correction version, the next run passes and loads. The sync check then reads every store as current.</dd>
+<dt>What you should see</dt><dd>The first run either loads all three stores or stops with a discovery report. After a person clears the report and the cut tool writes a correction version, the next run passes and loads. The sync check then reads every store as current. A rehearsal on a made-up workspace did exactly this: one blocking row, one cut, a second run that loaded, and a third that changed nothing.</dd>
 <dt>How to check it worked</dt><dd><code>py -m kpi_store.sync_check</code>, and the notebook's summary, whose <code>status</code> says <code>loaded</code> or <code>current</code>.</dd>
 <dt>What it enables next</dt><dd>Stores that hold this release, and a technical graph of the real objects beside it.</dd>
 <dt>Explained in</dt><dd><a href="#load">Load the three stores</a>; <a href="#tech-build">The technical graph</a>; <a href="#sync">Keeping every store in step</a></dd>
@@ -2189,7 +2257,7 @@ py -m kpi_store.sync_check</code></pre></dd>
 <tr><td><code>business_architecture/ontology/projection/test_pipeline.py</code></td><td>Tests for the Step 12 projection&#x27;s checks and record (the decision of 2026-10-13, the decision of 2026-11-01).</td></tr>
 <tr><td><code>business_architecture/ontology/projection/test_sync_stores.py</code></td><td>Offline tests of sync_stores.py</td></tr>
 </tbody></table></div>
-  <h3 id="fm-platform" class="rise" data-ss-id="file-map-fm-platform">The client's platform <span class="cnt">(21 rows)</span></h3>
+  <h3 id="fm-platform" class="rise" data-ss-id="file-map-fm-platform">The client's platform <span class="cnt">(23 rows)</span></h3>
   <p class="rise"><strong>Where to start:</strong> Start with <code>kpi_store/kpi_store.example.toml</code>, then <code>kpi_store/notebook/kpi_store_load.py</code> and the docstring at the top of each module.</p>
 <div class="tbl fm-tbl"><table><thead><tr><th>Path</th><th>What it is</th></tr></thead><tbody>
 <tr><td><code>kpi_store/__init__.py</code></td><td>KPI Store</td></tr>
@@ -2202,6 +2270,8 @@ py -m kpi_store.sync_check</code></pre></dd>
 <tr><td><code>kpi_store/report.py</code></td><td>The discovery report</td></tr>
 <tr><td><code>kpi_store/load_databricks.py</code></td><td>Loads the release into the Delta table epm_triples, and proves by a hash that nothing was lost.</td></tr>
 <tr><td><code>kpi_store/notebook/kpi_store_load.py</code></td><td>KPI Store load</td></tr>
+<tr><td><code>kpi_store/cut.py</code></td><td>The cut tool</td></tr>
+<tr><td><code>business_architecture/ontology/discovery-runs/README.md</code></td><td>Discovery runs</td></tr>
 <tr><td><code>kpi_store/tech_graph.py</code></td><td>Builds the technical graph of one environment from what the workspace reports, and loads it into the stores.</td></tr>
 <tr><td><code>kpi_store/questions/__init__.py</code></td><td>Cross-graph questions</td></tr>
 <tr><td><code>kpi_store/questions/roles.py</code></td><td>The roles the question templates need, with what each one means and the names to try first.</td></tr>

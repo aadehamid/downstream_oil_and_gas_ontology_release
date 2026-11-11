@@ -1254,6 +1254,17 @@ class RoundFour(OneBreak, unittest.TestCase):
             fails = cpr.check(module(), shapes(), config(lambda r: r["packages"].update({"lending": "1.2.0-rc.1"})), tmp)
         self.assertEqual(fails, [("inputs", "Inputs: lending is pinned at 1.2.0-rc.1, which is not a release (X.Y.Z)")])
 
+    def test_a_correction_pin_is_a_release_and_newer_than_the_version_it_corrects(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for version in ("1.2.0", "1.2.1-correction.1", "1.2.1-correction.2"):
+                os.makedirs(os.path.join(tmp, "lending", version))
+            pinned = lambda version: cpr.check(module(), shapes(), config(lambda r: r["packages"].update({"lending": version})), tmp)
+            self.assertEqual(pinned("1.2.1-correction.2"), [])
+            self.assertEqual(pinned("1.2.0"), [("inputs", "Inputs: lending is pinned at 1.2.0 but its newest release is 1.2.1-correction.2")])
+            # A pin with a final line end is no release: the form is applied to the whole text.
+            self.assertEqual(pinned("1.2.1-correction.2\n"),
+                             [("inputs", "Inputs: lending is pinned at 1.2.1-correction.2\n, which is not a release (X.Y.Z)")])
+
 
 class RoundFive(unittest.TestCase):
     """Quick check 4: one test per code finding; each failed on 83c1031."""

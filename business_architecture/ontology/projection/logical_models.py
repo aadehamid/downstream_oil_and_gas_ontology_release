@@ -54,10 +54,10 @@ def held(releases=None):
         return False
     for module in sorted(os.listdir(releases)):
         folder = os.path.join(releases, module)
-        versions = [v for v in os.listdir(folder) if all(p.isdigit() for p in v.split("."))] if os.path.isdir(folder) else []
+        versions = [v for v in os.listdir(folder) if ss.release_newest.version_key(v)] if os.path.isdir(folder) else []
         if not versions:
             continue
-        manifest = os.path.join(folder, max(versions, key=lambda v: tuple(int(p) for p in v.split("."))), "manifest.json")
+        manifest = os.path.join(folder, max(versions, key=ss.release_newest.version_key), "manifest.json")
         if not os.path.isfile(manifest):
             continue
         with open(manifest, encoding="utf-8") as f:

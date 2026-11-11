@@ -7,17 +7,41 @@ import re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ONTOLOGY = os.path.dirname(HERE)
-CORE_BUILDER = re.compile(r"^build_core_(\d+)_(\d+)\.py$")
+CORE_BUILDER = re.compile(r"build_core_(\d+)_(\d+)\.py")   # applied with fullmatch, so no name with a line end passes
+# A version as a pattern, for a builder or test that finds one inside a longer text.
+VERSION_PATTERN = r"\d+\.\d+\.\d+(?:-correction\.\d+)?"
+VERSION = re.compile(r"(\d+)\.(\d+)\.(\d+)(?:-correction\.(\d+))?")
+
+
+def version_key(version):
+    """The order of a version, and the one place that decides it. A correction version,
+    <major>.<minor>.<patch>-correction.<n>, is newer than the plain version of the same three numbers and older than
+    the next patch: 1.2.0, 1.2.1, 1.2.1-correction.1, 1.2.1-correction.2, 1.2.2. This is not SemVer's order, where a
+    suffix after a hyphen sorts before the plain version. Returns None for any other text."""
+    m = VERSION.fullmatch(version)   # fullmatch: with match and "$", a version with a final line end would pass
+    return tuple(int(n or 0) for n in m.groups()) if m else None
+
+
+def correction_version(current):
+    """The version a correction to `current` gets. A correction to a plain version takes the next patch number and
+    the marker: 1.2.0 gives 1.2.1-correction.1. A correction to a correction keeps the three numbers and counts up:
+    1.2.1-correction.1 gives 1.2.1-correction.2. No plain 1.2.1 is ever released beside them: the next ordinary
+    patch after a correction is 1.2.2, so SemVer's order and version_key agree on every tree."""
+    key = version_key(current)
+    if key is None:
+        raise ValueError(f"{current!r} is not a version")
+    major, minor, patch, n = key
+    return f"{major}.{minor}.{patch}-correction.{n + 1}" if n else f"{major}.{minor}.{patch + 1}-correction.1"
 
 
 def newest_version(module, ontology=ONTOLOGY):
-    """A module's newest version folder in releases/<module>/ that holds a manifest, by number, never by text."""
+    """A module's newest version folder in releases/<module>/ that holds a manifest, by version_key, never by text."""
     folder = os.path.join(ontology, "releases", module)
     versions = [v for v in os.listdir(folder)
-                if re.match(r"^\d+\.\d+\.\d+$", v) and os.path.isfile(os.path.join(folder, v, "manifest.json"))]
+                if version_key(v) and os.path.isfile(os.path.join(folder, v, "manifest.json"))]
     if not versions:
         raise FileNotFoundError(f"{folder} holds no released package")
-    return max(versions, key=lambda v: tuple(int(x) for x in v.split(".")))
+    return max(versions, key=version_key)
 
 
 def core_file(name="core.ttl", ontology=ONTOLOGY):
@@ -28,7 +52,7 @@ def core_file(name="core.ttl", ontology=ONTOLOGY):
 def core_builder(release=HERE):
     """The module name of the newest numbered core builder, build_core_<major>_<minor>; importing it gives its VERSION
     and BASE. A patch of core is a new builder too, named for its major and minor."""
-    found = [(int(m.group(1)), int(m.group(2)), f) for f in os.listdir(release) for m in [CORE_BUILDER.match(f)] if m]
+    found = [(int(m.group(1)), int(m.group(2)), f) for f in os.listdir(release) for m in [CORE_BUILDER.fullmatch(f)] if m]
     if not found:
         raise FileNotFoundError(f"{release} holds no build_core_<major>_<minor>.py")
     return max(found)[2][:-3]

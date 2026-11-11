@@ -189,3 +189,15 @@ def test_two_lineage_events_within_one_second_keep_their_order_in_the_reading_an
         assert discovery.instant(edges[(other, target)]) > discovery.instant(edges[(source, target)])
     assert discovery.utc_precise("2026-11-02 09:00:00") == "2026-11-02T09:00:00.000000Z"
     assert discovery.newest(["2026-11-02T06:00:00.100Z", "2026-11-02T06:00:00.9Z"]) == "2026-11-02T06:00:00.900000Z"
+
+
+def test_a_missing_package_stops_the_discovery_instead_of_reading_as_an_unreadable_view(monkeypatch):
+    # Without pyyaml no metric view can be parsed. The comparison must not go on as if the views were unreadable:
+    # it would count no metric view source and report edges as missing.
+    import sys
+
+    import pytest
+    workspace, genie = support.sandbox()
+    monkeypatch.setitem(sys.modules, "yaml", None)   # makes "import yaml" raise ImportError
+    with pytest.raises(ImportError):
+        discovery.discover(support.make_settings(), workspace.run_sql, genie, {"idp_sbx.semantic_sem_commercial"})

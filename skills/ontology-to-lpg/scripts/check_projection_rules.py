@@ -72,7 +72,8 @@ RDF_DATATYPES = {RDF.langString, RDF.HTML, RDF.XMLLiteral, DIR_LANG_STRING}
 PROPERTY_AXIOMS = (RDFS.domain, RDFS.range, RDFS.subPropertyOf)
 CLASS_OBJECTS = (RDFS.subClassOf, RDFS.domain, RDFS.range, OWL.equivalentClass, OWL.disjointWith)
 CLASS_KINDS = (OWL.Class, RDFS.Class)
-SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
+# A release folder's name: X.Y.Z, or a correction to a release, X.Y.Z-correction.N, which is newer than X.Y.Z.
+SEMVER = re.compile(r"(\d+)\.(\d+)\.(\d+)(?:-correction\.(\d+))?")   # applied with fullmatch
 # A string that ends like a BCP 47 language tag: n10s's keepLangTag stores "text@en", so such a
 # source string cannot be told apart from a tagged one on the way back.
 LANG_TAG_SUFFIX = re.compile(r"@[A-Za-z]{1,8}(-[A-Za-z0-9]{1,8})*$")
@@ -407,9 +408,9 @@ def check_packages(releases, cfg):
         folder = os.path.join(releases, module)
         if not os.path.isdir(folder):
             continue
-        versions = [v for v in os.listdir(folder) if SEMVER.match(v) and os.path.isdir(os.path.join(folder, v))]
+        versions = [v for v in os.listdir(folder) if SEMVER.fullmatch(v) and os.path.isdir(os.path.join(folder, v))]
         if versions:
-            newest[module] = max(versions, key=lambda v: tuple(map(int, v.split("."))))
+            newest[module] = max(versions, key=lambda v: tuple(int(n or 0) for n in SEMVER.fullmatch(v).groups()))
     for module, version in sorted(newest.items()):
         pin = cfg.packages.get(module)
         if pin is None:
@@ -418,7 +419,7 @@ def check_packages(releases, cfg):
             if os.path.isdir(os.path.join(releases, module, pin)):
                 fails.append(("inputs", f"Inputs: {module} is pinned at {pin} but its newest release is {version}"))
     for module, pin in sorted(cfg.packages.items()):
-        if not SEMVER.match(pin):
+        if not SEMVER.fullmatch(pin):
             fails.append(("inputs", f"Inputs: {module} is pinned at {pin}, which is not a release (X.Y.Z)"))
         elif not os.path.isdir(os.path.join(releases, module, pin)):
             fails.append(("inputs", f"Inputs: {module} is pinned at {pin}, which has no release folder"))

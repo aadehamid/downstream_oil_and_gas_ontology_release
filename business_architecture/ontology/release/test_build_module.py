@@ -257,6 +257,23 @@ class EarlierReleases(unittest.TestCase):
         finally:
             bm.released_requires = real
 
+    def test_a_correction_version_wins_over_the_version_it_corrects(self):
+        # reviews needs catalog 1.0.0 and prices needs catalog 1.0.1-correction.1: the correction is the higher one.
+        table = {("catalog", "1.0.0"): {}, ("catalog", "1.0.1-correction.1"): {}, ("catalog", "1.0.1-correction.2"): {},
+                 ("reviews", "1.0.0"): {"catalog": "1.0.0"}, ("prices", "1.0.0"): {"catalog": "1.0.1-correction.1"},
+                 ("offers", "1.0.0"): {"catalog": "1.0.1-correction.2"}}
+        requires = lambda dep, version: dict(table[(dep, version)])
+        self.assertEqual(bm.closure({"reviews": "1.0.0", "prices": "1.0.0"}, requires),
+                         {"reviews": "1.0.0", "prices": "1.0.0", "catalog": "1.0.1-correction.1"})
+        self.assertEqual(bm.closure({"offers": "1.0.0", "prices": "1.0.0"}, requires),
+                         {"offers": "1.0.0", "prices": "1.0.0", "catalog": "1.0.1-correction.2"})
+
+    def test_a_shape_path_with_a_correction_version_names_the_newest_package(self):
+        current = bm.label(bm.MODULES["party"])
+        self.assertEqual(bm.resolve("releases/party/1.0.1-correction.3/shapes.ttl"), f"releases/party/{current}/shapes.ttl")
+        self.assertEqual(bm.resolve("releases/party/1.0.0/shapes.ttl"), f"releases/party/{current}/shapes.ttl")
+        self.assertEqual(bm.resolve("party/shapes.ttl"), "party/shapes.ttl")
+
     def test_a_choice_justified_only_by_a_losing_release_does_not_settle(self):
         # root needs a 1.0.0, which needs b 1.0.0, which needs a 2.0.0,
         # which needs b 2.0.0. a 2.0.0 is reached only through b 1.0.0, which loses to b 2.0.0, which is
