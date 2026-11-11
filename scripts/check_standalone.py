@@ -9,9 +9,13 @@ Each rule below denies one kind of reference that leads outside (RULES), or one 
 documents must no longer mention. Public sources and licences stay; GitHub links are checked against an allow
 list of the public projects the tree cites (GITHUB_OWNERS).
 
-scripts/standalone-pending.txt lists the paths that are not clean yet, one glob and its reason per line. The
-check skips those paths. The list can only shrink: a line must be one of ALLOWED_PENDING below, and the check
-fails when a line matches no file or matches only clean files. --strict ignores the list; the final cut must pass
+This is a deny list, so it finds the known forms of an outside reference and no others. A reference written in a
+form no rule names passes. The check keeps the known forms out between reviews; it does not replace reading a
+new document, and the final cut still runs it with --strict over the whole tree.
+
+scripts/standalone-pending.txt lists the files that are not clean yet, one path and its reason per line. The
+check skips those files. The list can only shrink: a line must name one of the files in ALLOWED_PENDING below,
+with no wildcard, and the check fails when a line names no file or a clean file. --strict ignores the list; the final cut must pass
 with --strict.
 
 scripts/standalone-exceptions.txt lists the matches that stay, each with its reason: text in a released package,
@@ -23,7 +27,6 @@ A finding prints as `path:line: [rule] the text that matched`. The exit status i
 stale pending line, else 0.
 """
 import argparse
-import fnmatch
 import os
 import re
 import subprocess
@@ -37,7 +40,8 @@ EXCEPTIONS = os.path.join("scripts", "standalone-exceptions.txt")
 ALLOWED_PENDING = (
     "README.md",
     "KNOWN-OPEN-ITEMS.md",
-    "HOW-TO-UPDATE.*",
+    "HOW-TO-UPDATE.md",
+    "HOW-TO-UPDATE.html",
     "business_architecture/ontology/epm-walkthrough.html",
     "business_architecture/ontology/epm-ontology-guide.html",
     "viewer/index.html",
@@ -61,15 +65,16 @@ _COLOUR = re.compile(r"""(?:(?<=[:"'=])|(?<=:\s)|(?<=\bsolid\s)|(?<=\bdashed\s)|
 # A grade of fuel oil or diesel is written with a number sign (#2 diesel, diesel #2, No. #6 fuel oil).
 _FUEL_GRADE = re.compile(r"\#[1-6](?=\s+(?:diesel|fuel|heating|oil|distillate)\b)|(?<=diesel\s)\#[1-6]\b|(?<=oil\s)\#[1-6]\b", re.I)
 _NUMBER_SIGN = re.compile(r"(?<![&\w/#])\#\d+\b(?![\w-])")
-# Every way a line names a GitHub owner: a web link (with or without www), a raw or gist link, the API's repos
-# path, and an SSH remote (git@github.com:<owner>/..., ssh://git@github.com/<owner>/...). docs.github.com is the
-# public manual and names no owner.
-_GITHUB = re.compile(r"(?<![\w.-])(?:(?:www\.|gist\.)?github\.com[/:]|(?:raw|gist)\.githubusercontent\.com/"
-                     r"|api\.github\.com/repos/)([A-Za-z0-9_.-]+)", re.I)
-# A path under one person's account. An absolute one names the person; a home path leads outside the tree.
-_USER_PATH = re.compile(r"(?<![\w./~-])/(?:Users|home)/[A-Za-z0-9._-]+(?=/|\b)|\b[A-Za-z]:\\{1,2}Users\\{1,2}[A-Za-z0-9._-]+")
-_HOME_PATH = re.compile(r"""(?<![\w/.-])~/(?:[^\s"'`<>)\],;]*[^\s"'`<>)\],;.:])?"""
-                        r"""|\$HOME\b(?:[^\s"'`<>)\],;]*[^\s"'`<>)\],;.:])?|\$\{HOME\}|%USERPROFILE%""")
+# Every way a line names a GitHub owner: any host that ends in github.com or githubusercontent.com (www, gist, raw,
+# codeload, altssh, api and any other), over https or SSH, with or without a port. Two hosts name no owner in the
+# first part of the path: docs.github.com is the public manual, and api.github.com names one only after repos/.
+_GITHUB = re.compile(r"(?<![\w.-])((?:[a-z0-9-]+\.)*github(?:usercontent)?\.com)(?::\d+)?[/:](repos/)?([a-z0-9_.-]+)", re.I)
+# A path under one person's account, in any letter case, with either slash on Windows. An absolute one names the
+# person; a home path leads outside the tree. A placeholder such as /Users/<name>/ is not a path.
+_USER_PATH = re.compile(r"(?<![\w.~:-])(?<!:/)/(?:users|home)/[a-z0-9._-]+|\b[a-z]:[\\/]{1,2}users[\\/]{1,2}[a-z0-9._-]+", re.I)
+_REST = r"""(?:[^\s"'`<>)\],;]*[^\s"'`<>)\],;.:])?"""
+_HOME_PATH = re.compile(r"(?<![\w/.-])~(?:[A-Za-z][A-Za-z0-9._-]*)?/" + _REST + r"|\$HOME\b" + _REST + r"|\$\{HOME\}" + _REST
+                        + r"|\$env:(?:USERPROFILE|HOME|HOMEPATH)\b" + _REST + r"|%(?:USERPROFILE|HOMEPATH|HOMEDRIVE)%", re.I)
 
 
 def _number_sign(line):
@@ -81,7 +86,14 @@ def _number_sign(line):
 
 def _github(line):
     """Each GitHub link whose owner is not on the allow list."""
-    return [m for m in _GITHUB.finditer(line) if m.group(1).lower() not in GITHUB_OWNERS]
+    found = []
+    for m in _GITHUB.finditer(line):
+        host = m.group(1).lower()
+        if host == "docs.github.com" or (host == "api.github.com" and not m.group(2)):
+            continue
+        if m.group(3).lower() not in GITHUB_OWNERS:
+            found.append(m)
+    return found
 
 
 # A public project's own issue or pull request, cited as a source, is named with the project ("OEO issue 1958",
@@ -116,9 +128,9 @@ RULES = [
      _numbered_item),
     ("decision-record", "a decision record kept elsewhere", _regex(r"EPM-DEC-")),
     ("session", "a session or a handoff folder", _regex(r"~/\.claude|(?<![\w-])\.claude/|\bhandoffs?/|\bhandoff folder", re.I)),
-    ("user-path", "a path under one person's account: /Users/<name>, /home/<name>, C:\\Users\\<name>", _regex(_USER_PATH.pattern)),
-    ("home-path", "a path under the home folder (~/, $HOME, %USERPROFILE%), which leads outside the tree", _regex(_HOME_PATH.pattern)),
-    ("removed-demo", "the removed demo", _regex(r"(?<![\w-])demos/|\bpricing[ _-]demo\b|(?<![A-Za-z])pricing_demo(?![A-Za-z])", re.I)),
+    ("user-path", "a path under one person's account: /Users/<name>, /home/<name>, C:\\Users\\<name>", lambda line: list(_USER_PATH.finditer(line))),
+    ("home-path", "a path under the home folder (~/, $HOME, %USERPROFILE%), which leads outside the tree", lambda line: list(_HOME_PATH.finditer(line))),
+    ("removed-demo", "the removed demo", _regex(r"(?<![\w-])demos/|(?<![A-Za-z])pricing[ _-]?demos?(?![A-Za-z])", re.I)),
     ("removed-aura", "the removed AuraDB copy", _regex(r"\baura(?:db)?\b", re.I)),
     ("removed-docker", "the removed Docker stores", _regex(r"docker", re.I)),
     ("removed-token", "the removed token connector", _regex(r"\baccess tokens?\b|DATABRICKS_TOKEN", re.I)),
@@ -165,8 +177,8 @@ def read_text(path):
 
 
 def read_pending(root=ROOT):
-    """[(glob, reason)] from the pending list. A line is `<glob> :: <reason>`; `#` starts a comment. In a glob
-    `*` matches any run of characters, `/` included, so `skills/**` covers everything under skills/."""
+    """[(path, reason)] from the pending list. A line is `<path> :: <reason>`; `#` starts a comment. A path is one
+    file of ALLOWED_PENDING, spelled exactly."""
     path = os.path.join(root, PENDING)
     if not os.path.exists(path):
         return []
@@ -178,9 +190,9 @@ def read_pending(root=ROOT):
                 continue
             glob, sep, reason = (part.strip() for part in line.partition(" :: "))
             if not sep or not glob or not reason:
-                problems.append(f"{PENDING}:{number}: write `<glob> :: <reason>`")
-            elif glob not in ALLOWED_PENDING:
-                problems.append(f"{PENDING}:{number}: `{glob}` is not a path the list may hold; the list can only shrink")
+                problems.append(f"{PENDING}:{number}: write `<path> :: <reason>`")
+            elif glob not in ALLOWED_PENDING or any(c in glob for c in "*?["):
+                problems.append(f"{PENDING}:{number}: `{glob}` is not a file the list may hold; the list can only shrink")
             else:
                 entries.append((glob, reason))
     if problems:
@@ -234,7 +246,7 @@ def check(root=ROOT, strict=False):
                  if exceptions.get((name, rule, matched), (None,))[0] != counts[(name, rule, matched)]]
         if not found:
             continue
-        globs = [glob for glob, _ in pending if fnmatch.fnmatchcase(name, glob)]
+        globs = [glob for glob, _ in pending if name == glob]
         if globs:
             for glob in globs:
                 dirty.setdefault(glob, {})[name] = len(found)
@@ -247,10 +259,10 @@ def check(root=ROOT, strict=False):
             stale.append(f"{EXCEPTIONS}:{number}: {name} holds [{rule}] `{matched}` {have} times, not {count}; "
                          + ("remove the line" if have == 0 else "the exception no longer covers it"))
     for glob, _ in pending:
-        if not any(fnmatch.fnmatchcase(name, glob) for name in names):
-            stale.append(f"{PENDING}: `{glob}` matches no file; remove the line")
+        if not any(name == glob for name in names):
+            stale.append(f"{PENDING}: `{glob}` is not a file in this tree; remove the line")
         elif glob not in dirty:
-            stale.append(f"{PENDING}: every file under `{glob}` is clean; remove the line")
+            stale.append(f"{PENDING}: `{glob}` is clean; remove the line")
     summary = [f"pending `{glob}`: {sum(dirty.get(glob, {}).values())} findings in {len(dirty.get(glob, {}))} files ({reason})"
                for glob, reason in pending]
     return findings, stale, summary

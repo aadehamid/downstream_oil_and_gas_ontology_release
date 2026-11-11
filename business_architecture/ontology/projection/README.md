@@ -45,9 +45,10 @@ Each module package has three graphs: `<module>.ttl` (the content), `shapes.ttl`
 
 Run it after any input or shape changes. You need [uv](https://docs.astral.sh/uv/), Java 11 or later ([ROBOT's Getting Started](https://robot.obolibrary.org/): "make sure you have Java 11 or later installed"), and a local Neo4j 2025.06.2 that already runs with the n10s and APOC Core jars in its `plugins` folder. The driver starts and stops no server. It is in the `ontology-to-lpg` skill, in the `scripts/` folder of `$SKILLS/ontology-to-lpg`; the skill's `references/running.md`, rule 5, says how to prepare the Neo4j server, and the `rdf-store` skill's `references/stores.md` says how to start Fuseki from the Apache jar.
 
-1. Download ROBOT 1.9.10 (it runs the ELK reasoner) into a folder outside the repository, and check its SHA-256. If the checksum differs, stop: the driver refuses another file. On Windows, check it with `certutil -hashfile robot.jar SHA256`.
+1. Download ROBOT 1.9.10 (it runs the ELK reasoner), and check its SHA-256. Run these commands in a folder outside the repository; the jar never goes into this tree. If the checksum differs, stop: the driver refuses another file. On Windows, check it with `certutil -hashfile robot.jar SHA256`.
 
    ```bash
+   cd <a folder outside the repository>
    curl -L -o robot.jar https://github.com/ontodev/robot/releases/download/v1.9.10/robot.jar
    shasum -a 256 robot.jar
    # expect 16a73c074f3df359a7338a84b4e0788785fe06117f931bb9796e9619ea776105

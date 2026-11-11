@@ -70,7 +70,7 @@ class RunConfig(unittest.TestCase):
         # Machine paths (ROBOT, the outputs) cannot exist in CI, so they must sit under the home folder, which the
         # driver expands; the repository's own files are checked above.
         for key in ("out", "robot_jar"):
-            self.assertTrue(self.cfg[key].startswith("~"), key)
+            self.assertTrue(self.cfg[key].startswith("~/"), key)
 
     def test_it_names_no_store_address_or_login_file(self):
         self.assertEqual(sorted(self.cfg), ["inputs_script", "mode", "out", "projection_config", "queries", "release_graphs",

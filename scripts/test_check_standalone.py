@@ -68,6 +68,24 @@ CASES = [
      "See https://gist.github.com/jbarrasa/0123abcd."),
     ("github-link", "curl https://api.github.com/repos/some-owner/private-repo/contents/x", "api.github.com/repos/some-owner",
      "curl https://api.github.com/repos/ontodev/robot/releases and https://api.github.com/rate_limit"),
+    ("github-link", "curl -L https://codeload.github.com/some-owner/private-repo/zip/refs/heads/x", "codeload.github.com/some-owner",
+     "curl -L https://codeload.github.com/ontodev/robot/zip/refs/tags/v1.9.10"),
+    ("github-link", "git clone ssh://git@altssh.github.com:443/some-owner/private-repo.git", "altssh.github.com:443/some-owner",
+     "git clone ssh://git@altssh.github.com:443/apache/jena.git"),
+    ("github-link", "See https://objects.githubusercontent.com/some-owner/x.", "objects.githubusercontent.com/some-owner",
+     "See https://docs.github.com/en/actions/some-owner and https://notgithub.com/some-owner/x."),
+    ("user-path", "The file is //Users/somebody/work/notes.md.", "/Users/somebody", "See https://users/somebody/ and https://example.org//x."),
+    ("user-path", "Open C:\\users\\somebody in Explorer.", "C:\\users\\somebody", "Open C:\\users\\<name> in Explorer."),
+    ("user-path", "Open c:/Users/somebody/kpi-store.", "c:/Users/somebody", "The ratio c:/users is not a path; nor is c:/Users/<name>."),
+    ("user-path", "cd /HOME/somebody/kpi-store", "/HOME/somebody", "The page /homepage/somebody and the word home/somebody."),
+    ("home-path", "cd %HOMEDRIVE%%HOMEPATH%\\kpi-store", "%HOMEDRIVE%", "HOMEDRIVE and HOMEPATH are Windows variables; 50%HOME is not."),
+    ("home-path", "cd %HOMEPATH%\\kpi-store", "%HOMEPATH%", "Set %KPI_STORE_HOME% to the folder."),
+    ("home-path", "cd $env:USERPROFILE\\kpi-store", "$env:USERPROFILE\\kpi-store", "$env:EPM_STORES_ENV names the settings file."),
+    ("home-path", "export OUT=${HOME}/lpg-out", "${HOME}/lpg-out", "${HOMEBREW_PREFIX}/bin is not the home folder."),
+    ("home-path", "Read ~somebody/notes.md first.", "~somebody/notes.md", "About ~5/10 of the rows, or ~somebody without a path."),
+    ("removed-demo", "The pricing demos were removed.", "pricing demos", "Pricing demonstrations are public."),
+    ("removed-demo", "import pricing_demos", "pricing_demos", "repricing_demos = 2 and pricing_demosaic = 3"),
+    ("removed-demo", "the pricingdemo catalog", "pricingdemo", "the pricingdemography table"),
     ("user-path", "The file is /Users/somebody/work/notes.md.", "/Users/somebody", "See https://example.org/Users/somebody/ and /Users/<name>/."),
     ("user-path", "cd /home/somebody/kpi-store", "/home/somebody", "https://www.aspentech.com/-/media/aspentech/home/resources/x.pdf"),
     ("user-path", "Open C:\\Users\\somebody\\kpi-store in Explorer.", "C:\\Users\\somebody", "Open C:\\Users\\<name>\\kpi-store or C:\\kpi-store."),
@@ -144,11 +162,11 @@ def test_the_checks_own_files_are_not_read(tmp_path):
 
 
 def test_a_pending_path_is_skipped_and_counted(tmp_path, capsys):
-    root = tree(tmp_path, {"HOW-TO-UPDATE.md": "PR 12 and PR 13\n", "HOW-TO-UPDATE.html": "fine\n", "b.md": "fine\n"},
-                pending="# why\nHOW-TO-UPDATE.* :: awaits its rewrite\n")
+    root = tree(tmp_path, {"HOW-TO-UPDATE.md": "PR 12 and PR 13\n", "b.md": "fine\n"},
+                pending="# why\nHOW-TO-UPDATE.md :: awaits its rewrite\n")
     findings, stale, summary = cs.check(root)
     assert (findings, stale) == ([], [])
-    assert summary == ["pending `HOW-TO-UPDATE.*`: 2 findings in 1 files (awaits its rewrite)"]
+    assert summary == ["pending `HOW-TO-UPDATE.md`: 2 findings in 1 files (awaits its rewrite)"]
     assert cs.main(["--root", root]) == 0
     assert capsys.readouterr().out.endswith("stand-alone, except the 1 pending paths above\n")
 
@@ -159,15 +177,23 @@ def test_strict_ignores_the_pending_list(tmp_path):
     assert cs.main(["--root", root, "--strict"]) == 1
 
 
+def test_a_pending_file_hides_no_file_with_a_longer_name(tmp_path):
+    # The pending line names one file. A new file beside it, with a name that starts the same way, is checked.
+    root = tree(tmp_path, {"HOW-TO-UPDATE.md": "PR 12\n", "HOW-TO-UPDATE.evasion.md": "PR 13\n"},
+                pending="HOW-TO-UPDATE.md :: awaits its rewrite\n")
+    assert cs.check(root)[0] == ["HOW-TO-UPDATE.evasion.md:1: [pull-request] PR 13"]
+    assert cs.main(["--root", root]) == 1
+
+
 def test_a_pending_line_that_matches_no_file_fails(tmp_path):
     root = tree(tmp_path, {"a.md": "fine\n"}, pending="README.md :: awaits its rewrite\n")
-    assert cs.check(root)[1] == ["scripts/standalone-pending.txt: `README.md` matches no file; remove the line"]
+    assert cs.check(root)[1] == ["scripts/standalone-pending.txt: `README.md` is not a file in this tree; remove the line"]
     assert cs.main(["--root", root]) == 1
 
 
 def test_a_pending_line_whose_files_are_all_clean_fails(tmp_path):
-    root = tree(tmp_path, {"HOW-TO-UPDATE.md": "fine\n"}, pending="HOW-TO-UPDATE.* :: awaits its rewrite\n")
-    assert cs.check(root)[1] == ["scripts/standalone-pending.txt: every file under `HOW-TO-UPDATE.*` is clean; remove the line"]
+    root = tree(tmp_path, {"HOW-TO-UPDATE.md": "fine\n"}, pending="HOW-TO-UPDATE.md :: awaits its rewrite\n")
+    assert cs.check(root)[1] == ["scripts/standalone-pending.txt: `HOW-TO-UPDATE.md` is clean; remove the line"]
     assert cs.main(["--root", root]) == 1
 
 
@@ -178,7 +204,7 @@ def test_a_finding_outside_the_pending_paths_still_fails(tmp_path):
 
 def test_a_pending_line_without_a_reason_is_refused(tmp_path, capsys):
     root = tree(tmp_path, {"README.md": "PR 12\n"}, pending="README.md\n")
-    with pytest.raises(ValueError, match="standalone-pending.txt:1: write `<glob> :: <reason>`"):
+    with pytest.raises(ValueError, match="standalone-pending.txt:1: write `<path> :: <reason>`"):
         cs.check(root)
     assert cs.main(["--root", root]) == 1
 
@@ -187,29 +213,32 @@ def test_a_pending_line_without_a_reason_is_refused(tmp_path, capsys):
     "docs/** :: awaits rewrite",                 # a new folder
     "* :: everything",                           # the whole tree
     "README.* :: awaits the documents rewrite",  # an allowed path, widened
+    "HOW-TO-UPDATE.* :: awaits the documents rewrite",  # two allowed files as one wildcard
     "docs/new.md :: awaits rewrite",             # a new file
 ])
 def test_the_pending_list_cannot_grow(tmp_path, capsys, line):
     root = tree(tmp_path, {"docs/new.md": "PR 12\n", "README.md": "PR 13\n", "README.html": "PR 14\n"}, pending=line + "\n")
-    with pytest.raises(ValueError, match="standalone-pending.txt:1: .* is not a path the list may hold"):
+    with pytest.raises(ValueError, match="standalone-pending.txt:1: .* is not a file the list may hold"):
         cs.check(root)
     assert cs.main(["--root", root]) == 1
     assert cs.check(root, strict=True)[0] == ["README.html:1: [pull-request] PR 14", "README.md:1: [pull-request] PR 13",
                                               "docs/new.md:1: [pull-request] PR 12"]
 
 
-def test_the_allowed_pending_lines_are_these_seven_and_this_trees_list_holds_no_other():
+def test_the_allowed_pending_lines_are_these_eight_files_and_this_trees_list_holds_no_other():
     # Written by hand. A later change may delete a line here and in the list; it may never add or widen one.
     assert cs.ALLOWED_PENDING == (
         "README.md",
         "KNOWN-OPEN-ITEMS.md",
-        "HOW-TO-UPDATE.*",
+        "HOW-TO-UPDATE.md",
+        "HOW-TO-UPDATE.html",
         "business_architecture/ontology/epm-walkthrough.html",
         "business_architecture/ontology/epm-ontology-guide.html",
         "viewer/index.html",
         "horoi_viewer/index.html",
     )
-    assert [glob for glob, _ in cs.read_pending()] == list(cs.ALLOWED_PENDING)
+    assert not any(c in path for path in cs.ALLOWED_PENDING for c in "*?[")
+    assert [path for path, _ in cs.read_pending()] == list(cs.ALLOWED_PENDING)
 
 
 CHANGELOG = "releases/kpi/1.3.0/CHANGELOG.md"
@@ -274,9 +303,10 @@ def test_this_trees_exceptions_are_only_for_fixed_content():
                "skills/rdf-store/scripts/test_",
                # the two run configurations, whose default paths under the home folder a test pins
                "business_architecture/ontology/projection/skill-run/epm-run.json",
-               "skills/ontology-to-lpg/templates/run-config.json")
+               "skills/ontology-to-lpg/templates/run-config.json",
+               "business_architecture/ontology/projection/skill-run/test_skill_run.py")
     entries = cs.read_exceptions()
-    assert len(entries) == 37
+    assert len(entries) == 38
     assert [path for path, _, _ in entries if not path.startswith(allowed)] == []
 
 
