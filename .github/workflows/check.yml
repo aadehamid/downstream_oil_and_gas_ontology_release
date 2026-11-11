@@ -32,6 +32,11 @@ jobs:
         env:
           PYTEST_ADDOPTS: -rs   # name each skipped test and why, so a skip on one system is seen
         run: bash scripts/check.sh
+      # check.sh leaves out the tests that ask whether the tree still equals the release as shipped. This branch is
+      # the release as shipped, so they must pass here. One system is enough: they compare files, not behaviour.
+      - name: check-pinned.sh
+        if: matrix.os == 'ubuntu-24.04'
+        run: bash scripts/check-pinned.sh
 
   # The store loads on Windows, with the commands a person runs: the setup check, the Fuseki load, the Neo4j load,
   # the copy to a second database, and the sync check. The servers run on the runner and listen on 127.0.0.1 only.
