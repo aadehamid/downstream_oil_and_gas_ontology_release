@@ -42,6 +42,32 @@ jobs:
           sed 's/^set -euo pipefail/set -uo pipefail/' scripts/check.sh > scripts/check-survey.sh
           bash scripts/check-survey.sh 2>&1 | tee "$RUNNER_TEMP/survey.log" || true
 
+  # TEMPORARY while the Windows job is made green: the part of the check script after the pytest run, with every
+  # command run even after one fails, so its failures are seen in minutes.
+  tail-temporary:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v7
+      - name: the check script from the skills tests on
+        run: |
+          python - <<'PY'
+          import pathlib
+          lines = pathlib.Path("scripts/check.sh").read_text(encoding="utf-8").split("\n")
+          start = next(i for i, l in enumerate(lines) if l.startswith('before="$(snapshot)"'))
+          skills = next(i for i, l in enumerate(lines) if l.startswith("# The bundled skills' own checks"))
+          text = "\n".join(lines[:start + 1] + lines[skills:]).replace("set -euo pipefail", "set -uo pipefail")
+          pathlib.Path("scripts/check-tail.sh").write_text(text, encoding="utf-8", newline="\n")
+          PY
+          bash scripts/check-tail.sh 2>&1 || true
+
   # The store loads on Windows, with the commands a person runs: the setup check, the Fuseki load, the Neo4j load,
   # the copy to a second database, and the sync check. The servers run on the runner and listen on 127.0.0.1 only.
   # One Neo4j Enterprise server (evaluation licence) holds both databases: neo4j, with the n10s and APOC plugins,
