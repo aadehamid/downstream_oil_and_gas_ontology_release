@@ -7,14 +7,17 @@ The tool reads the report, shows each row and what it will change, and asks the 
 then changes the data-product module's tables, rebuilds the module, writes the package at the correction version,
 gives every module that depends on it a correction version too, rebuilds the catalog and the projection manifest,
 runs the competency questions, verifies each written package against a fresh build and writes the discovery-run
-record. In a Git copy it commits and tags. In a plain
-folder it writes the same files.
+record. In a Git copy it commits and tags: the cut ends with
+its commit and its tag, or it changes nothing. In a plain folder it writes the same files.
 
 All of the work happens in a temporary copy of the release. The release itself changes only after every step has
 passed, so a failure leaves it as it was. A report that was cut before changes nothing.
 
 Rules:
 - A report is cut only when every row that blocks has a decision.
+- A report is a file a person may have edited. An accepted row is refused unless its object, its found value and
+  each field of its proposed fix have the form of a name, and the fix names the data-product module. The record
+  holds a value of any other row only when it has that form.
 - `accept` applies the row's proposed fix when a correction can hold it. A fix that adds a concept needs a minor
   version, and a question waits for its answer: the tool lists both and leaves them.
 - `reject` changes nothing in the ontology. It becomes a standing decision, so the next comparison leaves the row out.
@@ -57,8 +60,29 @@ NEEDS_MINOR = {"add-measure-link": "a measure link with its filter needs a new p
                "record-replaces": "the table a Databricks table replaces belongs to the technical-graph module",
                "add-object": "a new object is a new concept",
                "add-edge": "a new table edge is new content"}
-# The kinds whose found value is an object's or a column's name. Any other found value stays in the report.
-NAME_KINDS = {"object-renamed", "column-renamed", "column-case", "migration-pair", "object-extra"}
+# A report is a file that a person may have edited, so the cut takes no text from it on trust. A value goes into
+# the record, the standing decisions or the module's tables only when it has the form of the name it stands for.
+# A column name is letters, digits, underscores and dollar signs. An object name is one to three such parts, which
+# may also hold a hyphen, joined by dots. A table type is capital letters and underscores.
+COLUMN_NAME = re.compile(r"^[\w$]{1,255}$")
+NAME_PART = r"[\w$-]{1,255}"
+OBJECT_NAME = re.compile(rf"^{NAME_PART}(?:\.{NAME_PART}){{0,2}}$")
+FULL_NAME = re.compile(rf"^{NAME_PART}(?:\.{NAME_PART}){{2}}$")
+TABLE_TYPE = re.compile(r"^[A-Z][A-Z_]{0,39}$")
+# The form of the found value, by row kind. A found value of any other kind stays in the report.
+FOUND_FORM = {"column-renamed": COLUMN_NAME, "column-case": COLUMN_NAME, "object-renamed": OBJECT_NAME,
+              "migration-pair": OBJECT_NAME, "object-extra": TABLE_TYPE}
+COLUMN_KINDS = {"column-missing", "column-renamed", "column-case"}
+# The form of each field of a proposed fix that a correction applies.
+FIX_FORM = {"rename-column": {"from": COLUMN_NAME, "to": COLUMN_NAME},
+            "add-serves-measure": {"view": OBJECT_NAME, "measure": re.compile(rf"^{NAME_PART}$")},
+            "rename-object": {"from": OBJECT_NAME, "to": FULL_NAME},
+            "remove-column": {"column": COLUMN_NAME},
+            "remove-edge": {"from": OBJECT_NAME, "to": OBJECT_NAME},
+            "remove-object": {"object": OBJECT_NAME}}
+KEPT = "(kept in the report)"
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
+RUN_AT = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
 DEFAULT_APPROVER = "The person who ran the cut"
 CHECK_COMMAND = "bash scripts/check.sh"
 GIT_PLACE = {"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR", "GIT_PREFIX", "GIT_NAMESPACE"}
@@ -70,6 +94,10 @@ class CutRefused(Exception):
 
 class CutFailed(Exception):
     """A step of the cut failed. The release is as it was before the cut."""
+
+
+class CutIncomplete(Exception):
+    """The cut is committed and Git could not tag it. Running the same command again finishes the tag."""
 
 
 @dataclass
@@ -262,8 +290,16 @@ def load_report(report_path, decisions=None):
             sums["decisions"] = _sha(Path(decisions).read_bytes())
     except (rep.ReportError, OSError, KeyError) as err:
         raise CutRefused(f"the report cannot be read: {err}") from None
-    if not RUN_ID.match(report["run"]["id"]):
-        raise CutRefused(f"the report's run ID {report['run']['id']!r} cannot name a file")
+    run = report["run"]
+    if not RUN_ID.match(run["id"]):
+        raise CutRefused(f"the report's run ID {run['id']!r} cannot name a file")
+    # The record copies these, so each must have its form.
+    if not RUN_AT.match(run["at"]) or not SHA256.match(run["settings_sha256"]) or not SHA256.match(run["zip_sha256"]):
+        raise CutRefused("the report's run must hold its time as <date>T<time>Z and two SHA-256 checksums in lower-case hexadecimal")
+    newest = ov.release_scripts_newest()
+    odd = sorted(m for m, v in report["ontology"].items() if not re.match(rf"^{NAME_PART}$", m) or newest.version_key(v) is None)
+    if odd:
+        raise CutRefused(f"the report's ontology versions are not module names with versions: {', '.join(repr(m) for m in odd)}")
     return report, sums
 
 
@@ -316,8 +352,9 @@ def _item(row, tables):
         return Item(row, "needs a minor version", NEEDS_MINOR[action])
     if action == "none":
         return Item(row, "not applied", "the row proposes no change")
-    if action not in APPLY or fix.get("module") != MODULE:
-        return Item(row, "not applied", f"a correction cannot apply the action {action} to the module {fix.get('module')}")
+    if action not in APPLY:
+        return Item(row, "not applied", "a correction cannot apply this row's action")
+    _check_fix(row, action)
     try:
         done = APPLY[action](tables, row, fix)
     except Unappliable as err:
@@ -330,13 +367,44 @@ def _item(row, tables):
     return Item(row, "apply", text, breaking, confirm, changes)
 
 
+def _check_fix(row, action):
+    """Stops the cut when an accepted row's fix holds anything but names: the module must be data-product, and the
+    object, the found value and each field of the fix must have the form of the name they stand for."""
+    fix = row["proposed_fix"]
+
+    def refuse(what):
+        raise CutRefused(f"row {row['id']} cannot be applied: {what}. Correct the report, or reject the row.")
+    if fix.get("module") != MODULE:
+        refuse(f"its proposed fix names a module other than {MODULE}")
+    for key, form in FIX_FORM[action].items():
+        if not isinstance(fix.get(key), str) or not form.match(fix[key]):
+            refuse(f"the '{key}' of its proposed fix is not a name")
+    if not OBJECT_NAME.match(row["object"]):
+        refuse("its object is not an object name")
+    form = FOUND_FORM.get(row["kind"])
+    if form and row["found_value"] and not form.match(row["found_value"]):
+        refuse("its found value is not a name")
+
+
+def _recorded(row):
+    """The row's object, ontology value and found value as the record and the standing decisions may hold them:
+    each as it is when it has the form of a name, and "(kept in the report)" otherwise. Evidence, query results,
+    Genie filter text and anything a person typed into these fields stay in the report."""
+    def name(value, form):
+        return value if not value or (form and form.match(value)) else KEPT
+    return (name(row["object"], OBJECT_NAME),
+            name(row["ontology_value"], COLUMN_NAME if row["kind"] in COLUMN_KINDS else OBJECT_NAME),
+            name(row["found_value"], FOUND_FORM.get(row["kind"])))
+
+
 def _setting(row):
     fix = row["proposed_fix"]
     if fix.get("action") == "set-catalog-name":
-        return (f"in kpi_store.toml, under [names], set {fix.get('ontology_catalog')} to the name this environment "
-                "gives that catalog")
+        catalog = fix.get("ontology_catalog")
+        catalog = catalog if isinstance(catalog, str) and re.match(rf"^{NAME_PART}$", catalog) else "the ontology's catalog name"
+        return f"in kpi_store.toml, under [names], set {catalog} to the name this environment gives that catalog"
     return (f"record this difference in kpi_store.toml ([names] for a catalog's name, [skip] for a schema or a table "
-            f"to leave out); the ontology keeps {row['ontology_value'] or row['object']}")
+            f"to leave out); the ontology keeps {_recorded(row)[1] or _recorded(row)[0]}")
 
 
 def _versions(root):
@@ -398,21 +466,23 @@ def cut(report_path, release_root=".", decisions=None, approver=None, ask=input,
         before_step=None):
     """Cuts the report into the release and returns an Outcome. `ask(prompt)` returns what the person typed and
     `say(line)` shows a line. `before_step(name)` is called before each step, for a caller that follows progress.
-    Raises CutRefused when the report or an answer stops the cut and CutFailed when a step fails; the release is
-    unchanged in both cases."""
+    Raises CutRefused when the report, the Git copy or an answer stops the cut and CutFailed when a step fails; the
+    release is unchanged in both cases. In a Git copy a cut ends with its commit and its tag, or changes nothing.
+    The one exception raises CutIncomplete: the commit is made and Git could not tag it. The same call again
+    finishes the tag."""
     root = Path(release_root).resolve()
     _requirements()
     report, sums = load_report(report_path, decisions)
     plan_ = plan(report, root, sums)
     for line in describe(plan_):
         say(line)
-    if plan_.already_cut:
-        return Outcome("already cut", plan_, record_path(report))
     if plan_only:
-        return Outcome("planned", plan_)
-    git = _git_state(root)
-    if git == "dirty":
-        raise CutRefused("this Git copy has changes that are not committed. Commit them or put them aside, then cut.")
+        return Outcome("already cut" if plan_.already_cut else "planned", plan_, record_path(report) if plan_.already_cut else None)
+    if plan_.already_cut:
+        outcome = Outcome("already cut", plan_, record_path(report))
+        _finish_tag(root, report, outcome, say)
+        return outcome
+    git = _git_ready(root, plan_)
     for item in plan_.applied:
         if item.breaking:
             typed = ask(f"Row {item.row['id']} is a breaking change: {item.text}. Type {item.confirm} to confirm: ")
@@ -595,8 +665,8 @@ def _write_standing(plan_, staging):
     keys = {d["key"] for d in held}
     for row in rejected:
         if rep.standing_key(row) not in keys:
-            held.append({"key": rep.standing_key(row), "kind": row["kind"], "object": row["object"],
-                         "ontology_value": row["ontology_value"], "decision": "reject", "run": plan_.report["run"]["id"]})
+            held.append({"key": rep.standing_key(row), "kind": row["kind"], "object": _recorded(row)[0],
+                         "ontology_value": _recorded(row)[1], "decision": "reject", "run": plan_.report["run"]["id"]})
     _write(path, json.dumps({"format": 1, "decisions": held}, indent=2, ensure_ascii=False) + "\n")
 
 
@@ -604,13 +674,6 @@ def _write_standing(plan_, staging):
 
 def _cell(text):
     return str(text).replace("|", "\\|").replace("\r", " ").replace("\n", " ").strip() or " "
-
-
-def _found(row):
-    """The row's found value when it is a name. Query results and Genie filter text stay in the report."""
-    if not row["found_value"]:
-        return ""
-    return row["found_value"] if row["kind"] in NAME_KINDS else "(kept in the report)"
 
 
 def _record(plan_, sums, approver, now, files):
@@ -643,7 +706,7 @@ def _record(plan_, sums, approver, now, files):
         r = i.row
         why = "; ".join(t for t in (i.text, r["note"]) if t)
         lines.append("| " + " | ".join(_cell(c) for c in (
-            r["id"], r["kind"], "yes" if r["blocks"] else "no", r["object"], r["ontology_value"], _found(r),
+            r["id"], r["kind"], "yes" if r["blocks"] else "no", *_recorded(r),
             r["decision"] or "none", r["decided_by"], i.outcome, why)) + " |")
     lines += ["", "## Changes", ""]
     changes = [(i.row["id"], *c) for i in plan_.applied for c in i.changes]
@@ -731,10 +794,12 @@ def _git(root, *args):
 
 
 def _git_state(root):
-    """"none" for a plain folder or a machine without Git, "dirty" when the copy has changes that are not committed,
-    "no author" when Git has no user.name or user.email, else "ready"."""
-    if not (root / ".git").exists() or not shutil.which("git"):
+    """"none" for a plain folder, "no git" for a Git copy on a machine without Git, "dirty" when the copy has changes
+    that are not committed, "no author" when Git has no user.name or user.email, else "ready"."""
+    if not (root / ".git").exists():
         return "none"
+    if not shutil.which("git"):
+        return "no git"
     if _git(root, "status", "--porcelain").stdout.strip():
         return "dirty"
     if any(not _git(root, "config", key).stdout.strip() for key in ("user.name", "user.email")):
@@ -742,27 +807,80 @@ def _git_state(root):
     return "ready"
 
 
+def _tag(plan_):
+    return f"{MODULE}-{plan_.versions[MODULE][1]}" if plan_.versions else ""
+
+
+def _tag_exists(root, tag):
+    return _git(root, "rev-parse", "-q", "--verify", f"refs/tags/{tag}").returncode == 0
+
+
+def _git_ready(root, plan_):
+    """Everything Git needs for the commit and the tag, checked before any file changes. Returns "none" for a plain
+    folder and "ready" for a Git copy; anything else stops the cut."""
+    state = _git_state(root)
+    plain = "A plain folder, one with no .git folder, needs no Git."
+    if state == "no git":
+        raise CutRefused(f"this folder is a Git copy, and Git is not installed, so the cut could not commit. Install Git, then cut. {plain}")
+    if state == "dirty":
+        raise CutRefused("this Git copy has changes that are not committed. Commit them or put them aside, then cut.")
+    if state == "no author":
+        raise CutRefused("this Git copy has no user.name or user.email, so the cut could not commit. Run these two commands, "
+                         'then cut:\n  git config user.name "<your name or role>"\n  git config user.email "<your e-mail address>"\n' + plain)
+    tag = _tag(plan_)
+    if state == "ready" and tag and _tag_exists(root, tag):
+        raise CutRefused(f"this Git copy already has the tag {tag}, which the cut would make. Find out what it marks, "
+                         f"and delete it (git tag -d {tag}) only if it is a mistake. Then cut.")
+    return state
+
+
 def _commit(root, git, plan_, outcome):
-    run = plan_.report["run"]["id"]
-    tag = f"{MODULE}-{plan_.versions[MODULE][1]}" if plan_.versions else ""
+    """Commits the cut and tags it. A failed commit puts the release back as it was. A failed tag leaves the commit
+    and raises CutIncomplete: the same command again finishes the tag (_finish_tag)."""
+    if git == "none":
+        return
+    run, tag = plan_.report["run"]["id"], _tag(plan_)
     subject = (f"Cut {MODULE} {plan_.versions[MODULE][1]} from discovery run {run}" if plan_.versions
                else f"Record the decisions of discovery run {run}")
-    body = f"The record is {outcome.record.as_posix()}."
-    by_hand = f'git add -A && git commit -m "{subject}"' + (f" && git tag {tag}" if tag else "")
-    if git == "none":
-        if (root / ".git").exists():
-            outcome.messages.append(f"Git is not installed, so nothing was committed. Later: {by_hand}")
-        return
-    if git == "no author":
-        outcome.messages.append("Git has no user.name or user.email, so the cut did not commit. Set them with "
-                                f"git config, then run: {by_hand}")
-        return
-    for args in (["add", "-A"], ["commit", "-q", "-m", subject, "-m", body]) + ((["tag", tag],) if tag else ()):
+    for args in (["add", "-A"], ["commit", "-q", "-m", subject, "-m", f"The record is {outcome.record.as_posix()}."]):
         done = _git(root, *args)
         if done.returncode != 0:
-            outcome.messages.append(f"The files are written, and git {args[0]} failed: {done.stderr.strip()}. Finish by hand: {by_hand}")
-            return
-    outcome.committed, outcome.tag = True, tag
+            # The copy was clean before the cut, so the last commit is exactly the release as it was.
+            _git(root, "reset", "-q", "--hard", "HEAD")
+            _git(root, "clean", "-fdq")
+            raise CutFailed(f"git {args[0]} failed: {(done.stderr or done.stdout).strip()}. The release is as it was.")
+    outcome.committed = True
+    if tag:
+        _make_tag(root, tag, "HEAD")
+        outcome.tag = tag
+
+
+def _make_tag(root, tag, commit):
+    done = _git(root, "tag", tag, commit)
+    if done.returncode != 0:
+        raise CutIncomplete(f"the cut is committed, and git tag {tag} failed: {(done.stderr or done.stdout).strip()}. "
+                            "Run the same command again to finish the tag.")
+
+
+def _finish_tag(root, report, outcome, say):
+    """For a run that was cut before: makes the cut's tag when the Git copy lacks it, on the commit that added the
+    run's record. A cut whose tag failed is finished this way."""
+    if _git_state(root) in ("none", "no git"):
+        return
+    written = re.search(rf"^\| {re.escape(MODULE)} \| \S+ \| (\S+) \|", (root / record_path(report)).read_text(encoding="utf-8"), re.M)
+    if not written or ov.release_scripts_newest(root).version_key(written.group(1)) is None:
+        return   # the cut wrote no version, so it has no tag
+    tag = f"{MODULE}-{written.group(1)}"
+    if _tag_exists(root, tag):
+        outcome.tag = tag
+        return
+    commit = _git(root, "log", "-1", "--format=%H", "--diff-filter=A", "--", record_path(report).as_posix()).stdout.strip()
+    if not commit:
+        raise CutIncomplete(f"the cut's files are in this Git copy and are not committed, so the tag {tag} cannot be made. "
+                            "Commit them, then run the same command again.")
+    _make_tag(root, tag, commit)
+    outcome.tag = tag
+    say(f"The tag {tag} was missing. It now marks the cut's commit {commit[:12]}.")
 
 
 # ---------- helpers and the command line ----------
@@ -790,7 +908,7 @@ def main(argv=None):
     except EOFError:
         print("No answer was typed; nothing was changed.", file=sys.stderr)
         return 1
-    except (CutRefused, CutFailed) as err:
+    except (CutRefused, CutFailed, CutIncomplete) as err:
         print(f"{type(err).__name__}: {err}", file=sys.stderr)
         return 1
     return 0

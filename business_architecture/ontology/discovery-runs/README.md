@@ -36,7 +36,16 @@ A change is breaking when it changes or removes a name that a query or a load ma
 
 The tool works in a temporary copy of the release. Your folder changes only after every step has passed. If a step fails, your folder is as it was. A report that was cut before changes nothing.
 
-In a Git copy the tool commits the change and tags it `data-product-<version>`. It needs a clean copy to start, and it never pushes. If Git has no `user.name` or `user.email`, the tool writes the files, does not commit, and prints the commands to run. In a plain folder it writes the same files.
+In a Git copy the tool commits the change and tags it `data-product-<version>`. The cut ends with its commit and its tag, or it changes nothing. It never pushes. Before it changes a file, the tool checks what Git needs and refuses the cut when one of these is missing:
+
+- Git is installed.
+- The copy has no change that is not committed.
+- Git has a `user.name` and a `user.email`. If not, the tool prints the two `git config` commands to run.
+- The tag does not exist yet.
+
+If the commit is made and Git cannot make the tag, the tool says so and stops. Run the same command again: it makes the tag on the cut's commit.
+
+A plain folder, one with no `.git` folder, needs no Git. The tool writes the same files there.
 
 After a cut, run the full check before you load any store. On Windows, run it in Git Bash:
 
@@ -56,6 +65,8 @@ bash scripts/check.sh
 
 The tool refuses a report in which a row that blocks the load has no decision.
 
+A report is a file that a person may have edited, so the tool takes no text from it on trust. It refuses an accepted row unless the row's object, its found value and each field of its proposed fix have the form of a name, and the fix names the `data-product` module. A column name is letters, digits, underscores and dollar signs. An object name is one to three such parts, which may also hold a hyphen, joined by dots. A column or an object whose name has another form goes through the release steps in `HOW-TO-UPDATE.md`.
+
 ## The record
 
 Each cut writes `<run ID>.md` here. Each corrected module's changelog names it, and each package's manifest names it under `approved_by`. The record has these parts:
@@ -68,7 +79,7 @@ Each cut writes `<run ID>.md` here. Each corrected module's changelog names it, 
 | Changes | For each applied row: the file, the value before and the value after. |
 | Files the cut changed | Every path the cut added, changed or removed. |
 
-The report stays in the volume. The record holds object and column names only. A found value that is not a name, such as a Genie filter's title or the time of a table's last write, appears as "(kept in the report)". The record holds no evidence text, no query result and no filter.
+The report stays in the volume. From a row's object, ontology value and found value, the record holds names only. A value that does not have the form of a name, such as a Genie filter's title, the time of a table's last write or anything a person typed into one of these fields, appears as "(kept in the report)". The record holds no evidence text, no query result and no filter. It holds the "decided by" text and the note of each row as the person wrote them, so write a role there, not a name.
 
 ## Standing decisions
 

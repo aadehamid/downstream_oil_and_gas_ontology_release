@@ -77,10 +77,10 @@ def never(prompt):
     raise AssertionError(f"the cut asked: {prompt}")
 
 
-def digest(root):
+def digest(root, skip=("__pycache__",)):
     h = hashlib.sha256()
     for folder, dirs, files in os.walk(root):
-        dirs[:] = sorted(d for d in dirs if d != "__pycache__")
+        dirs[:] = sorted(d for d in dirs if d not in skip)
         for name in sorted(files):
             path = Path(folder) / name
             h.update(path.relative_to(root).as_posix().encode() + b"\0" + hashlib.sha256(path.read_bytes()).digest())
@@ -388,7 +388,8 @@ def test_the_change_value_rename_goes_through_the_whole_cut_in_a_plain_folder_an
                  f"- `{RECORD.as_posix()}`"):
         assert line in record, line
     assert "KPI filter" not in record and "column lineage holds" not in record and "WHERE" not in record
-    assert record.count("(kept in the report)") == 9   # the eight measure links and the second source name a Genie filter
+    # The eight measure links and the second source name a Genie filter, and the second source's ontology value is a sentence.
+    assert record.count("(kept in the report)") == 10
     assert RECORD.as_posix() in outcome.files and len(outcome.files) > 60
 
     # The next comparison no longer stops, and no longer raises the rejected extras.
@@ -503,25 +504,213 @@ def test_a_failure_leaves_the_tree_untouched_and_a_cut_in_local_git_commits_and_
     assert kinds(compared(root)) == {"object-extra": 7, "migration-pair": 8, "measure-link": 8, "question": 1}
 
 
-@as_shipped
-@pytest.mark.skipif(shutil.which("git") is None, reason="Git is not installed")
-def test_git_without_an_author_gets_the_files_and_no_commit(tmp_path, no_global_git):
+def small_git_release(tmp_path):
+    """A small release in a Git copy with no author: enough for a cut that writes no version."""
     root = tmp_path / "release"
     (root / ONTOLOGY / "data-product").mkdir(parents=True)
     shutil.copytree(support.ROOT / ONTOLOGY / "data-product" / "pricing", root / ONTOLOGY / "data-product" / "pricing")
     shutil.copytree(support.ROOT / ONTOLOGY / "releases" / "data-product", root / ov.RELEASES / "data-product")
     shutil.copytree(support.ROOT / ONTOLOGY / "releases" / "kpi", root / ov.RELEASES / "kpi")
+    shutil.copytree(support.ROOT / ONTOLOGY / "release", root / ONTOLOGY / "release", ignore=shutil.ignore_patterns("__pycache__", "frozen"))
     shutil.copy2(support.ROOT / "release.json", root / "release.json")
     git(root, "init", "-q", "-b", "work")
     git(root, "add", "-A")
     git(root, "-c", "user.name=Setup", "-c", "user.email=setup@example.invalid", "commit", "-q", "-m", "The release as received")
-    assert cut._git_state(root) == "no author"
-    said = []
-    outcome = cut.cut(cleared(tmp_path, {"R004": "reject", "R002": "reject"}), root, ask=Answers("yes"), say=said.append, now=NOW)
-    assert (outcome.status, outcome.committed) == ("recorded", False)
-    assert (root / RECORD).is_file() and git(root, "rev-list", "--count", "HEAD").strip() == "1"
-    assert said[-1] == ("Git has no user.name or user.email, so the cut did not commit. Set them with git config, then run: "
-                        f'git add -A && git commit -m "Record the decisions of discovery run {RUN}"')
+    return root
+
+
+def with_author(root):
     git(root, "config", "user.name", "Sample Runner")
     git(root, "config", "user.email", "runner@example.invalid")
-    assert cut._git_state(root) == "dirty"
+
+
+@as_shipped
+@pytest.mark.skipif(shutil.which("git") is None, reason="Git is not installed")
+def test_a_git_copy_that_cannot_commit_is_refused_before_anything_changes(tmp_path, no_global_git, monkeypatch):
+    root = small_git_release(tmp_path)
+    path = cleared(tmp_path, {"R004": "reject", "R002": "reject"})
+    before, head = digest(root), git(root, "rev-parse", "HEAD")
+    assert cut._git_state(root) == "no author"
+    with pytest.raises(cut.CutRefused) as refused:
+        cut.cut(path, root, ask=never, say=quiet, now=NOW)
+    assert str(refused.value) == (
+        "this Git copy has no user.name or user.email, so the cut could not commit. Run these two commands, then cut:\n"
+        '  git config user.name "<your name or role>"\n  git config user.email "<your e-mail address>"\n'
+        "A plain folder, one with no .git folder, needs no Git.")
+    assert digest(root) == before and git(root, "status", "--porcelain") == "" and not (root / RECORD).exists()
+    # A Git copy on a machine without Git is refused too.
+    with monkeypatch.context() as m:
+        m.setattr(cut.shutil, "which", lambda name: None)
+        with pytest.raises(cut.CutRefused, match="this folder is a Git copy, and Git is not installed"):
+            cut.cut(path, root, ask=never, say=quiet, now=NOW)
+    assert digest(root) == before
+    # With an author the same cut commits, and makes no tag because it wrote no version.
+    with_author(root)
+    outcome = cut.cut(path, root, ask=Answers("yes"), say=quiet, now=NOW)
+    assert (outcome.status, outcome.committed, outcome.tag) == ("recorded", True, "")
+    assert git(root, "status", "--porcelain") == "" and git(root, "rev-list", "--count", "HEAD").strip() == "2"
+    assert git(root, "rev-parse", "HEAD") != head and git(root, "tag") == ""
+    assert git(root, "log", "-1", "--format=%s").strip() == f"Record the decisions of discovery run {RUN}"
+
+
+@as_shipped
+@pytest.mark.skipif(shutil.which("git") is None, reason="Git is not installed")
+def test_a_failed_commit_puts_the_release_back_and_a_failed_tag_is_finished_by_the_next_run(tmp_path, no_global_git, monkeypatch):
+    root = small_git_release(tmp_path)
+    with_author(root)
+    report_path = cleared(tmp_path, {"R002": "accept"})
+    report, sums = cut.load_report(report_path)
+    plan = cut.Plan(report, [], {"data-product": ("1.2.0", "1.2.1-correction.1")}, None)
+    record = f"# Discovery run {RUN}\n\n| Report checksum (SHA-256) | {sums['report']} |\n\n| data-product | 1.2.0 | 1.2.1-correction.1 | Rows R002 |\n"
+    files = ("__pycache__", ".git")   # Git's own folder changes when Git resets; the release's files must not
+    real, before = cut._git, digest(root, files)
+
+    def failing(verb):
+        def run(root_, *args):
+            if args[0] == verb:
+                return subprocess.CompletedProcess(args, 1, "", f"made-up {verb} failure")
+            return real(root_, *args)
+        return run
+
+    # The commit fails after the files are written: the release goes back to its last commit.
+    (root / RECORD).parent.mkdir(parents=True)
+    (root / RECORD).write_text(record, encoding="utf-8")
+    monkeypatch.setattr(cut, "_git", failing("commit"))
+    with pytest.raises(cut.CutFailed, match="git commit failed: made-up commit failure. The release is as it was."):
+        cut._commit(root, "ready", plan, cut.Outcome("cut", plan, RECORD))
+    assert digest(root, files) == before and git(root, "status", "--porcelain") == "" and not (root / RECORD).exists()
+    assert git(root, "rev-list", "--count", "HEAD").strip() == "1"
+
+    # The tag fails after the commit: the cut is not complete, and says how to finish.
+    (root / RECORD).parent.mkdir(parents=True)
+    (root / RECORD).write_text(record, encoding="utf-8")
+    monkeypatch.setattr(cut, "_git", failing("tag"))
+    with pytest.raises(cut.CutIncomplete, match="the cut is committed, and git tag data-product-1.2.1-correction.1 failed: made-up tag failure. "
+                                                "Run the same command again to finish the tag."):
+        cut._commit(root, "ready", plan, cut.Outcome("cut", plan, RECORD))
+    cut_commit = git(root, "rev-parse", "HEAD").strip()
+    assert git(root, "rev-list", "--count", "HEAD").strip() == "2" and git(root, "tag") == ""
+    assert cut.main(["--report", str(report_path), "--release", str(root)]) == 1   # still failing: the command says so
+    monkeypatch.setattr(cut, "_git", real)
+
+    # A later commit must not take the tag: the next run of the same report tags the cut's own commit.
+    (root / "later.txt").write_text("later work\n", encoding="utf-8")
+    git(root, "add", "-A")
+    git(root, "commit", "-q", "-m", "Later work")
+    said = []
+    outcome = cut.cut(report_path, root, ask=never, say=said.append)
+    assert (outcome.status, outcome.tag) == ("already cut", "data-product-1.2.1-correction.1")
+    assert git(root, "rev-parse", "data-product-1.2.1-correction.1^{commit}").strip() == cut_commit
+    assert said[-1] == f"The tag data-product-1.2.1-correction.1 was missing. It now marks the cut's commit {cut_commit[:12]}."
+    # Once the tag is there, a further run has nothing to do.
+    said.clear()
+    assert cut.cut(report_path, root, ask=never, say=said.append).tag == "data-product-1.2.1-correction.1"
+    assert said[-1].endswith("Nothing to do.")
+
+
+@as_shipped
+@pytest.mark.skipif(shutil.which("git") is None, reason="Git is not installed")
+def test_a_tag_that_exists_already_stops_the_cut_before_anything_changes(tmp_path, no_global_git):
+    root = release_copy(tmp_path)
+    git(root, "init", "-q", "-b", "work")
+    with_author(root)
+    git(root, "add", "-A")
+    git(root, "commit", "-q", "-m", "The release as received")
+    git(root, "tag", "data-product-1.2.1-correction.1")
+    before = digest(root)
+    with pytest.raises(cut.CutRefused, match="this Git copy already has the tag data-product-1.2.1-correction.1, which the cut would make"):
+        cut.cut(cleared(tmp_path, {"R002": "accept"}), root, ask=never, say=quiet)
+    assert digest(root) == before and git(root, "status", "--porcelain") == "" and git(root, "rev-list", "--count", "HEAD").strip() == "1"
+
+
+# ---------- the report is data a person may have edited ----------
+
+def edited(tmp_path, change, decisions, name):
+    """The fixture report with one row changed by `change(row)`, written to a folder of its own."""
+    report = json.loads(REPORT.read_text(encoding="utf-8"))
+    for r in report["rows"]:
+        change(r)
+    return cleared(tmp_path, decisions, rows=report["rows"], name=name)
+
+
+@as_shipped
+@pytest.mark.parametrize("field, value, why", [
+    ("found_value", "jane.doe@example.com", "its found value is not a name"),
+    ("found_value", "Change Value; see the note", "its found value is not a name"),
+    ("object", "ask jane.doe@example.com", "its object is not an object name"),
+    ("fix.to", "../../x", "the 'to' of its proposed fix is not a name"),
+    ("fix.to", "jane.doe@example.com", "the 'to' of its proposed fix is not a name"),
+    ("fix.from", "ChangeValue\nsecond line", "the 'from' of its proposed fix is not a name"),
+    ("fix.to", 7, "the 'to' of its proposed fix is not a name"),
+    ("fix.module", "../../x", "its proposed fix names a module other than data-product"),
+    ("fix.module", "kpi", "its proposed fix names a module other than data-product"),
+    ("fix.module", "no-such-module", "its proposed fix names a module other than data-product"),
+])
+def test_an_accepted_row_with_anything_but_names_is_refused(tmp_path, field, value, why):
+    def change(r):
+        if r["id"] == "R002":
+            if field.startswith("fix."):
+                r["proposed_fix"][field[4:]] = value
+            else:
+                r[field] = value
+    root = release_copy(tmp_path)
+    before = digest(root)
+    with pytest.raises(cut.CutRefused) as refused:
+        cut.cut(edited(tmp_path, change, {"R002": "accept"}, "edited"), root, ask=never, say=quiet)
+    assert str(refused.value) == f"row R002 cannot be applied: {why}. Correct the report, or reject the row."
+    assert digest(root) == before
+
+
+@as_shipped
+def test_a_table_or_view_value_that_is_a_path_is_refused(tmp_path):
+    def change(r):
+        if r["id"] == "R020":
+            r["proposed_fix"]["view"] = "../../x"
+    report, sums = cut.load_report(edited(tmp_path, change, {"R020": "accept", "R002": "reject"}, "path"))
+    with pytest.raises(cut.CutRefused, match="row R020 cannot be applied: the 'view' of its proposed fix is not a name"):
+        cut.plan(report, support.ROOT, sums)
+    rows = [row(1, "object-missing", GOLD, {"action": "remove-object", "module": "data-product", "object": "../../x"})]
+    report, sums = cut.load_report(cleared(tmp_path, {}, rows=rows, name="object"))
+    with pytest.raises(cut.CutRefused, match="row R001 cannot be applied: the 'object' of its proposed fix is not a name"):
+        cut.plan(report, support.ROOT, sums)
+
+
+@as_shipped
+def test_the_record_and_the_standing_decisions_hold_no_text_that_is_not_a_name(tmp_path):
+    def change(r):
+        if r["id"] == "R002":      # a name-kind row that is rejected: its edited found value must not be copied
+            r["found_value"] = "jane.doe@example.com"
+        if r["id"] == "R004":
+            r["object"], r["ontology_value"], r["found_value"] = "ask jane.doe@example.com", "call 555 0100", "managed by jane"
+        if r["id"] == "R001":      # no decision: recorded as a row, never applied
+            r["ontology_value"] = "jane.doe@example.com"
+    root = release_copy(tmp_path)
+    cut.cut(edited(tmp_path, change, {"R002": "reject", "R004": "reject"}, "edited"), root, ask=Answers("yes"), say=quiet, now=NOW)
+    record = (root / RECORD).read_text(encoding="utf-8")
+    standing = (root / rep.STANDING_DECISIONS).read_text(encoding="utf-8")
+    for text in ("jane", "example.com", "555 0100"):
+        assert text not in record and text not in standing, text
+    assert f"| R002 | column-renamed | yes | {GOLD} | ChangeValue | (kept in the report) | reject |" in record
+    assert "| R004 | object-extra | no | (kept in the report) | (kept in the report) | (kept in the report) | reject |" in record
+    assert f"| R001 | column-case | no | {GOLD} | (kept in the report) | Assessment_Amount | none |" in record
+    assert "| R005 | object-extra | no | idp_sbx.gold_commercial_core.sample_volume_fact |   | MANAGED | none |" in record
+    held = json.loads(standing)["decisions"]
+    assert [(d["kind"], d["object"], d["ontology_value"]) for d in held] == [
+        ("column-renamed", GOLD, "ChangeValue"), ("object-extra", "(kept in the report)", "(kept in the report)")]
+
+
+def test_a_report_whose_run_fields_are_not_a_time_and_checksums_is_refused(tmp_path):
+    for n, (key, value) in enumerate((("at", "yesterday, by jane.doe@example.com"), ("settings_sha256", "jane.doe@example.com"),
+                                      ("zip_sha256", "7" * 63))):
+        report = json.loads(REPORT.read_text(encoding="utf-8"))
+        report["run"][key] = value
+        path = tmp_path / f"run-{n}.json"
+        path.write_text(json.dumps(report), encoding="utf-8")
+        with pytest.raises(cut.CutRefused, match="the report's run must hold its time as"):
+            cut.load_report(path)
+    report = json.loads(REPORT.read_text(encoding="utf-8"))
+    report["ontology"]["jane.doe@example.com"] = "1.0.0"
+    report["ontology"]["kpi"] = "the newest one"
+    (tmp_path / "ontology.json").write_text(json.dumps(report), encoding="utf-8")
+    with pytest.raises(cut.CutRefused, match="the report's ontology versions are not module names with versions: 'jane.doe@example.com', 'kpi'"):
+        cut.load_report(tmp_path / "ontology.json")

@@ -243,6 +243,8 @@ def discover(settings, run_sql, genie=None, schemas=()):
                 view = mv.parse_describe_json(text)
                 view.name = info.full_name
                 found.metric_views[key] = view
+            except ImportError:   # a missing package (pyyaml, sqlglot) is a broken setup, not a view that cannot be read
+                raise
             except Exception as err:   # one view that cannot be read must not stop the rest; the comparison reports it
                 found.notes.append(f"metric view {info.full_name} could not be read ({type(err).__name__}: {err})")
 
