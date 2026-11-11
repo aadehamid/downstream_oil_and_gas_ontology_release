@@ -182,8 +182,8 @@ shasum -a 256 robot.jar
 # expect 16a73c074f3df359a7338a84b4e0788785fe06117f931bb9796e9619ea776105</code></pre></li></ol>
 <ol start="2"><li>Copy <code>skill-run/epm-run.json</code> to a folder outside the repository, set <code>robot_jar</code> to the jar's path and <code>out</code> to your output folder, and add the keys that name your stores (<code>skill-run/README.md</code> lists them). Then run the driver with the copy. It checks, reasons, empties and loads the local Neo4j, writes the release records, and runs each further step whose key the copy holds: the copy to the named database, the Jena round trip, the walks and the rebuild. <code>--plan</code> lists the steps first and runs nothing.
 <pre><code class="lang-bash">cd "$SKILLS/ontology-to-lpg/scripts"
-uv run --no-project --with rdflib python3 run_projection.py --config &lt;your copy of epm-run.json&gt; --plan
-uv run --no-project --with rdflib python3 run_projection.py --config &lt;your copy of epm-run.json&gt;</code></pre></li></ol>
+uv run --no-project --with rdflib python run_projection.py --config &lt;your copy of epm-run.json&gt; --plan
+uv run --no-project --with rdflib python run_projection.py --config &lt;your copy of epm-run.json&gt;</code></pre></li></ol>
 <ol start="3"><li>Take the result into this folder, from this folder. It refuses a run that read other inputs than this tree's, or whose report did not pass. Commit <code>inferred.nt</code>, the manifest and the report together.
 <pre><code class="lang-bash">uv run --with rdflib --with pyshacl python pipeline.py record --run &lt;your output folder&gt;</code></pre></li></ol>
 <ol start="4"><li>Load the logical models, then write the Neo4j marker. <code>mark</code> checks the database against this tree first and stops, writing nothing, when it does not match.

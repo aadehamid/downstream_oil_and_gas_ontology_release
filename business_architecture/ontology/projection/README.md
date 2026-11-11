@@ -58,8 +58,8 @@ Run it after any input or shape changes. You need [uv](https://docs.astral.sh/uv
 
    ```bash skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
    cd "$SKILLS/ontology-to-lpg/scripts"
-   uv run --no-project --with rdflib python3 run_projection.py --config <your copy of epm-run.json> --plan
-   uv run --no-project --with rdflib python3 run_projection.py --config <your copy of epm-run.json>
+   uv run --no-project --with rdflib python run_projection.py --config <your copy of epm-run.json> --plan
+   uv run --no-project --with rdflib python run_projection.py --config <your copy of epm-run.json>
    ```
 
 3. Take the result into this folder, from this folder. It refuses a run that read other inputs than this tree's, or whose report did not pass. Commit `inferred.nt`, the manifest and the report together.

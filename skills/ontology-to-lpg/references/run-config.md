@@ -3,8 +3,8 @@
 Read it when a project projects its release more than once, or into more than one store, and wants one command instead of its own scripts around this skill's. `run_projection.py` runs steps 2 to 6, add-ons F, H, I, J and M, the `rdf-store` skill's round trip through Jena Fuseki and a rebuild from that store, all from one run configuration, and runs every check each of them has. It runs the skill's own scripts; it adds no check of its own except the rebuild's two comparisons.
 
 ```bash skip reason="illustration: a usage pattern, where square brackets mark the optional arguments"
-uv run --no-project --with rdflib python3 scripts/run_projection.py --config run.json --plan
-uv run --no-project --with rdflib python3 scripts/run_projection.py --config run.json [--only a,b] [--skip a,b]
+uv run --no-project --with rdflib python scripts/run_projection.py --config run.json --plan
+uv run --no-project --with rdflib python scripts/run_projection.py --config run.json [--only a,b] [--skip a,b]
 ```
 
 `--plan` lists the steps that would run, and why any is skipped, and runs nothing. It needs uv, and Java 11 or later for ROBOT. It starts and stops no server: the Neo4j servers and the Fuseki datasets the configuration names must already run (`running.md`, rule 5; the `rdf-store` skill's `references/stores.md`). It reads no password: the env files are passed to the scripts by path.

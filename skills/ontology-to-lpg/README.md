@@ -16,9 +16,9 @@ This README is for people. Agents read `SKILL.md` and the files it points to.
 4. Run the checks the agent runs:
 
    ```sh skip reason="awaits-the-rewrite: the reader's own values stand in angle brackets, and no test supplies them yet"
-   uv run --no-project --with rdflib python3 scripts/check_projection_rules.py --config projection-config.json \
+   uv run --no-project --with rdflib python scripts/check_projection_rules.py --config projection-config.json \
      --shapes <shapes.ttl> --releases <release folder> <module.ttl>
-   uv run --no-project --with rdflib --with pyshacl python3 scripts/validate_data.py --config projection-config.json \
+   uv run --no-project --with rdflib --with pyshacl python scripts/validate_data.py --config projection-config.json \
      --shapes <shapes.ttl> <module.ttl>
    ```
 
