@@ -54,12 +54,13 @@ def packages_on_disk(ontology=ONTOLOGY):
     return found
 
 
-def previous_version(name, newest, ontology=ONTOLOGY):
-    """The version before `newest`, read from the newest package's own CHANGELOG.md (its second heading), not from
-    the folders on disk; None when the changelog names no earlier version."""
-    with open(os.path.join(ontology, "releases", name, newest, "CHANGELOG.md")) as f:
+def previous_version(name, version, ontology=ONTOLOGY):
+    """The version before `version`, a module's newest, read from that package's own CHANGELOG.md (its second
+    heading), not from the folders on disk; None when the changelog names no earlier version."""
+    # The argument is not called newest: that name is the release scripts' module, whose pattern is read here.
+    with open(os.path.join(ontology, "releases", name, version, "CHANGELOG.md")) as f:
         versions = re.findall(rf"^## ({newest.VERSION_PATTERN})", f.read(), re.M)
-    return versions[1] if versions[:1] == [newest] and len(versions) > 1 else None
+    return versions[1] if versions[:1] == [version] and len(versions) > 1 else None
 
 
 def expected_release_packages(ontology=ONTOLOGY):

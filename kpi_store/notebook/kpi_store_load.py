@@ -11,6 +11,9 @@
 # MAGIC    to the volume.
 # MAGIC 3. If a row of the report blocks, it stops there. Otherwise it loads `epm_triples` through a staging table
 # MAGIC    whose hash must equal the hash of the release files, and writes the marker row in `epm_store_markers`.
+# MAGIC 4. After a load it builds the technical graph from what step 2 read, saves it beside the report as
+# MAGIC    `tech-graph.nq`, and loads it into the `tech_graph` schema the same way. The summary holds its result
+# MAGIC    under `tech_graph`.
 # MAGIC
 # MAGIC Parameters:
 # MAGIC
@@ -109,9 +112,16 @@ def main(spark, dbutils, genie=None):
     summary = load_databricks.run(settings, root, lambda statement: spark.sql(statement).collect(), genie,
                                   mode=dbutils.widgets.get("mode").strip() or "load",
                                   stale_after_days=int(days) if days else None)
+    if summary["status"] in ("current", "marked", "loaded"):
+        from kpi_store import tech_graph
+        run_dir = Path(summary["report_json"]).parent   # the run's folder in the volume; discovery.json is there
+        graph_files = tech_graph.write(tech_graph.build_from_files(run_dir / "discovery.json", root, settings), run_dir)
+        gate = load_databricks.Gate(settings, lambda statement: spark.sql(statement).collect())
+        summary["tech_graph"] = tech_graph.load_delta(gate, settings, graph_files, root) | {"file": str(graph_files[0])}
     print(json.dumps(summary, indent=2))
-    if summary["status"] in ("staging-mismatch", "main-mismatch"):
-        raise RuntimeError(f"the load stopped: {summary['status']}. The hashes differ; see the summary above.")
+    for name, status in (("the load", summary["status"]), ("the technical graph's load", summary.get("tech_graph", {}).get("status"))):
+        if status in ("staging-mismatch", "main-mismatch"):
+            raise RuntimeError(f"{name} stopped: {status}. The hashes differ; see the summary above.")
     return summary
 
 # COMMAND ----------

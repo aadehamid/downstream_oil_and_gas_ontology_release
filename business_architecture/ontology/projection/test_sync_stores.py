@@ -24,8 +24,8 @@ class Expected(unittest.TestCase):
         # fingerprint: the "input_fingerprint" line of projection-manifest.json. A new release changes all three.
         want = ss.expected()
         self.assertEqual(want["catalog_datasets"], 13)
-        self.assertEqual(want["catalog_digest"], "804d78647c14762a2b42618c103a9f08fff9c9cf873881cecd06ec50c8724a53")
-        self.assertEqual(want["input_fingerprint"], "8526554d8c5a773d855033d23d7ebc689733f705c7fc397e8b83392e030427b2")
+        self.assertEqual(want["catalog_digest"], "8cc3ad0b0bb562340603c7f70997a75613c1b15f516e1387fac745ef97ea5e0d")
+        self.assertEqual(want["input_fingerprint"], "533aeb6cd08b32793edc241218763abf34b5c5bfaa33297293a0178c44d574e4")
         self.assertEqual(len(want["newest"]), 13)
         self.assertEqual(sorted(want), ["catalog_datasets", "catalog_digest", "input_fingerprint", "newest"])
 
@@ -297,7 +297,7 @@ class Reading(unittest.TestCase):
             self.assertEqual(ss.main(["expected"]), 0)
         printed = json.loads(out.getvalue())
         self.assertEqual((printed["catalog_datasets"], printed["catalog_digest"]),
-                         (13, "804d78647c14762a2b42618c103a9f08fff9c9cf873881cecd06ec50c8724a53"))
+                         (13, "8cc3ad0b0bb562340603c7f70997a75613c1b15f516e1387fac745ef97ea5e0d"))
         self.assertIn("https://w3id.org/mpc/ontology/modules/kpi/1.3.0", printed["newest"])
 
     def run_main(self, argv, read):
@@ -409,7 +409,7 @@ class Neo4jMarker(unittest.TestCase):
         return Session(self.report["nodes"] + nodes, self.report["relationships"] + edges, list(records), marker)
 
     def test_the_committed_report_holds_this_releases_counts(self):
-        self.assertEqual(self.counts, [4237, 22312])  # projection-report.json as shipped
+        self.assertEqual(self.counts, [4242, 22331])  # projection-report.json as shipped
 
     def test_counts_equal_to_the_committed_report_and_one_record_per_release_pass(self):
         self.assertEqual(ss.neo4j_checked("neo4j", self.session(), self.want), self.counts)
