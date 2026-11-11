@@ -899,8 +899,10 @@ def test_the_command_prints_each_failure_and_the_count_and_exits_1(tmp_path, cap
 
 def test_the_html_command_counts_only_pages_with_no_markdown_source(tmp_path, capsys):
     (tmp_path / "a.md").write_text("# A\n", encoding="utf-8")
-    (tmp_path / "a.html").write_text("<pre>from a.md</pre>", encoding="utf-8")
-    (tmp_path / "built.html").write_text('<meta name="generator" content="x"><pre>built</pre>', encoding="utf-8")
+    (tmp_path / "a.html").write_text('<meta name="generator" content="scripts/build_docs_html.py"><pre>from a.md</pre>',
+                                     encoding="utf-8")
+    (tmp_path / "built.html").write_text('<meta name="generator" content="scripts/build_playbook_html.py"><pre>built</pre>',
+                                         encoding="utf-8")
     (tmp_path / "hand.html").write_text("<pre><code>one</code></pre><p><code>two</code> <code>three</code></p>"
                                         "<pre class='x'>four</pre>", encoding="utf-8")
     assert d.html_pages(tmp_path) == [("hand.html", 2, 2)]
