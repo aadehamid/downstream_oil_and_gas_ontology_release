@@ -52,6 +52,7 @@ Follow a guide for every run. This page gives no steps.
 | `business_architecture/domain/` | The business glossary, the data domains, the problem statement, the decision packages and this release's decision records (`kpi-store-decisions/`) |
 | `skills/` | Five agent skills: `ontology` (the method), `ontology-to-lpg` (the projection into a property graph), `rdf-store` (triple stores), `ontology-visualization` (the viewer playbook) and `clear-writing` |
 | `viewer/` and `horoi_viewer/` | Two pages that show the ontology in a browser, offline |
+| `best-practices/` | One guide to the language work that comes before an ontology, the controlled vocabulary, with a made-up example |
 | `scripts/` | `check.sh`, the one command that proves your copy is valid, and the tools it runs. `DOC-SNIPPETS.md` says how the code blocks in the documents are tested |
 | `HOW-TO-UPDATE.md` | The guide for every update after the first run |
 | `KNOWN-OPEN-ITEMS.md` | What is open, and what has not run yet |
