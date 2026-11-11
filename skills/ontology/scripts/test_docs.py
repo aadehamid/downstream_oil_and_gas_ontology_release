@@ -20,6 +20,11 @@ from unittest import mock
 import build_docs
 import check_docs
 
+# The stand-in for java is a shell script. Windows starts a program named java only from java.exe, so the real
+# Java runs and refuses the empty jar. How build_docs.py swaps the new pages in, and puts the old pages back
+# when that fails, is therefore not proven on Windows.
+NO_STAND_IN = "Windows cannot start a shell script as java, so no stand-in for Widoco can run"
+
 LENDING_TTL = """@prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 <https://id.example.org/library/lending> a owl:Ontology ; rdfs:label "Library lending"@en .
@@ -162,6 +167,7 @@ class Docs(unittest.TestCase):
         self.assertEqual(check_docs.check(self.releases, self.docs), [])
         self.assertEqual(self.leftovers(), [])
 
+    @unittest.skipIf(os.name == "nt", NO_STAND_IN)
     def test_a_successful_run_replaces_the_previous_pages(self):
         self.write_old_pages()
         code, out = self.build_with_fake_java("ok", "lending/1.1.0")
@@ -171,6 +177,7 @@ class Docs(unittest.TestCase):
         self.assertEqual(check_docs.check(self.releases, self.docs), [])
         self.assertEqual(self.leftovers(), [])
 
+    @unittest.skipIf(os.name == "nt", NO_STAND_IN)
     def test_a_failed_promotion_puts_the_previous_pages_back(self):
         self.write_old_pages()
         real_rename = os.rename
@@ -189,6 +196,7 @@ class Docs(unittest.TestCase):
         self.assertEqual(check_docs.check(self.releases, self.docs), [])
         self.assertEqual(self.leftovers(), [])
 
+    @unittest.skipIf(os.name == "nt", NO_STAND_IN)
     def test_a_failed_restore_keeps_the_previous_pages_and_names_where_they_are(self):
         self.write_old_pages()
         real_rename = os.rename

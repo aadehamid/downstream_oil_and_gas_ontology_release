@@ -229,7 +229,7 @@ class WholeGraph(Files):
         data = self.write("books.ttl", BOOKS)
         code, out = self.gate([data], [listed], "--every-shapes-file-under", os.path.join(self.dir, "modules"))
         self.assertEqual(code, 1)
-        self.assertIn(f"shapes file not in the gate: {left_out}", out)
+        self.assertIn(f"shapes file not in the gate: {os.path.normpath(left_out)}", out)
         code, out = self.gate([data], [listed, left_out], "--every-shapes-file-under", os.path.join(self.dir, "modules"))
         self.assertEqual(code, 0, out)
 

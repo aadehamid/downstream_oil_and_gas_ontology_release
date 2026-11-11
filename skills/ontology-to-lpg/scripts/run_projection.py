@@ -317,7 +317,8 @@ def graph_names(files, mapping, base):
         elif path in mapping:
             names[path] = (mapping[path], "graphs")
         else:
-            names[path] = (FILE_GRAPH + urllib.parse.quote(os.path.relpath(path, base), safe="/"), "file name")
+            # Written with /, so a file has the same graph name on Windows, where the relative path holds \\.
+            names[path] = (FILE_GRAPH + urllib.parse.quote(os.path.relpath(path, base).replace(os.sep, "/"), safe="/"), "file name")
     taken = [g for g, _ in names.values()]
     if len(set(taken)) != len(taken):
         raise Failed("two files would have the same graph name; name one in graphs")

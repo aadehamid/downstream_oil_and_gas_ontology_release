@@ -450,7 +450,7 @@ class Rebuild(Base):
     def test_release_graphs_sit_beside_each_data_file(self):
         cfg = self.run_config()
         args = rp.release_graph_args(cfg["data"][:1], ["shapes"])
-        shapes = os.path.join(self.tmp, "releases/a/1.0.0/shapes.ttl")
+        shapes = os.path.join(self.tmp, "releases", "a", "1.0.0", "shapes.ttl")
         self.assertEqual(args, [cfg["data"][0], "--graph", f"{shapes}=https://x.org/a/1.0.0/shapes", shapes])
         with self.assertRaises(rp.Failed):
             rp.release_graph_args(cfg["data"][:1], ["catalog"])
@@ -510,7 +510,7 @@ class Rebuild(Base):
         rules = [cmd for cmd, _, _ in fake.calls if any(c.endswith("check_projection_rules.py") for c in cmd)][-1]
         shapes = [rules[i + 1] for i, c in enumerate(rules) if c == "--shapes"]
         self.assertEqual(shapes, [os.path.join(ttl, "graph-2.ttl"), os.path.join(ttl, "graph-4.ttl"),
-                                  os.path.join(self.tmp, "whole/shapes.ttl")])
+                                  os.path.join(self.tmp, "whole", "shapes.ttl")])
         # The release records read the release's own files: an export has no catalog.ttl beside each graph.
         records = [cmd for cmd, _, _ in fake.calls if "records" in cmd][-1]
         first = next(cmd for cmd, _, _ in fake.calls if any(c.endswith("build.py") for c in cmd) and "merge" in cmd)
@@ -597,7 +597,7 @@ class FilesMode(Base):
 
     def test_folders_expand_and_each_file_gets_a_graph_name(self):
         d = self.driver(self.files_config(), FakeRun())
-        t = lambda p: os.path.join(self.tmp, p)   # noqa: E731
+        t = lambda p: os.path.normpath(os.path.join(self.tmp, p))   # noqa: E731
         self.assertEqual(d.data, [t("plain/books.ttl"), t("plain/more/people.nt"), t("named.ttl"), t("releases/a/1.0.0/a.ttl")])
         self.assertEqual(d.graphs, {
             t("plain/books.ttl"): (rp.FILE_GRAPH + "plain/books.ttl", "file name"),
@@ -617,7 +617,7 @@ class FilesMode(Base):
     def test_without_shapes_default_shapes_come_from_the_data(self):
         from rdflib import Graph, Literal, Namespace, URIRef
         SH = Namespace("http://www.w3.org/ns/shacl#")
-        shapes, count = rp.default_shapes([os.path.join(self.tmp, "plain/books.ttl")])
+        shapes, count = rp.default_shapes([os.path.join(self.tmp, "plain", "books.ttl")])
         self.assertEqual(count, 1)   # Book; owl:Class is vocabulary
         node = next(shapes.subjects(SH.targetClass, URIRef("https://x.org/Book")))
         props = {str(shapes.value(p, SH.path)): (shapes.value(p, SH.minCount), shapes.value(p, SH.maxCount))
@@ -653,11 +653,11 @@ class FilesMode(Base):
         rules = next(cmd for cmd, _, _ in fake.calls if any(c.endswith("check_projection_rules.py") for c in cmd))
         self.assertNotIn("--releases", rules)
         self.assertEqual(rules[rules.index("--shapes") + 1], os.path.join(d.out, "default-shapes.ttl"))
-        books = os.path.join(self.tmp, "plain/books.ttl")
+        books = os.path.join(self.tmp, "plain", "books.ttl")
         for cmd, _, _ in fake.calls:
             if any(c.endswith("module_tags.py") for c in cmd):
                 self.assertIn(f"{books}={rp.FILE_GRAPH}plain/books.ttl", cmd)
-                self.assertNotIn(f"{os.path.join(self.tmp, 'releases/a/1.0.0/a.ttl')}=https://x.org/a/1.0.0", cmd)
+                self.assertNotIn(f"{os.path.join(self.tmp, 'releases', 'a', '1.0.0', 'a.ttl')}=https://x.org/a/1.0.0", cmd)
             if "roundtrip" in cmd:
                 self.assertIn(f"{books}={rp.FILE_GRAPH}plain/books.ttl", cmd)
             if any(c.endswith("explore.py") for c in cmd):

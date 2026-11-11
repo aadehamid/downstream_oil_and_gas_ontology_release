@@ -40,6 +40,9 @@ TEMPLATES = os.path.join(HERE, "..", "templates")
 # The bash on PATH. On Windows a program started by the bare name "bash" is looked for in the system folder first,
 # and the bash.exe there starts the Linux subsystem, not Git Bash.
 BASH = shutil.which("bash") or "bash"
+# Why two tests of the guard do not run on Windows. What they prove elsewhere, that the guard works with no git
+# and stops when git fails, is not proven on Windows.
+NO_PLAIN_BASH = ("on Windows bash comes with Git for Windows, which puts its own git first, so bash without git, or with a stand-in git, cannot be set up")
 SKELETON = os.path.join(TEMPLATES, "ontology-skeleton.ttl")
 SHAPES = os.path.join(TEMPLATES, "shapes-skeleton.ttl")
 REQUIREMENTS = os.path.join(TEMPLATES, "requirements.yaml")
@@ -1019,6 +1022,7 @@ class CheckScriptSkeleton(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("all checks passed", result.stdout)
 
+    @unittest.skipIf(os.name == "nt", "Windows keeps no execute bit, so there is none to drop")
     def test_write_guard_catches_a_dropped_execute_bit(self):
         tool = os.path.join(self.tmp, "tool.sh")
         with open(tool, "w", encoding="utf-8", newline="\n") as f:
@@ -1032,7 +1036,7 @@ class CheckScriptSkeleton(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("the checks changed the working tree", result.stderr)
 
-    TAXONOMY_LINES = ("# TODO: data=()", "# TODO: [ \"${#data[@]}\"", "# TODO: uv run --no-project --with rdflib python3 scripts/ontology/check_taxonomy.py")
+    TAXONOMY_LINES = ("# TODO: data=()", "# TODO: [ \"${#data[@]}\"", "# TODO: uv run --no-project --with rdflib python scripts/ontology/check_taxonomy.py")
 
     def fill_taxonomy(self, text):
         lines = []
@@ -1142,6 +1146,7 @@ class CheckScriptWithoutGit(CheckScriptSkeleton):
                 os.symlink(found, os.path.join(bin_dir, tool))
         return dict(self.env, PATH=bin_dir)
 
+    @unittest.skipIf(os.name == "nt", NO_PLAIN_BASH)
     def test_the_guard_runs_with_no_git_installed(self):
         self.edit_script(self.drop_todos)
         env = self.without_git()
@@ -1156,6 +1161,7 @@ class CheckScriptWithoutGit(CheckScriptSkeleton):
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("the checks changed the working tree", result.stderr)
 
+    @unittest.skipIf(os.name == "nt", NO_PLAIN_BASH)
     def test_a_git_that_fails_stops_the_guard(self):
         # git is present but cannot answer (a dubious owner, a broken repository): the guard must not fall
         # back to the plain-folder snapshots, which would leave out the index and status it was asked for.
@@ -1182,6 +1188,7 @@ class CheckScriptWithoutGit(CheckScriptSkeleton):
         self.assertIn("git rev-parse failed, so the guard cannot tell whether this is a checkout", result.stderr)
         self.assertNotIn("all checks passed", result.stdout)
 
+    @unittest.skipIf(os.name == "nt", "on Windows chmod cannot take away the right to list a folder")
     def test_a_folder_that_cannot_be_listed_stops_the_guard(self):
         if os.geteuid() == 0:
             self.skipTest("root can list any folder")
