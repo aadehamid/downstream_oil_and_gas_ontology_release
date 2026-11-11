@@ -13,6 +13,11 @@ scripts/standalone-pending.txt lists the paths that are not clean yet, one glob 
 check skips those paths, and it fails when a glob matches no file or matches only clean files, so the list can
 only shrink. --strict ignores the list; the final cut must pass with --strict.
 
+scripts/standalone-exceptions.txt lists the matches that stay, each with its reason: text in a released package,
+which never changes after its release, and a word a file must name in order to forbid or record it. An exception
+names one file, one rule, the exact text and how many times the file holds it. One more occurrence is a finding,
+and one fewer makes the line stale, so an exception never covers new text. --strict applies the exceptions.
+
 A finding prints as `path:line: [rule] the text that matched`. The exit status is 1 when there is a finding or a
 stale pending line, else 0.
 """
@@ -25,8 +30,9 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PENDING = os.path.join("scripts", "standalone-pending.txt")
-# These two files state the deny list and hold one failing line per rule, so they cannot pass it.
-OWN_FILES = {"scripts/check_standalone.py", "scripts/test_check_standalone.py"}
+EXCEPTIONS = os.path.join("scripts", "standalone-exceptions.txt")
+# These files state the deny list, hold one failing line per rule, or quote the excepted text, so they cannot pass it.
+OWN_FILES = {"scripts/check_standalone.py", "scripts/test_check_standalone.py", "scripts/standalone-exceptions.txt"}
 
 # The public projects the tree cites on GitHub, in lower case. A link to any other owner is a finding: add an
 # owner here only when the link is a public source or a licence.
@@ -58,14 +64,17 @@ def _github(line):
     return [m for m in _GITHUB.finditer(line) if m.group(1).lower() not in GITHUB_OWNERS]
 
 
-# A public project's own issue, cited as a source, is named with the project ("OEO issue 1958").
+# A public project's own issue or pull request, cited as a source, is named with the project ("OEO issue 1958",
+# "rdflib issue 3524") or is followed at once by its link on an allowed owner's GitHub ("PR 361, https://github.com/...").
 _NUMBERED = re.compile(r"\b(?:PRs?|[Pp]ull [Rr]equests?|[Ii]ssues?)\s+\#?\d+\b")
-_PUBLIC_ISSUE = re.compile(r"\bOEO issue \d+\b")
+_PUBLIC_ISSUE = re.compile(r"\b(?:OEO|rdflib|neosemantics) (issue \d+)\b")
+_LINKED_ISSUE = re.compile(r"\b((?:PR|[Ii]ssue) \d+), https://github\.com/([A-Za-z0-9_.-]+)/")
 
 
 def _numbered_item(line):
     """Each "PR 123", "pull request 123" or "issue 45", except a public project's issue cited as a source."""
-    spared = [m.span() for m in _PUBLIC_ISSUE.finditer(line)]
+    spared = [m.span(1) for m in _PUBLIC_ISSUE.finditer(line)]
+    spared += [m.span(1) for m in _LINKED_ISSUE.finditer(line) if m.group(2).lower() in GITHUB_OWNERS]
     return [m for m in _NUMBERED.finditer(line) if not any(a <= m.start() < b for a, b in spared)]
 
 
@@ -154,17 +163,50 @@ def read_pending(root=ROOT):
     return entries
 
 
+def read_exceptions(root=ROOT):
+    """{(path, rule, text): (count, line number)} from the exceptions list. A line is
+    `<path> :: <rule> :: <text> :: <count> :: <reason>`; `#` starts a comment."""
+    path = os.path.join(root, EXCEPTIONS)
+    if not os.path.exists(path):
+        return {}
+    entries, problems, rules = {}, [], {rule for rule, _, _ in RULES}
+    with open(path, encoding="utf-8") as f:
+        for number, raw in enumerate(f, 1):
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = [part.strip() for part in line.split(" :: ")]
+            if len(parts) != 5 or not all(parts) or parts[1] not in rules or not parts[3].isdigit() or parts[3] == "0":
+                problems.append(f"{EXCEPTIONS}:{number}: write `<path> :: <rule> :: <text> :: <count> :: <reason>`")
+            elif (parts[0], parts[1], parts[2]) in entries:
+                problems.append(f"{EXCEPTIONS}:{number}: a second line for the same path, rule and text")
+            else:
+                entries[(parts[0], parts[1], parts[2])] = (int(parts[3]), number)
+    if problems:
+        raise ValueError("\n".join(problems))
+    return entries
+
+
 def check(root=ROOT, strict=False):
-    """(findings, stale pending lines, summary). A finding is `path:line: [rule] text`."""
+    """(findings, stale pending or exception lines, summary). A finding is `path:line: [rule] text`."""
     pending = [] if strict else read_pending(root)
-    findings, dirty = [], {}
-    for name in tracked_files(root):
+    exceptions = read_exceptions(root)
+    findings, dirty, held = [], {}, {}
+    names = tracked_files(root)
+    for name in names:
         if name in OWN_FILES:
             continue
         text = read_text(os.path.join(root, name))
         if text is None:
             continue
         found = findings_in(text)
+        counts = {}
+        for _, rule, matched in found:
+            counts[(name, rule, matched)] = counts.get((name, rule, matched), 0) + 1
+        held.update(counts)
+        # An exception covers its text only while the file holds it exactly as many times as the line says.
+        found = [(number, rule, matched) for number, rule, matched in found
+                 if exceptions.get((name, rule, matched), (None,))[0] != counts[(name, rule, matched)]]
         if not found:
             continue
         globs = [glob for glob, _ in pending if fnmatch.fnmatchcase(name, glob)]
@@ -173,8 +215,12 @@ def check(root=ROOT, strict=False):
                 dirty.setdefault(glob, {})[name] = len(found)
         else:
             findings += [f"{name}:{number}: [{rule}] {matched}" for number, rule, matched in found]
-    names = tracked_files(root)
     stale = []
+    for (name, rule, matched), (count, number) in sorted(exceptions.items(), key=lambda item: item[1][1]):
+        have = held.get((name, rule, matched), 0)
+        if have != count:
+            stale.append(f"{EXCEPTIONS}:{number}: {name} holds [{rule}] `{matched}` {have} times, not {count}; "
+                         + ("remove the line" if have == 0 else "the exception no longer covers it"))
     for glob, _ in pending:
         if not any(fnmatch.fnmatchcase(name, glob) for name in names):
             stale.append(f"{PENDING}: `{glob}` matches no file; remove the line")
@@ -205,7 +251,7 @@ def main(argv=None):
     for line in summary:
         print(line)
     if findings or stale:
-        print(f"not stand-alone: {len(findings)} findings, {len(stale)} stale pending lines", file=sys.stderr)
+        print(f"not stand-alone: {len(findings)} findings, {len(stale)} stale pending or exception lines", file=sys.stderr)
         return 1
     print("stand-alone" + ("" if args.strict or not summary else f", except the {len(summary)} pending paths above"))
     return 0

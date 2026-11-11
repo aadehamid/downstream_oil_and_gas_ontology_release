@@ -241,7 +241,7 @@ class TaxonomyChecks(OneBreak, unittest.TestCase):
     def test_notation_and_version_need_no_tag(self):
         self.assertFalse([f for f in check_taxonomy.check(skeleton()) if f[0] == "untagged"])
 
-    # untyped: any IRI used as a subject (finding #1 of the db5ae6d review)
+    # untyped: any IRI used as a subject
     def test_untyped_subject_with_any_predicate(self):
         for pred, obj in ((SKOS.altLabel, Literal("Reservation", lang="en")),
                           (SKOS.note, Literal("A note.", lang="en")),
@@ -251,7 +251,7 @@ class TaxonomyChecks(OneBreak, unittest.TestCase):
                 self.broken(lambda g: g.add((lib("hold"), pred, obj)),
                             "untyped", "lib:hold is the subject of triples but has no rdf:type")
 
-    # annotation properties (finding #3)
+    # annotation properties
     def test_incomplete_annotation_property(self):
         g = skeleton()
         g.add((lib("lpgName"), RDF.type, OWL.AnnotationProperty))
@@ -287,7 +287,7 @@ class TaxonomyChecks(OneBreak, unittest.TestCase):
         g.add((lib("lpgName"), SKOS.definition, Literal("Relates a term to the name it takes in the property graph.", lang="en")))
         self.assertEqual(check_taxonomy.check(g), [])
 
-    # literal targets (finding #4)
+    # literal targets
     def test_literal_domain_range_and_superclass(self):
         target = Literal(LIB + "Member", datatype=XSD.anyURI)
         for pred, subject, axis in ((RDFS.domain, "borrower", "rdfs:domain"),
@@ -300,7 +300,7 @@ class TaxonomyChecks(OneBreak, unittest.TestCase):
                 g.set((lib(subject), pred, target))
                 self.assertTrue(any("a literal; it must be an IRI" in m for _, m in check_taxonomy.check(g)))
 
-    # rdfs:Class (finding #8)
+    # rdfs:Class
     def test_bare_rdfs_class_is_checked(self):
         g = skeleton()
         g.add((lib("Fine"), RDF.type, RDFS.Class))
@@ -785,7 +785,7 @@ class RequirementsChecks(OneBreak, unittest.TestCase):
     def test_confirmed_assumption_needs_record(self):
         self.broken(lambda r: r["assumptions"][0].update(status="confirmed"), "assumptions", "A1 is confirmed but names no decision record")
 
-    # structural schema (finding #2 of the db5ae6d review)
+    # structural schema
     def test_missing_scope_out(self):
         self.broken(lambda r: r["scope"].pop("out"), "schema", "'scope' needs 'in'")
 

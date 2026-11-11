@@ -34,6 +34,10 @@ CASES = [
     ("pull-request", "Rounds on PRs #479 and #480.", "PRs #479", "PRIDE 123 is a product code."),
     ("pull-request", "Opened as pull request 17.", "pull request 17", "Pull requests are reviewed in 2 rounds."),
     ("pull-request", "This closes issue 45.", "issue 45", "OEO has no fuel oil class (OEO issue 1958)."),
+    ("pull-request", "Tracked in issue 3524 of the tracker.", "issue 3524", "Recheck rdflib issue 3524 every three months."),
+    ("pull-request", "See PR 361, https://github.com/some-owner/x/pull/361.", "PR 361",
+     "Issue 237, https://github.com/neo4j-labs/neosemantics/issues/237, and PR 361, https://github.com/neo4j-labs/neosemantics/pull/361"),
+    ("pull-request", "It broke after issue 237.", "issue 237", "MAP mode breaks in-graph SHACL (neosemantics issue 237, open)."),
     ("decision-record", "Recorded as EPM-DEC-001-0028.", "EPM-DEC-", "The decision of 2026-10-31 records it; see EPM-GLOS-001."),
     ("session", "The plan is in ~/.claude/handoffs.", "~/.claude", "The claim is in the file claude.md."),
     ("session", "Read handoffs/epm/notes.md first.", "handoffs/", "The shift handoff is at 06:00."),
@@ -74,7 +78,7 @@ def test_the_allowed_owners_are_public_projects_the_tree_cites():
     assert all(owner == owner.lower() for owner in cs.GITHUB_OWNERS)
 
 
-def tree(tmp_path, files, pending=None):
+def tree(tmp_path, files, pending=None, exceptions=None):
     for name, text in files.items():
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -85,6 +89,9 @@ def tree(tmp_path, files, pending=None):
     if pending is not None:
         (tmp_path / "scripts").mkdir(exist_ok=True)
         (tmp_path / "scripts" / "standalone-pending.txt").write_text(pending, encoding="utf-8")
+    if exceptions is not None:
+        (tmp_path / "scripts").mkdir(exist_ok=True)
+        (tmp_path / "scripts" / "standalone-exceptions.txt").write_text(exceptions, encoding="utf-8")
     return str(tmp_path)
 
 
@@ -109,7 +116,7 @@ def test_a_file_that_is_not_text_is_skipped(tmp_path):
 
 def test_the_checks_own_files_are_not_read(tmp_path):
     root = tree(tmp_path, {"scripts/check_standalone.py": "PR 12\n", "scripts/test_check_standalone.py": "PR 12\n",
-                           "scripts/other.py": "PR 12\n"})
+                           "scripts/standalone-exceptions.txt": "# quotes PR 12\n", "scripts/other.py": "PR 12\n"})
     assert cs.check(root)[0] == ["scripts/other.py:1: [pull-request] PR 12"]
 
 
@@ -151,6 +158,71 @@ def test_a_pending_line_without_a_reason_is_refused(tmp_path, capsys):
     with pytest.raises(ValueError, match="standalone-pending.txt:1: write `<glob> :: <reason>`"):
         cs.check(root)
     assert cs.main(["--root", root]) == 1
+
+
+CHANGELOG = "releases/kpi/1.3.0/CHANGELOG.md"
+EXCEPTION = CHANGELOG + " :: other-release :: Share release :: 1 :: a released package never changes\n"
+
+
+def test_an_exception_covers_its_exact_text_in_its_file(tmp_path, capsys):
+    root = tree(tmp_path, {CHANGELOG: "# kpi\n*Share release, 2026-11-04:* built against core 2.4.0.\n"}, exceptions="# why\n" + EXCEPTION)
+    assert cs.check(root) == ([], [], [])
+    assert cs.check(root, strict=True) == ([], [], [])  # an exception stays in force for the final cut
+    assert cs.main(["--root", root, "--strict"]) == 0
+
+
+def test_an_exception_does_not_cover_a_new_occurrence(tmp_path):
+    text = "*Share release, 2026-11-04:* one.\nAnother note on the Share release.\n"
+    root = tree(tmp_path, {CHANGELOG: text}, exceptions=EXCEPTION)
+    findings, stale, _ = cs.check(root)
+    assert findings == [CHANGELOG + ":1: [other-release] Share release", CHANGELOG + ":2: [other-release] Share release"]
+    assert stale == ["scripts/standalone-exceptions.txt:1: " + CHANGELOG
+                     + " holds [other-release] `Share release` 2 times, not 1; the exception no longer covers it"]
+
+
+def test_an_exception_does_not_cover_other_text_another_rule_or_another_file(tmp_path):
+    root = tree(tmp_path, {CHANGELOG: "*Share release:* one. Fixed in PR 12. The share release again.\n",
+                           "docs/a.md": "Share release\n"}, exceptions=EXCEPTION)
+    assert cs.check(root)[0] == ["docs/a.md:1: [other-release] Share release",
+                                 CHANGELOG + ":1: [other-release] share release", CHANGELOG + ":1: [pull-request] PR 12"]
+
+
+def test_an_exception_whose_text_is_gone_fails(tmp_path):
+    root = tree(tmp_path, {CHANGELOG: "# kpi\nNothing here.\n"}, exceptions=EXCEPTION)
+    assert cs.check(root)[1] == ["scripts/standalone-exceptions.txt:1: " + CHANGELOG
+                                 + " holds [other-release] `Share release` 0 times, not 1; remove the line"]
+    assert cs.main(["--root", root]) == 1
+
+
+@pytest.mark.parametrize("line", [
+    "a.md :: other-release :: Share release :: 1",                    # no reason
+    "a.md :: no-such-rule :: Share release :: 1 :: reason",           # a rule the check does not have
+    "a.md :: other-release :: Share release :: many :: reason",       # the count is not a number
+    "a.md :: other-release :: Share release :: 0 :: reason",          # an exception for nothing
+])
+def test_a_malformed_exception_is_refused(tmp_path, line):
+    root = tree(tmp_path, {"a.md": "Share release\n"}, exceptions=line + "\n")
+    with pytest.raises(ValueError, match="standalone-exceptions.txt:1: write"):
+        cs.check(root)
+    assert cs.main(["--root", root]) == 1
+
+
+def test_two_exceptions_for_one_text_are_refused(tmp_path):
+    root = tree(tmp_path, {CHANGELOG: "Share release\n"}, exceptions=EXCEPTION + EXCEPTION)
+    with pytest.raises(ValueError, match="standalone-exceptions.txt:2: a second line"):
+        cs.check(root)
+
+
+def test_this_trees_exceptions_are_only_for_fixed_content():
+    # Written by hand: an exception is for a released package and its changelog, the two taxonomy files, the
+    # decision records, and a test that names a word to prove it is gone. Nothing else may be excepted.
+    allowed = ("business_architecture/ontology/releases/", "business_architecture/domain/kpi-store-decisions/",
+               "business_architecture/ontology/build/output/step3-taxonomy.ttl",
+               "business_architecture/ontology/step4/baseline/step3-taxonomy.ttl", "skills/ontology-to-lpg/scripts/test_",
+               "skills/rdf-store/scripts/test_")
+    entries = cs.read_exceptions()
+    assert len(entries) == 30
+    assert [path for path, _, _ in entries if not path.startswith(allowed)] == []
 
 
 def test_with_git_only_tracked_files_are_read(tmp_path):

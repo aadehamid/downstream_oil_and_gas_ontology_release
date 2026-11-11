@@ -1,5 +1,5 @@
 {
-  "about": "Saved exploration queries for explore.py compare (the ontology-to-lpg skill). Each is the general walk from one node, both directions, with the hop limit given; the named shortcuts are walks too. Run against local Neo4j or Aura and against Jena (README.md, 'Exploring the stores').",
+  "about": "Saved exploration queries for explore.py compare (the ontology-to-lpg skill). Each is the general walk from one node, both directions, with the hop limit given; the named shortcuts are walks too. Run against the local Neo4j, or its copy, and against Jena.",
   "queries": [
     {"name": "process across modules", "iri": "https://w3id.org/mpc/ontology/process/CM-1-1-5-8", "hops": 2},
     {"name": "value stream end to end", "iri": "https://w3id.org/mpc/ontology/modules/value-stream/stream/order-to-cash", "hops": 3},

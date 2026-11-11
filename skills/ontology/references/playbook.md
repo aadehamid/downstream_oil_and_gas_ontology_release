@@ -617,8 +617,8 @@ that holds it; the rule, not this list, is the source.
 7. **The projection and the stores.** In the property graph, SHACL runs
    inside the graph, a deliberate broken case is caught, a round trip back
    to RDF loses and adds nothing, and two loads in different orders give the
-   same graph. Each triple-store copy's hash equals the source's, the Aura
-   copy's hash equals the local graph's, and walks compare Neo4j with the
+   same graph. Each triple-store copy's hash equals the source's, the copied
+   graph's hash equals the local graph's, and walks compare Neo4j with the
    triple store (the `ontology-to-lpg` skill: `multi-store.md`, and
    `add-ons.md`, section F).
 8. **Review.** A reviewer who did not write the change reviews it before the

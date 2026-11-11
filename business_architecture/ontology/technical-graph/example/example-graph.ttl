@@ -35,12 +35,12 @@
     tg:producedBy <urn:pricing-demo:tech:step/tech_graph-collect> ;
     tg:result result:pass .
 
-<urn:pricing-demo:tech:check/databricks-reaches-auradb> a tg:QualityCheck ;
-    rdfs:label "A Databricks job reaches AuraDB with the login in secret scope epm-neo4j"@en ;
+<urn:pricing-demo:tech:check/databricks-reaches-neo4j> a tg:QualityCheck ;
+    rdfs:label "A Databricks job reaches the Neo4j copy with the login in secret scope epm-neo4j"@en ;
     tg:checkedAt "2026-11-03T07:42:58+00:00"^^xsd:dateTime ;
     tg:checks <urn:pricing-demo:tech:triples/epm_triples> ;
     tg:detail "bolt_query: ok; dns: ok; tcp_7687: ok" ;
-    tg:name "databricks-reaches-auradb" ;
+    tg:name "databricks-reaches-neo4j" ;
     tg:producedBy <urn:pricing-demo:tech:step/tech_graph-collect> ;
     tg:result result:pass .
 
@@ -169,7 +169,7 @@
     tg:order 9 .
 
 <urn:pricing-demo:tech:host/pricing-demo-sources> a tg:Host ;
-    rdfs:label "local Docker container"@en ;
+    rdfs:label "local database server"@en ;
     tg:name "pricing-demo-sources" .
 
 <urn:pricing-demo:tech:object/ontology_definitions.crack_spread_definitions_vw> a tg:DefinitionsView ;

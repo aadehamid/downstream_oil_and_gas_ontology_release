@@ -224,7 +224,7 @@ try {
   await page.locator("#results .term-button:visible").first().click();
   assert.ok(await page.locator("#results > details[open]").count(), "Selecting a term must retain the open hierarchy");
   await page.locator("#about").click();
-  assert.match(await page.locator("#release-pin").innerText(), /81f2f63b/);
+  assert.match(await page.locator("#release-pin").innerText(), /KPI Store 1\.1/);
   await page.locator("#close-about").click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator("#back").click();

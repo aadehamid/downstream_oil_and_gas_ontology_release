@@ -155,7 +155,7 @@ class FileAgainstEngine(unittest.TestCase):
         self.assertEqual([(c["term"], c["value"]) for c in missing], [("sh:maxLength", 9)])
 
     def test_closed_matches_its_ignored_properties_row_exactly(self):
-        # Review 8, #4: the file's ignore-list is compared with the compiled one, not skipped.
+        # The file's ignore-list is compared with the compiled one, not skipped.
         g = shape_graph((lib("S"), SH.closed, Literal(True)))
         head = BNode()
         Collection(g, head, [RDF.type])
@@ -827,7 +827,7 @@ GATE_BREAKS += PROOF_BREAKS
 
 
 class GateClauses(unittest.TestCase):
-    """Review 8, #8 and #2: every clause of passed() and of check_report is seen to fail on its own."""
+    """Every clause of passed() and of check_report is seen to fail on its own."""
 
     def test_passed_fails_on_each_clause(self):
         self.assertTrue(lv.passed(dict(GOOD_REPORT)))
@@ -1017,7 +1017,7 @@ class FakeEngine:
 
 
 class RunWiring(unittest.TestCase):
-    """Review 8, #7: run() itself, with a fake engine, not a patched-out run()."""
+    """run() itself, with a fake engine, not a patched-out run()."""
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
@@ -1185,7 +1185,7 @@ class RoundEight(unittest.TestCase):
             {"NEO4J_URI": "bolt://h;rm -rf x", "NEO4J_USERNAME": "n", "NEO4J_PASSWORD": "p"}))
 
     def test_graph_type_left_out_lines_cannot_break_the_comment(self):
-        # Review 9, #1: the statement goes to a file; each comment is one quoted word on one line.
+        # The statement goes to a file; each comment is one quoted word on one line.
         out_path = os.path.join(self.tmp(), "gt.cypher")
         bad = "a\n`MATCH (n) DETACH DELETE n` $(touch x) <y>"
         with mock.patch.object(build, "graph_type", return_value=("CYPHER 25", [bad])):
@@ -1607,7 +1607,7 @@ class QuickCheckTen(unittest.TestCase):
     """Quick check 10 of 88a8510: each test here fails on 88a8510."""
 
     def test_copy_refuses_the_source_database_under_another_uri(self):
-        # Quick check 10, #3: one server reached as bolt://127.0.0.1 and as bolt://localhost.
+        # One server reached as bolt://127.0.0.1 and as bolt://localhost.
         class Server:
             def run(self, query, **_):
                 return FakeResult([{"id": "one-database"}] if "db.info()" in query else [{"n": 5}])

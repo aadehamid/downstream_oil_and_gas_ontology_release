@@ -57,7 +57,7 @@ Every store loaded from the releases (a property graph, a triple store, a lakeho
 
 ## Inputs kept outside Git
 
-Some releases read files that may never enter the repository, such as an export a client keeps private, read through a release option from a folder git ignores (`logical-model.md`, rule 12). That content, and anything built from it, never enters the main branch: no package, test fixture, page or commit message there holds it, so the release that carries it ships as its own archive.
+Some releases read files that may never enter the repository, such as an export a client keeps private, read through a release option from a folder git ignores (`logical-model.md`, rule 12). That content, and anything built from it, never enters the default branch: no package, test fixture, page or commit message there holds it, so the release that carries it ships as its own archive.
 
 - **Record each file's hash in the input record, never the folder.** The release build writes one release-level record, `release-inputs.json` at the archive's root beside the packages and separate from every package's manifest (a package's manifest lists only its package's files, rule 8). It lists each file read from the folder by its path relative to that folder, with its SHA-256. It never records the folder's own path, which names a machine and often the client.
 - **Validate the release from its archive alone.** The archive validates without the folder: the package check (`check_packages.py`), the shapes and the competency questions pass on the unpacked archive with no folder present, since a recipient of the release has none.

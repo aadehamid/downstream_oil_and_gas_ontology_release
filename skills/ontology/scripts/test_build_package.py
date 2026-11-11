@@ -415,7 +415,7 @@ class Git(Workspace):
         path = self.write_answers()
         self.assertEqual(run(["build", path, "--releases", self.releases])[0], 0)
         self.commit_all()
-        git("push", "-q", "origin", "release", cwd=self.root)   # pushed, but not merged into main
+        git("push", "-q", "origin", "release", cwd=self.root)   # pushed, but not merged into the default branch
         code, out = run(["tag", path, "--releases", self.releases])
         self.assertEqual(code, 1)
         self.assertIn("is not on origin's default branch yet", out)
@@ -432,7 +432,7 @@ class Git(Workspace):
         self.commit_all()
         code, out = run(["tag", path, "--releases", self.releases])
         self.assertEqual(code, 1)
-        self.assertRegex(out, "default branch")   # rule 16: not before the merge (nothing on main yet)
+        self.assertRegex(out, "default branch")   # rule 16: not before the merge (nothing on the default branch yet)
         git("push", "-q", "origin", "HEAD:refs/heads/main", cwd=self.root)
         git("fetch", "-q", "origin", cwd=self.root)
         code, out = run(["tag", path, "--releases", self.releases])
@@ -441,7 +441,7 @@ class Git(Workspace):
         self.assertEqual(subprocess.run(["git", "ls-remote", "--tags", bare], env=CLEAN_ENV, capture_output=True,
                                         text=True).stdout.strip(), "")
         git("push", "-q", "origin", "lending-v1.0.0", cwd=self.root)
-        # main is rewritten on the remote to a commit without the package; the cached origin/main still has it.
+        # The default branch is rewritten on the remote to a commit without the package; the cached remote-tracking ref still has it.
         package_commit = git("rev-parse", "HEAD", cwd=self.root).stdout.strip()
         git("checkout", "-q", "--orphan", "other", cwd=self.root)
         git("rm", "-rq", "--cached", ".", cwd=self.root)
@@ -454,7 +454,7 @@ class Git(Workspace):
         git("tag", "-d", "lending-v1.0.0", cwd=self.root)
         git("push", "-q", "origin", ":refs/tags/lending-v1.0.0", cwd=self.root)
         code, out = run(["tag", path, "--releases", self.releases])
-        self.assertEqual(code, 1)   # the stale origin/main no longer vouches for the merge
+        self.assertEqual(code, 1)   # the stale remote-tracking ref no longer vouches for the merge
         self.assertIn("is not on origin's default branch yet", out)
         git("push", "-q", "-f", "origin", f"{package_commit}:refs/heads/main", cwd=self.root)
         code, out = run(["tag", path, "--releases", self.releases])

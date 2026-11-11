@@ -169,7 +169,7 @@ Register the module in every place below. A place you miss fails a check or leav
 
 | Place | What to add |
 |---|---|
-| `$ONT/release/build_module.py` | An entry in `MODULES`: title, description, version, stage (`None`), approver, approval, issued, parts, shapes, `depends_on`, pins and decisions |
+| `$ONT/release/build_module.py` | An entry in `MODULES`: title, description, version, stage (`None`), approver, approval, issued, parts, shapes, `depends_on` and decisions |
 | `$ONT/releases/<module>/CHANGELOG.md` | A new file: a title line, then the section for its first release |
 | `scripts/check.sh` | The builder's `--verify`, `build_module.py <module> --verify`, and the test file in the test list |
 | `$ONT/projection/pipeline.py` | `PACKAGES`, `OWN` and `PREFIXES` |

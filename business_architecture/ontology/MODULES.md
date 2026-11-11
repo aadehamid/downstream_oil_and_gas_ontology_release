@@ -55,7 +55,7 @@ Every module package holds three graphs in Turtle:
 
 The module builder writes each `catalog.ttl` from the release's own version and issue date; several of the Turtle files above are themselves built from the CSV tables beside them.
 
-**What each store holds.** Jena and the Delta table `epm_triples` hold all three graphs of each module in full. Neo4j and AuraDB hold all of `<module>.ttl`, with no selective projection, and one `ModuleRelease` node per module drawn from `catalog.ttl`; the shapes validate the release and are not nodes. There is one local Neo4j and one standing Jena. The newest releases hold the `logical-model` module, so the stores also hold its models' own graphs. `projection/README.md`, "What each store holds", gives the policy.
+**What each store holds.** Jena and the Delta table `epm_triples` hold all three graphs of each module in full. Jena is one Fuseki dataset served by the plain Apache jar, and a Databricks notebook loads the table. The local Neo4j, which has n10s, and its copy in a named database on another server hold all of `<module>.ttl`, with no selective projection, and one `ModuleRelease` node per module drawn from `catalog.ttl`; the shapes validate the release and are not nodes. The newest releases hold the `logical-model` module, so the stores also hold its models' own graphs. `projection/README.md`, "What each store holds", gives the policy.
 
 ## Each module and its links
 

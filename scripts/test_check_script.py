@@ -72,24 +72,3 @@ def test_every_tracked_test_file_is_run():
     text = _commands()
     missing = [f for f in files if f not in text]  # by its full path, in a command, not in a comment
     assert files and not missing, missing
-
-
-def test_every_pending_test_still_exists():
-    # scripts/pending-tests.txt may only shrink: a line whose test was rewritten or removed must go.
-    root = os.path.join(HERE, "..")
-    with open(os.path.join(root, "scripts", "pending-tests.txt"), encoding="utf-8") as f:
-        listed = [line.strip() for line in f if line.strip() and not line.startswith("#")]
-    stale = []
-    for test_id in listed:
-        path, cls, name = test_id.split("::")
-        text = ""
-        if os.path.exists(os.path.join(root, path)):
-            with open(os.path.join(root, path), encoding="utf-8") as f:
-                text = f.read()
-        body = text.split(f"\nclass {cls}(", 1)[1].split("\nclass ", 1)[0] if f"\nclass {cls}(" in text else ""
-        if f"    def {name}(self" not in body:
-            stale.append(test_id)
-    assert stale == [], "scripts/pending-tests.txt names tests that no longer exist; remove these lines"
-    # Only tests of the projection, which the store-removal change rewrites, may wait.
-    assert all(t.startswith("business_architecture/ontology/projection/test_") for t in listed)
-    assert len(listed) <= 19

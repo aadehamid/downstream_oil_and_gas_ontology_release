@@ -1,0 +1,36 @@
+# Matches that scripts/check_standalone.py lets stand, each with its reason. One line per file, rule and text:
+#   <path> :: <rule> :: <text> :: <count> :: <reason>
+# The file must hold the text exactly <count> times. One more occurrence is a finding, and one fewer makes the
+# line stale, so an exception never covers new text. Use it only for a released package, which never changes
+# after its release, and for a file that must name a word in order to forbid or record it.
+
+business_architecture/domain/kpi-store-decisions/KPI-DEC-0001.md :: removed-aura :: AuraDB :: 2 :: the decision record names what this release removed
+business_architecture/domain/kpi-store-decisions/KPI-DEC-0001.md :: removed-docker :: Docker :: 2 :: the decision record names what this release removed
+business_architecture/domain/kpi-store-decisions/answers/2026-11-11-kpi-store-1.1.md :: removed-aura :: AuraDB :: 1 :: the decision record names what this release removed
+business_architecture/domain/kpi-store-decisions/answers/2026-11-11-kpi-store-1.1.md :: removed-docker :: Docker :: 1 :: the decision record names what this release removed
+business_architecture/ontology/build/output/step3-taxonomy.ttl :: reference-number :: #31 :: 2 :: ontology content, changed only through a cut; the intake note names an earlier change by its number
+business_architecture/ontology/releases/core/2.4.0/core.jsonld :: reference-number :: #31 :: 2 :: a released package never changes; the intake note names an earlier change by its number
+business_architecture/ontology/releases/core/2.4.0/core.ttl :: reference-number :: #31 :: 2 :: a released package never changes; the intake note names an earlier change by its number
+business_architecture/ontology/releases/data-product/1.2.0/CHANGELOG.md :: other-release :: Share release :: 1 :: a released package never changes; its changelog names the release this one was cut from
+business_architecture/ontology/releases/data-product/CHANGELOG.md :: other-release :: Share release :: 1 :: the changelog a released package holds a copy of; the two must stay equal
+business_architecture/ontology/releases/integration/2.5.0/CHANGELOG.md :: other-release :: Share release :: 1 :: a released package never changes; its changelog names the release this one was cut from
+business_architecture/ontology/releases/integration/CHANGELOG.md :: other-release :: Share release :: 1 :: the changelog a released package holds a copy of; the two must stay equal
+business_architecture/ontology/releases/kpi/1.3.0/CHANGELOG.md :: other-release :: Share release :: 1 :: a released package never changes; its changelog names the release this one was cut from
+business_architecture/ontology/releases/kpi/CHANGELOG.md :: other-release :: Share release :: 1 :: the changelog a released package holds a copy of; the two must stay equal
+business_architecture/ontology/releases/lane/1.1.0/CHANGELOG.md :: other-release :: Share release :: 1 :: a released package never changes; its changelog names the release this one was cut from
+business_architecture/ontology/releases/lane/CHANGELOG.md :: other-release :: Share release :: 1 :: the changelog a released package holds a copy of; the two must stay equal
+business_architecture/ontology/releases/market-data/1.1.0/CHANGELOG.md :: other-release :: Share release :: 1 :: a released package never changes; its changelog names the release this one was cut from
+business_architecture/ontology/releases/market-data/CHANGELOG.md :: other-release :: Share release :: 1 :: the changelog a released package holds a copy of; the two must stay equal
+business_architecture/ontology/releases/organization/2.2.0/CHANGELOG.md :: other-release :: Share release :: 1 :: a released package never changes; its changelog names the release this one was cut from
+business_architecture/ontology/releases/organization/CHANGELOG.md :: other-release :: Share release :: 1 :: the changelog a released package holds a copy of; the two must stay equal
+business_architecture/ontology/releases/previous/core/2.3.0/core.jsonld :: reference-number :: #31 :: 2 :: a released package never changes; the intake note names an earlier change by its number
+business_architecture/ontology/releases/previous/core/2.3.0/core.ttl :: reference-number :: #31 :: 2 :: a released package never changes; the intake note names an earlier change by its number
+business_architecture/ontology/releases/ref-mpc/1.3.0/CHANGELOG.md :: other-release :: Share release :: 1 :: a released package never changes; its changelog names the release this one was cut from
+business_architecture/ontology/releases/ref-mpc/CHANGELOG.md :: other-release :: Share release :: 1 :: the changelog a released package holds a copy of; the two must stay equal
+business_architecture/ontology/releases/value-stream/1.2.0/CHANGELOG.md :: other-release :: Share release :: 1 :: a released package never changes; its changelog names the release this one was cut from
+business_architecture/ontology/releases/value-stream/CHANGELOG.md :: other-release :: Share release :: 1 :: the changelog a released package holds a copy of; the two must stay equal
+business_architecture/ontology/step4/baseline/step3-taxonomy.ttl :: reference-number :: #31 :: 2 :: ontology content, changed only through a cut; the intake note names an earlier change by its number
+skills/ontology-to-lpg/scripts/test_engine_gate.py :: removed-docker :: docker :: 2 :: the test names the word to prove the skill no longer holds it
+skills/ontology-to-lpg/scripts/test_projection.py :: removed-aura :: aura :: 1 :: the test names the word to prove the skill no longer holds it
+skills/ontology-to-lpg/scripts/test_projection.py :: removed-docker :: docker :: 1 :: the test names the word to prove the skill no longer holds it
+skills/rdf-store/scripts/test_rdf_store.py :: removed-docker :: docker :: 1 :: the test names the word to prove the skill no longer holds it

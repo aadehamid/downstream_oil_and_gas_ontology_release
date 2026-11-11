@@ -86,7 +86,7 @@ QUALIFIED_RELATIONS = [
 # named here with its fix target; the build fails on any gap not listed, and on a listed gap
 # that no longer occurs, so the list cannot go stale (the decision of 2026-10-13).
 RELEASE_EXCEPTIONS = {}  # every listed gap is closed by integration 2.0.0 (the decision of 2026-10-23)
-VERSIONS = {"neo4j": "2025.06.2", "n10s": "2025.06.1", "apoc": "bundled with neo4j:2025.06.2",
+VERSIONS = {"neo4j": "2025.06.2", "n10s": "2025.06.1", "apoc": "2025.06.2",
             "robot": "1.9.10", "reasoner": "ELK (through ROBOT)", "method": "ontology-to-lpg 2.3"}
 
 

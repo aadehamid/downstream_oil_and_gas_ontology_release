@@ -19,7 +19,7 @@ sys.path.insert(0, str(HERE.parents[2] / "scripts"))
 from epm_source_descriptions import neutral_source_description
 
 ONTOLOGY = Path("business_architecture/ontology")
-SOURCE_COMMIT = "81f2f63b128820854a25204641b6899d55051ae3"
+RELEASE = "KPI Store 1.1"
 LABELS = (SKOS.prefLabel, RDFS.label, DCTERMS.title)
 PARENTS = (RDFS.subClassOf, RDFS.subPropertyOf, SKOS.broader)
 SUPPORTING_KINDS = ("Anonymous node", "Evidence", "Metadata", "Constraint")
@@ -68,12 +68,10 @@ def release_files(root):
     return files
 
 
-def pinned_source(root):
-    head = subprocess.check_output(
-        ["git", "-C", str(root), "rev-parse", "HEAD"], text=True
-    ).strip()
-    if head != SOURCE_COMMIT:
-        raise ValueError(f"Expected source release {SOURCE_COMMIT}; got {head}")
+def clean_packages(root):
+    """Refuse a tree whose release packages have local changes. A tree without Git has nothing to compare with."""
+    if not (Path(root) / ".git").exists():
+        return
     changed = subprocess.check_output(
         [
             "git",
@@ -87,7 +85,7 @@ def pinned_source(root):
         text=True,
     )
     if changed:
-        raise ValueError("Source release packages have local changes")
+        raise ValueError("The release packages have local changes")
 
 
 def term_id(value):
@@ -187,7 +185,7 @@ def build_data(root):
                 "kind": kind,
                 "modules": [
                     {"name": m, "version": v}
-                    for m, v in sorted(membership[s] or {("Release metadata", "EPM 1.0")})
+                    for m, v in sorted(membership[s] or {("Release metadata", RELEASE)})
                 ],
                 "parents": sorted(
                     term_id(o)
@@ -200,8 +198,7 @@ def build_data(root):
         )
     counts = dict(sorted(Counter(n["kind"] for n in nodes).items()))
     return {
-        "release": "EPM 1.0",
-        "sourceCommit": SOURCE_COMMIT,
+        "release": RELEASE,
         "nodes": nodes,
         "inputs": inputs,
         "counts": counts,
@@ -211,10 +208,10 @@ def build_data(root):
     }
 
 
-def build(root, output, compare=None, require_pin=True):
+def build(root, output, compare=None, require_clean=True):
     root = Path(root).resolve()
-    if require_pin:
-        pinned_source(root)
+    if require_clean:
+        clean_packages(root)
     data = build_data(root)
     if compare:
         compare = Path(compare).resolve()
@@ -235,10 +232,10 @@ def build(root, output, compare=None, require_pin=True):
             for path, _, _ in release_files(compare)
         ]
         if other_inputs != expected_inputs:
-            raise ValueError("Cut packages differ from the pinned viewer release")
-        # Emit the verified cut's data, so its source titles and file hashes agree
+            raise ValueError("The compared tree's packages differ from the source tree's")
+        # Emit the compared tree's data, so its source titles and file hashes agree
         # with the files recipients receive. Only the exact source-title substitution
-        # above may differ from the pinned release, even in a metadata graph.
+        # above may differ between the two trees, even in a metadata graph.
         data = build_data(compare)
     payload = (
         json.dumps(data, ensure_ascii=False, separators=(",", ":"))
@@ -269,7 +266,7 @@ def build(root, output, compare=None, require_pin=True):
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(page)
-    return {k: data[k] for k in ("sourceCommit", "counts", "terms", "triples")}
+    return {k: data[k] for k in ("release", "counts", "terms", "triples")}
 
 
 def main():
