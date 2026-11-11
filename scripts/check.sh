@@ -120,6 +120,7 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   business_architecture/ontology/value-stream/test_value_streams.py \
   business_architecture/ontology/viewer/test_viewer.py \
   kpi_store/tests/test_compare.py \
+  kpi_store/tests/test_cut.py \
   kpi_store/tests/test_discovery.py \
   kpi_store/tests/test_load_databricks.py \
   kpi_store/tests/test_metric_view.py \

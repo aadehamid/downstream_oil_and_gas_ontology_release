@@ -5,6 +5,7 @@ person to read and to clear. A person clears a row by writing a decision; the re
 that blocks has one.
 """
 import csv
+import hashlib
 import io
 import json
 import secrets
@@ -22,6 +23,8 @@ PASSES = ("object_names", "table_edges", "metric_view_sources")
 ROW_FIELDS = ("id", "kind", "blocks", "object", "ontology_value", "found_value", "evidence", "proposed_fix",
               "recommended", "decision", "decided_by", "note")
 RUN_FIELDS = ("id", "at", "settings_sha256", "zip_sha256")
+# The rows a person rejected in a cleared report. The cut tool writes the file and the comparison reads it.
+STANDING_DECISIONS = Path("business_architecture") / "ontology" / "discovery-runs" / "standing-decisions.json"
 
 
 class ReportError(Exception):
@@ -143,6 +146,26 @@ def read(path):
     except (OSError, ValueError) as err:
         raise ReportError(f"cannot read the report {path}: {type(err).__name__}") from None
     return validate(report)
+
+
+def standing_key(row):
+    """What makes two findings the same one: the kind, the object, the ontology's value and the found value, case
+    ignored. It is a SHA-256, so the standing decisions never hold a found value as text."""
+    parts = (row["kind"], row["object"].lower(), row["ontology_value"].lower(), row["found_value"].lower())
+    return hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
+
+
+def read_standing(release_root):
+    """The keys (standing_key) of the rows that a cleared report rejected, from the release's standing decisions.
+    An empty set when the release has none."""
+    path = Path(release_root) / STANDING_DECISIONS
+    if not path.is_file():
+        return frozenset()
+    try:
+        with path.open(encoding="utf-8") as f:
+            return frozenset(d["key"] for d in json.load(f)["decisions"])
+    except (OSError, ValueError, KeyError, TypeError) as err:
+        raise ReportError(f"cannot read the standing decisions {path}: {type(err).__name__}") from None
 
 
 def apply_csv_decisions(report, csv_path):

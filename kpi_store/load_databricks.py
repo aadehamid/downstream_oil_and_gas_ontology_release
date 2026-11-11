@@ -299,7 +299,7 @@ def run(settings, release_root, run_sql, genie=None, zip_sha256="", mode="load",
 
     schemas = {settings.environment_name(o.full_name).rsplit(".", 1)[0] for o in view.objects.values()}
     found = disc.discover(settings, gate.run, genie, schemas)
-    comparison = cmp.compare(view, found, settings, now, stale_after_days)
+    comparison = cmp.compare(view, found, settings, now, stale_after_days, rep.read_standing(release_root))
     run_record = rep.new_run(now, settings.sha256, zip_sha256 or settings.zip_sha256)
     report = rep.build(release, view.versions, run_record, comparison.rows, comparison.passes)
     run_dir = out_dir / "reports" / run_record["id"]
