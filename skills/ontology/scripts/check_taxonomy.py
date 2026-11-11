@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Mechanical checks for Steps 2 and 3 of the ontology skill.
 
-Run: uv run --with rdflib python3 check_taxonomy.py [--allow-namespace=<IRI>]... [--code-property=<IRI>]... <file.ttl>...
+Run: uv run --with rdflib python check_taxonomy.py [--allow-namespace=<IRI>]... [--code-property=<IRI>]... <file.ttl>...
 
 Run it on data files only (each module's and code list's Turtle), never on shapes files:
 SHACL builds shapes from blank nodes (identity-taxonomy.md, Step 2, rule 5).

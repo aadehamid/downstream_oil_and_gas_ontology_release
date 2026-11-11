@@ -3,12 +3,22 @@
 Databricks returns a metric view's definition from DESCRIBE TABLE EXTENDED <view> AS JSON. Its view_text is YAML
 (version 1.1): a source that is a table name or a SQL query, optional joins and filter, dimensions, and measures
 with an expression each. Needs pyyaml and sqlglot.
+
+Where it sits: kpi_store.discovery calls parse_describe_json for every metric view it finds, and the comparison
+then checks the view's tables against the sources the ontology names. The Gate of kpi_store.load_databricks uses
+cte_references to decide which names in a statement are real tables. This module reads text only: it sends
+nothing to Databricks, writes nothing and has no command.
+
+pyyaml and sqlglot are loaded inside the functions that use them, so loading this module needs neither package.
 """
 import json
 import re
 from dataclasses import dataclass, field
 
+# A source that is a table name: one to three parts with dots between them, each with or without backticks. A
+# source that does not match is taken as a SQL query.
 TABLE_NAME = re.compile(r"^`?[\w$]+`?(\.`?[\w$]+`?){0,2}$")
+# MEASURE(name) inside a measure's expression: a measure built on another measure. Group 1 is that measure's name.
 MEASURE_REF = re.compile(r"\bMEASURE\s*\(\s*`?([\w$]+)`?\s*\)", re.IGNORECASE)
 
 
@@ -18,6 +28,7 @@ class MetricViewError(Exception):
 
 @dataclass
 class MetricView:
+    """One metric view as its definition describes it."""
     name: str                                         # the view's full name, as Databricks spells it
     source: str = ""                                  # the source as written: a table name or a SQL query
     source_is_sql: bool = False
@@ -30,6 +41,7 @@ class MetricView:
 
     def reads_column(self, column):
         """True when a measure, a dimension or the filter names the column. Case is ignored."""
+        # The column as a whole word: Amount must not be found inside Amount_USD.
         word = re.compile(rf"(?<![\w$]){re.escape(column)}(?![\w$])", re.IGNORECASE)
         texts = [d.get("expr", "") for d in self.dimensions] + [m.get("expr", "") for m in self.measures] + [self.filter]
         return any(word.search(t or "") for t in texts)
@@ -97,6 +109,7 @@ def columns_in_sql(expression):
 
 
 def _joins(items, out):
+    """Collects the source of every join into out, through the joins nested inside a join."""
     for item in items or []:
         if isinstance(item, dict):
             if item.get("source"):
@@ -143,6 +156,7 @@ def parse_describe_json(text):
     except (TypeError, ValueError):
         raise MetricViewError("the DESCRIBE result is not JSON") from None
     catalog, schema, table = doc.get("catalog_name"), doc.get("schema_name"), doc.get("table_name")
+    # Some answers give the schema as the last part of a namespace list, not as schema_name.
     if not schema and isinstance(doc.get("namespace"), list) and doc["namespace"]:
         schema = doc["namespace"][-1]
     name = ".".join(str(p) for p in (catalog, schema, table) if p)

@@ -73,7 +73,7 @@ def indexes():
 def load():
     streams = []
     for path in STREAMS:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             streams.append((path, json.load(f)))
     procs, items, measures = indexes()
     problems, ids = [], Counter()
@@ -201,12 +201,12 @@ def main():
             + build(streams, procs, items).serialize(format="turtle"))
     print("; ".join(f"{k} {v}" for k, v in figures(streams).items()))
     if args.verify:
-        current = os.path.exists(OUTPUT) and open(OUTPUT).read() == text
+        current = os.path.exists(OUTPUT) and open(OUTPUT, encoding="utf-8").read() == text
         if not current:
             sys.exit("value-streams.ttl is not current: run build_value_streams.py --write")
         print("value-streams.ttl is current")
     if args.write:
-        with open(OUTPUT, "w") as f:
+        with open(OUTPUT, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
         print(f"wrote {OUTPUT}")
 

@@ -1,28 +1,38 @@
-# How to update this ontology
+# How to update the KPI Store ontology
 
-This release is your starting point. Your copy is yours to change: add a module, change a module, reword a definition, add a process. This guide says what to do and who decides. Use whichever tools you prefer to do it. Every command here has been run on this release.
+This guide covers every change after the first run: a correction, a new version of a module, a new concept, a new process, a new environment and a new module. For the first run on the client sandbox, use the runbook, `business_architecture/ontology/projection/ontology-stores-runbook.md`.
 
-If your copy includes `viewer/index.html`, that page shows the ontology as you received it. Changing a package does not refresh the page. Use the changed Turtle or JSON-LD to inspect your edits; a newly cut viewer is needed to view a later release.
+Each section is a list of steps. Do them in order. The document test runs every command of this guide, except where a section says otherwise.
 
-**Who decides.** Your ontology owner is the person your organisation names to decide what the ontology means. A module owner is the person they name for one module. The ontology owner approves every major release and every module's first release. The module owner approves minor and patch releases. Until a module has an owner, the ontology owner decides for it.
+If your copy includes `viewer/index.html`, that page shows the ontology as you received it. Changing a package does not refresh the page.
 
-**What the words mean.** A *module* is one part of the ontology with its own version, such as `kpi`. A *package* is one released version of a module: the folder `business_architecture/ontology/releases/<module>/<version>/`. A package never changes after its release. A change makes a new package.
+## The words this guide uses
 
-Commands below start from the top folder of your copy unless they say otherwise. They use this shorthand, so define it first:
+| Word | Meaning |
+|---|---|
+| Module | One part of the ontology with its own version, such as `kpi`. |
+| Package | One released version of a module: the folder `business_architecture/ontology/releases/`, then the module, then the version. A package never changes after its release. A change makes a new package. |
+| Release folder | The top folder of your copy, which holds `README.md` and `kpi_store`. |
+| Ontology owner | The person your organisation names to decide what the ontology means. |
+| Module owner | The person the ontology owner names for one module. Until a module has an owner, the ontology owner decides for it. |
+| Correction version | A version that the cut tool wrote from a cleared report. Its name carries a marker: `1.2.1-correction.1`. |
 
-```sh run=release-git,slow define status-only
-py() { uv run -q --no-project --with rdflib --with pyshacl --with openpyxl --with jsonschema --with pytest --with "markdown-it-py>=4,<5" python3 -B "$@"; }
-ONT=business_architecture/ontology
-```
+The ontology owner approves every major release and every module's first release. The module owner approves minor and patch releases. The person who runs the cut approves a correction, at the cut's prompt.
 
-The versions in the worked commands are those of this release as you received it. After your first change, read the one you hold, from `$ONT/release`: `py next_version.py current kpi`.
+## Before you change anything
 
-## Start here
+You need the machine that the runbook set up. The commands start in the release folder unless a step moves you. They start Python with `py`, as on Windows.
 
-1. Make your own copy. A Git clone keeps your history; an unpacked export works too. The process-map section says what changes without Git.
-2. Check that the copy works before you change it. The script takes about 10 minutes:
+1. Install the one more package that this guide's page builder needs.
 
-   ```sh run=slow
+   ```powershell run=scratch os=windows status-only
+   py -m pip install "markdown-it-py>=4,<5"
+   ```
+
+2. Open Git Bash in the release folder. In File Explorer, right-click the folder and choose "Open Git Bash here".
+3. Run the full check. It must end with `all checks passed`. It took about 10 minutes on a Mac and 21 minutes on a Windows machine with 4 cores. Run it in Git Bash: in PowerShell, the plain word `bash` starts the launcher of the Linux subsystem.
+
+   ```bash run=slow
    bash scripts/check.sh
    ```
 
@@ -31,30 +41,155 @@ The versions in the worked commands are those of this release as you received it
    all checks passed
    ```
 
-3. Run `scripts/check.sh` again after each change. It proves your copy is valid: every package equals a fresh build of its sources, the shapes conform, the competency questions answer and the tests pass. Do not share a change until it passes. In a Git copy, run `git add -A` first, because one test reads which generated pages Git tracks. The log shows skipped tests and a line that starts `FAIL a store request`. Both are expected. Most skipped tests read what this release does not hold, a few depend on your machine, and adding `-rs` to the script's pytest line prints each reason. That `FAIL` line comes from `skills/rdf-store/scripts/test_rdf_store.py`, which makes a write fail on purpose. Any other `FAIL` line is a real failure, such as a generated page that differs from its source, and the script does not reach its last line. The last line, `all checks passed`, tells you the result. Do not edit files while the script runs: it compares the tree at its start and end, and a change fails the run. Commit when it passes. To try one test file first, run `py -m pytest -q <file>`, which takes seconds.
+4. Run the full check again after each change, before you load any store.
+
+The check proves your copy is valid. Every package equals a fresh build of its sources, the shapes conform, the competency questions answer and the tests pass. Its log shows skipped tests and one line that starts `FAIL a store request`. Both are expected: that line comes from a test that makes a write fail on purpose. Any other `FAIL` line is a real failure, and the script then does not reach its last line.
+
+Do not edit files while the check runs. It compares the folder at its start and its end, and a change fails the run.
+
+A Git copy keeps your history, and the cut tool then commits and tags each correction. Keep the file `.gitattributes` in a Git copy: without it, Git for Windows checks text files out with other line ends, and the packages' hashes differ. A plain folder works too. In a Git copy, run `git add -A` before the check, because one test reads which pages Git tracks.
+
+## Choose the way a change goes
+
+| What changed | The way | Section |
+|---|---|---|
+| Databricks renamed or removed a column, a table or a view that the ontology names. | A correction, through the report and the cut. | "A correction through the loop" |
+| A column's spelling differs only in case. | The same correction. | "A correction through the loop" |
+| A report row says "needs a minor version": a measure link with its filter, a new object, a new table edge, or the table that a Databricks table replaces. | A minor version of the module, with the release steps. | "The release steps" |
+| A definition's wording, with the same meaning. | A patch, with the release steps. | "Change a concept's definition" |
+| A new concept, alias, property or shape. | A minor version, with the release steps. | "Add a concept or a property" |
+| A new process, or a changed one. | A release of `core`, then every module. | "Change a process" |
+| The same ontology in another workspace, such as production. | New settings files. The ontology does not change. | "A new environment" |
+| A data area that no module covers. | A new module at 1.0.0. | "Onboard another module" |
 
 ## Patch, minor or major
 
-Classify every change before you make it, then ask your owner to approve it. `skills/ontology/references/release.md` holds the full rules; rules 3 and 4 are the ones you use most.
+Classify every change before you make it. Then ask the owner who approves that kind. `skills/ontology/references/release.md` holds the full rules.
 
 | Kind | What it covers |
 |---|---|
-| Major | An IRI changes or a concept is removed; a definition's meaning changes; a hierarchy change alters what a concept means; any deprecation. A new module's first release, 1.0.0, also counts as a major of that module, so your ontology owner approves it |
-| Minor | New concepts, aliases, references, instances or shapes that existing content already meets |
-| Patch | Typos; clearer wording with the same meaning; an added example or scope note |
+| Major | An IRI changes or a concept is removed. A definition's meaning changes. A hierarchy change alters what a concept means. Any deprecation. A new module's first release, 1.0.0, also needs the ontology owner. |
+| Minor | New concepts, aliases, references, instances or shapes that existing content already meets. |
+| Patch | Typos, clearer wording with the same meaning, an added example or scope note. |
+| Correction | A name in Databricks changed, and the ontology follows it. The cut tool writes it. |
 
-Use this test: would every query, report and answer made under the old definition still be correct under the new one? If yes, it is a patch or a minor. If no, or if you are unsure, it is a major.
+Use this test. Would every query, report and answer made under the old definition still be correct under the new one? If yes, it is a patch or a minor. If no, or if you are unsure, it is a major.
 
 **Never delete a term.** Mark it `owl:deprecated true`, add `dcterms:isReplacedBy` for its successor, keep its triples and say why in the changelog. Do this only in a major release.
 
+A correction version sorts between two patches. The order is 1.2.0, 1.2.1-correction.1, 1.2.1-correction.2, 1.2.2. The next ordinary patch after a correction is 1.2.2.
+
+## A correction through the loop
+
+This is the normal way to follow a change in Databricks. The runner compares the ontology with the workspace on every run. If a name that the ontology holds is missing or renamed, the run stops on a report. You clear the report. The next run cuts a correction version and loads every store.
+
+The steps are the runbook's, from "The first run" to "The sync check". Two things differ after the first run.
+
+1. Run the runner, as in the runbook's "The first run". If it ends with `every step passed`, nothing differs and you are done.
+2. If it stops on a report, clear the report, as in the runbook's "Clear the report".
+3. Run the runner again and answer the cut's prompts, as in the runbook's "The second run".
+4. If the `enterprise` step stops because the database holds KPI Store nodes of the earlier release, run the step again with the replace allowed. **The replace deletes every node in that database that carries the KPI Store's marks, before it copies.** The runbook's "The limits" lists the marks.
+
+   ```powershell skip reason="needs-client-server: replaces the KPI Store's nodes in the client's Enterprise database"
+   py -m kpi_store.runner --from enterprise --replace-enterprise
+   ```
+
+5. Read the last line. Expect `the steps that ran passed`, with the steps before `enterprise` named as left out.
+
+The second difference is the version. A second correction to the same module counts up: `1.2.1-correction.2`.
+
+### See the cut by itself
+
+The runner calls the cut tool for you. To see what a cut does, run the tool on the made-up report that ships with the tests. It is the report of a made-up workspace in the sandbox's shapes. Do this in a copy of the release folder, never in the folder you load from.
+
+1. Ask for the plan of the report as the notebook wrote it, with no decision. The tool refuses it, because the row that blocks has no decision.
+
+   ```powershell run=correction exit=1
+   py -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --plan
+   ```
+
+   ```text expect
+   CutRefused: the report is not cleared. Rows that block the load and have no decision: R002
+   ```
+
+2. Ask for the plan with the cleared decisions. `cleared-decisions.csv` accepts the renamed column, the two case-only spellings and the second source. `--plan` changes nothing.
+
+   ```powershell run=correction
+   py -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --decisions kpi_store/tests/fixtures/cut/cleared-decisions.csv --plan
+   ```
+
+   ```text expect
+   Discovery run 20261111T120000Z-0a1b2c3d of KPI Store 1.1: 28 rows.
+   The cut applies (4):
+     R001 column-case: column assessment_amount of idp_sbx.gold_commercial_core.mips_mpr_executive_summary_fact becomes Assessment_Amount (case only)
+   ...
+     R002 column-renamed: column ChangeValue of idp_sbx.gold_commercial_core.mips_mpr_executive_summary_fact becomes Change_Value_Amount  BREAKING
+   ...
+     R003 column-case: column Previous_amount of idp_sbx.gold_commercial_core.mips_mpr_executive_summary_fact becomes Previous_Amount (case only)
+   ...
+     R020 second-source: idp_sbx.semantic_sem_commercial.mips_mpr_executive_summary_fact_vw also serves the measure crack-spreads
+   ...
+   Waits, so the cut leaves it (1):
+   ...
+   No decision (<count>):
+   ...
+   Versions the cut writes:
+     data-product 1.2.0 -> 1.2.1-correction.1
+     logical-model 1.0.0 -> 1.0.1-correction.1
+     technical-graph 1.1.0 -> 1.1.1-correction.1
+     value-stream 1.2.0 -> 1.2.1-correction.1
+     integration 2.5.0 -> 2.5.1-correction.1
+   ```
+
+3. Cut. At the first prompt type `Change_Value_Amount`, which confirms the breaking change. At the second prompt type `yes`.
+
+   ```powershell run=correction types="Change_Value_Amount,yes"
+   py -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --decisions kpi_store/tests/fixtures/cut/cleared-decisions.csv --approver "the ontology owner"
+   ```
+
+   ```text expect
+   ...
+   Done. The record is business_architecture/ontology/discovery-runs/20261111T120000Z-0a1b2c3d.md; the cut changed <count> files.
+   Run the full check before you load: bash scripts/check.sh (on Windows, in Git Bash; the runner does it).
+   ```
+
+4. In a Git copy, see the commit and the tag that the cut made. In a plain folder the cut writes the same files and makes no commit.
+
+   ```powershell run=correction
+   git --no-pager log --oneline -1
+   git --no-pager tag --list
+   ```
+
+   ```text expect
+   <commit> Cut data-product 1.2.1-correction.1 from discovery run 20261111T120000Z-0a1b2c3d
+   data-product-1.2.1-correction.1
+   ```
+
+5. Run the full check on the corrected copy.
+
+   ```bash run=correction
+   bash scripts/check.sh
+   ```
+
+   ```text expect
+   ...
+   all checks passed
+   ```
+
+`business_architecture/ontology/discovery-runs/README.md` says what each decision does, what the record holds and how a standing decision works.
+
 ## The release steps
 
-Every change below ends with these steps. Run them once for the module you changed and once for each module that depends on it.
+A patch, a minor and a major all end with these steps. The worked example adds the alias "unit capacity utilization" to the measure Unit Utilization in `kpi`. An alias is new content that changes no meaning, so it is a minor: `kpi` 1.3.0 becomes 1.4.0.
 
-1. List the modules to release, in order. The first line is the one you changed. `core` is the exception: its list holds only the modules that depend on it, because you release `core` by hand first ("Change a process"):
+The versions in the commands are those of the release as you received it. Read the version you hold with `py next_version.py current kpi`, from the folder `business_architecture/ontology/release`.
 
-   ```sh run=release-git
-   (cd $ONT/release && py dependents.py kpi)
+1. List the modules to release, in order. The first line is the module you change. Each module after it depends on it and gets a patch.
+
+   ```powershell run=release-git
+   cd business_architecture/ontology/release
+   py dependents.py kpi
+   cd ../../..
    ```
 
    ```text expect
@@ -67,280 +202,516 @@ Every change below ends with these steps. Run them once for the module you chang
    integration
    ```
 
-2. Save the approval. Create the folder `$ONT/approvals/` if you have none, and write the sentence that approved the release in a file there, such as `$ONT/approvals/2026-11-01-kpi.md`. One file can cover all the modules of one change. That file is your decision record unless your team keeps its own.
-3. For each module in that order, set its version, write its package, and move its old package. `next_version.py` does the edits; `pins` has no effect in this release, so leave it. A module that only takes the new version of what it requires gets a patch.
+2. Change the module's source. A release is built from its sources, never edited in `releases`. For the example, open `business_architecture\ontology\kpi\measure-details.csv`, find the row `unit-utilization`, and change its `aliases` from `unit rates` to `unit rates;unit capacity utilization`.
+3. Save the approval. Make the folder `business_architecture\ontology\approvals` if you have none. Write the sentence that approved the release in a file there, such as `2026-11-12-kpi.md`. One file can cover every module of one change.
 
-   ```sh run=slow status-only
-   cd $ONT/release
-   py next_version.py start kpi 1.3.1 patch --why "Reworded Unit Utilization's definition; the meaning is the same." \
-       --approver "The kpi module owner" --where "approvals/2026-11-01-kpi.md" --words "Approved as a patch."
+   The document test does steps 2 and 3 with this block. If you did them by hand, skip it.
+
+   ```python run=slow
+   from pathlib import Path
+
+   ontology = Path("business_architecture/ontology")
+   table = ontology / "kpi" / "measure-details.csv"
+   text = table.read_text(encoding="utf-8")
+   old = ",unit rates,crude-utilization,"
+   assert text.count(old) == 1
+   table.write_text(text.replace(old, ",unit rates;unit capacity utilization,crude-utilization,"), encoding="utf-8", newline="\n")
+   approval = ontology / "approvals" / "2026-11-12-kpi.md"
+   approval.parent.mkdir(exist_ok=True)
+   approval.write_text("# Approval of kpi 1.4.0\n\nApproved as a minor: the alias \"unit capacity utilization\" for Unit Utilization.\n",
+                       encoding="utf-8", newline="\n")
+   print("changed", table.name, "and wrote", approval.name)
+   ```
+
+   ```text expect
+   changed measure-details.csv and wrote 2026-11-12-kpi.md
+   ```
+
+4. Rebuild the module's source file. Each module has its own builder in its folder. `scripts/check.sh` lists them.
+
+   ```powershell run=slow
+   cd business_architecture/ontology/kpi
+   py build_measures.py --write
+   ```
+
+   ```text expect
+   measures 41; <the counts by source and kind>
+   wrote <the path of the measures file>
+   ```
+
+5. Set the module's new version and write its package. `start` sets the version, the date, the approver and the approval in the module's entry in `build_module.py`. It also adds a section to the top of the module's `CHANGELOG.md`.
+
+   ```powershell run=slow
+   cd ../release
+   py next_version.py start kpi 1.4.0 minor --why "Adds the alias unit capacity utilization to Unit Utilization." --approver "The kpi module owner" --where "approvals/2026-11-12-kpi.md" --words "Approved as a minor."
    py build_module.py kpi --write
+   ```
+
+   ```text expect
+   kpi is set to 1.4.0. Now run: python3 build_module.py kpi --write
+   kpi 1.4.0: <count> triples; shapes conform
+   wrote <the path of the new package>
+   ```
+
+   The write stops if the version is already released and the content differs. Raise the version first, because a released package never changes.
+
+6. Release every module that depends on it, and finish all of them. `cascade` gives each module of step 1's list the next patch, writes its package, and moves each old package to `releases\previous`. It also changes each version in the projection's two lists, `projection/pipeline.py` and `projection/skill-run/epm-config.json`.
+
+   ```powershell run=slow
+   py next_version.py cascade kpi --approver "The kpi module owner" --where "approvals/2026-11-12-kpi.md" --words "Approved as a minor."
+   ```
+
+   ```text expect
+   data-product is set to 1.2.1. Now run: python3 build_module.py data-product --write
+   market-data is set to 1.1.1. Now run: python3 build_module.py market-data --write
+   logical-model is set to 1.0.1. Now run: python3 build_module.py logical-model --write
+   technical-graph is set to 1.1.1. Now run: python3 build_module.py technical-graph --write
+   value-stream is set to 1.2.1. Now run: python3 build_module.py value-stream --write
+   integration is set to 2.5.1. Now run: python3 build_module.py integration --write
+   kpi 1.3.0 moved to releases/previous/; the projection's lists name 1.4.0
+   data-product 1.2.0 moved to releases/previous/; the projection's lists name 1.2.1
+   market-data 1.1.0 moved to releases/previous/; the projection's lists name 1.1.1
+   logical-model 1.0.0 moved to releases/previous/; the projection's lists name 1.0.1
+   technical-graph 1.1.0 moved to releases/previous/; the projection's lists name 1.1.1
+   value-stream 1.2.0 moved to releases/previous/; the projection's lists name 1.2.1
+   integration 2.5.0 moved to releases/previous/; the projection's lists name 2.5.1
+   7 modules released. Now rebuild the catalog and the projection manifest, and run the check.
+   ```
+
+   The lines that say "Now run" are `start`'s own. `cascade` has already run that command for each module. `cascade` verifies each package against a fresh build before it finishes the module. If it stops halfway, fix what it names and run it again. It keeps its plan in `release\cascade-in-progress.json` until it ends, so the next run leaves a finished module alone and builds what is missing. If it names a folder that is not a whole package, delete that folder first. A build that failed midway leaves such a folder.
+
+7. Rebuild the catalog, then the projection manifest, then run the competency questions.
+
+   ```powershell run=slow
+   py build_catalog.py --write
+   cd ../projection
+   py pipeline.py build
+   cd ../regression
+   py run.py
    cd ../../..
    ```
 
-   `start` sets `version`, `issued`, `approver` and `approval` in the module's entry in `build_module.py`, and adds a section to the top of `$ONT/releases/<module>/CHANGELOG.md`, carrying forward any known gap. Edit that section when you have more to say. `start` leaves the entry's `decisions` list alone, so add your approval file there if you want the package's manifest to name it. Nothing fails without it. **The write stops if the version is already released and the content differs.** Raise the version first, because a released package never changes. Before the package is shared, you may correct it with `--rebuild-released`.
-
-4. When every module in the list is written, finish each one. This moves the old package to `$ONT/releases/previous/<module>/`, which keeps every earlier package, and changes the version in `$ONT/projection/pipeline.py` (`PACKAGES`) and `$ONT/projection/skill-run/epm-config.json` (`packages`):
-
-   ```sh run=slow status-only
-   (cd $ONT/release && py next_version.py finish kpi 1.3.0)
+   ```text expect
+   catalog: 13 releases from 13 packages
+   wrote <the path of the catalog file>
+   Step 1 passed; loadable.nt <count> triples, inferred.nt 2
+   wrote projection-manifest.json
+   ...
+   competency coverage on <the core package>: 57 questions; answerable 56, partial 0, waiting 0, parked 1
    ```
 
-5. Rebuild what follows from the packages, and check:
+8. In a Git copy, stage the change. Then run the full check.
 
-   ```sh skip reason="awaits-the-rewrite: the check passes only after the same steps for each module that requires kpi, and the example shows kpi alone"
-   (cd $ONT/release && py build_catalog.py --write)
-   (cd $ONT/projection && py pipeline.py build)
-   (cd $ONT/regression && py run.py)
+   ```bash run=slow
    git add -A
    bash scripts/check.sh
    ```
 
-   After a change, the script prints a note that the projection report describes an earlier build, until you project into Neo4j again. The note does not fail the check.
+   ```text expect
+   ...
+   all checks passed
+   ```
 
-6. If you keep stores loaded, reload them ("Project into Neo4j and Jena") and run the check in its step 5. The release is done only when every store you keep reads `current`, on its ontology line and on its `tech:` line, which is the technical graph's.
+   After a change, the check prints a note: `projection-report.json describes an earlier build`. That file is the summary of the last Neo4j load, and it now describes the release before your change. The note does not fail the check, and it does not mean the ontology is wrong. It goes away when you have loaded the stores and recorded the new load's report with `py pipeline.py record`. The runbook's section "Record the load's report in the release folder" runs that command.
 
-   This release holds `logical-model`, so the check also prints an `lm:` line for the local Neo4j and AuraDB, one per store, and the release is done only when each of those reads `current` too.
+9. Search your copy for text that the change made stale, and update each document that holds it. No check catches a copy of a sentence.
+10. Load the stores with the runner, and read its last line. The release is done when the sync check reads `current` on every line.
+
+    ```powershell skip reason="needs-client-server: loads the client's Databricks and Enterprise database"
+    py -m kpi_store.runner
+    ```
+
+    If the `enterprise` step stops because the database holds the earlier release, see step 4 of "A correction through the loop".
 
 ## Change a concept's definition
 
-The worked example changes the definition of the measure Unit Utilization in `kpi`. The wording changes and the meaning does not, so it is a patch.
+A new wording with the same meaning is a patch. If the meaning changes, the release is a major, and the ontology owner approves it.
 
-1. Find where the definition lives. A release is built from its sources, never edited in `releases/`. Most sources are tables and Turtle files in the module's folder, so search there for the text. A file that starts "Built by" is generated: edit the source it names. For `lane`, that is `business_architecture/business_process/office_lanes.json`, and rewording a lane there is still a release of `lane`.
+1. Find where the definition lives. Most sources are tables and Turtle files in the module's folder, so search there for the text. A file that starts "Built by" is generated: edit the source it names.
+2. Edit the text in that source. Keep the citation of its source. If the new wording rests on a new source, cite it.
+3. Follow "The release steps" from step 3. In step 5, use `patch` and the next patch version.
 
-   ```sh run=release-git status-only
-   grep -n "unit-utilization" $ONT/kpi/measure-details.csv
-   ```
+For `lane`, the source is `business_architecture/business_process/office_lanes.json`. Rewording a lane there is still a release of `lane`.
 
-2. Edit the text in that file. Keep the citation of its source. If the new wording rests on a new source, cite it.
-3. Rebuild the module's source file. Each module has its own builder in its folder, listed in `scripts/check.sh`:
+## Add a concept or a property
 
-   ```sh run=release-git status-only
-   (cd $ONT/kpi && py build_measures.py --write)
-   ```
+A new term that removes nothing is a minor.
 
-4. Follow the release steps for `kpi`.
-5. Search the whole copy for the old wording, and update each document that quotes it. No check catches a copy of a sentence. This command leaves out this guide, which quotes the wording as its example, and the packages, which never change. In a plain folder with no Git, use `grep -rn` and skip the same paths. For this example:
+1. Add the term to the module's `vocabulary.ttl`, with `rdfs:label`, `skos:definition`, and its source in `dcterms:bibliographicCitation`. Copy a neighbouring term of the same kind, because the module's tests may ask for more.
+2. Add what checks it to the module's `shapes.ttl`. Each property on a class states its cardinality in a `sh:property` line on that class's shape.
+3. If the module also has a closed shape, add the property to its `sh:ignoredProperties` list too. `kpi/shapes.ttl` needs both: the line on `shp:Measure`, and the list on `shp:NoValuesOnMeasures`.
+4. For a value on instances, add a column to the module's table and to its builder. Give every row the column, even when it is empty, because a short row passes with no warning.
+5. For a concept in a code list, add a row to that list's table.
+6. Add a test that names the term, in the module's `test_*.py`.
+7. Follow "The release steps" from step 3.
 
-   ```sh run=release-git status-only
-   git grep -n "as a share of its constrained capacity" -- . ':!HOW-TO-UPDATE.*' ':!business_architecture/ontology/releases/'
-   ```
+When the source of a term is your owner's request, cite the file that holds their approval.
 
-If the meaning changed, the release is a major, and your ontology owner approves it.
+### A report row that needs a minor version
 
-## Add a concept or property
+The cut tool leaves four kinds of accepted rows, and lists each as "needs a minor version". Each goes in by the steps above.
 
-The worked example adds a property `kpi:reviewCadence`. It adds and removes nothing else, so it is a minor.
-
-1. Add the term to the module's `vocabulary.ttl`, with `rdfs:label`, `skos:definition`, and its source in `dcterms:bibliographicCitation`. Copy a neighbouring term of the same kind, because the module's tests may ask for more: `kpi`'s ask for one `rdfs:range` and one kind. When the source is your owner's request, cite the file that holds their approval.
-2. Add what checks it to the module's `shapes.ttl`. Each property on a class states its cardinality in a `sh:property` line on that class's shape. If the module also has a closed shape, add the property to its `sh:ignoredProperties` list too. `kpi/shapes.ttl` needs both: the `sh:property` line on `shp:Measure`, and the list on `shp:NoValuesOnMeasures`.
-3. For a value on instances, add a column to the module's table and to its builder, then run the builder with `--write`. Use the table that holds fields of the same kind, such as `kpi/measure-details.csv` for a measure's `grain` and `basis`. Give every row the column, even when it is empty, because a short row passes with no warning. A concept in a code list is a new row in that table.
-4. Add a test that names the term, in the module's `test_*.py`.
-5. Follow the release steps for the module.
+| Row | Module | What to add |
+|---|---|---|
+| `measure-link` | `data-product` | A property for the filter, in `vocabulary.ttl` and `shapes.ttl`, and the link with its filter in the module's tables. The Genie space's creator confirms each filter first. Take the change through the `ontology` skill's gates. |
+| `migration-pair` | `technical-graph` | The table that a Databricks table replaces. |
+| A new object, from an `object-extra` row you accepted | `data-product` | A row in `data-product/pricing/tables.csv`, and its lineage in `lineage.csv`. |
+| A new table edge, from a `question` row | `data-product` | A row in `data-product/pricing/lineage.csv`. |
 
 ## Change a process
 
 The process map is the source of the taxonomy in `core`. Every module depends on `core`, so this is the widest change. A change to an existing process's meaning is a major. A new process is a minor.
 
-1. Add the node to `business_architecture/business_process/downstream_process_map.json`, with its `id`, `level`, `name` and `description`. The builder makes the description's first sentence the definition and the rest the scope note, so put the whole definition in the first sentence.
-2. Add its row to `$ONT/build/output/step2-identity-map.json`, beside its siblings, with the same fields as they have. The description belongs in the map only. Copy `minted` and `deprecated` from a sibling: `false` for an ordinary new process.
-3. Save the approval, as the release steps say, because the builder below names it. Commit, and note the commit before your change and the commit of the change. `scripts/check.sh` does not pass on this commit, because the map has a node that `core` lacks yet, so do not share it. The builder compares the two copies of the map. In a plain folder with no Git, choose a label for each instead, at least 12 letters or digits long.
-4. Save both copies under `$ONT/release/frozen/`. Each file's name starts with the first 12 characters of its commit or label:
+The document test does not run this section's commands. Each needs your own edits to a new builder first. The steps it ends with, the cascade and the check, are tested in "The release steps".
 
-   ```sh skip reason="awaits-the-rewrite: the reader's own values stand in angle brackets, and no test supplies them yet"
-   M=business_architecture/business_process/downstream_process_map.json
-   git show <earlier commit>:$M > $ONT/release/frozen/<first 12 of earlier>-downstream_process_map.json
-   git show <your commit>:$M > $ONT/release/frozen/<first 12 of yours>-downstream_process_map.json
-   ```
+1. Copy `business_architecture\business_process\downstream_process_map.json` into `business_architecture\ontology\release\frozen`. Name the copy with a label of 12 letters or digits, a hyphen, and the file's name, such as `before202611-downstream_process_map.json`.
+2. Add the node to `downstream_process_map.json`, with its `id`, `level`, `name` and `description`. The builder makes the description's first sentence the definition and the rest the scope note. So put the whole definition in the first sentence.
+3. Add its row to `business_architecture\ontology\build\output\step2-identity-map.json`, beside its siblings, with the same fields. Copy `minted` and `deprecated` from a sibling: `false` for an ordinary new process.
+4. Copy the changed map into `frozen` too, under a second label, such as `after2026110-downstream_process_map.json`.
+5. Save the approval, as step 3 of "The release steps" says.
+6. In `business_architecture\ontology\release`, copy `build_core_template.py` to `build_core_2_5.py`. The name is for the first change to this release. A later change raises it.
+7. Fill in the block that the new builder marks: the two labels, the new version and the approval. To change an existing node's ID or description, read `build_core_2_2.py`, which applies those changes.
+8. Write the changelog `business_architecture\ontology\releases\core\CHANGELOG-2.5.0.md`, in the form of `CHANGELOG-2.4.0.md` beside it.
+9. Add a short test, `test_build_core_2_5.py`, beside the builder. It says what the release adds and that it removes no IRI. Add it to the test list in `scripts/check.sh`.
+10. From the folder `release`, write the package with `py build_core_2_5.py --write`.
+11. Move the folder `releases\core\2.4.0` into `releases\previous\core`. Make that folder first if it is missing.
+12. Rebuild every module's source file, since each reads `core`. `scripts/check.sh` lists the builders after the comment on each module's source Turtle. Run each from its folder with `--write`.
+13. From the folder `release`, release every module with `py next_version.py cascade core`, with `--approver`, `--where` and `--words` as in "The release steps".
+14. Change the version of `core` by hand in `PACKAGES` in `projection/pipeline.py` and under `packages` in `projection/skill-run/epm-config.json`.
+15. Follow "The release steps" from step 7.
 
-5. Copy the core builder and fill in the block it marks. `build_core_template.py` follows `build_core_2_3.py`, the builder that added a node. To change an existing node's ID or description, read `build_core_2_2.py`, which applies those changes.
+In a Git copy you may name the two copies of the map by the first 12 characters of their commits instead.
 
-   ```sh run=release-git status-only
-   cp $ONT/release/build_core_template.py $ONT/release/build_core_2_5.py
-   ```
+## A new environment
 
-   These names are for the first change to this release. A later change raises them. A patch of `core` is a new builder too, named for its major and minor.
+The same ontology loads into another workspace with new settings files. The ontology does not change. The ontology names its catalogs `idp_sbx` and `synapse_dev`. The `[names]` table says what each is called in the new environment.
 
-6. Write its changelog, `$ONT/releases/core/CHANGELOG-2.5.0.md`, in the form of `CHANGELOG-2.4.0.md` beside it: the title line `# core changelog`, a heading with the version and date, one sentence on the kind of release, and a line per change.
-7. Add a short test, `$ONT/release/test_build_core_2_5.py`, that says what the release adds and that it removes no IRI. Add it to the test list in `scripts/check.sh`.
-8. Write the package and move the old one:
+1. Copy `C:\kpi-store-local\kpi_store.toml` to a new file beside it, such as `kpi_store.prod.toml`.
+2. In the new file, set `write_catalog` and `read_catalogs` to the new environment's catalogs.
+3. In `[names]`, set each of the ontology's two catalog names to the catalog that holds those objects in the new environment.
+4. Set `warehouse_id` to a SQL warehouse of the new workspace.
+5. Copy `C:\kpi-store-local\stores.toml` to a new file, such as `stores.prod.toml`.
+6. In the new file, set `settings` to the new `kpi_store` file, and `run_folder` to a new folder, such as `C:/kpi-store-local/runs-prod`.
+7. In `[databricks]`, set `profile` to a profile that you signed in to the new workspace with.
+8. Set `[neo4j.enterprise]` to the new environment's server and database.
+9. Run every command for that environment with `--stores` and the new file.
 
-   ```sh skip reason="awaits-the-rewrite: works only after the edits to the new builder that the step before describes"
-   (cd $ONT/release && py build_core_2_5.py --write)
-   mkdir -p $ONT/releases/previous/core && mv $ONT/releases/core/2.4.0 $ONT/releases/previous/core/2.4.0
-   ```
+The new settings file has this shape. The names in angle brackets are yours to fill in.
 
-   `scripts/check.sh` reads the newest core builder and the builders read the newest core package, so neither needs an edit.
-9. Rebuild every module's source files, since they read `core`. The list is in `scripts/check.sh`, after the comment on each module's source Turtle. Each runs from its folder with `--write`.
-10. Follow the release steps for the modules `dependents.py core` lists. For `core` itself, you have already written the package and moved the old one, so change its version by hand in `PACKAGES` and in `epm-config.json`.
+```toml parse
+[release]
+zip = "kpi-store-1.1.zip"
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
 
-## Add a module
+[databricks]
+write_catalog = "<your production catalog>"
+write_schema = "kpi_store"
+tech_graph_schema = "tech_graph"
+volume = "releases"
+read_catalogs = ["<your production catalog>", "<its Synapse catalog>"]
+warehouse_id = "<a SQL warehouse ID>"
 
-Copy `$ONT/lane/`, the smallest module: a README, `vocabulary.ttl`, `shapes.ttl`, a build script, its output and its test. Keep the shape of its build script and test, and rewrite their content: `test_lanes.py` pins `lane`'s versions, and `build_lanes.py` reads two JSON files outside the folder. Read `skills/ontology/references/new-module.md` first. It says when a new module is the right answer, and it holds the full method for a large module. For a small module, this section is enough. Name the competency question the existing modules cannot answer. Your ontology owner approves a module's first release, and names its owner. Write that name in the approval file, because no other field holds it.
+[names]
+idp_sbx = "<your production catalog>"
+synapse_dev = "<its Synapse catalog>"
 
-`next_version.py` works on modules already in `MODULES`, so write this first entry and changelog by hand. Each module has a table or a Turtle source and one builder. `build_lanes.py` is in the `lane` folder, and `kpi` is built by `build_measures.py`. Name yours for what it builds, and give it `--write` and `--verify`.
+[skip]
+schemas = ["information_schema", "bronze_replica_*"]
+tables = ["*__ct", "attrep_*"]
 
-Register the module in every place below. A place you miss fails a check or leaves the module out of a store.
+[genie]
+spaces = []
+```
+
+Each catalog in `[names]` must also be in `read_catalogs`. Two ontology catalogs may not share one catalog of the environment. The settings reader refuses both mistakes before any read or write. To check a settings file before you use it, load it. The example loads the file that ships with the release:
+
+```powershell run=release-copy
+py -c "from kpi_store import settings; s = settings.load('kpi_store/kpi_store.example.toml'); print(s.write_schemas, s.read_catalogs, s.names)"
+```
+
+```text expect
+('idp_sbx.kpi_store', 'idp_sbx.tech_graph') ('idp_sbx', 'synapse_dev') {'idp_sbx': 'idp_sbx', 'synapse_dev': 'synapse_dev'}
+```
+
+The first run in a new environment is a first run. Follow the runbook from "Run the setup check", with `--stores` and the new file on every command. A name that differs in the new environment is an `environment setting` row or a correction, as the report says.
+
+**A correction changes the ontology for every environment.** Accept a rename only when the name changed everywhere. When it differs in one environment only, decide the row as `environment setting`.
+
+## Onboard another module
+
+A module is one part of the ontology with its own version, such as `kpi`. Add a module when a new data area brings terms that no module owns. This section says how to decide, where to register the module, and how its tables join the discovery comparison. It ends with a made-up example that you can run.
+
+`skills/ontology/references/new-module.md` holds the full method and its gates. Read it before you start a real module.
+
+### Decide whether the area needs a module
+
+1. Write the competency question that the existing modules cannot answer. If you find none, stop: the area needs no module.
+2. Check that no module owns the area already. `business_architecture/ontology/MODULES.md` lists what each module holds.
+3. If a module owns the area, extend that module with a minor version ("The release steps"). Do not add a second owner.
+4. Ask your ontology owner to approve the new module and to name its owner. The ontology owner approves every first release.
+5. Save the approving sentence in a file under `business_architecture/ontology/approvals/`. The module's entry names that file.
+
+### Write the module's folder
+
+Copy the shape of `business_architecture/ontology/lane/`, the smallest module. Write six files in a new folder named after the module.
+
+| File | What it holds |
+|---|---|
+| `README.md` | What the module holds, in a few sentences, and a table of its files. |
+| `vocabulary.ttl` | Each class, property and concept scheme, with `rdfs:label`, `skos:definition` and `dcterms:bibliographicCitation`. Give each property one `rdfs:domain` and one `rdfs:range`. Point to another module's term by its IRI. Never define it again. |
+| `shapes.ttl` | The SHACL shapes. Give each property of a class a `sh:property` line. Write no apostrophe in a `sh:message`. |
+| A table, as CSV | The module's instances, one row each. |
+| A builder | It reads the table and writes the instances as Turtle. Give it `--write` and `--verify`. |
+| A test file | The build is current, the instances are the table's, and the shapes reject a wrong instance. |
+
+Cite a source in words, with `dcterms:bibliographicCitation`. A `dcterms:source` link needs a row in `authority/source-tiers.csv`, and that table is part of `integration`. Such a row means a minor version of `integration` after your module.
+
+### Register the module in every place
+
+A place you miss fails a check, or leaves the module out of a store without a word. Register the module in each place below before you build.
 
 | Place | What to add |
 |---|---|
-| `$ONT/release/build_module.py` | An entry in `MODULES`: title, description, version, stage (`None`), approver, approval, issued, parts, shapes, `depends_on` and decisions |
-| `$ONT/releases/<module>/CHANGELOG.md` | A new file: a title line, then the section for its first release |
-| `scripts/check.sh` | The builder's `--verify`, `build_module.py <module> --verify`, and the test file in the test list |
-| `$ONT/projection/pipeline.py` | `PACKAGES`, `OWN` and `PREFIXES` |
-| `$ONT/projection/skill-run/epm-config.json` | The version under `packages`, the namespace under `own_namespaces`, the prefix under `prefixes` |
-| `$ONT/regression/` | Its questions in `expected.csv`, a query in `queries/`, and the module's files in the list in `run.py` |
-| `$ONT/validation/test_all_module_shapes.py` | Its `shapes.ttl` in `SHAPE_FILES` |
-| `$ONT/competency-questions.md` | Each new question, numbered after the last, in the section it fits or a new one. "Locked" there, and "44 questions" in `$ONT/epm-ontology-guide.html` and `$ONT/regression/run.py`, describe this release's set: your owner may add to it. No check reads the count, so change it where your readers use it |
-| `scripts/epm_facts.py` | An entry in the `coverage` table, if processes link to the module |
-| `$ONT/MODULES.md` | A section on the module, with a `<!-- module: name -->` example, and a row in the table under "The three files of each package" |
-| `scripts/build_docs_html.py` | The module's folder in `MODULE_READMES`, then run the builder for its HTML page |
-| `$ONT/authority/source-tiers.csv` | A row with its evidence tier, for each `dcterms:source` the module cites; `build_source_tiers.py` and `vocabulary.ttl` in that folder define the five tiers: 1 process authority, 2 MPC, 3 peers, 4 industry and 5 framework. Choose the tier of the kind of source it is. Run `build_source_tiers.py --write` in that folder. This table is part of `integration`, so release `integration` as a minor after your module. A source written only as a `dcterms:bibliographicCitation` needs no row |
-| `$ONT/placement/vocabulary.ttl` | Optional. A placement kind for a property that links to a process, as `lane:officeLane` has, if a competency question reads it |
-| `$ONT/projection/skill-run/queries.json` | Optional. A saved "walk" that starts from one of the module's terms |
-| `integration`'s entry in `build_module.py` | Not now, unless the row above releases it. Add the module to `depends_on` the next time `integration` is released, if `integration` links to it. A tier row is not a link |
+| `business_architecture/ontology/release/build_module.py` | An entry in `MODULES`: title, description, `version` `1.0.0`, `stage` `None`, approver, approval, issued, parts, shapes, `depends_on` and decisions. |
+| `business_architecture/ontology/releases/<module>/CHANGELOG.md` | A new file: a title line, then the section of the first release, with "Known gaps". |
+| `scripts/check.sh` | Three lines: `build_module.py <module> --verify`, the builder's `--verify`, and the test file in the test list. |
+| `business_architecture/ontology/projection/pipeline.py` | The module and its version in `PACKAGES`, its name in `OWN`, and its prefix in `PREFIXES`. |
+| `business_architecture/ontology/projection/skill-run/epm-config.json` | The namespace under `own_namespaces`, the prefix under `prefixes`, and the version under `packages`. |
+| `business_architecture/ontology/regression/` | The question's row in `expected.csv`, its query in `queries/`, and the module's files in the list in `run.py`. |
+| `business_architecture/ontology/validation/test_all_module_shapes.py` | The module's `shapes.ttl` in `SHAPE_FILES`. |
+| `business_architecture/ontology/competency-questions.md` | The new question, numbered after the last one. |
+| `business_architecture/ontology/MODULES.md` | A row in the table of what each package is built from, and a section with an example that starts with a `module:` comment line. The example's triples must be in the released package. |
+| `scripts/build_docs_html.py` | The module's folder in `MODULE_READMES`, so that its README gets a page. |
 
-Then build, in this order, starting with the module's own builder:
+Two more places apply to some modules only. Add a row to `scripts/epm_facts.py`, in the `coverage` table, when processes link to the module and you want them counted. Add the module to `depends_on` of `integration` at the next release of `integration`, if `integration` links to it.
 
-```sh skip reason="awaits-the-rewrite: the reader's own values stand in angle brackets, and no test supplies them yet"
-(cd $ONT/<module> && py build_<your builder>.py --write)
-(cd $ONT/release && py build_module.py <module> --write)
-# Only if you added a row to source-tiers.csv: rebuild the table and release integration, as the release steps say.
-(cd $ONT/authority && py build_source_tiers.py --write)
-# 2.6.0 and 2.5.0 fit the release as you received it. Read yours: next_version.py current integration.
-(cd $ONT/release && py next_version.py start integration 2.6.0 minor --why "Adds the new module's source." --approver "Your ontology owner" --where "approvals/your-file.md" --words "The sentence that approved it.")
-(cd $ONT/release && py build_module.py integration --write)
-(cd $ONT/release && py next_version.py finish integration 2.5.0)
-# Then, always:
-(cd $ONT/release && py build_catalog.py --write)
-(cd $ONT/projection && py pipeline.py build)
-py scripts/build_docs_html.py
-git add -A
-bash scripts/check.sh
-```
+### Give the area's tables their place in the discovery comparison
+
+The comparison before each Databricks load reads the platform tables of the `data-product` module. A table that is not there is not compared. So a new data area joins the comparison through `data-product`, whether or not it also gets a module of its own.
+
+**An object, a column or a table edge that the ontology names and the workspace lacks stops the load.** Add a table only when it exists in the workspace under that name.
+
+1. Add a row for each table and view of the area to `business_architecture/ontology/data-product/pricing/tables.csv`. Use the names the workspace uses.
+2. Add a row for each hop of the area's lineage to `lineage.csv`, in the same folder.
+3. Add a row for each value column to `columns.csv`, in the same folder.
+4. Run the builder from `business_architecture/ontology/data-product`: `py build_pricing.py --write`. It fails on a name that does not resolve.
+5. Release `data-product` as a minor version, with its cascade ("The release steps").
+6. Run `py -m kpi_store.runner`. The run now compares the new tables with the workspace.
+
+The cut tool applies corrections to the tables in `data-product/pricing/` only. A difference in any other module's content goes through the release steps of this guide, not through the cut.
+
+### Release the module at 1.0.0
+
+1. Run the module's builder with `--write`, from the module's folder.
+2. Write the package: `py build_module.py <module> --write`, from `business_architecture/ontology/release`.
+3. Rebuild the catalog: `py build_catalog.py --write`, from the same folder.
+4. Rebuild the projection manifest: `py pipeline.py build`, from `business_architecture/ontology/projection`.
+5. Run the competency questions: `py run.py`, from `business_architecture/ontology/regression`.
+6. Rebuild the pages: `py scripts/build_docs_html.py`, from the top folder.
+7. Run the full check. Do not share the module until it prints `all checks passed`.
+
+A first release needs no cascade. No released module requires the new one yet. A module that should link to it does so in its own next release.
+
+### Reload the stores
+
+The projection takes every module in `PACKAGES`, so the new module goes into Neo4j with the others. No store needs a setting of its own for it.
+
+1. Run `py -m kpi_store.runner --replace-enterprise`. The Enterprise database holds the earlier release, so the copy needs the replace.
+2. Read the last line. Expect `every step passed`.
+3. Run `py -m kpi_store.sync_check`. Every line must read `current`.
+
+The runbook, `business_architecture/ontology/projection/ontology-stores-runbook.md`, explains each line of both commands.
+
+### A worked example: the made-up module `sample-area`
+
+The release holds a helper, `release/onboard_example.py`, that onboards one made-up module. It writes the six files of the folder and registers the module in each place of the table above. Read its functions as the pattern for your own module: it has one function per place.
+
+**Run the example in a copy of the release, never in the folder you load the stores from.** It adds a made-up module to the ontology.
+
+The commands start in the top folder of the copy.
+
+1. List the places. This changes nothing.
+
+   ```powershell run=new-module
+   cd business_architecture/ontology/release
+   py onboard_example.py --plan
+   ```
+
+   ```text expect
+   would register in business_architecture/ontology/sample-area/
+   would register in business_architecture/ontology/approvals/sample-area-1.0.0.md
+   would register in business_architecture/ontology/release/build_module.py
+   would register in business_architecture/ontology/releases/sample-area/CHANGELOG.md
+   would register in scripts/check.sh
+   would register in business_architecture/ontology/projection/pipeline.py
+   would register in business_architecture/ontology/projection/skill-run/epm-config.json
+   would register in business_architecture/ontology/regression/
+   would register in business_architecture/ontology/validation/test_all_module_shapes.py
+   would register in business_architecture/ontology/competency-questions.md
+   would register in business_architecture/ontology/MODULES.md
+   would register in scripts/build_docs_html.py
+   ```
+
+2. Write the module's folder and register the module.
+
+   ```powershell run=new-module
+   py onboard_example.py --write
+   ```
+
+   ```text expect
+   registered in business_architecture/ontology/sample-area/
+   ...
+   registered in scripts/build_docs_html.py
+   Now build: cd ../sample-area, then build_sample_areas.py --write. HOW-TO-UPDATE.md has the steps after it.
+   ```
+
+3. Build the module's instances from its table.
+
+   ```powershell run=new-module
+   cd ../sample-area
+   py build_sample_areas.py --write
+   ```
+
+   ```text expect
+   areas 3; covered processes 3
+   wrote sample-areas.ttl
+   ```
+
+4. Write the package at 1.0.0, then rebuild the catalog.
+
+   ```powershell run=new-module
+   cd ../release
+   py build_module.py sample-area --write
+   py build_catalog.py --write
+   ```
+
+   ```text expect
+   sample-area 1.0.0: 52 triples; shapes conform
+   wrote <the package folder>
+   catalog: 14 releases from 14 packages
+   wrote <the catalog file>
+   ```
+
+5. Rebuild the projection manifest. The projection now takes the module.
+
+   ```powershell run=new-module
+   cd ../projection
+   py pipeline.py build
+   ```
+
+   ```text expect
+   ...
+   wrote projection-manifest.json
+   ```
+
+6. Run the competency questions. The count is one higher than before: the module's question is number 58.
+
+   ```powershell run=new-module
+   cd ../regression
+   py run.py
+   ```
+
+   ```text expect
+   competency coverage on <the core release>: 58 questions; answerable 57, partial 0, waiting 0, parked 1
+   ```
+
+7. Rebuild the pages, and tell Git about the new files. One test reads which pages Git tracks.
+
+   ```powershell run=new-module status-only
+   cd ../../..
+   py scripts/build_docs_html.py
+   git add -A
+   ```
+
+8. Run the full check. It takes about 10 minutes. On Windows, run it in Git Bash.
+
+   ```bash run=new-module
+   bash scripts/check.sh
+   ```
+
+   ```text expect
+   ...
+   all checks passed
+   ```
+
+9. Run the helper again. It refuses a copy that holds the module, and changes nothing.
+
+   ```powershell run=new-module exit=1
+   cd business_architecture/ontology/release
+   py onboard_example.py --write
+   ```
+
+   ```text expect
+   refused: this release holds the module sample-area already; nothing was changed
+   ```
+
+The copy now holds the made-up module. Delete the copy when you have read what the helper changed.
 
 ## Add a logical model
 
-`logical-model` holds logical data models exported from ER Studio Data Architect. A new model joins this module as one more model; it is not a new module. Each model is two files in `$ONT/logical-model/models/`: ER Studio's Turtle export, saved as `<model>.erstudio.ttl`, and a links file, `<model>.links.csv`. Name the model in lower-case words joined by hyphens, such as `supplier-logical-model`. `$ONT/logical-model/README.md` describes the links file's columns: one row per entity, keyed on ER Studio's identifier, with the source system, the `party` concept and the `data-product` table it links to, and `asserted` or `doubtful`. Only `asserted` rows become triples, and the builder prints each `doubtful` row for your ontology owner. Every link target must be in the newest package of its module, so use this release's IRIs (`https://w3id.org/mpc/ontology/modules/...`).
+`logical-model` holds logical data models exported from ER Studio Data Architect. A new model joins this module as one more model. It is not a new module.
 
-1. Build the model's graphs. The builder writes `<model>.layer.ttl` beside the export, and fails on an IRI that your model and a model already in `models/` both define:
+Each model is two files in `business_architecture\ontology\logical-model\models`: ER Studio's Turtle export, saved as the model's name and `.erstudio.ttl`, and a links file, the model's name and `.links.csv`. Name the model in lower-case words joined by hyphens. `logical-model/README.md` describes the links file's columns. Only rows marked `asserted` become triples. Every link target must be in the newest package of its module.
 
-   ```sh skip reason="awaits-the-rewrite: the reader's own values stand in angle brackets, and no test supplies them yet"
-   (cd $ONT/logical-model && py build_logical_model.py --export models/<model>.erstudio.ttl --links models/<model>.links.csv \
-       --model <model> --title "<Model title>" --out models --write)
+1. Save the two files in `models`.
+2. Build the model's graphs with `--write`. The command below is the one for the made-up model that ships with the release, with `--verify`, which changes nothing. For your model, change the four names and write `--write` in place of `--verify`.
+
+   ```powershell run=release-copy status-only
+   cd business_architecture/ontology/logical-model
+   py build_logical_model.py --export models/customer-logical-model.erstudio.ttl --links models/customer-logical-model.links.csv --model customer-logical-model --title "Customer logical model" --out models --verify
    ```
 
-2. In `$ONT/release/build_module.py`, add the model's two files to the `graphs` list of the `logical-model` entry: `"logical-model/models/<model>.erstudio.ttl"` and `"logical-model/models/<model>.layer.ttl"`. Delete the entry's `augment` list, which names the files this release was cut from, unless you keep a record of your own files in it.
-3. Release `logical-model` as a minor, with the release steps above: save the approval, then `next_version.py start logical-model 1.1.0 minor`, `build_module.py logical-model --write` and `next_version.py finish logical-model 1.0.0`.
-4. In `scripts/check.sh`, add `--export`, `--links`, `--model` and `--title` for the new model to the line that runs `build_logical_model.py ... --verify`, so the check rebuilds every model.
-5. Rebuild the catalog and the projection manifest, and check, as in step 5 of the release steps.
+3. In `release/build_module.py`, add the model's two graph files to the `graphs` list of the `logical-model` entry: the `.erstudio.ttl` file and the `.layer.ttl` file that the builder wrote.
+4. In `scripts/check.sh`, add the new model's four options to the line that runs `build_logical_model.py`, so that the check rebuilds every model.
+5. Release `logical-model` as a minor, with "The release steps" from step 3.
 
-Questions 51 to 55 in `$ONT/regression/` run on the made-up example model. To ask them of your models, run the queries in `$ONT/regression/queries/q51-*.rq` to `q55b-*.rq` over the package's files.
+The stores load each model: Fuseki and Databricks its two graphs as named graphs, the two Neo4j databases the model as its own subgraph. The sync check prints an `lm:` line for each Neo4j database.
 
-The stores load each model too: Jena and Delta its two graphs as named graphs, the local Neo4j and AuraDB the model as its own subgraph. `sync_stores.py check`, in step 5 of "Project into Neo4j and Jena", then prints an `lm:` line for each Neo4j store, and a release is done only when each of those reads `current` too (release steps, step 6).
+A build can also read a model's files from a folder outside your copy. Point `--export` and `--links` at them, and keep `--out` at `models`. List each file with its SHA-256 in the `augment` list of the `logical-model` entry, and compare the files with those hashes before you build from them again.
 
-## Inputs from outside the repository
+## Keep the catalog, the regression and the projection current
 
-A build can read an input from a folder outside the repository instead of from your copy. The builders take each input's location as an option, so the same build runs whether the files sit in the repository or in such a folder.
+| Part | Command, from its folder | When |
+|---|---|---|
+| The catalog, `releases/catalog.ttl` | `py build_catalog.py --write`, in `release` | After any package is written. |
+| The regression | `py run.py`, in `regression` | After any change. A new question goes in `regression/expected.csv`, with its query in `regression/queries`. |
+| The projection manifest | `py pipeline.py build`, in `projection` | After any package is written. The check fails until you run it. |
 
-This release's logical models were built that way. When the release was made, the build read each model's ER Studio export and links file from a folder outside the repository, `release-cut/augment/logical-model/`, and copied them into `$ONT/logical-model/models/`. `release.json` and the package's `manifest.json` record each of those files by its path relative to that folder and its SHA-256. For a model you add, choose either way:
+Step 7 of "The release steps" runs all three.
 
-- **Keep the files outside the repository.** Save the export and the links file in a folder of your own, outside your copy. Point `build_logical_model.py`'s `--export` and `--links` at them, and give `--out $ONT/logical-model/models` so the two graphs it writes go where the package build reads them. List each file with its SHA-256 in the `augment` list of the `logical-model` entry in `$ONT/release/build_module.py`, and compare the files with those hashes before you build from them again. The line in `scripts/check.sh` that runs `build_logical_model.py ... --verify` then needs `--links` pointed at your folder, so a copy without that folder cannot run it.
-- **Move the files into the repository.** Save them in `$ONT/logical-model/models/`, beside the module's sources, as "Add a logical model" does, and build from there.
+## Keep every store in step
 
-## The cascade
+Your packages are the master copy. Each store is a copy that falls behind when you release.
 
-A package names the exact version of each module it requires. So a new version of a module means a new version of every module that depends on it. `dependents.py` lists them, each after what it requires. Raise each version before you write its package, and write them in that order. A module that only takes the new version of what it requires gets a patch, with a changelog line that says so. A change to `core` reaches every module, so use a loop. It patches each module on the list and then finishes them all, and it stops at the first failing step. For any other module, change the list to `py dependents.py <module>`, and start the loop with `for m in $(echo "$list" | tail -n +2)`, which leaves out the module you released yourself.
+1. After every release, run the runner. It loads Databricks, Fuseki, the local Neo4j and Enterprise, and then runs the sync check.
+2. To see later which store is behind, run the sync check alone. The runbook's "The sync check" shows the command and how to read each line.
+3. To repair a store, run the runner again. Do not fix a store by hand.
 
-```sh skip reason="awaits-the-rewrite: moves every module to a new version, and no test starts from a changed core yet"
-(
-  set -e
-  cd $ONT/release
-  moved=""
-  list="$(py dependents.py core)"
-  for m in $(echo "$list"); do
-    old=$(py next_version.py current "$m"); new="${old%.*}.$(( ${old##*.} + 1 ))"
-    py next_version.py start "$m" "$new" patch --why "Takes the new version of what it requires; nothing else changes." \
-        --approver "Your ontology owner" --where "approvals/your-file.md" --words "The sentence that approved it."
-    py build_module.py "$m" --write
-    moved="$moved $m:$old"
-  done
-  for pair in $(echo "$moved"); do py next_version.py finish "${pair%:*}" "${pair#*:}"; done
-)
-```
-
-## Keep the catalog, regression and projection current
-
-- **Catalog:** `build_catalog.py --write` rebuilds `$ONT/releases/catalog.ttl` from the packages on disk.
-- **Regression:** `regression/run.py` runs the competency questions. A new question goes in `regression/expected.csv`, with its query in `regression/queries/`.
-- **Projection manifest:** `pipeline.py build` checks the projection's rules and records the hash of every input. `scripts/check.sh` fails until you run it after a change.
-
-## Project into Neo4j and Jena
-
-The packages are the source. Neo4j and Jena are copies that you can empty and reload. `scripts/check.sh` does not need them: when the stores are behind, it prints a note and still passes. One command, `rebuild_stores.py`, loads both from an environment file, in about five minutes. You need Docker, Java 11 or later and ROBOT 1.9.10 at `~/epm-lpg/robot.jar`; the script refuses any other file. By default the local Neo4j listens on port 17711 and Jena on 13031. `$ONT/epm-walkthrough.html`, "Connect and load every store", says how to get ROBOT and explains each step, and `$ONT/projection/ontology-stores-runbook.html` shows each store hands on.
-
-1. Copy the environment file outside your copy, and let only yourself read it. The script refuses a file that others can read. Every key has a default, so for these two stores you can leave the file as it is.
-
-   ```sh skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
-   mkdir -p ~/.config/epm
-   cp $ONT/projection/skill-run/environment.example ~/.config/epm/qa.env
-   chmod 600 ~/.config/epm/qa.env
-   ```
-
-2. List the steps. This changes nothing. Name the two stores, because the default is all four, and the other two need logins:
-
-   ```sh skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
-   python3 $ONT/projection/rebuild_stores.py --env ~/.config/epm/qa.env --store driver --store jena --plan
-   ```
-
-3. Load the stores. **`--empty` replaces what the two stores hold.** Without it, the script refuses a store that holds data.
-
-   ```sh skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
-   python3 $ONT/projection/rebuild_stores.py --env ~/.config/epm/qa.env --store driver --store jena --empty
-   ```
-
-   The script stops at the first failing step and names it. The load fails if it lost a triple, added one or found a violation. The script also takes the result into `$ONT/projection/` and checks the stores against your packages.
-4. Commit `inferred.nt`, `projection-manifest.json` and `projection-report.json` from `$ONT/projection/`. `scripts/check.sh` then stops printing its note, and `python3 scripts/epm_facts.py projection` prints the new figures.
-5. To see later which store is behind your newest packages, or holds other technical-graph files than the demo's (the line that starts `tech:`):
-
-   ```sh skip reason="awaits-the-rewrite: written for the stores of the earlier platform"
-   (cd $ONT/projection && uv run -q --no-project --with rdflib --with neo4j python sync_stores.py check --ref worktree --store driver --store jena)
-   ```
-
-## Keep every copy in step
-
-Your packages are the master copy, and everything you load from them is a copy that falls behind when you release. Each kind of copy has its own check:
-
-- **The ontology in each store.** The check in step 5 of "Project into Neo4j and Jena" reads each store's ontology line as `current`, `behind`, `changed`, `unmarked` or `unreachable` (Jena, which has no marker, reads `empty` after a restart). For Jena it compares each named graph's triple count with your packages; Jena reads `empty` after a restart, because its dataset is in memory.
-- **The technical graph.** It is loaded from the demo's graph files, not from your packages. The same check's `tech:` line compares each store's technical graph with those files, by the marker the load wrote and by a fingerprint of the content.
-
-- **The logical models.** The `lm:` line compares each Neo4j store's logical-model subgraph with the package's graphs. `release.json` and the package's `manifest.json` record each file the models were built from under `augment`, by its path and its SHA-256. If you keep those originals, compare each one's SHA-256 with its record before you build from it again ("Inputs from outside the repository").
-
-To repair any of them, run step 3 of "Project into Neo4j and Jena" again, which reloads the stores from your packages and ends with the check. Do not fix a store by hand. A release is done only when every store you keep reads `current` (release steps, step 6).
+A release is done only when every line of the sync check reads `current`.
 
 ## The optional check against this release
 
-`scripts/check-pinned.sh` asks a different question from `scripts/check.sh`: does your copy still equal EPM 1.0 as shipped? Its tests pin versions, counts, approvals and the figures in the guide. They pass on the release as shipped. After your first change some of them fail, and that means only that your copy has moved on. Ignore them from then on, or edit `scripts/pinned-tests.txt` when you want your own pins.
+`scripts/check-pinned.sh` asks a different question from `scripts/check.sh`: does your copy still equal KPI Store 1.1 as shipped? Its tests pin versions, counts, approvals and the figures in the guide. They pass on the release as shipped. After your first change some of them fail. That means only that your copy has moved on. Ignore them from then on, or edit `scripts/pinned-tests.txt` when you want your own pins.
 
-The documents that state figures or versions, such as `$ONT/epm-ontology-guide.html` and the module READMEs that name a core version, describe EPM 1.0. They do not update themselves. Update the ones your readers use.
+The documents that state figures or versions describe KPI Store 1.1 as shipped. They do not update themselves. Update the ones your readers use.
 
 ## The namespace
 
 The IRIs begin with `https://w3id.org/mpc/ontology/`. Keep them as working names unless you have a reason to change them. They identify terms and resolve nowhere. A term's IRI is its identity, so a change is a major release of every module.
 
-If you do change the namespace, do it first, before other changes, and with your ontology owner's approval:
+If you do change the namespace, do it first, before other changes, and with the ontology owner's approval.
 
 1. Raise `core` and every module to the next major version, following the sections above.
-2. Replace the base in the sources: the module folders, the process map's identity map, the builders, `$ONT/projection/`, the shapes and the regression queries.
-3. Leave `$ONT/releases/previous/` alone. Those packages keep the old IRIs, because a released package never changes.
-4. Write every package again in the order `dependents.py core` prints, and run `scripts/check.sh`.
+2. Replace the base in the sources: the module folders, the process map's identity map, the builders, the folder `projection`, the shapes and the regression queries.
+3. Leave `releases\previous` alone. Those packages keep the old IRIs, because a released package never changes.
+4. Write every package again in the order `dependents.py core` prints, and run the full check.
 
 ## What you can ignore
 
-These describe how the ontology was first built. You need none of them to update it:
+These describe how the ontology was first built. You need none of them to update it.
 
-- `$ONT/epm-walkthrough.html`, Part 2, and `$ONT/build/`, apart from the identity map named above.
-- `$ONT/step4/` and the older core builders, `build_core_next.py` and `build_core_2_1.py`, which rebuild earlier releases.
-- `$ONT/release/frozen/`, apart from the copies you add.
-- `business_architecture/domain/decision-packages/`, questions put to the subject matter expert during the build.
-- `$ONT/business-closeout.md`, and any note in a README or changelog dated before you received this release.
+- Part 2 of `business_architecture/ontology/epm-walkthrough.html`, and the folder `build`, apart from the identity map named above.
+- The folder `step4` and the older core builders, `build_core_next.py` and `build_core_2_1.py`, which rebuild earlier releases.
+- The folder `release/frozen`, apart from the copies you add.
+- `business_architecture/domain/decision-packages`, questions put to the subject matter expert during the build.
+- `business_architecture/ontology/business-closeout.md`, and any note in a README or changelog dated before you received this release.

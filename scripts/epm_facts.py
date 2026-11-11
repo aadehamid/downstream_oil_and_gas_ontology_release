@@ -36,7 +36,7 @@ How it gets the numbers:
 
 Standard library only, except taxonomy triple counts, which use rdflib when it
 is installed, the quotes command, which needs markdown-it-py, and the
-modules (for core's triple count) and coverage commands, which need rdflib (`uv run --with rdflib python3 scripts/epm_facts.py counts`).
+modules (for core's triple count) and coverage commands, which need rdflib (`uv run --with rdflib python scripts/epm_facts.py counts`).
 """
 import argparse
 import collections
@@ -97,15 +97,20 @@ HOLD_SETS = [
 ]
 
 
+def relpath(path, start):
+    """The path from start, written with /, as Git writes a tracked path on every system."""
+    return os.path.relpath(path, start).replace(os.sep, "/")
+
+
 def rel(path):
-    return os.path.relpath(path, ROOT)
+    return relpath(path, ROOT)
 
 
 def commit():
     try:
         if not os.path.exists(os.path.join(ROOT, ".git")):
             return "unknown (not a Git checkout)"
-        sha = subprocess.check_output(["git", "-C", ROOT, "rev-parse", "--short", "HEAD"], text=True).strip()
+        sha = subprocess.check_output(["git", "-C", ROOT, "rev-parse", "--short", "HEAD"], text=True, encoding="utf-8").strip()
         dirty = subprocess.call(["git", "-C", ROOT, "diff", "--quiet", "HEAD", "--", rel(STEP4)]) != 0
         return sha + (" (step4 has uncommitted changes)" if dirty else "")
     except (OSError, subprocess.CalledProcessError):
@@ -147,7 +152,7 @@ def run_keeping_globals(path):
     namespace = {"__name__": "__main__", "__file__": path}
     out = io.StringIO()
     ok = True
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         code = compile(f.read(), path, "exec")
     try:
         with contextlib.redirect_stdout(out):
@@ -212,7 +217,7 @@ def phase1_rows(text=None):
     An ID that is only cited inside a sentence or a parenthesis is not a row.
     """
     if text is None:
-        with open(BACKLOG) as f:
+        with open(BACKLOG, encoding="utf-8") as f:
             text = f.read()
     home, paired = {}, {}
     section = None
@@ -254,7 +259,7 @@ def review_holds():
     per_file, per_row = {}, collections.defaultdict(list)
     for path in sorted(glob.glob(os.path.join(REVIEWS, "*.csv"))):
         try:
-            with open(path, newline="") as f:
+            with open(path, newline="", encoding="utf-8") as f:
                 reader = list(csv.DictReader(f))
         except (csv.Error, UnicodeDecodeError):
             continue
@@ -276,7 +281,7 @@ def review_holds():
 # ---------- facts ----------
 
 def stored_facts():
-    with open(FACTS, newline="") as f:
+    with open(FACTS, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
@@ -493,7 +498,7 @@ def find_hits(needle, root=ROOT):
     whatever its extension (.sql, .jsonld and .page files included). The HTML pages generated from
     Markdown that equal a fresh build (generated_copies) are skipped: their Markdown is searched instead."""
     # -z: git quotes paths with non-ASCII characters otherwise, and a quoted path cannot be opened.
-    files = subprocess.check_output(["git", "-C", root, "ls-files", "-z"], text=True).split("\0")
+    files = subprocess.check_output(["git", "-C", root, "ls-files", "-z"], text=True, encoding="utf-8").split("\0")
     copies = generated_copies(root)
     flat_needle = re.sub(r"\s+", " ", needle).strip().lower()
     hits = []
@@ -608,7 +613,7 @@ def sweep(base, root=ROOT):
     a date (DATED) and "live" otherwise."""
     try:
         diff = subprocess.check_output(["git", "-C", root, "diff", "-U1", "--no-color", f"{base}...HEAD"],
-                                       text=True, stderr=subprocess.PIPE)
+                                       text=True, stderr=subprocess.PIPE, encoding="utf-8")
     except subprocess.CalledProcessError as e:
         raise SystemExit(f"sweep: cannot diff {base}...HEAD: {e.stderr.strip()}")
     report = []
@@ -662,7 +667,7 @@ def decision_problems(folder=DECISIONS):
     records = {}
     for path in sorted(glob.glob(os.path.join(folder, "DEC-*.md"))):
         number = re.search(r"DEC-(\d{4})", os.path.basename(path)).group(1)
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             text = f.read()
         m = re.search(r"^\| Status \| (.+?) \|\s*$", text, re.M)
         if not m:
@@ -670,7 +675,7 @@ def decision_problems(folder=DECISIONS):
             continue
         records[number] = (path, text, m.group(1).strip())
     index_path = os.path.join(folder, "README.md")
-    with open(index_path) as f:
+    with open(index_path, encoding="utf-8") as f:
         index = {}
         for line in f:
             m = re.match(r"\| \[DEC-(\d{4})\]\(([^)]+)\) \|[^|]*\| ([^|]+) \|", line)
@@ -719,7 +724,7 @@ def answer_corpus(folder=ANSWERS):
     """The decision owner's saved answers, whitespace-collapsed, without each file's HTML header comment."""
     parts = []
     for path in sorted(glob.glob(os.path.join(folder, "*.md"))):
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             parts.append(_flat(re.sub(r"<!--.*?-->", "", f.read(), flags=re.S)))
     return "\n".join(parts)
 
@@ -859,7 +864,7 @@ def rendered_answer_corpus(folder=ANSWERS):
     """The decision owner's saved answers as displayed text, one line per block, to compare with displayed quotes."""
     lines = []
     for path in sorted(glob.glob(os.path.join(folder, "*.md"))):
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             lines.extend(rendered_blocks(f.read()))
     return "\n".join(lines)
 
@@ -968,7 +973,7 @@ def quote_problems(reviews=REVIEWS, backlog=BACKLOG, answers=ANSWERS, decisions=
 
     checked_files = 0
     for path in sorted(glob.glob(os.path.join(reviews, "*.csv"))):
-        with open(path, newline="") as f:
+        with open(path, newline="", encoding="utf-8") as f:
             header = next(csv.reader(f), [])
             f.seek(0)
             rows = list(csv.DictReader(f))
@@ -994,7 +999,7 @@ def quote_problems(reviews=REVIEWS, backlog=BACKLOG, answers=ANSWERS, decisions=
                     check(f"{where} {col}", span)
     if not checked_files:
         problems.append(f"no review file with an owner_words column in {reviews}: nothing checked")
-    with open(backlog) as f:
+    with open(backlog, encoding="utf-8") as f:
         text = f.read()
     for para in block_quotes(text):
         check(f"{os.path.basename(backlog)} block quote", para)
@@ -1003,7 +1008,7 @@ def quote_problems(reviews=REVIEWS, backlog=BACKLOG, answers=ANSWERS, decisions=
         number = int(re.search(r"DEC-(\d{4})", os.path.basename(path)).group(1))
         if number < FIRST_QUOTE_CHECKED_DECISION:
             continue
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             record = f.read()
         name = f"DEC-{number:04d}"
         # Raw HTML can hide or relabel any part of a record (a status, a heading, a
@@ -1102,9 +1107,9 @@ COMMENT_ID = re.compile(r"comment (\d{6,})")
 def markdown_files(root=ROOT):
     """Every tracked Markdown file from the root; in a tree without Git, every .md file in it."""
     if os.path.exists(os.path.join(root, ".git")):
-        out = subprocess.run(["git", "ls-files", "-z", "*.md"], cwd=root, capture_output=True, text=True, check=True).stdout
+        out = subprocess.run(["git", "ls-files", "-z", "*.md"], cwd=root, capture_output=True, text=True, check=True, encoding="utf-8").stdout
         return [f for f in out.split("\0") if f]
-    return sorted(os.path.relpath(os.path.join(r, f), root) for r, ds, fs in os.walk(root)
+    return sorted(relpath(os.path.join(r, f), root) for r, ds, fs in os.walk(root)
                   for f in fs if f.endswith(".md") and ".git" not in r.split(os.sep))
 
 
@@ -1118,13 +1123,13 @@ def citation_problems(root=ROOT, answers=ANSWERS, decisions=DECISIONS, files=Non
     corpus = answer_corpus(answers)
     files_by_name, files_by_comment = {}, {}
     for path in glob.glob(os.path.join(answers, "*.md")):
-        raw = open(path).read()
+        raw = open(path, encoding="utf-8").read()
         files_by_name[os.path.basename(path)] = _flat(re.sub(r"<!--.*?-->", "", raw, flags=re.S))
         header = re.match(r"\s*<!--(.*?)-->", raw, re.S)  # the file's own header records its source, nothing later
         for comment in re.findall(r"comment:(\d{6,})", header.group(1) if header else ""):
             files_by_comment[comment] = files_by_comment.get(comment, "") + files_by_name[os.path.basename(path)]
     def recorded_words(path):
-        found = RECORDED_WORDS.search(open(path).read())
+        found = RECORDED_WORDS.search(open(path, encoding="utf-8").read())
         return _flat(found.group(1)) if found else ""
     record_texts = {m.group(1): recorded_words(p) for p in glob.glob(os.path.join(decisions, "DEC-*.md"))
                     for m in [re.search(r"DEC-(\d{4})", os.path.basename(p))] if m}
@@ -1133,7 +1138,7 @@ def citation_problems(root=ROOT, answers=ANSWERS, decisions=DECISIONS, files=Non
         files = markdown_files(root)
     # the saved answers, the decision records (checked by `quotes`) and the rest of the review evidence: records kept as
     # they were made, not documents to correct
-    skip = (os.path.relpath(answers, root), os.path.relpath(decisions, root), os.path.relpath(REVIEWS, root))
+    skip = (relpath(answers, root), relpath(decisions, root), relpath(REVIEWS, root))
     problems = []
     for f in files:
         if f.startswith(skip):
@@ -1283,7 +1288,7 @@ def tracked_files(root=ROOT):
         env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
         return [n for n in subprocess.check_output(["git", "-C", root, "ls-files", "-z"], env=env).decode().split("\0") if n]
     left_out = {".git", "__pycache__", ".venv", "node_modules", ".pytest_cache"}
-    return sorted(os.path.relpath(os.path.join(r, f), root) for r, ds, fs in os.walk(root) for f in fs
+    return sorted(relpath(os.path.join(r, f), root) for r, ds, fs in os.walk(root) for f in fs
                   if not left_out & set(os.path.relpath(r, root).split(os.sep)))
 
 

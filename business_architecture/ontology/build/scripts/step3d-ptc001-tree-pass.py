@@ -117,7 +117,7 @@ def main() -> int:
 
     # --- write (preserve file's 2-space indent + leading blank line) ---
     SRC.write_text("\n" + json.dumps(data, indent=2, ensure_ascii=False) + "\n",
-                   encoding="utf-8")
+                   encoding="utf-8", newline="\n")
     print("tree pass complete: 680 -> 682 nodes")
     print(f"  + L2 {FIN_L2_NAME!r} under Finance, hosting Plan Budgets (L3)")
     print(f"  + L2 {REF_L2_NAME!r} under Refining, hosting {RISK_NEW_NAME!r} (L3)")

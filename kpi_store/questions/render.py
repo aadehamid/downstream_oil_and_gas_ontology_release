@@ -15,6 +15,13 @@ The header is the comment lines at the top:
     // param: <name> | default <JSON value> | <meaning>
     // needs-any: <role> <role> ...        at least one of these roles must have a value
     // language-tagged: <column> ...       columns whose text ends in a language tag such as @en
+
+The header ends at the first line that is not a comment. Any other comment line, in the header or below it, is
+for the reader. It stays in the query text and the server ignores it.
+
+`run.py` calls `render` once per question, after the drift check. This module reads the template files and
+writes nothing. The order inside `render_text` matters: it refuses an unconfirmed mapping, then a template that
+the write guard (`refuse_writes`) does not pass, and only then builds the text.
 """
 from __future__ import annotations
 
@@ -28,15 +35,19 @@ from . import roles as R
 from .discover import Schema
 
 TEMPLATES = Path(__file__).resolve().parent / "templates"
+# The questions that can be asked, each a file in templates/. The numbers are the questions' own, so they have gaps.
 QUESTIONS = ("q1", "q4", "q6", "q7")
 
 # The two graph names reach `USE graph.byName(...)` as parameters, so no database name is written into a query.
 GRAPH_PARAMS = {R.GOVERNANCE: "governance_graph", R.BPA: "bpa_graph"}
 
+# A role placeholder: two braces, the kind, a colon, the role's name, two braces. Group 1 is the kind, group 2 the name.
 PLACEHOLDER = re.compile(r"\{\{\s*([a-z]+)\s*:\s*([A-Za-z0-9_.]+)\s*\}\}")
 
-# Every clause that can change a graph, a database or the server. A procedure call is refused too, because a
-# procedure can write: the templates need none.
+# The words the write guard refuses: the clauses and commands known to change a graph, a database or the server.
+# A procedure call is refused too, because a procedure can write: the templates need none. The guard works by
+# word, so it is not proof that a text cannot write. A function that writes would pass it. The read transaction
+# in run.py is the guard for that case.
 WRITE_WORDS = ("CREATE", "MERGE", "SET", "DELETE", "DETACH", "REMOVE", "DROP", "FOREACH", "LOAD", "ALTER",
                "INSERT", "GRANT", "DENY", "REVOKE", "RENAME", "START", "STOP", "TERMINATE", "ENABLE", "DEALLOCATE",
                "REALLOCATE", "DRYRUN")
@@ -48,6 +59,8 @@ class RenderError(Exception):
 
 @dataclass
 class Rendered:
+    """A query ready to run: its text, its parameters with the two graph names, the columns that hold
+    language-tagged text, and the roles its placeholders used."""
     question: str
     title: str
     query: str
@@ -57,6 +70,8 @@ class Rendered:
 
 
 def template_text(question: str) -> str:
+    """A question's template, read from templates/. The name is checked against QUESTIONS first, so no text from
+    the command line becomes part of a path."""
     if question not in QUESTIONS:
         raise RenderError(f"no question named {question}: choose one of {', '.join(QUESTIONS)}")
     with (TEMPLATES / f"{question}.cypher").open(encoding="utf-8", newline="\n") as f:
@@ -71,6 +86,8 @@ def code_only(text: str) -> str:
     return pattern.sub(" ", text)
 
 
+# One Cypher token. The order of the alternatives matters: a comment, a string and a backtick name are tried before
+# a bare word, so a word inside one of them is never a separate token.
 TOKEN = re.compile(r"""
       (?P<skip>\s+|/\*.*?\*/|//[^\n]*)                   # white space and comments say nothing
     | (?P<text>'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*")      # a quoted string
@@ -113,6 +130,10 @@ def _is_subquery(found: list[tuple[str, str]], at: int) -> bool:
 
 
 def refuse_writes(text: str) -> None:
+    """Raises RenderError when the template holds one of WRITE_WORDS as a bare word, a procedure call, or
+    IN TRANSACTIONS. The questions are also run in a read transaction (run.py), so this is the first of two
+    guards. It stops such a template before it reaches the server, with a message that names the clause. It also
+    refuses a harmless template that uses one of the words as a variable or a map key."""
     found = tokens(text)
     for i, (kind, word) in enumerate(found):
         # A word after a dot is a property name, such as n.set. Everywhere else a bare word can be a keyword.
@@ -126,6 +147,7 @@ def refuse_writes(text: str) -> None:
         if keyword == "CALL" and not _is_subquery(found, i + 1):
             raise RenderError("refused: the template calls a procedure; after CALL only a subquery may follow, "
                               "as CALL { or CALL (variables) {")
+        # CALL { ... } IN TRANSACTIONS commits in batches, which a single read transaction cannot hold.
         if keyword == "IN":
             following = [w.upper() for k, w in found[i + 1:i + 4] if k == "word"]
             if "TRANSACTIONS" in following:
@@ -134,6 +156,9 @@ def refuse_writes(text: str) -> None:
 
 
 def _header(text: str):
+    """The template's header: (title, {parameter: its rule}, the needs-any groups, the language-tagged columns).
+    It reads the comment lines at the top and stops at the first line of query or the first //# directive. A
+    comment line with no known key is prose and is passed over."""
     title, params, needs_any, tagged = "", {}, [], ()
     for line in text.splitlines():
         if not line.startswith("//") or line.startswith("//#"):
@@ -158,6 +183,8 @@ def _header(text: str):
 
 
 def _conditionals(text: str, mapping: dict) -> str:
+    """The template without its //# directive lines and without the parts whose roles have no value. Blocks
+    nest: a line stays only when every block around it stays."""
     kept, open_ifs = [], []          # one entry per open //#if: does its current part stay?
     for number, line in enumerate(text.splitlines(), 1):
         directive = line.strip()
@@ -185,12 +212,19 @@ def _conditionals(text: str, mapping: dict) -> str:
 
 
 def quote(name: str) -> str:
+    """The name in backticks, with a backtick inside it doubled, so a name that holds a backtick, a space or a
+    quote is still read as one name. One case is not handled: a name that holds the text of a Unicode escape (a
+    backslash, u and four hexadecimal digits). A Cypher parser that reads such escapes before the quotes would
+    turn one into a character, a backtick included."""
     if not isinstance(name, str) or not name or "\x00" in name:
         raise RenderError(f"not a usable name: {name!r}")
     return "`" + name.replace("`", "``") + "`"
 
 
 def _identifier(kind: str, role_name: str, mapping: dict, schemas: dict[str, Schema]) -> str:
+    """The text that replaces one placeholder: the role's confirmed value, quoted. The value must be in the
+    schemas given, which run.py reads just before each question. A path becomes its types joined with
+    bars and its length, such as :`HOSTS`|`CONTAINS`*1..2, for use inside a relationship's square brackets."""
     try:
         role = R.role(role_name)
     except KeyError as error:
@@ -221,7 +255,7 @@ def render_text(question: str, text: str, mapping: dict, schemas: dict[str, Sche
                 graphs: dict[str, str] | None = None) -> Rendered:
     """The query for one template text. `graphs` gives each graph's name inside the composite database."""
     M.require_confirmed(mapping)
-    refuse_writes(text)
+    refuse_writes(text)   # on the template as written, before any name from the mapping enters the text
     title, declared, needs_any, tagged = _header(text)
     for group in needs_any:
         unknown = [name for name in group if name not in R.BY_NAME]
@@ -236,6 +270,8 @@ def render_text(question: str, text: str, mapping: dict, schemas: dict[str, Sche
         return _identifier(match.group(1), match.group(2), mapping, schemas)
 
     body = _conditionals(text, mapping)
+    # Anything in double braces that is not a well-formed placeholder is a typing mistake in the template. Left
+    # alone it would reach the server as query text.
     for found in re.findall(r"\{\{.*?\}\}", body, re.S):
         if not PLACEHOLDER.fullmatch(found):
             raise RenderError(f"{found} is not a placeholder of the form {{{{kind:role}}}}")
@@ -255,6 +291,8 @@ def render_text(question: str, text: str, mapping: dict, schemas: dict[str, Sche
             values[name] = rule["default"]
     for graph, name in GRAPH_PARAMS.items():
         values[name] = (graphs or {}).get(graph, graph)
+    # Every $name in the query's code must have a value now. A template that uses a parameter its header does
+    # not declare would otherwise fail on the server with a less clear message.
     undeclared = sorted(set(re.findall(r"\$([A-Za-z_][A-Za-z0-9_]*)", code_only(query))) - set(values))
     if undeclared:
         raise RenderError(f"the template uses the parameter {', '.join(undeclared)} and does not declare it")
@@ -263,4 +301,5 @@ def render_text(question: str, text: str, mapping: dict, schemas: dict[str, Sche
 
 def render(question: str, mapping: dict, schemas: dict[str, Schema], params: dict | None = None,
            graphs: dict[str, str] | None = None) -> Rendered:
+    """The query for one of the release's questions, from its template file."""
     return render_text(question, template_text(question), mapping, schemas, params, graphs)

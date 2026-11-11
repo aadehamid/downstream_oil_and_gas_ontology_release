@@ -1,0 +1,913 @@
+<!doctype html>
+<!-- Adapted from Horoi 0.2.0 styles at e0660af0f795ebfeb6f1354a69b3b0c47ebafba6.
+Modified for the KPI Store with new navigation, RDF rendering and relationship views.
+See NOTICE.txt and LICENSE.txt for attribution and licence terms. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MPC ontology reference</title>
+<style>
+:root { color-scheme:light dark;
+  --bg:#FFFFFF; --panel:#FFFFFF; --ink:#111827; --muted:#4B5563; --faint:#9CA3AF; --section:#6E7788; --line:#E5E7EB;
+  --accent:#EA580C; --accent-soft:#FFF1E8; --blue:#2563EB; --blue-soft:#EEF4FF; --green:#16A34A; --green-soft:#ECFBF1; --code:#F6F7F9;
+  --mono:ui-monospace,"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+  --sans:Inter,"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --gutter:28px; --side:230px; --toggle:36px; --rail:calc(var(--gutter) + var(--side) + 40px);
+  --fold:240ms; --ease:cubic-bezier(.2,0,.38,.9); }
+:root[data-side="closed"] { --rail:calc(var(--gutter) + var(--toggle) + 16px); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#121212; --panel:#1A1A1A; --ink:#ECECEC; --muted:#A3A3A3; --faint:#737373; --section:#7D7D7D; --line:#2E2E2E; --accent:#FB923C; --accent-soft:#2A1D14; --blue:#60A5FA; --blue-soft:#172131; --green:#4ADE80; --green-soft:#15261B; --code:#1F1F1F; } }
+:root[data-theme="dark"] { --bg:#121212; --panel:#1A1A1A; --ink:#ECECEC; --muted:#A3A3A3; --faint:#737373; --section:#7D7D7D; --line:#2E2E2E; --accent:#FB923C; --accent-soft:#2A1D14; --blue:#60A5FA; --blue-soft:#172131; --green:#4ADE80; --green-soft:#15261B; --code:#1F1F1F; }
+:root[data-theme="light"] svg.hr-diagram {  }
+:root[data-theme="dark"] svg.hr-diagram {  }
+* { box-sizing:border-box; }
+html { scroll-behavior:smooth; scroll-padding-top:84px; }
+body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.6 var(--sans); }
+a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
+code { font-family:var(--mono); font-size:.9em; }
+.top { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:14px; padding:12px var(--gutter);
+  background:color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter:blur(10px); border-bottom:1px solid var(--line); }
+.mark { width:30px; height:30px; border-radius:6px; background:#EA580C; display:grid; place-items:center; color:#fff;
+  font:700 15px var(--sans); }
+.top .name { font-size:21px; font-weight:400; letter-spacing:-.2px; align-self:baseline; }
+.top .v { font:500 12px var(--mono); color:var(--muted); border:1px solid var(--line); padding:2px 8px; border-radius:4px; align-self:baseline; }
+.top nav { margin-left:auto; display:flex; gap:20px; font-size:14px; align-items:center; } .top nav a { color:var(--muted); }
+#theme { border:none; background:transparent; color:var(--muted); border-radius:4px; width:32px; height:28px;
+  cursor:pointer; font-size:15px; line-height:1; }
+.wrap { display:grid; grid-template-columns:minmax(var(--rail),1fr) minmax(0,914px) minmax(var(--gutter),1fr);
+  padding:36px 0 80px; transition:grid-template-columns var(--fold) var(--ease); }
+aside { position:sticky; top:95px; align-self:start; width:var(--side); margin-left:var(--gutter); }
+#side { position:absolute; top:0; left:0; z-index:1; display:grid; place-items:center; width:var(--toggle); height:var(--toggle); padding:0;
+  border:1px solid var(--line); border-radius:4px; background:transparent; color:var(--muted); cursor:pointer; }
+#side:hover { background:var(--accent-soft); color:var(--accent); }
+#side svg { display:block; width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.5; }
+#side .pane { fill:currentColor; stroke:none; opacity:.35; transform-box:fill-box; transform-origin:left;
+  transition:transform var(--fold) var(--ease); }
+.fold { display:flex; flex-direction:column; max-height:calc(100vh - 115px); clip-path:inset(-4px -10px -4px -10px);
+  transition:clip-path var(--fold) var(--ease), opacity var(--fold) var(--ease), visibility var(--fold); }
+aside input { flex:none; width:calc(100% - var(--toggle) - 8px); height:var(--toggle); margin:0 0 28px calc(var(--toggle) + 8px); padding:0 11px;
+  border:1px solid var(--line); border-radius:4px; background:var(--panel); color:var(--ink); font:14.5px var(--sans); }
+.list { flex:1; min-height:0; overflow:auto; margin:0 -10px; padding:0 10px; }
+aside a { display:block; margin-left:-10px; padding:3px 10px; border-radius:4px; color:var(--muted); font:14.5px var(--sans); }
+aside a:hover { background:var(--accent-soft); color:var(--accent); text-decoration:none; }
+.group:not([hidden]) ~ .group { margin-top:24px; }
+.navh { margin:0 0 6px; font:700 13px var(--sans); letter-spacing:1.6px; text-transform:uppercase; color:var(--section); }
+:root[data-side="closed"] aside { pointer-events:none; }
+:root[data-side="closed"] #side { pointer-events:auto; }
+:root[data-side="closed"] #side .pane { transform:scaleX(0); }
+:root[data-side="closed"] .fold { clip-path:inset(-4px 100% -4px 0); opacity:0; visibility:hidden; }
+@media (prefers-reduced-motion:reduce) { .wrap, .fold, #side .pane { transition:none; } }
+main section { margin-bottom:56px; }
+h1 { font-size:44px; line-height:1.1; letter-spacing:-.8px; margin:0 0 14px; font-weight:600; }
+h2 { font-size:13px; letter-spacing:2px; text-transform:uppercase; color:var(--accent); margin:0 0 18px; }
+.lead { font-size:20px; color:var(--muted); max-width:760px; margin:0 0 28px; }
+.ns { display:flex; align-items:center; gap:12px; flex-wrap:wrap; background:var(--panel); border:1px solid var(--line);
+  border-radius:6px; padding:12px 16px; margin-bottom:16px; }
+.ns .p { font:700 13px var(--mono); color:var(--accent); background:var(--accent-soft); padding:3px 9px; border-radius:4px; }
+.ns code { font-size:15px; } .ns button { margin-left:auto; border:1px solid var(--line); background:transparent; color:var(--muted);
+  border-radius:4px; padding:5px 11px; font:13px var(--sans); cursor:pointer; }
+.meta { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:0; }
+.meta div { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:11px 14px; }
+.meta dt { font-size:12px; color:var(--faint); } .meta dd { margin:2px 0 0; font-weight:600; }
+.diagram { border:1px solid var(--line); border-radius:6px; padding:16px; overflow:auto; }
+.diagram svg { display:block; width:100%; height:auto; min-width:640px; }
+.cap { font-size:14px; color:var(--muted); margin-top:10px; }
+.term { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:20px 22px; margin-bottom:14px; }
+.term:target { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+.term header { display:flex; align-items:center; gap:12px; }
+.term h3 { margin:0; font:600 20px var(--mono); }
+.badge { font-size:12px; font-weight:600; padding:2px 8px; border-radius:4px; background:var(--accent-soft); color:var(--accent); }
+.badge.datatype { background:var(--green-soft); color:var(--green); } .badge.object { background:var(--blue-soft); color:var(--blue); }
+.iri { margin:6px 0 12px; font:13px var(--mono); color:var(--faint); } .iri .lbl { font-family:var(--sans); margin-left:12px; }
+.def { font-size:17.5px; margin:0 0 6px; }
+.term dl { display:grid; grid-template-columns:150px 1fr; gap:8px 16px; margin:16px 0 0; padding-top:14px; border-top:1px dashed var(--line); }
+.term dt { font-size:13px; color:var(--faint); padding-top:3px; } .term dd { margin:0; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.chip { font:13px var(--mono); padding:2px 8px; border-radius:4px; background:var(--accent-soft); color:var(--accent); }
+.chip.any { background:var(--code); color:var(--muted); font-style:italic; font-family:var(--sans); }
+.chip.lit { background:var(--code); color:var(--ink); font-family:var(--sans); }
+.chip.ext { background:var(--code); color:var(--muted); }
+.edge { white-space:nowrap; } .arrow { color:var(--faint); }
+pre { background:var(--code); border:1px solid var(--line); border-radius:6px; padding:16px 18px; overflow:auto;
+  font:13.5px/1.6 var(--mono); }
+pre .k { color:var(--faint); } pre .s { color:var(--green); } pre .t { color:var(--blue); font-weight:600; }
+.dls { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; }
+.dl { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:12px 16px; color:var(--ink); }
+.dl:hover { border-color:var(--accent); text-decoration:none; } .dl span { display:block; font-weight:600; }
+.dl code { color:var(--muted); }
+footer { border-top:1px solid var(--line); padding:24px 28px; color:var(--faint); font-size:13px; text-align:center; }
+@media (max-width:900px) { .wrap { grid-template-columns:minmax(0,1fr); padding:24px 16px 60px; } aside { display:none; }
+  .top nav a { display:none; } h1 { font-size:34px; } .term dl { grid-template-columns:1fr; } }
+
+:root { --accent:#17665d; --accent-soft:#e7f1ed; --core:#77602b; --party:#285e7c; --sans:system-ui,-apple-system,"Segoe UI",sans-serif; }
+* { box-sizing:border-box; }
+body { font:16px/1.6 var(--sans); }
+button,input,select { font:inherit; }
+button,select { cursor:pointer; }
+button { padding:.5rem .8rem; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink); }
+button:hover,a.tile:hover { border-color:var(--accent); }
+a { color:var(--accent); }
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible { outline:3px solid #d38a32; outline-offset:3px; }
+.skip { position:absolute; top:-80px; left:10px; z-index:20; background:var(--panel); padding:12px; }.skip:focus { top:8px; }
+.masthead { display:flex; align-items:center; flex-wrap:wrap; gap:20px; border-bottom:1px solid var(--line); padding:18px max(22px,calc((100vw - 1220px)/2)); }
+.brand { font-weight:750; letter-spacing:.02em; color:var(--ink); white-space:nowrap; }.brand span { margin-left:12px; font-weight:450; }
+.masthead nav { display:flex; flex-wrap:wrap; gap:20px; margin-left:auto; font-size:14px; }
+.masthead nav a[aria-current=page] { color:var(--ink); text-decoration:underline; text-underline-offset:6px; }
+.masthead #theme { font-size:13px; width:auto; height:auto; white-space:nowrap; flex-shrink:0; }
+.release-bar { padding:8px max(22px,calc((100vw - 1220px)/2)); background:var(--accent-soft); color:var(--ink); font-size:13px; display:flex; justify-content:space-between; gap:16px; }
+main { max-width:1220px; margin:auto; padding:42px 24px 70px; min-height:72vh; }
+main:focus { outline:none; }
+h1 { font-size:clamp(28px,4vw,46px); max-width:900px; line-height:1.15; margin:12px 0 20px; }
+h2 { font-size:23px; text-transform:none; letter-spacing:-.02em; color:var(--ink); margin:0 0 14px; }
+h3 { font-size:18px; margin:0 0 10px; }
+p { max-width:78ch; }
+.lead { font-size:20px; color:var(--muted); max-width:780px; }
+.eyebrow,.crumb { font-size:13px; color:var(--muted); }.eyebrow { text-transform:uppercase; letter-spacing:.1em; }
+.grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
+.layers { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.tile,.panel { display:block; padding:22px; border:1px solid var(--line); border-radius:10px; background:var(--panel); color:var(--ink); }
+.tile p { margin:8px 0; color:var(--muted); }.tile .go { color:var(--accent); font-weight:600; }
+.party { border-top:4px solid var(--party); }.core { border-top:4px solid var(--core); }
+.section { margin-top:40px; }.panel p:first-child { margin-top:0; }
+.note { padding:14px 18px; border-left:3px solid var(--accent); background:var(--accent-soft); }
+.actions { display:flex; flex-wrap:wrap; gap:12px; margin:20px 0; }.actions a { padding:9px 15px; border:1px solid var(--line); border-radius:6px; }
+.actions a.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+.filters { display:flex; gap:14px; flex-wrap:wrap; align-items:end; margin:24px 0 8px; }
+label { display:flex; flex-direction:column; font-size:14px; gap:5px; }
+input,select { padding:10px; border:1px solid var(--line); border-radius:6px; color:var(--ink); background:var(--panel); }
+label.search { flex:1; min-width:220px; }
+.results { list-style:none; padding:0; margin:18px 0; }.results li { border-bottom:1px solid var(--line); padding:16px 0; }.results a { font-weight:650; }.results p { margin:3px 0; color:var(--muted); font-size:14px; }.badge { margin-left:10px; background:var(--accent-soft); color:var(--accent); }
+.term-head { display:flex; align-items:start; justify-content:space-between; gap:20px; }.term-head h1 { margin-bottom:12px; }
+.iri-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:18px 0; }.iri-row code { overflow-wrap:anywhere; font-size:12px; }.iri-row button { font-size:13px; }
+.term-definition { font-size:20px; }.lang { font-size:12px; color:var(--muted); margin-left:6px; }
+.table-wrap { overflow-x:auto; }table { width:100%; border-collapse:collapse; text-align:left; }th,td { padding:12px 10px; border-bottom:1px solid var(--line); vertical-align:top; overflow-wrap:anywhere; }th { font-size:13px; color:var(--muted); }td code { font-size:12px; overflow-wrap:anywhere; }
+details { border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin:14px 0; }summary { cursor:pointer; font-weight:600; }
+.graph { overflow:auto; border:1px solid var(--line); border-radius:8px; padding:12px; }.graph svg { width:100%; min-width:620px; max-height:480px; }.graph rect { fill:var(--panel); stroke:var(--accent); }.graph text { fill:var(--ink); font-family:var(--sans); }.graph line { stroke:var(--muted); }.graph .edge-label { fill:var(--muted); font-size:12px; }.graph polygon { fill:var(--muted); }
+.quiet { color:var(--muted); font-size:14px; }.pager { display:flex; align-items:center; gap:18px; }.empty { padding:28px; border:1px dashed var(--line); border-radius:8px; }
+footer { display:flex; justify-content:center; flex-wrap:wrap; gap:12px; }
+:root[data-theme=dark] { --accent:#8bd6c9; --accent-soft:#162d2b; --bg:#131b20; --panel:#1a252b; --ink:#e5edf1; --muted:#aebcc3; --faint:#aebcc3; --line:#3b4d56; --core:#d9b969; --party:#81badb; --code:#1a252b; }
+:root[data-theme=dark] .actions a.primary { color:#11231e; }
+@media(max-width:760px) { .masthead { padding:16px; gap:14px; }.masthead nav { order:3; width:100%; margin:0; gap:12px 18px; }.masthead button { margin-left:auto; }.release-bar { padding:8px 16px; flex-wrap:wrap; gap:0; }.grid,.layers { grid-template-columns:1fr; }main { padding:26px 16px 45px; }.term-head { display:block; }.filters label { width:100%; }.table-wrap table { min-width:480px; }.brand span { margin-left:6px; }.section { margin-top:28px; } }
+@media(prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
+@media(max-width:760px) {
+  .relationship-table table { min-width:0; }
+  .relationship-table thead { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+  .relationship-table tr { display:block; border:1px solid var(--line); border-radius:8px; margin:12px 0; padding:10px; }
+  .relationship-table td { display:block; border:0; padding:5px 0; }
+  .relationship-table td::before { content:attr(data-label); display:block; font-size:12px; color:var(--muted); }
+}
+
+.graph .compact-graph { display:none; }
+@media(max-width:760px) { .graph .wide-graph { display:none; }.graph .compact-graph { display:block; min-width:0; max-height:none; }.graph { overflow:visible; } }
+
+.explorer-layout { display:grid; grid-template-columns:minmax(260px,340px) minmax(0,1fr); gap:28px; align-items:start; }
+.explorer-layout > *, .explorer-selection { min-width:0; }
+.explorer-sidebar { display:block; position:static; width:auto; margin:0; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px; }
+.explorer-sidebar input { width:100%; min-width:0; height:auto; margin:0; padding:10px; }
+.explorer-sidebar a { display:inline; margin:0; padding:3px 0; font:inherit; color:var(--accent); }
+.explorer-sidebar ul { list-style:none; padding:0; }
+.process-tree ul { padding-left:12px; border-left:1px solid var(--line); margin-left:4px; }
+.process-tree li { margin:8px 0; }
+.process-branch { border:0; padding:0; margin:8px 0; }
+.process-branch summary { font-size:14px; font-weight:450; padding:6px 0; overflow-wrap:anywhere; }
+.tree-leaf { display:block; font-size:14px; padding:6px 0 6px 15px; overflow-wrap:anywhere; }
+.selected-process > details > summary, .selected-process > .tree-leaf { background:var(--accent-soft); border-radius:4px; }
+.level { display:inline-block; padding:0 6px; border:1px solid var(--line); border-radius:4px; color:var(--muted); font-size:12px; white-space:nowrap; vertical-align:middle; }
+.stage-list li { border-bottom:1px solid var(--line); padding:16px 8px; }
+.stage-list li p { font-size:13px; color:var(--muted); margin:5px 0 0; }
+.stage-list a { display:block; font-weight:650; padding:5px 0; }
+.stage-list .selected-stage { border-left:3px solid var(--accent); background:var(--accent-soft); }
+#selected-title { font-size:30px; line-height:1.25; margin:12px 0 20px; overflow-wrap:anywhere; }
+.explorer-selection .term-definition { font-size:18px; }
+.process-position { border-top:1px solid var(--line); padding-top:24px; margin-top:30px; }
+.ancestry { list-style:none; padding:0; }
+.ancestry li { padding:6px 0 6px 16px; margin-left:6px; border-left:2px solid var(--line); }
+.ancestry li + li::before { content:"↳ "; color:var(--muted); }
+.position-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.position-grid ul { padding-left:18px; }.position-grid li { padding:6px 0; }
+.reading-trail { background:var(--accent-soft); margin:0 0 24px; }
+.reading-trail ol { list-style:none; padding:0; }.reading-trail li { overflow-wrap:anywhere; }
+.trail-edge { padding-top:10px; }.trail-edge > span { display:block; color:var(--muted); font-size:13px; }
+.connection-group { padding:14px; }
+.connection-group > summary { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.connection-group > summary::before { content:"+"; }.connection-group[open] > summary::before { content:"−"; }
+.connection-card { padding:18px 0; border-top:1px solid var(--line); margin-top:14px; }
+.statement { display:grid; grid-template-columns:1fr .8fr 1fr; gap:14px; align-items:start; }
+.statement > div { min-width:0; overflow-wrap:anywhere; }.statement .quiet { display:block; margin-bottom:4px; font-size:12px; }
+.statement > div:first-child, .statement > div:last-child { padding:12px; border:1px solid var(--line); border-radius:6px; background:var(--accent-soft); }
+.statement-relation { align-self:center; text-align:center; }
+.statement-relation a,.statement-relation span:not(.quiet) { font-size:14px; }
+.connection-meta { display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-top:14px; font-size:12px; color:var(--muted); }
+.connection-meta a { padding:5px 0; }.connection-card p { margin-bottom:0; font-size:13px; }
+.connection-definition { border:0; padding:0; margin:8px 0 0; }.connection-definition summary { font-size:12px; font-weight:450; color:var(--muted); }
+.explorer-iri { overflow-wrap:anywhere; }
+@media(min-width:1000px) { .explorer-sidebar { max-height:82vh; overflow:auto; position:sticky; top:12px; } }
+@media(max-width:900px) { .explorer-layout { grid-template-columns:1fr; }.explorer-sidebar { max-height:380px; overflow:auto; }.position-grid { grid-template-columns:1fr; } }
+@media(max-width:560px) { .statement { grid-template-columns:1fr; gap:10px; }.statement-relation { padding-left:16px; border-left:2px solid var(--accent); text-align:left; }.connection-group { padding:12px; }.connection-group > summary { flex-wrap:wrap; } }
+
+.stream-stage-list { list-style:none; padding:0; }
+.stream-stage-list > li { border-left:2px solid var(--line); margin:14px 0; padding:8px 0 8px 12px; }
+.stream-stage-list > li.active-stage { border-left-color:var(--accent); background:var(--accent-soft); border-radius:4px; }
+.stream-stage-heading { display:flex; align-items:start; gap:8px; }
+.stream-stage-heading > .level { flex-shrink:0; }
+.stream-stage-list details { border:0; padding:0; margin:8px 0 0; }
+.stream-stage-list summary { font-size:12px; font-weight:450; color:var(--muted); }
+.stream-stage-list details li { padding:8px 4px; font-size:14px; }
+.stream-overview { margin-top:28px; }
+.stream-overview > h2 { margin-top:28px; }
+.stream-map { list-style:none; padding:0; }
+.stream-map > li { display:flex; gap:16px; padding:20px; border:1px solid var(--line); border-radius:10px; background:var(--panel); margin:12px 0; }
+.stage-number { display:flex; flex-shrink:0; align-items:center; justify-content:center; align-self:start; width:36px; height:36px; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-weight:650; }
+.stream-map h3 { margin:0; }.stream-map p { font-size:14px; color:var(--muted); margin:8px 0; }
+.stage-processes .tile { padding:16px; }.stage-processes h3 { margin:10px 0; }
+@media(max-width:560px) { .stream-map > li { padding:16px 12px; gap:12px; } }
+
+@media(min-width:1000px) { .module-directory { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+
+.relationship-definition { margin:10px 0 0; padding:0; border:0; text-align:left; }
+.relationship-definition summary { font-size:13px; font-weight:450; overflow-wrap:anywhere; }
+.relationship-definition p { font-size:14px; overflow-wrap:anywhere; }
+.connection-shortcuts { display:flex; flex-wrap:wrap; gap:8px; margin:18px 0; }
+.connection-shortcuts button { font-size:14px; text-align:left; }
+
+.measure-sidebar .section { margin-top:12px; }
+.measure-sidebar .section > h2 { font-size:17px; }
+.measure-sidebar .section > p { font-size:13px; }
+.measure-sidebar .results li { padding:10px 0; }
+.measure-sidebar details { padding:10px; }
+
+.measure-context dt { font-weight:650; margin-top:12px; }
+.measure-context dd { margin:4px 0 0; overflow-wrap:anywhere; }
+
+.measure-sidebar .selected-measure { border-left:3px solid var(--accent); padding-left:8px; background:var(--accent-soft); }
+</style>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<header class="masthead">
+  <a class="brand" href="#overview">MPC <span>Ontology reference</span></a>
+  <nav aria-label="Primary"><a href="#overview">Overview</a><a href="#process">Processes</a><a href="#customer">Customer lifecycle</a><a href="#streams">Value streams</a><a href="#measures">Measures and KPIs</a><a href="#modules">Modules and connections</a><a href="#browse">Find a term</a><a href="#guide">How to use it</a></nav>
+  <button id="theme" aria-label="Switch colour theme">Light / dark</button>
+</header>
+<div class="release-bar"><div id="release-scope">All ontology modules</div> <span>Read-only · Works offline</span></div>
+<main id="content" tabindex="-1"></main>
+<footer><a href="../viewer/index.html">Open the full ontology viewer</a> · <a href="#about">Release and coverage</a> · <a href="NOTICE.txt" id="credits">Adapted from Horoi · Credits</a></footer>
+<script id="ontology-data" type="application/json">/* EMBEDDED_DATA */</script>
+<script>"use strict";
+const data = JSON.parse(document.getElementById("ontology-data").textContent);
+document.getElementById("release-scope").textContent = `${data.release} · All ontology modules`;
+document.getElementById("credits").textContent = `Adapted from Horoi ${data.horoiVersion} · Credits`;
+const explorer = createExplorerIndex(data);
+const nodes = explorer.byId;
+const referenceTerms = new Set(data.referenceTerms);
+const RDF = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
+const RDFS = "http://www.w3.org/2000/01/rdf-schema#";
+const SKOS = "http://www.w3.org/2004/02/skos/core#";
+const main = document.getElementById("content");
+const incoming = explorer.incoming;
+const e = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+const short = id => id.replace(/[/#]$/, "").split(/[/#]/).pop();
+const title = id => nodes.get(id)?.label || short(id);
+const moduleNames = n => n.modules.map(m => m.name).filter(m => m !== "Release metadata");
+const isLocal = n => n && moduleNames(n).some(m => data.referenceModules.includes(m));
+const viewerHref = id => "../viewer/index.html#" + encodeURIComponent(id);
+const termHref = id => isLocal(nodes.get(id)) ? "#term=" + encodeURIComponent(id) : viewerHref(id);
+const link = id => nodes.has(id)
+  ? `<a href="${e(termHref(id))}" title="${e(id)}">${e(title(id))}</a>`
+  : `<span title="${e(id)}">${e(title(id))}</span>`;
+const vals = (n, p) => n.values.filter(v => v.p === p);
+const definitions = n => vals(n, SKOS+"definition").length ? vals(n, SKOS+"definition") : vals(n, RDFS+"comment");
+const definition = n => definitions(n).find(v => !v.lang || v.lang === "en")?.v || definitions(n)[0]?.v || "No definition is recorded.";
+function relationshipExplanation(id) {
+  const n=nodes.get(id);
+  return `<details class="relationship-definition"><summary>What does ${e(title(id))} mean?</summary><p>${n && definitions(n).length ? e(definition(n)) : "No definition for this relationship is included in this release."}</p></details>`;
+}
+const layer = n => ["Class","Property"].includes(n.kind) ? "Vocabulary" : data.supportingKinds.includes(n.kind) || n.kind === "Metadata" ? "Rules and evidence" : "Business concepts";
+const moduleLabel = m => ({party:"Party · Customer domain",core:"Core · Process map",
+  "data-product":"Data products",integration:"Integration",kpi:"Measures and KPIs",lane:"Office lanes",
+  "logical-model":"Logical models","market-data":"Market data",organization:"Organization and responsibilities",
+  "ref-mpc":"MPC reference facts",system:"Systems","technical-graph":"Technical graph","value-stream":"Value streams"})[m] || m;
+const pageLink = (m, l="") => "#browse?" + new URLSearchParams({module:m, layer:l});
+const moduleLink = m => data.referenceModules.includes(m) ? `#module=${encodeURIComponent(m)}` : `../viewer/index.html#view=module:${encodeURIComponent(m)}`;
+const moduleInfo = m => data.moduleInfo.find(i => i.name === m);
+const valuesHtml = vs => vs.map(v => `<p>${e(v.v)}${v.lang ? `<span class="lang">${e(v.lang)}</span>` : ""}</p>`).join("");
+const crumb = trail => `<div class="crumb"><a href="#overview">Overview</a>${trail.map(x=>` / ${x}`).join("")}</div>`;
+const browseState = {q:"",module:"",layer:"",page:0};
+const readingGroups = ["Business concepts","Vocabulary","Rules and evidence"];
+
+function intro() {
+  return `<div class="eyebrow">MPC Business Process and Architecture Ontology</div>
+  <h1>Understand the concepts.<br>Follow their connections.</h1>
+  <p class="lead">Start with the customer domain or the process map. Read what a term means, see how it connects to other terms, and follow those links across modules.</p>
+  <div class="actions"><a class="primary" href="#module=party">Explore the customer domain</a><a href="#module=core">Explore the process map</a><a href="#measures">Explore measures and KPIs</a><a href="#guide">Take a guided tour</a></div>
+  <section class="section"><h2>Walk through the connections</h2><div class="grid"><a class="tile core" href="#process"><span class="eyebrow">Start with a business process</span><h3>Process explorer</h3><p>Walk from the top of the process tree to its deepest branches. Follow the connections around each process.</p><span class="go">Open the process tree →</span></a><a class="tile party" href="#customer"><span class="eyebrow">Start with the customer</span><h3>Customer lifecycle</h3><p>Choose a lifecycle stage. Follow its processes and systems, and keep your connection trail as you explore.</p><span class="go">Explore lifecycle stages →</span></a></div></section>
+  <section class="section"><h2>Follow a value stream</h2>${valueStreamTiles()}</section>
+  <section class="section"><h2>Browse the modules</h2><div class="grid module-directory">${data.referenceModules.map(moduleTile).join("")}</div></section>
+  <section class="section"><h2>Three ways to read the ontology</h2><p>These are reading groups. They help you distinguish the kinds of information in a module.</p>${layersHtml()}</section>
+  <section class="section panel"><h2>How the modules connect</h2><p>Each module describes one part of the business. Recorded relationships connect its terms to terms in other modules. Module dependencies identify the versions it requires.</p><a href="#modules">See the modules and their connections</a></section>
+  <p class="quiet section">Every current module in this release is available here. Use Modules and connections or Find a term to explore the full reference.</p>`;
+}
+function moduleTile(m) {
+  const info = moduleInfo(m);
+  return `<a class="tile ${e(m)}" href="${e(moduleLink(m))}"><span class="eyebrow">${e(m)} · ${e(info?.version || "")}</span><h2>${e(moduleLabel(m))}</h2><p>${e(info?.description || "Read this module in the full viewer.")}</p><span class="go">Open module →</span></a>`;
+}
+function layersHtml(m="") {
+  const entries = [
+    ["Business concepts","The things the model describes","Processes, code-list values and designed individuals give the vocabulary its business content. These are definitions and modelled concepts, not live operational records."],
+    ["Vocabulary","The types and relationships","Classes describe kinds of thing. Properties name the relationships and attributes used to describe them."],
+    ["Rules and evidence","How to read the supporting detail","Constraints record validation rules. Evidence and source references explain where statements come from. They are available from a term's detail."]
+  ];
+  return `<div class="grid layers">${entries.map(([l,t,d])=>`<div class="panel"><span class="eyebrow">${e(l)}</span><h3>${e(t)}</h3><p>${e(d)}</p><a href="${e(pageLink(m,l))}">Browse ${e(l.toLowerCase())}</a></div>`).join("")}</div>`;
+}
+function modulePage(m) {
+  const info = moduleInfo(m);
+  if (!info || !data.referenceModules.includes(m)) return missing("Choose a module included in this reference.");
+  const candidates = data.nodes.filter(n => referenceTerms.has(n.id) && moduleNames(n).includes(m));
+  const preferred = {
+    party:["Party","CustomerAccount","PartyRole","Person","Organization"],
+    "data-product":["DataProduct","DataProductLine","PlatformDataProduct"],
+    "value-stream":["ValueStream","Stage","ValueStreamProcess","Capability"],
+    "technical-graph":["TechnicalObject","DataObject","PipelineStep","Agent"],
+    organization:["ResponsibilityAssignment","ControlRelationship"],
+    "market-data":["MarketPrice","Benchmark","BenchmarkSeries"],
+    kpi:["MeasureDefinition"],system:["System"],lane:["OfficeLane"],"logical-model":["LogicalModel"]
+  };
+  const owned=candidates.filter(n=>n.id.startsWith(info.id+"/"));
+  const selected=m==="core" ? candidates.filter(n=>vals(n,info.id+"/taxonomyLevel").some(v=>v.literal&&v.v==="0"))
+    : (preferred[m]||[]).map(name=>owned.find(n=>short(n.id)===name)).filter(Boolean);
+  const featured=selected.length?selected:owned.filter(n=>n.kind!=="Property").slice(0,5);
+  if(!featured.length) featured.push(...candidates.slice(0,5));
+  return `${crumb([e(moduleLabel(m))])}<div class="eyebrow">${e(m)} · ${e(info.version)}</div><h1>${e(moduleLabel(m))}</h1><p class="lead">${e(info.description)}</p>
+  <div class="actions"><a class="primary" href="${e(pageLink(m))}">Browse this module</a><a href="#connections=${e(m)}">Follow connections to other modules</a></div>
+  ${m==="core"?'<p><a href="#process">Walk the process tree in the Process explorer</a></p>':m==="party"?'<p><a href="#customer">Walk through the Customer lifecycle</a></p>':""}
+  ${m==="kpi"?`<p><a href="#measures">Walk from a measure to its connected processes, data and systems</a></p>${measureCatalogue()}`:""}
+  <section class="section"><h2>Start here</h2><div class="grid">${featured.map(n=>`<a class="tile" href="${e(termHref(n.id))}"><h3>${e(n.label)}</h3><p>${e(definition(n))}</p><span class="go">Read ${e(n.label)} →</span></a>`).join("")}</div></section>
+  <section class="section"><h2>Read the module in layers</h2>${layersHtml(m)}</section>
+  <section class="section"><h2>Required modules</h2><p>These are declared package dependencies. They do not by themselves describe a business relationship.</p>${dependencies(info)}</section>`;
+}
+let cachedMeasureCatalogue;
+function measureCatalogue(mode=null) {
+  const info=moduleInfo("kpi");
+  if (!info) return '<p>The KPI module is not included in this release.</p>';
+  const namespace=info.id+"/";
+  if (!cachedMeasureCatalogue) {
+    const entries=data.nodes.filter(n=>vals(n,RDF+"type").some(v=>!v.literal && v.v===namespace+"MeasureDefinition"));
+    const groups=new Map();
+    for (const n of entries) {
+      const kinds=vals(n,namespace+"measureKind").filter(v=>!v.literal).map(v=>v.v);
+      for (const kind of new Set(kinds.length?kinds:[""])) {
+        if (!groups.has(kind)) groups.set(kind,[]);
+        groups.get(kind).push(n);
+      }
+    }
+    const designated=namespace+"measure-kind/kpi";
+    const ordered=[...groups.keys()].sort((a,b)=>Number(b===designated)-Number(a===designated)||title(a).localeCompare(title(b)));
+    for (const group of groups.values()) group.sort((a,b)=>explorer.compare(a.id,b.id));
+    cachedMeasureCatalogue={groups,designated,ordered};
+  }
+  const {groups,designated,ordered}=cachedMeasureCatalogue;
+  return `<section class="section" id="measure-catalogue"><h2>Browse measures by recorded kind</h2><p>The KPI module contains measure definitions, their planning users and the processes they inform. It records definitions, not live results. KPI candidates, operational metrics, indicators and reports keep their recorded classifications.</p>
+    ${ordered.map(kind=>`<details ${kind===designated || (mode && groups.get(kind).some(n=>n.id===explorerState.id))?"open":""}><summary>${e(kind?title(kind):"Kind not recorded")} · ${groups.get(kind).length} ${groups.get(kind).length===1?"entry":"entries"}</summary>${kind && nodes.has(kind)?`<p>${e(definition(nodes.get(kind)))}</p>`:""}<ul class="results">${groups.get(kind).map(n=>`<li ${mode && n.id===explorerState.id?'class="selected-measure"':""}>${mode?exploreLink(mode,n.id):link(n.id)}${mode?"":`<p>${e(definition(n))}</p>`}</li>`).join("")}</ul></details>`).join("") || '<p>No measure definitions are recorded in this release.</p>'}
+    <p><a href="${e(pageLink("kpi"))}">Browse all KPI module terms, including its vocabulary</a></p></section>`;
+}
+function dependencies(info) {
+  return info.requires.length ? `<ul>${info.requires.map(id=>{
+    const match = data.moduleInfo.find(m=>id===m.id || id.startsWith(m.id+"/"));
+    return `<li>${match ? `<a href="${e(moduleLink(match.name))}">${e(moduleLabel(match.name))}</a>` : e(id)} <code>${e(id)}</code></li>`;
+  }).join("")}</ul>` : "<p>No package dependency is declared in this module's ontology header.</p>";
+}
+function modulesPage() {
+  return `${crumb(["Modules and connections"])}<h1>Modules and connections</h1><p class="lead">A module groups terms for one part of the model. Follow a term's relationship to see how those parts connect.</p>
+  <div class="grid">${data.referenceModules.map(moduleTile).join("")}</div>
+  <section class="section"><h2>Follow a recorded connection</h2><p>These views show actual statements from the released RDF, grouped by the module at the other end.</p><div class="actions">${data.referenceModules.map(m=>`<a href="#connections=${e(m)}">Connections from ${e(moduleLabel(m))}</a>`).join("")}</div></section>
+  <p class="quiet section">All modules in this source release have local reference pages. The original ontology viewer remains available from the footer.</p>`;
+}
+function connectionRows(module) {
+  const rows = [];
+  for (const n of data.nodes) {
+    if (!referenceTerms.has(n.id) || !moduleNames(n).includes(module)) continue;
+    for (const v of n.values) {
+      const target = !v.literal && nodes.get(v.v);
+      if (!target || ["Metadata",...data.supportingKinds].includes(target.kind)) continue;
+      for (const m of moduleNames(target)) if (m !== module && !moduleNames(n).includes(m))
+        rows.push({s:n.id,p:v.p,o:v.v,module:m});
+    }
+  }
+  return rows.sort((a,b)=>a.module.localeCompare(b.module)||title(a.s).localeCompare(title(b.s))||a.p.localeCompare(b.p)||a.o.localeCompare(b.o));
+}
+function connectionsPage(module) {
+  if (!data.referenceModules.includes(module)) return missing("Choose a module to inspect its outgoing connections.");
+  const rows = connectionRows(module);
+  const groups = [...new Set(rows.map(r=>r.module))];
+  return `${crumb([`<a href="${e(moduleLink(module))}">${e(moduleLabel(module))}</a>`,"Connections"])}<h1>Connections from ${e(moduleLabel(module))}</h1>
+  <p class="lead">Read each row as a statement: the first term has the named relationship to the second term. Follow either term to read its definition and continue through the reference.</p>
+  <p class="note">This view shows outgoing statements to named terms in other modules. It excludes evidence and package metadata. A property domain or range describes vocabulary; it does not assert a relationship between individual records.</p>
+  ${groups.length ? groups.map(m=>`<section class="section"><h2>To ${e(moduleLabel(m))}</h2>${relationshipList(rows.filter(r=>r.module===m))}</section>`).join("") : '<p class="empty">No outgoing connection to another module is recorded for the terms in this view. Incoming links remain visible on each term.</p>'}`;
+}
+function relationshipTable(rows) {
+  return `<div class="table-wrap relationship-table"><table><thead><tr><th scope="col">From</th><th scope="col">Relationship</th><th scope="col">To</th></tr></thead><tbody>${rows.map(r=>`<tr><td data-label="From">${link(r.s)}</td><td data-label="Relationship">${link(r.p)}${relationshipExplanation(r.p)}</td><td data-label="To">${link(r.o)}</td></tr>`).join("")}</tbody></table></div>`;
+}
+function relationshipList(rows) {
+  const preview = relationshipTable(rows.slice(0,8));
+  return rows.length > 8
+    ? preview + `<details><summary>Show ${rows.length-8} more statements (${rows.length} total)</summary>${relationshipTable(rows.slice(8))}</details>`
+    : preview;
+}
+function browsePage(params) {
+  browseState.q=params.get("q")||""; browseState.module=params.get("module")||""; browseState.layer=params.get("layer")||"";
+  if(!data.referenceModules.includes(browseState.module)) browseState.module="";
+  if(!readingGroups.includes(browseState.layer)) browseState.layer="";
+  const requestedPage=Number(params.get("page"));
+  browseState.page=Number.isSafeInteger(requestedPage)&&requestedPage>=0?requestedPage:0;
+  return `${crumb(["Find a term"])}<h1>Find a term</h1><p>Search labels, definitions and identifiers. Filter by module or reading group to narrow the result.</p>
+  <div class="filters"><label class="search">Search terms<input id="search" type="search" placeholder="Try customer account or a process name" value="${e(browseState.q)}"></label>
+  <label>Module<select id="module-filter"><option value="">All modules</option>${data.referenceModules.map(m=>`<option value="${e(m)}" ${m===browseState.module?"selected":""}>${e(moduleLabel(m))}</option>`).join("")}</select></label>
+  <label>Reading group<select id="layer-filter"><option value="">All groups</option>${readingGroups.map(l=>`<option ${l===browseState.layer?"selected":""}>${e(l)}</option>`).join("")}</select></label></div>
+  <p id="result-count" role="status" class="quiet"></p><ul class="results" id="results"></ul><div id="pager" class="pager"><button id="prev">Previous</button><button id="next">Next</button></div>`;
+}
+function refreshResults() {
+  const s=browseState;
+  const found=data.nodes.filter(n=>isLocal(n) && (s.layer==="Rules and evidence" ? layer(n)===s.layer : referenceTerms.has(n.id))
+    && (!s.module||moduleNames(n).includes(s.module)) && (!s.layer||layer(n)===s.layer)
+    && (n.label+" "+n.id+" "+definition(n)).toLowerCase().includes(s.q.toLowerCase())).sort((a,b)=>a.label.localeCompare(b.label)||a.id.localeCompare(b.id));
+  s.page=Math.min(s.page,Math.max(0,Math.ceil(found.length/40)-1));
+  const start=s.page*40;
+  document.getElementById("result-count").textContent=found.length ? `${found.length} results. Showing ${start+1} to ${Math.min(start+40,found.length)}.` : "No matching terms. Try a shorter name or clear the filters.";
+  document.getElementById("results").innerHTML=found.slice(start,start+40).map(n=>`<li>${link(n.id)}<span class="badge">${e(n.kind)}</span><p>${e(moduleNames(n).join(", "))} · ${e(definition(n))}</p></li>`).join("");
+  const prev=document.getElementById("prev"),next=document.getElementById("next");
+  const focused=document.activeElement;
+  prev.disabled=!s.page;next.disabled=start+40>=found.length;
+  if(focused===prev&&prev.disabled&&!next.disabled) next.focus();
+  if(focused===next&&next.disabled&&!prev.disabled) prev.focus();
+  history.replaceState(null,"","#browse?"+new URLSearchParams({q:s.q,module:s.module,layer:s.layer,page:s.page}));
+}
+function kindExplanation(kind) {
+  const descriptions = {
+    Class: "This is a vocabulary class. Its subclasses describe more specific kinds of thing.",
+    Property: "This property names a relationship or an attribute. Domain and range describe how it is used; they do not establish required fields or counts.",
+    Concept: "This is a concept in the business taxonomy. Broader links identify its recorded parent concepts."
+  };
+  return descriptions[kind] || "Its types and relationships are recorded below.";
+}
+function termPage(id) {
+  const n=nodes.get(id);
+  if (!n || !isLocal(n)) return missing("This term is not included in the reference. Choose a module or search for a term.");
+  const primary=moduleNames(n).find(m=>data.referenceModules.includes(m));
+  const structural=[RDFS+"subClassOf",RDFS+"subPropertyOf",SKOS+"broader",RDFS+"domain",RDFS+"range"];
+  const outgoing=n.values.filter(v=>!v.literal && v.p!==RDF+"type").map(v=>({s:id,p:v.p,o:v.v}));
+  const back=incoming.get(id)||[];
+  const namedBack=[], supportingBack=[];
+  for (const row of back) {
+    const named=referenceTerms.has(row.s) || !["Metadata",...data.supportingKinds].includes(nodes.get(row.s).kind);
+    (named ? namedBack : supportingBack).push(row);
+  }
+  const neighbours=outgoing.filter(r=>nodes.has(r.o) && !r.o.startsWith("_:") && !data.supportingKinds.includes(nodes.get(r.o).kind));
+  const hierarchy=outgoing.filter(r=>structural.includes(r.p));
+  return `${crumb([`<a href="${e(moduleLink(primary))}">${e(moduleLabel(primary))}</a>`,`<a href="${e(pageLink(primary,layer(n)))}">${e(layer(n))}</a>`])}
+  <div class="term-head"><div><h1>${e(n.label)}</h1><span class="badge">${e(n.kind)}</span><span class="quiet"> ${e(moduleNames(n).join(", "))}</span></div><a href="${e(pageLink(primary))}">Find another term</a></div>
+  <div class="term-definition">${definitions(n).length?valuesHtml(definitions(n)):"<p>No definition is recorded.</p>"}</div>
+  ${vals(n,SKOS+"scopeNote").length?`<div class="note"><h3>Scope notes</h3>${valuesHtml(vals(n,SKOS+"scopeNote"))}</div>`:""}
+  <div class="iri-row"><code id="term-iri">${e(id)}</code><button id="copy-iri">Copy identifier</button><span id="copy-status" role="status"></span></div>
+  <section class="section"><h2>Where this term fits</h2><p>${kindExplanation(n.kind)}</p>${hierarchy.length?relationshipTable(hierarchy):"<p class=quiet>No parent, domain or range statement is recorded on this term.</p>"}</section>
+  <section class="section"><h2>Follow its connections</h2><p>Arrows show outgoing statements exactly as recorded. The tables list its outgoing relationships. Types appear under all recorded facts.</p>${neighbours.length?smallGraph(n,neighbours.slice(0,6)):""}${neighbours.length>6?"<p class=quiet>The diagram shows the first six named connections. Expand the tables for all connections.</p>":""}${outgoing.length?relationshipList(outgoing):"<p>No outgoing relationship other than its types is recorded.</p>"}</section>
+  <section class="section"><h2>What points to this term</h2><p>These incoming statements show how other terms use this term. Expand the list to see every statement.</p>${namedBack.length?relationshipList(namedBack):"<p>No incoming statement from a named term is recorded.</p>"}${supportingBack.length?`<details><summary>Rules and evidence: ${supportingBack.length} incoming statements</summary>${relationshipTable(supportingBack)}</details>`:""}</section>
+  <details id="facts"><summary>All recorded facts, types and sources</summary><p>Literal language and datatype are shown when recorded. Anonymous nodes open their own detail. No inferred statements have been added.</p>${facts(n)}</details>
+  <div class="actions"><a href="${e(viewerHref(id))}">Open this term in the full viewer</a></div>`;
+}
+function smallGraph(n,rows) {
+  const height=rows.length*76+32, middle=height/2;
+  return `<div class="graph"><svg class="wide-graph" viewBox="0 0 900 ${height}" role="img" aria-label="Outgoing connections from ${e(n.label)}. The same statements appear in the table below.">
+  <rect x="8" y="${middle-28}" width="240" height="56" rx="8"/><text x="20" y="${middle+5}" font-size="14">${e(n.label.slice(0,27))}</text>
+  ${rows.map((r,i)=>{const y=i*76+48;return `<line x1="248" y1="${middle}" x2="615" y2="${y}"/><polygon points="615,${y} 605,${y-5} 605,${y+5}"/><text class="edge-label" x="395" y="${(middle+y)/2-9}">${e(title(r.p).slice(0,29))}</text><a href="${e(termHref(r.o))}"><rect x="620" y="${y-26}" width="265" height="52" rx="8"/><text x="635" y="${y+5}" font-size="14">${e(title(r.o).slice(0,29))}</text><title>${e(title(r.o))}</title></a>`;}).join("")}</svg>
+  <svg class="compact-graph" viewBox="0 0 360 ${rows.length*116+90}" role="img" aria-label="Outgoing connections from ${e(n.label)}. The same statements appear in the cards below.">
+  <rect x="12" y="8" width="336" height="50" rx="8"/><text x="24" y="38" font-size="14">${e(n.label.slice(0,38))}</text><title>${e(n.label)}</title>
+  ${rows.map((r,i)=>{const y=i*116+106;return `<path d="M 36 58 V ${y+26} H 98" fill="none" stroke="currentColor"/><polygon points="100,${y+26} 90,${y+21} 90,${y+31}"/><text class="edge-label" x="100" y="${y-12}">${e(title(r.p).slice(0,29))}</text><a href="${e(termHref(r.o))}"><rect x="100" y="${y}" width="248" height="52" rx="8"/><text x="112" y="${y+31}" font-size="14">${e(title(r.o).slice(0,27))}</text><title>${e(title(r.o))}</title></a>`;}).join("")}</svg></div>`;
+}
+function facts(n) {
+  return `<div class="table-wrap"><table><thead><tr><th scope="col">Property</th><th scope="col">Value</th></tr></thead><tbody>${n.values.map(v=>`<tr><td>${link(v.p)}<br><code>${e(v.p)}</code></td><td>${v.literal?`${e(v.v)} ${v.lang?`<span class="lang">Language: ${e(v.lang)}</span>`:""}${v.datatype?`<br><code>Datatype: ${e(v.datatype)}</code>`:""}`:link(v.v)}</td></tr>`).join("")}</tbody></table></div>`;
+}
+function guide() {
+  const account=data.nodes.find(n=>referenceTerms.has(n.id)&&short(n.id)==="CustomerAccount");
+  const partyRole=data.nodes.find(n=>referenceTerms.has(n.id)&&short(n.id)==="PartyRole");
+  return `${crumb(["How to use it"])}<h1>Read the ontology with a question in mind</h1><p class="lead">The ontology records shared definitions and connections. Use it to find what a term means and how it relates to the rest of the model.</p>
+  <section class="section"><h2>Choose a guided path</h2><ul><li><a href="#process">Process explorer</a>: expand the tree, choose a process and use Go deeper to reach its lowest recorded level.</li><li><a href="#customer">Customer lifecycle</a>: choose a stage, then follow its recorded processes and system stages. These lifecycle stages have no asserted sequence.</li><li><a href="#streams">Value streams</a>: choose Commercial Hydrocarbon Lifecycle or Order to Cash, then follow the ordered stages into their processes and connected concepts.</li></ul><p>Expand a relationship explanation to read its recorded definition without leaving the page. Use the connection-group shortcuts to move to processes, systems, data or other groups. Connection cards retain the direction and name of each relationship. Your connection trail keeps the items you followed and distinguishes a value-stream process from its process-map concept. Select an earlier item to return there.</p><p>For a different starting point, <a href="#modules">browse every module</a> or <a href="#browse">find a term</a>. Connections across modules stay in this reference.</p></section>
+  <section class="section"><h2>Start with a customer question</h2><ol><li>Open ${account?link(account.id):'<a href="#module=party">the Party module</a>'}. Read its definition and scope notes before following a connection.</li><li>Use <strong>Where this term fits</strong> to inspect its parent, domain or range statements.</li><li>Read a connection from left to right: a term, a named relationship, then another term. Select the destination to continue.</li><li>Open ${partyRole?link(partyRole.id):'<a href="#browse?module=party">another Party term</a>'} and compare its definition. Similar labels do not make two terms equivalent.</li><li>Use <strong>All recorded facts, types and sources</strong> when you need the exact predicate, source reference or datatype.</li></ol></section>
+  <section class="section"><h2>Follow a process</h2><ol><li><a href="#browse?module=core&layer=Business+concepts">Find a process in Core</a>.</li><li>Read its definition, then follow its broader concept to see where it sits in the taxonomy.</li><li>Inspect outgoing connections and <strong>What points to this term</strong>. An incoming link may connect a customer lifecycle stage or another module to that process.</li><li><a href="#connections=party">Open Party's connections</a> to see which recorded statements cross module boundaries.</li></ol></section>
+  <section class="section"><h2>Find a measure or KPI</h2><p><a href="#measures">Open Measures and KPIs</a> to browse definitions by their recorded kind. Open a definition to inspect its basis, grain, planning users and process connections. A KPI candidate is not a designated KPI. Values are held by the systems that compute the measures.</p></section>
+  <section class="section"><h2>Distinguish the layers</h2>${layersHtml()}</section>
+  <section class="section panel"><h2>Read relationships precisely</h2><p>A subclass is a more specific kind of class. A broader concept is a parent in a concept hierarchy. A property domain or range is a vocabulary statement. A validation shape records a constraint. These relationships have different meanings.</p><p>An arrow does not imply a required field, a process sequence, a causal effect or a live data flow unless the named relationship explicitly says so. This reference adds no inferred relationships.</p><p>Module dependencies identify package versions needed by a module. They are separate from the business connections shown between terms.</p></section>
+  <section class="section"><h2>Use an identifier</h2><p>Use <strong>Copy identifier</strong> on a term to copy its IRI, the full identifier used in the RDF. The label helps people read it; the IRI identifies the term when querying or mapping data.</p><p>This site is a reference. To run queries or set up a store, use the existing instructions in this release. Reading these pages needs no connection to a store.</p><ul><li><a href="../business_architecture/ontology/epm-ontology-guide.html">Read the ontology guide</a></li><li><a href="../business_architecture/ontology/epm-walkthrough.html">Follow the walkthrough</a></li><li><a href="../viewer/index.html">Explore the full ontology</a></li></ul></section>`;
+}
+function about() {
+  return `${crumb(["Release and coverage"])}<h1>Release and coverage</h1><p>This reference covers every current ontology module of ${e(data.release)}. It retains their recorded facts, supporting nodes and cross-module relationships. Module pages, search and term links stay within this reference.</p><p>The source is the set of release packages of ${e(data.release)}. The build record lists each input file with its checksum. Package versions are shown on each module. This documentation does not update those packages or their versions.</p><p>Historical packages, example datasets and technical-graph records are outside the input set. Blank nodes and evidence remain reachable through term details.</p><p>To read the reference offline, unzip the whole release and open <code>horoi_viewer/index.html</code>. Keep its location within the release so links to the full viewer and guides work.</p><p><a href="build.json">Build record and input hashes</a> · <a href="NOTICE.txt">Credits and license notes</a></p>`;
+}
+function missing(message) {return `<h1>Choose a starting point</h1><p>${e(message)}</p><div class="actions"><a href="#overview">Overview</a><a href="#browse">Find a term</a><a href="../viewer/index.html">Full viewer</a></div>`;}
+"use strict";
+
+// Index existing assertions only. Kept separate from the UI for counterexample tests.
+function createExplorerIndex(data) {
+  const skos = "http://www.w3.org/2004/02/skos/core#";
+  const byId = new Map(data.nodes.map(n => [n.id, n]));
+  const namespace = name => data.moduleInfo.find(m => m.name === name)?.id + "/";
+  const levelPredicate = namespace("core") + "taxonomyLevel";
+  const stageScheme = namespace("party") + "lifecycle-stage";
+  const streamNamespace = namespace("value-stream");
+  const values = (id, p) => (byId.get(id)?.values || []).filter(v => v.p === p);
+  const compare = (a,b) => (byId.get(a)?.label || a).localeCompare(byId.get(b)?.label || b) || a.localeCompare(b);
+  const sorted = ids => [...new Set(ids)].sort(compare);
+  const objects = (id,p) => sorted(values(id,p).filter(v=>!v.literal).map(v=>v.v));
+  function streamStages(id) {
+    return objects(id,streamNamespace+"hasStage").map(stage=>{
+      const literals=values(stage,streamNamespace+"sequence").filter(v=>v.literal);
+      const recorded=literals.map(v=>v.v);
+      const numbers=literals.map(v=>{
+        const lexical=v.datatype==="http://www.w3.org/2001/XMLSchema#integer"
+          ? v.v.replace(/^[\t\n\r ]+|[\t\n\r ]+$/g,"") : v.v;
+        return /^\+?\d+$/.test(lexical)?Number(lexical):NaN;
+      });
+      const position=recorded.length===1 && Number.isSafeInteger(numbers[0]) && numbers[0]>0?numbers[0]:null;
+      return {id:stage,position,recorded};
+    }).sort((a,b)=>(a.position??Infinity)-(b.position??Infinity)||compare(a.id,b.id));
+  }
+  const stageProcesses = id => objects(id,streamNamespace+"hasProcess");
+  const processes = new Set(data.nodes.filter(n => values(n.id,levelPredicate).some(v => v.literal)).map(n => n.id));
+  const stages = sorted(data.nodes.filter(n => values(n.id,skos+"inScheme").some(v => !v.literal && v.v === stageScheme)).map(n => n.id));
+  const parents = new Map(), children = new Map(), incoming = new Map();
+  for (const n of data.nodes) {
+    for (const v of n.values) if (!v.literal) {
+      if (!incoming.has(v.v)) incoming.set(v.v,[]);
+      incoming.get(v.v).push({s:n.id,p:v.p,o:v.v});
+    }
+    if (!processes.has(n.id)) continue;
+    parents.set(n.id, sorted(values(n.id,skos+"broader").filter(v => !v.literal && processes.has(v.v)).map(v => v.v)));
+    for (const p of parents.get(n.id)) {
+      if (!children.has(p)) children.set(p,[]);
+      children.get(p).push(n.id);
+    }
+  }
+  for (const [p, ids] of children) children.set(p,sorted(ids));
+  const roots = sorted([...processes].filter(id => !parents.get(id).length));
+  const reached = new Set(), pending = [...roots];
+  while (pending.length) {
+    const id = pending.pop();
+    if (reached.has(id)) continue;
+    reached.add(id);pending.push(...children.get(id)||[]);
+  }
+  const unplaced = sorted([...processes].filter(id => !reached.has(id)));
+  function ancestry(id) {
+    const queue = [[id]], seen = new Set([id]);
+    for (let i=0;i<queue.length;i++) {
+      const path=queue[i], ps=parents.get(path[0])||[];
+      if (!ps.length) return path;
+      for (const p of ps) if (!seen.has(p)) { seen.add(p);queue.push([p,...path]); }
+    }
+    return [id]; // A closed cycle has no root; do not manufacture one.
+  }
+  function adjacent(id) {
+    const out=(byId.get(id)?.values||[]).filter(v=>!v.literal).map(v=>({s:id,p:v.p,o:v.v}));
+    const unique=new Map([...out,...incoming.get(id)||[]].map(r=>[JSON.stringify(r),r]));
+    return [...unique.values()];
+  }
+  const asserted = r => byId.get(r.s)?.values.some(v => !v.literal && v.p===r.p && v.v===r.o);
+  // A route is untrusted input. Each hop must be an asserted, connected edge.
+  function readTrail(serialized, selected) {
+    if (!serialized) return {start:selected, steps:[], valid:true};
+    try {
+      const trail=JSON.parse(serialized);
+      if (!byId.has(trail.start) || !Array.isArray(trail.steps) || trail.steps.length>100) throw Error();
+      let at=trail.start;
+      for (const r of trail.steps) {
+        if (!r || !asserted(r) || (r.s!==at && r.o!==at)) throw Error();
+        at=r.s===at?r.o:r.s;
+        if (!byId.has(at)) throw Error();
+      }
+      if (at!==selected) throw Error();
+      return {...trail,valid:true};
+    } catch { return {start:selected,steps:[],valid:false}; }
+  }
+  return {byId, incoming, processes, stages, parents, children, roots, unplaced, ancestry, adjacent, asserted, readTrail, streamStages, stageProcesses, streamNamespace,
+    level:id=>values(id,levelPredicate).filter(v=>v.literal).map(v=>v.v).join(", "),
+    notation:id=>values(id,skos+"notation").find(v=>v.literal)?.v || "", compare};
+}
+
+"use strict";
+let explorerState = null;
+const streamModes = {commercial:explorer.streamNamespace+"stream/commercial-hydrocarbon-lifecycle","order-to-cash":explorer.streamNamespace+"stream/order-to-cash"};
+const streamNames = {commercial:"Commercial Hydrocarbon Lifecycle","order-to-cash":"Order to Cash"};
+const explorerNames = {process:"Process explorer",customer:"Customer lifecycle",measures:"Measures and KPIs",...Object.fromEntries(Object.entries(streamModes).map(([mode,id])=>[mode,nodes.get(id)?.label||streamNames[mode]]))};
+const isExplorerRoute = route => Object.hasOwn(explorerNames,route);
+const explorerHref = (mode,id="",trail=null) => "#"+mode+"?"+new URLSearchParams({at:id,...(trail?.steps.length?{trail:JSON.stringify({start:trail.start,steps:trail.steps})}:{})});
+const explorerLabel = id => {
+  const level=explorer.level(id), code=explorer.notation(id);
+  return `${level!==""?`<span class="level">L${e(level)}</span> `:""}${e(title(id))}${code && explorer.processes.has(id)?` <span class="quiet">${e(code)}</span>`:""}`;
+};
+const exploreLink = (mode,id,label=null,trail=null) => nodes.has(id)
+  ? `<a href="${e(explorerHref(mode,id,trail))}" title="${e(id)}">${label||e(title(id))}</a>`
+  : `<span title="${e(id)}">${label||e(title(id))}</span>`;
+
+function valueStreamTiles() {
+  return `<div class="grid">${Object.entries(streamModes).map(([mode,id])=>{
+    const node=nodes.get(id), heading=`<span class="eyebrow">Value stream</span><h3>${e(explorerNames[mode])}</h3>`;
+    return node
+      ? `<a class="tile" href="#${e(mode)}">${heading}<p>${e(definition(node))}</p><span class="go">Explore stages and connections →</span></a>`
+      : `<article class="tile">${heading}<p>This value stream is not included in this release.</p></article>`;
+  }).join("")}</div>`;
+}
+function valueStreamsPage() {
+  return `${crumb(["Value streams"])}<h1>Value streams</h1><p class="lead">Follow a value stream through its stages, then explore the processes and concepts connected to each stage.</p>${valueStreamTiles()}<p class="note">Stage positions come from the released ontology. Processes within a stage are listed alphabetically. Feedback and other process relationships keep their own labels and directions.</p>`;
+}
+function streamTrail(stream,stage,process=null) {
+  const steps=[{s:stream,p:explorer.streamNamespace+"hasStage",o:stage}];
+  if(process) steps.push({s:stage,p:explorer.streamNamespace+"hasProcess",o:process});
+  return {start:stream,steps};
+}
+function streamSidebar(mode,stream,id) {
+  const stages=explorer.streamStages(stream), trail=explorerState.trail;
+  const visited=[trail.start,...trail.steps.flatMap(r=>[r.s,r.o])];
+  return `<aside class="explorer-sidebar" id="explorer-start"><h2>Stages in this stream</h2><p class="quiet">Follow the recorded stage positions. Select a stage, then choose one of its processes.</p><a href="#${e(mode)}">Back to the stream overview</a><ol class="stream-stage-list">${stages.map(stage=>{
+    const ps=explorer.stageProcesses(stage.id), active=stage.id===id||visited.includes(stage.id)||ps.includes(id);
+    return `<li class="${active?'active-stage':''}"><div class="stream-stage-heading"><span class="level">${stage.position===null?'?':e(stage.position)}</span>${exploreLink(mode,stage.id,null,streamTrail(stream,stage.id))}</div><details ${active?'open':''}><summary>${ps.length} processes</summary><ul>${ps.map(p=>`<li>${exploreLink(mode,p,null,streamTrail(stream,stage.id,p))}</li>`).join("")}</ul></details></li>`;
+  }).join("")}</ol><a href="#streams">Choose another value stream</a></aside>`;
+}
+function streamContext(id) {
+  const {mode}=explorerState, stream=streamModes[mode];
+  if(!stream) return "";
+  const stages=explorer.streamStages(stream), stage=stages.find(s=>s.id===id);
+  if(id===stream) {
+    const n=nodes.get(id), fields=[["What starts it","trigger"],["What it delivers","outcome"]];
+    const known=stages.filter(s=>s.position!==null).map(s=>s.position);
+    const ambiguous=known.length!==stages.length||new Set(known).size!==known.length;
+    return `<section class="stream-overview"><div class="grid">${fields.map(([label,p])=>`<div class="panel"><h3>${label}</h3>${vals(n,explorer.streamNamespace+p).length?valuesHtml(vals(n,explorer.streamNamespace+p)):"<p>No statement is recorded.</p>"}</div>`).join("")}</div><h2>Walk through the stages</h2><p>Numbers show the recorded stage positions. Open a stage to see its processes and follow their connections.</p>${ambiguous?'<p class="note">Some stage positions are missing, invalid or shared. Equal positions are listed alphabetically; stages without one are listed last. No unique order is implied for those stages.</p>':""}<ol class="stream-map">${stages.map(s=>`<li><span class="stage-number">${s.position===null?'?':e(s.position)}</span><div><h3>${exploreLink(mode,s.id,null,streamTrail(stream,s.id))}</h3><p>${nodes.has(s.id)?e(definition(nodes.get(s.id))):"No description is included in this release."}</p><span class="quiet">${explorer.stageProcesses(s.id).length} processes</span></div></li>`).join("")}</ol></section>`;
+  }
+  if(stage) {
+    const ps=explorer.stageProcesses(id);
+    return `<section class="stream-overview"><p class="note">Stage ${stage.position===null?'position not uniquely recorded':e(stage.position)} in ${exploreLink(mode,stream)}.</p><h2>Processes in this stage</h2><p>Choose a process to follow its connected concepts. This list is alphabetical; stage membership does not specify process execution order.</p><div class="grid stage-processes">${ps.map(p=>`<a class="tile" href="${e(explorerHref(mode,p,streamTrail(stream,id,p)))}" title="${e(p)}"><span class="eyebrow">Value-stream process</span><h3>${e(title(p))}</h3><span class="go">Explore connections →</span></a>`).join("")}</div></section>`;
+  }
+  const memberships=stages.filter(s=>explorer.stageProcesses(s.id).includes(id));
+  return memberships.length?`<p class="note">In this stream: ${memberships.map(s=>exploreLink(mode,s.id,`Stage ${s.position===null?'?':e(s.position)} · ${e(title(s.id))}`,streamTrail(stream,s.id))).join(" · ")}. ${exploreLink(mode,stream,"Return to the stream overview")}.</p>`:"";
+}
+function explorerKind(n) {
+  if(explorer.processes.has(n.id)) return "Process-map concept";
+  const types=vals(n,RDF+"type").filter(v=>!v.literal).map(v=>v.v);
+  if(types.includes(moduleInfo("kpi")?.id+"/MeasureDefinition")) return "Measure definition";
+  if(types.includes("http://www.w3.org/ns/org#Role")) return "Role";
+  const kinds={ValueStream:"Value stream",Stage:"Value-stream stage",ValueStreamProcess:"Value-stream process",Capability:"Capability",MeasureLink:"Measure link"};
+  return Object.entries(kinds).find(([type])=>types.includes(explorer.streamNamespace+type))?.[1]||n.kind;
+}
+
+function processTreeItem(id, ancestry=[], expanded=new Set()) {
+  const {mode}=explorerState;
+  const label=exploreLink(mode,id,explorerLabel(id));
+  if (ancestry.includes(id)) return `<li>${label} <span class="quiet">Already on this branch; follow its reference.</span></li>`;
+  const children=explorer.children.get(id)||[], path=[...ancestry,id];
+  const current=id===explorerState.id?' class="selected-process"':"";
+  return children.length
+    ? `<li${current}><details class="process-branch" data-path="${e(JSON.stringify(path))}" ${expanded.has(id)?"open":""}><summary>${label}<span class="quiet"> · ${children.length} below</span></summary><ul data-children="${e(id)}" ${expanded.has(id)?'data-loaded="true"':""}>${expanded.has(id)?children.map(child=>processTreeItem(child,path,expanded)).join(""):""}</ul></details></li>`
+    : `<li${current}><span class="tree-leaf">${label}</span></li>`;
+}
+
+function explorerTrail() {
+  const {mode,trail}=explorerState;
+  if (!trail.steps.length) return "";
+  let at=trail.start;
+  const trailLink=(id,prefix=null)=>exploreLink(mode,id,`${e(title(id))}<span class="quiet"> · ${e(explorerKind(nodes.get(id)))}</span>`,prefix);
+  const parts=[`<li>${trailLink(at)}</li>`];
+  trail.steps.forEach((r,i)=>{
+    const forward=r.s===at, next=forward?r.o:r.s;
+    const prefix={start:trail.start,steps:trail.steps.slice(0,i+1)};
+    parts.push(`<li class="trail-edge"><span aria-label="${forward?'outgoing':'incoming'} relationship">${forward?'→':'←'} ${e(title(r.p))} ${forward?'→':'←'}</span> ${trailLink(next,prefix)}</li>`);
+    at=next;
+  });
+  return `<details class="reading-trail" open><summary>Your connection trail</summary><ol>${parts.join("")}</ol><p class="quiet">Arrows retain the direction of each recorded statement. Select an earlier item to return there.</p></details>`;
+}
+
+function explorerFollow(row) {
+  const {mode,id,trail}=explorerState, next=row.s===id?row.o:row.s;
+  // Returning to an earlier node closes a cycle instead of growing the URL forever.
+  let at=trail.start;
+  if (next===at) return {href:explorerHref(mode,next),returning:true};
+  for (let i=0;i<trail.steps.length;i++) {
+    const r=trail.steps[i];at=r.s===at?r.o:r.s;
+    if (next===at) return {href:explorerHref(mode,next,{start:trail.start,steps:trail.steps.slice(0,i+1)}),returning:true};
+  }
+  if (trail.steps.length>=100) return {href:explorerHref(mode,next),restart:true};
+  return {href:explorerHref(mode,next,{start:trail.start,steps:[...trail.steps,row]})};
+}
+
+function connectionGroup(row,id) {
+  const other=nodes.get(row.s===id?row.o:row.s), p=row.p;
+  if (!other || other.id.startsWith("_:") || data.supportingKinds.includes(other.kind) || other.kind==="Metadata"
+      || p.startsWith("http://purl.org/dc/terms/")) return "Sources, rules and evidence";
+  if ([RDF+"type",RDFS+"subClassOf",RDFS+"subPropertyOf",RDFS+"domain",RDFS+"range",SKOS+"inScheme",SKOS+"topConceptOf",SKOS+"hasTopConcept"].includes(p)) return "Vocabulary and types";
+  if (explorer.processes.has(other.id)) return "Processes";
+  const ms=moduleNames(other);
+  const party=moduleInfo("party");
+  if (ms.includes("system") || (party && (vals(other,SKOS+"inScheme").some(v=>!v.literal && v.v===party.id+"/system-stage") || p===party.id+"/stageSystem"))) return "Systems and system stages";
+  if (ms.includes("organization") || vals(other,RDF+"type").some(v=>!v.literal && v.v==="http://www.w3.org/ns/org#Role")) return "People and responsibilities";
+  if (ms.includes("kpi")) return "Measures";
+  if (ms.includes("data-product")||ms.includes("logical-model")||ms.includes("integration")||ms.includes("technical-graph")) return "Data and integration";
+  if (ms.includes("value-stream")) {
+    if (explorerKind(other)==="Capability") return "Capabilities";
+    if (explorerKind(other)==="Measure link") return "Measures";
+    return "Value streams";
+  }
+  if (ms.includes("party")) return "Customer domain";
+  return "Business context";
+}
+
+function explorerCard(row) {
+  const {mode,id}=explorerState, next=row.s===id?row.o:row.s, other=nodes.get(next), follow=explorerFollow(row);
+  const endpoint=which => which===id?`<strong>${e(title(which))}</strong>`:nodes.has(which)?`<a href="${e(follow.href)}" title="${e(which)}">${e(title(which))}</a>`:`<span title="${e(which)}">${e(title(which))}</span>`;
+  return `<article class="connection-card" data-subject="${e(row.s)}" data-predicate="${e(row.p)}" data-object="${e(row.o)}">
+    <div class="statement"><div><span class="quiet">From</span>${endpoint(row.s)}</div><div class="statement-relation"><span class="quiet">Relationship →</span>${exploreLink(mode,row.p)}${relationshipExplanation(row.p)}</div><div><span class="quiet">To</span>${endpoint(row.o)}</div></div>
+    <div class="connection-meta"><span>${other?e(moduleNames(other).join(", ")+" · "+explorerKind(other)):"External reference"}</span>${other?`<a href="${e(follow.href)}">${follow.returning?'Return to this item':follow.restart?'Start a new trail here':'Follow connection'} →</a>`:"<span>No description is included in this release.</span>"}</div>
+    ${other && definitions(other).length?`<details class="connection-definition"><summary>Read the connected item's definition</summary><p>${e(definition(other))}</p></details>`:""}</article>`;
+}
+
+function explorerConnections() {
+  const {id}=explorerState, rows=explorer.adjacent(id), groups=new Map();
+  for (const r of rows) {
+    const group=connectionGroup(r,id);
+    if (!groups.has(group)) groups.set(group,[]);
+    groups.get(group).push(r);
+  }
+  const order=["Processes","Customer domain","Systems and system stages","People and responsibilities","Data and integration","Measures","Capabilities","Value streams","Business context","Vocabulary and types","Sources, rules and evidence"];
+  const visible=order.filter(g=>groups.has(g));
+  return `<section class="section" id="explorer-connections"><h2>Connected to this item</h2><p>Read each card from <strong>From</strong> to <strong>To</strong>. Follow either end to continue across the ontology. These groups organize recorded connections by the other item's kind and module. Only groups with recorded connections appear. Follow the available connections to explore further.</p>
+    ${rows.length?`<nav class="connection-shortcuts" aria-label="Connection groups">${visible.map((g,i)=>`<button type="button" data-jump="connection-group-${i}">${e(g)} (${groups.get(g).length})</button>`).join("")}</nav>`:""}
+    ${rows.length?visible.map((g,i)=>{
+      const rs=groups.get(g), closed=["Sources, rules and evidence","Vocabulary and types","Business context"].includes(g);
+      return `<details id="connection-group-${i}" class="connection-group" ${closed?"":"open"}><summary>${e(g)} <span class="quiet">${rs.length} statements</span></summary>${rs.slice(0,6).map(explorerCard).join("")}${rs.length>6?`<details><summary>Show ${rs.length-6} more statements</summary>${rs.slice(6).map(explorerCard).join("")}</details>`:""}</details>`;
+    }).join(""):"<p>No connection to another term is recorded.</p>"}</section>`;
+}
+
+function processPosition(id) {
+  if (!explorer.processes.has(id)) return "";
+  const {mode}=explorerState, parents=explorer.parents.get(id)||[], children=explorer.children.get(id)||[];
+  const path=explorer.ancestry(id);
+  const hierarchyLink=(other,row)=>`<a href="${e(explorerFollow(row).href)}" title="${e(other)}">${explorerLabel(other)}</a>`;
+  return `<section class="process-position"><h2>Where this sits in the process tree</h2><nav aria-label="Process ancestry"><ol class="ancestry">${path.map(p=>`<li>${exploreLink(mode,p,explorerLabel(p))}</li>`).join("")}</ol></nav>
+    <p class="quiet">Each step down follows a child's recorded broader concept. This shows the hierarchy; workflow order uses its own named relationships.</p>
+    ${parents.length>1?`<p>This process has multiple parents. The path above is one route to a root.</p>`:""}
+    <div class="position-grid"><div><h3>${parents.length>1?'Parents':'Parent'}</h3>${parents.length?`<ul>${parents.map(p=>`<li>${hierarchyLink(p,{s:id,p:SKOS+"broader",o:p})}</li>`).join("")}</ul>`:"<p>No parent process is recorded.</p>"}</div>
+    <div><h3>Go deeper</h3>${children.length?`<ul>${children.map(c=>`<li>${hierarchyLink(c,{s:c,p:SKOS+"broader",o:id})}</li>`).join("")}</ul>`:"<p>This is the lowest recorded level on this branch. Its other connections remain below.</p>"}</div></div></section>`;
+}
+
+function measureContext(n) {
+  const info=moduleInfo("kpi");
+  if (!info) return "";
+  const ns=info.id+"/";
+  if (!vals(n,RDF+"type").some(v=>!v.literal && v.v===ns+"MeasureDefinition")) return "";
+  const fields=[["Recorded kind",ns+"measureKind"],["Identifier","http://purl.org/dc/terms/identifier"],["Notation",SKOS+"notation"],["Basis",ns+"basis"],["Grain",ns+"grain"],["Compared against",ns+"comparedAgainst"],["KPI candidate",ns+"kpiCandidate"]];
+  const value = v => {
+    if (v.literal) return e(v.v);
+    if (!nodes.has(v.v)) return `<span title="${e(v.v)}">${e(title(v.v))}</span>`;
+    const follow=explorerFollow({s:n.id,p:v.p,o:v.v});
+    return `<a href="${e(follow.href)}" title="${e(v.v)}">${e(title(v.v))}${follow.restart?' (start a new trail)':''}</a>`;
+  };
+  return `<section class="section measure-context"><h3>About this measure</h3><dl>${fields.filter(([,p])=>vals(n,p).length).map(([label,p])=>`<dt>${e(label)}</dt><dd>${vals(n,p).map(value).join("; ")}</dd>`).join("")}</dl><p class="quiet">The recorded kind determines its classification. An identifier or candidate flag does not change that kind. Connections below retain their own meanings; informing a process does not mean owning or computing it.</p></section>`;
+}
+
+function explorerSelection() {
+  const {id,mode,trail}=explorerState, n=nodes.get(id);
+  if (!n) return `<section class="panel"><h2>Choose a ${mode==='customer'?'lifecycle stage':mode==='measures'?'measure':'process'}</h2><p>Select an item to read its definition and follow its connections.</p></section>`;
+  return `<section class="explorer-selection" aria-label="Selected item">
+    ${!trail.valid?'<p class="note">This saved trail contains an unavailable or unconnected statement. Showing the selected item without that trail.</p>':""}${explorerTrail()}
+    <div class="eyebrow">${e(moduleNames(n).join(" · "))} · ${e(explorerKind(n))}</div><h2 id="selected-title">${explorerLabel(id)}</h2>
+    <div class="term-definition">${valuesHtml(definitions(n))||"<p>No definition is recorded.</p>"}</div>
+    ${vals(n,SKOS+"scopeNote").length?`<div class="note">${valuesHtml(vals(n,SKOS+"scopeNote"))}</div>`:""}
+    <div class="actions"><a href="#explorer-connections" data-jump="explorer-connections">See connections</a><a href="#explorer-start" data-jump="explorer-start">Choose another ${mode==='process'?'process':mode==='measures'?'measure':'stage'}</a><a href="${e(termHref(id))}">Open reference page</a></div>
+    ${measureContext(n)}${streamContext(id)}${processPosition(id)}${explorerConnections()}
+    <details><summary>All recorded facts, types and sources</summary><code class="explorer-iri">${e(id)}</code>${facts(n)}</details></section>`;
+}
+
+function explorerSidebar(mode,id) {
+  if (mode==="measures") return `<aside class="explorer-sidebar measure-sidebar" id="explorer-start"><h2>Choose a starting measure</h2>${measureCatalogue("measures")}</aside>`;
+  if (streamModes[mode]) return streamSidebar(mode,streamModes[mode],id);
+  if (mode==="process") {
+    const expanded=new Set(explorer.ancestry(id));
+    return `<aside class="explorer-sidebar" id="explorer-start"><h2>Process tree</h2><p class="quiet">Expand a branch, then select a process. L labels show the recorded depth.</p><label>Find a process<input type="search" id="process-search" placeholder="Name, definition or code" value="${e(explorerState.query)}"></label><div id="process-search-results" aria-live="polite"></div><ul class="process-tree">${explorer.roots.map(r=>processTreeItem(r,[],expanded)).join("")}</ul>${explorer.unplaced.length?`<details><summary>Processes without a route from a root</summary><ul>${explorer.unplaced.map(r=>processTreeItem(r)).join("")}</ul></details>`:""}</aside>`;
+  }
+  return `<aside class="explorer-sidebar" id="explorer-start"><h2>Lifecycle stages</h2><p class="quiet">Choose any stage. The source records these stages without a sequence; the list is alphabetical.</p><ul class="stage-list">${explorer.stages.map(s=>`<li${s===id?' class="selected-stage"':""}>${exploreLink(mode,s)}<p>${e(definition(nodes.get(s)))}</p></li>`).join("")}</ul><a href="#module=party">Read the customer domain reference</a></aside>`;
+}
+function explorerLead(mode) {
+  if (mode==="measures") return "Start with a KPI, operational metric or another recorded entry. Follow its connections to processes, planning users, data and systems. Each step stays in your connection trail.";
+  if (streamModes[mode]) return "Follow the stages, choose a process, and explore its connected concepts. Your trail keeps the path back to this value stream.";
+  if (mode==="process") return "Start at the top of the process tree. Walk down each branch, then follow the people, systems, data and other items connected to it.";
+  return "Start with a customer lifecycle stage. Follow its processes and system stages, then explore the connections around each one.";
+}
+
+function explorerPage(mode,params) {
+  const requested=params.get("at"), id=requested===null?(streamModes[mode]||(mode==="process"?explorer.roots[0]||"":"")):requested;
+  if (id && !nodes.has(id)) return missing("This item is not included in the release. Choose a process, measure, customer lifecycle stage or value stream.");
+  const trail=explorer.readTrail(params.get("trail"),id);
+  const origin=trail.valid && trail.steps.length ? Object.keys(streamModes).find(key=>streamModes[key]===trail.start) : null;
+  if(Object.hasOwn(streamModes,mode) && origin && origin!==mode) {
+    mode=origin;params.set("at",id);
+    history.replaceState(null,"","#"+mode+"?"+params);
+  }
+  explorerState={mode,id,query:params.get("q")||"",trail};
+  return `${crumb([e(explorerNames[mode])])}<h1>${e(explorerNames[mode])}</h1><p class="lead">${explorerLead(mode)}</p>
+    <div class="actions"><a href="#process" ${mode==="process"?'aria-current="page"':""}>Process explorer</a><a href="#customer" ${mode==="customer"?'aria-current="page"':""}>Customer lifecycle</a><a href="#measures" ${mode==="measures"?'aria-current="page"':""}>Measures and KPIs</a><a href="#streams" ${streamModes[mode]?'aria-current="page"':""}>Value streams</a></div>
+    <div class="explorer-layout">${explorerSidebar(mode,id)}<div>${explorerSelection()}</div></div>`;
+}
+
+function bindExplorer() {
+  for (const jump of main.querySelectorAll("[data-jump]")) jump.onclick=event=>{
+    event.preventDefault();const target=document.getElementById(jump.dataset.jump);
+    if (!target) return;
+    if (target.matches("details")) target.open=true;
+    const focus=target.matches("details")?target.querySelector("summary"):target;
+    if (!target.matches("details")) focus.tabIndex=-1;
+    focus.focus();target.scrollIntoView({block:"start"});
+  };
+  const input=document.getElementById("process-search");
+  if (input) {
+    const search=()=>{
+    const q=input.value.trim().toLowerCase(), result=document.getElementById("process-search-results");
+    if (!q) { result.innerHTML="";return; }
+    const found=[...explorer.processes].filter(id=>(title(id)+" "+id+" "+definition(nodes.get(id))).toLowerCase().includes(q)).sort(explorer.compare);
+    result.innerHTML=`<p class="quiet">${found.length} matches${found.length>30?". Showing the first 30; refine your search for more.":"."}</p><ul>${found.slice(0,30).map(id=>`<li>${exploreLink(explorerState.mode,id,explorerLabel(id))}</li>`).join("")}</ul>`;
+    };
+    input.oninput=()=>{
+      const params=new URLSearchParams(location.hash.split("?")[1]||"");
+      if(input.value) params.set("q",input.value);else params.delete("q");
+      history.replaceState(null,"","#process?"+params);search();
+    };
+    search();
+  }
+}
+main.addEventListener("toggle",event=>{
+  const branch=event.target;
+  if (!branch.matches("details.process-branch")||!branch.open) return;
+  const list=branch.querySelector(":scope > ul");
+  if (list.dataset.loaded) return;
+  const path=JSON.parse(branch.dataset.path);
+  list.innerHTML=(explorer.children.get(list.dataset.children)||[]).map(id=>processTreeItem(id,path)).join("");
+  list.dataset.loaded="true";
+},true);
+
+function render() {
+  const raw=location.hash.slice(1)||"overview";
+  const [route,query=""]=raw.split("?",2);
+  let html;
+  const routeValue = route.includes("=") ? route.slice(route.indexOf("=")+1) : "";
+  let decoded;
+  try { decoded=decodeURIComponent(routeValue); } catch { decoded=null; }
+  if(decoded===null) html=missing("This address contains an invalid identifier. Choose a module or search for the term.");
+  else if(route.startsWith("term=")) html=termPage(decoded);
+  else if(route.startsWith("module=")) html=modulePage(decoded);
+  else if(route.startsWith("connections=")) html=connectionsPage(decoded);
+  else if(route==="modules") html=modulesPage();
+  else if(route==="browse") html=browsePage(new URLSearchParams(query));
+  else if(route==="guide") html=guide();
+  else if(route==="about") html=about();
+  else if(route==="streams") html=valueStreamsPage();
+  else if(isExplorerRoute(route)) html=explorerPage(route,new URLSearchParams(query));
+  else if(route==="overview") html=intro();
+  else html=missing("This page is not available. Choose a starting point.");
+  main.innerHTML=html;
+  if(isExplorerRoute(route)) bindExplorer();
+  document.querySelectorAll(".masthead nav a").forEach(a=>a.toggleAttribute("aria-current",a.hash.slice(1)===route || (a.hash==="#streams" && Object.hasOwn(streamModes,route))));
+  document.querySelectorAll(".masthead nav a[aria-current]").forEach(a=>a.setAttribute("aria-current","page"));
+  if(route==="browse") {
+    refreshResults();
+    document.getElementById("prev").onclick=()=>{browseState.page--;refreshResults();};
+    document.getElementById("next").onclick=()=>{browseState.page++;refreshResults();};
+    for(const [id,key] of [["search","q"],["module-filter","module"],["layer-filter","layer"]]) document.getElementById(id).addEventListener("input",event=>{
+      browseState[key]=event.target.value;browseState.page=0;
+      refreshResults();
+    });
+  }
+  const copy=document.getElementById("copy-iri");
+  if(copy) copy.onclick=async()=>{
+    const iri=document.getElementById("term-iri"),status=document.getElementById("copy-status");
+    const text=iri.textContent;
+    try { await navigator.clipboard.writeText(text);if(status.isConnected) status.textContent="Copied"; }
+    catch {
+      if(!iri.isConnected||!status.isConnected) return;
+      const r=document.createRange();r.selectNodeContents(iri);getSelection().removeAllRanges();getSelection().addRange(r);
+      status.textContent="Identifier selected. Use Copy from your browser.";
+    }
+  };
+  window.scrollTo(0,0);
+  main.focus({preventScroll:true});
+  if (isExplorerRoute(route) && new URLSearchParams(query).get("at")) {
+    const selected=document.getElementById("selected-title");
+    if(selected) {
+      selected.tabIndex=-1;selected.focus({preventScroll:true});
+      if(matchMedia("(max-width:900px)").matches) selected.scrollIntoView({block:"start"});
+    }
+  }
+}
+const themeRoot=document.documentElement,systemTheme=matchMedia("(prefers-color-scheme: dark)");
+let chosenTheme=null;
+function applyTheme(){themeRoot.dataset.theme=chosenTheme||(systemTheme.matches?"dark":"light");}
+systemTheme.addEventListener("change",applyTheme);
+applyTheme();
+document.getElementById("theme").onclick=()=>{chosenTheme=themeRoot.dataset.theme==="dark"?"light":"dark";applyTheme();};
+document.querySelector(".skip").onclick=event=>{event.preventDefault();main.focus();main.scrollIntoView();};
+window.addEventListener("hashchange",render);
+render();
+</script>
+</body>
+</html>

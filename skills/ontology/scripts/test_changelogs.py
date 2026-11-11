@@ -1,7 +1,7 @@
 """Tests for check_changelogs.py.
 
 Run from this folder:
-  uv run --no-project python3 -m unittest test_changelogs
+  uv run --no-project python -m unittest test_changelogs
 
 A changelog with a Known gaps section passes; each one-break test plants one failure.
 """
@@ -97,9 +97,9 @@ class CheckChangelogs(unittest.TestCase):
             for version, text in (("1.0.0", GOOD), ("notes", "no section here")):
                 package = os.path.join(root, "lending", version)
                 os.makedirs(package)
-                with open(os.path.join(package, "manifest.json"), "w") as f:
+                with open(os.path.join(package, "manifest.json"), "w", encoding="utf-8", newline="\n") as f:
                     f.write("{}")
-                with open(os.path.join(package, "CHANGELOG.md"), "w") as f:
+                with open(os.path.join(package, "CHANGELOG.md"), "w", encoding="utf-8", newline="\n") as f:
                     f.write(text)
             code, out = self.run_main(["--releases", root])
             self.assertEqual(code, 0, out)
@@ -111,9 +111,9 @@ class CheckChangelogs(unittest.TestCase):
         try:
             package = os.path.join(root, "lending", "1.0.0")
             os.makedirs(package)
-            with open(os.path.join(package, "manifest.json"), "w") as f:
+            with open(os.path.join(package, "manifest.json"), "w", encoding="utf-8", newline="\n") as f:
                 f.write("{}")
-            with open(os.path.join(package, "CHANGELOG.md"), "w") as f:
+            with open(os.path.join(package, "CHANGELOG.md"), "w", encoding="utf-8", newline="\n") as f:
                 f.write("# lending 1.0.0\n")
             code, out = self.run_main(["--releases", root, "--exempt", "lending/1.0.0"])
             self.assertEqual(code, 0, out)
@@ -126,10 +126,10 @@ class CheckChangelogs(unittest.TestCase):
             for version, changelog in (("1.0.0", "# lending 1.0.0\n\n## Changes\n- First release.\n"), ("1.1.0", GOOD)):
                 package = os.path.join(root, "lending", version)
                 os.makedirs(package)
-                open(os.path.join(package, "manifest.json"), "w").write("{}")
-                open(os.path.join(package, "CHANGELOG.md"), "w").write(changelog)
+                open(os.path.join(package, "manifest.json"), "w", encoding="utf-8", newline="\n").write("{}")
+                open(os.path.join(package, "CHANGELOG.md"), "w", encoding="utf-8", newline="\n").write(changelog)
             os.makedirs(os.path.join(root, "lending", "1.2.0"))
-            open(os.path.join(root, "lending", "1.2.0", "manifest.json"), "w").write("{}")
+            open(os.path.join(root, "lending", "1.2.0", "manifest.json"), "w", encoding="utf-8", newline="\n").write("{}")
             out = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
                 self.assertEqual(check_changelogs.main(["--releases", root]), 1)

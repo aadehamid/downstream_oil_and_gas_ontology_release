@@ -52,7 +52,7 @@ It leaves out, and lists as `// left out:` comments: relationship counts, `sh:in
 n10s and APOC run only where the projection is built: "neosemantics is only available for Neo4j self-hosted (CE and EE)" (https://neo4j.com/labs/neosemantics/, "Availability & Installation"), and a managed or shared server often allows no plugin. So build and verify locally (steps 5 and 6), then copy the verified graph with plain Cypher to a database you name:
 
 ```bash skip reason="illustration: a usage pattern, where square brackets mark the optional arguments"
-uv run --no-project --with rdflib --with neo4j python3 copy_graph.py \
+uv run --no-project --with rdflib --with neo4j python copy_graph.py \
   --source-env <local.env> [--source-database <name>] \
   --target-env <target.env> [--target-database <name>] \
   --report projection-report.json [--replace] [--batch 1000] [--query-timeout 120]
@@ -81,7 +81,7 @@ Loading a store and proving that nothing was lost (an export of everything the s
 `triplestore.py` loads the validated inputs into any SPARQL 1.1 store and checks per-graph and per-predicate counts, and with a projection report the three-way counts. It speaks only W3C protocols: the SPARQL 1.1 Graph Store HTTP Protocol (https://www.w3.org/TR/sparql11-http-rdf-update/) to replace each named graph with `PUT` (`?graph=<IRI>`), and the SPARQL 1.1 Protocol to count. There is no store-specific code.
 
 ```bash skip reason="illustration: a usage pattern, where square brackets mark the optional arguments"
-uv run --no-project --with rdflib python3 triplestore.py --gsp <graph store URL> --query <SPARQL URL> \
+uv run --no-project --with rdflib python triplestore.py --gsp <graph store URL> --query <SPARQL URL> \
   [--env <store.env>] [--graph-base <IRI>] --inferred inferred.nt \
   [--projection-report projection-report.json] [--cq <question.rq>]... --report triplestore-report.json <data.ttl>...
 ```
@@ -137,9 +137,9 @@ To read them: `MATCH (r:ModuleRelease)-[:DESCRIBES]->(o) RETURN r.module, r.vers
 `model_review.py` checks a loaded graph (after step 6, or on the copy of add-on I) against the anti-patterns of Neo4j's `neo4j-modeling-skill` 1.0.7 that a projection keeps, with that skill's severities (ERROR a correctness failure, WARNING a performance or extensibility risk, INFO a style point):
 
 ```bash skip reason="illustration: a usage pattern, where square brackets mark the optional arguments"
-NEO4J_PASSWORD="$PASSWORD" uv run --no-project --with rdflib --with neo4j python3 model_review.py \
+NEO4J_PASSWORD="$PASSWORD" uv run --no-project --with rdflib --with neo4j python model_review.py \
   --uri "bolt://127.0.0.1:$PORT" [--report model-review.json] [--separator _]
-uv run --no-project --with rdflib --with neo4j python3 model_review.py --env <target.env> [--report ...] [--separator _]
+uv run --no-project --with rdflib --with neo4j python model_review.py --env <target.env> [--report ...] [--separator _]
 ```
 
 - **ERROR** `missing-key-constraint`: no uniqueness or node-key constraint on `:Resource(uri)` (`--key-label`, `--key-property` for another key). n10s MERGEs on `uri`, and without the constraint it creates duplicates without a word.

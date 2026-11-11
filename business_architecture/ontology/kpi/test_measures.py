@@ -57,7 +57,7 @@ def conforms(g):
 
 
 def rows():
-    with open(bm.CLASSIFICATION, newline="") as f:
+    with open(bm.CLASSIFICATION, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
@@ -100,7 +100,7 @@ class Build(unittest.TestCase):
 
     def test_measures_ttl_is_current(self):
         r = subprocess.run([sys.executable, os.path.join(HERE, "build_measures.py"), "--verify"],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
     def test_every_row_becomes_one_measure(self):
@@ -190,7 +190,7 @@ class Release130(unittest.TestCase):
     def test_the_build_rejects_an_identifier_off_its_kind(self):
         import tempfile
         from unittest import mock
-        with open(bm.IDENTIFIER_TABLE, newline="") as f:
+        with open(bm.IDENTIFIER_TABLE, newline="", encoding="utf-8") as f:
             table = list(csv.DictReader(f))
         cases = (("crude-utilization", "OPM-0003", "breaks the OPM run"),             # an allowed ID out of order
                  ("crude-utilization", "KPI-0099", "needs a OPM-nnnn identifier"),  # a KPI ID on an operational metric
@@ -198,7 +198,7 @@ class Release130(unittest.TestCase):
                  ("tar-activities-tracker", "OPM-0099", "has no identifier"))          # an ID on a tracker
         for measure, bad, message in cases:
             rows = [dict(r) for r in table if r["measure_id"] != measure] + [{"measure_id": measure, "identifier": bad}]
-            with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False, newline="") as t:
+            with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False, newline="", encoding="utf-8") as t:
                 w = csv.DictWriter(t, fieldnames=list(table[0].keys()))
                 w.writeheader()
                 w.writerows([{k: r.get(k, "") for k in table[0].keys()} for r in rows])
@@ -338,7 +338,7 @@ class ValueStreamLinks(unittest.TestCase):
     BP = os.path.join(HERE, "..", "..", "business_process")
 
     def value_streams(self):
-        return {f: json.load(open(f)) for f in sorted(glob.glob(os.path.join(self.BP, "value_stream_*.json")))}
+        return {f: json.load(open(f, encoding="utf-8")) for f in sorted(glob.glob(os.path.join(self.BP, "value_stream_*.json")))}
 
     def links(self):
         for f, vs in self.value_streams().items():

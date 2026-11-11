@@ -488,7 +488,7 @@ def main() -> None:
 
     out_path = Path(args.out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
-    (out_path / "step3-taxonomy.ttl").write_text(ttl, encoding="utf-8")
+    (out_path / "step3-taxonomy.ttl").write_text(ttl, encoding="utf-8", newline="\n")
 
     n_triples = len(g)
     wb_bits = ""
@@ -556,7 +556,7 @@ every concept in scheme; {n_broader} broader links, no dangling targets, no
 self-references; 2 top concepts; zero untagged literals; Turtle
 round-trip lossless.
 """
-    (out_path / "step3-taxonomy-report.md").write_text(report, encoding="utf-8")
+    (out_path / "step3-taxonomy-report.md").write_text(report, encoding="utf-8", newline="\n")
     print(f"OK: {n_rows} concepts, {n_triples} triples, "
           f"{with_definition}/{n_rows} definitions ({adopted} triangulated, "
           f"{authored_count} human-authored, {workbook_count} workbook).")

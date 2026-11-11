@@ -89,7 +89,7 @@ class Build(unittest.TestCase):
     def test_code_lists_are_current(self):
         env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
         r = subprocess.run([sys.executable, "build_party.py", "--verify"], cwd=HERE, env=env,
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
 

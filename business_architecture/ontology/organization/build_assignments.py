@@ -39,7 +39,7 @@ RACI = Namespace("https://w3id.org/mpc/ontology/modules/organization/raci-level/
 
 def process_iris():
     """Map each process map ID (the concept's skos:notation) to its IRI from the Step 2 identity map."""
-    with open(IDENTITY) as f:
+    with open(IDENTITY, encoding="utf-8") as f:
         return {row["skos_notation"]: URIRef(row["uri"]) for row in json.load(f) if row["skos_notation"]}
 
 
@@ -135,13 +135,13 @@ def main():
     print("; ".join(f"{k} {v}" for k, v in ledger(entries, register, g)) + "; SHACL conforms")
     if args.verify:
         stale = [os.path.basename(p) for p, text in files.items()
-                 if not os.path.exists(p) or open(p).read() != text]
+                 if not os.path.exists(p) or open(p, encoding="utf-8").read() != text]
         if stale:
             sys.exit(f"not current: {stale}; run build_assignments.py --write")
         print("assignments.ttl and raci-conservation.csv are current")
     if args.write:
         for p, text in files.items():
-            with open(p, "w") as f:
+            with open(p, "w", encoding="utf-8", newline="\n") as f:
                 f.write(text)
         print("wrote assignments.ttl and raci-conservation.csv")
 

@@ -1,6 +1,7 @@
-# Runs the release's check script on every pull request, on Linux and on Windows under Git Bash.
-# The Linux job must pass. The Windows job reports its result but does not block yet: some tests still assume
-# POSIX file modes and symbolic links. When those tests pass on Windows, remove continue-on-error below.
+# Runs on every pull request, and every job must pass.
+# check: the release's check script, scripts/check.sh, on Linux and on Windows under Git Bash. The job sets no
+#   encoding variable, so on Windows Python reads text as cp1252 unless the code names UTF-8, as on most machines.
+# stores: the store loads on Windows, as a person runs them, against servers the job starts on the runner.
 name: check
 on:
   pull_request:
@@ -17,24 +18,181 @@ jobs:
       matrix:
         os: [ubuntu-24.04, windows-2025]
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.os == 'windows-2025' }}
     timeout-minutes: 45
     defaults:
       run:
         shell: bash
-    env:
-      PYTHONUTF8: "1"
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@v7
-      - name: python3 on Windows
-        if: runner.os == 'Windows'
-        run: |
-          # Git Bash on the Windows runner has python but no python3; the check script calls python3.
-          dir="$(dirname "$(command -v python)")"
-          cp "$dir/python.exe" "$dir/python3.exe"
       - name: check.sh
+        env:
+          PYTEST_ADDOPTS: -rs   # name each skipped test and why, so a skip on one system is seen
         run: bash scripts/check.sh
+
+  # The store loads on Windows, with the commands a person runs: the setup check, the Fuseki load, the Neo4j load,
+  # the copy to a second database, and the sync check. The servers run on the runner and listen on 127.0.0.1 only.
+  # One Neo4j Enterprise server (evaluation licence) holds both databases: neo4j, with the n10s and APOC plugins,
+  # stands for the local Neo4j, and businessprocessarchitecturegraph stands for the Enterprise target.
+  stores:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      # The py launcher starts the newest Python, and from 3.15 Python reads text as UTF-8 by default. 3.12 still reads
+      # cp1252 on Windows, as most machines do, so the commands run on 3.12.
+      PY_PYTHON: "3.12"
+      NEO4J_ACCEPT_LICENSE_AGREEMENT: eval
+      FUSEKI_SHA256: 2c92c598e65ab69d99820052e05f4277ed1d77980a8845f87545ad35b71a76ee
+      N10S_SHA256: 4c461087e08405c7cb472ecfefc043e9e8ed93628ed74988e4fda1f1bac54b3e
+      APOC_SHA256: 4df40cea7444ea193d08f8a679aa998c498196fe149c8c02badb998f1c9580fb
+      ROBOT_SHA256: 16a73c074f3df359a7338a84b4e0788785fe06117f931bb9796e9619ea776105
+      NEO4J_ZIP_SHA256: 1b1cf3715fbf6a7632d2d221b9eaccdd34037baaa4ddb7242b2ecfecf473b378
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: astral-sh/setup-uv@v7
+      - name: folders
+        run: |
+          local="$(cygpath -m "$RUNNER_TEMP")/kpi-local"
+          mkdir -p "$local/dl" "$local/runs"
+          echo "LOCAL=$local" >> "$GITHUB_ENV"
+          echo "KPI_STORE_LOCAL=$local/stores.toml" >> "$GITHUB_ENV"
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/kpi-local/dl
+          key: store-downloads-${{ env.FUSEKI_SHA256 }}-${{ env.N10S_SHA256 }}-${{ env.APOC_SHA256 }}-${{ env.ROBOT_SHA256 }}-${{ env.NEO4J_ZIP_SHA256 }}
+      - name: downloads, each checked against its pinned SHA-256
+        run: |
+          cd "$LOCAL/dl"
+          fetch() {  # <file> <sha256> <url>
+            [ -f "$1" ] || curl -sSfL --retry 3 -o "$1" "$3"
+            echo "$2 *$1" | sha256sum -c -
+          }
+          fetch jena-fuseki-server-6.2.0.jar "$FUSEKI_SHA256" https://repo1.maven.org/maven2/org/apache/jena/jena-fuseki-server/6.2.0/jena-fuseki-server-6.2.0.jar
+          fetch neosemantics-2025.06.1.jar "$N10S_SHA256" https://github.com/neo4j-labs/neosemantics/releases/download/2025.06.1/neosemantics-2025.06.1.jar
+          fetch apoc-2025.06.2-core.jar "$APOC_SHA256" https://github.com/neo4j/apoc/releases/download/2025.06.2/apoc-2025.06.2-core.jar
+          fetch robot.jar "$ROBOT_SHA256" https://github.com/ontodev/robot/releases/download/v1.9.10/robot.jar
+          fetch neo4j-enterprise-2025.06.2-windows.zip "$NEO4J_ZIP_SHA256" https://dist.neo4j.org/neo4j-enterprise-2025.06.2-windows.zip
+      - name: the packages, at the versions the setup check names, for the Python the py launcher starts
+        run: |
+          py -0p || true
+          py -c "import sys; print(sys.executable, sys.version)"
+          py -m pip install -q rdflib==7.6.0 pyshacl==0.40.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3
+      - name: the local settings file, outside the checkout
+        run: |
+          py -c "import secrets; print(secrets.token_hex(16))" > "$LOCAL/pw"
+          pw="$(cat "$LOCAL/pw")"; rm "$LOCAL/pw"
+          echo "::add-mask::$pw"
+          echo "KPI_CI_NEO4J_PASSWORD=$pw" >> "$GITHUB_ENV"
+          sed 's/^warehouse_id = ""/warehouse_id = "0000000000000000"/' kpi_store/kpi_store.example.toml > "$LOCAL/kpi_store.toml"
+          cat > "$LOCAL/stores.toml" <<EOF
+          [release]
+          settings = "$LOCAL/kpi_store.toml"
+          run_folder = "$LOCAL/runs"
+
+          [fuseki]
+          jar = "$LOCAL/dl/jena-fuseki-server-6.2.0.jar"
+          url = "http://127.0.0.1:13030/ds"
+          data_folder = "$LOCAL/fuseki-db"
+
+          [neo4j.local]
+          uri = "bolt://127.0.0.1:17687"
+          username = "neo4j"
+          password_env = "KPI_CI_NEO4J_PASSWORD"
+          database = "neo4j"
+          plugins_folder = "$LOCAL/neo4j-enterprise-2025.06.2/plugins"
+
+          [neo4j.enterprise]
+          uri = "bolt://127.0.0.1:17687"
+          username = "neo4j"
+          password_env = "KPI_CI_NEO4J_PASSWORD"
+          database = "businessprocessarchitecturegraph"
+
+          [projection]
+          robot_jar = "$LOCAL/dl/robot.jar"
+          out = "$LOCAL/lpg-out"
+          EOF
+          cat "$LOCAL/stores.toml"
+      - name: setup check, list
+        run: py -m kpi_store.setup_check --list
+      - name: setup check, before any server runs
+        run: py -m kpi_store.setup_check --only python --only packages --only local-settings --only kpi-store-settings --only java --only fuseki-jar --only robot-jar --only bash --only uv --only check-script-tools
+      - name: Fuseki load
+        run: time py -m kpi_store.load_fuseki --json
+      - name: Fuseki load again, which must change nothing
+        run: time py -m kpi_store.load_fuseki --json
+      - name: sync check, Jena
+        run: time py -m kpi_store.sync_check --store jena --no-tech-graph
+      - name: unpack Neo4j, add APOC and n10s, set the password
+        shell: pwsh
+        run: |
+          $neo = "$env:LOCAL/neo4j-enterprise-2025.06.2"
+          & "$env:SystemRoot/System32/tar.exe" -xf "$env:LOCAL/dl/neo4j-enterprise-2025.06.2-windows.zip" -C $env:LOCAL
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Copy-Item "$env:LOCAL/dl/neosemantics-2025.06.1.jar", "$env:LOCAL/dl/apoc-2025.06.2-core.jar" "$neo/plugins/"
+          Add-Content -Path "$neo/conf/neo4j.conf" -Value @(
+            "server.default_listen_address=127.0.0.1",
+            "server.bolt.listen_address=127.0.0.1:17687",
+            "server.http.listen_address=127.0.0.1:17474",
+            "dbms.security.procedures.unrestricted=apoc.*,n10s.*",
+            "dbms.usage_report.enabled=false")
+          & "$neo/bin/neo4j-admin.bat" dbms set-initial-password $env:KPI_CI_NEO4J_PASSWORD
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      # Started with its own hidden console and no tie to this step: a server on the step's console ends with the step.
+      - name: start Neo4j and wait for it
+        run: |
+          py - <<'PY'
+          import os, socket, subprocess, sys, time
+          local = os.environ["LOCAL"]
+          log = open(local + "/neo4j-console.log", "ab")
+          bat = os.path.normpath(local + "/neo4j-enterprise-2025.06.2/bin/neo4j.bat")
+          subprocess.Popen([bat, "console"], stdin=subprocess.DEVNULL, stdout=log,
+                           stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP)
+          for _ in range(240):
+              time.sleep(1)
+              try:
+                  socket.create_connection(("127.0.0.1", 17687), timeout=2).close()
+                  print("Neo4j answers on 127.0.0.1:17687")
+                  sys.exit(0)
+              except OSError:
+                  pass
+          sys.exit("Neo4j did not answer within 240 seconds")
+          PY
+      - name: the second database, which stands for the Enterprise target
+        run: |
+          py - <<'PY'
+          import os, neo4j
+          with neo4j.GraphDatabase.driver("bolt://127.0.0.1:17687", auth=("neo4j", os.environ["KPI_CI_NEO4J_PASSWORD"])) as driver:
+              driver.execute_query("CREATE DATABASE businessprocessarchitecturegraph IF NOT EXISTS WAIT", database_="system")
+              for row in driver.execute_query("SHOW DATABASES YIELD name, currentStatus", database_="system").records:
+                  print(row["name"], row["currentStatus"])
+          PY
+      - name: setup check, the Neo4j checks
+        run: py -m kpi_store.setup_check --only neo4j-local --only neo4j-plugins --only neo4j-enterprise
+      - name: Neo4j load
+        run: time py -m kpi_store.load_neo4j --json
+      - name: copy to the second database
+        run: time py -m kpi_store.copy_enterprise --json
+      - name: sync check, Jena and both Neo4j databases
+        run: time py -m kpi_store.sync_check --store jena --store neo4j --store enterprise --no-tech-graph
+      - name: stop Fuseki
+        if: always()
+        run: py -m kpi_store.load_fuseki --stop || true
+      - name: logs, when a step failed
+        if: failure()
+        run: |
+          for f in "$LOCAL"/runs/fuseki/fuseki.log "$LOCAL"/runs/neo4j/neo4j-load.log "$LOCAL"/neo4j-console.log "$LOCAL"/neo4j-enterprise-2025.06.2/logs/neo4j.log; do
+            [ -f "$f" ] && { echo "=== $f"; tail -n 150 "$f"; } || true
+          done

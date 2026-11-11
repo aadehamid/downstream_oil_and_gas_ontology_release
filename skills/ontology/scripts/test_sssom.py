@@ -1,7 +1,7 @@
 """Tests for check_sssom.py.
 
 Run from this folder:
-  uv run --no-project --with pyyaml python3 -m unittest test_sssom
+  uv run --no-project --with pyyaml python -m unittest test_sssom
 
 The template mapping set passes; each one-break test changes it in one way and asserts that exactly the named
 check fires, so a check that passes vacuously, or fires for the wrong reason, fails here.
@@ -154,7 +154,7 @@ class CheckSssom(unittest.TestCase):
     def test_main_exit_codes(self):
         with tempfile.TemporaryDirectory() as d:
             bad = os.path.join(d, "bad.sssom.tsv")
-            with open(bad, "w", encoding="utf-8") as f:
+            with open(bad, "w", encoding="utf-8", newline="\n") as f:
                 f.write(replace(template(), "\tskos:exactMatch\t", "\towl:sameAs\t"))
             out = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):

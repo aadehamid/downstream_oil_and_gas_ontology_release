@@ -4,7 +4,7 @@ Serves the load step (rule 5, the local Neo4j) and the running step. Read it bef
 
 ## Rules
 
-1. **Split the steps by what they need.** CI runs only what needs no Java and no database (each line is `uv run --no-project --with rdflib python3 <script> ...`, with `--with pyshacl` for `validate_data.py`):
+1. **Split the steps by what they need.** CI runs only what needs no Java and no database (each line is `uv run --no-project --with rdflib python <script> ...`, with `--with pyshacl` for `validate_data.py`):
 
    ```bash skip reason="illustration: the order of the steps, with a name in angle brackets for each input"
    check_projection_rules.py --config <config> --shapes <shapes>... --releases <folder> <data>...

@@ -114,5 +114,5 @@ arrow(b3, ob, side=("b", "t"), dashed=True)
 
 json.dump({"type": "excalidraw", "version": 2, "source": "https://excalidraw.com", "elements": els,
            "appState": {"viewBackgroundColor": "#ffffff", "gridSize": None}, "files": {}},
-          open(sys.argv[1], "w"), indent=1)
+          open(sys.argv[1], "w", encoding="utf-8", newline="\n"), indent=1)
 print(len(els), "elements")

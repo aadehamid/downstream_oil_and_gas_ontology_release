@@ -11,6 +11,15 @@ Lineage rules: an edge is kept only when both of its tables exist today and no s
 from a table to itself is dropped; the lineage's entity_type is not read. A column edge is kept when both of its
 tables exist today, whether or not the columns do, because an old column name in the lineage is the evidence of
 a rename.
+
+Where it sits: the notebook calls kpi_store.load_databricks.run, which calls discover here, hands the result to
+kpi_store.compare, and saves it as discovery.json beside the report. The technical graph is later built from that
+file. This module only reads. Every statement it sends is a SELECT or a DESCRIBE, and in the notebook each one
+passes the Gate of kpi_store.load_databricks first. It has no command of its own.
+
+The reading is narrow on purpose. All tables of the read catalogs are listed, and those a skip rule covers are
+then dropped, because the comparison must see what exists. Columns, metric view definitions and column lineage
+are read only for the schemas that hold the ontology's objects or a Genie space's tables.
 """
 import datetime as dt
 import json
@@ -21,6 +30,7 @@ from . import metric_view as mv
 
 @dataclass
 class TableInfo:
+    """One table, view or metric view of a read catalog, as information_schema lists it."""
     full_name: str      # catalog.schema.name, as Databricks spells it
     catalog: str
     schema: str
@@ -31,6 +41,7 @@ class TableInfo:
 
 @dataclass
 class GenieSpace:
+    """What one Genie space says about measures: the tables it reads and the SQL its creator wrote for it."""
     space_id: str
     title: str
     tables: list = field(default_factory=list)        # full names, as the space spells them
@@ -41,6 +52,8 @@ class GenieSpace:
 
 @dataclass
 class Discovery:
+    """One reading of the workspace. Every key that is a name is in lower case, because all name comparisons
+    ignore case; the spelling Databricks uses is kept in the values."""
     tables: dict = field(default_factory=dict)          # {full name, lower case: TableInfo}, skipped ones left out
     columns: dict = field(default_factory=dict)         # {table, lower case: [column names as spelled]}
     metric_views: dict = field(default_factory=dict)    # {view, lower case: MetricView}
@@ -52,6 +65,7 @@ class Discovery:
     notes: list = field(default_factory=list)           # what could not be read, in words
 
     def exists(self, name):
+        """True when the workspace holds the object and no skip rule covers it."""
         return name.lower() in self.tables
 
     def spelled(self, name):
@@ -59,9 +73,11 @@ class Discovery:
         return self.tables[name.lower()].full_name
 
     def upstream(self, name):
+        """The tables that table lineage shows feeding this one, in lower case."""
         return {s for s, t in self.table_edges if t == name.lower()}
 
     def column_sources(self, table, column):
+        """The (table, column) pairs that column lineage shows feeding this column, in lower case."""
         return {(st, sc) for st, sc, tt, tc in self.column_edges if tt == table.lower() and tc == column.lower()}
 
     def last_written(self, name):
@@ -179,7 +195,7 @@ def read_genie(genie, space_ids=()):
     becomes a note, so one closed space does not hide the others."""
     spaces, notes, listed = [], [], {}
     if not space_ids:
-        token = None
+        token = None   # the list comes in pages; this marks where the next page starts
         while True:
             page = genie.list_spaces(page_token=token) if token else genie.list_spaces()
             for s in getattr(page, "spaces", None) or []:
@@ -202,6 +218,9 @@ def discover(settings, run_sql, genie=None, schemas=()):
     found = Discovery()
     catalogs = _quoted(settings.read_catalogs)
     in_scope = {c.lower() for c in settings.read_catalogs}
+
+    # 1. Every table, view and metric view of the read catalogs, less what the skip rules cover. The rest of the
+    # reading keeps only what is in this list, so a skipped or dropped table never comes back through lineage.
     for row in map(as_dict, run_sql(
             "SELECT table_catalog, table_schema, table_name, table_type, last_altered "
             f"FROM system.information_schema.tables WHERE lower(table_catalog) IN ({catalogs})")):
@@ -212,6 +231,8 @@ def discover(settings, run_sql, genie=None, schemas=()):
         if not settings.skipped(info.schema, info.name):
             found.tables[info.full_name.lower()] = info
 
+    # 2. The Genie spaces, before the columns: the tables a space reads widen the scope of step 3. A Genie
+    # problem becomes a note and never stops the reading, because measure links do not block a load.
     if genie is None:
         found.notes.append("Genie spaces were not read: no Genie client was given")
     else:
@@ -221,6 +242,7 @@ def discover(settings, run_sql, genie=None, schemas=()):
         except Exception as err:   # the Genie API as a whole is closed to the caller
             found.notes.append(f"Genie spaces could not be listed ({type(err).__name__})")
 
+    # 3. Columns, in their table's order, for the schemas in scope only.
     scope = {s.lower() for s in schemas}
     for space in found.genie_spaces:
         scope |= {t.lower().rsplit(".", 1)[0] for t in space.tables if t.lower() in found.tables}
@@ -235,6 +257,7 @@ def discover(settings, run_sql, genie=None, schemas=()):
                 found.columns.setdefault(table, []).append((int(row.get("ordinal_position") or 0), str(row["column_name"])))
         found.columns = {t: [name for _, name in sorted(cols)] for t, cols in found.columns.items()}
 
+    # 4. Each metric view's definition, read with one DESCRIBE statement per view.
     for key, info in sorted(found.tables.items()):
         if info.table_type.upper() == "METRIC_VIEW" and key.rsplit(".", 1)[0] in scope:
             try:
@@ -248,6 +271,8 @@ def discover(settings, run_sql, genie=None, schemas=()):
             except Exception as err:   # one view that cannot be read must not stop the rest; the comparison reports it
                 found.notes.append(f"metric view {info.full_name} could not be read ({type(err).__name__}: {err})")
 
+    # 5. Table lineage: one edge per pair of tables, with the jobs and pipelines that wrote it and its newest
+    # event. The migration pairs are the edges that follow the naming rule (migration_pair).
     def kept(source, target):
         s, t = source.lower(), target.lower()
         return s != t and s in found.tables and t in found.tables
@@ -267,6 +292,7 @@ def discover(settings, run_sql, genie=None, schemas=()):
         edge["last_event"] = newest([edge["last_event"], row.get("last_event")])
     found.migration_pairs = sorted(e for e in found.table_edges if migration_pair(*e))
 
+    # 6. Column lineage into the schemas in scope. The comparison uses it to tell a renamed column from a missing one.
     if scope:
         for row in map(as_dict, run_sql(
                 "SELECT source_table_full_name, source_column_name, target_table_full_name, target_column_name "
@@ -280,6 +306,7 @@ def discover(settings, run_sql, genie=None, schemas=()):
                 found.column_edges.add((row["source_table_full_name"].lower(), row["source_column_name"].lower(),
                                         row["target_table_full_name"].lower(), row["target_column_name"].lower()))
 
+    # 7. The builders: the current name of each job or pipeline that the lineage edges name.
     entities = sorted({e for edge in found.table_edges.values() for e in edge["entities"]})
     if entities:
         ids = _quoted(entities)

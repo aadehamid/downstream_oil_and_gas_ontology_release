@@ -68,7 +68,7 @@ def en(text):
 def mapping(path=MAPPING):
     """The canonical-fact mapping: one row per fact, (subject IRI, predicate IRI, object IRI, REL IDs)."""
     rows = []
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         for r in csv.DictReader(f):
             ids = r["row_ids"].split(";")
             if not ids or any(not REL_ID.match(i) for i in ids) or len(set(ids)) != len(ids):
@@ -245,9 +245,9 @@ shp:CanonicalTriple-noSecondFact a sh:SPARQLConstraint ;
 
 def shapes_text(preds):
     """2.0.0's shapes file unchanged, then the controlled-value shapes as approved, then the fact shapes."""
-    with open(os.path.join(BASE, "shapes.ttl")) as f:
+    with open(os.path.join(BASE, "shapes.ttl"), encoding="utf-8") as f:
         base = f.read()
-    with open(CONTROLLED) as f:
+    with open(CONTROLLED, encoding="utf-8") as f:
         controlled = f.read()
     return (base + "\n# ---- Added in 2.1.0: the controlled-value shapes (the decision of 2026-10-13, the decision of 2026-10-18), as the subject matter expert approved them ----\n"
             + controlled + fact_shapes(preds))
@@ -282,14 +282,14 @@ def catalog():
 
 
 def package(g, preds, counts):
-    with open(MAPPING) as f:
+    with open(MAPPING, encoding="utf-8") as f:
         mapping_text = f.read()
     files = {"core.ttl": g.serialize(format="turtle"), "core.jsonld": prev.jsonld(g), "shapes.ttl": shapes_text(preds),
              "catalog.ttl": catalog(), "canonical-facts.csv": mapping_text,
              "counts.json": json.dumps(dict(sorted(counts.items())), indent=2) + "\n"}
-    with open(CHANGELOG) as f:
+    with open(CHANGELOG, encoding="utf-8") as f:
         files["CHANGELOG.md"] = f.read()
-    with open(os.path.join(BASE, "manifest.json")) as f:
+    with open(os.path.join(BASE, "manifest.json"), encoding="utf-8") as f:
         base_manifest = f.read()
     files["manifest.json"] = json.dumps({
         "module": "core", "version": VERSION, "release_candidate": False,
@@ -322,14 +322,14 @@ def main():
           + ", ".join(f"{k} {v}" for k, v in sorted(counts.items())))
     if args.verify:
         stale = [n for n, t in files.items() if not os.path.exists(os.path.join(RELEASE_DIR, n))
-                 or open(os.path.join(RELEASE_DIR, n)).read() != t]
+                 or open(os.path.join(RELEASE_DIR, n), encoding="utf-8").read() != t]
         if stale:
             sys.exit(f"core {VERSION} package is not current: {stale}")
         print("release package is current")
     if args.write:
         os.makedirs(RELEASE_DIR, exist_ok=True)
         for n, t in files.items():
-            with open(os.path.join(RELEASE_DIR, n), "w") as f:
+            with open(os.path.join(RELEASE_DIR, n), "w", encoding="utf-8", newline="\n") as f:
                 f.write(t)
         print(f"wrote {RELEASE_DIR}")
 

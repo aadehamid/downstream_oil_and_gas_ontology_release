@@ -1,7 +1,7 @@
 """Tests for check_candidates.py.
 
 Run from this folder:
-  uv run --no-project --with pyyaml python3 -m unittest test_candidates
+  uv run --no-project --with pyyaml python -m unittest test_candidates
 
 The worked example in templates/intake/ passes; each one-break test changes it in one way and asserts that exactly
 the named check fires.
@@ -122,9 +122,9 @@ class CheckCandidates(unittest.TestCase):
     def test_an_early_unquoted_span_is_read_as_text(self):
         with tempfile.TemporaryDirectory() as d:
             doc, res = os.path.join(d, "doc.txt"), os.path.join(d, "result.yaml")
-            with open(doc, "w", encoding="utf-8") as f:
+            with open(doc, "w", encoding="utf-8", newline="\n") as f:
                 f.write("Members renew loans.")
-            with open(res, "w", encoding="utf-8") as f:
+            with open(res, "w", encoding="utf-8", newline="\n") as f:
                 f.write("input_text: Members renew loans.\nnamed_entities:\n- label: renew\n  original_spans:\n  - 8:12\n")
             out = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):

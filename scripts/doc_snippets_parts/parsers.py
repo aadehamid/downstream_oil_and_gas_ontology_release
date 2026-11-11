@@ -49,15 +49,34 @@ def parse_sql(body, attrs):
         raise ValueError("no statement")
 
 
+def _questions_tokenizer():
+    """The tokenizer of this tree's cross-graph questions. Another copy of the package may already be loaded,
+    from a folder that is gone: a test that unpacks the release zip leaves one behind. So a package loaded from
+    outside this tree is set aside while this one is imported, and put back afterwards."""
+    root = str(ROOT.resolve())
+    held = {name: module for name, module in sys.modules.items()
+            if (name == "kpi_store" or name.startswith("kpi_store."))
+            and not str(getattr(module, "__file__", "") or "").startswith(root)}
+    if "kpi_store" not in held:
+        held = {}
+    saved = {name: sys.modules.pop(name) for name in [n for n in sys.modules if n == "kpi_store" or n.startswith("kpi_store.")]} if held else {}
+    sys.path.insert(0, root)
+    try:
+        from kpi_store.questions.render import tokens
+    finally:
+        sys.path.remove(root)
+        if saved:
+            for name in [n for n in sys.modules if n == "kpi_store" or n.startswith("kpi_store.")]:
+                del sys.modules[name]
+            sys.modules.update(saved)
+    return tokens
+
+
 def parse_cypher(body, attrs):
     """A token check, not a grammar check: there is no Cypher parser here. The questions' tokenizer reads the
     text, and this finds a string, a backtick name or a bracket that is never closed, and a block with no word
     in it. Clauses in the wrong order pass."""
-    sys.path.insert(0, str(ROOT))
-    try:
-        from kpi_store.questions.render import tokens
-    finally:
-        sys.path.pop(0)
+    tokens = _questions_tokenizer()
     pairs, stack, found = {")": "(", "]": "[", "}": "{"}, [], tokens(body)
     for kind, text in found:
         if kind != "mark":

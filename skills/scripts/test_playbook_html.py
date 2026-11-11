@@ -44,7 +44,7 @@ class Fresh(unittest.TestCase):
             self.assertEqual(quiet(b.main, [], out_root=tmp), 0)
             self.assertEqual(quiet(b.main, ["--check"], out_root=tmp), 0)
             stale = os.path.join(tmp, ONTOLOGY["out"])
-            with open(stale, "a", encoding="utf-8") as f:
+            with open(stale, "a", encoding="utf-8", newline="\n") as f:
                 f.write("<!-- edited by hand -->")
             self.assertEqual(quiet(b.main, ["--check"], out_root=tmp), 1)
             os.remove(stale)
@@ -75,7 +75,7 @@ class Inventory(unittest.TestCase):
     """The README tables, the reference folders and PAGES name the same sources."""
 
     def test_every_projection_reference_is_on_the_page(self):
-        refs = sorted(os.path.relpath(p, b.ROOT) for p in
+        refs = sorted(b.relpath(p, b.ROOT) for p in
                       glob.glob(os.path.join(b.ROOT, "ontology-to-lpg/references/*.md")))
         self.assertEqual(refs, sorted(s for s in PROJECTION["sources"] if "/references/" in s))
         self.assertIn("ontology-to-lpg/README.md", PROJECTION["sources"])
@@ -464,7 +464,7 @@ class Unsupported(unittest.TestCase):
     def test_the_build_reports_each_bypass_with_its_line(self):
         with tempfile.TemporaryDirectory() as tmp:
             src = os.path.join(tmp, "bad.md")
-            with open(src, "w", encoding="utf-8") as f:
+            with open(src, "w", encoding="utf-8", newline="\n") as f:
                 f.write("# Title\n\n- item\n    > quoted\n\n[r]:https://example.org\n")
             spec = {"out": os.path.join(tmp, "bad.html"), "title": "t", "scope": "s", "lead": "l", "sources": [src]}
             with self.assertRaisesRegex(ValueError, r"bad\.md:4: a blockquote.*bad\.md:6: a reference-style"):
@@ -480,7 +480,7 @@ class Unsupported(unittest.TestCase):
     def test_the_build_stops_on_an_unsupported_source(self):
         with tempfile.TemporaryDirectory() as tmp:
             src = os.path.join(tmp, "bad.md")
-            with open(src, "w", encoding="utf-8") as f:
+            with open(src, "w", encoding="utf-8", newline="\n") as f:
                 f.write("# Title\n\n> quoted\n")
             spec = {"out": os.path.join(tmp, "bad.html"), "title": "t", "scope": "s", "lead": "l", "sources": [src]}
             with self.assertRaisesRegex(ValueError, r"bad\.md:3: a blockquote is not supported"):

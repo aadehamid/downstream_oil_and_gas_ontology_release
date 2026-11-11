@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .extract import Block, documents, extract
 from .match import has_fixed_text, normalise, output_matches
+from .pages import extract_html, html_documents, is_page
 from .parsers import PARSERS
 from .registry import (NESTED, NESTED_FILE, PARSE_LANGS, PLACEHOLDER, REGISTRY, ROOT, RUN_LANGS, SAFE_VALUE, Registry,
                        load_registry)
@@ -67,7 +68,7 @@ class Checker:
     def check(self, docs=None) -> Result:
         if not self._started_by_a_block():
             return self.result
-        docs = documents(self.root) if not docs else list(docs)
+        docs = documents(self.root) + html_documents(self.root) if not docs else list(docs)
         with tempfile.TemporaryDirectory(prefix="doc-snippets-") as tmp:
             self.runner = Runner(self.root, self.registry, self.environ, Path(tmp).resolve())
             for doc in docs:
@@ -98,7 +99,8 @@ class Checker:
         if not path.is_file():
             self._fail(None, f"{doc}: no such document")
             return
-        blocks, problems = extract(doc, path.read_text(encoding="utf-8"))
+        read = extract_html if is_page(doc) else extract
+        blocks, problems = read(doc, path.read_text(encoding="utf-8"))
         tally = self.result.by_document.setdefault(doc, Counter())
         for problem in problems:
             self.result.failures.append(problem)
@@ -256,7 +258,7 @@ class Checker:
     # -- run
 
     def _tag_run(self, block, previous):
-        error = self._only(block, attrs=("exit", "os"), flags=("define", "status-only"))
+        error = self._only(block, attrs=("exit", "os", "types"), flags=("define", "status-only"))
         if error:
             return self._fail(block, error)
         if block.lang not in RUN_LANGS:
@@ -283,6 +285,9 @@ class Checker:
         values, error = self._placeholder_values(block, context)
         if error:
             return self._fail(block, error)
+        answers = [answer.strip() for answer in block.attrs.get("types", "").split(",")] if "types" in block.attrs else []
+        if "types" in block.attrs and not all(answers):
+            return self._fail(block, "types= holds what the reader types at each prompt, with commas between the answers")
         if block.lang in ("powershell", "cmd") and wanted_os != "windows":
             # Read the lines now, so a line that needs a shell fails on every machine, also where nothing runs.
             for n, line in command_lines(block.lang, PLACEHOLDER.sub("x", block.body)):
@@ -311,7 +316,7 @@ class Checker:
             return self._fail(block, f"not run: the block at line {instance.failed_at} of the same context failed")
         body = self._fill(block.body, values)
         instance.count += 1
-        status, output, problem = self.runner.execute(block, instance, body, wanted_os)
+        status, output, problem = self.runner.execute(block, instance, body, wanted_os, "".join(a + "\n" for a in answers) or None)
         if problem:
             instance.failed_at = str(block.line)
             return self._fail(block, problem, output)

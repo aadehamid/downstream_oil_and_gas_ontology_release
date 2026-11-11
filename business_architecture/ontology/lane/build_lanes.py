@@ -35,7 +35,7 @@ SRC = Namespace("https://w3id.org/mpc/ontology/source/")
 
 
 def placements():
-    with open(MAP) as f:
+    with open(MAP, encoding="utf-8") as f:
         roots = json.load(f)
     found = []
 
@@ -50,7 +50,7 @@ def placements():
 
 
 def load():
-    with open(LANES) as f:
+    with open(LANES, encoding="utf-8") as f:
         lanes = json.load(f)
     g = Graph().parse(CORE)
     procs = {str(n): s for s, n in g.subject_objects(SKOS.notation) if str(s).startswith(str(PROC))}
@@ -105,11 +105,11 @@ def main():
             + build(lanes, placed, procs).serialize(format="turtle"))
     print("; ".join(f"{k} {v}" for k, v in figures(lanes, placed).items()))
     if args.verify:
-        if not (os.path.exists(OUTPUT) and open(OUTPUT).read() == text):
+        if not (os.path.exists(OUTPUT) and open(OUTPUT, encoding="utf-8").read() == text):
             sys.exit("lanes.ttl is not current: run build_lanes.py --write")
         print("lanes.ttl is current")
     if args.write:
-        with open(OUTPUT, "w") as f:
+        with open(OUTPUT, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
         print(f"wrote {OUTPUT}")
 

@@ -131,8 +131,7 @@ def main() -> None:
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     (OUT_DIR / "step2-identity-map.json").write_text(
-        json.dumps(rows, indent=1, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
+        json.dumps(rows, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
 
     lines = [
         "# Step 2 — Identity normalization report",
@@ -163,8 +162,7 @@ def main() -> None:
         "No version segment; versions ride on `owl:versionInfo` (Appendix B).",
     ]
     (OUT_DIR / "step2-identity-report.md").write_text(
-        "\n".join(lines) + "\n", encoding="utf-8"
-    )
+        "\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
     print(f"OK: {len(rows)} nodes, {len(minted)} minted stubs, no collisions.")
 

@@ -148,7 +148,7 @@ class Build(unittest.TestCase):
         self.assertEqual(pl.PACKAGES, [
             ("core", "2.4.0"), ("organization", "2.2.0"), ("ref-mpc", "1.3.0"), ("kpi", "1.3.0"), ("party", "2.1.0"),
             ("data-product", "1.2.0"), ("value-stream", "1.2.0"), ("system", "1.5.0"), ("lane", "1.1.0"),
-            ("market-data", "1.1.0"), ("integration", "2.5.0"), ("technical-graph", "1.0.0"), ("logical-model", "1.0.0")])
+            ("market-data", "1.1.0"), ("integration", "2.5.0"), ("technical-graph", "1.1.0"), ("logical-model", "1.0.0")])
         import glob, os
         newest = {}
         for d in glob.glob(os.path.join(pl.ONTOLOGY, "releases", "*", "*", "")):
@@ -161,7 +161,7 @@ class Build(unittest.TestCase):
 
     def test_the_manifest_is_current(self):
         _, _, manifest = pl.build()
-        with open(pl.MANIFEST) as f:
+        with open(pl.MANIFEST, encoding="utf-8") as f:
             self.assertEqual(f.read(), manifest)
 
     def test_loadable_is_sorted_and_without_duplicates(self):
@@ -194,7 +194,7 @@ class Report(unittest.TestCase):
             self.assertNotEqual(json.load(f)["shapes_fingerprint"], changed)
 
     def test_the_step_5_report_describes_the_current_inputs_and_passed(self):
-        with open(pl.REPORT) as f:
+        with open(pl.REPORT, encoding="utf-8") as f:
             report = json.load(f)
         loadable, inferred, _ = pl.build()
         self.assertEqual(report["input_fingerprint"], pl.sha(loadable, inferred),
@@ -228,37 +228,37 @@ class Record(unittest.TestCase):
             patcher = mock.patch.object(pl, name, os.path.join(self.tmp.name, name.lower()))
             patcher.start()
             self.addCleanup(patcher.stop)
-        files = [{"sha256": pl.sha(open(os.path.join(pl.ONTOLOGY, p)).read())} for p in pl.INPUTS + pl.SHAPES]
+        files = [{"sha256": pl.sha(open(os.path.join(pl.ONTOLOGY, p), encoding="utf-8").read())} for p in pl.INPUTS + pl.SHAPES]
         self.write_run(files, self.REPORT_OK, pl.sorted_nt(pl.graph(pl.INPUTS)))
 
     def write_run(self, files, report, loaded):
         for name, text in (("run-manifest.json", json.dumps({"data": files[:1], "shapes": files[1:]})),
                            ("projection-report.json", json.dumps(report)), ("inferred.nt", ""), ("loadable.nt", loaded)):
-            with open(os.path.join(self.run_dir, name), "w") as f:
+            with open(os.path.join(self.run_dir, name), "w", encoding="utf-8", newline="\n") as f:
                 f.write(text)
 
     def test_a_run_of_this_tree_writes_the_three_files_and_only_the_summary(self):
         with mock.patch("sys.stdout", new_callable=lambda: __import__("io").StringIO()):
             pl.record(self.run_dir)
-        with open(pl.REPORT) as f:
+        with open(pl.REPORT, encoding="utf-8") as f:
             report = json.load(f)
         loadable, inferred, manifest = pl.build()
         self.assertEqual(report["input_fingerprint"], pl.sha(loadable, inferred))
         self.assertEqual(report["shapes_fingerprint"], pl.shapes_fingerprint())
         self.assertEqual((report["nodes"], report["relationships"]), (3, 2))
         self.assertNotIn("compiled", report)
-        with open(pl.MANIFEST) as f:
+        with open(pl.MANIFEST, encoding="utf-8") as f:
             self.assertEqual(f.read(), manifest)
 
     def test_a_run_of_other_inputs_is_refused_and_writes_nothing(self):
-        with open(os.path.join(self.run_dir, "run-manifest.json"), "w") as f:
+        with open(os.path.join(self.run_dir, "run-manifest.json"), "w", encoding="utf-8", newline="\n") as f:
             json.dump({"data": [{"sha256": "other"}], "shapes": []}, f)
         with self.assertRaisesRegex(SystemExit, "other inputs"):
             pl.record(self.run_dir)
         self.assertFalse(os.path.exists(pl.REPORT))
 
     def test_a_run_that_loaded_other_triples_is_refused(self):
-        with open(os.path.join(self.run_dir, "loadable.nt"), "w") as f:
+        with open(os.path.join(self.run_dir, "loadable.nt"), "w", encoding="utf-8", newline="\n") as f:
             f.write("<urn:a> <urn:b> <urn:c> .\n")
         with self.assertRaisesRegex(SystemExit, "other triples"):
             pl.record(self.run_dir)
@@ -268,7 +268,7 @@ class Record(unittest.TestCase):
                        {"roundtrip_lost": 1}, {"roundtrip_added": 1}, {"determinism_hash_shuffled": "other"},
                        {"rename_lossless": False}):
             with self.subTest(change=change):
-                with open(os.path.join(self.run_dir, "projection-report.json"), "w") as f:
+                with open(os.path.join(self.run_dir, "projection-report.json"), "w", encoding="utf-8", newline="\n") as f:
                     json.dump({**self.REPORT_OK, **change}, f)
                 with self.assertRaisesRegex(SystemExit, "cannot stand"):
                     pl.record(self.run_dir)

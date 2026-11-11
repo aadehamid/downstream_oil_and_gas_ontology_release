@@ -18,6 +18,16 @@ def normalise(text: str) -> list:
     return lines
 
 
+# uv says what it resolved and installed only on a machine that has not run the command before, so the same
+# command prints these lines on one machine and not on the next. No uv setting turns them off.
+_UV_STATUS = re.compile(r"(Resolved|Prepared|Installed|Uninstalled|Audited) \d+ packages? in \d+(\.\d+)?(ms|s)")
+
+
+def without_uv_status(lines: list) -> list:
+    """The lines of an output without uv's own report of its installs."""
+    return [line for line in lines if not _UV_STATUS.fullmatch(line)]
+
+
 def has_fixed_text(expected: str) -> bool:
     """True when at least one line holds text of its own. An empty block, a lone `...` or lines made only of
     placeholders would match any output, so they check nothing."""
@@ -37,10 +47,10 @@ def _line_pattern(expected: str):
 def output_matches(expected: str, actual: str) -> bool:
     """True when the output is what the `expect` block shows. A placeholder such as <run id> stands for any text
     on its line; a line that is only `...` stands for any number of lines, also none. A block with no text of
-    its own matches nothing."""
+    its own matches nothing. uv's report of its installs is not part of the output, so a block cannot show it."""
     if not has_fixed_text(expected):
         return False
-    want, got = normalise(expected), normalise(actual)
+    want, got = normalise(expected), without_uv_status(normalise(actual))
     patterns = [None if line.strip() == "..." else _line_pattern(line) for line in want]
     # reach[j] is true when the expected lines read so far can end exactly at output line j.
     reach = [True] + [False] * len(got)

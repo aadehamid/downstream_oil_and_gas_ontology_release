@@ -1,11 +1,13 @@
 # Code blocks in the documents
 
-Every code block in a Markdown document of this release is tested. `scripts/doc_snippets.py` reads each block's
+Every code block in a Markdown document of this release is tested, and so is every code block in an HTML page
+that was written by hand. `scripts/doc_snippets.py` reads each block's
 tag and runs the block, compares it, parses it, or counts it as skipped for a stated reason. A block with no tag
 fails `scripts/check.sh`. This page says how to write the tag.
 
 The check reads every Markdown file that Git tracks or would add. A file that Git ignores does not ship, so the check
-does not read it. In a folder with no Git, such as the unpacked zip, it reads every Markdown file.
+does not read it. In a folder with no Git, such as the unpacked zip, it reads every Markdown file. It reads the
+HTML pages by the same rule; "A page written by hand" below says which ones.
 
 The examples on this page are tested the same way. Each example is a small document inside a `markdown nested`
 block, and the check tests the blocks in it.
@@ -26,7 +28,8 @@ Markdown viewers show the block as before, without the tag.
 | `nested` | Reads it as a small document and tests the blocks in it. The language is `markdown`. |
 
 Use three backticks for a fence. The check cannot test code that is written any other way, and fails on it: a
-block inside a block quote, a block indented by four spaces, and a raw `<pre>` or `<code>` block.
+block inside a block quote, a block indented by four spaces, and a raw `<pre>` or `<code>` block in a Markdown
+file. An HTML page written by hand tags its `<pre>` blocks in another way, described below.
 
 ## A command: `run`
 
@@ -103,6 +106,25 @@ the report has 1 blocking row
 ```
 ````
 
+When a command asks the reader a question, give the answers in `types=`, with commas between them. The check
+types each answer and a line end at the command's prompts, in that order. In a PowerShell or cmd block the
+answers go to the last line's command. Say in the text around the block what the reader types and why. A
+command that asks and gets no `types=` reads nothing and fails.
+
+````markdown nested
+```python run=scratch types="Change_Value_Amount,yes"
+name = input("Type the new name to confirm: ")
+answer = input("Type yes to cut: ")
+print()
+print("typed", name, "and", answer)
+```
+
+```text expect
+Type the new name to confirm: Type yes to cut:
+typed Change_Value_Amount and yes
+```
+````
+
 ## Commands for Windows
 
 Write a command for Windows in a `powershell` or `cmd` block, with the `py` launcher. The check reads each line
@@ -149,6 +171,10 @@ and the end. Two marks stand for text that changes from run to run:
 - A line that holds only `...` stands for any number of lines, also none.
 
 Everything else must match letter for letter.
+
+One kind of line is left out of the output before the check compares. On a machine that has not run a `uv`
+command before, `uv` first reports its own work, for example `Installed 2 packages in 3ms`. The next run does
+not print it. So do not show such a line in an `expect` block: the check would never find it.
 
 An `expect` block needs at least one line with text of its own. An empty block, a lone `...` or a line made
 only of placeholders would match any output, so the check refuses it.
@@ -246,6 +272,37 @@ MATCH (n:Resource {uri: $uri}) RETURN n.uri AS uri
 ```
 ````
 
+## A page written by hand
+
+Most HTML pages of the release are built from a Markdown file, and the check tests them through that file. A page
+written by hand has no such source, so its blocks carry the tag themselves. The check reads every HTML page that
+has no Markdown file of the same name beside it and does not name the tool that built it in a `generator` line of
+its head. Today these are the walkthrough, the ontology guide, the two viewers with their templates, and the
+best-practice pages. A page with no code block passes.
+
+In such a page a code block is a `<pre>` element. Write the tag in its `data-snippet` attribute: the same words
+a Markdown fence carries after its backticks, the language first. The attribute changes nothing a reader sees.
+
+```html skip reason="illustration: the form of the attribute in a page, with made-up blocks"
+<pre data-snippet="bash run=release-copy"><code>python3 scripts/epm_facts.py projection</code></pre>
+<pre data-snippet="text expect"><code>...
+  806 in-graph constraints</code></pre>
+<pre data-snippet="text skip reason=&quot;illustration: a sketch of the order of the loads&quot;"><code>Databricks, then Fuseki, then Neo4j</code></pre>
+```
+
+The same rules apply as in Markdown, with these differences:
+
+- A `<pre>` with no `data-snippet` attribute fails the check. So does an unknown tag, as on a fence.
+- The block's text is what the reader sees. The check decodes `&lt;`, `&amp;` and the other character references,
+  and drops the tags inside the block, such as a `<code>` or a `<span>` that colours a word.
+- Inside the attribute, write a double quote as `&quot;`, or put the attribute in single quotes.
+- Another element that shows a code block, such as a `<div>`, is tested too when it carries the attribute. A
+  `<code>` span inside a sentence is text and is not tested, as in Markdown.
+- Text in a `<script>` or a `<style>` is never a block.
+- `nested` is for Markdown documents only.
+
+The line a failure names is the line of the block's opening tag.
+
 ## Values the reader fills in
 
 Write a value the reader must supply as a placeholder in angle brackets: `<your workspace>`. Use lower-case
@@ -272,10 +329,18 @@ its commands with that in mind.
 | `release-copy` | A copy of the release as a plain folder. | Always. |
 | `release-git` | A copy of the release in a new Git repository with one commit. | Always. |
 | `slow` | The same as `release-git`, for commands that take minutes. | `DOC_SNIPPETS_SLOW` is set. |
+| `correction` | A Git copy of its own for the update guide's cut of the made-up report, which ends with the whole check. | `DOC_SNIPPETS_SLOW` is set. |
+| `new-module` | A Git copy of its own for the made-up module of the update guide. | `DOC_SNIPPETS_SLOW` is set. |
 | `stores` | A copy of the release beside a local Fuseki and a local Neo4j test server. | `KPI_STORE_TEST_FUSEKI_URL` and `KPI_STORE_TEST_NEO4J_URI` are set. |
 | `databricks-free` | A copy of the release with the rehearsal workspace's profile. It keeps the real home folder. | `KPI_STORE_TEST_DATABRICKS_PROFILE` is set. |
 | `reasoner` | A copy of the release, for a command that runs the ROBOT jar with Java. | `KPI_STORE_TEST_ROBOT_JAR` names the jar. |
 | `empty-fuseki` | A copy of the release beside a second local Fuseki dataset that no other document loads. | `KPI_STORE_TEST_EMPTY_FUSEKI_URL` is set. |
+| `first-run` | A copy of the release as a plain folder, with a prepared local settings file. It keeps the real home folder. | `KPI_STORE_TEST_LOCAL_SETTINGS` and `KPI_STORE_TEST_LPG_OUT` are set. |
+
+The `first-run` context is for the runbook, whose commands find the local settings file through the variable
+`KPI_STORE_LOCAL`. The context gives its blocks that variable, with the value of `KPI_STORE_TEST_LOCAL_SETTINGS`.
+The file must name test stores and a rehearsal workspace, never the client's. `KPI_STORE_TEST_LPG_OUT` is the folder that the file's `[projection]` `out` names. No block of another context gets
+`KPI_STORE_LOCAL`, also when your own terminal has it set.
 
 A context is one chain. When its variable is not set, the check counts every block of the context as skipped and
 prints the count with the variable to set. So keep the quick, independent commands in a context that always
@@ -316,7 +381,8 @@ py scripts/doc_snippets.py check scripts/DOC-SNIPPETS.md --verbose
 this check was started by a block of another check, so it ran no block
 ```
 
-`--verbose` prints one line for each block. With no document, the check reads every Markdown document.
+`--verbose` prints one line for each block. With no document, the check reads every Markdown document and every
+HTML page written by hand.
 `check --static` reads the tags, the files and the parsed blocks and runs nothing. `list` counts the blocks of
 each document by tag, and `contexts` says which contexts can run on this machine.
 
@@ -326,7 +392,7 @@ test they read the tags and stop there.
 The parsers need three packages. When they are not installed, start the check through `uv`:
 
 ```bash run=release-copy
-uv run --no-project --with rdflib --with pyyaml --with sqlglot python3 scripts/doc_snippets.py check scripts/DOC-SNIPPETS.md
+uv run -q --no-project --with rdflib --with pyyaml --with sqlglot python scripts/doc_snippets.py check scripts/DOC-SNIPPETS.md
 ```
 
 ```text expect
@@ -338,7 +404,7 @@ To run a context that is off, set its variable. **The slow context takes many mi
 `HOW-TO-UPDATE.md` run the whole of `scripts/check.sh`.
 
 ```bash run=release-copy
-DOC_SNIPPETS_SLOW=1 uv run --no-project --with rdflib --with pyyaml --with sqlglot python3 scripts/doc_snippets.py check HOW-TO-UPDATE.md
+DOC_SNIPPETS_SLOW=1 uv run -q --no-project --with rdflib --with pyyaml --with sqlglot python scripts/doc_snippets.py check HOW-TO-UPDATE.md
 ```
 
 ```text expect
@@ -359,5 +425,4 @@ blocks that ran with no `expect` block:
 121 blocks: 18 run (9 status-only), 43 checked, 60 skipped (awaits-the-rewrite 21, illustration 31, ...)
 ```
 
-The check reads Markdown only. An HTML page with no Markdown source is out of its reach.
-`py scripts/doc_snippets.py html` lists those pages with the number of code blocks in each.
+`py scripts/doc_snippets.py html` lists the HTML pages written by hand, with the number of `<pre>` blocks in each.

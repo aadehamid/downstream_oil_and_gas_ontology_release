@@ -174,26 +174,23 @@ figure.pic figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
 <h2 id="settings">Settings<a class="hl" href="#settings" aria-label="Link to this section">#</a></h2>
 <p><code>sync_stores.py</code>, <code>empty_stores.py</code> and <code>logical_models.py</code> read one set of settings: <code>NEO4J_URI</code>, <code>NEO4J_USERNAME</code>, <code>NEO4J_PASSWORD</code>, <code>NEO4J_DATABASE</code> and <code>EPM_JENA_QUERY</code>. Copy <code>skill-run/environment.example</code> to a file outside the repository, fill it in, and name that file in <code>EPM_STORES_ENV</code>. A value set in the process environment wins over the file. No command prints a password.</p>
 <h2 id="run-the-projection">Run the projection<a class="hl" href="#run-the-projection" aria-label="Link to this section">#</a></h2>
-<p>Run it after any input or shape changes. You need <a href="https://docs.astral.sh/uv/">uv</a>, Java 11 or later (<a href="https://robot.obolibrary.org/">ROBOT's Getting Started</a>: "make sure you have Java 11 or later installed"), and a local Neo4j 2025.06.2 that already runs with the n10s and APOC Core jars in its <code>plugins</code> folder. The driver starts and stops no server. It is in the <code>ontology-to-lpg</code> skill, in the <code>scripts/</code> folder of <code>$SKILLS/ontology-to-lpg</code>; the skill's <code>references/running.md</code>, rule 5, says how to prepare the Neo4j server, and the <code>rdf-store</code> skill's <code>references/stores.md</code> says how to start Fuseki from the Apache jar.</p>
-<ol><li>Download ROBOT 1.9.10 (it runs the ELK reasoner), and check its SHA-256. Run these commands in a folder outside the repository; the jar never goes into this tree. If the checksum differs, stop: the driver refuses another file. On Windows, check it with <code>certutil -hashfile robot.jar SHA256</code>.
-<pre><code class="lang-bash">cd &lt;a folder outside the repository&gt;
-curl -L -o robot.jar https://github.com/ontodev/robot/releases/download/v1.9.10/robot.jar
-shasum -a 256 robot.jar
-# expect 16a73c074f3df359a7338a84b4e0788785fe06117f931bb9796e9619ea776105</code></pre></li></ol>
-<ol start="2"><li>Copy <code>skill-run/epm-run.json</code> to a folder outside the repository, set <code>robot_jar</code> to the jar's path and <code>out</code> to your output folder, and add the keys that name your stores (<code>skill-run/README.md</code> lists them). Then run the driver with the copy. It checks, reasons, empties and loads the local Neo4j, writes the release records, and runs each further step whose key the copy holds: the copy to the named database, the Jena round trip, the walks and the rebuild. <code>--plan</code> lists the steps first and runs nothing.
-<pre><code class="lang-bash">cd "$SKILLS/ontology-to-lpg/scripts"
-uv run --no-project --with rdflib python3 run_projection.py --config &lt;your copy of epm-run.json&gt; --plan
-uv run --no-project --with rdflib python3 run_projection.py --config &lt;your copy of epm-run.json&gt;</code></pre></li></ol>
-<ol start="3"><li>Take the result into this folder, from this folder. It refuses a run that read other inputs than this tree's, or whose report did not pass. Commit <code>inferred.nt</code>, the manifest and the report together.
-<pre><code class="lang-bash">uv run --with rdflib --with pyshacl python pipeline.py record --run &lt;your output folder&gt;</code></pre></li></ol>
-<ol start="4"><li>Load the logical models, then write the Neo4j marker. <code>mark</code> checks the database against this tree first and stops, writing nothing, when it does not match.
-<pre><code class="lang-bash">uv run --with rdflib --with neo4j --with pyoxigraph python logical_models.py load
-uv run --with rdflib --with neo4j python sync_stores.py mark</code></pre></li></ol>
-<p>The Databricks table is not loaded from here. A notebook loads <code>epm_triples</code> with the <code>rdf-store</code> skill's <code>rdfstore.py</code> and writes the table's marker row in <code>epm_store_markers</code>.</p>
+<p>On the client platform one command runs the projection and every load: the runner, <code>py -m kpi_store.runner</code>. Its <code>neo4j</code> step calls <code>kpi_store/load_neo4j.py</code>, which runs the driver on this folder's inputs against the local Neo4j, and its <code>enterprise</code> step copies the checked graph to the named database. <code>ontology-stores-runbook.md</code> in this folder gives every step, from the setup of the machine to the sync check, and says what each step of the runner does.</p>
+<p>Two commands of this folder need no database. Run them from this folder after any input or shape changes.</p>
+<ol><li>Check the rules, validate, and compare the manifest with a fresh build. It fails unless the manifest is current. To write a new manifest, run <code>py pipeline.py build</code>.
+<pre><code class="lang-powershell">cd business_architecture/ontology/projection
+py pipeline.py build --verify</code></pre>
+<pre><code class="lang-text">Step 1 passed; loadable.nt &lt;count&gt; triples, inferred.nt 2
+projection-manifest.json is current</code></pre></li></ol>
+<ol start="2"><li>After a Neo4j load, take the load's result into this folder: <code>inferred.nt</code>, a summary of its report, and the manifest. The runbook's section "Record the load's report in the release folder" runs the command, <code>py pipeline.py record</code>, on a real load. It refuses a load that read other inputs than this tree's, or whose report did not pass.</li></ol>
+<p>The Databricks table is not loaded from here. The runner's <code>notebook</code> step loads <code>epm_triples</code> with the <code>rdf-store</code> skill's <code>rdfstore.py</code> and writes the table's marker row in <code>epm_store_markers</code>.</p>
 <h2 id="check-the-stores">Check the stores<a class="hl" href="#check-the-stores" aria-label="Link to this section">#</a></h2>
-<pre><code class="lang-bash">uv run --with rdflib python sync_stores.py expected
-uv run --with rdflib --with neo4j python sync_stores.py check</code></pre>
-<p><code>expected</code> prints what a current store's marker holds: the number of catalog datasets, their digest, the input fingerprint and the newest release IRIs. <code>check</code> reads the Neo4j database and the Jena dataset the settings name and says whether each is current; <code>--store</code> limits it to one. <code>empty_stores.py</code> counts what a store holds and, with <code>--yes</code>, empties it before a clean reload.</p>
+<p><code>py -m kpi_store.sync_check</code> reads the four stores of the client platform and says whether each is current. The runbook's section "The sync check" shows it and how to read each line. It takes what a current store holds from <code>sync_stores.py</code> in this folder:</p>
+<pre><code class="lang-powershell">py sync_stores.py expected</code></pre>
+<pre><code class="lang-text">{
+  "catalog_datasets": 13,
+...
+}</code></pre>
+<p><code>expected</code> prints what a current store's marker holds: the number of catalog datasets, their digest, the input fingerprint and the newest release IRIs. <code>empty_stores.py</code> counts what a store holds and, with <code>--yes</code>, empties it before a clean reload.</p>
 <h2 id="the-committed-figures">The committed figures<a class="hl" href="#the-committed-figures" aria-label="Link to this section">#</a></h2>
 <p><code>python3 scripts/epm_facts.py projection</code>, from the repository root, prints the figures of the last recorded load. <code>projection-report.json</code> holds them: 4,237 nodes and 22,312 relationships from 37,206 triples and 2 inferred, 0 SHACL violations in the graph over 806 in-graph constraints, the deliberate mutant caught, a round trip that lost 0 and added 0 triples, equal hashes for the sorted and shuffled loads, and every name renamed to one underscore without loss (88 keys, 52 labels, 88 node keys, 0 rel keys, 121 rels). Of the relationships, 21,883 come from the releases' triples, 427 are schema relationships from the ontology import, and 2 come from inferences. That load ran on 2026-11-04, on a Neo4j 2025.06.2 with n10s 2025.06.1.</p>
       <p class="end">Generated from <code>README.md</code> by <code>scripts/build_docs_html.py</code>. Start with the <a href="../epm-ontology-guide.html">ontology guide</a>.</p>

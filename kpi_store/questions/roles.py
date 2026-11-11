@@ -3,15 +3,24 @@
 A role is a slot in a template: "the node that stands for a source system", "the property that holds a table's
 qualified name". The candidates are first guesses only. Discovery matches them to a graph's real schema, and a
 person confirms the result.
+
+This module holds the list and nothing else: it reads and writes no file and no graph. The templates name these
+roles in their placeholders, `discover.py` proposes a value for each, `mapping.py` checks each against the live
+schema, and `render.py` replaces each placeholder with its confirmed value. A new question that needs a new
+label, property or relationship type adds a role here first.
+
+A role's name reads <thing>.<aspect>: `system.node` is the label, `system.code` a property on that label.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+# The two graphs. "bpa" is the KPI Store graph, as in the bpa_alias connection setting.
 GOVERNANCE = "governance"
 BPA = "bpa"
 GRAPHS = (GOVERNANCE, BPA)
 
+# The four kinds of role. A path is one or more relationship types followed for a bounded number of steps.
 LABEL = "label"
 PROPERTY = "property"
 RELATIONSHIP = "relationship"
@@ -20,6 +29,8 @@ PATH = "path"
 
 @dataclass(frozen=True)
 class Role:
+    """One slot a template can name. A required role must have a value before any question runs. An optional
+    role may have none, and a template then leaves out the part that needs it."""
     name: str
     graph: str
     kind: str
@@ -31,6 +42,8 @@ class Role:
     ends: tuple[str, ...] = ()    # the label roles a relationship or path may end at
 
 
+# Short forms for the three shapes of role, so the list below reads one role per entry. The candidates are in
+# order of preference: discovery scores the first one highest.
 def _label(name, graph, meaning, *candidates, required=True):
     return Role(name, graph, LABEL, meaning, candidates, required)
 
@@ -117,10 +130,12 @@ ROLES = (
 )
 
 BY_NAME = {role.name: role for role in ROLES}
+# A second role with the same name would replace the first in BY_NAME without a word, so the import stops here.
 assert len(BY_NAME) == len(ROLES), "two roles share a name"
 
 
 def role(name: str) -> Role:
+    """The role with this name. Raises KeyError with a readable message for a name no role has."""
     if name not in BY_NAME:
         raise KeyError(f"no role named {name}")
     return BY_NAME[name]

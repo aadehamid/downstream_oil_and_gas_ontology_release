@@ -238,7 +238,7 @@ def build():
     counts = Counter({"process concepts": len(concepts), "new concepts": len(new), "IDs on stubs": len(ids),
                       "changed descriptions": len(descriptions), "19948 references rejected": len(REJECT_19948),
                       "19948 references confirmed": sum(1 for _ in g.subjects(DCTERMS.references, ELEMENT_19948)) - len(REJECT_19948)})
-    with open(os.path.join(BASE, "counts.json")) as f:
+    with open(os.path.join(BASE, "counts.json"), encoding="utf-8") as f:
         counts.update(json.load(f))
     return g, counts
 
@@ -269,16 +269,16 @@ def catalog():
 
 def package(g, counts):
     """2.1.0's shapes and canonical-fact mapping unchanged; the graph, catalog, counts and changelog new."""
-    with open(os.path.join(BASE, "shapes.ttl")) as f:
+    with open(os.path.join(BASE, "shapes.ttl"), encoding="utf-8") as f:
         shapes_text = f.read()
-    with open(os.path.join(BASE, "canonical-facts.csv")) as f:
+    with open(os.path.join(BASE, "canonical-facts.csv"), encoding="utf-8") as f:
         mapping_text = f.read()
     files = {"core.ttl": g.serialize(format="turtle"), "core.jsonld": prev.prev.jsonld(g), "shapes.ttl": shapes_text,
              "catalog.ttl": catalog(), "canonical-facts.csv": mapping_text,
              "counts.json": json.dumps(dict(sorted(counts.items())), indent=2) + "\n"}
-    with open(CHANGELOG) as f:
+    with open(CHANGELOG, encoding="utf-8") as f:
         files["CHANGELOG.md"] = f.read()
-    with open(os.path.join(BASE, "manifest.json")) as f:
+    with open(os.path.join(BASE, "manifest.json"), encoding="utf-8") as f:
         base_manifest = f.read()
     files["manifest.json"] = json.dumps({
         "module": "core", "version": VERSION, "release_candidate": False,
@@ -306,14 +306,14 @@ def main():
           + ", ".join(f"{k} {v}" for k, v in sorted(counts.items()) if not k.startswith(("facts ", "evidence", "canonical"))))
     if args.verify:
         stale = [n for n, t in files.items() if not os.path.exists(os.path.join(RELEASE_DIR, n))
-                 or open(os.path.join(RELEASE_DIR, n)).read() != t]
+                 or open(os.path.join(RELEASE_DIR, n), encoding="utf-8").read() != t]
         if stale:
             sys.exit(f"core {VERSION} package is not current: {stale}")
         print("release package is current")
     if args.write:
         os.makedirs(RELEASE_DIR, exist_ok=True)
         for n, t in files.items():
-            with open(os.path.join(RELEASE_DIR, n), "w") as f:
+            with open(os.path.join(RELEASE_DIR, n), "w", encoding="utf-8", newline="\n") as f:
                 f.write(t)
         print(f"wrote {RELEASE_DIR}")
 

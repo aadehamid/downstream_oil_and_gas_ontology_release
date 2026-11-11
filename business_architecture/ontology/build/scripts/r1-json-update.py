@@ -189,9 +189,9 @@ def main():
 
     # ---- write, preserving the original framing ----
     body = json.dumps(data, indent=2, ensure_ascii=False)
-    src.write_text(prefix + body + suffix, encoding="utf-8")
+    src.write_text(prefix + body + suffix, encoding="utf-8", newline="\n")
 
-    with open(a.diff_out, "w", encoding="utf-8") as f:
+    with open(a.diff_out, "w", encoding="utf-8", newline="\n") as f:
         f.write("# R1 source-JSON structural diff\n\n")
         f.write(f"682 → 683 nodes ({DATE}). The file framing (leading blank "
                 f"line, 2-space indent, trailing newline) is preserved, so the "

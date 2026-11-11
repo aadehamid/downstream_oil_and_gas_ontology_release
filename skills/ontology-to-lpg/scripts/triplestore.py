@@ -2,7 +2,7 @@
 """Load the validated inputs into any SPARQL 1.1 store, one named graph per input file, and check
 that nothing was lost: the store's counts against the files, and against the n10s export.
 
-Run: uv run --no-project --with rdflib python3 triplestore.py --gsp <graph store URL> --query <SPARQL URL>
+Run: uv run --no-project --with rdflib python triplestore.py --gsp <graph store URL> --query <SPARQL URL>
          [--env <file>] [--graph-base <IRI>] --inferred inferred.nt [--projection-report <report.json>]
          [--cq <question.rq>]... --report <triplestore-report.json> <data.ttl>...
 
@@ -165,6 +165,8 @@ def main(argv):
     files = []
     try:
         for path in data + [opts["--inferred"]]:
+            if not os.path.isfile(path):   # rdflib reads a missing Windows path as a URL, and its warning prints the path
+                raise FileNotFoundError("an input file is missing")
             g = Graph().parse(path, format="nt" if path.endswith(".nt") else "turtle")
             iri = base + "inferred" if path == opts["--inferred"] else graph_iri(g, path, base)
             files.append((path, iri, g))

@@ -130,16 +130,17 @@ def _stop(proc):
         proc.kill()
 
 
-def run_process(args, cwd, env, timeout):
-    """Run one program with no shell and no input. Returns (exit status, output); a run that passes the time
-    limit is stopped with everything it started, and its status is None."""
+def run_process(args, cwd, env, timeout, typed=None):
+    """Run one program with no shell. It gets no input, or the text a reader would type at its prompts. Returns
+    (exit status, output); a run that passes the time limit is stopped with everything it started, and its status
+    is None."""
     env = {k: v for k, v in env.items() if k != "OLDPWD"}
     env["PWD"] = str(cwd)       # the folder the process is in, never the one the check was started from
     kwargs = {"start_new_session": True} if os.name == "posix" else {}
-    proc = subprocess.Popen(args, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, **kwargs)
+    proc = subprocess.Popen(args, cwd=cwd, env=env, stdin=subprocess.PIPE if typed else subprocess.DEVNULL,
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs)
     try:
-        out, _ = proc.communicate(timeout=timeout)
+        out, _ = proc.communicate(typed.encode("utf-8") if typed else None, timeout=timeout)
         return proc.returncode, out.decode("utf-8", errors="replace")
     except subprocess.TimeoutExpired:
         _stop(proc)
@@ -165,7 +166,7 @@ def _uv_environment() -> dict:
                                       ("UV_PYTHON_INSTALL_DIR", ["uv", "python", "dir"])):
                 if os.environ.get(variable):
                     continue
-                r = subprocess.run(command, capture_output=True, text=True)
+                r = subprocess.run(command, capture_output=True, text=True, encoding="utf-8")
                 if r.returncode == 0 and r.stdout.strip():
                     _uv_dirs[variable] = r.stdout.strip()
     return _uv_dirs
@@ -250,7 +251,7 @@ class Runner:
     def _nested_token(self) -> dict:
         if self._token is None:
             self._token = secrets.token_hex(16)
-            (self.tmp / "nested-token").write_text(self._token, encoding="utf-8")
+            (self.tmp / "nested-token").write_text(self._token, encoding="utf-8", newline="\n")
         return {NESTED: self._token, NESTED_FILE: str(self.tmp / "nested-token")}
 
     def env(self, instance) -> dict:
@@ -259,11 +260,15 @@ class Runner:
         where it is. PATH stays: the programs a block starts are found through it."""
         context = instance.context
         keep = set(context.needs_env) | set(context.pass_env)
-        gates = {name for c in self.registry.contexts.values() for name in (*c.needs_env, *c.pass_env)}
+        # A variable that some context sets for its blocks reaches no block from outside: the reader's own
+        # KPI_STORE_LOCAL, for one, must never point a tested command at the reader's real stores.
+        gates = {name for c in self.registry.contexts.values() for name in (*c.needs_env, *c.pass_env, *c.set_env)}
         tree = {str(self.root), str(self.root.resolve())}
         env = {k: v for k, v in no_git_env(self.environ).items()
                if (k not in gates or k in keep) and k not in ENCODING_VARIABLES
                and (k.upper() == "PATH" or not any(name in v for name in tree))}
+        for name, source in context.set_env.items():
+            env[name] = self.environ.get(source[4:], "") if source.startswith("env:") else source
         env.update(_uv_environment())
         env.update(self._nested_token())
         env["PYTHONDONTWRITEBYTECODE"] = "1"
@@ -273,9 +278,9 @@ class Runner:
                 del env[name]
         return env
 
-    def execute(self, block, instance, body, wanted_os):
-        """Runs the block's text. Returns (exit status, output, problem): the problem says why the block could not
-        run at all."""
+    def execute(self, block, instance, body, wanted_os, typed=None):
+        """Runs the block's text. `typed` is what the reader types at the block's prompts, one answer per line.
+        Returns (exit status, output, problem): the problem says why the block could not run at all."""
         env, timeout = self.env(instance), instance.context.timeout
         script = instance.private / f"block-{instance.count}"
         prelude = "\n".join(instance.defines.get(family(block.lang), []))
@@ -291,7 +296,7 @@ class Runner:
             script.write_text("set -euo pipefail\n"
                               "trap '{ pwd -W 2>/dev/null || pwd -P; } > \"$DOC_SNIPPETS_CWD_FILE\"' EXIT\n"
                               f"{prelude}\n{body}\n", encoding="utf-8", newline="\n")
-            status, output = run_process([bash, str(script)], instance.cwd, env, timeout)
+            status, output = run_process([bash, str(script)], instance.cwd, env, timeout, typed)
             if state.is_file() and status is not None:
                 left = Path(state.read_text(encoding="utf-8").strip())
                 if left.is_dir():
@@ -300,17 +305,19 @@ class Runner:
         if block.lang == "python":
             script = script.with_suffix(".py")
             script.write_text(f"{prelude}\n{body}\n", encoding="utf-8", newline="\n")
-            status, output = run_process([sys.executable, "-B", str(script)], instance.cwd, env, timeout)
+            status, output = run_process([sys.executable, "-B", str(script)], instance.cwd, env, timeout, typed)
             return status, output, None
         if wanted_os == "windows":
-            return self._execute_windows_shell(block, instance, script, prelude, body, env, timeout)
-        return self._execute_lines(block, instance, prelude + "\n" + body, env, timeout)
+            return self._execute_windows_shell(block, instance, script, prelude, body, env, timeout, typed)
+        return self._execute_lines(block, instance, prelude + "\n" + body, env, timeout, typed)
 
     @staticmethod
-    def _execute_lines(block, instance, text, env, timeout):
-        """PowerShell or cmd lines, each run as a program with its arguments. `cd` moves the next line's folder."""
+    def _execute_lines(block, instance, text, env, timeout, typed=None):
+        """PowerShell or cmd lines, each run as a program with its arguments. `cd` moves the next line's folder.
+        Typed answers go to the last line's program: the lines before it prepare, and the last one asks."""
+        lines = command_lines(block.lang, text)
         output = []
-        for _, line in command_lines(block.lang, text):
+        for position, (_, line) in enumerate(lines, 1):
             args = split_command(line)
             if args[0].lower() in ("cd", "chdir", "set-location"):
                 target = (instance.cwd / args[-1]).resolve() if len(args) > 1 else instance.cwd
@@ -322,14 +329,14 @@ class Runner:
                 command = resolve_program(args, env.get("PATH"))
             except FileNotFoundError:
                 return None, "".join(output), f"the program `{args[0]}` is not installed, so the line cannot run"
-            status, text_out = run_process(command, instance.cwd, env, timeout)
+            status, text_out = run_process(command, instance.cwd, env, timeout, typed if position == len(lines) else None)
             output.append(text_out)
             if status != 0:
                 return status, "".join(output), None
         return 0, "".join(output), None
 
     @staticmethod
-    def _execute_windows_shell(block, instance, script, prelude, body, env, timeout):
+    def _execute_windows_shell(block, instance, script, prelude, body, env, timeout, typed=None):
         if block.lang == "powershell":
             shell = shutil.which("pwsh") or shutil.which("powershell")
             if not shell:
@@ -342,5 +349,5 @@ class Runner:
             script = script.with_suffix(".bat")
             script.write_text(f"@echo off\r\n{prelude}\r\n{body}\r\n", encoding="utf-8", newline="")
             command = [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/c", str(script)]
-        status, output = run_process(command, instance.cwd, env, timeout)
+        status, output = run_process(command, instance.cwd, env, timeout, typed)
         return status, output, None

@@ -80,7 +80,7 @@ KINDS = ("crude-marker", "product-benchmark", "compliance-cost")
 
 
 def read_csv(name):
-    with open(os.path.join(HERE, name), newline="") as f:
+    with open(os.path.join(HERE, name), newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
@@ -261,11 +261,11 @@ def main():
             + build(regions, benchmarks, series, prices, enums).serialize(format="turtle"))
     print("; ".join(f"{k} {v}" for k, v in figures(regions, benchmarks, series, prices, enums).items()))
     if args.verify:
-        if not (os.path.exists(OUTPUT) and open(OUTPUT).read() == text):
+        if not (os.path.exists(OUTPUT) and open(OUTPUT, encoding="utf-8").read() == text):
             sys.exit("market-data.ttl is not current: run build_market_data.py --write")
         print("market-data.ttl is current")
     if args.write:
-        with open(OUTPUT, "w") as f:
+        with open(OUTPUT, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
         print(f"wrote {OUTPUT}")
 

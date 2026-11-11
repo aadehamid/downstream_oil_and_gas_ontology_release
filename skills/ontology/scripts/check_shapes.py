@@ -2,7 +2,7 @@
 """Step 9, the whole-graph gate: every shapes file, run together over every data file, finds no result
 (references/shacl.md, rule 7).
 
-Run: uv run --no-project --with rdflib --with pyshacl python3 check_shapes.py --shapes <s.ttl>... --data <d.ttl>...
+Run: uv run --no-project --with rdflib --with pyshacl python check_shapes.py --shapes <s.ttl>... --data <d.ttl>...
      [--every-shapes-file-under <dir>]
 
 The gate passes only when the report holds no result: SHACL makes sh:conforms true only when validation

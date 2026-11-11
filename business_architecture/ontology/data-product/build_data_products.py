@@ -86,9 +86,9 @@ def resolve_domain(ref, by_key, by_label):
 
 
 def load():
-    with open(PORTFOLIO) as f:
+    with open(PORTFOLIO, encoding="utf-8") as f:
         portfolio = json.load(f)
-    with open(LINKS, newline="") as f:
+    with open(LINKS, newline="", encoding="utf-8") as f:
         links = list(csv.DictReader(f))
     by_key, by_label = core_index()
     problems = []
@@ -216,12 +216,12 @@ def main():
             + build(portfolio, links, by_key, by_label).serialize(format="turtle"))
     print("; ".join(f"{k} {v}" for k, v in figures(portfolio, links).items()))
     if args.verify:
-        current = os.path.exists(OUTPUT) and open(OUTPUT).read() == text
+        current = os.path.exists(OUTPUT) and open(OUTPUT, encoding="utf-8").read() == text
         if not current:
             sys.exit("data-products.ttl is not current: run build_data_products.py --write")
         print("data-products.ttl is current")
     if args.write:
-        with open(OUTPUT, "w") as f:
+        with open(OUTPUT, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
         print(f"wrote {OUTPUT}")
 

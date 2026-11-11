@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Step 10: one combined catalog of every release on disk (references/release.md, rule 19).
 
-Run (uv run --no-project --with rdflib --with pyshacl python3 build_catalog.py ...; pySHACL because the
+Run (uv run --no-project --with rdflib --with pyshacl python build_catalog.py ...; pySHACL because the
 package layout and manifest reader come from check_packages.py):
   build_catalog.py build  --releases <dir> --title <text> --description <text> [--out <file>]
   build_catalog.py verify --releases <dir> --title <text> --description <text> [--out <file>]

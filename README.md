@@ -68,7 +68,7 @@ The loads run on a Windows machine. Set these up once. The runbook gives the ste
 |---|---|
 | Python 3.11 or later, with the `py` launcher | The KPI Store commands are Python modules, and the documents start them with `py`. The check is a bash script, and the sign-in is the Databricks command line; both have their own rows below |
 | Java 21 | Fuseki 6.2.0 and ROBOT, the reasoner, run on Java. This release was tested with Java 21 |
-| Git for Windows, for Git Bash, and [uv](https://docs.astral.sh/uv/) | The full check, `scripts/check.sh`, is a bash script. It runs each check through uv, which fetches the test packages. The script calls `python3`, so Git Bash must find a `python3` command |
+| Git for Windows, for Git Bash, and [uv](https://docs.astral.sh/uv/) | The full check, `scripts/check.sh`, is a bash script. It runs each check through uv, which fetches the test packages. The script takes the first of `python3`, `python` and `py` that is Python 3.11 or later. Run it from Git Bash or through the runner: in PowerShell, the plain word `bash` starts the launcher of the Linux subsystem |
 | The Databricks command line, signed in with OAuth (`databricks auth login`) | The commands on Windows upload the release and start the notebook with this sign-in |
 | `jena-fuseki-server-6.2.0.jar` | The Fuseki server. `skills/rdf-store/references/stores.md` gives the download address and the SHA-256 |
 | `robot.jar`, ROBOT 1.9.10 | The reasoner that runs before the Neo4j load. `skills/ontology-to-lpg/references/running.md` gives the download address and the SHA-256 |

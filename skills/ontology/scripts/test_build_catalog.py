@@ -1,7 +1,7 @@
 """Tests for build_catalog.py.
 
 Run from this folder:
-  uv run --no-project --with rdflib --with pyyaml --with pyshacl python3 -m unittest test_build_catalog
+  uv run --no-project --with rdflib --with pyyaml --with pyshacl python -m unittest test_build_catalog
 
 Two packages are built with build_package.py from the library skeleton; the catalog is built from them, and
 each one-break test changes one thing (a package added, a hand edit, a second catalog IRI, a distribution
@@ -55,11 +55,11 @@ class Catalog(unittest.TestCase):
         """Build one package: the library skeleton, or, for another module, a one-class module of that IRI."""
         answers = dict(self.answers, **changes)
         if answers["module"] != "lending":
-            with open(os.path.join(self.root, f"{answers['module']}.ttl"), "w", encoding="utf-8") as f:
+            with open(os.path.join(self.root, f"{answers['module']}.ttl"), "w", encoding="utf-8", newline="\n") as f:
                 f.write(MODULE_TTL.format(iri=answers["ontology_iri"]))
             answers.update(sources=[f"{answers['module']}.ttl"], shapes=[])
         path = os.path.join(self.root, f"{answers['module']}-{answers['version']}.yaml")
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             yaml.safe_dump(answers, f, sort_keys=False)
         out = io.StringIO()
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
@@ -103,7 +103,7 @@ class Catalog(unittest.TestCase):
         self.build()
         env = dict(os.environ, PYTHONHASHSEED="12345", PYTHONDONTWRITEBYTECODE="1")
         result = subprocess.run([sys.executable, os.path.join(HERE, "build_catalog.py"), "verify", "--releases", self.releases,
-                                 "--title", TITLE, "--description", DESCRIPTION], env=env, capture_output=True, text=True)
+                                 "--title", TITLE, "--description", DESCRIPTION], env=env, capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_a_package_added_later_fails_verify(self):
@@ -115,7 +115,7 @@ class Catalog(unittest.TestCase):
 
     def test_a_hand_edit_fails_verify(self):
         self.build()
-        with open(self.catalog, "a", encoding="utf-8") as f:
+        with open(self.catalog, "a", encoding="utf-8", newline="\n") as f:
             f.write("\n<https://id.example.org/library/catalog> <http://purl.org/dc/terms/creator> \"someone\" .\n")
         code, out = self.verify()
         self.assertEqual(code, 1)
@@ -145,7 +145,7 @@ class Catalog(unittest.TestCase):
         with open(path, encoding="utf-8") as f:
             m = json.load(f)
         del m["version_iri"]
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             json.dump(m, f)
         code, out = self.build()
         self.assertEqual(code, 1)
@@ -175,7 +175,7 @@ class Catalog(unittest.TestCase):
         path = os.path.join(self.releases, module, "1.0.0", "catalog.ttl")
         with open(path, encoding="utf-8") as f:
             text = f.read()
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(transform(text))
 
     def test_a_distribution_naming_no_file_fails(self):
@@ -267,7 +267,7 @@ class Catalog(unittest.TestCase):
 
     def test_the_manifest_is_read_as_check_packages_reads_it(self):
         path = os.path.join(self.releases, "core", "1.0.0", "manifest.json")
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             json.dump({"files": ["core.ttl"]}, f)
         code, out = self.build()
         self.assertEqual(code, 1)

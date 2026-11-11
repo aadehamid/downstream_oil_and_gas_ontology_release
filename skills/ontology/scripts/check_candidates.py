@@ -2,7 +2,7 @@
 """Steps 0 and 3: candidate terms drawn from a document stay grounded in that document and stay candidates
 (references/governance.md, "Candidates from documents"; rules 18 and 19).
 
-Run: uv run --no-project --with pyyaml python3 check_candidates.py --source <document.txt>
+Run: uv run --no-project --with pyyaml python check_candidates.py --source <document.txt>
          [--ontogpt <result.yaml>]... [--candidates <register.yaml>]...
 
 --ontogpt reads the result of `ontogpt extract` (OntoGPT's ExtractionResult: input_text, named_entities with

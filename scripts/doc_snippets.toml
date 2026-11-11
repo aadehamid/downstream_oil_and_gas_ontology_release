@@ -25,6 +25,8 @@ awaits-the-rewrite = "The document is about to be rewritten, and the block goes 
 #   home          "temporary" (the default) gives a block an empty home folder; "real" keeps the real one
 #   timeout       seconds one block may take (default 120)
 #   placeholders  the value of each <placeholder> a block of this context uses: text, or env:NAME
+#   set_env       variables a block of this context gets: text, or env:NAME for another variable's value. Such a
+#                 variable reaches no block of another context, whatever the reader's own environment holds
 
 [contexts.scratch]
 base = "empty"
@@ -45,6 +47,13 @@ git = true
 needs_env = ["DOC_SNIPPETS_SLOW"]
 timeout = 1800
 about = "The same copy, for commands that take minutes, such as the whole check. Set DOC_SNIPPETS_SLOW=1."
+
+[contexts.new-module]
+base = "release-copy"
+git = true
+needs_env = ["DOC_SNIPPETS_SLOW"]
+timeout = 1800
+about = "A Git copy of its own for the made-up module of the update guide, which ends with the whole check. Set DOC_SNIPPETS_SLOW=1."
 
 [contexts.stores]
 base = "release-copy"
@@ -84,3 +93,23 @@ about = "A copy of the release beside a second local Fuseki dataset that no othe
 
 [contexts.empty-fuseki.placeholders]
 "your Fuseki address" = "env:KPI_STORE_TEST_EMPTY_FUSEKI_URL"
+
+[contexts.first-run]
+base = "release-copy"
+needs_env = ["KPI_STORE_TEST_LOCAL_SETTINGS", "KPI_STORE_TEST_LPG_OUT"]
+home = "real"
+timeout = 5400
+about = "A copy of the release as a plain folder, as an unpacked zip is, with a prepared local settings file that names test stores and the rehearsal workspace. For the runbook's chain. It keeps the real home folder."
+
+[contexts.first-run.set_env]
+KPI_STORE_LOCAL = "env:KPI_STORE_TEST_LOCAL_SETTINGS"
+
+[contexts.correction]
+base = "release-copy"
+git = true
+needs_env = ["DOC_SNIPPETS_SLOW"]
+timeout = 1800
+about = "A Git copy of its own for the update guide's cut of the made-up report, which ends with the whole check. Set DOC_SNIPPETS_SLOW=1."
+
+[contexts.first-run.placeholders]
+"your Neo4j load folder" = "env:KPI_STORE_TEST_LPG_OUT"

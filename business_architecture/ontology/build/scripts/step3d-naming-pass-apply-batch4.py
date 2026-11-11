@@ -241,7 +241,7 @@ def main() -> int:
             "definition change."
         )
     IDENTITY_MAP.write_text(json.dumps(entries, indent=1, ensure_ascii=False) + "\n",
-                            encoding="utf-8")
+                            encoding="utf-8", newline="\n")
     print("identity map: 11 overlays updated")
 
     # 6. naming queue: mark the 8 directionality rows EXECUTED (7 claims rows
@@ -295,7 +295,7 @@ def main() -> int:
                   "consolidated naming pass.")
     assert old_status in text, "queue execution-status line not in expected form"
     text = text.replace(old_status, new_status)
-    QUEUE.write_text(text, encoding="utf-8")
+    QUEUE.write_text(text, encoding="utf-8", newline="\n")
     print("naming queue: 8 directionality rows marked EXECUTED")
 
     return 0
