@@ -38,8 +38,8 @@ undecided. decided_by is a role or initials, such as "the ontology owner"; the c
 report to the cut tool, which shows its plan and asks you to approve it in the terminal.
 
 A store load never runs after a notebook run that did not load this release: the run then stops, with exit 3.
---skip leaves a step out on purpose; the last line and the summary then name the steps left out, and the run
-does not say that every step passed.
+--skip, --only, --from and --mode check each leave steps out; the last line and the summary then name the steps
+left out, and the run does not say that every step passed. Only a run of the whole chain says that.
 
 Exit 0 when every requested step ran and passed, 1 when a step failed, 2 on bad settings or arguments, 3 when the
 run stopped for a person to act (the last line says what to do).
@@ -729,8 +729,8 @@ def step_summary(ctx):
     steps = {name: ctx.earlier(name) for name in STEPS if name != "summary"}
     ctx.out(f"summary of run {ctx.run_id}:")
     for name, result in steps.items():
-        if name in ctx.left_out:
-            ctx.out(f"  {name:<11} left out of this run")
+        if name in ctx.left_out:   # an earlier command's result for this run stays in its file; it is not this command's
+            ctx.out(f"  {name:<11} left out of this run" + (f" (recorded earlier: {result.get('status')})" if result else ""))
         elif result:
             ctx.out(f"  {name:<11} {result.get('status')}")
     write_text(ctx.run_dir / "summary.json", json.dumps({"run": ctx.run_id, "left_out": list(ctx.left_out), "steps": steps},
@@ -832,10 +832,10 @@ def main(argv=None, **context_options):
         print(f"runner: {err}", file=sys.stderr)
         return 2
     names = selected(args.only, args.start, args.skip)
-    ctx.left_out = [n for n in args.skip if n in selected(args.only, args.start)]
     if args.mode == "check":   # the notebook loads nothing in this mode, so the stores are not loaded either
-        ctx.left_out += [n for n in names if n in LOCAL_LOADS]
         names = [n for n in names if n not in LOCAL_LOADS]
+    # Whatever narrowed the run (--only, --from, --skip or --mode check), a step that did not run is named.
+    ctx.left_out = [n for n in STEPS if n not in names]
     ctx.out(f"run {run_id}{' (dry run)' if args.dry_run else ''}: {', '.join(names)}")
     code = run_steps(ctx, names)
     if code == 0 and not args.dry_run:

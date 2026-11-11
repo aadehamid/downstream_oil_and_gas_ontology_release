@@ -2,9 +2,14 @@
 
 Every expected figure is written by hand from support.sandbox(): its objects, lineage rows, jobs and Genie
 spaces. Nothing here is read back from the code under test.
+
+The ontology the graph is built against is the one KPI Store 1.1 shipped with: data-product 1.2.0 and kpi 1.3.0
+(shipped_root). A released package never changes, and a cut moves a superseded one to releases/previous, so these
+figures hold on any later tree too, whatever correction versions it has gained.
 """
 import json
 import random
+import shutil
 from pathlib import Path
 
 import pytest
@@ -42,12 +47,40 @@ EXTRAS = (
 )
 
 
+RELEASES = support.ROOT / "business_architecture" / "ontology" / "releases"
+SHIPPED = (("data-product", "1.2.0"), ("kpi", "1.3.0"))   # the two packages the ontology view reads, as shipped
+
+
+def shipped_package(module, version):
+    """The folder of a package as it was released: among the newest packages, or under releases/previous once a
+    newer version exists. Its files are the same in both places."""
+    for folder in (RELEASES / module / version, RELEASES / "previous" / module / version):
+        if (folder / f"{module}.ttl").is_file():
+            return folder
+    raise AssertionError(f"the tree no longer holds {module} {version}")
+
+
 @pytest.fixture(scope="module")
-def reading():
-    """(Discovery, OntologyView, Settings): the sandbox-shaped workspace read against the release's own packages."""
+def shipped_root(tmp_path_factory):
+    """A release root that holds only the shipped data-product and kpi packages: what ontology_view.read needs."""
+    root = tmp_path_factory.mktemp("shipped")
+    for module, version in SHIPPED:
+        shutil.copytree(shipped_package(module, version), root / "business_architecture" / "ontology" / "releases" / module / version)
+    return root
+
+
+def test_the_shipped_root_holds_the_shipped_versions_whatever_the_tree_has_gained(shipped_root):
+    assert ov.read(shipped_root).versions == {"data-product": "1.2.0", "kpi": "1.3.0"}
+    with pytest.raises(AssertionError, match="no longer holds data-product 9.9.9"):
+        shipped_package("data-product", "9.9.9")
+
+
+@pytest.fixture(scope="module")
+def reading(shipped_root):
+    """(Discovery, OntologyView, Settings): the sandbox-shaped workspace read against the shipped packages."""
     workspace, genie = support.sandbox()
     settings = support.make_settings()
-    view = ov.read(support.ROOT)
+    view = ov.read(shipped_root)
     schemas = {settings.environment_name(o.full_name).rsplit(".", 1)[0] for o in view.objects.values()}
     return disc.discover(settings, workspace.run_sql, genie, schemas), view, settings
 
@@ -404,15 +437,14 @@ def test_the_file_holds_no_time_but_the_platforms(graph, tmp_path):
     assert again[0].read_bytes() == text and tg.digest(again) == tg.digest(files)
 
 
-def test_build_from_files_reads_the_runs_discovery_json(reading, graph, tmp_path):
+def test_build_from_files_reads_the_runs_discovery_json(reading, graph, tmp_path, shipped_root):
     found, _, settings = reading
     (tmp_path / "discovery.json").write_text(found.to_json(), encoding="utf-8", newline="\n")
-    assert tg.build_from_files(tmp_path / "discovery.json", support.ROOT, settings).nquads() == graph.nquads()
+    assert tg.build_from_files(tmp_path / "discovery.json", shipped_root, settings).nquads() == graph.nquads()
 
 
 # ---- the module's shapes ------------------------------------------------------------------------------
 
-RELEASES = support.ROOT / "business_architecture" / "ontology" / "releases"
 
 
 @pytest.fixture(scope="module")
@@ -421,8 +453,9 @@ def shapes():
     from rdflib import Graph
     package = RELEASES / "technical-graph" / ov.newest_version("technical-graph", RELEASES)   # a cut moves the version on
     linked = Graph().parse(package / "technical-graph.ttl")
-    for module in ("data-product", "kpi", "system"):
-        linked.parse(RELEASES / module / ov.newest_version(module, RELEASES) / f"{module}.ttl")
+    for module, version in SHIPPED:   # the designs and measures the built graph points to
+        linked.parse(shipped_package(module, version) / f"{module}.ttl")
+    linked.parse(RELEASES / "system" / ov.newest_version("system", RELEASES) / "system.ttl")
     return Graph().parse(package / "shapes.ttl"), linked
 
 
@@ -611,16 +644,17 @@ def test_the_delta_load_cannot_write_outside_the_two_schemas(files):
     assert workspace.writes() == []
 
 
-def test_the_notebooks_lines(tmp_path):
+def test_the_notebooks_lines(tmp_path, shipped_root):
     """The lines the notebook runs after its own load: the run's discovery.json becomes the graph files, and the
-    graph files load through the same Gate."""
+    graph files load through the same Gate. The notebook builds against the release it runs from; here the graph
+    is built against the shipped packages, so the count below holds after a cut too."""
     workspace, genie = support.sandbox()
     settings = support.make_settings(tmp_path)
     root = support.ROOT
     summary = lb.run(settings, root, workspace.run_sql, genie, mode="check", out_dir=tmp_path)
 
     run_dir = Path(summary["report_json"]).parent
-    graph_files = tg.write(tg.build_from_files(run_dir / "discovery.json", root, settings), run_dir)
+    graph_files = tg.write(tg.build_from_files(run_dir / "discovery.json", shipped_root, settings), run_dir)
     summary["tech_graph"] = tg.load_delta(lb.Gate(settings, workspace.run_sql), settings, graph_files, root)
 
     assert (run_dir / "tech-graph.nq").is_file() and (run_dir / "tech-graph-summary.json").is_file()

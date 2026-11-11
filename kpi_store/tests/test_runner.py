@@ -667,12 +667,34 @@ def test_the_last_line_says_every_step_passed_only_when_none_was_left_out():
 
 
 def test_a_skipped_check_is_named_in_the_last_line_and_the_summary(setup):
-    code = runner.main(["--stores", str(setup.local.path), "--release", str(setup.root), "--only", "check,summary", "--skip", "check",
+    code = runner.main(["--stores", str(setup.local.path), "--release", str(setup.root), "--skip", "check", "--only", "check,summary",
                         "--run-id", RUN], out=setup.lines.append)
     assert code == 0 and "  check       left out of this run" in setup.lines
-    assert setup.lines[-1] == "the steps that ran passed; left out: check (not run, so not checked)"
-    assert json.loads((setup.run_dir / "summary.json").read_text(encoding="utf-8"))["left_out"] == ["check"]
+    assert setup.lines[-1].startswith("the steps that ran passed; left out: cut, check, zip, ") and "every step passed" not in setup.lines
+    assert json.loads((setup.run_dir / "summary.json").read_text(encoding="utf-8"))["left_out"] == [n for n in runner.STEPS if n != "summary"]
+
+
+def test_a_run_narrowed_by_only_or_from_never_says_every_step_passed(setup):
+    args = ["--stores", str(setup.local.path), "--release", str(setup.root), "--run-id", RUN]
+    options = dict(out=setup.lines.append, run=Recorder(), databricks=CLI, bash="/sample/bash")
+    assert runner.main([*args, "--only", "zip,volume"], **options) == 0
+    assert setup.lines[-1] == ("the steps that ran passed; left out: cut, check, upload, notebook, report, fuseki, neo4j, enterprise, "
+                               "sync, summary (not run, so not checked)")
+    assert runner.main([*args, "--from", "summary"], **options) == 0
+    assert setup.lines[-1].startswith("the steps that ran passed; left out: cut, check, zip, volume, upload, ")
+    # The summary names a step this command left out, and what an earlier command of the same run recorded for it.
+    assert "  zip         left out of this run (recorded earlier: built)" in setup.lines
+    assert "  cut         left out of this run" in setup.lines
     assert "every step passed" not in setup.lines
+
+
+def test_only_a_run_of_the_whole_chain_says_every_step_passed(setup, monkeypatch):
+    for name in runner.STEPS:
+        monkeypatch.setitem(runner.STEP_FUNCTIONS, name, lambda ctx: {"status": "loaded", "line": "done"})
+    args = ["--stores", str(setup.local.path), "--release", str(setup.root), "--run-id", RUN]
+    assert runner.main(args, out=setup.lines.append) == 0 and setup.lines[-1] == "every step passed"
+    assert runner.main([*args, "--only", ",".join(runner.STEPS[:-1])], out=setup.lines.append) == 0
+    assert setup.lines[-1] == "the steps that ran passed; left out: summary (not run, so not checked)"
 
 
 def test_mode_check_leaves_the_store_loads_out_and_says_so(setup):
