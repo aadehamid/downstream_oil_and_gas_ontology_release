@@ -23,7 +23,8 @@ whose hash differs reads changed. --quick leaves the hash out, and each Neo4j li
 The technical graph gets a tech: line per store when its file is known: --tech-graph <tech-graph.nq>, or the
 file the runner fetched into <run folder>/tech-graph/. Each line is the technical graph's own judgement
 (kpi_store.tech_graph), which reads the store's copy back and compares its content with the file. Without a file
-the technical graph is not checked, and the last line says so.
+each tech: line reads "not checked", and the command does not pass: a technical graph nobody compared is not
+current. --no-tech-graph leaves the technical graph out on purpose; one line says so, and the other lines decide.
 
 This command only reads. Exit 0 when every line reads current, 1 otherwise, 2 on bad settings.
 Needs rdflib; databricks-sdk for databricks; neo4j for the two Neo4j databases.
@@ -43,6 +44,9 @@ from . import settings as settings_module
 
 STORES = ("databricks", "jena", "neo4j", "enterprise")
 TECH_FOLDER = "tech-graph"   # in the run folder: the technical graph's file as the runner last fetched it
+NOT_CHECKED, LEFT_OUT = "not checked", "left out"
+NO_FILE = ("no tech-graph.nq was named or fetched, so its content was not compared; name the file with --tech-graph, "
+           "or let the runner's report step fetch it")
 NEO4J_STORES = ("neo4j", "enterprise")
 WORKTREE = "worktree"
 STATEMENT_WAIT_SECONDS = 300
@@ -180,9 +184,10 @@ def read_stores(stores, local, newest, code, connect=local_load.connect, client_
 
 
 def check(local, release_root, stores=STORES, ref=WORKTREE, extra_graphs=(), code=None, quick=False, tech_graph_files=None,
-          **readers):
-    """[(line name, status, why)] for the named stores, then the lm: rows, then the tech: rows when the technical
-    graph's files are given. Reads only."""
+          no_tech_graph=False, **readers):
+    """[(line name, status, why)] for the named stores, then the lm: rows, then the technical graph's rows: one
+    tech: row per store judged against its files; without files, one per store that reads "not checked", which is
+    never current; with no_tech_graph, one row that says it was left out on request. Reads only."""
     code = code or local_load.release_code(release_root)
     if tech_graph_files:   # its named graphs are no part of the release, so the ontology's own check leaves them out
         from . import tech_graph
@@ -191,8 +196,12 @@ def check(local, release_root, stores=STORES, ref=WORKTREE, extra_graphs=(), cod
     markers, live, models, hashes = read_stores(stores, local, want["newest"], code, quick=quick, **readers)
     rows = judge_hashes(code.ss.drift(markers, live, want, stores), markers, hashes, quick)
     rows += [("lm:" + store, status, why) for store, status, why in models]
-    if tech_graph_files:
+    if no_tech_graph:
+        rows.append(("tech", LEFT_OUT, "the technical graph was left out on request"))
+    elif tech_graph_files:
         rows += tech_rows(stores, local, tech_graph_files, release_root, code, **readers)
+    else:
+        rows += [("tech:" + store, NOT_CHECKED, NO_FILE) for store in stores]
     return rows
 
 
@@ -242,7 +251,9 @@ def lines(rows):
 
 
 def all_current(rows):
-    return all(status == "current" for _, status, _ in rows)
+    """True when every row reads current. A row left out on request does not decide; a row not checked is not
+    current."""
+    return all(status == "current" for _, status, _ in rows if status != LEFT_OUT)
 
 
 def main(argv=None):
@@ -255,6 +266,9 @@ def main(argv=None):
     ap.add_argument("--extra-graphs", help="the JSON file of graphs outside the release that the Fuseki load was given")
     ap.add_argument("--tech-graph", help="the technical graph's file, tech-graph.nq (default: the one the runner "
                     "last fetched into the run folder)")
+    ap.add_argument("--no-tech-graph", action="store_true",
+                    help="leave the technical graph out on purpose; without this, a technical graph with no file to "
+                         "compare reads not checked and the command does not pass")
     ap.add_argument("--quick", action="store_true",
                     help="compare a Neo4j database's counts only, not its graph hash; each such line says so")
     ap.add_argument("--json", action="store_true", help="print the rows as JSON")
@@ -262,9 +276,11 @@ def main(argv=None):
     try:
         local = ls.load(ls.locate(args.stores), release_root=Path(args.release))
         extra = load_fuseki.read_extra_graphs(args.extra_graphs) if args.extra_graphs else {}
-        tech = tech_graph_file(local, args.tech_graph)
+        if args.no_tech_graph and args.tech_graph:
+            raise ls.LocalSettingsError("give --tech-graph or --no-tech-graph, not both")
+        tech = None if args.no_tech_graph else tech_graph_file(local, args.tech_graph)
         rows = check(local, Path(args.release), tuple(args.store or STORES), args.ref, tuple(extra), quick=args.quick,
-                     tech_graph_files=[tech] if tech else None)
+                     tech_graph_files=[tech] if tech else None, no_tech_graph=args.no_tech_graph)
     except (ls.LocalSettingsError, load_fuseki.FusekiError) as err:
         print(f"sync check: {err}", file=sys.stderr)
         return 2
@@ -275,8 +291,6 @@ def main(argv=None):
         print(json.dumps([{"store": s, "status": status, "why": why} for s, status, why in rows], indent=2))
     else:
         print("\n".join(lines(rows)))
-        if not tech:
-            print("the technical graph was not checked: no tech-graph.nq was named or fetched")
     return 0 if all_current(rows) else 1
 
 

@@ -141,8 +141,9 @@ def stores(tmp_path, monkeypatch, jena=GRAPHS, databricks=None, local=None, ente
     drivers = {"bolt://127.0.0.1:7687": stores_support.FakeDriver({"neo4j": local or graph()}),
                local_settings.neo4j_enterprise.uri: stores_support.FakeDriver({TARGET: target})}
     rows = sc.check(local_settings, support.ROOT, code=code, connect=connect or (lambda neo4j: drivers[neo4j.uri]),
-                    client_for=lambda profile: f"client of {profile}", quick=quick)
-    return {store: (status, why) for store, status, why in rows}, drivers
+                    client_for=lambda profile: f"client of {profile}", quick=quick, no_tech_graph=True)
+    assert rows[-1] == ("tech", "left out", "the technical graph was left out on request")   # its own tests are below
+    return {store: (status, why) for store, status, why in rows[:-1]}, drivers
 
 
 def marked_target():
@@ -247,8 +248,18 @@ def test_the_technical_graph_gets_a_line_per_store_judged_by_its_own_module(tmp_
                          ("tech:enterprise", "changed", "its technical graph differs from the graph files although its marker matches")]
     assert seen["jena"] == ("http://127.0.0.1:3030/ds/query", files) and seen["delta"] == "tech_graph"
     assert seen["neo4j"] == ["neo4j", TARGET] and not sc.all_current(rows)
-    without = sc.check(local, support.ROOT, code=code, connect=lambda neo4j: drivers[neo4j.uri], client_for=lambda profile: "client")
-    assert not any(store.startswith("tech:") for store, _, _ in without)
+    # With no file, the technical graph is not checked, and that is never current.
+    readers = dict(code=code, connect=lambda neo4j: drivers[neo4j.uri], client_for=lambda profile: "client")
+    without = sc.check(local, support.ROOT, **readers)
+    why = ("no tech-graph.nq was named or fetched, so its content was not compared; name the file with --tech-graph, "
+           "or let the runner's report step fetch it")
+    assert without[-4:] == [(f"tech:{store}", "not checked", why) for store in ("databricks", "jena", "neo4j", "enterprise")]
+    assert all(status == "current" for _, status, _ in without[:-4]) and not sc.all_current(without)
+    # Left out on request: one line says so, and the other lines decide.
+    left_out = sc.check(local, support.ROOT, no_tech_graph=True, **readers)
+    assert left_out[-1] == ("tech", "left out", "the technical graph was left out on request")
+    assert left_out[:-1] == without[:-4] and sc.all_current(left_out)
+    assert not sc.all_current(left_out[:-1] + [("jena", "behind", "1 graph missing")] + left_out[-1:])
 
 
 def test_the_technical_graphs_file_is_the_one_named_or_the_one_the_runner_fetched(tmp_path):

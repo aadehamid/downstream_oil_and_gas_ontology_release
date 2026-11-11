@@ -184,7 +184,7 @@ def cut_with_tool(report_json, release_root, run_dir, decisions=None, run=subpro
 
 def cleared_report(pending):
     """The pending report with the decisions of the to-clear CSV, or Stop when a row that blocks lacks a decision or
-    a name. The CSV must hold exactly the report's rows, each once: a row deleted from it is not a decision. A
+    a decided_by. The CSV must hold exactly the report's rows, each once: a row deleted from it is not a decision. A
     row that does not block and has a decision but no name was not confirmed: its decision is dropped. The result
     is checked again after the CSV is applied, on the report itself. Returns (report, IDs of the rows left undecided)."""
     report = rep.read(pending / rep.JSON_NAME)
@@ -216,7 +216,7 @@ def cleared_report(pending):
             row["decision"] = ""
             undecided.append(row["id"])
     if open_rows:
-        raise Stop(f"clear the report: in {path} give a decision and your name in decided_by for the row(s) that block "
+        raise Stop(f"clear the report: in {path} give a decision and write your role or initials in decided_by for the row(s) that block "
                    f"({', '.join(open_rows)}), save, then run the same command again")
     confirmed = pending / CONFIRMED
     with confirmed.open("w", encoding="utf-8", newline="") as f:
@@ -230,7 +230,7 @@ def cleared_report(pending):
     # The last word is the report that goes to the cut, not the CSV it was built from.
     still_open = [row["id"] for row in cleared["rows"] if row["blocks"] and not (row["decision"] and row["decided_by"])]
     if still_open:
-        raise Stop(f"clear the report: in {path} give a decision and your name in decided_by for the row(s) that block "
+        raise Stop(f"clear the report: in {path} give a decision and write your role or initials in decided_by for the row(s) that block "
                    f"({', '.join(still_open)}), save, then run the same command again")
     return cleared, undecided
 
@@ -701,9 +701,13 @@ def step_sync(ctx):
         ctx.out("  " + text)
     result = {"rows": [{"store": s, "status": status, "why": why} for s, status, why in rows]}
     if not sync_check.all_current(rows):
-        behind = [s for s, status, _ in rows if status != "current"]
+        behind = [s for s, status, _ in rows if status not in ("current", sync_check.LEFT_OUT)]
         write_text(ctx.step_file("sync"), json.dumps({**result, "status": "not current"}, indent=2) + "\n")
-        raise StepFailed(f"not current: {', '.join(behind)}")
+        fix = ""
+        if any(status == sync_check.NOT_CHECKED for _, status, _ in rows):
+            fix = (". The technical graph was not checked, because its file was never fetched: the report step fetches "
+                   "it after a notebook run that loaded, so run the same command with --from notebook")
+        raise StepFailed(f"not current: {', '.join(behind)}{fix}")
     return {**result, "status": "current", "line": f"all {len(rows)} lines read current"}
 
 

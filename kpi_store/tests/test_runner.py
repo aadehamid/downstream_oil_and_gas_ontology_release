@@ -458,8 +458,10 @@ def test_with_no_pending_report_there_is_nothing_to_cut(setup):
 def test_a_report_that_is_not_cleared_stops_the_run_before_the_cut(setup):
     pending_report(setup)   # the recommended decisions, and no name
     called = []
-    with pytest.raises(runner.Stop, match=r"give a decision and your name in decided_by for the row\(s\) that block \(R001\)"):
+    with pytest.raises(runner.Stop) as stop:
         runner.step_cut(setup.make(hooks={"cut": lambda *a: called.append(a)}))
+    assert str(stop.value) == (f"clear the report: in {setup.pending / runner.TO_CLEAR} give a decision and write your role or initials "
+                               "in decided_by for the row(s) that block (R001), save, then run the same command again")
     assert called == [] and setup.pending.is_dir()
 
 
@@ -506,7 +508,7 @@ def test_the_report_itself_is_checked_after_the_csv_is_applied(setup, monkeypatc
     pending_report(setup, {"R001": {"decided_by": "the owner"}})
     # Whatever the CSV step lets through, a blocking row without a decision and a name stops the cut.
     monkeypatch.setattr(rep, "apply_csv_decisions", lambda report, path: report)
-    with pytest.raises(runner.Stop, match=r"give a decision and your name in decided_by for the row\(s\) that block \(R001\)"):
+    with pytest.raises(runner.Stop, match=r"give a decision and write your role or initials in decided_by for the row\(s\) that block \(R001\)"):
         runner.step_cut(setup.make(hooks={"cut": lambda *a: pytest.fail("the cut ran")}))
 
 
@@ -700,6 +702,20 @@ def test_the_local_steps_pass_the_hooks_on_and_the_summary_lists_the_run(setup, 
     monkeypatch.setattr(sync_check, "check", lambda local, root, extra_graphs=(), tech_graph_files=None: [("jena", "behind", "1 graph missing")])
     assert runner.run_steps(ctx, ["sync"]) == 1 and setup.lines[-1] == "sync: FAILED. not current: jena"
     assert json.loads((setup.run_dir / "steps" / "11-sync.json").read_text(encoding="utf-8"))["rows"][0]["status"] == "behind"
+
+
+def test_the_sync_step_fails_on_a_technical_graph_that_was_not_checked_and_names_the_fix(setup, monkeypatch):
+    from kpi_store import sync_check
+    seen = {}
+    def check(local, root, extra_graphs=(), tech_graph_files=None):
+        seen["files"] = tech_graph_files
+        return [("jena", "current", "8 graphs"), ("tech:jena", "not checked", sync_check.NO_FILE)]
+    monkeypatch.setattr(sync_check, "check", check)
+    assert runner.run_steps(setup.make(), ["sync"]) == 1 and seen["files"] is None   # no file was ever fetched
+    assert setup.lines[-1] == ("sync: FAILED. not current: tech:jena. The technical graph was not checked, because its file was "
+                               "never fetched: the report step fetches it after a notebook run that loaded, so run the same "
+                               "command with --from notebook")
+    assert json.loads((setup.run_dir / "steps" / "11-sync.json").read_text(encoding="utf-8"))["status"] == "not current"
 
 
 def test_the_command_refuses_bad_settings_before_anything_else(tmp_path, capsys):
