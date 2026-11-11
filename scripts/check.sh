@@ -117,6 +117,7 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   business_architecture/ontology/validation/test_controlled_values.py \
   business_architecture/ontology/validation/test_release_package_shapes.py \
   business_architecture/ontology/value-stream/test_value_streams.py \
+  business_architecture/ontology/viewer/test_horoi.py \
   business_architecture/ontology/viewer/test_viewer.py \
   kpi_store/tests/test_compare.py \
   kpi_store/tests/test_discovery.py \

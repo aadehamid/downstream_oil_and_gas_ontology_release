@@ -1,20 +1,59 @@
 {
-  "source_commit": "8307c88d8896504d342a0d44880271ed4e6846ab",
+  "release": "KPI Store 1.1",
   "horoi_commit": "33caa8cc916e7efb767a5c2831216ff1cb11c509",
   "modules": [
-    "core",
-    "data-product",
-    "integration",
-    "kpi",
-    "lane",
-    "logical-model",
-    "market-data",
-    "organization",
-    "party",
-    "ref-mpc",
-    "system",
-    "technical-graph",
-    "value-stream"
+    {
+      "name": "core",
+      "version": "2.4.0"
+    },
+    {
+      "name": "data-product",
+      "version": "1.2.0"
+    },
+    {
+      "name": "integration",
+      "version": "2.5.0"
+    },
+    {
+      "name": "kpi",
+      "version": "1.3.0"
+    },
+    {
+      "name": "lane",
+      "version": "1.1.0"
+    },
+    {
+      "name": "logical-model",
+      "version": "1.0.0"
+    },
+    {
+      "name": "market-data",
+      "version": "1.1.0"
+    },
+    {
+      "name": "organization",
+      "version": "2.2.0"
+    },
+    {
+      "name": "party",
+      "version": "2.1.0"
+    },
+    {
+      "name": "ref-mpc",
+      "version": "1.3.0"
+    },
+    {
+      "name": "system",
+      "version": "1.5.0"
+    },
+    {
+      "name": "technical-graph",
+      "version": "1.1.0"
+    },
+    {
+      "name": "value-stream",
+      "version": "1.2.0"
+    }
   ],
   "inputs": [
     {
@@ -158,16 +197,16 @@
       "sha256": "a517c778b6effd37c9e02d196c6b9baa94e866ca00d1165aa071872f0ae2c0e6"
     },
     {
-      "path": "business_architecture/ontology/releases/technical-graph/1.0.0/catalog.ttl",
-      "sha256": "66a921a9dde322ebe690639d94a4cded20245a17a9c058d4e0f16a615acba8fc"
+      "path": "business_architecture/ontology/releases/technical-graph/1.1.0/catalog.ttl",
+      "sha256": "03773cd3f3a574b00d5d4f0fcb0197efbf0a600c76fd204b9912fac7e69ff209"
     },
     {
-      "path": "business_architecture/ontology/releases/technical-graph/1.0.0/shapes.ttl",
-      "sha256": "b4709f138f4dd73e2315e17a40da54a30a491c0c617588b5e2420bdd2c99d5f8"
+      "path": "business_architecture/ontology/releases/technical-graph/1.1.0/shapes.ttl",
+      "sha256": "c3246caa9b055c8472cc3dffc30c04240cce6e01425619719e5c136f4d841ffb"
     },
     {
-      "path": "business_architecture/ontology/releases/technical-graph/1.0.0/technical-graph.ttl",
-      "sha256": "98b4c7898b0ddd3022152aa6e591a401c594b8c61dcd1ae59b706fd608107630"
+      "path": "business_architecture/ontology/releases/technical-graph/1.1.0/technical-graph.ttl",
+      "sha256": "bd48d37a7e8f13c1fa2b941ff9d92fb69dd4251e79ebc44c2290af5ac1bc10f3"
     },
     {
       "path": "business_architecture/ontology/releases/value-stream/1.2.0/catalog.ttl",
@@ -183,10 +222,10 @@
     },
     {
       "path": "business_architecture/ontology/releases/catalog.ttl",
-      "sha256": "f3f99b25bd37ce23b3c7894e3c641b3507d50d53f2f2730a965069d80e4ddf83"
+      "sha256": "0f2d1d54ee0984eacb3aa6301ecd4d5a8a027f7337369e8feca5e73ae420eb78"
     }
   ],
-  "reference_terms": 6562,
-  "triples_available": 58104,
-  "index_sha256": "feeaa56bb0f1a9f872b2a736565db758fd7829ac1c0b24baa80c8a84afb94c41"
+  "reference_terms": 6567,
+  "triples_available": 58154,
+  "index_sha256": "4286ac987c8788a232e35ac21594750f971b5b4e74315b59ea63a55b0fcaaf3b"
 }

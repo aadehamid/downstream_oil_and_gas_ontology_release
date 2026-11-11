@@ -7,6 +7,10 @@ The navigation, guided overview, RDF rendering, search, and relationship views
 are adaptations for the MPC Business Process and Architecture Ontology.
 These adaptations do not change the released ontology.
 
+The page is built from business_architecture/ontology/viewer/horoi_page.html
+by build_horoi.py in the same folder. That template carries the same adapted
+styles, and this notice covers it.
+
 The software license does not replace the rights and source notices in the
 ontology packages. Those notices remain available in the term facts and the
 release documents.
