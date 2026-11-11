@@ -48,6 +48,10 @@ needs_env = ["DOC_TEST_GATE"]
 [contexts.quick]
 base = "empty"
 timeout = 1
+
+[contexts.signed-in]
+base = "empty"
+home = "real"
 """
 
 
@@ -64,7 +68,7 @@ def check(tmp_path, text, *, files=None, environ=None, registry=REGISTRY, **opti
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         (root / name).write_text(content, encoding="utf-8", newline="\n")
     (tmp_path / "registry.toml").write_text(registry, encoding="utf-8")
-    env = {k: v for k, v in os.environ.items() if k != d.NESTED}
+    env = {k: v for k, v in os.environ.items() if k not in (d.NESTED, d.NESTED_FILE)}
     env.update(environ or {})
     checker = d.Checker(root, d.load_registry(tmp_path / "registry.toml"), environ=env, **options)
     return checker.check(["guide.md"])
@@ -82,7 +86,7 @@ def test_a_block_with_no_tag_fails_with_its_document_and_line(tmp_path):
     result = check(tmp_path, "# Guide\n\n" + fence("", "echo hello") + "\n" + fence("bash", "echo hello"))
     assert result.failures == ["guide.md:3: the block has no language and no tag",
                                "guide.md:7: the block has no tag after its language `bash`"]
-    assert result.summary() == "2 blocks: 0 run, 0 checked, 0 skipped, 2 failed"
+    assert result.summary() == "2 blocks: 0 run (0 status-only), 0 checked, 0 skipped, 2 failed"
 
 
 def test_an_unknown_tag_fails(tmp_path):
@@ -103,7 +107,7 @@ def test_a_block_in_a_list_a_tilde_fence_and_an_open_fence_are_all_seen(tmp_path
 
 def test_inline_code_that_starts_a_line_with_three_backticks_is_not_a_block(tmp_path):
     result = check(tmp_path, "```bash run``` is how a tag looks.\n\n" + fence("json parse", "{}"))
-    assert result.failures == [] and result.summary() == "1 blocks: 0 run, 1 checked, 0 skipped"
+    assert result.failures == [] and result.summary() == "1 blocks: 0 run (0 status-only), 1 checked, 0 skipped"
 
 
 def test_an_attribute_a_tag_does_not_take_fails(tmp_path):
@@ -116,42 +120,59 @@ def test_an_attribute_a_tag_does_not_take_fails(tmp_path):
 
 
 def test_a_run_block_runs_and_is_counted(tmp_path):
-    result = check(tmp_path, fence("python run=scratch", "print(6 * 7)"))
-    assert result.failures == [] and result.summary() == "1 blocks: 1 run, 0 checked, 0 skipped"
+    result = check(tmp_path, fence("python run=scratch status-only", "print(6 * 7)"))
+    assert result.failures == [] and result.summary() == "1 blocks: 1 run (1 status-only), 0 checked, 0 skipped"
+
+
+def test_a_run_block_needs_an_expect_block_or_the_word_status_only(tmp_path):
+    """Without this rule a block that prints the wrong thing passes on its exit status alone."""
+    bare = check(tmp_path, fence("python run=scratch", "print('unexpected')"))
+    assert bare.failures == ["guide.md:1: nothing checks what this block prints. Put an `expect` block right after "
+                             "it, or add `status-only` to say that only its exit status counts"]
+    assert bare.summary() == "1 blocks: 0 run (0 status-only), 0 checked, 0 skipped, 1 failed"
+    both = check(tmp_path, fence("python run=scratch status-only", "print(1)") + fence("text expect", "1"))
+    assert both.failures[0] == "guide.md:1: the block says `status-only`, but an expect block follows it. Keep one"
+    apart = check(tmp_path, fence("python run=scratch", "print(1)") + fence("json parse", "{}")
+                  + fence("text expect", "1"))
+    assert apart.failures[0].startswith("guide.md:1: nothing checks what this block prints")
+    mixed = check(tmp_path, fence("python run=scratch", "print(1)") + fence("text expect", "1")
+                  + fence("python run=scratch status-only", "print(2)"))
+    assert mixed.failures == [] and mixed.summary() == "3 blocks: 2 run (1 status-only), 1 checked, 0 skipped"
 
 
 def test_a_failing_run_block_fails_with_its_document_line_and_output(tmp_path):
-    text = "# Guide\n\n" + fence("python run=scratch", "print('before the error')", "raise SystemExit(3)")
+    text = "# Guide\n\n" + fence("python run=scratch status-only", "print('before the error')", "raise SystemExit(3)")
     result = check(tmp_path, text)
     assert result.failures == ["guide.md:3: the block ended with exit status 3, not 0 (context scratch)\n"
                                "    | before the error"]
-    assert result.summary() == "1 blocks: 0 run, 0 checked, 0 skipped, 1 failed"
+    assert result.summary() == "1 blocks: 0 run (0 status-only), 0 checked, 0 skipped, 1 failed"
 
 
 def test_a_bash_block_stops_at_its_first_failing_command(tmp_path):
-    result = check(tmp_path, fence("bash run=scratch", "echo one", "false", "echo two"))
+    result = check(tmp_path, fence("bash run=scratch status-only", "echo one", "false", "echo two"))
     assert result.failures == ["guide.md:1: the block ended with exit status 1, not 0 (context scratch)\n    | one"]
 
 
 def test_a_run_block_may_expect_another_exit_status(tmp_path):
-    good = check(tmp_path, fence("python run=scratch exit=2", "raise SystemExit(2)"))
+    good = check(tmp_path, fence("python run=scratch exit=2 status-only", "raise SystemExit(2)"))
     assert good.failures == []
-    bad = check(tmp_path, fence("python run=scratch exit=2", "pass"))
+    bad = check(tmp_path, fence("python run=scratch exit=2 status-only", "pass"))
     assert bad.failures == ["guide.md:1: the block ended with exit status 0, not 2 (context scratch)\n    | (no output)"]
 
 
 def test_a_run_block_needs_a_known_context_and_a_language_that_runs(tmp_path):
-    text = fence("python run", "pass") + fence("python run=nowhere", "pass") + fence("json run=scratch", "{}")
+    text = (fence("python run status-only", "pass") + fence("python run=nowhere status-only", "pass")
+            + fence("json run=scratch status-only", "{}"))
     result = check(tmp_path, text)
     assert result.failures == [
-        "guide.md:1: a run block names its context: `run=<context>` (one of copy, gated, other, quick, repo, scratch)",
+        "guide.md:1: a run block names its context: `run=<context>` (one of copy, gated, other, quick, repo, scratch, signed-in)",
         "guide.md:4: no context named `nowhere` in doc_snippets.toml: use one of copy, gated, other, quick, repo, "
-        "scratch",
+        "scratch, signed-in",
         "guide.md:7: a `json` block cannot run: `run` takes bash, sh, python, powershell, cmd"]
 
 
 def test_a_block_that_runs_too_long_is_stopped(tmp_path):
-    result = check(tmp_path, fence("python run=quick", "import time", "time.sleep(30)"))
+    result = check(tmp_path, fence("python run=quick status-only", "import time", "time.sleep(30)"))
     assert result.failures == ["guide.md:1: the block ran past its time limit of 1 seconds (context quick)\n"
                                "    | (no output)"]
 
@@ -160,51 +181,52 @@ def test_a_block_that_runs_too_long_is_stopped(tmp_path):
 
 
 def test_blocks_of_one_context_run_in_order_in_one_folder(tmp_path):
-    text = (fence("bash run=scratch", "echo first > made.txt")
+    text = (fence("bash run=scratch status-only", "echo first > made.txt")
             + fence("python run=scratch", "print(open('made.txt').read().strip(), 'then second')")
             + fence("text expect", "first then second"))
     result = check(tmp_path, text)
-    assert result.failures == [] and result.summary() == "3 blocks: 2 run, 1 checked, 0 skipped"
+    assert result.failures == [] and result.summary() == "3 blocks: 2 run (1 status-only), 1 checked, 0 skipped"
 
 
 def test_two_contexts_do_not_share_a_folder(tmp_path):
-    text = (fence("bash run=scratch", "echo first > made.txt")
-            + fence("python run=other", "import os", "print(os.listdir('.'))") + fence("text expect", "[]"))
+    text = (fence("bash run=scratch status-only", "echo first > made.txt")
+            + fence("python run=other", "import os", "print(sorted(os.listdir('.')), 'is all')")
+            + fence("text expect", "[] is all"))
     assert check(tmp_path, text).failures == []
 
 
 def test_a_later_bash_block_starts_in_the_folder_the_earlier_one_left(tmp_path):
-    text = (fence("bash run=scratch", "mkdir inner", "cd inner") + fence("bash run=scratch", "basename \"$PWD\"")
+    text = (fence("bash run=scratch status-only", "mkdir inner", "cd inner") + fence("bash run=scratch", "basename \"$PWD\"")
             + fence("text expect", "inner"))
     assert check(tmp_path, text).failures == []
 
 
 def test_only_a_define_block_gives_later_blocks_its_variables_and_functions(tmp_path):
-    kept = (fence("bash run=scratch define", "NAME=store", "greet() { echo \"hello $1\"; }")
+    kept = (fence("bash run=scratch define status-only", "NAME=store", "greet() { echo \"hello $1\"; }")
             + fence("bash run=scratch", "greet \"$NAME\"") + fence("text expect", "hello store"))
     assert check(tmp_path, kept).failures == []
-    lost = fence("bash run=scratch", "NAME=store") + fence("bash run=scratch", "echo \"$NAME\"")
+    lost = fence("bash run=scratch status-only", "NAME=store") + fence("bash run=scratch status-only", "echo \"$NAME\"")
     failures = check(tmp_path, lost).failures
     assert len(failures) == 1 and failures[0].startswith("guide.md:4: the block ended with exit status 1, not 0")
     assert "NAME: unbound variable" in failures[0]
 
 
 def test_a_define_block_may_name_several_contexts(tmp_path):
-    text = (fence("bash run=scratch,other define", "WORD=shared") + fence("bash run=scratch", "echo \"$WORD\" one")
+    text = (fence("bash run=scratch,other define status-only", "WORD=shared") + fence("bash run=scratch", "echo \"$WORD\" one")
             + fence("text expect", "shared one") + fence("bash run=other", "echo \"$WORD\" two")
             + fence("text expect", "shared two"))
     assert check(tmp_path, text).failures == []
-    result = check(tmp_path, fence("bash run=scratch,other", "echo no"))
+    result = check(tmp_path, fence("bash run=scratch,other status-only", "echo no"))
     assert result.failures == ["guide.md:1: only a `define` block may name more than one context"]
 
 
 def test_after_a_failure_the_later_blocks_of_that_context_fail_without_running(tmp_path):
-    text = (fence("python run=scratch", "raise SystemExit(1)")
-            + fence("python run=scratch", "open('ran.txt', 'w').close()")
-            + fence("python run=other", "print('another context still runs')"))
+    text = (fence("python run=scratch status-only", "raise SystemExit(1)")
+            + fence("python run=scratch status-only", "open('ran.txt', 'w').close()")
+            + fence("python run=other status-only", "print('another context still runs')"))
     result = check(tmp_path, text)
     assert result.failures[1] == "guide.md:4: not run: the block at line 1 of the same context failed"
-    assert result.summary() == "3 blocks: 1 run, 0 checked, 0 skipped, 2 failed"
+    assert result.summary() == "3 blocks: 1 run (1 status-only), 0 checked, 0 skipped, 2 failed"
 
 
 def test_a_release_copy_holds_the_tree_and_a_git_copy_holds_one_commit(tmp_path):
@@ -217,29 +239,58 @@ def test_a_context_that_is_off_is_counted_and_all_contexts_makes_it_a_failure(tm
     text = fence("python run=gated", "print('<a word>')") + fence("text expect", "plain")
     off = check(tmp_path, text)
     assert off.failures == []
-    assert off.summary() == "2 blocks: 0 run, 0 checked, 2 skipped (context gated is off (set DOC_TEST_GATE) 2)"
+    assert off.summary() == "2 blocks: 0 run (0 status-only), 0 checked, 2 skipped (context gated is off (set DOC_TEST_GATE) 2)"
     on = check(tmp_path, text, environ={"DOC_TEST_GATE": "1"})
-    assert on.failures == [] and on.summary() == "2 blocks: 1 run, 1 checked, 0 skipped"
+    assert on.failures == [] and on.summary() == "2 blocks: 1 run (0 status-only), 1 checked, 0 skipped"
     required = check(tmp_path, text, all_contexts=True)
     assert required.failures[0] == "guide.md:1: the context `gated` cannot run: set DOC_TEST_GATE"
 
 
 def test_a_block_does_not_see_the_variables_of_another_context(tmp_path):
-    text = fence("python run=scratch", "import os", "print(os.environ.get('DOC_TEST_GATE'), os.environ['DOC_SNIPPETS_NESTED'])") \
-        + fence("text expect", "None 1")
+    text = fence("python run=scratch", "import os", "print('gate:', os.environ.get('DOC_TEST_GATE'))") \
+        + fence("text expect", "gate: None")
     assert check(tmp_path, text, environ={"DOC_TEST_GATE": "secret"}).failures == []
 
 
-def test_a_check_started_by_a_block_runs_no_block(tmp_path):
-    text = fence("python run=scratch", "raise SystemExit(1)") + fence("json parse", "{}")
-    result = check(tmp_path, text, environ={d.NESTED: "1"})
-    assert result.failures == []
-    assert result.summary() == ("2 blocks: 0 run, 1 checked, 1 skipped "
-                                "(not run: a check started by a block runs no block 1)")
+def test_a_check_started_by_a_block_runs_no_block_and_says_so(tmp_path):
+    """The running check hands its blocks a random value and a file that holds it. Here a block starts the check
+    again on the same tree: the second check must run nothing, or it would start a third."""
+    tool = str(d.ROOT / "scripts" / "doc_snippets.py")
+    text = (fence("python run=scratch", "import os, subprocess, sys",
+                  f"r = subprocess.run([sys.executable, {tool!r}, '--root', {str(tmp_path / 'tree')!r}, 'check'],",
+                  "                   capture_output=True, text=True)", "print(r.stdout + 'exit ' + str(r.returncode))")
+            + fence("text expect", "3 blocks: 0 run (0 status-only), 1 checked, 2 skipped (not run: a check started by a "
+                                   "block runs no block 2)",
+                    "this check was started by a block of another check, so it ran no block", "exit 0")
+            + fence("json parse", "{}"))
+    result = check(tmp_path, text)
+    assert result.failures == [] and result.summary() == "3 blocks: 1 run (0 status-only), 2 checked, 0 skipped"
+    assert not result.nested
+
+
+def test_the_nested_variable_alone_never_turns_the_check_off(tmp_path):
+    """Set by hand, or left over from a check that has ended, the variable once made the check run nothing and
+    exit 0. Now it is an error, with every option."""
+    text = fence("python run=scratch status-only", "raise SystemExit(1)")
+    message = ["the variable DOC_SNIPPETS_NESTED is set, but no running check started this one. Unset it and run "
+               "the check again: it runs nothing only when a block of another check starts it"]
+    gone = tmp_path / "gone" / "nested-token"
+    for environ in ({d.NESTED: "1"}, {d.NESTED: "abc", d.NESTED_FILE: str(gone)}):
+        for options in ({}, {"all_contexts": True}, {"static": True}):
+            result = check(tmp_path, text, environ=environ, **options)
+            assert result.failures == message, (environ, options)
+            assert result.summary() == "0 blocks: 0 run (0 status-only), 0 checked, 0 skipped"
+    wrong = tmp_path / "nested-token"
+    wrong.write_text("another value", encoding="utf-8")
+    assert check(tmp_path, text, environ={d.NESTED: "abc", d.NESTED_FILE: str(wrong)}).failures == message
+    wrong.write_text("abc", encoding="utf-8")
+    proved = check(tmp_path, text, environ={d.NESTED: "abc", d.NESTED_FILE: str(wrong)})
+    assert proved.failures == [] and proved.nested
+    assert proved.skipped == {"not run: a check started by a block runs no block": 1}
 
 
 def test_the_static_check_runs_nothing_but_still_reads_the_tags(tmp_path):
-    text = fence("python run=scratch", "raise SystemExit(1)") + fence("python run=nowhere", "pass")
+    text = fence("python run=scratch status-only", "raise SystemExit(1)") + fence("python run=nowhere status-only", "pass")
     result = check(tmp_path, text, static=True)
     assert len(result.failures) == 1 and result.failures[0].startswith("guide.md:4: no context named `nowhere`")
     assert result.skipped == {"not run: static check": 1}
@@ -248,7 +299,7 @@ def test_the_static_check_runs_nothing_but_still_reads_the_tags(tmp_path):
 # -- nothing is written to the tree or to the home folder
 
 
-def test_a_block_writes_to_its_copy_and_its_own_home_never_to_the_tree_or_the_real_home(tmp_path):
+def test_in_a_context_with_a_temporary_home_a_block_writes_to_its_copy_and_that_home(tmp_path):
     marker = f".doc-snippets-test-{uuid.uuid4().hex}"
     in_home = "~" + "/" + marker        # written in two parts: the stand-alone check refuses a home path in a file
     text = (fence("bash run=copy", "echo changed > data/a.txt", "echo new > data/b.txt", f"echo home > {in_home}",
@@ -281,12 +332,140 @@ def test_the_tool_leaves_no_python_cache_in_the_tree(tmp_path):
     (tree / "scripts").mkdir()
     for name in ("doc_snippets.py", "doc_snippets.toml"):
         shutil.copy(d.ROOT / "scripts" / name, tree / "scripts" / name)
+    shutil.copytree(d.ROOT / "scripts" / "doc_snippets_parts", tree / "scripts" / "doc_snippets_parts",
+                    ignore=shutil.ignore_patterns("__pycache__"))
     (tree / "guide.md").write_text(fence("cypher parse", "MATCH (n) RETURN n"), encoding="utf-8")
-    env = {k: v for k, v in os.environ.items() if k not in ("PYTHONDONTWRITEBYTECODE", d.NESTED)}
+    env = {k: v for k, v in os.environ.items() if k not in ("PYTHONDONTWRITEBYTECODE", d.NESTED, d.NESTED_FILE)}
     r = subprocess.run([sys.executable, str(tree / "scripts" / "doc_snippets.py"), "check"], cwd=tree, env=env,
                        capture_output=True, text=True)
-    assert r.stdout == "1 blocks: 0 run, 1 checked, 0 skipped\n", r.stdout + r.stderr
+    assert r.stdout == "1 blocks: 0 run (0 status-only), 1 checked, 0 skipped\n", r.stdout + r.stderr
     assert [p.as_posix() for p in tree.rglob("__pycache__")] == []
+
+
+def test_a_context_that_keeps_the_real_home_gives_it_to_its_blocks(tmp_path):
+    """The stated exception: a context with home = "real" does not protect the home folder."""
+    home = tmp_path / "the-real-home"
+    home.mkdir()
+    text = (fence("python run=signed-in", "import pathlib", "print('home is', pathlib.Path.home().name)")
+            + fence("text expect", "home is the-real-home")
+            + fence("python run=scratch", "import pathlib", "print('home is', pathlib.Path.home().name)")
+            + fence("text expect", "home is home"))
+    result = check(tmp_path, text, environ={"HOME": str(home), "USERPROFILE": str(home)})
+    assert result.failures == []
+
+
+def test_a_block_cannot_find_the_tree_through_a_variable(tmp_path):
+    """The check is started in the tree, so PWD named it, and a block that wrote to $PWD wrote into the tree."""
+    root = tmp_path / "tree"
+    text = (fence("python run=scratch", "import os, pathlib",
+                  "pathlib.Path(os.environ['PWD'], 'escape-marker').write_text('x')",
+                  "print('same folder:', os.path.samefile(os.environ['PWD'], os.getcwd()))",
+                  "print('old folder:', os.environ.get('OLDPWD'))",
+                  "print('tool home:', os.environ.get('SOME_TOOL_HOME'))",
+                  "print('path kept:', 'PATH' in os.environ)")
+            + fence("text expect", "same folder: True", "old folder: None", "tool home: None", "path kept: True"))
+    environ = {"PWD": str(root), "OLDPWD": str(root), "SOME_TOOL_HOME": str(root / "tools")}
+    result = check(tmp_path, text, environ=environ)
+    assert result.failures == []
+    assert sorted(p.name for p in root.iterdir()) == ["guide.md"]
+
+
+needs_links = pytest.mark.skipif(os.name == "nt", reason="making a link needs a privilege on Windows")
+
+
+@needs_links
+def test_a_link_inside_the_tree_is_copied_as_what_it_points_to(tmp_path):
+    """Copied as a link, it pointed back into the tree, and a block that wrote through it changed the tree."""
+    root = tmp_path / "tree"
+    (root / "data").mkdir(parents=True)
+    (root / "data" / "a.txt").write_text("from the tree\n", encoding="utf-8")
+    os.symlink(root / "data" / "a.txt", root / "link.txt")
+    os.symlink("data", root / "linked-folder")
+    text = (fence("bash run=copy", "cat link.txt", "echo changed > link.txt", "echo changed > linked-folder/a.txt",
+                  "cat data/a.txt")
+            + fence("text expect", "from the tree", "from the tree"))
+    result = check(tmp_path, text)
+    assert result.failures == []
+    assert (root / "data" / "a.txt").read_text(encoding="utf-8") == "from the tree\n"
+
+
+@needs_links
+def test_a_link_that_leads_outside_the_tree_is_refused(tmp_path):
+    root = tmp_path / "tree"
+    root.mkdir()
+    outside = tmp_path / "outside.txt"
+    outside.write_text("not part of the release\n", encoding="utf-8")
+    os.symlink(outside, root / "out.txt")
+    result = check(tmp_path, fence("bash run=copy status-only", "echo changed > out.txt"))
+    assert result.failures == ["guide.md:1: the link out.txt leads outside the release, so the release cannot be "
+                               "copied"]
+    assert outside.read_text(encoding="utf-8") == "not part of the release\n"
+
+
+def test_a_block_does_not_get_the_checks_own_encoding_settings(tmp_path):
+    """A reader on Windows has neither variable. A block that needs one must set it where the reader sees it."""
+    text = (fence("python run=scratch", "import os",
+                  "print('settings:', os.environ.get('PYTHONUTF8'), os.environ.get('PYTHONIOENCODING'))")
+            + fence("text expect", "settings: None None"))
+    assert check(tmp_path, text).failures == []
+    assert check(tmp_path, text, environ={"PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}).failures == []
+
+
+@pytest.mark.skipif(os.name == "nt", reason="the POSIX half; on Windows taskkill stops the tree")
+def test_a_stopped_block_does_not_keep_the_check_waiting_for_a_process_that_got_away(tmp_path, monkeypatch):
+    """The block starts a process in its own session, which outlives the stop and holds the output pipe open.
+    Reading the output with no limit waited for it."""
+    import time
+    from doc_snippets_parts import run
+    monkeypatch.setattr(run, "DRAIN_SECONDS", 1)
+    text = fence("python run=quick status-only", "import subprocess, sys, time",
+                 "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(12)'], start_new_session=True)",
+                 "time.sleep(30)")
+    started = time.monotonic()
+    result = check(tmp_path, text)
+    assert time.monotonic() - started < 8
+    assert result.failures == ["guide.md:1: the block ran past its time limit of 1 seconds (context quick)\n"
+                               "    | (no output)"]
+
+
+# -- code that is not in a fence
+
+
+def test_a_code_block_indented_by_four_spaces_fails(tmp_path):
+    text = "\n".join(["# Guide", "", "Run this:", "", "    python3 obsolete.py", "    python3 second-line.py", "",
+                      "Then this, under a heading:", "", "## Next", "    python3 after-a-heading.py", "",
+                      "- A step.", "", "      python3 inside-a-list-item.py", ""])
+    result = check(tmp_path, text)
+    assert result.failures == [
+        "guide.md:5: a code block indented by four spaces cannot be tested; use a fenced block",
+        "guide.md:11: a code block indented by four spaces cannot be tested; use a fenced block",
+        "guide.md:15: a code block indented by four spaces cannot be tested; use a fenced block"]
+    assert result.summary() == "3 blocks: 0 run (0 status-only), 0 checked, 0 skipped, 3 failed"
+
+
+def test_indented_text_that_is_not_code_passes(tmp_path):
+    text = "\n".join([
+        "# Guide", "",
+        "A paragraph whose second line", "    is indented by four spaces is still the paragraph.", "",
+        "1. A step.", "", "   More text of the step.", "", "   - A point inside the step.", "",
+        "     More text of the point, five spaces in.", "", "       Seven spaces in is still text of the point.", "",
+        "10. A step with a wide number.", "", "    Its text starts four spaces in.", "",
+        "- A point", "    whose wrapped line is indented.", "", "    - A point four spaces in is a nested point.", "",
+        "| a | b |", "|---|---|", "", "<!--", "    a comment may hold anything", "-->", "",
+        "   ```json parse", "   {}", "   ```", ""])
+    result = check(tmp_path, text)
+    assert result.failures == [] and result.summary() == "1 blocks: 0 run (0 status-only), 1 checked, 0 skipped"
+
+
+def test_a_raw_html_code_block_fails(tmp_path):
+    text = "\n".join(["# Guide", "", "<pre><code>python3 obsolete.py</code></pre>", "", "<code>", "python3 x.py",
+                      "</code>", "", "A table cell may hold <pre>one</pre> too.", "",
+                      "The words `<pre>` and `<code>` in code spans, and a <code>span</code> in a sentence, are text.",
+                      ""])
+    result = check(tmp_path, text)
+    assert result.failures == ["guide.md:3: a raw HTML code block cannot be tested; use a fenced block",
+                               "guide.md:5: a raw HTML code block cannot be tested; use a fenced block",
+                               "guide.md:9: a raw HTML code block cannot be tested; use a fenced block"]
 
 
 # -- expect
@@ -321,13 +500,30 @@ def test_output_that_differs(expected, actual):
     assert not d.output_matches(expected, actual)
 
 
+@pytest.mark.parametrize("expected", ["", "\n\n", "...", "...\n...", "<output>", "<first line>\n...\n<last line>",
+                                      "  <a>  <b>  "])
+def test_an_expectation_with_no_text_of_its_own_matches_nothing(expected):
+    """Each of these matched any output, so a block was counted as checked with nothing checked."""
+    assert not d.has_fixed_text(expected)
+    for actual in ("", "something else", "a\nb\nc"):
+        assert not d.output_matches(expected, actual)
+
+
+@pytest.mark.parametrize("body", [[], ["..."], ["<any output>"], ["...", "<the last line>"]])
+def test_an_expect_block_with_no_text_of_its_own_fails(tmp_path, body):
+    result = check(tmp_path, fence("python run=scratch", "print('anything')") + fence("text expect", *body))
+    assert result.failures == ["guide.md:4: the expect block holds no text of its own, so it would match any output. "
+                               "Give it at least one line with words that the output must hold"]
+    assert result.summary() == "2 blocks: 1 run (0 status-only), 0 checked, 0 skipped, 1 failed"
+
+
 def test_an_expect_block_that_differs_fails_with_both_texts(tmp_path):
     text = fence("python run=scratch", "print('loaded 12 triples')") + fence("text expect", "loaded 13 triples")
     result = check(tmp_path, text)
     assert result.failures == ["guide.md:4: the output of the block at line 1 is not what this block shows\n"
                                "    | --- expected\n    | +++ output\n    | @@ -1 +1 @@\n"
                                "    | -loaded 13 triples\n    | +loaded 12 triples"]
-    assert result.summary() == "2 blocks: 1 run, 0 checked, 0 skipped, 1 failed"
+    assert result.summary() == "2 blocks: 1 run (0 status-only), 0 checked, 0 skipped, 1 failed"
 
 
 def test_an_expect_block_must_follow_a_run_or_skip_block(tmp_path):
@@ -342,7 +538,7 @@ def test_an_expect_block_after_a_skipped_block_is_skipped_for_the_same_reason(tm
     text = fence('bash skip reason="needs-client-server: reads the client\'s workspace"', "databricks current-user me") \
         + fence("text expect", "someone")
     result = check(tmp_path, text)
-    assert result.failures == [] and result.summary() == "2 blocks: 0 run, 0 checked, 2 skipped (needs-client-server 2)"
+    assert result.failures == [] and result.summary() == "2 blocks: 0 run (0 status-only), 0 checked, 2 skipped (needs-client-server 2)"
 
 
 # -- skip
@@ -416,6 +612,13 @@ def test_a_parse_block_must_be_valid(tmp_path, lang, good, bad):
     assert len(failures) == 1 and failures[0].startswith(f"guide.md:1: the block is not valid {lang}\n")
 
 
+def test_the_cypher_check_is_a_token_check_and_not_a_grammar_check(tmp_path):
+    """The stated limit: clauses in the wrong order pass. What it finds is in the test above."""
+    assert check(tmp_path, fence("cypher parse", "MATCH RETURN")).failures == []
+    assert check(tmp_path, fence("cypher parse", "// only a comment")).failures == [
+        "guide.md:1: the block is not valid cypher\n    | ValueError: no statement"]
+
+
 def test_a_command_cannot_be_parsed_instead_of_run(tmp_path):
     result = check(tmp_path, fence("bash parse", "echo hello"))
     assert result.failures == ["guide.md:1: `bash` cannot be parsed: `parse` reads json, toml, yaml, turtle, sparql, "
@@ -432,13 +635,13 @@ def test_a_placeholder_takes_its_value_from_the_context(tmp_path):
 
 
 def test_a_placeholder_with_no_value_or_an_unsafe_value_fails(tmp_path):
-    none = check(tmp_path, fence("python run=scratch", "print('<your name>')"))
+    none = check(tmp_path, fence("python run=scratch status-only", "print('<your name>')"))
     assert none.failures == ["guide.md:1: the placeholder <your name> has no value in the context `scratch`. "
                              "Give it one in doc_snippets.toml, or tag the block `skip`"]
-    unset = check(tmp_path, fence("python run=gated", "print('<your name>')"), environ={"DOC_TEST_GATE": "1"})
+    unset = check(tmp_path, fence("python run=gated status-only", "print('<your name>')"), environ={"DOC_TEST_GATE": "1"})
     assert unset.failures == ["guide.md:1: the placeholder <your name> reads the variable DOC_TEST_NAME, "
                               "which is not set"]
-    unsafe = check(tmp_path, fence("bash run=gated", "echo <your name>"),
+    unsafe = check(tmp_path, fence("bash run=gated status-only", "echo <your name>"),
                    environ={"DOC_TEST_GATE": "1", "DOC_TEST_NAME": "x; touch injected"})
     assert unsafe.failures == ["guide.md:1: the value of the placeholder <your name> holds a character that is "
                                "not allowed"]
@@ -475,13 +678,13 @@ def test_py_and_python_are_this_interpreter():
 def test_a_powershell_block_of_plain_lines_runs_without_a_shell(tmp_path):
     text = (fence("powershell run=copy", "# A comment line.", "cd tools", 'py show.py "two words" `', "    last")
             + fence("text expect", "['two words', 'last']")
-            + fence("cmd run=copy", "REM back in the top folder", "cd ..", "py tools/show.py one"))
+            + fence("cmd run=copy status-only", "REM back in the top folder", "cd ..", "py tools/show.py one"))
     result = check(tmp_path, text, files={"tools/show.py": "import sys\nprint(sys.argv[1:])\n"})
-    assert result.failures == [] and result.summary() == "3 blocks: 2 run, 1 checked, 0 skipped"
+    assert result.failures == [] and result.summary() == "3 blocks: 2 run (1 status-only), 1 checked, 0 skipped"
 
 
 def test_a_powershell_block_with_shell_syntax_fails_unless_it_says_windows(tmp_path):
-    result = check(tmp_path, "# Guide\n\n" + fence("powershell run=scratch", "py -c \"print(1)\"", "$env:A = 1"),
+    result = check(tmp_path, "# Guide\n\n" + fence("powershell run=scratch status-only", "py -c \"print(1)\"", "$env:A = 1"),
                    static=True)
     assert result.failures == ["guide.md:3: line 5 is not a plain command line (`$`). Write it without shell syntax, "
                                "or add os=windows so that it runs in a real shell on Windows only"]
@@ -489,12 +692,12 @@ def test_a_powershell_block_with_shell_syntax_fails_unless_it_says_windows(tmp_p
 
 @pytest.mark.skipif(os.name == "nt", reason="on Windows the block runs")
 def test_a_block_for_windows_only_is_counted_elsewhere(tmp_path):
-    result = check(tmp_path, fence("powershell run=scratch os=windows", "$env:A = 1; py -c \"print($env:A)\""))
-    assert result.failures == [] and result.summary() == "1 blocks: 0 run, 0 checked, 1 skipped (windows-only 1)"
+    result = check(tmp_path, fence("powershell run=scratch os=windows status-only", "$env:A = 1; py -c \"print($env:A)\""))
+    assert result.failures == [] and result.summary() == "1 blocks: 0 run (0 status-only), 0 checked, 1 skipped (windows-only 1)"
 
 
 def test_a_missing_program_fails_the_line(tmp_path):
-    result = check(tmp_path, fence("powershell run=scratch", "no-such-program-here --version"))
+    result = check(tmp_path, fence("powershell run=scratch status-only", "no-such-program-here --version"))
     assert result.failures == ["guide.md:1: the program `no-such-program-here` is not installed, so the line cannot "
                                "run\n    | (no output)"]
 
@@ -511,7 +714,7 @@ def test_a_nested_block_is_a_small_document_whose_blocks_are_tested(tmp_path):
     result = check(tmp_path, text)
     assert result.failures == ["guide.md:11: the output of the block at line 6 is not what this block shows\n"
                                "    | --- expected\n    | +++ output\n    | @@ -1 +1 @@\n    | -outside\n    | +inside"]
-    assert result.summary() == "4 blocks: 2 run, 1 checked, 0 skipped, 1 failed"
+    assert result.summary() == "4 blocks: 2 run (0 status-only), 1 checked, 0 skipped, 1 failed"
 
 
 def test_a_nested_block_must_hold_a_block(tmp_path):
@@ -526,10 +729,10 @@ def test_the_command_prints_each_failure_and_the_count_and_exits_1(tmp_path, cap
     (tmp_path / "guide.md").write_text(fence("json parse", "{}") + fence("text", "no tag"), encoding="utf-8")
     assert d.main(["--root", str(tmp_path), "check"]) == 1
     assert capsys.readouterr().out == ("FAIL guide.md:4: the block has no tag after its language `text`\n"
-                                       "2 blocks: 0 run, 1 checked, 0 skipped, 1 failed\n")
+                                       "2 blocks: 0 run (0 status-only), 1 checked, 0 skipped, 1 failed\n")
     (tmp_path / "guide.md").write_text(fence("json parse", "{}"), encoding="utf-8")
     assert d.main(["--root", str(tmp_path), "check", "guide.md"]) == 0
-    assert capsys.readouterr().out == "1 blocks: 0 run, 1 checked, 0 skipped\n"
+    assert capsys.readouterr().out == "1 blocks: 0 run (0 status-only), 1 checked, 0 skipped\n"
     assert d.main(["--root", str(tmp_path), "list"]) == 0
     assert capsys.readouterr().out == "   1  guide.md: parse 1\n   1  total: parse 1\n"
 
@@ -589,6 +792,30 @@ def test_every_markdown_document_of_the_tree_is_in_scope():
                if not set(p.relative_to(d.ROOT).parts) & d.SKIP_DIRS}
     tracked_or_new = set(d.tree_files(d.ROOT))
     assert set(docs) == {p for p in on_disk if p in tracked_or_new}
+
+
+def test_a_markdown_file_git_ignores_is_outside_the_scan(tmp_path):
+    """The rule of the scan: what Git tracks or would add. An ignored file does not ship. A folder with no Git
+    is read whole."""
+    import subprocess
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    for folder in ("repository", "plain"):
+        (tmp_path / folder).mkdir()
+        for name, content in (("tracked.md", "# T\n"), ("new.md", "# N\n"), ("notes.md", "# I\n"),
+                              (".gitignore", "notes.md\n")):
+            (tmp_path / folder / name).write_text(content, encoding="utf-8")
+    for args in (["init", "-q"], ["add", "tracked.md", ".gitignore"]):
+        subprocess.run(["git", *args], cwd=tmp_path / "repository", env=env, check=True, capture_output=True)
+    assert d.documents(tmp_path / "repository") == ["new.md", "tracked.md"]
+    assert d.documents(tmp_path / "plain") == ["new.md", "notes.md", "tracked.md"]
+
+
+def test_no_part_of_the_tool_is_a_long_file():
+    parts = sorted((d.ROOT / "scripts" / "doc_snippets_parts").glob("*.py")) + [d.ROOT / "scripts" / "doc_snippets.py"]
+    assert [p.name for p in parts] == ["__init__.py", "check.py", "extract.py", "match.py", "parsers.py",
+                                       "registry.py", "report.py", "run.py", "doc_snippets.py"]
+    for part in parts:
+        assert len(part.read_text(encoding="utf-8").split("\n")) < 500, part.name
 
 
 def test_every_block_of_the_tree_has_a_valid_tag():

@@ -10,7 +10,7 @@ If your copy includes `viewer/index.html`, that page shows the ontology as you r
 
 Commands below start from the top folder of your copy unless they say otherwise. They use this shorthand, so define it first:
 
-```sh run=release-git,slow define
+```sh run=release-git,slow define status-only
 py() { uv run -q --no-project --with rdflib --with pyshacl --with openpyxl --with jsonschema --with pytest --with "markdown-it-py>=4,<5" python3 -B "$@"; }
 ONT=business_architecture/ontology
 ```
@@ -24,6 +24,11 @@ The versions in the worked commands are those of this release as you received it
 
    ```sh run=slow
    bash scripts/check.sh
+   ```
+
+   ```text expect
+   ...
+   all checks passed
    ```
 
 3. Run `scripts/check.sh` again after each change. It proves your copy is valid: every package equals a fresh build of its sources, the shapes conform, the competency questions answer and the tests pass. Do not share a change until it passes. In a Git copy, run `git add -A` first, because one test reads which generated pages Git tracks. The log shows skipped tests and a line that starts `FAIL a store request`. Both are expected. Most skipped tests read what this release does not hold, a few depend on your machine, and adding `-rs` to the script's pytest line prints each reason. That `FAIL` line comes from `skills/rdf-store/scripts/test_rdf_store.py`, which makes a write fail on purpose. Any other `FAIL` line is a real failure, such as a generated page that differs from its source, and the script does not reach its last line. The last line, `all checks passed`, tells you the result. Do not edit files while the script runs: it compares the tree at its start and end, and a change fails the run. Commit when it passes. To try one test file first, run `py -m pytest -q <file>`, which takes seconds.
@@ -52,10 +57,20 @@ Every change below ends with these steps. Run them once for the module you chang
    (cd $ONT/release && py dependents.py kpi)
    ```
 
+   ```text expect
+   kpi
+   data-product
+   market-data
+   logical-model
+   technical-graph
+   value-stream
+   integration
+   ```
+
 2. Save the approval. Create the folder `$ONT/approvals/` if you have none, and write the sentence that approved the release in a file there, such as `$ONT/approvals/2026-11-01-kpi.md`. One file can cover all the modules of one change. That file is your decision record unless your team keeps its own.
 3. For each module in that order, set its version, write its package, and move its old package. `next_version.py` does the edits; `pins` has no effect in this release, so leave it. A module that only takes the new version of what it requires gets a patch.
 
-   ```sh run=slow
+   ```sh run=slow status-only
    cd $ONT/release
    py next_version.py start kpi 1.3.1 patch --why "Reworded Unit Utilization's definition; the meaning is the same." \
        --approver "The kpi module owner" --where "approvals/2026-11-01-kpi.md" --words "Approved as a patch."
@@ -67,7 +82,7 @@ Every change below ends with these steps. Run them once for the module you chang
 
 4. When every module in the list is written, finish each one. This moves the old package to `$ONT/releases/previous/<module>/`, which keeps every earlier package, and changes the version in `$ONT/projection/pipeline.py` (`PACKAGES`) and `$ONT/projection/skill-run/epm-config.json` (`packages`):
 
-   ```sh run=slow
+   ```sh run=slow status-only
    (cd $ONT/release && py next_version.py finish kpi 1.3.0)
    ```
 
@@ -93,21 +108,21 @@ The worked example changes the definition of the measure Unit Utilization in `kp
 
 1. Find where the definition lives. A release is built from its sources, never edited in `releases/`. Most sources are tables and Turtle files in the module's folder, so search there for the text. A file that starts "Built by" is generated: edit the source it names. For `lane`, that is `business_architecture/business_process/office_lanes.json`, and rewording a lane there is still a release of `lane`.
 
-   ```sh run=release-git
+   ```sh run=release-git status-only
    grep -n "unit-utilization" $ONT/kpi/measure-details.csv
    ```
 
 2. Edit the text in that file. Keep the citation of its source. If the new wording rests on a new source, cite it.
 3. Rebuild the module's source file. Each module has its own builder in its folder, listed in `scripts/check.sh`:
 
-   ```sh run=release-git
+   ```sh run=release-git status-only
    (cd $ONT/kpi && py build_measures.py --write)
    ```
 
 4. Follow the release steps for `kpi`.
 5. Search the whole copy for the old wording, and update each document that quotes it. No check catches a copy of a sentence. This command leaves out this guide, which quotes the wording as its example, and the packages, which never change. In a plain folder with no Git, use `grep -rn` and skip the same paths. For this example:
 
-   ```sh run=release-git
+   ```sh run=release-git status-only
    git grep -n "as a share of its constrained capacity" -- . ':!HOW-TO-UPDATE.*' ':!business_architecture/ontology/releases/'
    ```
 
@@ -140,7 +155,7 @@ The process map is the source of the taxonomy in `core`. Every module depends on
 
 5. Copy the core builder and fill in the block it marks. `build_core_template.py` follows `build_core_2_3.py`, the builder that added a node. To change an existing node's ID or description, read `build_core_2_2.py`, which applies those changes.
 
-   ```sh run=release-git
+   ```sh run=release-git status-only
    cp $ONT/release/build_core_template.py $ONT/release/build_core_2_5.py
    ```
 

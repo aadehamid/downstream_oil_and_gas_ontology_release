@@ -4,6 +4,9 @@ Every code block in a Markdown document of this release is tested. `scripts/doc_
 tag and runs the block, compares it, parses it, or counts it as skipped for a stated reason. A block with no tag
 fails `scripts/check.sh`. This page says how to write the tag.
 
+The check reads every Markdown file that Git tracks or would add. A file that Git ignores does not ship, so the check
+does not read it. In a folder with no Git, such as the unpacked zip, it reads every Markdown file.
+
 The examples on this page are tested the same way. Each example is a small document inside a `markdown nested`
 block, and the check tests the blocks in it.
 
@@ -14,20 +17,26 @@ Markdown viewers show the block as before, without the tag.
 
 | Tag | What the check does with the block |
 |---|---|
-| `run=<context>` | Runs it in the context's folder. It must end with exit status 0. |
+| `run=<context>` | Runs it in the context's folder. It must end with exit status 0. An `expect` block follows it, or it says `status-only`. |
 | `expect` | Compares it with the output of the `run` block just before it. |
 | `skip reason="<reason>: <detail>"` | Does not run it. Counts it under the reason. |
 | `file=<path>` | Compares it with the whole file at that path. |
 | `excerpt=<path>` | Checks that its lines are in that file, in this order and next to each other. |
-| `parse` | Parses it: `json`, `toml`, `yaml`, `turtle`, `sparql`, `sql` or `cypher`. |
+| `parse` | Parses it: `json`, `toml`, `yaml`, `turtle`, `sparql`, `sql` or `cypher`. For `cypher` this is a token check, not a grammar check: it finds a string, a backtick name or a bracket that is never closed, and nothing else. |
 | `nested` | Reads it as a small document and tests the blocks in it. The language is `markdown`. |
 
-Use three backticks for a fence. Do not put a block inside a block quote: the check cannot test it there.
+Use three backticks for a fence. The check cannot test code that is written any other way, and fails on it: a
+block inside a block quote, a block indented by four spaces, and a raw `<pre>` or `<code>` block.
 
 ## A command: `run`
 
 A `run` block names the context it runs in. The languages that run are `bash`, `sh`, `python`, `powershell` and
 `cmd`. Show the output in an `expect` block right after it.
+
+A block passes on its exit status and on its `expect` block. With no `expect` block, nothing checks what the
+command prints, so the block must say so with the word `status-only`. The count at the end shows how many
+blocks ran that way. Use it for a command that prints nothing, or whose output is long or changes with every
+run.
 
 ````markdown nested
 ```python run=scratch
@@ -43,7 +52,7 @@ Blocks of one document that name the same context run in the order they appear, 
 finds the files an earlier block made. This is how the steps of a guide build on each other.
 
 ````markdown nested
-```bash run=scratch
+```bash run=scratch status-only
 mkdir reports
 echo "blocked: 1 row" > reports/first.txt
 ```
@@ -63,11 +72,11 @@ Three rules follow from the fact that the reader types the blocks into one termi
   folder.
 - A variable or a function lasts beyond its block only when the block says `define`. The check runs a `define`
   block, then puts its text in front of every later block of the same language in that context. A `define` block
-  may name several contexts, with commas: `run=release-git,slow define`.
+  may name several contexts, with commas: `run=release-git,slow define status-only`.
 - A bash block stops at its first failing command.
 
 ````markdown nested
-```bash run=scratch define
+```bash run=scratch define status-only
 ONT=business_architecture/ontology
 ```
 
@@ -120,7 +129,15 @@ PowerShell or cmd on Windows, and every other platform counts it as skipped unde
 $env:PYTHONUTF8 = "1"
 py -c "print('KPI Store')"
 ```
+
+```text expect
+KPI Store
+```
 ````
+
+The check does not set `PYTHONUTF8` or `PYTHONIOENCODING` for a block, and removes them when its own environment
+has them. A reader on Windows has neither. So when a command needs one of them, the block must set it, as the
+example above does.
 
 ## Output: `expect`
 
@@ -132,6 +149,9 @@ and the end. Two marks stand for text that changes from run to run:
 - A line that holds only `...` stands for any number of lines, also none.
 
 Everything else must match letter for letter.
+
+An `expect` block needs at least one line with text of its own. An empty block, a lone `...` or a line made
+only of placeholders would match any output, so the check refuses it.
 
 ````markdown nested
 ```python run=scratch
@@ -200,9 +220,11 @@ base = "empty"
 ## An example to read: `parse`
 
 A block of data or of a query that is not a file of the release is parsed, so a typing error fails. A Turtle
-block may leave out its prefix lines. Cypher has no parser here: the check reads it with the tokenizer of the
-cross-graph questions and tests that every string is closed and every bracket has its partner. A command is
-never parsed in place of a run: tag it `run` or `skip`.
+block may leave out its prefix lines. A command is never parsed in place of a run: tag it `run` or `skip`.
+
+For `cypher` the check is a token check, not a grammar check, because there is no Cypher parser here. The
+tokenizer of the cross-graph questions reads the block, and the check finds a string, a backtick name or a
+bracket that is never closed. It does not find clauses in the wrong order or a misspelt keyword.
 
 ````markdown nested
 ```toml parse
@@ -237,7 +259,12 @@ puts it into the command.
 ## The contexts
 
 A context is the folder a block runs in. Nothing runs in the release itself: each context is a temporary folder,
-and a block's home folder is temporary too.
+and a block's home folder is temporary too. No variable that names the release's folder reaches a block, and a
+link in the release is copied as the file it points to. A link that leads outside the release fails the block.
+
+`databricks-free` is the one exception. Its blocks get the real home folder, because the sign-in of the
+Databricks command line is kept there. A block in that context can write to the real home folder, so write
+its commands with that in mind.
 
 | Context | What it is | Runs when |
 |---|---|---|
@@ -255,7 +282,9 @@ runs, and give a guide whose steps take minutes one context for all its steps.
 A block must be quick in a context that always runs: `scripts/check.sh` runs them all, and the whole document
 check has two minutes.
 
-A check that a block starts, such as `bash scripts/check.sh` in a copy of the release, runs no block itself.
+A check that a block starts, such as `bash scripts/check.sh` in a copy of the release, runs no block itself, and
+its last line says so. The running check proves to it that a block started it. The variable
+`DOC_SNIPPETS_NESTED` set by hand proves nothing: a check that finds it without that proof fails.
 
 To add a context, add a table to `scripts/doc_snippets.toml`. The comments there explain each key.
 
@@ -281,7 +310,8 @@ py scripts/doc_snippets.py check scripts/DOC-SNIPPETS.md --verbose
 
 ```text expect
 ...
-<count> blocks: <the counts>
+<count> blocks: 0 run (0 status-only), <checked> checked, <skipped> skipped (<the reasons>)
+this check was started by a block of another check, so it ran no block
 ```
 
 `--verbose` prints one line for each block. With no document, the check reads every Markdown document.
@@ -297,12 +327,21 @@ The parsers need three packages. When they are not installed, start the check th
 uv run --no-project --with rdflib --with pyyaml --with sqlglot python3 scripts/doc_snippets.py check scripts/DOC-SNIPPETS.md
 ```
 
-To run a context that is off, set its variable. For the slow context:
+```text expect
+<count> blocks: 0 run (0 status-only), <checked> checked, <skipped> skipped (<the reasons>)
+this check was started by a block of another check, so it ran no block
+```
 
-**This takes many minutes.** The slow blocks of that guide run the whole of `scripts/check.sh`.
+To run a context that is off, set its variable. **The slow context takes many minutes.** The slow blocks of
+`HOW-TO-UPDATE.md` run the whole of `scripts/check.sh`.
 
 ```bash run=release-copy
 DOC_SNIPPETS_SLOW=1 uv run --no-project --with rdflib --with pyyaml --with sqlglot python3 scripts/doc_snippets.py check HOW-TO-UPDATE.md
+```
+
+```text expect
+<count> blocks: 0 run (0 status-only), <checked> checked, <skipped> skipped (<the reasons>)
+this check was started by a block of another check, so it ran no block
 ```
 
 At the cut, set the variable of every context and add `--strict --all-contexts`. `--all-contexts` fails a block
@@ -311,10 +350,11 @@ whose context cannot run, so nothing is skipped for a missing server.
 ## What the check prints
 
 Each failure is one line with the document and the line of the block, then the end of the block's output. The
-last line counts the blocks:
+last line counts the blocks. "checked" counts the blocks that were compared or parsed, and "status-only" the
+blocks that ran with no `expect` block:
 
 ```text skip reason="illustration: the shape of the count, whose numbers change with every document"
-88 blocks: 7 run, 26 checked, 55 skipped (awaits-the-rewrite 20, illustration 29, needs-client-server 1, ...)
+121 blocks: 18 run (9 status-only), 43 checked, 60 skipped (awaits-the-rewrite 21, illustration 31, ...)
 ```
 
 The check reads Markdown only. An HTML page with no Markdown source is out of its reach.

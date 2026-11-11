@@ -151,6 +151,10 @@ The complete mapping of **every registered external source → the process areas
 uv run --with openpyxl python business_architecture/ontology/build/scripts/step3c-source-traceability.py
 ```
 
+```text expect
+wrote <the appendix file>: 48 cited sources, 2 uncited, 1 unknown citations
+```
+
 Output: [`build/output/source-to-process-traceability.md`](build/output/source-to-process-traceability.md). Regenerate after every batch and at completion. As of 2026-09-21 it maps 46 cited sources across 462 citing rows (4 registered sources currently uncited from workbook rows, retained as earlier-step evidence; zero citations without a register entry).
 
 Reading guide: each entry shows the source's organization, reference, access/verification record, authority type, the permitted-use limitation (what the source may inform and which internal owner makes every determination it does not), and the process areas and rows citing it. This is the register's promise made visible: **evidence, traceable to exactly the parts of the business process it informs — and no further.**
