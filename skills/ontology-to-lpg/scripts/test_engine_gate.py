@@ -592,6 +592,21 @@ class CopyToANamedDatabase(unittest.TestCase):
             code, out = run_main(cg.main, argv)
         return code, out, source, target, opened
 
+    def test_a_batch_size_below_one_is_bad_input_and_opens_no_connection(self):
+        for size in ("0", "-3"):
+            with self.subTest(size):
+                code, out, source, target, opened = self.run_copy(
+                    ["--source-env", "SRC", "--target-env", "DST", "--replace", "--batch", size], target_nodes=[{"uri": "u:old"}])
+                self.assertEqual(code, 2, out)
+                self.assertIn("--batch needs a whole number of 1 or more", out)
+                self.assertEqual(opened, [])
+
+    def test_the_relationships_are_paged_in_one_fixed_order(self):
+        # Two relationships of one type between the same two nodes, with no uri, tie on s, t, o and r.uri.
+        # The relationship's own ID settles the tie, so a page neither repeats nor misses one.
+        self.assertEqual(cg.EDGES, "MATCH (a:Resource)-[r]->(b:Resource) RETURN a.uri AS s, type(r) AS t, b.uri AS o, "
+                                   "properties(r) AS props ORDER BY s, t, o, r.uri, elementId(r) SKIP $skip LIMIT $limit")
+
     def test_the_copy_writes_the_named_database_with_plain_cypher_only(self):
         code, out, source, target, opened = self.run_copy(
             ["--source-env", "SRC", "--target-env", "DST", "--target-database", "businessgraph", "--batch", "2"])

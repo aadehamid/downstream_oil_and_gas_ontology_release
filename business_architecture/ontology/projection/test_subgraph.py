@@ -116,6 +116,16 @@ class Replace(unittest.TestCase):
             self.replace(tx)
         self.assertFalse(any(q.startswith("CREATE (m:") for q, _ in tx.queries))
 
+    def test_an_edge_that_does_not_say_where_it_ends_is_refused_before_any_statement(self):
+        for odd in ({"s": "urn:e:1", "t": "DESCRIBES", "o": "urn:r:2", "ontology": None, "p": {}},
+                    {"s": "urn:e:1", "t": "DESCRIBES", "o": "urn:r:2", "p": {}}):
+            with self.subTest(odd):
+                tx = Tx()
+                with self.assertRaisesRegex(SystemExit, r"^neo4j: 1 edge\(s\) do not say whether they end at an ontology "
+                                                        r"node, e\.g\. to urn:r:2; nothing was changed$"):
+                    sg.replace_subgraph(tx, "neo4j", "LogicalModel", "LogicalModelMarker", NODES, EDGES + [odd], self.marker, "model", True)
+                self.assertEqual(tx.queries, [])
+
     def test_a_move_in_the_ontologys_counts_stops_before_the_marker(self):
         tx = Tx(counts=((4237, 22312), (4237, 22311)))
         with self.assertRaisesRegex(SystemExit, r"the ontology's counts changed from \(4237, 22312\) to \(4237, 22311\)"):

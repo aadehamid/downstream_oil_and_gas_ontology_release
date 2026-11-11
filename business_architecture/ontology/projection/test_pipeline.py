@@ -263,6 +263,28 @@ class Record(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "other triples"):
             pl.record(self.run_dir)
 
+    def test_a_build_that_stops_leaves_the_inferred_triples_this_folder_held(self):
+        with open(os.path.join(self.run_dir, "inferred.nt"), "w", encoding="utf-8", newline="\n") as f:
+            f.write("<urn:new> <urn:b> <urn:c> .\n")
+
+        def stopped():
+            with open(pl.INFERRED, encoding="utf-8") as f:   # build reads the run's inferred triples from disk
+                self.assertEqual(f.read(), "<urn:new> <urn:b> <urn:c> .\n")
+            raise SystemExit("build: the data breaks a rule")
+        for earlier in (None, "<urn:old> <urn:b> <urn:c> .\n"):
+            with self.subTest(earlier=earlier):
+                if earlier is not None:
+                    with open(pl.INFERRED, "w", encoding="utf-8", newline="\n") as f:
+                        f.write(earlier)
+                with mock.patch.object(pl, "build", stopped), self.assertRaisesRegex(SystemExit, "the data breaks a rule"):
+                    pl.record(self.run_dir)
+                if earlier is None:
+                    self.assertFalse(os.path.exists(pl.INFERRED))
+                else:
+                    with open(pl.INFERRED, encoding="utf-8", newline="") as f:
+                        self.assertEqual(f.read(), earlier)
+                self.assertFalse(os.path.exists(pl.REPORT) or os.path.exists(pl.MANIFEST))
+
     def test_each_failed_check_stops_the_record(self):
         for change in ({"passed": False}, {"shacl_violations_in_graph": 1}, {"in_graph_mutant_violations": 0},
                        {"roundtrip_lost": 1}, {"roundtrip_added": 1}, {"determinism_hash_shuffled": "other"},

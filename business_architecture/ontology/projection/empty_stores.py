@@ -12,8 +12,9 @@ name. With --yes, a store that cannot be read fails the command.
 Needs neo4j for Neo4j (uv run --with neo4j ...).
 
 No step of the KPI Store runner calls this file: each store load replaces what it loaded before. It is a tool to run
-by hand, for a store that must start empty. The stores are handled in the order the --store options name them, and
-one store's deletion is not undone when a later store fails or is refused.
+by hand, for a store that must start empty. The two Neo4j refusals need no connection and come before any store is
+touched. The stores are then handled in the order the --store options name them, and one store's deletion is not
+undone when a later store cannot be reached.
 """
 import argparse
 import json
@@ -46,6 +47,15 @@ def jena_update(query_url, statement):
     urllib.request.urlopen(urllib.request.Request(url, data=body, method="POST"), timeout=120).close()
 
 
+def refuse_neo4j(yes, values, database=None):
+    """Stops the command when the Neo4j arguments cannot be right. It needs no connection, so main asks it for
+    every named store before the first store is touched: a refusal then finds every store as it was."""
+    if yes and not database:
+        raise SystemExit("neo4j: --yes deletes every node of one database; name it with --database")
+    if database and values.get("NEO4J_DATABASE") not in (None, database):
+        raise SystemExit(f"neo4j: --database {database} is not the database the settings name; nothing was changed")
+
+
 def one_store(store, yes, values, database=None):
     """One store's count and, with yes, its count after emptying, as the JSON line's dict.
 
@@ -60,10 +70,7 @@ def one_store(store, yes, values, database=None):
             jena_update(query_url, "DROP ALL")
             return {"store": store, "held": held, "after": sum(ss.read_jena(query_url).values())}
         return {"store": store, "held": held}
-    if yes and not database:
-        raise SystemExit("neo4j: --yes deletes every node of one database; name it with --database")
-    if database and values.get("NEO4J_DATABASE") not in (None, database):
-        raise SystemExit(f"neo4j: --database {database} is not the database the settings name; nothing was changed")
+    refuse_neo4j(yes, values, database)
     driver, session = ss.neo4j_session_from(values | ({"NEO4J_DATABASE": database} if database else {}))
     with driver, session:
         held = neo4j_counts(session)
@@ -82,6 +89,8 @@ def main(argv=None):
     args = ap.parse_args(argv)
     values = ss.settings()
     failed = False
+    if "neo4j" in args.store:   # before any store is emptied, so "nothing was changed" is true of all of them
+        refuse_neo4j(args.yes, values, args.database)
     for store in args.store:
         try:
             print(json.dumps(one_store(store, args.yes, values, args.database)))

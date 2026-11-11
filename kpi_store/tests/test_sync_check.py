@@ -45,6 +45,13 @@ class Client:
         self.calls.append(("chunk", statement_id, index))
         return self.chunks[index]
 
+    def cancel_execution(self, statement_id):
+        self.calls.append(("cancel", statement_id))
+        if self.cancel_fails:
+            raise ConnectionError("made up")
+
+    cancel_fails = False
+
 
 def test_a_statement_runs_on_the_named_warehouse_and_returns_row_dicts():
     client = Client(response("SUCCEEDED", [[DP, "3"], [None, "1"]]))
@@ -65,6 +72,17 @@ def test_a_statement_that_fails_or_never_ends_raises():
     with pytest.raises(RuntimeError, match="the statement ended as FAILED"):
         sc.statement_runner(Client(response("FAILED")), "wh123")("SELECT 1")
     forever = Client(response("PENDING"), [response("RUNNING")] * 5)
+    with pytest.raises(RuntimeError, match="did not finish within 4 seconds"):
+        sc.statement_runner(forever, "wh123", wait_seconds=4, sleep=lambda s: None)("SELECT 1")
+
+
+def test_a_statement_that_never_ends_is_cancelled_and_a_failed_cancel_keeps_the_reason():
+    forever = Client(response("PENDING"), [response("RUNNING")] * 5)
+    with pytest.raises(RuntimeError, match="did not finish within 4 seconds"):
+        sc.statement_runner(forever, "wh123", wait_seconds=4, sleep=lambda s: None)("SELECT 1")
+    assert [c[0] for c in forever.calls] == ["execute", "get", "get", "cancel"] and forever.calls[-1] == ("cancel", "st-1")
+    forever = Client(response("PENDING"), [response("RUNNING")] * 5)
+    forever.cancel_fails = True
     with pytest.raises(RuntimeError, match="did not finish within 4 seconds"):
         sc.statement_runner(forever, "wh123", wait_seconds=4, sleep=lambda s: None)("SELECT 1")
 
@@ -146,7 +164,7 @@ def test_expected_at_a_git_ref_orders_a_correction_version_too(tmp_path):
 # ---- reading and judging the four stores -----------------------------------------------------------
 
 def stores(tmp_path, monkeypatch, jena=GRAPHS, databricks=None, local=None, enterprise=None, warehouse="wh123", connect=None,
-           quick=False):
+           quick=False, models=lambda newest: []):
     """check()'s rows with every store a stand-in. Each argument is what that store holds."""
     monkeypatch.setattr(sc, "expected", lambda root, ss, ref="worktree", extra=(): dict(WANT))
     local_settings = stores_support.local_settings(tmp_path)
@@ -158,7 +176,7 @@ def stores(tmp_path, monkeypatch, jena=GRAPHS, databricks=None, local=None, ente
             raise jena
         return dict(jena)
     ss.read_jena = read_jena
-    code = SimpleNamespace(ss=ss, lm=SimpleNamespace(models=lambda newest: []),
+    code = SimpleNamespace(ss=ss, lm=SimpleNamespace(models=models),
                            lv=SimpleNamespace(hash_graph=lambda session: (session.graph_hash, 0, 0, 0)))
     run_sql, sent = databricks or workspace()
     monkeypatch.setattr(sc, "statement_runner", lambda client, warehouse_id: run_sql if (client, warehouse_id) == ("client of DEFAULT", "wh123") else None)
@@ -313,6 +331,15 @@ def test_a_store_that_cannot_be_read_says_why_without_an_address(tmp_path, monke
     assert rows["enterprise"] == ("unreachable", "unreachable (ConnectionError)")
     assert rows["jena"] == ("unreachable", "unreachable (TimeoutError)")
     assert rows["databricks"] == ("unreachable", "set [databricks] warehouse_id in kpi_store.toml to read the triple table")
+
+
+def test_a_release_whose_logical_model_cannot_be_listed_gives_each_neo4j_store_a_line(tmp_path, monkeypatch):
+    def models(newest):   # as logical_models.models stops: with an exit, not an error
+        raise SystemExit("logical-model: model sample lacks its export in the package's manifest")
+    rows, _ = stores(tmp_path, monkeypatch, models=models)
+    why = "logical-model: model sample lacks its export in the package's manifest"
+    assert rows["neo4j"] == ("unreachable", why) and rows["enterprise"] == ("unreachable", why)
+    assert rows["jena"][0] == "current" and rows["databricks"][0] == "current"   # the other stores are still read
 
 
 def test_the_lines_and_the_exit_code(tmp_path, capsys):

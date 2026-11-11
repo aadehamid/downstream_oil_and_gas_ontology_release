@@ -54,8 +54,10 @@ import load_verify as lv
 CONFIG_LABELS = ("_GraphConfig", "_NsPrefDef", "_n10sValidatorConfig")
 NODES = ("MATCH (n:Resource) RETURN n.uri AS uri, labels(n) AS labels, properties(n) AS props "
          "ORDER BY n.uri SKIP $skip LIMIT $limit")
+# The relationship's own ID ends the order: two relationships of one type between the same two nodes, with no uri,
+# tie on everything before it, and a tie could repeat or miss one of them at a page's edge.
 EDGES = ("MATCH (a:Resource)-[r]->(b:Resource) RETURN a.uri AS s, type(r) AS t, b.uri AS o, properties(r) AS props "
-         "ORDER BY s, t, o, r.uri SKIP $skip LIMIT $limit")
+         "ORDER BY s, t, o, r.uri, elementId(r) SKIP $skip LIMIT $limit")
 WRITE_NODES = "UNWIND $rows AS row CREATE (n:$(row.labels)) SET n = row.props"
 WRITE_EDGES = ("UNWIND $rows AS row MATCH (a:Resource {uri: row.s}), (b:Resource {uri: row.o}) "
                "CREATE (a)-[r:$(row.t)]->(b) SET r = row.props")
@@ -189,6 +191,8 @@ def main(argv):
             size = int(opts.get("--batch", 1000))
         except ValueError:
             raise Refusal("--batch needs a whole number") from None
+        if size < 1:   # a page of no rows copies nothing, and the run would end as a failed copy, not as bad input
+            raise Refusal("--batch needs a whole number of 1 or more")
         timeout = lv.query_timeout(opts)
         source_uri, source_auth, source_db = source_connection(opts)
         target_values = read_env_file(opts["--target-env"])

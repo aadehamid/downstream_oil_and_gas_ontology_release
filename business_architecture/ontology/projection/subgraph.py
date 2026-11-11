@@ -74,8 +74,12 @@ def replace_subgraph(tx, store, label, marker_label, nodes, edges, marker, kind,
     checks, and the words "nothing was changed" in the messages below are true. The marker is created last, so
     inside the transaction no marker exists for a subgraph that failed a check. Edges are created by MATCH on both
     ends, so an edge whose end is missing creates nothing. The check is a count: edges made against rows sent. It
-    assumes one node per uri, and it does not see an edge whose "ontology" value is neither true nor false, which
-    belongs to neither pass."""
+    assumes one node per uri. An edge whose "ontology" value is neither true nor false belongs to neither pass,
+    so such an edge is refused before the first statement."""
+    odd = [e for e in edges if not isinstance(e.get("ontology"), bool)]
+    if odd:
+        raise SystemExit(f"{store}: {len(odd)} edge(s) do not say whether they end at an ontology node, "
+                         f"e.g. to {odd[0].get('o')}; nothing was changed")
     before = ontology_counts(tx)   # compared with the counts at the end: a check by count, not by content
     tx.run(f"MATCH (m:{marker_label}) DETACH DELETE m").consume()
     tx.run(f"MATCH (n:{label}) DETACH DELETE n").consume()

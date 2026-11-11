@@ -43,7 +43,7 @@ def stub_code(calls, fails=None, report=REPORT):
             env = Path(self.cfg["neo4j_env"])
             calls.append(("steps", steps, env.read_text(encoding="utf-8")))
             if fails:
-                raise REAL.rp.Failed(fails)
+                raise fails if isinstance(fails, Exception) else REAL.rp.Failed(fails)
             Path(self.cfg["out"]).mkdir(parents=True, exist_ok=True)
             (Path(self.cfg["out"]) / "projection-report.json").write_text(json.dumps(report), encoding="utf-8", newline="\n")
 
@@ -292,6 +292,23 @@ def test_a_failed_step_stops_the_load_and_still_removes_the_login_file(tmp_path,
     with pytest.raises(ln.LoadError, match="the local load stopped: load_verify.py exited 1"):
         ln.load(local, support.ROOT, tmp_path / "run", code=stub_code([], fails="load_verify.py exited 1"), connect=connect_to(db))
     assert not (tmp_path / "run" / "neo4j-local.env").exists() and db.writes() == []
+
+
+def test_a_step_that_cannot_open_a_file_gives_a_whole_message(tmp_path, local):
+    missing = FileNotFoundError(2, "No such file or directory", "robot.jar")
+    with pytest.raises(ln.LoadError) as stopped:
+        ln.load(local, support.ROOT, tmp_path / "run", code=stub_code([], fails=missing), connect=connect_to(graph(marked=False)))
+    assert str(stopped.value) == f"the local load stopped (FileNotFoundError). The log is {tmp_path / 'run' / 'neo4j-load.log'}"
+    with pytest.raises(ln.LoadError) as stopped:
+        ln.load(local, support.ROOT, tmp_path / "run", code=stub_code([], fails=ValueError("made up")), connect=connect_to(graph(marked=False)))
+    assert str(stopped.value) == f"the local load stopped (ValueError): made up. The log is {tmp_path / 'run' / 'neo4j-load.log'}"
+
+
+def test_a_logical_model_the_release_cannot_list_is_a_load_error_not_an_exit():
+    def models(newest):   # as logical_models.models stops: with an exit
+        raise SystemExit("logical-model: model sample lacks its layer in the package's manifest")
+    with pytest.raises(ln.LoadError, match="^logical-model: model sample lacks its layer in the package's manifest$"):
+        ln.models_status("a session", "neo4j", [], SimpleNamespace(lm=SimpleNamespace(models=models)))
 
 
 def test_an_extra_load_runs_before_the_marker(tmp_path, local):

@@ -57,6 +57,10 @@ from . import load_databricks as ldb
 from . import local_settings as ls
 
 FUSEKI_SHA256 = "2c92c598e65ab69d99820052e05f4277ed1d77980a8845f87545ad35b71a76ee"   # jena-fuseki-server-6.2.0.jar
+# The form of a technical graph's graph name, as kpi_store.tech_graph.graph_iri writes it for an environment. A graph
+# of this form is the KPI Store's and belongs to that module's load, also when this command runs alone and no
+# technical-graph file names it.
+TECH_GRAPH = re.compile(r"^urn:kpi-store:tech:[^:/<>\s]+:graph$")
 JAVA_MINIMUM = 21   # the jar's manifest says Java-Version: 21
 # `java -version` prints a line such as: openjdk version "21.0.4". Group 1 is the major version. Java 8 and older
 # print "1.8.0", where the major version is the second number, so group 2 is kept too (java_major).
@@ -311,10 +315,13 @@ def load(store, dataset, rdfstore, bases, drop_unknown=False, apart=()):
     loaded     the graphs were replaced, read back, and the hashes are equal
     mismatch   the hashes differ after the load (see "comparison")
 
+    A graph with the form of a technical graph's name (TECH_GRAPH) is set apart too, whether or not it was named.
+
     Raises FusekiError, before any write, when the store holds a graph that is not the KPI Store's (see the
-    module's text) and drop_unknown is false."""
+    module's text) and drop_unknown is false, and when the dataset is one a Fuseki dataset cannot hold."""
     want_hash = rdfstore.dataset_hash(dataset)
     wanted = set(rdfstore.named_graphs(dataset))
+    apart = sorted(set(apart) | {g for g in store.graphs() if TECH_GRAPH.match(g) and g not in wanted})
     held = set(store.graphs()) - set(apart)
     in_default = default_graph_triples(store)
     result = {"dataset_hash": want_hash, "graphs": len(wanted), "triples": len(dataset)}
@@ -329,18 +336,21 @@ def load(store, dataset, rdfstore, bases, drop_unknown=False, apart=()):
     if unknown and not drop_unknown:
         raise FusekiError(f"the dataset holds {len(unknown)} graph(s) that are not the KPI Store's, e.g. {unknown[:3]}. "
                           "Nothing was written. Name a dataset of the KPI Store's own, or pass --drop-unknown to drop them")
+    # The two checks of the rdf-store skill's round trip come before the first write, the drops included, so a
+    # dataset the store cannot hold exactly is refused with the store as it was.
+    try:
+        for quad in dataset:
+            rdfstore.check_term(quad)
+    except rdfstore.BadInput as err:
+        raise FusekiError(f"the release holds a statement a Fuseki dataset cannot hold: {err}") from None
+    if rdfstore.shared_blank_nodes(dataset):
+        raise FusekiError("a blank node occurs in more than one graph of the release, which a Fuseki dataset cannot hold")
     drops = [f"DROP SILENT GRAPH <{g}>" for g in stale if g in earlier or drop_unknown]
     if in_default and drop_unknown:
         drops.append("DROP SILENT DEFAULT")
     if drops:
         _update(store, " ;\n".join(drops))
-    # The rdf-store skill's round trip, with the store's copy read without the graphs apart. Both checks below run
-    # before publish, so a dataset the store cannot hold exactly is refused before any of its graphs is replaced.
-    # They run after the drops above, though: a refusal here leaves the store without the graphs just dropped.
-    for quad in dataset:
-        rdfstore.check_term(quad)
-    if rdfstore.shared_blank_nodes(dataset):
-        raise FusekiError("a blank node occurs in more than one graph of the release, which a Fuseki dataset cannot hold")
+    # The round trip itself, with the store's copy read without the graphs apart.
     store.publish(dataset)
     passed, comparison = rdfstore.compare(dataset, held_dataset(store, rdfstore, apart))
     result |= {"store_hash": comparison["actual_hash"], "dropped": stale if drop_unknown else earlier}

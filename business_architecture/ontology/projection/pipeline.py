@@ -274,8 +274,8 @@ def record(run):
     this tree's triples. A run that fails one of them leaves this folder as it was. inferred.nt is then written
     first, because build reads it from disk: the manifest and the report must describe the run's inferred triples,
     not the ones this folder held before. build can still stop after that write, on a rule or a SHACL failure of
-    the data with the new inferred triples. The folder then holds the new inferred.nt beside the earlier manifest
-    and report, and build stops on the same failure, with or without --verify, until inferred.nt is put right."""
+    the data with the new inferred triples. record then puts back the inferred.nt this folder held, or removes the
+    file when it held none, and stops with build's own message, so the folder is as it was."""
     with open(os.path.join(run, "run-manifest.json"), encoding="utf-8") as f:
         ran = json.load(f)
     with open(os.path.join(run, "projection-report.json"), encoding="utf-8") as f:
@@ -292,9 +292,21 @@ def record(run):
         sys.exit("record: the run's report cannot stand: " + "; ".join(problems))
     if set(loaded.splitlines()) != set(sorted_nt(graph(INPUTS)).splitlines()):
         sys.exit("record: that run loaded other triples than this tree's")
+    earlier = None
+    if os.path.exists(INFERRED):
+        with open(INFERRED, encoding="utf-8", newline="") as f:   # newline="": put back byte for byte
+            earlier = f.read()
     with open(INFERRED, "w", encoding="utf-8", newline="\n") as f:
         f.write(inferred)
-    loadable, inferred, manifest = build()  # Step 1 now covers the run's inferences too
+    try:
+        loadable, inferred, manifest = build()  # Step 1 now covers the run's inferences too
+    except BaseException:   # build stops with SystemExit; the manifest and the report were not written yet
+        if earlier is None:
+            os.remove(INFERRED)
+        else:
+            with open(INFERRED, "w", encoding="utf-8", newline="") as f:
+                f.write(earlier)
+        raise
     summary = {k: report[k] for k in REPORT_FIELDS}
     summary.update({"input_fingerprint": sha(loadable, inferred), "shapes_fingerprint": shapes_fingerprint(),
                     "versions": report["versions"]})
