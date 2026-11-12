@@ -180,7 +180,8 @@ run with_deps python scripts/epm_facts.py coverage >/dev/null
 # The generated pages must equal a fresh build of their Markdown.
 run with_deps python scripts/build_docs_html.py --check
 # Every code block in the Markdown documents and in the HTML pages written by hand is run, compared, parsed or skipped for a stated reason, and the last
-# line counts them. scripts/DOC-SNIPPETS.md explains the tags. The cut adds --strict --all-contexts.
+# line counts them. scripts/DOC-SNIPPETS.md explains the tags. The cut adds --strict --all-contexts. On a release that
+# is not the one the examples describe (after a correction or a new version) it runs no block and says so.
 run with_deps python scripts/doc_snippets.py check
 # Every relative link in a Markdown document or an HTML page points at a file or a folder of the tree.
 run "$PYTHON" scripts/doc_snippets.py links

@@ -10,9 +10,9 @@ The tool also runs alone, with the commands above.
 
 The tool reads the report, shows each row and what it will change, and asks the person who runs it to approve. It
 then changes the data-product module's tables, rebuilds the module, writes the package at the correction version,
-gives every module that depends on it a correction version too, rebuilds the catalog and the projection manifest,
-runs the competency questions, verifies each written package against a fresh build and writes the discovery-run
-record. In a Git copy it then commits and tags. In a plain folder it writes the same files.
+gives every module that depends on it a correction version too, rebuilds the catalog, the projection manifest
+and the KPI intake pack, runs the competency questions, verifies each written package and the pack against a
+fresh build and writes the discovery-run record. In a Git copy it then commits and tags. In a plain folder it writes the same files.
 
 All of the building happens in a temporary copy of the release, in the system's temporary folder. The release's
 files change only after every build and check has passed on the copy, so a failure before that point leaves the
@@ -29,7 +29,8 @@ What it reads and writes:
 - It reads the report, the cleared CSV when one is given, and the release folder.
 - In the release folder it writes the data-product module's pricing tables and Turtle, the new packages under
   releases/, the old ones moved to releases/previous/, the catalog, the projection manifest, the standing
-  decisions, the stand-alone exceptions and one discovery-run record. In a Git copy it adds one commit and one tag.
+  decisions, the stand-alone exceptions and one discovery-run record. Under kpi-intake/ it writes each generated
+  file of the KPI intake pack that the new packages change. In a Git copy it adds one commit and one tag.
 - Outside the release folder it writes one temporary folder, where the system keeps temporary files. It holds the
   working copy of the release and a backup of each file the cut replaces. It is removed when the tool ends,
   unless the process is ended from outside.
@@ -53,7 +54,8 @@ Rules:
   or a load may hold: a column whose new name differs by more than case, an object's name, or the removal of a
   column, an object or a table edge. A case-only spelling and an added measure are not breaking.
 
-Needs Python 3.11 or later with rdflib and pyshacl. It needs no Java and no bash. A plain folder needs no Git; a
+Needs Python 3.11 or later with rdflib and pyshacl, and openpyxl when the release holds the KPI intake pack,
+whose Excel forms the cut rebuilds. It needs no Java and no bash. A plain folder needs no Git; a
 Git copy needs Git installed.
 """
 import argparse
@@ -149,6 +151,10 @@ ROLE_HELP = ("write a role or initials, such as \"the ontology owner\": letters,
 # The approver a new version's approval names when --approver is not given.
 DEFAULT_APPROVER = "The person who ran the cut"
 CHECK_COMMAND = "bash scripts/check.sh"
+# The KPI intake pack: its pick lists, forms and examples are built from the newest packages, so a cut rebuilds
+# them. INTAKE_NEEDS are the files a release must hold for the cut to do that: the pack's catalogue and its builder.
+INTAKE = ["-m", "kpi_store.intake", "build"]
+INTAKE_NEEDS = (Path("kpi-intake") / "catalogue.toml", Path("kpi_store") / "intake" / "build.py")
 # Environment variables that point Git at a repository. _git removes them, so Git works on the release folder.
 GIT_PLACE = {"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR", "GIT_PREFIX", "GIT_NAMESPACE"}
 
@@ -186,6 +192,7 @@ class Plan:
     versions: dict                  # {module: (current version, correction version)}, in release order; empty when no row applies
     tables: object                  # the pricing tables with every applied row's change
     already_cut: bool = False       # the release holds this run's record already
+    intake: bool = False            # the release holds the KPI intake pack, which a cut with versions rebuilds
 
     @property
     def applied(self):
@@ -455,7 +462,7 @@ def plan(report, release_root, sums=None):
     # _item applies each accepted fix to `tables` in memory, row by row, so a later row sees an earlier row's change.
     items = [_item(row, tables) for row in report["rows"]]
     versions = _versions(root) if any(i.outcome == "apply" for i in items) else {}
-    return Plan(report, items, versions, tables)
+    return Plan(report, items, versions, tables, intake=_has_intake(root))
 
 
 def _item(row, tables):
@@ -590,6 +597,8 @@ def describe(plan_):
     if plan_.versions:
         lines.append("Versions the cut writes:")
         lines += [f"  {m} {old} -> {new}" for m, (old, new) in plan_.versions.items()]
+        if plan_.intake:
+            lines.append("The cut also rebuilds the KPI intake pack (kpi-intake/), whose pick lists come from these packages.")
     else:
         lines.append("No row changes the ontology, so the cut writes no version.")
     return lines
@@ -611,7 +620,7 @@ def cut(report_path, release_root=".", decisions=None, approver=None, ask=input,
     # report, the plan and the state of Git. They refuse, before anything is written, a cut that is already known
     # not to finish. A build or a check can still fail later, on the temporary copy. One path here does write: for
     # a run that was cut before, _finish_tag makes a missing tag. git status may also refresh Git's own index.
-    _requirements()
+    _requirements(root)
     if approver is not None and not is_role(approver):
         raise CutRefused(f"--approver is not a role or initials: {ROLE_HELP}.")
     report, sums = load_report(report_path, decisions)
@@ -696,9 +705,16 @@ class _Steps:
             raise CutFailed(f"the step '{name}' failed: {type(err).__name__}: {err}. The release is as it was.") from err
 
 
-def _requirements():
-    """Stops the cut when a package the release's builders import is missing, with the command that installs it."""
-    missing = [name for name in ("rdflib", "pyshacl") if not _importable(name)]
+def _has_intake(root):
+    """True when the release holds the KPI intake pack and the code that builds it."""
+    return all((Path(root) / path).is_file() for path in INTAKE_NEEDS)
+
+
+def _requirements(root):
+    """Stops the cut when a package the release's builders import is missing, with the command that installs it.
+    The KPI intake pack's Excel forms need openpyxl, so a release that holds the pack needs it too."""
+    needed = ("rdflib", "pyshacl") + (("openpyxl",) if _has_intake(root) else ())
+    missing = [name for name in needed if not _importable(name)]
     if missing:
         raise CutRefused(f"the cut needs the Python package{'s' if len(missing) > 1 else ''} {' and '.join(missing)}: "
                          f"py -m pip install {' '.join(missing)}")
@@ -731,8 +747,8 @@ def _approval(report):
 def _build(plan_, staging, approver, now, step):
     """Every change of the cut, made in the staging copy with the release's own build scripts, in the order a
     release is made by hand: the tables, the module's Turtle, each package at its new version, the old packages
-    to releases/previous, then the catalog and the projection manifest, which both read the packages. The
-    competency questions and the verify steps run last, on the finished copy."""
+    to releases/previous, then the catalog, the projection manifest and the KPI intake pack, which all read the
+    packages. The competency questions and the verify steps run last, on the finished copy."""
     report = plan_.report
     if not plan_.versions:   # only rejected rows or settings: the cut writes the record and builds nothing
         return
@@ -763,12 +779,19 @@ def _build(plan_, staging, approver, now, step):
     step("carry the stand-alone exceptions to the moved packages", lambda: _carry_exceptions(staging, plan_.versions))
     step("rebuild the catalog", lambda: _run("rebuild the catalog", ["build_catalog.py", "--write"], release))
     step("rebuild the projection manifest", lambda: _run("rebuild the projection manifest", ["pipeline.py", "build"], ontology / "projection"))
+    # The pack's pick lists name each module's version, and `py -m kpi_store.intake check` refuses lists that are
+    # older than the packages. The module is the staging copy's own: -m finds kpi_store in the folder the command
+    # runs in before any installed copy.
+    intake = [*INTAKE, "--root", str(staging)]
+    if plan_.intake:
+        step("rebuild the KPI intake pack", lambda: _run("rebuild the KPI intake pack", intake, staging))
     step("run the competency questions", lambda: _run("run the competency questions", ["run.py"], ontology / "regression"))
     # The checks of scripts/check.sh that need no bash and that this cut can change: each written file must equal
     # a fresh build of its source. The projection manifest was built one step ago by the same code.
     verify = [("the module's Turtle", ["build_pricing.py", "--verify"], ontology / MODULE)]
     verify += [(f"the {module} package", ["build_module.py", module, "--verify"], release) for module in plan_.versions]
     verify += [("the catalog", ["build_catalog.py", "--verify"], release)]
+    verify += [("the KPI intake pack", [*intake, "--check"], staging)] if plan_.intake else []
     for name, args, cwd in verify:
         step(f"verify {name}", lambda name=name, args=args, cwd=cwd: _run(f"verify {name}", args, cwd))
     step("check that the release agrees with itself", lambda: _agreement(plan_, staging))

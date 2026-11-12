@@ -244,7 +244,8 @@ Versions the cut writes:
   logical-model 1.0.0 -&gt; 1.0.1-correction.1
   technical-graph 1.1.0 -&gt; 1.1.1-correction.1
   value-stream 1.2.0 -&gt; 1.2.1-correction.1
-  integration 2.5.0 -&gt; 2.5.1-correction.1</code></pre></li></ol>
+  integration 2.5.0 -&gt; 2.5.1-correction.1
+The cut also rebuilds the KPI intake pack (kpi-intake/), whose pick lists come from these packages.</code></pre></li></ol>
 <ol start="3"><li>Cut. At the first prompt type <code>Change_Value_Amount</code>, which confirms the breaking change. At the second prompt type <code>yes</code>.
 <pre><code class="lang-powershell">py -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --decisions kpi_store/tests/fixtures/cut/cleared-decisions.csv --approver "the ontology owner"</code></pre>
 <pre><code class="lang-text">...
@@ -255,7 +256,7 @@ Run the full check before you load: bash scripts/check.sh (on Windows, in Git Ba
 git --no-pager tag --list</code></pre>
 <pre><code class="lang-text">&lt;commit&gt; Cut data-product 1.2.1-correction.1 from discovery run 20261111T120000Z-0a1b2c3d
 data-product-1.2.1-correction.1</code></pre></li></ol>
-<ol start="5"><li>Run the full check on the corrected copy.
+<ol start="5"><li>Run the full check on the corrected copy. The documents' examples show the release as shipped, so on a corrected copy the check reads them and runs none. Updating the examples is part of preparing a new zip: <code>scripts/DOC-SNIPPETS.md</code> says how, under "The release the examples describe".
 <pre><code class="lang-bash">bash scripts/check.sh</code></pre>
 <pre><code class="lang-text">...
 all checks passed</code></pre></li></ol>
@@ -337,7 +338,7 @@ competency coverage on &lt;the core package&gt;: 57 questions; answerable 56, pa
 <pre><code class="lang-powershell">py -m kpi_store.intake build</code></pre>
 <pre><code class="lang-text">wrote kpi-intake/pick-lists.json
 ...</code></pre></li></ol>
-<ol start="9"><li>In a Git copy, stage the change. Then run the full check.
+<ol start="9"><li>In a Git copy, stage the change. Then run the full check. After a release of a module the check reads the documents' examples and runs none, as after a cut. Before you send the release on as a new zip, bring the examples up to date and record the release they describe (<code>scripts/DOC-SNIPPETS.md</code>, "The release the examples describe").
 <pre><code class="lang-bash">git add -A
 bash scripts/check.sh</code></pre>
 <pre><code class="lang-text">...

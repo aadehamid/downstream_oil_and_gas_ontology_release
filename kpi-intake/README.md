@@ -316,7 +316,7 @@ After a change it prints one line for each file it wrote. It stops with the reas
 
 The build writes only inside the pack folder it is given, which is `kpi-intake` unless you name another with `--pack`. It does not follow a link there. If a generated file or the `examples` folder is a link, the build stops and names it, and `--check` does the same.
 
-Rebuild after every release of a module too, because the lists come from the newest packages. To see whether the pack is current without writing anything, add `--check`:
+Rebuild after every release of a module too, because the lists come from the newest packages. The cut tool (`py -m kpi_store.cut`) runs this build itself, so after a correction the pack is already current. To see whether the pack is current without writing anything, add `--check`:
 
 ```powershell run=release-copy
 py -m kpi_store.intake build --check
