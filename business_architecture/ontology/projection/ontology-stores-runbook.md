@@ -598,7 +598,7 @@ the steps that ran passed; left out: <the other steps> (not run, so not checked)
 
 ### `check`
 
-It runs `scripts/check.sh` with bash. The script rebuilds every package and compares it with the one on disk. It runs the competency questions and every test. It checks that the generated pages equal their sources and that every code block of the documents works.
+It runs `scripts/check.sh` with bash. The script rebuilds every package and compares it with the one on disk. It runs the competency questions and every test. It checks that the generated pages equal their sources and that every code block of the documents works. After a cut it reads the code blocks and runs none, because their examples show the release as shipped. `scripts/DOC-SNIPPETS.md` explains this under "The release the examples describe".
 
 It reads the release folder. It writes only `check.log` in the run's folder. It took about 10 minutes on a Mac and 21 minutes on a Windows machine with 4 cores.
 

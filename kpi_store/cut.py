@@ -747,8 +747,8 @@ def _approval(report):
 def _build(plan_, staging, approver, now, step):
     """Every change of the cut, made in the staging copy with the release's own build scripts, in the order a
     release is made by hand: the tables, the module's Turtle, each package at its new version, the old packages
-    to releases/previous, then the catalog and the projection manifest, which both read the packages. The
-    competency questions and the verify steps run last, on the finished copy."""
+    to releases/previous, then the catalog, the projection manifest and the KPI intake pack, which all read the
+    packages. The competency questions and the verify steps run last, on the finished copy."""
     report = plan_.report
     if not plan_.versions:   # only rejected rows or settings: the cut writes the record and builds nothing
         return

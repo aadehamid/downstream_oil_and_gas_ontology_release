@@ -476,7 +476,7 @@ every step passed</code></pre></li></ol>
 cut: no report waits to be cut
 the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
 <h3 id="check"><code>check</code><a class="hl" href="#check" aria-label="Link to this section">#</a></h3>
-<p>It runs <code>scripts/check.sh</code> with bash. The script rebuilds every package and compares it with the one on disk. It runs the competency questions and every test. It checks that the generated pages equal their sources and that every code block of the documents works.</p>
+<p>It runs <code>scripts/check.sh</code> with bash. The script rebuilds every package and compares it with the one on disk. It runs the competency questions and every test. It checks that the generated pages equal their sources and that every code block of the documents works. After a cut it reads the code blocks and runs none, because their examples show the release as shipped. <code>scripts/DOC-SNIPPETS.md</code> explains this under "The release the examples describe".</p>
 <p>It reads the release folder. It writes only <code>check.log</code> in the run's folder. It took about 10 minutes on a Mac and 21 minutes on a Windows machine with 4 cores.</p>
 <pre><code class="lang-powershell">py -m kpi_store.runner --only check</code></pre>
 <pre><code class="lang-text">run &lt;run ID&gt;: check
