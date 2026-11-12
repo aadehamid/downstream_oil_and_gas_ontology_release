@@ -5,6 +5,7 @@
     py -m kpi_store.runner --stores <file> --from fuseki                  # go on from one step, in the newest run
     py -m kpi_store.runner --stores <file> --only sync                    # one step
     py -m kpi_store.runner --stores <file> --skip check,enterprise        # leave steps out
+    py -m kpi_store.runner --stores <file> --reset                        # empty the stores, to load them again
 
 The steps, in order:
   cut         when a cleared report waits in <run folder>/pending, turn it into a correction version (the cut tool)
@@ -54,8 +55,16 @@ with exit 3. A run that has no notebook step of its own (--only or --from on a n
 --skip, --only, --from and --mode check each leave steps out; the last line and the summary then name the steps
 left out, and the run does not say that every step passed. Only a run of the whole chain says that.
 
+--reset runs no step. It empties the stores the steps loaded: the Enterprise database's KPI Store nodes, the local
+Neo4j database, the local Fuseki dataset and the four Databricks tables (kpi_store.reset). It first prints what it
+will delete in each store and asks for the word reset; --yes leaves the question out, and --dry-run prints and
+deletes nothing. With --reset, --only and --skip take store names: enterprise, neo4j, fuseki, databricks. It keeps
+the release folder, the run folder and, in Databricks, the schemas, the volume and the notebook. The next plain
+run then loads every store again.
+
 Exit 0 when every requested step ran and passed, 1 when a step failed, 2 on bad settings or arguments, 3 when the
-run stopped for a person to act (the last line says what to do).
+run stopped for a person to act (the last line says what to do). A reset ends with 0 when the stores it named
+hold nothing of the KPI Store, and with 1 when one could not be emptied or the word was not typed.
 """
 import argparse
 import csv
@@ -919,12 +928,13 @@ def newest_run(run_root):
     return runs[-1] if runs else None
 
 
-def step_list(text):
-    """Reads the value of --only or --skip: step names with commas between them. An unknown name is an error."""
+def step_list(text, known=STEPS, what="step"):
+    """Reads the value of --only or --skip: names with commas between them. An unknown name is an error. The names
+    are steps, or stores when the command is a reset."""
     names = [n for n in (text or "").split(",") if n]
-    unknown = [n for n in names if n not in STEPS]
+    unknown = [n for n in names if n not in known]
     if unknown:
-        raise argparse.ArgumentTypeError(f"unknown step {unknown[0]}; the steps are {', '.join(STEPS)}")
+        raise argparse.ArgumentTypeError(f"unknown {what} {unknown[0]}; the {what}s are {', '.join(known)}")
     return names
 
 
@@ -935,15 +945,36 @@ def main(argv=None, **context_options):
     ap.add_argument("--stores", help=f"the local settings file (default: the one {ls.ENV_VAR} names)")
     ap.add_argument("--release", default=str(ls.ROOT), help="the release folder (default: the one this code is in)")
     ap.add_argument("--from", dest="start", choices=STEPS, help="start at this step, in the newest run")
-    ap.add_argument("--only", type=step_list, help="run only these steps (comma-separated), in the newest run")
-    ap.add_argument("--skip", type=step_list, default=[], help="leave these steps out (comma-separated)")
+    # --only and --skip are read as text here and checked below: their names are steps, or stores with --reset.
+    ap.add_argument("--only", help="run only these steps (comma-separated), in the newest run; with --reset, empty "
+                    "only these stores")
+    ap.add_argument("--skip", default="", help="leave these steps out (comma-separated); with --reset, these stores")
     ap.add_argument("--run-id", help="the run to go on with (default: a new run, or the newest with --from or --only)")
     ap.add_argument("--mode", choices=("load", "check"), default="load",
                     help="check stops the notebook after its report and loads nothing (default load)")
     ap.add_argument("--replace-enterprise", action="store_true",
                     help="let the copy replace the KPI Store's nodes the Enterprise database already holds")
-    ap.add_argument("--dry-run", action="store_true", help="print each step's commands as argument lists and run nothing")
+    ap.add_argument("--dry-run", action="store_true", help="print each step's commands as argument lists and run nothing; "
+                    "with --reset, print what would be deleted and delete nothing")
+    ap.add_argument("--reset", action="store_true",
+                    help="run no step; empty the stores the KPI Store loaded (enterprise, neo4j, fuseki, databricks), so "
+                         "the next run loads them again. It prints what it will delete and asks for the word reset first")
+    ap.add_argument("--yes", action="store_true", help="with --reset: do not ask before deleting; for a script")
     args = ap.parse_args(argv)
+    if args.reset:
+        from . import reset
+    # The two kinds of command share --only and --skip, so an option that belongs to the other kind is refused:
+    # a reset that silently ignored --from, or a load that ignored --yes, would not do what the person asked.
+    if args.reset and (args.start or args.run_id or args.replace_enterprise or args.mode != "load"):
+        ap.error("--reset takes only --stores, --release, --only, --skip, --yes and --dry-run")
+    if args.yes and not args.reset:
+        ap.error("--yes belongs to --reset")
+    try:
+        known, what = (reset.STORES, "store") if args.reset else (STEPS, "step")
+        args.only = step_list(args.only, known, what) if args.only is not None else None
+        args.skip = step_list(args.skip, known, what)
+    except argparse.ArgumentTypeError as err:
+        ap.error(str(err))
     try:
         local = ls.load(ls.locate(args.stores), release_root=Path(args.release))
         run_root = local.need("run_folder")
@@ -955,6 +986,12 @@ def main(argv=None, **context_options):
     except (ls.LocalSettingsError, settings_module.SettingsError) as err:
         print(f"runner: {err}", file=sys.stderr)
         return 2
+    if args.reset:
+        # A reset is no run: it gets no run folder and writes no step file. It reads the same two settings files.
+        stores = [s for s in reset.STORES if (args.only is None or s in args.only) and s not in args.skip]
+        if not stores:
+            ap.error("--only and --skip leave no store to reset")
+        return reset.run(ctx, stores, yes=args.yes, dry_run=args.dry_run, named=args.only or ())
     names = selected(args.only, args.start, args.skip)
     if args.mode == "check":   # the notebook loads nothing in this mode, so the stores are not loaded either
         names = [n for n in names if n not in LOCAL_LOADS]

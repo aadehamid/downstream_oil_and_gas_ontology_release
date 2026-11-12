@@ -71,6 +71,7 @@ class FakeNeo4j:
     def __init__(self, name="neo4j", ident="db-1"):
         self.name, self.ident = name, ident
         self.nodes = []          # [(labels, props)]
+        self.constraints = []    # constraint names
         self.relationships = 0   # between Resource nodes
         self.statements = []
         self.closed = False
@@ -97,6 +98,14 @@ class FakeNeo4j:
         text = " ".join(getattr(query, "text", query).split())
         params = dict(parameters or {}, **kwargs)
         self.statements.append(text)
+        # A rule with no condition, "(n:<label> AND true)", makes every node of that label the KPI Store's: the
+        # reset of the local database adds such rules for the n10s plugin's configuration nodes.
+        always = re.findall(r"\(n:(\w+) AND true\)", text)
+
+        def own(labels, props):
+            return owns(labels, props, params) or any(label in always for label in labels)
+        if text == "SHOW CONSTRAINTS YIELD name RETURN count(*) AS n":
+            return Result([{"n": len(self.constraints)}])
         if text.startswith("CALL db.info() YIELD name"):
             return Result([{"name": self.name}])
         if text.startswith("CALL db.info() YIELD id"):
@@ -104,14 +113,14 @@ class FakeNeo4j:
         if text.startswith("MATCH (n) WITH labels(n) AS labels, coalesce((n:Resource AND ") and text.endswith("RETURN own, labels, count(*) AS n"):
             groups = {}
             for labels, props in self.nodes:
-                key = (owns(labels, props, params), tuple(labels))
+                key = (own(labels, props), tuple(labels))
                 groups[key] = groups.get(key, 0) + 1
             return Result([{"own": own, "labels": list(labels), "n": n} for (own, labels), n in groups.items()])
         if text.startswith("MATCH (n) WHERE NOT coalesce((n:Resource AND ") and text.endswith("LIMIT 5"):
-            foreign = [(l, p) for l, p in self.nodes if not owns(l, p, params)]
+            foreign = [(l, p) for l, p in self.nodes if not own(l, p)]
             return Result([{"labels": list(l), "uri": p.get("uri")} for l, p in foreign[:5]])
         if text.startswith("MATCH (n) WHERE coalesce((n:Resource AND ") and text.endswith("CALL (n) { DETACH DELETE n } IN TRANSACTIONS OF 1000 ROWS"):
-            self.nodes = [(l, p) for l, p in self.nodes if not owns(l, p, params)]
+            self.nodes = [(l, p) for l, p in self.nodes if not own(l, p)]
             return Result([])
         if text == "MATCH (n) RETURN count(n) AS n":
             return Result([{"n": len(self.nodes)}])

@@ -204,6 +204,16 @@ def own_params(bases, label_prefixes, tech_classes=(), store=STORE, logical_mode
             "lm_slugs": sorted(lm["slugs"]), "lm_bases": sorted(lm["bases"]), "lm_labels": sorted(lm["labels"])}
 
 
+def release_marks(release_root, cfg_doc, newest, code, store=STORE):
+    """The parameters of OWN_RULES for the release in this folder (own_params), read from its files: the modules'
+    addresses, the projection's label prefixes, the technical graph's class names and the logical models' marks.
+    The copy and the reset (kpi_store.reset) both call this, so both judge a node by the same marks. store is the
+    name on the markers of the database that is judged: this copy's, or the local load's."""
+    prefixes = code.build.load_config(cfg_doc["projection_config"]).prefixes
+    return own_params(load_fuseki.module_bases(code.ss), prefixes, tech_class_names(release_root, newest), store=store,
+                      logical_models=logical_model_marks(newest, code))
+
+
 def logical_model_marks(newest, code):
     """What only this release's logical-model load writes on its nodes: the models' slugs, each label it gives, and
     the base of each node's uri (the uri up to its last / or #). Read from the release's own models, so a new model
@@ -374,9 +384,7 @@ def copy(local, release_root, replace=False, confirm=None, code=None, connect=lo
         if source_hash != report["determinism_hash_sorted"]:
             raise Refused("the local graph is not the graph the load report verified; nothing was changed on "
                           "Enterprise. Run the local Neo4j load again")
-        prefixes = code.build.load_config(cfg_doc["projection_config"]).prefixes
-        params = own_params(load_fuseki.module_bases(code.ss), prefixes, tech_class_names(release_root, want["newest"]),
-                            logical_models=logical_model_marks(want["newest"], code))
+        params = release_marks(release_root, cfg_doc, want["newest"], code)
         held = holdings(target, params, own_rules)
         if held["nodes"] and not held["foreign_nodes"] and local_load.is_current(target, STORE, want, report, code, sep) \
                 and local_load.models_status(target, STORE, want["newest"], code)[1] in ("current", "none"):
