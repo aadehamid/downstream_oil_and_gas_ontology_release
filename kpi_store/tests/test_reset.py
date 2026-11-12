@@ -304,6 +304,40 @@ def test_a_delete_that_fails_rolls_its_transaction_back(world, monkeypatch):
     assert world.neo4j.transactions == [["guard", "rollback"]] and len(world.neo4j.nodes) == 12
 
 
+def test_on_enterprise_every_statement_of_the_delete_passes_the_copys_guard_inside_the_transaction(world, monkeypatch):
+    from kpi_store import copy_enterprise as ce
+    monkeypatch.setattr(reset, "BATCH", 5)
+    guarded = []
+    real = ce.check_statement
+    monkeypatch.setattr(ce, "check_statement", lambda statement: (guarded.append(" ".join(statement.split())), real(statement))[1])
+    own = ce.own_predicate()
+    check = f"MATCH (n) WHERE NOT {own} WITH n AS far MATCH (far)-[r]-(n) WHERE {own} RETURN labels(far) AS labels, count(DISTINCT r) AS n"
+    delete = f"MATCH (n) WHERE {own} WITH n LIMIT 5 DETACH DELETE n RETURN count(*) AS c"
+    # The copy's own way in, as the reset opens it: open_target's session over a stand-in driver.
+    with ce.open_target(stores_support.FakeDriver({TARGET: world.enterprise}), TARGET) as session:
+        guarded.clear(), world.enterprise.statements.clear()
+        assert reset.delete_own(session, PARAMS | {"store": "enterprise"}, ce.OWN_RULES, "the database") == 8
+    # Two batches (5 and 3 of the 8 nodes): each statement of each transaction went through the guard, and the
+    # database received exactly the statements the guard saw.
+    assert guarded == [check, delete, check, delete]
+    assert world.enterprise.statements == guarded
+    assert world.enterprise.transactions == [["guard", "delete 5", "commit"], ["guard", "delete 3", "commit"]]
+
+
+def test_a_statement_the_guard_refuses_inside_the_transaction_never_reaches_enterprise(world, monkeypatch):
+    from kpi_store import copy_enterprise as ce
+    real = ce.check_statement
+    def refuse_the_delete(statement):
+        if "DETACH DELETE" in statement:
+            raise ce.Refused("refused: made up")
+        real(statement)
+    monkeypatch.setattr(ce, "check_statement", refuse_the_delete)
+    assert world.go(stores=["enterprise"]) == 1
+    assert world.lines[-2] == "enterprise: FAILED. refused: made up"
+    assert len(world.enterprise.nodes) == 10 and not world.enterprise.writes()
+    assert world.enterprise.transactions == [["guard", "rollback"]]
+
+
 def test_the_copys_own_delete_is_unchanged():
     from kpi_store import copy_enterprise as ce
     # The reset's two statements pass the copy's guard as they are sent to Enterprise.
