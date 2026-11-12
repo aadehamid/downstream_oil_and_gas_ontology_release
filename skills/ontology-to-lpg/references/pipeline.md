@@ -72,12 +72,12 @@ The checks of these rules, numbered V1 to V12 in the order they run, are mapped 
 
 7. **Rule 4b only: flatten each reifier into a plain `EdgeRecord` node with SPARQL 1.2** (Jena 6.1.0+ or RDF4J 6.0.0+), then union, sort and de-duplicate. n10s cannot load triple terms, and RDF 1.1 N-Triples cannot write them. Check first that triple terms appear only as objects of `rdf:reifies`, so `keep.rq` drops nothing else.
 
-   ```sparql skip reason="illustration: SPARQL 1.2 with isTRIPLE, which the parser here does not read"
+   ```sparql parse rdf=1.2
    # keep.rq: every triple whose object is not a triple term
    CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o FILTER(!isTRIPLE(?o)) }
    ```
 
-   ```sparql skip reason="illustration: SPARQL 1.2 with SUBJECT, which the parser here does not read"
+   ```sparql parse rdf=1.2
    # edges.rq: one EdgeRecord per reifier
    PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
    PREFIX lpg: <https://id.example.org/lpg-mapping#>

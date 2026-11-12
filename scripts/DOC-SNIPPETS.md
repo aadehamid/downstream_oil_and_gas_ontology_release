@@ -21,10 +21,11 @@ Markdown viewers show the block as before, without the tag.
 |---|---|
 | `run=<context>` | Runs it in the context's folder. It must end with exit status 0. An `expect` block follows it, or it says `status-only`. |
 | `expect` | Compares it with the output of the `run` block just before it. |
-| `skip reason="<reason>: <detail>"` | Does not run it. Counts it under the reason. |
+| `skip reason="<reason>: <detail>"` | Does not run it. Counts it under the reason. Parses it when its language is one that `parse` reads, or `python`. |
 | `file=<path>` | Compares it with the whole file at that path. |
 | `excerpt=<path>` | Checks that its lines are in that file, in this order and next to each other. |
-| `parse` | Parses it: `json`, `toml`, `yaml`, `turtle`, `sparql`, `sql` or `cypher`. For `cypher` this is a token check, not a grammar check: it finds a string, a backtick name or a bracket that is never closed, and nothing else. |
+| `usage=<path>` | Checks a usage pattern against the script at that path. The script must exist and have each option the block names. |
+| `parse` | Parses it: `json`, `toml`, `yaml`, `ini`, `turtle`, `sparql`, `sql` or `cypher`. For `cypher` this is a token check, not a grammar check: it finds a string, a backtick name or a bracket that is never closed, and nothing else. |
 | `nested` | Reads it as a small document and tests the blocks in it. The language is `markdown`. |
 
 Use three backticks for a fence. The check cannot test code that is written any other way, and fails on it: a
@@ -34,7 +35,8 @@ file. An HTML page written by hand tags its `<pre>` blocks in another way, descr
 ## A command: `run`
 
 A `run` block names the context it runs in. The languages that run are `bash`, `sh`, `python`, `powershell` and
-`cmd`. Show the output in an `expect` block right after it.
+`cmd`. A context may name a program for one more language, and then a block in that language runs there: "A
+statement for a store" below shows `sql` and `cypher`. Show the output in an `expect` block right after it.
 
 A block passes on its exit status and on its `expect` block. With no `expect` block, nothing checks what the
 command prints, so the block must say so with the word `status-only`. The count at the end shows how many
@@ -197,19 +199,57 @@ all checks passed
 
 An `expect` block after a `skip` block is counted as skipped under the same reason.
 
+## A statement for a store
+
+A SQL statement runs in a SQL editor and a Cypher statement in Neo4j Browser, so the check cannot run them as
+commands. Four contexts give such a block a store to run on. `scripts/doc_snippets_fixtures.py` makes the store
+of the last three, removes it when the check ends, and runs the statements of all four.
+
+| Context | The block runs on | Write there |
+|---|---|---|
+| `enterprise-database` | The database `businessprocessarchitecturegraph` of the Neo4j test server, read only. | A `cypher` block that only asks. A statement that writes fails. |
+| `scratch-database` | A database of 25 made-up nodes with the constraint `n10s_unique_uri`. The context makes it and drops it. | A `cypher` block that deletes. |
+| `scratch-schemas` | Two schemas in the rehearsal catalog, with the four tables and the volume that a run of the KPI Store leaves. The context makes them and drops them. | A `sql` block that drops, and a `python` block that needs a notebook's `spark`. |
+| `questions` | A composite database over two made-up graphs. The context makes it and drops it. | The commands of the cross-graph questions. |
+
+A `cypher` block prints the rows of each statement: one line of column names, then one line for each row. A
+`sql` block prints `OK:` and the statement, for each statement.
+
+The documents name the client's objects, such as `idp_sbx.kpi_store.epm_triples`. In `scratch-schemas` the
+program replaces the two schema names of `kpi_store/kpi_store.example.toml`, in the catalog that file names, with
+the two throwaway schemas. It refuses a statement that then still names anything else. It also refuses a
+`DROP ... IF EXISTS` that names nothing the context made, because such a statement would pass in silence
+whatever name it held. So a wrong name in the document fails the block.
+
+A `python` block in `scratch-schemas` runs as a notebook cell of the `rdf-store` skill would. It has `spark` and
+`files`, and it can import `rdfstore`. Here `spark` sends each statement to the rehearsal workspace's SQL
+warehouse, and `files` is the three smallest module packages of the release. A Spark session exists only inside
+a Databricks notebook; the runner's `notebook` step runs the real one.
+
+A block that empties or drops what other blocks read must not run on the stores they share. Give it one of these
+contexts. When it must run on the shared stores, as the runbook's reset does, the document's next step must load
+them again.
+
 ## A block the check cannot run: `skip`
 
-Skip a block only when a test on this machine cannot run it. Give one of these reasons, then a colon, then the
-detail in a few words.
+Skip a block only when no test can run it. Give one of these reasons, then a colon, then the detail in a few
+words.
 
 | Reason | Use it when |
 |---|---|
-| `needs-client-server` | The command reads or writes a server that only the client has. |
+| `needs-client-server` | The command reads or writes a server that only the client has, and no stand-in is meaningful. |
 | `needs-browser-sign-in` | The command opens a browser for a person to sign in. |
-| `windows-only` | The command works only on Windows, and the Windows test cannot run it either. |
+| `windows-only` | The command works only on Windows, and the Windows test job cannot run it either. |
 | `destructive` | The command deletes or replaces something a test must not touch. |
-| `illustration` | The block is a sketch, a formula or a usage pattern. Nobody types it or copies it. |
+| `illustration` | The block is a sketch, a formula or a form to fill in. No tool can run it or parse it. |
 | `awaits-the-rewrite` | The document is about to be rewritten. This reason is temporary. |
+
+A skipped block is still parsed when its language is one that `parse` reads, or `python`. A typing error in it
+fails the check. The block then counts as checked, and the last line of the check says how many such blocks
+there are. Write `text` as the language of a block that is deliberately not valid.
+
+Every skipped block has a row in the table of "Blocks the test does not run" below. A test fails when a skipped
+block has no row, so add the row when you add the block.
 
 ````markdown nested
 ```bash skip reason="needs-browser-sign-in: opens the sign-in page of the workspace"
@@ -243,10 +283,27 @@ base = "empty"
 ```
 ````
 
+## A usage pattern: `usage`
+
+A usage pattern shows how to call a script. It has a name in angle brackets for each value, and square brackets
+around what is optional, so it cannot run. Name the script, and the check reads the script's text. Each option
+that the block names after the script, such as `--config`, must be there as `"--config"`. When the block calls several scripts,
+name the folder that holds them all. The block fails when a script is renamed or loses an option.
+
+````markdown nested
+```bash usage=scripts/check_standalone.py
+python3 scripts/check_standalone.py [--strict] [--rules] [--root <folder>]
+```
+````
+
 ## An example to read: `parse`
 
 A block of data or of a query that is not a file of the release is parsed, so a typing error fails. A Turtle
-block may leave out its prefix lines. A command is never parsed in place of a run: tag it `run` or `skip`.
+block may leave out its prefix lines. An `ini` block may leave out its section heading. A command is never parsed
+in place of a run: tag it `run` or `skip`.
+
+A Turtle or SPARQL block that uses the syntax of RDF 1.2, such as a reifier or `isTRIPLE`, says `rdf=1.2`. The
+`pyoxigraph` package then parses it, because `rdflib` does not read that syntax.
 
 For `cypher` the check is a token check, not a grammar check, because there is no Cypher parser here. The
 tokenizer of the cross-graph questions reads the block, and the check finds a string, a backtick name or a
@@ -269,6 +326,14 @@ SELECT ?measure WHERE { ?measure a <https://example.org/Measure> }
 
 ```cypher parse
 MATCH (n:Resource {uri: $uri}) RETURN n.uri AS uri
+```
+
+```turtle parse rdf=1.2
+kpi:crack-spread kpi:definedBy kpi:economics ~ kpi:definition-1 {| kpi:position 2 |} .
+```
+
+```ini parse
+dbms.security.procedures.unrestricted=apoc.*,n10s.*
 ```
 ````
 
@@ -310,7 +375,8 @@ words that say what the value is.
 
 In a `run` block, the context gives each placeholder its value, so the block still runs in the test. A
 placeholder that the context does not know fails the block. The contexts' placeholders are in
-`scripts/doc_snippets.toml`. A value may hold letters, digits and `. _ / : @ = + , -` only, because the check
+`scripts/doc_snippets.toml`. A placeholder whose value there is `fixture` gets its value from the store that the
+context makes. A value may hold letters, digits and `. _ / : @ = + , -` only, because the check
 puts it into the command.
 
 ## The contexts
@@ -336,11 +402,24 @@ its commands with that in mind.
 | `reasoner` | A copy of the release, for a command that runs the ROBOT jar with Java. | `KPI_STORE_TEST_ROBOT_JAR` names the jar. |
 | `empty-fuseki` | A copy of the release beside a second local Fuseki dataset that no other document loads. | `KPI_STORE_TEST_EMPTY_FUSEKI_URL` is set. |
 | `first-run` | A copy of the release as a plain folder, with a prepared local settings file. It keeps the real home folder. | `KPI_STORE_TEST_LOCAL_SETTINGS` and `KPI_STORE_TEST_LPG_OUT` are set. |
+| `enterprise-database`, `scratch-database`, `questions` | A copy of the release beside the Neo4j test server. "A statement for a store" describes each. | `KPI_STORE_TEST_NEO4J_URI` and `KPI_STORE_TEST_NEO4J_PASSWORD` are set. |
+| `scratch-schemas` | A copy of the release beside two throwaway schemas of the rehearsal workspace. It keeps the real home folder. | `KPI_STORE_TEST_LOCAL_SETTINGS` is set. |
+| `windows-account` | An empty folder on a Windows account that may be changed. It keeps the real home folder. | `DOC_SNIPPETS_WINDOWS_ACCOUNT` is set. |
 
 The `first-run` context is for the runbook, whose commands find the local settings file through the variable
 `KPI_STORE_LOCAL`. The context gives its blocks that variable, with the value of `KPI_STORE_TEST_LOCAL_SETTINGS`.
 The file must name test stores and a rehearsal workspace, never the client's. `KPI_STORE_TEST_LPG_OUT` is the folder that the file's `[projection]` `out` names. No block of another context gets
 `KPI_STORE_LOCAL`, also when your own terminal has it set.
+
+The `first-run` context is one chain for the whole check, because the stores it loads are shared. The registry
+names the runbook as its `owner`. A block of another document that says `run=first-run` runs in the same folder,
+after the runbook's blocks, and finds the stores as the runbook left them. The check reads the runbook before
+such a document, wherever its name sorts. When you check such a document alone, its `first-run` blocks are
+counted as skipped, and `--all-contexts` fails them. Name the runbook in the same command.
+
+**Set `DOC_SNIPPETS_WINDOWS_ACCOUNT` only on an account you can throw away.** A block of `windows-account`
+changes a setting of the Windows account that runs the check, as `setx` does. The Windows test job sets the
+variable. On a reader's machine it is not set, so `scripts/check.sh` never runs such a block there.
 
 A context is one chain. When its variable is not set, the check counts every block of the context as skipped and
 prints the count with the variable to set. So keep the quick, independent commands in a context that always
@@ -353,7 +432,9 @@ A check that a block starts, such as `bash scripts/check.sh` in a copy of the re
 its last line says so. The running check proves to it that a block started it. The variable
 `DOC_SNIPPETS_NESTED` set by hand proves nothing: a check that finds it without that proof fails.
 
-To add a context, add a table to `scripts/doc_snippets.toml`. The comments there explain each key.
+To add a context, add a table to `scripts/doc_snippets.toml`. The comments there explain each key. A context
+that needs a store of its own names a `fixture`. That is a command, which the check runs with `up` before the
+context's first block and with `down` when the check ends.
 
 ````markdown nested
 ```toml parse
@@ -384,15 +465,16 @@ this check was started by a block of another check, so it ran no block
 `--verbose` prints one line for each block. With no document, the check reads every Markdown document and every
 HTML page written by hand.
 `check --static` reads the tags, the files and the parsed blocks and runs nothing. `list` counts the blocks of
-each document by tag, and `contexts` says which contexts can run on this machine.
+each document by tag, and `contexts` says which contexts can run on this machine. `not-run` prints one table row
+for each skipped block, for the table of "Blocks the test does not run".
 
 These three commands are tested in a copy of the release. A check that a block starts runs no block, so in the
 test they read the tags and stop there.
 
-The parsers need three packages. When they are not installed, start the check through `uv`:
+The parsers need four packages. When they are not installed, start the check through `uv`:
 
 ```bash run=release-copy
-uv run -q --no-project --with rdflib --with pyyaml --with sqlglot python scripts/doc_snippets.py check scripts/DOC-SNIPPETS.md
+uv run -q --no-project --with rdflib --with pyyaml --with sqlglot --with pyoxigraph python scripts/doc_snippets.py check scripts/DOC-SNIPPETS.md
 ```
 
 ```text expect
@@ -404,7 +486,7 @@ To run a context that is off, set its variable. **The slow context takes many mi
 `HOW-TO-UPDATE.md` run the whole of `scripts/check.sh`.
 
 ```bash run=release-copy
-DOC_SNIPPETS_SLOW=1 uv run -q --no-project --with rdflib --with pyyaml --with sqlglot python scripts/doc_snippets.py check HOW-TO-UPDATE.md
+DOC_SNIPPETS_SLOW=1 uv run -q --no-project --with rdflib --with pyyaml --with sqlglot --with pyoxigraph python scripts/doc_snippets.py check HOW-TO-UPDATE.md
 ```
 
 ```text expect
@@ -444,9 +526,16 @@ When you prepare a new zip from a changed release, bring the examples up to date
 1. Run `check --strict`, and change each example that fails.
 2. Record the release that the examples now describe:
 
-   ```powershell skip reason="destructive: writes this release's digest into the registry of the release"
+   ```powershell run=release-copy
    py scripts/doc_snippets.py describe-release --write
    ```
+
+   ```text expect
+   the documents' examples describe this release (business_architecture/ontology/releases/catalog.ttl, SHA-256 <a digest>)
+   ```
+
+   The test runs the command on the release as shipped, where the recorded value is already right, so it writes
+   nothing and prints the line above. On a changed release its line starts with `wrote` and holds the new value.
 
 With no option, the command writes nothing and says whether the recorded value is this release's. It ends with
 exit 1 when it is not:
@@ -467,13 +556,66 @@ release the examples describe.
 
 Each failure is one line with the document and the line of the block, then the end of the block's output. The
 last line counts the blocks. "checked" counts the blocks that were compared or parsed, and "status-only" the
-blocks that ran with no `expect` block:
+blocks that ran with no `expect` block. This is the count for a document with four parsed blocks and one sketch:
 
-```text skip reason="illustration: the shape of the count, whose numbers change with every document"
-121 blocks: 18 run (9 status-only), 43 checked, 60 skipped (awaits-the-rewrite 21, illustration 31, ...)
+```powershell run=release-copy
+py scripts/doc_snippets.py check skills/ontology-to-lpg/references/design-rules.md
 ```
 
+```text expect
+5 blocks: 0 run (0 status-only), 4 checked, 1 skipped (illustration 1)
+this check was started by a block of another check, so it ran no block
+```
+
+When a skipped block was parsed, the line ends with their number and reasons, such as
+`1 of the checked parsed but not run (needs-client-server 1)`.
+
 `py scripts/doc_snippets.py html` lists the HTML pages written by hand, with the number of `<pre>` blocks in each.
+
+## Blocks the test does not run
+
+Every other block of the documents is run, compared with a file, checked against a script or parsed. The blocks in
+this table are tagged `skip`, and no test runs them. Each row says why, what is done instead, and who can run the
+block.
+
+A test in `scripts/test_doc_snippets.py` compares this table with the documents. It fails when a skipped block
+has no row here, and when a row names a block that is gone. The first four cells must be the block's document,
+the heading it stands under, the start of its first line and its reason. `py scripts/doc_snippets.py not-run`
+prints those four cells for every skipped block. Write the last two cells yourself.
+
+| Document | Heading | The block starts with | Reason | What is done instead | Who can run it |
+|---|---|---|---|---|---|
+| `business_architecture/domain/decision-packages/2026-10-14/step9-walkthrough.md` | Question 1. Approve the controlled-value shapes | `Constraint Violation in HasValueConstraintComponent` | `illustration` | It is a shortened quote of a validation report in a dated decision record. `business_architecture/ontology/validation/test_controlled_values.py` tests that a value from the wrong list fails these shapes. | Nobody. It is a quote, not a command. |
+| `business_architecture/ontology/MODULES.md` | One walk across modules | `Gulf Coast 3-2-1 crack spread (market-data)` | `illustration` | It is a sketch. Each link in it is quoted earlier on the page in a Turtle block, and those blocks are parsed. | Nobody. It is a sketch. |
+| `business_architecture/ontology/build/r1/r1-consumer-inventory-checklist.md` | R1 Hierarchy-Consumer Inventory — Team Checklist | `Downstream Operations > Commercial & Marketing > Planning &` | `illustration` | Nothing. The block holds two texts to search for in tools outside this release. | The team that owns each tool, by hand. |
+| `business_architecture/ontology/build/r1/r1-consumer-inventory-checklist.md` | G. Attestation | `Asset class: _______________ Owner: _______________ Date: __` | `illustration` | Nothing. It is a form. | A person fills it in by hand. |
+| `business_architecture/ontology/projection/ontology-stores-runbook.md` | Install the programs | `winget install Databricks.DatabricksCLI` | `windows-only` | The Windows test job tries the command in its step "winget, to learn whether this runner can run the runbook's install command" and does not fail on it, because the runner image's list of software (image 20261101.318.1) does not name winget. The setup check's `databricks-cli` line proves the result of the install, and the document test runs that check. | The reader, on a Windows 10 or 11 machine. |
+| `business_architecture/ontology/projection/ontology-stores-runbook.md` | Sign in to Databricks | `databricks auth login --host <your workspace URL> --profile` | `needs-browser-sign-in` | Nothing runs it. The setup check's `databricks-auth` line passes only after this sign-in, and the document test runs that check with the rehearsal workspace's profile. | A person, in a browser. |
+| `business_architecture/reference/internal/crack-spread-kpi-definition.md` | 3.2 Core formulas | `3-2-1 Ex-RVO, $/bbl` | `illustration` | Nothing. It is the client's formula, quoted as text. | Nobody. It is a formula. |
+| `business_architecture/reference/internal/crack-spread-kpi-definition.md` | 3.2 Core formulas | `3-2-1 Inc-RVO, $/bbl` | `illustration` | Nothing. It is the client's formula, quoted as text. | Nobody. It is a formula. |
+| `business_architecture/reference/internal/crack-spread-kpi-definition.md` | 4.4 MPC-weighted 3-2-1 | `Before 5 May 2024: (USGC × 0.40) + (Chicago × 0.40) + (LA ×` | `illustration` | Nothing. It is the client's formula, quoted as text. | Nobody. It is a formula. |
+| `scripts/DOC-SNIPPETS.md` | A block the check cannot run: `skip` | `databricks auth login` | `needs-browser-sign-in` | It is this page's example of the `skip` tag, so it must be skipped. `scripts/test_doc_snippets.py` tests the tag. | A person, in a browser. |
+| `scripts/DOC-SNIPPETS.md` | A block the check cannot run: `skip` | `Databricks -> Fuseki -> Neo4j` | `illustration` | It is this page's example of a sketch. `scripts/test_doc_snippets.py` tests the tag. | Nobody. It is a sketch. |
+| `scripts/DOC-SNIPPETS.md` | A page written by hand | `<pre data-snippet="bash run=release-copy"><code>python3 scri` | `illustration` | It shows three made-up blocks of a page. `scripts/test_doc_snippets.py` runs blocks written in this form (`test_a_page_block_runs_as_the_text_its_reader_sees`). | Nobody. The three blocks are made up. |
+| `skills/ontology-to-lpg/references/design-rules.md` | Mental model | `literal object -> node property` | `illustration` | It is a sketch of the rules that the same page states. The skill's `test_projection.py` tests the rules. | Nobody. It is a sketch. |
+| `skills/ontology-to-lpg/references/pipeline.md` | The pipeline: check, reason, serialise, load, verify | `module.ttl ──┐` | `illustration` | It is a drawing of the five steps. The commands of each step are run blocks further down the page. | Nobody. It is a drawing. |
+| `kpi-intake/how-to-use-the-form.html` | The name of an answers file | `crack-spreads-pricing.kpi-intake.json` | `illustration` | It is a file name. `kpi_store/intake/browser_check.py` checks the name that the form proposes for a download. | Nobody. It is a name. |
+| `kpi-intake/how-to-use-the-form.html` | Make the shared folder | `py -m kpi_store.intake folders "S:/Commercial Planning/Share` | `needs-client-server` | The same command runs in the block before it, with `.` as the location. `kpi_store/tests/test_intake_build.py` runs it on a folder of the test. | The reader, on a machine that has the shared drive. |
+| `kpi-intake/how-to-use-the-form.html` | Check a file | `py -m kpi_store.intake check "S:/Commercial Planning/Shared/` | `needs-client-server` | The same command runs in the block before it, on the example that ships with the release. | The reader, on a machine that has the shared drive. |
+
+Some blocks run in a test and still not everywhere:
+
+- **Nothing runs on the client's sandbox or the client's Enterprise server.** The `first-run` chain loads a
+  rehearsal workspace and local test servers. The SQL and the Cypher of the runbook's "How to undo" run on
+  throwaway schemas and a throwaway database, not on the objects they name.
+- **No Databricks step runs in the Windows test job.** The repository and its CI hold no token, so the job has
+  no workspace to sign in to. `.github/workflows/check.yml` says which steps of the runner it leaves out. Those
+  steps run in the `first-run` chain on macOS.
+- **A block that says `os=windows` runs on Windows only.** `scripts/check.sh` runs it in the Windows test job. A
+  block of the `windows-account` context runs in that job's `stores` part.
+- **The store contexts run only where their variables are set.** `scripts/check.sh` on a reader's machine sets
+  none, so it counts those blocks as skipped and names the variable. The cut sets them all and adds
+  `--all-contexts`.
 
 ## The links of the documents
 

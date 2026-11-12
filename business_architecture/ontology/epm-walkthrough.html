@@ -1339,9 +1339,10 @@ WHERE { GRAPH ?g { ?s ?p ?o } FILTER(STRSTARTS(STR(?g), "https://w3id.org/mpc/on
 <tr><td><code>q7</code></td><td data-k="What it asks">KPIs that rest on SOX-relevant or confidential systems</td></tr>
 </tbody></table></div>
 <p class="rise">The governance graph belongs to its owner, and its labels can change. So no template names a label, a property or a relationship type: it names roles. <code>discover</code> reads both graphs' schemas and proposes which name plays each role. A person corrects the proposal and confirms it once. Every later run checks the confirmed mapping against the live schemas before it asks anything. Every query runs in a read transaction.</p>
-<pre data-snippet="powershell skip reason=&quot;needs-client-server: reads the client's Neo4j composite database&quot;"><code>py -m kpi_store.questions.run discover --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
-py -m kpi_store.questions.run confirm  --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
-py -m kpi_store.questions.run check    --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
+<pre data-snippet="powershell run=questions types=&quot;yes&quot; status-only"><code>py -m kpi_store.questions.run discover --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
+py -m kpi_store.questions.run confirm  --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;</code></pre>
+<p class="rise"><code>confirm</code> shows the mapping and asks <code>Type yes to confirm this mapping:</code>. Type <code>yes</code> and press Enter. Any other answer leaves the mapping file as it was. Then check the mapping and ask a question:</p>
+<pre data-snippet="powershell run=questions status-only"><code>py -m kpi_store.questions.run check    --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
 py -m kpi_store.questions.run ask q6   --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt; --param kpi=crude-prices --out &lt;a folder&gt;</code></pre>
 <p class="rise">The settings file and the mapping file describe one environment, so both stay outside the release. <code>kpi_store/questions/connection.py</code> lists the settings.</p></section>
 
@@ -1942,7 +1943,7 @@ rebuild: skipped, 'no rebuild in the run configuration'</code></pre></dd>
 <dl class="parts">
 <dt>Prerequisites</dt><dd>The release, checked (build step 23); a Windows machine with Python, Java, the Fuseki jar, a local Neo4j with n10s and APOC, and the Databricks command line; a Databricks workspace; a Neo4j Enterprise database.</dd>
 <dt>Files to open, in this order</dt><dd><ol class="files"><li><code>business_architecture/ontology/projection/ontology-stores-runbook.html</code>: the steps, in order</li><li><code>kpi_store/kpi_store.example.toml</code>: the settings of one environment</li><li><code>kpi_store/notebook/kpi_store_load.py</code>: the Databricks load</li><li><code>kpi_store/discovery.py, compare.py, report.py</code>: the reading of the workspace, the comparison and the report</li><li><code>kpi_store/load_databricks.py</code>: the load of <code>epm_triples</code> and its proof by a hash</li><li><code>kpi_store/cut.py</code> and <code>business_architecture/ontology/discovery-runs/README.md</code>: the cut tool and the record it writes</li><li><code>kpi_store/tech_graph.py</code>: the technical graph, built from the same reading</li><li><code>kpi_store/tests/</code>: the tests, on made-up fixtures with the real shapes</li></ol></dd>
-<dt>Commands</dt><dd><pre data-snippet="powershell skip reason=&quot;needs-client-server: loads the client's Databricks workspace, Fuseki and Neo4j&quot;"><code>py -m kpi_store.setup_check
+<dt>Commands</dt><dd><pre data-snippet="powershell run=first-run status-only"><code>py -m kpi_store.setup_check
 py -m kpi_store.runner
 py -m kpi_store.sync_check</code></pre></dd>
 <dt>What you should see</dt><dd>The first run either loads all three stores or stops with a discovery report. After a person clears the report and the cut tool writes a correction version, the next run passes and loads. The sync check then reads every store as current. A rehearsal on a made-up workspace did exactly this: one blocking row, one cut, a second run that loaded, and a third that changed nothing.</dd>

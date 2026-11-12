@@ -12,6 +12,7 @@ from .check import NESTED_NOTE, REFRESH, RELEASE_NOTE, Checker
 from .extract import documents, extract
 from .links import broken_links
 from .pages import extract_html, html_documents, is_page
+from .static import not_run
 from .registry import REGISTRY, ROOT, RegistryError, load_registry, release_digest, write_release_digest
 
 
@@ -86,6 +87,7 @@ def main(argv=None, registry_path: Path = REGISTRY) -> int:
     listing = sub.add_parser("list", help="count the blocks of each document by tag")
     listing.add_argument("docs", nargs="*")
     sub.add_parser("contexts", help="the contexts, and which ones can run here")
+    sub.add_parser("not-run", help="the blocks that no test runs, as rows for the table in scripts/DOC-SNIPPETS.md")
     sub.add_parser("html", help="the HTML pages with no Markdown source, which the check reads too")
     links = sub.add_parser("links", help="check that every relative link of the documents points into the tree")
     links.add_argument("docs", nargs="*", help="documents, relative to the top folder (default: every one)")
@@ -130,6 +132,11 @@ def main(argv=None, registry_path: Path = REGISTRY) -> int:
             total.update(counts)
             print(f"{sum(counts.values()):4d}  {doc}: " + ", ".join(f"{k} {n}" for k, n in sorted(counts.items())))
         print(f"{sum(total.values()):4d}  total: " + ", ".join(f"{k} {n}" for k, n in sorted(total.items())))
+        return 0
+    if args.command == "not-run":
+        for doc, heading, key, reason in not_run(root):
+            code = "``" if "`" in key else "`"
+            print(f"| `{doc}` | {heading} | {code}{' ' if '`' in key else ''}{key.replace('|', chr(92) + '|')}{' ' if '`' in key else ''}{code} | `{reason}` |")
         return 0
     if args.command == "contexts":
         for context in registry.contexts.values():

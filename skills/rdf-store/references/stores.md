@@ -26,12 +26,19 @@ An in-memory dataset starts empty on every restart, which makes "nothing you hav
 
 Spark is the only Databricks path. A Databricks notebook already has a Spark session, `spark`, so the load needs no host name, no warehouse and no credential. There is no command for it, because there is no Spark outside the notebook. The notebook imports `rdfstore.py` and calls it:
 
-```python skip reason="needs-client-server: needs a Spark session in a Databricks workspace"
+```python run=scratch-schemas
 import rdfstore as rs
 dataset = rs.pack(files)                      # one named graph per file
 store = rs.SparkStore(spark, "<catalog>.<schema>.<table>")
 passed, report = rs.roundtrip(store, dataset)
+print(passed, report["actual_quads"], "quads,", "published" if report["published"] else "not published")
 ```
+
+```text expect
+True <count> quads, published
+```
+
+`files` is the list of the files to load, and `passed` is `True` only when the table holds exactly the dataset.
 
 `SparkStore` calls one method of the session, `spark.sql(<statement>)`, and reads rows with `.collect()` on its result. The schema must exist. The table name is one to three parts of letters, digits and `_`; any other name is refused before a statement runs. The run touches two tables: `<table>` and a staging table of its own, `<table>__staging_<random>`, so two runs on one table never verify or promote each other's rows.
 

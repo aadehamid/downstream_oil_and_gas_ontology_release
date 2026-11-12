@@ -1,6 +1,8 @@
 """The `parse` tag: one parser per language. Each raises when the text is not valid."""
 from __future__ import annotations
 
+import ast
+import configparser
 import json
 import re
 import sys
@@ -22,17 +24,45 @@ def parse_yaml(body, attrs):
     list(yaml.safe_load_all(body))
 
 
+def parse_ini(body, attrs):
+    """A settings file of sections and `name = value` lines. A block that shows lines of one section without
+    its heading is read under a made-up heading."""
+    text = body if re.search(r"(?m)^\s*\[", body) else "[doc-snippets]\n" + body
+    configparser.ConfigParser(interpolation=None, strict=True).read_string(text)
+
+
+def parse_python(body, attrs):
+    """The syntax only: nothing is imported and nothing runs. For a skipped block."""
+    ast.parse(body)
+
+
+def _rdf_version(attrs):
+    """rdf=1.2 names the syntax of RDF 1.2: a triple term, a reifier. rdflib does not read it, so pyoxigraph does."""
+    if attrs.get("rdf", "1.1") not in ("1.1", "1.2"):
+        raise ValueError("rdf= is 1.1 (the default) or 1.2")
+    return attrs.get("rdf", "1.1")
+
+
 def parse_turtle(body, attrs):
-    import rdflib
     # A document often shows a few triples without their prefix lines. Each prefix the block uses and does
     # not declare gets a made-up namespace, so the triples themselves are still read.
     declared = set(re.findall(r"(?im)^\s*@?prefix\s+([\w-]*):", body))
     used = set(re.findall(r"(?<![\w<:/#])([A-Za-z][\w-]*):(?!//)", body))
     made_up = "".join(f"@prefix {name}: <urn:doc-snippets:{name}#> .\n" for name in sorted(used - declared))
+    if _rdf_version(attrs) == "1.2":
+        import pyoxigraph
+        if not list(pyoxigraph.parse(made_up + body, format=pyoxigraph.RdfFormat.TURTLE)):
+            raise ValueError("no triple")
+        return
+    import rdflib
     rdflib.Graph().parse(data=made_up + body, format="turtle")
 
 
 def parse_sparql(body, attrs):
+    if _rdf_version(attrs) == "1.2":
+        import pyoxigraph
+        pyoxigraph.Store().query(body)      # an empty store in memory: the query is parsed and finds nothing
+        return
     from rdflib.plugins.sparql import prepareQuery, prepareUpdate
     try:
         prepareQuery(body)
@@ -93,5 +123,6 @@ def parse_cypher(body, attrs):
         raise ValueError("no statement")
 
 
-PARSERS = {"json": parse_json, "toml": parse_toml, "yaml": parse_yaml, "turtle": parse_turtle,
+PARSERS = {"json": parse_json, "toml": parse_toml, "yaml": parse_yaml, "ini": parse_ini, "python": parse_python,
+           "turtle": parse_turtle,
            "sparql": parse_sparql, "sql": parse_sql, "cypher": parse_cypher}

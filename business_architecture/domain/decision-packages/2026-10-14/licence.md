@@ -16,7 +16,7 @@ A licence policy already exists. The worklog has a section headed "License polic
 
 The ontology README states the same policy, at `business_architecture/ontology/README.md` lines 74 to 76:
 
-```text skip reason="illustration: a passage quoted from another document"
+```text excerpt=business_architecture/ontology/README.md
 - **License:** this folder's contents are proprietary, all rights reserved.
   APQC-sourced material is used under the APQC/IBM license terms —
   attribution travels with every distribution (see `../reference/README.md`).

@@ -216,7 +216,11 @@ all checks passed</code></pre></li></ol>
 <p>The steps are the runbook's, from "The first run" to "The sync check". Two things differ after the first run.</p>
 <ol><li>Run the runner, as in the runbook's "The first run". If it ends with <code>every step passed</code>, nothing differs and you are done.</li><li>If it stops on a report, clear the report, as in the runbook's "Clear the report".</li><li>Run the runner again and answer the cut's prompts, as in the runbook's "The second run".</li><li>If the <code>enterprise</code> step stops because the database holds KPI Store nodes of the earlier release, run the step again with the replace allowed. <strong>The replace deletes every node in that database that carries the KPI Store's marks, before it copies.</strong> The runbook's "The limits" lists the marks. If the copy still stops and names nodes, the new release dropped a model, class or label that those nodes belong to; the runbook's "Replace what Enterprise holds" says what to do.
 <pre><code class="lang-powershell">py -m kpi_store.runner --from enterprise --replace-enterprise</code></pre></li></ol>
-<ol start="5"><li>Read the last line. Expect <code>the steps that ran passed</code>, with the steps before <code>enterprise</code> named as left out.</li></ol>
+<ol start="5"><li>Read the last line. Expect <code>the steps that ran passed</code>, with the steps before <code>enterprise</code> named as left out.
+<pre><code class="lang-text">run &lt;run ID&gt;: enterprise, sync, summary
+enterprise: &lt;what the copy did&gt;
+...
+the steps that ran passed; left out: cut, check, zip, volume, upload, notebook, report, fuseki, neo4j (not run, so not checked)</code></pre></li></ol>
 <p>The second difference is the version. A second correction to the same module counts up: <code>1.2.1-correction.2</code>.</p>
 <h3 id="see-the-cut-by-itself">See the cut by itself<a class="hl" href="#see-the-cut-by-itself" aria-label="Link to this section">#</a></h3>
 <p>The runner calls the cut tool for you. To see what a cut does, run the tool on the made-up report that ships with the tests. It is the report of a made-up workspace in the sandbox's shapes. Do this in a copy of the release folder, never in the folder you load from.</p>
@@ -346,6 +350,11 @@ all checks passed</code></pre>
 <p>After a change, the check prints a note: <code>projection-report.json describes an earlier build</code>. That file is the summary of the last Neo4j load, and it now describes the release before your change. The note does not fail the check, and it does not mean the ontology is wrong. It goes away when you have loaded the stores and recorded the new load's report with <code>py pipeline.py record</code>. The runbook's section "Record the load's report in the release folder" runs that command.</p></li></ol>
 <ol start="10"><li>Search your copy for text that the change made stale, and update each document that holds it. No check catches a copy of a sentence.</li><li>Load the stores with the runner, and read its last line. The release is done when the sync check reads <code>current</code> on every line.
 <pre><code class="lang-powershell">py -m kpi_store.runner</code></pre>
+<pre><code class="lang-text">run &lt;run ID&gt;: cut, check, zip, volume, upload, notebook, report, fuseki, neo4j, enterprise, sync, summary
+...
+sync: all &lt;count&gt; lines read current
+...
+every step passed</code></pre>
 <p>If the <code>enterprise</code> step stops because the database holds the earlier release, see step 4 of "A correction through the loop".</p></li></ol>
 <h2 id="change-a-concept-s-definition">Change a concept's definition<a class="hl" href="#change-a-concept-s-definition" aria-label="Link to this section">#</a></h2>
 <p>A new wording with the same meaning is a patch. If the meaning changes, the release is a major, and the ontology owner approves it.</p>

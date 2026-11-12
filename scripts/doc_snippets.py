@@ -5,6 +5,7 @@
     python3 scripts/doc_snippets.py list [DOC ...]     count the blocks of each document by tag
     python3 scripts/doc_snippets.py contexts           the contexts, and which ones can run here
     python3 scripts/doc_snippets.py html               the HTML pages with no Markdown source, and their blocks
+    python3 scripts/doc_snippets.py not-run            the blocks no test runs, as rows of the table that lists them
     python3 scripts/doc_snippets.py links [DOC ...]    check that every relative link points at a file of the tree
     py scripts/doc_snippets.py describe-release [--write]   say whether the examples describe this release, or record it
 
@@ -35,6 +36,7 @@ from doc_snippets_parts.match import has_fixed_text, normalise, output_matches  
 from doc_snippets_parts.registry import (NESTED, NESTED_FILE, REGISTRY, ROOT, RegistryError, load_registry,  # noqa: E402,F401
                                          release_digest, write_release_digest)
 from doc_snippets_parts.report import describe_release, html_pages, main, tally  # noqa: E402,F401
+from doc_snippets_parts.static import block_key, chain_order, not_run, table_rows, usage_problem  # noqa: E402,F401
 from doc_snippets_parts.run import NotSimple, command_lines, resolve_program, run_process, split_command  # noqa: E402,F401
 
 if __name__ == "__main__":

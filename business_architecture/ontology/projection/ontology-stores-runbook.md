@@ -70,7 +70,7 @@ Do this section once per machine. The setup check at its end tells you what is s
 6. Open `https://adoptium.net/temurin/releases/`, choose version 21 for Windows, and install it with its default choices. Fuseki 6.2.0 and ROBOT run on Java 21.
 7. Open Command Prompt and install the Databricks command line. The command is from Databricks' page "Install or update the Databricks CLI" (last updated 2026-09-11).
 
-   ```cmd skip reason="windows-only: installs a program on the reader's machine with the Windows package manager"
+   ```cmd skip reason="windows-only: installs a program with winget, which the image of the Windows test job does not list"
    winget install Databricks.DatabricksCLI
    ```
 
@@ -116,7 +116,7 @@ You do not compare the checksums by hand. The setup check does it and fails on a
 
 3. If the machine has more than one Python, tell the `py` launcher which one to start. `py` starts the newest Python it finds, and the packages of step 2 must be installed for that one. This command makes `py` start Python 3.12 in every new terminal.
 
-   ```cmd skip reason="windows-only: sets a variable of the reader's own account for the Windows Python launcher"
+   ```cmd run=windows-account os=windows status-only
    setx PY_PYTHON 3.12
    ```
 
@@ -151,7 +151,7 @@ The local Neo4j checks the graph before anything goes to Enterprise. It needs tw
 5. On the instance's menu, open `neo4j.conf`.
 6. Add this line at the end of the file and save it.
 
-   ```text skip reason="illustration: one line of the Neo4j instance's own settings file, which the setup check then proves by calling both plugins"
+   ```ini parse
    dbms.security.procedures.unrestricted=apoc.*,n10s.*
    ```
 
@@ -204,7 +204,7 @@ The release has an example of each file. Copy both, then change only the lines t
 7. Save the file and close Notepad.
 8. Tell every command where the file is. Then close PowerShell and open it again, because the setting reaches new windows only.
 
-   ```cmd skip reason="windows-only: sets a variable of the reader's own account to a file on the reader's machine"
+   ```cmd run=windows-account os=windows status-only
    setx KPI_STORE_LOCAL C:\kpi-store-local\stores.toml
    ```
 
@@ -228,7 +228,7 @@ When the sign-in expires later, a run fails at its first Databricks step. Run th
 
 1. In PowerShell, go to the release folder. Every later command in this guide starts there.
 
-   ```powershell skip reason="windows-only: moves to a folder on the reader's machine"
+   ```powershell run=windows-account os=windows status-only
    cd C:\kpi-store-1.1
    ```
 
@@ -490,9 +490,20 @@ One case needs a person. The marks are those of the release you copy. When that 
 
 If the `enterprise` step stops for that reason, run the step again with the replace allowed:
 
-```powershell skip reason="needs-client-server: replaces the KPI Store's nodes in the client's Enterprise database"
+```powershell run=first-run
 py -m kpi_store.runner --from enterprise --replace-enterprise
 ```
+
+```text expect
+run <run ID>: enterprise, sync, summary
+enterprise: <what the copy did>
+...
+sync: all <count> lines read current
+...
+the steps that ran passed; left out: cut, check, zip, volume, upload, notebook, report, fuseki, neo4j (not run, so not checked)
+```
+
+The `enterprise` line starts with `copied` after a replace. When the database already holds this release, it starts with `current` and nothing was replaced. The document test runs the command in that state, right after the second run.
 
 Do not add `--replace-enterprise` to a first run. An empty database needs no replace, and without the option the copy cannot delete anything.
 
@@ -905,7 +916,7 @@ The exit code is 0 only when every store that the command names holds nothing of
 2. Check each line. A line that says `cannot be emptied` or `cannot be read` names a store that the reset will leave alone, and the reason. The last line then says that the reset would end with exit code 1.
 3. Run the reset. **This step deletes.** It prints the same lines again and then asks.
 
-   ```powershell skip reason="destructive: empties the four stores that the later steps of this guide read"
+   ```powershell run=first-run types="reset"
    py -m kpi_store.runner --reset
    ```
 
@@ -917,9 +928,46 @@ The exit code is 0 only when every store that the command names holds nothing of
    reset done: enterprise, neo4j, fuseki and databricks hold nothing of the KPI Store. To load again, run: py -m kpi_store.runner
    ```
 
-6. Load the stores again with the normal run, `py -m kpi_store.runner`, as in "Run it again: nothing changes". Do not add `--replace-enterprise`, because the database holds no KPI Store node. This time the lines `notebook`, `fuseki` and `neo4j` say `loaded`, and the line `enterprise` says `copied`. In the test run, the steps after `check` took 9 minutes.
+6. Run the sync check. It reads `unmarked` for Databricks and for the two Neo4j databases. It reads `unreachable` for `jena`, because Fuseki is stopped. The command ends with exit code 1, because no store holds the release now.
 
-Between the reset and the load, the sync check reads `unmarked` for Databricks and for the two Neo4j databases. It reads `unreachable` for `jena`, because Fuseki is stopped. The load starts Fuseki again.
+   ```powershell run=first-run exit=1
+   py -m kpi_store.sync_check
+   ```
+
+   ```text expect
+   databricks      unmarked    <why>
+   jena            unreachable <why>
+   neo4j           unmarked    <why>
+   enterprise      unmarked    <why>
+   lm:neo4j        unmarked    <why>
+   lm:enterprise   unmarked    <why>
+   tech:databricks unmarked    <why>
+   tech:jena       unreachable <why>
+   tech:neo4j      unmarked    <why>
+   tech:enterprise unmarked    <why>
+   ```
+
+7. Load the stores again with the normal run, as in "Run it again: nothing changes". Do not add `--replace-enterprise`, because the database holds no KPI Store node. The load starts Fuseki again. This time the lines `notebook`, `fuseki` and `neo4j` say `loaded`, and the line `enterprise` says `copied`. In the test run, the steps after `check` took 9 minutes.
+
+   ```powershell run=first-run
+   py -m kpi_store.runner
+   ```
+
+   ```text expect
+   run <run ID>: cut, check, zip, volume, upload, notebook, report, fuseki, neo4j, enterprise, sync, summary
+   cut: no report waits to be cut
+   check: all checks passed
+   ...
+   notebook: notebook run <number> loaded: <count> triples in <catalog>.<schema>.epm_triples, hash <hash>
+   ...
+   fuseki: loaded, <count> graphs, <count> triples, RDFC-1.0 hash <hash> equal in the store and the release files (<which server and where it keeps the data>); technical graph loaded, <count> triples
+   neo4j: loaded, <count> nodes, <count> relationships, 0 SHACL violations over <count> constraints, round trip lost 0 and added 0, graph hash <hash>; technical graph loaded, <count> nodes
+   enterprise: copied, <count> nodes, <count> relationships, graph hash <hash> equal to the local graph's; technical graph loaded, <count> nodes
+   ...
+   sync: all <count> lines read current
+   ...
+   every step passed
+   ```
 
 Three options change what the reset does.
 
@@ -965,7 +1013,7 @@ Before the first run, the two schemas held no KPI Store table.
 1. Open a SQL editor in the Databricks workspace.
 2. Run these statements.
 
-   ```sql skip reason="destructive: drops the four tables the run wrote in the client's workspace"
+   ```sql run=scratch-schemas status-only
    DROP TABLE IF EXISTS idp_sbx.kpi_store.epm_triples;
    DROP TABLE IF EXISTS idp_sbx.kpi_store.epm_store_markers;
    DROP TABLE IF EXISTS idp_sbx.tech_graph.tech_graph_triples;
@@ -974,18 +1022,20 @@ Before the first run, the two schemas held no KPI Store table.
 
 3. To remove the uploaded zip, the settings copy and the reports too, drop the volume. **This deletes every report the runs wrote.**
 
-   ```sql skip reason="destructive: drops the volume the run made in the client's workspace"
+   ```sql run=scratch-schemas status-only
    DROP VOLUME IF EXISTS idp_sbx.kpi_store.releases;
    ```
 
 4. To remove the two schemas, drop them without `CASCADE`. Databricks then refuses a schema that still holds anything, so nothing of anyone else's can be lost.
 
-   ```sql skip reason="destructive: drops the two schemas the run made in the client's workspace"
+   ```sql run=scratch-schemas status-only
    DROP SCHEMA IF EXISTS idp_sbx.kpi_store;
    DROP SCHEMA IF EXISTS idp_sbx.tech_graph;
    ```
 
 5. In the workspace browser, delete the notebook `kpi_store_load` from the folder that your local settings name.
+
+The document test runs the statements of steps 2 to 4 on two throwaway schemas of the rehearsal workspace. They hold the four tables and the volume, as the two schemas do after a run. The statements of step 4 pass only because steps 2 and 3 left both schemas empty.
 
 ### Fuseki
 
@@ -1017,16 +1067,37 @@ Before the first run, `businessprocessarchitecturegraph` held no node. The setup
 2. Choose the database `businessprocessarchitecturegraph`.
 3. Check which database you are in. The answer must be `businessprocessarchitecturegraph`.
 
-   ```cypher skip reason="needs-client-server: asks the client's Enterprise server which database the session is in"
+   ```cypher run=enterprise-database
    CALL db.info() YIELD name RETURN name
+   ```
+
+   ```text expect
+   name
+   businessprocessarchitecturegraph
    ```
 
 4. Delete the nodes, then the one constraint the copy made.
 
-   ```cypher skip reason="destructive: deletes every node of the database the reader is connected to"
+   ```cypher run=scratch-database status-only
    MATCH (n) CALL (n) { DETACH DELETE n } IN TRANSACTIONS OF 10000 ROWS;
    DROP CONSTRAINT n10s_unique_uri IF EXISTS;
    ```
+
+5. Check that nothing is left. Both answers must be 0.
+
+   ```cypher run=scratch-database
+   MATCH (n) RETURN count(n) AS nodes_left;
+   SHOW CONSTRAINTS YIELD name RETURN count(name) AS constraints_left;
+   ```
+
+   ```text expect
+   nodes_left
+   0
+   constraints_left
+   0
+   ```
+
+The document test runs step 3 on the test server's `businessprocessarchitecturegraph`, read only. It runs steps 4 and 5 on a database of its own with 25 made-up nodes and the same constraint, so that the database the other steps read stays loaded.
 
 ### The runs' files
 
@@ -1040,7 +1111,7 @@ This is the design of this release. One person runs the runner on a Windows mach
 
 | Machine | State |
 |---|---|
-| Windows 10 or 11 | The design. The check script, the three store loads and the sync check ran on Windows in the test job. The runner itself has not run there. "What ran where" lists what that leaves open. |
+| Windows 10 or 11 | The design. The test job runs the check script on Windows. It also runs the runner for the three local stores, the reset of those stores and the sync check. It runs no Databricks step. "What ran where" lists what that leaves open. |
 | macOS | Every run of this guide's chain so far happened here. Write `python3` where this guide writes `py`. Git Bash and `setx` are not needed. |
 
 ### A pipeline
@@ -1060,7 +1131,7 @@ The sign-in is the third limit. Today it is `databricks auth login`, which opens
 
 A service principal changes that. Databricks' page "Authorize service principal access with OAuth M2M" (last updated 2026-10-30, `https://docs.databricks.com/aws/en/dev-tools/auth/oauth-m2m`) describes the sign-in: OAuth for machines, with a client ID and a client secret. The runner passes `--profile` and the profile's name to every Databricks command. The sync check opens the Databricks SDK with the same profile. So the pipeline needs a profile in the file `.databrickscfg` in its home folder, with the three fields that the page names:
 
-```ini skip reason="illustration: the shape of a profile for a service principal, whose secret comes from the pipeline's secret store"
+```ini parse
 [kpi-store-pipeline]
 host          = <your workspace URL>
 client_id     = <the service principal's client ID>
@@ -1106,30 +1177,35 @@ Three places ran parts of this guide. No place ran all of it, and nothing ran on
 
 | Place | What ran there |
 |---|---|
-| macOS, with a rehearsal Databricks workspace in the sandbox's shapes, a local Fuseki 6.2.0 and a local Neo4j 2025.06.2 Enterprise with n10s 2025.06.1 and APOC 2025.06.2 | The whole chain of this guide, through the runner: every command that the document test runs. |
-| The Windows test job (Windows Server 2025, Python 3.12, Java 21) | The whole check script. The setup check, 13 of its 15 checks. The Fuseki load, a second load that changed nothing, its sync check and `--stop`. The Neo4j Enterprise load with n10s and APOC and all its checks: 4,242 nodes, 22,331 relationships, 816 of 816 failing cases caught and 0 violations. The copy into `businessprocessarchitecturegraph` on the same server. The sync check of all three stores. |
+| macOS, with a rehearsal Databricks workspace in the sandbox's shapes, a local Fuseki 6.2.0 and a local Neo4j 2025.06.2 Enterprise with n10s 2025.06.1 and APOC 2025.06.2 | The whole chain of this guide, through the runner: every command that the document test runs. That includes the reset of all four stores and the load after it. |
+| The Windows test job (Windows Server 2025, Python 3.12, Java 21) | The whole check script. The setup check, 13 of its 15 checks. The Fuseki load, a second load that changed nothing, its sync check and `--stop`. Through the runner, without its `check` step and its Databricks steps: the Fuseki load, the Neo4j Enterprise load with n10s and APOC and all its checks (4,242 nodes, 22,331 relationships, 816 of 816 failing cases caught and 0 violations), and the copy into `businessprocessarchitecturegraph` on the same server. The sync check of all three stores. The reset of the three local stores, once with the typed word and once with `--yes`, then a sync check that reads no store as current, then the load again. `--replace-enterprise` on a copy that the job made incomplete. Through the document test: the two `setx` commands and the `cd` of this guide, and the Cypher of "How to undo". |
 | The client's sandbox and Enterprise server | Nothing yet. Your first run is the first. |
 
-These points are not proven on Windows. Each is written from the code and from the vendor's documentation.
+These points are not proven on Windows, or not on the client's own objects. Each is written from the code and from the vendor's documentation.
 
 | What | Why it is not proven | If it fails |
 |---|---|---|
-| The runner itself, as one command | The Windows job ran the check script and the loads one by one, not through the runner. | Run the steps one at a time with `--only`, and report the step that failed. |
-| Every Databricks step, and the two Databricks checks of the setup check | The Windows job has no workspace to sign in to. They ran on macOS. | Report the line. |
+| The runner as one command, with every step | The Windows job runs the runner without its `check` step and its Databricks steps. The check script runs in the same job on its own. | Run the steps one at a time with `--only`, and report the step that failed. |
+| Every Databricks step, the reset of Databricks, and the two Databricks checks of the setup check | The Windows job has no workspace to sign in to, because the repository holds no token. They run on macOS, in the document test. | Report the line. |
 | The technical graph in the three stores | It is built by the notebook, so it needs Databricks. It ran on macOS. | Report the line. |
 | Every step of "Install the programs" and "Unpack the release" | No test installs programs. | Report the step. |
 | The steps of "Set up the local Neo4j" | The Windows job used a Neo4j server, not Neo4j Desktop. The steps follow Neo4j Desktop's documentation ("Instance management"), and menu names may differ in your version. | Reach the same goal by the menu your version has. The setup check proves the result. |
-| `setx KPI_STORE_LOCAL` and `setx PY_PYTHON` | They change your account's settings, so no test runs them. | Add `--stores C:\kpi-store-local\stores.toml` to every command of this guide instead. |
+| A new terminal after `setx KPI_STORE_LOCAL` and `setx PY_PYTHON` | The Windows job runs both commands and reads both values back from the account's settings. It opens no new terminal to read them there. | Add `--stores C:\kpi-store-local\stores.toml` to every command of this guide instead. |
 | Clearing the report in Excel | The test edits the file with Python. The runner reads the CSV as UTF-8, with or without a byte-order mark, and reads only the columns `id`, `decision`, `decided_by` and `note`. | Edit the same three cells in Notepad instead. They are the last three values of each line. |
-| `py -m kpi_store.runner --reset` | It deletes, so the document test runs only its `--dry-run`. The reset itself ran on macOS against the test servers and the rehearsal workspace. It emptied the four stores, a node without the marks stayed in the Enterprise database, and the next run loaded every store again. It has not run on Windows. | Report the line. To empty that store by hand, use "How to undo". |
-| The SQL of "How to undo" | It deletes, so no test runs it. The Cypher ran once on a local test server and left 0 nodes and 0 constraints. | Do not improvise. Report it. |
-| `--replace-enterprise` | No run needed it. | Report the line. |
+| The SQL and the Cypher of "How to undo", on the objects they name | The document test runs the SQL on two throwaway schemas of the rehearsal workspace, and the delete on a throwaway database of the test server. No run used them on the sandbox or on `businessprocessarchitecturegraph`. | Do not improvise. Report it. |
+| `--replace-enterprise` on a database that holds an earlier release | The document test runs the command on a database that already holds this release, so nothing is replaced. The Windows job runs it on a copy that the job made incomplete by deleting 100 nodes. The copy stops there, and it passes with the replace allowed. A hand run on macOS did the same against the test server. No run replaced the nodes of an earlier release. | Report the line. |
 | The rows of "The rows to expect on the sandbox" | They come from a comparison by hand. The rehearsal workspace gave the one blocking row and the two case-only rows. It has no Genie space, so no test produced the Genie rows. | Follow "When your report differs from the table". |
 
 The check script passes on Windows in the test job. Your machine is another machine, with its own antivirus and its own folders, so one fallback stays. If the step `check` fails, read the end of `check.log`. If the failing test is about the release's content, stop and report it. If it is about the machine, such as a file that another program holds open, report it and leave the step out of the run:
 
-```powershell skip reason="windows-only: the fallback for a check script that fails for a reason of the reader's machine"
+```powershell run=first-run
 py -m kpi_store.runner --skip check
+```
+
+```text expect
+run <run ID>: cut, zip, volume, upload, notebook, report, fuseki, neo4j, enterprise, sync, summary
+...
+the steps that ran passed; left out: check (not run, so not checked)
 ```
 
 A run with a step left out never says `every step passed`. Its last line names the step that was left out. On the first run the release folder is the one that was checked before it was zipped. After the cut, the cut tool has already verified each package it wrote against a fresh build and has run the competency questions.
