@@ -309,6 +309,8 @@ def _pick_list_problems(pick_lists):
                 or not all(isinstance(a.get("id"), str) and a["id"].strip() and isinstance(a.get("label"), str) and a["label"].strip()
                            and not set(a) - {"id", "label"} for a in added)):
             out.append(f"{where}: each added entry needs an id and a label, nothing else, and no id twice")
+        elif len({a["label"].strip().casefold() for a in added}) != len(added):
+            out.append(f"{where}: two added entries have the same label. A workbook cell holds the label, so each needs its own")
         elif any(a["id"].startswith("@") or ":" in a["id"] or "/" in a["id"] for a in added):
             out.append(f"{where}: the id of an added entry is a short name of its own, such as \"sharepoint\"")
     return out

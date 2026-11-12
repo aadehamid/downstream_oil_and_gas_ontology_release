@@ -215,5 +215,6 @@ Keep the lists in step with the ontology:
 - A hidden entry stays known. A form that already holds it still checks, with a note.
 - A list with `keep_only` offers nothing new by itself. When a release of `data-product` adds a data product, the rebuild adds its name to the hidden entries above. Add the name to `keep_only` to offer it.
 - A list with `hide` offers every new entry of the ontology as soon as the pack is rebuilt.
-- When you have added an entry to the ontology, remove it from `add` and rebuild. The build stops if `add` names a label the list already holds, so you cannot forget.
+- When you have added an entry to the ontology under the same label, rebuild. Leave the entry under `add` for now: the forms offer the ontology's entry only, and an answer that a form in progress saved under the added entry is read as the ontology's. The list above then names the entry. Remove it from `add` once no form in progress uses it. After that, such an answer no longer checks.
+- The build stops when `add` names an entry that `hide` hides, or when two added entries share a label.
 - `KNOWN-OPEN-ITEMS.md` lists the changes to the ontology that these settings stand in for.

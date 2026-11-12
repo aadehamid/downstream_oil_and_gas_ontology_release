@@ -12,7 +12,9 @@ A deprecated term stays in its list with "(deprecated)" in its label, so the lis
 
 apply_settings() then marks the lists with what the organization's settings.toml says under [pick_list.<name>]. A
 hidden entry stays in its list with "hidden": true, so the forms do not offer it and the check still knows it. An
-added entry joins its list with "added": true, an id that starts with "new:" and a label that says it is new.
+added entry joins its list with "added": true, an id that starts with "new:" and a label that says it is new. When
+the ontology has since gained an entry of the same label, the added entry is not offered a second time: its id
+becomes an alias of the ontology's entry ("aliases" on that entry), so an answer saved under it is still read.
 """
 import json
 from collections import Counter, defaultdict
@@ -270,7 +272,8 @@ def apply_settings(built, pick_lists):
 
     `hide` and `keep_only` name an entry by its label, as the list shows it, or by its id. `hide_tiers` names the
     evidence tiers of the sources to hide. Raises CatalogueError when a name matches no entry of its list, so a
-    misspelt name cannot hide nothing unnoticed, and when an added entry repeats a label the list already has."""
+    misspelt name cannot hide nothing unnoticed, and when an added entry has the label of an entry the same
+    settings hide. An added entry with the label of an entry the list offers becomes an alias of that entry."""
     problems = []
     for name in SETTINGS_LISTS:
         change = pick_lists.get(name) or {}
@@ -296,12 +299,22 @@ def apply_settings(built, pick_lists):
         for item in items:
             if item["id"] in hidden:
                 item["hidden"] = True
-        labels = {i["label"].casefold() for i in items}
+        held = {i["label"].strip().casefold(): i for i in items}
+        taken = set()
         for entry in change.get("add", []):
-            if entry["label"].casefold() in labels:
-                problems.append(f"{where}: the list already holds {entry['label']!r}, so it cannot be added")
+            key = entry["label"].strip().casefold()
+            if key in taken:
+                problems.append(f"{where}: two added entries have the label {entry['label']!r}")
                 continue
-            items.append({"id": ADDED + entry["id"], "label": entry["label"] + ADDED_MARK, "added": True})
+            taken.add(key)
+            same = held.get(key)
+            if same is not None and same.get("hidden"):
+                problems.append(f"{where}: the settings both hide and add {entry['label']!r}. Remove one of the two.")
+            elif same is not None:
+                # The ontology has gained this entry. Answers saved under the added id are read as the entry.
+                same["aliases"] = sorted(set(same.get("aliases", [])) | {ADDED + entry["id"]})
+            else:
+                items.append({"id": ADDED + entry["id"], "label": entry["label"].strip() + ADDED_MARK, "added": True})
         built["lists"][name] = sorted(items, key=lambda item: (item["label"].casefold(), item["id"]))
     if problems:
         raise CatalogueError("\n".join(problems))

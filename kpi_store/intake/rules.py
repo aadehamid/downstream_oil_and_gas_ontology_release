@@ -65,6 +65,12 @@ def options(cat, lists, question, answers=None, hidden=False):
     return items + [{"id": o["id"], "label": o["label"]} for o in question.get("option", [])]
 
 
+def aliases(lists, question):
+    """{added id: the ontology's entry} for a question whose list holds entries that the settings once added and the
+    ontology has since gained."""
+    return {alias: item for item in lists.get(question.get("source", ""), []) for alias in item.get("aliases", [])}
+
+
 def _is_under(by_id, item, ancestor):
     at = by_id.get(item["parent"])
     while at is not None:

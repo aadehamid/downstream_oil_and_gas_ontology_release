@@ -357,3 +357,87 @@ def test_the_report_option_writes_the_report_beside_the_file(tmp_path, capsys, m
     assert out.endswith("The report is also in crack-spreads-pricing.kpi-intake.check.txt, beside the file.\n")
     assert saved.read_text(encoding="utf-8") + out.splitlines()[-1] + "\n" == out
     assert "Result: the intake is complete and signed." in saved.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("change", [{"roles": {"hide": ["Stock Planner"]}}, {"roles": {"keep_only": ["Billing Clerk"]}}])
+def test_a_workbook_filled_before_an_entry_was_hidden_still_checks(cat, tmp_path, change):
+    from kpi_store.intake import picklists
+    before = made_up.data()
+    path = tmp_path / "filled.xlsx"
+    workbook.save(workbook.build(cat, before["lists"], {}, made_up.intake()), path)       # its cell holds "Stock Planner"
+    after = picklists.apply_settings(made_up.data(), change)
+    intake = answers.read(path, cat, after["lists"])
+    assert intake.answers["6.1"] == [made_up.ROLE_PLANNER]
+    report = check.check(cat, after, intake)
+    assert report.complete, report.text()
+    assert '  Note: 6.1: "Stock Planner" is hidden in this organization\'s settings.' in report.text()
+
+
+@pytest.mark.parametrize("kind", ["json", "xlsx"])
+def test_an_answer_saved_under_an_added_entry_is_read_as_the_entry_the_ontology_gained(cat, tmp_path, kind):
+    from kpi_store.intake import picklists
+    add = {"roles": {"add": [{"id": "night-planner", "label": "Night Planner"}]}}
+    before = picklists.apply_settings(made_up.data(), add)
+    filled = made_up.intake(change={"6.1": [made_up.ROLE_PLANNER, "new:night-planner"]})
+    path = tmp_path / f"filled.{kind}"
+    if kind == "json":
+        path.write_text(answers.dumps(filled), encoding="utf-8", newline="\n")
+    else:
+        workbook.save(workbook.build(cat, before["lists"], {}, filled), path)     # its cell holds the "new" label
+    # The ontology gains the role. The settings still name it under `add`.
+    gained = made_up.data()
+    night = made_up.X + "role/night-planner"
+    gained["lists"]["roles"].append({"id": night, "label": "Night Planner", "group": "Role register"})
+    import copy
+    after = picklists.apply_settings(copy.deepcopy(gained), add)
+    report = check.check(cat, after, answers.read(path, cat, after["lists"]))
+    assert report.complete, report.text()
+    assert 'Note: 6.1: "Night Planner" is now in the ontology; the answer was read as that entry.\n' in report.text()
+    assert "To add to the ontology first" not in report.text() and "Not in the ontology" not in report.text()
+    assert "Roles: 1 of the chosen roles are in the role register." in report.text()        # read as the register's role
+    # An answer that holds both the old id and the new one is one answer.
+    both = check._read_aliases(cat, after["lists"], made_up.intake(change={"6.1": [night, "new:night-planner"]}))[0]
+    assert both.answers["6.1"] == [night]
+    # Once the entry is removed from `add`, the old answer is unknown again, as the Architect's page says.
+    report = check.check(cat, gained, made_up.intake(change={"6.1": ["new:night-planner"]}))
+    assert report.blocking == ['6.1: "new:night-planner" is not in the list of roles.']
+
+
+def test_a_form_loaded_without_a_status_is_not_given_the_default(cat, tmp_path):
+    # The default belongs to a new form. A filled workbook that lacks 3.9 reads back without it, and the check says so.
+    data = made_up.data()
+    path = tmp_path / "filled.xlsx"
+    workbook.save(workbook.build(cat, data["lists"], {}, made_up.intake(remove=["3.9"])), path)
+    intake = answers.read(path, cat, data["lists"])
+    assert "3.9" not in intake.answers
+    assert check.check(cat, data, intake).blocking == ["3.9 is missing"]
+
+
+def test_the_reports_of_two_forms_of_one_workbook_do_not_share_a_file(tmp_path, capsys, monkeypatch):
+    import shutil
+    from kpi_store.intake.__main__ import report_path
+    monkeypatch.setattr("kpi_store.intake.picklists.stale_modules", lambda data, root: {})
+    book = tmp_path / "crack-spreads-pricing.kpi-intake.xlsx"
+    shutil.copy(catalogue.PACK / "examples" / "crack-spreads-pricing.xlsx", book)
+    assert main(["check", str(book), "--report"]) == 0
+    assert main(["check", str(book), "--form", "domain-activation", "--report"]) == 1
+    out = capsys.readouterr().out
+    first, second = tmp_path / "crack-spreads-pricing.kpi-intake.check.txt", tmp_path / "crack-spreads-pricing.kpi-intake.domain-activation.check.txt"
+    assert first.read_text(encoding="utf-8").startswith("KPI intake check: Crack Spreads Pricing\n")
+    assert second.read_text(encoding="utf-8").startswith("Domain activation check: ")
+    assert "The report is also in crack-spreads-pricing.kpi-intake.domain-activation.check.txt, beside the file.\n" in out
+    # The rule: a JSON file holds one form and keeps its name; a workbook's report names the form.
+    assert report_path("x.kpi-intake.json").name == "x.kpi-intake.check.txt"
+    assert report_path("x.domain-activation.json", "domain-activation").name == "x.domain-activation.check.txt"
+    assert report_path("margin.xlsx").name == "margin.kpi-intake.check.txt"
+    assert report_path("margin.xlsx", "process-map-request").name == "margin.process-map-request.check.txt"
+
+
+def test_a_report_that_cannot_be_written_says_so(tmp_path, capsys, monkeypatch):
+    import shutil
+    monkeypatch.setattr("kpi_store.intake.picklists.stale_modules", lambda data, root: {})
+    filled = tmp_path / "crack-spreads-pricing.kpi-intake.json"
+    shutil.copy(catalogue.PACK / "examples" / "crack-spreads-pricing.json", filled)
+    (tmp_path / "crack-spreads-pricing.kpi-intake.check.txt").mkdir()        # a folder where the report would go
+    assert main(["check", str(filled), "--report"]) == 2
+    assert "stopped: the report could not be written to " in capsys.readouterr().err

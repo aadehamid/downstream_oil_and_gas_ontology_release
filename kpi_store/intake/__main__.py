@@ -9,6 +9,19 @@ from kpi_store.intake.catalogue import FORMS, CatalogueError
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def report_path(file, form=None):
+    """Where `check --report` writes: beside the file, under its name with .check.txt in place of its ending. A
+    workbook holds three forms, so the form's name comes before .check.txt, unless the file's name already ends
+    with it. So two forms of one workbook never share a report."""
+    file = Path(file)
+    stem = file.stem
+    if file.suffix.lower() != ".json":
+        form = form or "kpi-intake"
+        if not stem.endswith("." + form):
+            stem += "." + form
+    return file.with_name(stem + ".check.txt")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="py -m kpi_store.intake", description="The KPI intake pack: build its forms, check a filled form, or set up the shared folder.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -17,7 +30,8 @@ def main(argv=None):
     check = sub.add_parser("check", help="say what a filled form still lacks; exit 0 only when it is complete and signed")
     check.add_argument("file", help="an answers file (.json) or a filled workbook (.xlsx)")
     check.add_argument("--form", choices=list(FORMS), help="the form to read from a workbook (default: kpi-intake)")
-    check.add_argument("--report", action="store_true", help="also write the report beside the file, as <file's name>.check.txt")
+    check.add_argument("--report", action="store_true", help="also write the report beside the file, as <file's name>.check.txt; "
+                       "for a workbook the form's name comes before .check.txt")
     folders = sub.add_parser("folders", help="make the shared KPI-intake folder in the place you name, with the forms and the guide in it")
     folders.add_argument("place", help="an existing folder, such as your team's shared drive")
     for command in (build, check, folders):
@@ -42,7 +56,10 @@ def main(argv=None):
             return builder.main(root, pack, args.check)
         if args.command == "folders":
             from kpi_store.intake import folders as shared
-            top, done = shared.create(args.place, pack)
+            try:
+                top, done = shared.create(args.place, pack)
+            except OSError as e:
+                raise FoldersError(f"the shared folder could not be made or filled: {e}") from None
             for line in done:
                 print(line)
             print(f"{top.name} is ready" if done else f"{top.name} is current; nothing was changed")
@@ -51,16 +68,16 @@ def main(argv=None):
         report = checker.run(args.file, pack, args.form, root)
         saved = None
         if args.report:
-            saved = Path(args.file).with_name(Path(args.file).stem + ".check.txt")
+            saved = report_path(args.file, args.form)
             if saved.is_symlink():
                 raise AnswersError(f"{saved} is a link, so the report was not written there")
-            with saved.open("w", encoding="utf-8", newline="\n") as f:
-                f.write(report.text())
+            try:
+                with saved.open("w", encoding="utf-8", newline="\n") as f:
+                    f.write(report.text())
+            except OSError as e:
+                raise AnswersError(f"the report could not be written to {saved}: {e}") from None
     except errors as e:
         print(f"stopped: {e}", file=sys.stderr)
-        return 2
-    except OSError as e:
-        print(f"stopped: the report could not be written: {e}", file=sys.stderr)
         return 2
     sys.stdout.write(report.text())
     if saved:

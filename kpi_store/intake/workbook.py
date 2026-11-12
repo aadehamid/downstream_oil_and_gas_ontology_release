@@ -23,7 +23,7 @@ from pathlib import Path
 
 from kpi_store.intake import rules
 from kpi_store.intake.answers import AnswersError, Intake
-from kpi_store.intake.catalogue import CHOICE_TYPES, DEFAULT_ROWS, FORMS, MANY_TYPES
+from kpi_store.intake.catalogue import ADDED_MARK, CHOICE_TYPES, DEFAULT_ROWS, FORMS, HIDDEN_MARK, MANY_TYPES
 
 START, SIGN_OFF, ROLES, LISTS = "Start", "Sign-off", "Roles", "lists"
 OTHER_FORMS = [f for f in FORMS if f != "kpi-intake"]    # each has one sheet, named as FORMS names it
@@ -106,7 +106,7 @@ def build(cat, lists, examples=None, intake=None, others=None):
 
     def label_of(question, value):
         offered = {o["id"]: o["label"] for o in rules.options(cat, lists, question, hidden=True)}
-        return offered.get(value, value)
+        return offered.get(value) or rules.aliases(lists, question).get(value, {}).get("label", value)
 
     def section_rows(ws, row, section, held):
         """The rows of one section, from `row` on. Returns the next free row."""
@@ -292,6 +292,23 @@ def same_content(path, wb):
     return snapshot(on_disk) == snapshot(_reloaded(wb))
 
 
+def label_ids(cat, lists, question):
+    """{label: id} for every label a cell of this question may hold. A workbook filled before the settings changed
+    holds the label of that time, so an entry is known by its label with and without its mark: the plain label of
+    an entry that is hidden now, and the "new" label of an entry the ontology has since gained."""
+    ids = {}
+    offered = rules.options(cat, lists, question, hidden=True)
+    for option in offered:
+        ids[option["label"]] = option["id"]
+    for option in offered:
+        for mark in (HIDDEN_MARK, ADDED_MARK):
+            if option["label"].endswith(mark):
+                ids.setdefault(option["label"].removesuffix(mark), option["id"])
+    for alias, item in rules.aliases(lists, question).items():
+        ids.setdefault(item["label"] + ADDED_MARK, alias)
+    return ids
+
+
 def _text(value):
     """A cell's value as the text a person typed. A date cell gives its ISO date."""
     if value is None:
@@ -360,7 +377,7 @@ def read(path, cat, lists, form="kpi-intake"):
             intake.answers[base] = texts[0]
             continue
         if question["type"] in CHOICE_TYPES:
-            ids = {o["label"]: o["id"] for o in rules.options(cat, lists, question, hidden=True)}
+            ids = label_ids(cat, lists, question)
             texts = [ids.get(text, text) for text in texts]
         intake.answers[base] = rules.as_answer(question, texts)
     intake.kpi_name = "".join(rules.values(intake.answers, "2.1")[:1])

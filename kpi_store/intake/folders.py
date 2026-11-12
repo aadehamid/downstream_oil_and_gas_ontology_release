@@ -14,7 +14,12 @@ the guide into the first:
 
 Run it again after a rebuild of the pack: it replaces the three files in the-form with the newer ones. It never
 changes or removes a file in the three numbered folders. kpi-intake/how-to-use-the-form.html explains the folders
-to the people who use them. Standard library only.
+to the people who use them.
+
+The command writes only under <place>/KPI-intake. A link there could send a write somewhere else, so it refuses,
+before it reads or writes anything, when KPI-intake, one of the four folders, one of the three files or READ-ME.txt
+is a link or a Windows junction, as the build does for its own files (build.refuse_links). The place itself may be
+reached by a link: that is the operator's choice. Standard library only.
 """
 import shutil
 from pathlib import Path
@@ -44,6 +49,25 @@ def read_me():
     return "\n".join(lines)
 
 
+def _is_link(path):
+    """True for a symbolic link and, where Python can tell (3.12 and later), for a Windows junction."""
+    return path.is_symlink() or bool(getattr(path, "is_junction", lambda: False)())
+
+
+def refuse_links(place):
+    """Raises FoldersError when anything this command would write to, or write through, is a link."""
+    top = Path(place) / TOP
+    paths = [top] + [top / name for name, _ in FOLDERS] + [top / FORM_FOLDER / name for name in COPIED] + [top / READ_ME]
+    for path in paths:
+        if _is_link(path):
+            raise FoldersError(f"{path} is a link. This command writes only inside {top}, so it does not follow a link. "
+                               "Remove the link and run the command again. Nothing was changed.")
+    real = Path(place).resolve() / TOP
+    for path in paths:
+        if path.exists() and not path.resolve().is_relative_to(real):
+            raise FoldersError(f"{path} is not inside {real}. This command writes only there. Nothing was changed.")
+
+
 def create(place, pack):
     """Makes the folders under `place` and copies the forms and the guide from the pack folder. Returns the top
     folder and what was done, as lines."""
@@ -53,20 +77,19 @@ def create(place, pack):
     missing = [name for name in COPIED if not (pack / name).is_file()]
     if missing:
         raise FoldersError(f"the pack folder {pack} has no {', '.join(missing)}. Build the pack first: py -m kpi_store.intake build")
+    refuse_links(place)        # before anything is read or written
     top = place / TOP
     done = []
     for name, _ in FOLDERS:
         folder = top / name
-        if folder.is_symlink() or (folder.exists() and not folder.is_dir()):
-            raise FoldersError(f"{folder} exists and is not a plain folder. Remove it and run the command again.")
+        if folder.exists() and not folder.is_dir():
+            raise FoldersError(f"{folder} exists and is not a folder. Remove it and run the command again.")
         if not folder.is_dir():
             folder.mkdir(parents=True)
             done.append(f"made {TOP}/{name}")
     for name in COPIED:
         target = top / FORM_FOLDER / name
         fresh = (pack / name).read_bytes()
-        if target.is_symlink():
-            raise FoldersError(f"{target} is a link. Remove it and run the command again.")
         if not target.is_file() or target.read_bytes() != fresh:
             verb = "replaced" if target.is_file() else "copied"
             shutil.copyfile(pack / name, target)

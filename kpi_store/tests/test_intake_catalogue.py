@@ -190,6 +190,8 @@ def test_the_settings_hide_and_add_entries_of_the_ontologys_lists(cat):
     ('[pick_list.data-products]\nkeep_only = [', '[pick_list.data-products]\nhide = ["HR"]\nkeep_only = [', "use `keep_only`, or `hide` and `hide_tiers`, not both"),
     ('id = "sharepoint"\nlabel = "SharePoint"', 'id = "sharepoint"', "each added entry needs an id and a label"),
     ('id = "sharepoint"', 'id = "new:sharepoint"', "the id of an added entry is a short name of its own"),
+    ('id = "sharepoint"\nlabel = "SharePoint"', 'id = "sharepoint"\nlabel = "SharePoint"\n\n[[pick_list.systems.add]]\nid = "sharepoint-online"\nlabel = " sharepoint "',
+     "two added entries have the same label"),
 ])
 def test_a_wrong_pick_list_setting_is_refused_with_the_reason(tmp_path, old, new, message):
     with pytest.raises(catalogue.CatalogueError) as error:
@@ -216,8 +218,19 @@ def test_a_hidden_entry_is_not_offered_and_an_added_entry_is_offered_marked_new(
         ({"roles": {"hide": ["Billing Clark"]}}, "`hide` names 'Billing Clark', which is no entry of the list"),
         ({"systems": {"keep_only": ["Ledger"]}}, "`keep_only` names 'Ledger'"),
         ({"sources": {"hide_tiers": ["folklore"]}}, "`hide_tiers` names 'folklore', which is no tier"),
-        ({"roles": {"add": [{"id": "planner", "label": "stock planner"}]}}, "the list already holds 'stock planner'"),
+        ({"roles": {"hide": ["Stock Planner"], "add": [{"id": "planner", "label": "stock planner"}]}}, "the settings both hide and add 'stock planner'"),
+        ({"roles": {"add": [{"id": "a", "label": "Night Planner"}, {"id": "b", "label": "night planner "}]}}, "two added entries have the label"),
     ):
         with pytest.raises(catalogue.CatalogueError) as error:
             picklists.apply_settings(made_up.data(), change)
         assert message in str(error.value)
+
+
+def test_an_added_entry_the_ontology_has_gained_becomes_an_alias_and_is_not_offered_twice(cat):
+    from kpi_store.intake import picklists
+    # "Billing Clerk" is in the list. The settings still add it, as they did before the ontology held it.
+    built = picklists.apply_settings(made_up.data(), {"roles": {"add": [{"id": "billing-clerk", "label": "Billing Clerk"}]}})
+    question = cat.by_id["6.1"]
+    assert [o["label"] for o in rules.options(cat, built["lists"], question)] == ["Billing Clerk", "Stock Planner", "A role that is not in the list"]
+    assert rules.aliases(built["lists"], question) == {"new:billing-clerk": next(r for r in built["lists"]["roles"] if r["id"] == made_up.ROLE_CLERK)}
+    assert not any(r.get("added") for r in built["lists"]["roles"])

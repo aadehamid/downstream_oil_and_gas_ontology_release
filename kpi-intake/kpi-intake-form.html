@@ -856,6 +856,26 @@ function loadDraft() {
   return "ok";
 }
 
+// An answer that names an entry the settings once added, and the ontology has since gained, is read as the
+// ontology's entry. Returns the labels of the entries read this way.
+function readAliases(form) {
+  const found = [];
+  const answers = state[form].answers;
+  for (const q of questionsOf(form)) {
+    if (!isChoice(q) || q.source.includes(":") || !(q.id in answers)) continue;
+    const known = {};
+    for (const item of DATA.lists[q.source]) for (const alias of item.aliases || []) known[alias] = item;
+    if (!Object.keys(known).length) continue;
+    const swap = (v) => { if (!known[v]) return v; found.push(known[v].label); return known[v].id; };
+    const held = answers[q.id];
+    answers[q.id] = Array.isArray(held) ? held.map(swap).filter((v, i, all) => q.per || all.indexOf(v) === i) : swap(held);
+  }
+  return found;
+}
+function aliasLine(found) {
+  return found.map((label) => ` "${label}" is now in the ontology; the answer was read as that entry.`).join("");
+}
+
 // ---- Changing an answer ----------------------------------------------------------------------------------------
 function dependents(id) { return DATA.questions.filter((q) => q.narrow_by === id || q.under === id || q.per === id); }
 function setAnswer(q, value) {
@@ -1404,8 +1424,9 @@ function readFile(text, name) {
     answers, request: data.request || {}, sign_offs: data.sign_offs || {}, consulted: data.consulted || {},
     example_of: data.example_of || "", comment: data.comment || "",
   });
+  const gained = readAliases(data.form);
   show(data.form);
-  say(`Loaded ${name}` + (elsewhere ? ` into the ${DATA.forms[data.form]} form.` : ".")
+  say(`Loaded ${name}` + (elsewhere ? ` into the ${DATA.forms[data.form]} form.` : ".") + aliasLine(gained)
     + (data.catalogue_version && data.catalogue_version !== DATA.catalogue_version ? ` It was saved with catalogue ${data.catalogue_version}; this form is ${DATA.catalogue_version}.` : "")
     + (ignored.length ? ` Left out ${ignored.length} ${ignored.length === 1 ? "answer" : "answers"} that this form does not ask: ${ignored.slice(0, 8).join(", ")}${ignored.length > 8 ? " and more" : ""}.` : ""));
 }
@@ -1520,8 +1541,9 @@ for (const [name, title] of VIEWS) {
 }
 startFrame();
 const restored = loadDraft();
+const gainedInDraft = restored === "ok" ? FORMS.flatMap(readAliases) : [];
 show(view);
-if (restored === "ok") say("Your unsaved draft was restored from this browser.");
+if (restored === "ok") say("Your unsaved draft was restored from this browser." + aliasLine(gainedInDraft));
 if (restored === "bad") say("The browser draft could not be read and was not restored.", "problem");
 </script>
 </body>

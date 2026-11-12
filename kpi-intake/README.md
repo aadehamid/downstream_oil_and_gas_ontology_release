@@ -168,7 +168,7 @@ Result: the intake is complete and signed.
 This check changes nothing in the ontology. The Architect applies a complete intake by hand, with HOW-TO-UPDATE.md.
 ```
 
-Add `--report` to also write the report beside the file, under the same name with `.check.txt` in place of `.json` or `.xlsx`. The Architect keeps that report with the file in `3-checked`.
+Add `--report` to also write the report beside the file, under the same name with `.check.txt` in place of `.json`. A workbook holds three forms, so its report also names the form: `rm-margin-per-barrel.xlsx` gives `rm-margin-per-barrel.kpi-intake.check.txt`. The Architect keeps that report with the file in `3-checked`.
 
 The check prints, section by section, what is missing and which questions the rules rightly skipped. Then it prints the kind of measure, where an answer routes the request, what it found in the ontology, and who has signed. The last lines give the result.
 
@@ -291,7 +291,9 @@ After the build, [`for-the-architect.md`](for-the-architect.md) shows the list a
 | `roles` | 6.1 and P5 | 64 of 65 | 1 | Value Chain Optimization Director |
 ```
 
-A hidden entry stays known. An answers file that already holds it still passes the check, with the note "hidden in this organization's settings". When a form names an added entry, the check tells the Architect to add it to the ontology first. The build stops when a name under `hide` or `keep_only` matches no entry, so a misspelt name cannot go unnoticed. When the entry is in the ontology, remove it from `add` and rebuild.
+A hidden entry stays known. An answers file that already holds it still passes the check, with the note "hidden in this organization's settings". When a form names an added entry, the check tells the Architect to add it to the ontology first. The build stops when a name under `hide` or `keep_only` matches no entry, so a misspelt name cannot go unnoticed. It also stops when `add` names an entry that `hide` hides, or when two added entries share a label.
+
+When the ontology has gained an added entry under the same label, rebuild and leave the entry under `add` for now. The forms then offer the ontology's entry only. An answer that a form in progress saved under the added entry is read as the ontology's entry, and the check says "is now in the ontology; the answer was read as that entry". `for-the-architect.md` names each such entry. Remove it from `add` once no form in progress uses it.
 
 Question 6.1 still has the option "A role that is not in the list", which sends the request to a process map request. Use `add` for a role your organization has already decided on, and that option for a role the interview finds.
 
@@ -377,5 +379,6 @@ intake  17 hidden      pass
 intake  18 added       pass
 intake  19 new fields  pass
 intake  20 guide       pass
-the intake form passed all 20 proofs
+intake  21 alias       pass
+the intake form passed all 21 proofs
 ```

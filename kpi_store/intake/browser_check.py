@@ -1,4 +1,4 @@
-"""Open the HTML intake form in a real browser and prove the twenty things a person filling it relies on.
+"""Open the HTML intake form in a real browser and prove the twenty-one things a person filling it relies on.
 
     uv run --no-project --with playwright==1.65.0 python kpi_store/intake/browser_check.py
 
@@ -34,6 +34,8 @@ Each proof starts from a fresh load of kpi-intake/kpi-intake-form.html, with emp
  19 new fields   the status starts at Draft, also after "Clear this form"; the effective date is asked only when a
                  threshold is given; the objective, the grain, the owner and the steward count as required
  20 guide        "How to use this form" links to the guide beside the form, which opens with no network request
+ 21 alias        an answer saved under an added entry that the ontology has since gained is read as the ontology's
+                 entry, from a file and from a draft; the entry is offered once, and the form says what it did
 
 Every expected value below is written by hand from the catalogue and the release packages. The script exits 1
 when a proof fails and names it. scripts/check.sh does not run it, because it needs a browser.
@@ -42,6 +44,7 @@ import argparse
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -517,7 +520,11 @@ def hidden(s):
     same(card(page, "6.1").locator(".picker-chosen .chosen-label").all_inner_texts(), ["Black Oil Manager (hidden in this organization's settings)"], "the hidden role a file holds")
     with page.expect_download() as download:
         page.locator("#save").click()
-    same(json.loads(Path(download.value.path()).read_text(encoding="utf-8"))["answers"]["6.1"], [BLACK_OIL], "the hidden role saved again")
+    again = json.loads(Path(download.value.path()).read_text(encoding="utf-8"))["answers"]
+    same(again["6.1"], [BLACK_OIL], "the hidden role saved again")
+    # The file has no status. The default belongs to a new form and is never put into a loaded one.
+    same(card(page, "3.9").locator(".picker-list input:checked").count(), 0, "a status chosen in a loaded file that has none")
+    same(again, older["answers"], "the answers of the older file saved again, with no status added")
     card(page, "6.1").locator(".picker-chosen button").click()
     same(search(page, "6.1", "Black Oil").locator(".picker-more").inner_text(), "Nothing in the list matches.", "the hidden role after it was removed")
     s.shot(page, "17-hidden")
@@ -629,11 +636,49 @@ def guide(s):
     assert not phone_page.evaluate("document.documentElement.scrollWidth > innerWidth"), "the form scrolls sideways at 390 px with the link"
 
 
+def alias(s):
+    # The shipped settings add no entry that the ontology holds. So this proof opens a copy of the form in which
+    # the ontology has gained SharePoint, as the build writes it: the entry carries the added id as an alias.
+    text = Path(s.url.removeprefix("file://")).read_text(encoding="utf-8") if not sys.platform.startswith("win") else PAGE.read_text(encoding="utf-8")
+    head, rest = text.split('<script id="intake-data" type="application/json">', 1)
+    held, tail = rest.split("</script>", 1)
+    data = json.loads(held)
+    gained = "https://example.org/system/sharepoint"
+    data["lists"]["systems"] = [i for i in data["lists"]["systems"] if i["id"] != "new:sharepoint"] + [{"id": gained, "label": "SharePoint", "aliases": ["new:sharepoint"]}]
+    folder = Path(tempfile.mkdtemp())
+    copy = folder / "kpi-intake-form.html"
+    copy.write_text(head + '<script id="intake-data" type="application/json">' + json.dumps(data).replace("<", "\\u003c").replace("&", "\\u0026") + "</script>" + tail, encoding="utf-8")
+    context = s.browser.new_context(viewport={"width": 1280, "height": 900}, accept_downloads=True)
+    page = context.new_page()
+    page.set_default_timeout(10_000)
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(copy.as_uri())
+    older = {"format": 1, "form": "kpi-intake", "answers": {"2.1": "Tank Turnover", "7.1": "@not-in-list", "7.4": ["new:sharepoint", gained]}}
+    page.locator("#load-file").set_input_files({"name": "older.kpi-intake.json", "mimeType": "application/json", "buffer": json.dumps(older).encode("utf-8")})
+    page.wait_for_function("document.getElementById('status').textContent.startsWith('Loaded older.kpi-intake.json')")
+    same(page.locator("#status").inner_text(), 'Loaded older.kpi-intake.json. "SharePoint" is now in the ontology; the answer was read as that entry.', "the status line")
+    same(card(page, "7.4").locator(".picker-chosen .chosen-label").all_inner_texts(), ["SharePoint"], "the answer, read as the ontology's entry, once")
+    same(card(page, "7.4").locator('[data-notice="to-add"]').count(), 0, "a notice to add an entry the ontology holds")
+    same(search(page, "7.4", "SharePoint").locator(".picker-list .option-label").all_inner_texts(), ["SharePoint"], "SharePoint, offered once and not as new")
+    with page.expect_download() as download:
+        page.locator("#save").click()
+    same(json.loads(Path(download.value.path()).read_text(encoding="utf-8"))["answers"]["7.4"], [gained], "the answer in the file saved again")
+    # A draft that holds the added id is read the same way.
+    page.evaluate("""() => { const d = JSON.parse(localStorage.getItem('kpi-intake-draft-1')); d.state['kpi-intake'].answers['7.4'] = ['new:sharepoint'];
+                     localStorage.setItem('kpi-intake-draft-1', JSON.stringify(d)); }""")
+    page.reload()
+    same(page.locator("#status").inner_text(), 'Your unsaved draft was restored from this browser. "SharePoint" is now in the ontology; the answer was read as that entry.', "the status line of the draft")
+    same(card(page, "7.4").locator(".picker-chosen .chosen-label").all_inner_texts(), ["SharePoint"], "the draft's answer")
+    same(errors, [], "errors on the page")
+    context.close()
+
+
 PROOFS = [("1 load", load), ("2 fill", fill), ("3 narrow list", narrow_list), ("4 conditional", conditional),
           ("5 routing", routing), ("6 save", save), ("7 load file", load_file), ("8 draft", draft), ("9 phone", phone),
           ("10 theme", theme), ("11 next step", next_step), ("12 bad file", bad_file), ("13 other form", other_form),
           ("14 detail", detail), ("15 conflict", conflict), ("16 bad draft", bad_draft), ("17 hidden", hidden),
-          ("18 added", added), ("19 new fields", new_fields), ("20 guide", guide)]
+          ("18 added", added), ("19 new fields", new_fields), ("20 guide", guide), ("21 alias", alias)]
 
 
 def launch(playwright, channels):

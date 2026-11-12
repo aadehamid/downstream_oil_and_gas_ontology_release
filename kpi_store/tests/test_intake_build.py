@@ -431,6 +431,62 @@ def test_the_folders_command_makes_the_shared_folder_and_keeps_what_is_in_it(tmp
     assert [name for name, _ in folders.FOLDERS] == ["the-form", "1-in-progress", "2-ready-for-check", "3-checked"]
 
 
+@pytest.mark.parametrize("linked", ["KPI-intake", "KPI-intake/the-form", "KPI-intake/3-checked", "KPI-intake/READ-ME.txt",
+                                    "KPI-intake/the-form/kpi-intake-form.html"])
+def test_the_folders_command_refuses_a_link_and_changes_nothing(tmp_path, capsys, linked):
+    place, outside = tmp_path / "shared", tmp_path / "outside"
+    place.mkdir()
+    outside.mkdir()
+    is_file = linked.endswith((".txt", ".html"))
+    target = outside / ("kept.txt" if is_file else "folder")
+    if is_file:
+        target.write_text("kept as it was", encoding="utf-8")
+    else:
+        target.mkdir()
+    link = place / linked
+    link.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        link.symlink_to(target, target_is_directory=not is_file)
+    except OSError:
+        pytest.skip("this system does not let the test make a link")
+    before = sorted(p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*"))
+    assert main(["folders", str(place)]) == 2
+    err = capsys.readouterr().err
+    assert "is a link." in err and "Nothing was changed." in err and "report" not in err
+    assert sorted(p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*")) == before      # nothing was made, inside or outside
+    if is_file:
+        assert target.read_text(encoding="utf-8") == "kept as it was"
+    # The place itself may be reached by a link: that is the operator's choice.
+    way = tmp_path / "way-in"
+    link.unlink()
+    way.symlink_to(place, target_is_directory=True)
+    assert main(["folders", str(way)]) == 0
+    assert (place / "KPI-intake" / "the-form" / "kpi-intake-form.html").is_file()
+
+
+def test_a_failure_to_make_the_folders_is_not_called_a_report_failure(tmp_path, capsys, monkeypatch):
+    def refuse(*args, **kwargs):
+        raise PermissionError(13, "Permission denied")
+    monkeypatch.setattr("shutil.copyfile", refuse)
+    assert main(["folders", str(tmp_path)]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("stopped: the shared folder could not be made or filled: ") and "report" not in err
+
+
+def test_the_architects_page_names_an_added_entry_the_ontology_has_gained(cat):
+    import copy as copies
+    from kpi_store.intake import catalogue as c
+    data = made_up.data()
+    data["lists"]["systems"].append({"id": made_up.X + "sys/sharepoint", "label": "SharePoint"})
+    settings = copies.copy(cat)
+    settings.pick_lists = {"systems": {"add": [{"id": "sharepoint", "label": "SharePoint"}]}}
+    built = picklists.apply_settings(data, settings.pick_lists)
+    text = "\n".join(build.lists_text(settings, built["lists"]))
+    assert ("- `systems`: the ontology now holds SharePoint. The entry under `add` is no longer offered a second time. An answer saved under it "
+            "is read as the ontology's entry, and the check says so. Remove the entry from `add` once no form in progress uses it.") in text
+    assert "| `systems` | 7.4 | 2 of 2 | 0 | None |" in text and c.ADDED_MARK not in text.split("Keep the lists")[0].split("|---|")[1]
+
+
 # ---- The build writes only inside the pack folder -----------------------------------------------------------------
 
 def _linked(tmp_path, name, directory=False):
