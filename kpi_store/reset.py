@@ -14,8 +14,8 @@ The stores, in the order they are emptied, and what each one loses:
               the three kinds of marker node. A node without the marks stays. The uniqueness constraint that the
               copy made stays too, because no statement of this code may drop anything on Enterprise.
   neo4j       in the database [neo4j.local] names: the same nodes, and the configuration nodes that the n10s plugin
-              wrote for the load. When no node is left after that, every constraint goes too. A node that the load
-              did not write stays, and then the constraints stay with it.
+              wrote for the load. Then the constraints that the load makes, by name (LOAD_CONSTRAINTS). A node that
+              the load did not write stays, and so does every other constraint; the plan lists both.
   fuseki      the Fuseki that the load started is stopped, and the folder [fuseki] data_folder names is deleted.
   databricks  the four tables: epm_triples and epm_store_markers in the write schema, tech_graph_triples and
               tech_graph_markers in the technical graph's schema.
@@ -26,26 +26,35 @@ needs them, and the reports are a record.
 
 No store gets a deletion rule of its own here. Each deletion goes the way the load of that store already goes:
   enterprise  copy_enterprise.remove_own, on the copy's guarded session (open_target). It is the delete of a replace.
-  neo4j       the same remove_own with the local load's store name, then load_verify.wipe, which is how the load
-              itself empties this database. wipe runs only when no node is left, so here it drops constraints only.
+  neo4j       the same remove_own with the local load's store name. The load's own wipe is not used: it drops
+              every constraint of the database, and the reset drops only the ones the load makes.
   fuseki      load_fuseki.stop, which signals only the process that the load started.
   databricks  DROP TABLE IF EXISTS through load_databricks.Gate, which refuses a write outside the two schemas.
 
 Before it deletes, run() prints for each store what it will delete, with counts where the store can be read, and
 asks the person to type the word reset. --yes leaves the question out. --dry-run prints the same and stops there.
 
-Databricks is emptied through a SQL warehouse, as the sync check reads it. When kpi_store.toml names no warehouse,
-the reset says so, prints the four statements to run by hand, and goes on with the other stores. That counts as a
-failure only when the person named databricks with --only.
+A store that cannot be read or emptied is left alone, and the reset goes on with the others. It then ends with
+exit code 1, whoever chose the store: every store of the selection must be empty for a 0. To leave a store out on
+purpose, name it with --skip. Three cases leave a store alone:
+- It cannot be reached, or its settings are missing.
+- Databricks, when kpi_store.toml names no SQL warehouse. Databricks is emptied through a warehouse, as the sync
+  check reads it. The reset then prints the four statements to run by hand.
+- A Neo4j database in which a relationship joins a KPI Store node to a node without the marks. The delete removes
+  a node with its relationships, so it would remove that relationship, which another writer made. The reset counts
+  such relationships first, and again right before the delete, and deletes nothing in that database while there
+  is one. The copy stops on a node without the marks in the same way.
 
-The stores are emptied one after another, and a deletion is not undone. When one store fails, the reset stops
-there, names the stores it did not reach, and leaves the stores before it empty. Run the same command again: a store
-that is already empty has nothing to delete.
+The stores are emptied one after another, and a deletion is not undone. When one store fails, or Ctrl+C stops the
+reset, it stops there, says which store may be partly emptied, names the stores it did not reach, and leaves the
+stores before it empty. Run the same command again: a store that is already empty has nothing to delete.
 
-run() returns 0 when every named store holds nothing of the KPI Store at the end, or when the dry run could read
-every store. It returns 1 when a store could not be emptied or the word was not typed.
+run() returns 0 when every store of the selection holds nothing of the KPI Store at the end, or when the dry run
+found that a reset would empty them all. It returns 1 when a store was left alone, a store failed, Ctrl+C stopped
+it, or the word was not typed.
 """
 import contextlib
+import os
 import re
 import shutil
 from dataclasses import dataclass
@@ -67,6 +76,15 @@ WORD = "reset"   # what the person types to allow the deletion
 # What a TDB2 dataset folder holds at its top: the numbered data folders, the lock file and the backups folder.
 # The folder is deleted only when it holds nothing else (check_dataset_folder).
 TDB2_ENTRY = re.compile(r"^(Data-\d+|tdb\.lock|Backups)$")
+# Every constraint a load makes in a Neo4j database, by name. The projection's load script and the copy each make
+# this one (build.py and copy_graph.py of the ontology-to-lpg skill); the logical models, the technical graph, the
+# release records and the markers make none. The local reset drops these and no other constraint.
+LOAD_CONSTRAINTS = ("n10s_unique_uri",)
+# The relationships that join a node with the KPI Store's marks to a node without them, counted by the labels of
+# the node without. {own} is copy_enterprise.own_predicate, which speaks of the variable n, so the far node is
+# renamed first and n is bound again to the near one.
+FOREIGN_LINKS = ("MATCH (n) WHERE NOT {own} WITH n AS far MATCH (far)-[r]-(n) WHERE {own} "
+                 "RETURN labels(far) AS labels, count(DISTINCT r) AS n")
 STOP_WAIT_SECONDS = 30   # how long the reset waits for the stopped Fuseki to end before it gives up
 DELETE_TRIES = 10        # Windows frees a stopped program's files a moment after it ends, so the delete is tried again
 KEPT = ("kept: the release folder, the run folder with every run's files and reports, and in Databricks the two "
@@ -80,14 +98,12 @@ class ResetFailed(Exception):
 @dataclass
 class Plan:
     """What the reset will do to one store. status is "delete", "nothing" (the store is already empty) or
-    "blocked" (it cannot be read or emptied; the lines say why). empty() deletes and returns the line to print.
-    optional marks a blocked store that fails the reset only when the person named it (Databricks with no
-    warehouse)."""
+    "blocked" (it cannot be read or emptied, so it is left alone; the lines say why). empty() deletes and returns
+    the line to print."""
     store: str
     lines: list
     status: str
     empty: object = None
-    optional: bool = False
 
 
 def count_text(counts):
@@ -96,6 +112,24 @@ def count_text(counts):
 
 
 # ---- the two Neo4j databases --------------------------------------------------------------------------
+
+def refuse_foreign_links(session, params, rules, where):
+    """Raises ResetFailed when a relationship joins a KPI Store node to a node without the marks. remove_own deletes
+    a node with its relationships, and such a relationship is another writer's, so the whole database is left as it
+    is. where names the database in the message."""
+    found = session.run(FOREIGN_LINKS.format(own=copy_enterprise.own_predicate(rules)), **params).data()
+    total = sum(row["n"] for row in found)
+    if not total:
+        return
+    far = {}
+    for row in found:   # by label of the far node, as holdings counts the nodes without the marks
+        for label in row["labels"] or ["(no label)"]:
+            far[label] = far.get(label, 0) + row["n"]
+    by_count = ", ".join(f"{n} {label}" for label, n in sorted(far.items(), key=lambda item: (-item[1], item[0])))
+    raise ResetFailed(f"in {where}, {total} relationship(s) join a KPI Store node to a node without its marks (at the "
+                      f"far end: {by_count}). The delete would remove them with the node, and they are another writer's. "
+                      "Nothing was deleted. Ask their owner to remove them, then run the reset again")
+
 
 def marks(ctx, code, store):
     """The parameters that the copy's rules read (copy_enterprise.release_marks), for this release folder and for
@@ -122,6 +156,8 @@ def plan_enterprise(ctx, code, connect):
     def empty():
         with session() as target:
             before = copy_enterprise.holdings(target, params, rules)
+            # Counted again right before the delete: the question may have waited a long time for its answer.
+            refuse_foreign_links(target, params, rules, f"the database {database}")
             copy_enterprise.remove_own(target, params, rules)
             after = copy_enterprise.holdings(target, params, rules)   # read back: the delete must have left none
         if after["own"]:
@@ -132,6 +168,7 @@ def plan_enterprise(ctx, code, connect):
 
     with session() as target:
         held = copy_enterprise.holdings(target, params, rules)
+        refuse_foreign_links(target, params, rules, f"the database {database}")   # the plan then reads "cannot be emptied"
     own = sum(held["own"].values())
     stay = ([f"{held['foreign_nodes']} node(s) without those marks stay ({count_text(held['foreign'])}). The next copy "
              "stops while the database holds them"] if held["foreign_nodes"] else [])
@@ -143,48 +180,53 @@ def plan_enterprise(ctx, code, connect):
 
 
 def plan_neo4j(ctx, code, connect):
-    """The local database. The load owns all of it and empties it at its start, so the nodes the load wrote are the
-    copy's rules plus the n10s plugin's own configuration nodes, which have no Resource label and are never copied
-    (copy_graph.CONFIG_LABELS). Constraints go only through the load's own wipe, and only when no node is left."""
+    """The local database. The nodes the load wrote are the copy's rules plus the n10s plugin's own configuration
+    nodes, which have no Resource label and are never copied (copy_graph.CONFIG_LABELS). Of the constraints, only
+    the ones the load makes are dropped, by name."""
     cfg = ctx.local.need("neo4j_local")
     release_code = code()
     rules = dict(ctx.hooks["own_rules"] or copy_enterprise.OWN_RULES) | {label: "true" for label in release_code.cg.CONFIG_LABELS}
     params = marks(ctx, release_code, local_load.STORE)
+    where = f"the local database {cfg.database}"
 
     def read(session):
+        """(holdings, the load's constraints that exist, every other constraint), after the check for a
+        relationship of another writer."""
         held = copy_enterprise.holdings(session, params, rules)
-        return held, session.run("SHOW CONSTRAINTS YIELD name RETURN count(*) AS n").single()["n"]
+        refuse_foreign_links(session, params, rules, where)
+        names = sorted(session.run("SHOW CONSTRAINTS YIELD name RETURN name").value())
+        return held, [n for n in names if n in LOAD_CONSTRAINTS], [n for n in names if n not in LOAD_CONSTRAINTS]
+
+    def named(constraints):
+        return f"constraint{'' if len(constraints) == 1 else 's'}"
 
     def empty():
         with connect(cfg) as driver, driver.session(database=cfg.database) as session:
-            before, constraints = read(session)
+            before, mine, others = read(session)   # read again right before the delete
             copy_enterprise.remove_own(session, params, rules)
-            left = session.run("MATCH (n) RETURN count(n) AS n").single()["n"]
-            if not left:
-                # The load's own way to empty this database. No node is left, so it drops the constraints, and
-                # then checks that the database holds neither a node nor a constraint.
-                release_code.lv.wipe(session)
-            elif copy_enterprise.holdings(session, params, rules)["own"]:
-                raise ResetFailed(f"the local database {cfg.database} still holds nodes that the load wrote after the "
-                                  "delete; run the reset again")
-        done = f"emptied. {sum(before['own'].values())} node(s) deleted from the local database {cfg.database}"
-        if left:
-            return done + (f"; {left} node(s) that the load did not write left as they were"
-                           + (", with the constraints" if constraints else ""))
-        return done + (f", and {constraints} constraint(s) dropped" if constraints else "")
+            # The load's own wipe would drop every constraint here. Only the load's constraints go, each by its
+            # name; LOAD_CONSTRAINTS holds fixed names, so no name from the database reaches the statement.
+            for name in mine:
+                session.run(f"DROP CONSTRAINT `{name}` IF EXISTS").consume()
+            after = copy_enterprise.holdings(session, params, rules)   # read back: the delete must have left none
+        if after["own"]:
+            raise ResetFailed(f"{where} still holds nodes that the load wrote after the delete; run the reset again")
+        left = [f"{after['foreign_nodes']} node(s) that the load did not write"] if after["foreign_nodes"] else []
+        left += [f"{len(others)} constraint(s) that it did not make"] if others else []
+        return (f"emptied. {sum(before['own'].values())} node(s) deleted from {where}"
+                + (f", and the {named(mine)} {', '.join(mine)} dropped" if mine else "")
+                + (f"; {' and '.join(left)} left as they were" if left else ""))
 
     with connect(cfg) as driver, driver.session(database=cfg.database) as session:
-        held, constraints = read(session)
+        held, mine, others = read(session)
     own, foreign = sum(held["own"].values()), held["foreign_nodes"]
-    stay = ([f"{foreign} node(s) that the load did not write stay ({count_text(held['foreign'])})"
-             + (", and so do the constraints" if constraints else "")
-             + ". The next load deletes them: it empties this database before it loads"] if foreign else [])
-    if not own and (foreign or not constraints):
-        return Plan("neo4j", [f"the local database {cfg.database} holds no node that the load wrote; nothing to delete"] + stay, "nothing")
-    what = f"delete {own} node(s) that the load wrote, with their relationships ({count_text(held['own'])})" if own else ""
-    if not foreign and constraints:
-        what += (", then drop " if what else "drop ") + f"its {constraints} constraint(s)"
-    return Plan("neo4j", [f"in the local database {cfg.database}, {what}"] + stay, "delete", empty)
+    stay = ([f"{foreign} node(s) that the load did not write stay ({count_text(held['foreign'])})"] if foreign else []) \
+        + ([f"{len(others)} constraint(s) that the load did not make stay ({', '.join(others)})"] if others else [])
+    if not own and not mine:
+        return Plan("neo4j", [f"{where} holds no node that the load wrote and no constraint that it made; nothing to delete"] + stay, "nothing")
+    steps = ([f"delete {own} node(s) that the load wrote, with their relationships ({count_text(held['own'])})"] if own else []) \
+        + ([f"drop the {named(mine)} that the load made ({', '.join(mine)})"] if mine else [])
+    return Plan("neo4j", [f"in {where}, " + ", then ".join(steps)] + stay, "delete", empty)
 
 
 # ---- Fuseki -------------------------------------------------------------------------------------------
@@ -196,15 +238,25 @@ def same_path(one, two):
 
 def check_dataset_folder(folder, local, release_root):
     """Raises ResetFailed unless this folder may be deleted as the Fuseki dataset. It must be the folder that
-    [fuseki] data_folder names, a real folder, with nothing in it but a TDB2 dataset, and nothing the KPI Store
-    needs may lie in it. The last two checks are for a data_folder line that names a wrong folder, such as the
-    whole local folder: the settings would then allow a delete that takes the settings file with it."""
+    [fuseki] data_folder names, a real folder reached through no link, with nothing in it but a TDB2 dataset, and
+    nothing the KPI Store needs may lie in it. The last two checks are for a data_folder line that names a wrong
+    folder, such as the whole local folder: the settings would then allow a delete that takes the settings file
+    with it. Returns the folder's resolved path: the path that was checked, and the one to delete."""
     folder = Path(folder)
     configured = local.fuseki.data_folder if local.fuseki else None
     if configured is None or not same_path(folder, configured):
         raise ResetFailed(f"{folder} is not the folder that [fuseki] data_folder names; nothing was deleted")
-    if folder.is_symlink() or not folder.is_dir():
-        raise ResetFailed(f"{folder} is a link or a file, not a folder; nothing was deleted")
+    # No part of the configured path may be a link, the last part or any folder above it. Through a link the
+    # settings would name one place and the delete would reach another, which the person never saw named.
+    written = Path(os.path.abspath(configured.expanduser()))   # absolute, with .. removed, and no link followed
+    for part in (*reversed(written.parents), written):
+        if part.is_symlink() or getattr(part, "is_junction", lambda: False)():   # is_junction: Windows, Python 3.12
+            raise ResetFailed(f"{part} is a link, so [fuseki] data_folder does not say which folder would be deleted; "
+                              "nothing was deleted. Name the real folder in [fuseki] data_folder")
+    # Resolved once. Every check below is of this path, and it is the path the caller deletes.
+    folder = written.resolve()
+    if not folder.is_dir():
+        raise ResetFailed(f"{folder} is a file, not a folder; nothing was deleted")
     needed = (("the release folder", release_root), ("the local settings file", local.path),
               ("the settings file of [release] settings", local.settings), ("the run folder", local.run_folder),
               ("the folder of [projection] out", local.projection_out), ("the Fuseki jar", local.fuseki.jar),
@@ -249,7 +301,7 @@ def plan_fuseki(ctx):
         return Plan("fuseki", ["cannot be emptied: " + not_ours], "blocked")
     on_disk = folder is not None and folder.exists()
     if on_disk:
-        check_dataset_folder(folder, ctx.local, ctx.release_root)   # a wrong folder is refused before the question
+        folder = check_dataset_folder(folder, ctx.local, ctx.release_root)   # a wrong folder is refused before the question
 
     def empty():
         outcome, pid = load_fuseki.stop(state)
@@ -266,8 +318,10 @@ def plan_fuseki(ctx):
         said = [f"process {pid} stopped"] if outcome == "stopped" else []
         if folder is not None and folder.exists():
             # Checked again here, right before the delete: the question may have waited a long time for its answer.
-            delete_folder(check_dataset_folder(folder, ctx.local, ctx.release_root), ctx.sleep)
-            said.append(f"{folder} deleted")
+            # What is deleted is the resolved path that this check returns, not the text of the settings.
+            checked = check_dataset_folder(folder, ctx.local, ctx.release_root)
+            delete_folder(checked, ctx.sleep)
+            said.append(f"{checked} deleted")
         return "emptied. " + "; ".join(said)
 
     if not up and not started and not on_disk:
@@ -310,8 +364,9 @@ def plan_databricks(ctx, client_for):
     if not settings.warehouse_id:
         return Plan("databricks", ["cannot be emptied from this machine: kpi_store.toml names no SQL warehouse, and outside "
                                    "the notebook this code runs SQL only through one. Set [databricks] warehouse_id and run "
-                                   "the reset again, or run these four statements in a Databricks SQL editor:"]
-                    + [f"{statement};" for statement in drop_statements(settings)], "blocked", optional=True)
+                                   "the reset again. Or run these four statements in a Databricks SQL editor, and leave "
+                                   "Databricks out of the reset with --skip databricks:"]
+                    + [f"{statement};" for statement in drop_statements(settings)], "blocked")
     gate = ldb.Gate(settings, sync_check.statement_runner(client_for(ctx.local.need("databricks").profile), settings.warehouse_id))
 
     def there():
@@ -364,12 +419,11 @@ def store_list(names):
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
 
-def run(ctx, stores=STORES, yes=False, dry_run=False, named=(), ask=input, connect=local_load.connect,
+def run(ctx, stores=STORES, yes=False, dry_run=False, ask=input, connect=local_load.connect,
         client_for=sync_check.workspace_client, code=None):
-    """The whole reset of the named stores. Prints the plan, asks for the word unless yes, deletes store by store,
-    and returns the exit code. named are the stores the person named with --only: a store that is blocked only
-    for want of a warehouse fails the reset only when it is among them. ask, connect, client_for and code are
-    replaced by the tests."""
+    """The whole reset of the stores of the selection. Prints the plan, asks for the word unless yes, deletes store
+    by store, and returns the exit code: 0 only when no store of the selection was left alone. ask, connect,
+    client_for and code are replaced by the tests."""
     loaded = {}
 
     def release_code():
@@ -385,16 +439,19 @@ def run(ctx, stores=STORES, yes=False, dry_run=False, named=(), ask=input, conne
         for i, text in enumerate(item.lines):
             ctx.out(f"{item.store}: {text}" if i == 0 else f"  {text}")
     ctx.out(KEPT)
-    failed = [p.store for p in plans if p.status == "blocked" and not (p.optional and p.store not in named)]
+    # A store that is left alone fails the reset, whether the person named it or the default chose it: an exit 0
+    # must mean that every store of the selection is empty. --skip is how a store is left out on purpose.
     left_alone = [p.store for p in plans if p.status == "blocked"]
+    skip_hint = f"leave a store out on purpose with --skip {','.join(left_alone)}"
     to_do = [p for p in plans if p.status == "delete"]
     if dry_run:
-        ctx.out("dry run: nothing was deleted")
-        return 1 if failed else 0
+        ctx.out("dry run: nothing was deleted" + (f". The reset would leave {store_list(left_alone)} alone and end with "
+                                                  f"exit code 1; {skip_hint}" if left_alone else ""))
+        return 1 if left_alone else 0
     if to_do and not yes:
         try:
             typed = ask(f"Type {WORD} to delete this, or press Enter to stop: ")
-        except EOFError:   # no keyboard, as under a scheduler: nobody typed the word
+        except (EOFError, KeyboardInterrupt):   # no keyboard, as under a scheduler, or Ctrl+C: nobody typed the word
             typed = ""
         if typed.strip() != WORD:
             ctx.out(f"reset: STOPPED. The word {WORD} was not typed; nothing was deleted")
@@ -402,23 +459,29 @@ def run(ctx, stores=STORES, yes=False, dry_run=False, named=(), ask=input, conne
     for position, item in enumerate(to_do):
         try:
             said = item.empty()
+        except KeyboardInterrupt:
+            # Ctrl+C is answered here and not passed on as a traceback: the person must learn which store the
+            # stop caught half-way and which stores were never touched. The runner has no exit code of its own
+            # for an interrupt, so this is its code for a failure.
+            said = "STOPPED by Ctrl+C while it was being emptied. It may be partly emptied"
         except (ResetFailed, copy_enterprise.Refused, ldb.GateRefusal, ls.LocalSettingsError) as err:
             said = f"FAILED. {err}"
         except Exception as err:   # only the error's kind: its text can carry an address
             said = (f"FAILED. The store did not answer, or a statement failed ({type(err).__name__}). It may be part "
                     "emptied; run the reset again")
         ctx.out(f"{item.store}: {said}")
-        if said.startswith("FAILED"):
+        if said.startswith(("FAILED", "STOPPED")):
             later = [p.store for p in to_do[position + 1:]]
             ctx.out("reset: STOPPED at " + item.store + (f". Not reached, so not changed: {store_list(later)}" if later else "")
                     + ". Run the same command again")
             return 1
     empty = [p.store for p in plans if p.status != "blocked"]
-    if not empty:
-        ctx.out(f"reset: nothing was deleted. Not emptied: {store_list(left_alone)}")
-        return 1 if failed else 0
     # "Nothing of the KPI Store", not "empty": a node that the KPI Store did not write may still be there.
-    ctx.out(f"reset done: {store_list(empty)} {'holds' if len(empty) == 1 else 'hold'} nothing of the KPI Store"
-            + (f". Not emptied: {store_list(left_alone)}" if left_alone else "")
-            + ". To load again, run: py -m kpi_store.runner")
-    return 1 if failed else 0
+    holds = f"{store_list(empty)} {'holds' if len(empty) == 1 else 'hold'} nothing of the KPI Store" if empty else ""
+    if left_alone:
+        ctx.out("reset: NOT DONE. " + ("" if empty else "Nothing was deleted. ")
+                + f"Not emptied: {store_list(left_alone)}; {'its line above says' if len(left_alone) == 1 else 'their lines above say'} why. " + (f"{holds}. " if empty else "")
+                + f"Run the same command again, or {skip_hint}")
+        return 1
+    ctx.out(f"reset done: {holds}. To load again, run: py -m kpi_store.runner")
+    return 0

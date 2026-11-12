@@ -82,9 +82,9 @@ def world(tmp_path, monkeypatch):
                        "idp_sbx.tech_graph.notes": [{"x": 1}]}
     monkeypatch.setattr(reset.sync_check, "statement_runner", lambda client, warehouse: workspace.run_sql)
     monkeypatch.setattr(reset, "marks", lambda ctx, code, store: PARAMS | {"store": store})
-    wiped = []
+    wiped = []   # the load's own wipe drops every constraint, so the reset must never call it
     code = SimpleNamespace(cg=SimpleNamespace(CONFIG_LABELS=("_GraphConfig", "_NsPrefDef", "_n10sValidatorConfig")),
-                           lv=SimpleNamespace(wipe=lambda session: (wiped.append(session.name), setattr(session, "constraints", []))))
+                           lv=SimpleNamespace(wipe=lambda session: wiped.append(session.name)))
     lines = []
     ctx = runner.Context(local, root, "20261111T130000Z", sleep=lambda s: None, databricks="/sample/databricks",
                          bash="/sample/bash", out=lines.append)
@@ -93,9 +93,9 @@ def world(tmp_path, monkeypatch):
     def go(typed=reset.WORD, **options):
         def ask(text):
             asked.append(text)
-            if isinstance(typed, Exception):
+            if isinstance(typed, BaseException):
                 raise typed
-            return typed
+            return typed() if callable(typed) else typed
         return reset.run(ctx, options.pop("stores", reset.STORES), ask=ask, code=code, client_for=lambda profile: None,
                          connect=lambda cfg: stores_support.FakeDriver({"neo4j": neo4j, TARGET: enterprise}), **options)
     return SimpleNamespace(go=go, lines=lines, asked=asked, enterprise=enterprise, neo4j=neo4j, data=data, fuseki=fuseki,
@@ -122,7 +122,8 @@ def test_the_plan_says_for_each_store_what_will_be_deleted_and_what_stays(world)
         "  2 node(s) without those marks stay (2 Invoice). The next copy stops while the database holds them",
         "  the uniqueness constraint that the copy made stays; the next copy uses it",
         "neo4j: in the local database neo4j, delete 12 node(s) that the load wrote, with their relationships "
-        "(1 EpmStoreMarker, 2 ModuleRelease, 5 Resource, 1 _GraphConfig, 3 _NsPrefDef), then drop its 1 constraint(s)",
+        "(1 EpmStoreMarker, 2 ModuleRelease, 5 Resource, 1 _GraphConfig, 3 _NsPrefDef), then drop the constraint that the "
+        "load made (n10s_unique_uri)",
         f"fuseki: stop the Fuseki that the load started, then delete the dataset folder {world.data} (2 graph(s), 7 triples)",
         "databricks: drop 3 table(s): idp_sbx.kpi_store.epm_triples (4 row(s)), idp_sbx.kpi_store.epm_store_markers (1 row(s)), "
         "idp_sbx.tech_graph.tech_graph_triples (2 row(s))",
@@ -158,7 +159,7 @@ def test_the_word_empties_the_stores_in_order_and_a_node_without_the_marks_survi
     assert world.lines[-5:] == [
         "enterprise: emptied. 8 node(s) deleted from the database businessprocessarchitecturegraph; 2 node(s) without the "
         "KPI Store's marks left as they were",
-        "neo4j: emptied. 12 node(s) deleted from the local database neo4j, and 1 constraint(s) dropped",
+        "neo4j: emptied. 12 node(s) deleted from the local database neo4j, and the constraint n10s_unique_uri dropped",
         f"fuseki: emptied. process 4242 stopped; {world.data} deleted",
         "databricks: emptied. 3 table(s) dropped: idp_sbx.kpi_store.epm_triples, idp_sbx.kpi_store.epm_store_markers, "
         "idp_sbx.tech_graph.tech_graph_triples",
@@ -166,8 +167,9 @@ def test_the_word_empties_the_stores_in_order_and_a_node_without_the_marks_survi
     # Enterprise: the two Invoice nodes are all that is left, and no statement dropped anything there.
     assert world.enterprise.nodes == [(["Invoice"], {"number": "made up"})] * 2
     assert not any("DROP" in s for s in world.enterprise.statements)
-    # The local database: nothing is left, so the load's own wipe ran there, and only there.
-    assert world.neo4j.nodes == [] and world.wiped == ["neo4j"] and world.neo4j.constraints == []
+    # The local database: nothing is left. The one constraint went by its name, not through the load's wipe.
+    assert world.neo4j.nodes == [] and world.wiped == [] and world.neo4j.constraints == []
+    assert [s for s in world.neo4j.statements if "DROP" in s] == ["DROP CONSTRAINT `n10s_unique_uri` IF EXISTS"]
     assert not world.data.exists() and world.fuseki.events == ["stop"]
     # What the reset never touches: the run's files, the release folder, the local folder's other files.
     assert world.step_file.read_text(encoding="utf-8") == '{"status": "loaded"}\n'
@@ -183,34 +185,45 @@ def test_a_second_reset_finds_nothing_to_delete_and_asks_nothing(world):
     assert world.lines[1:-1] == [
         "enterprise: the database businessprocessarchitecturegraph holds no node with the KPI Store's marks; nothing to delete",
         "  2 node(s) without those marks stay (2 Invoice). The next copy stops while the database holds them",
-        "neo4j: the local database neo4j holds no node that the load wrote; nothing to delete",
+        "neo4j: the local database neo4j holds no node that the load wrote and no constraint that it made; nothing to delete",
         "fuseki: no Fuseki runs that the load started, and there is no dataset folder; nothing to delete",
         "databricks: none of the four tables exists (idp_sbx.kpi_store.epm_triples, idp_sbx.kpi_store.epm_store_markers, "
         "idp_sbx.tech_graph.tech_graph_triples, idp_sbx.tech_graph.tech_graph_markers); nothing to delete",
         KEPT]
 
 
-def test_in_the_local_database_a_node_the_load_did_not_write_stays_with_the_constraints(world):
+def test_in_the_local_database_a_node_and_a_constraint_that_the_load_did_not_make_stay(world):
     world.neo4j.add(["Note"], text="made up")
+    world.neo4j.constraints = ["note_text_unique", "n10s_unique_uri", "other_work_key"]
     assert world.go(stores=["neo4j"]) == 0
-    assert world.lines[1:3] == [
+    assert world.lines[1:4] == [
         "neo4j: in the local database neo4j, delete 12 node(s) that the load wrote, with their relationships "
-        "(1 EpmStoreMarker, 2 ModuleRelease, 5 Resource, 1 _GraphConfig, 3 _NsPrefDef)",
-        "  1 node(s) that the load did not write stay (1 Note), and so do the constraints. The next load deletes them: "
-        "it empties this database before it loads"]
-    assert world.lines[-2] == ("neo4j: emptied. 12 node(s) deleted from the local database neo4j; 1 node(s) that the load "
-                               "did not write left as they were, with the constraints")
+        "(1 EpmStoreMarker, 2 ModuleRelease, 5 Resource, 1 _GraphConfig, 3 _NsPrefDef), then drop the constraint that the "
+        "load made (n10s_unique_uri)",
+        "  1 node(s) that the load did not write stay (1 Note)",
+        "  2 constraint(s) that the load did not make stay (note_text_unique, other_work_key)"]
+    assert world.lines[-2] == ("neo4j: emptied. 12 node(s) deleted from the local database neo4j, and the constraint "
+                               "n10s_unique_uri dropped; 1 node(s) that the load did not write and 2 constraint(s) that it "
+                               "did not make left as they were")
     assert world.neo4j.nodes == [(["Note"], {"text": "made up"})]
-    assert world.wiped == [] and world.neo4j.constraints == ["n10s_unique_uri"]
+    assert world.wiped == [] and world.neo4j.constraints == ["note_text_unique", "other_work_key"]
     assert len(world.enterprise.nodes) == 10   # a store that was not named is not touched
+
+
+def test_a_constraint_of_the_load_is_dropped_also_when_no_node_is_left_to_delete(world):
+    world.neo4j.nodes, world.neo4j.constraints = [], ["n10s_unique_uri", "other_work_key"]
+    assert world.go(stores=["neo4j"]) == 0
+    assert world.lines[1:3] == ["neo4j: in the local database neo4j, drop the constraint that the load made (n10s_unique_uri)",
+                                "  1 constraint(s) that the load did not make stay (other_work_key)"]
+    assert world.neo4j.constraints == ["other_work_key"] and world.wiped == []
 
 
 def test_a_local_database_with_no_constraint_does_not_speak_of_constraints(world):
     world.neo4j.nodes, world.neo4j.constraints = [(["Note"], {"text": "made up"})], []
     assert world.go(stores=["neo4j"], typed=AssertionError("asked")) == 0
     assert world.lines[1:3] == [
-        "neo4j: the local database neo4j holds no node that the load wrote; nothing to delete",
-        "  1 node(s) that the load did not write stay (1 Note). The next load deletes them: it empties this database before it loads"]
+        "neo4j: the local database neo4j holds no node that the load wrote and no constraint that it made; nothing to delete",
+        "  1 node(s) that the load did not write stay (1 Note)"]
     assert world.lines[-1] == "reset done: neo4j holds nothing of the KPI Store. To load again, run: py -m kpi_store.runner"
     assert world.neo4j.nodes == [(["Note"], {"text": "made up"})] and world.asked == []
 
@@ -220,6 +233,70 @@ def test_only_the_named_stores_are_emptied(world):
     assert world.lines[0] == "reset: what will be deleted in enterprise and fuseki. Nothing is deleted yet"
     assert world.enterprise.count("Resource") == 0 and not world.data.exists()
     assert len(world.neo4j.nodes) == 12 and world.workspace.statements == []
+
+
+# ---- a relationship that another writer attached ---------------------------------------------------
+
+@pytest.mark.parametrize("store, said", [
+    ("enterprise", "enterprise: cannot be emptied: in the database businessprocessarchitecturegraph, 3 relationship(s) join a "
+                   "KPI Store node to a node without its marks (at the far end: 3 Invoice, 1 Paid). The delete would remove "
+                   "them with the node, and they are another writer's. Nothing was deleted. Ask their owner to remove them, "
+                   "then run the reset again"),
+    ("neo4j", "neo4j: cannot be emptied: in the local database neo4j, 3 relationship(s) join a KPI Store node to a node "
+              "without its marks (at the far end: 3 Invoice, 1 Paid). The delete would remove them with the node, and they "
+              "are another writer's. Nothing was deleted. Ask their owner to remove them, then run the reset again")])
+def test_a_relationship_from_another_writers_node_to_a_kpi_store_node_leaves_the_store_alone(world, store, said):
+    db = getattr(world, store)
+    db.add(["Invoice", "Paid"], number="made up")
+    db.links = [(["Invoice", "Paid"], 1), (["Invoice"], 2)]
+    before = list(db.nodes)
+    assert world.go() == 1
+    assert said in world.lines
+    assert db.nodes == before and not db.writes() and db.constraints == (["n10s_unique_uri"] if store == "neo4j" else [])
+    other = world.neo4j if store == "enterprise" else world.enterprise
+    assert other.count("Resource") == 0   # the other stores are emptied
+    assert world.lines[-1].startswith(f"reset: NOT DONE. Not emptied: {store}; its line above says why.")
+
+
+@pytest.mark.parametrize("store", ["enterprise", "neo4j"])
+def test_a_relationship_attached_after_the_question_stops_the_delete(world, store):
+    db = getattr(world, store)
+    before = list(db.nodes)
+    def typed():
+        db.links = [(["Invoice"], 1)]   # another writer attaches it while the question waits
+        return "reset"
+    assert world.go(typed, stores=[store]) == 1
+    assert world.lines[-2].startswith(f"{store}: FAILED. in the ") and "1 relationship(s) join a KPI Store node" in world.lines[-2]
+    assert db.nodes == before and not db.writes()
+
+
+def test_the_copys_own_delete_is_unchanged():
+    from kpi_store import copy_enterprise as ce
+    assert ce.own_predicate().startswith("coalesce((n:Resource AND ")
+    db = stores_support.FakeNeo4j()
+    ce.remove_own(db, PARAMS | {"store": "enterprise"})
+    assert len(db.statements) == 1 and db.statements[0].endswith("CALL (n) { DETACH DELETE n } IN TRANSACTIONS OF 1000 ROWS")
+
+
+# ---- Ctrl+C ----------------------------------------------------------------------------------------
+
+def test_ctrl_c_during_a_store_names_it_and_the_stores_not_reached(world, monkeypatch):
+    def stopped(session, params, rules):
+        if session.name == "neo4j":
+            raise KeyboardInterrupt
+        world.enterprise.nodes = [n for n in world.enterprise.nodes if n[0] == ["Invoice"]]
+    monkeypatch.setattr(reset.copy_enterprise, "remove_own", stopped)
+    assert world.go() == 1
+    assert world.lines[-2:] == [
+        "neo4j: STOPPED by Ctrl+C while it was being emptied. It may be partly emptied",
+        "reset: STOPPED at neo4j. Not reached, so not changed: fuseki and databricks. Run the same command again"]
+    assert world.data.exists() and len(world.workspace.store) == 6 and world.fuseki.events == []
+
+
+def test_ctrl_c_at_the_question_deletes_nothing(world):
+    assert world.go(KeyboardInterrupt()) == 1
+    assert world.lines[-1] == "reset: STOPPED. The word reset was not typed; nothing was deleted"
+    assert untouched(world)
 
 
 # ---- Databricks: the four tables and no other ------------------------------------------------------
@@ -249,24 +326,36 @@ def test_every_statement_goes_through_the_gate(world, monkeypatch):
         reset.ldb.Gate(world.ctx.settings, world.workspace.run_sql).run("DROP TABLE IF EXISTS idp_sbx.gold_commercial_core.sample_fact")
 
 
-def test_with_no_warehouse_the_reset_prints_the_statements_and_fails_only_when_databricks_was_named(world, tmp_path):
+def test_with_no_warehouse_the_reset_prints_the_statements_and_ends_with_exit_1(world, tmp_path):
     (world.folder / "kpi_store.toml").write_text(support.SETTINGS_TEXT, encoding="utf-8", newline="\n")   # warehouse_id = ""
     world.ctx.settings = reset.settings_module.load(world.folder / "kpi_store.toml")
-    assert world.go() == 0
+    assert world.go() == 1   # a store of the selection that was left alone is a failure, also when nobody named it
     said = world.lines[world.lines.index(KEPT) - 5:world.lines.index(KEPT)]
     assert said == [
         "databricks: cannot be emptied from this machine: kpi_store.toml names no SQL warehouse, and outside the notebook this "
-        "code runs SQL only through one. Set [databricks] warehouse_id and run the reset again, or run these four statements "
-        "in a Databricks SQL editor:",
+        "code runs SQL only through one. Set [databricks] warehouse_id and run the reset again. Or run these four statements "
+        "in a Databricks SQL editor, and leave Databricks out of the reset with --skip databricks:",
         "  DROP TABLE IF EXISTS idp_sbx.kpi_store.epm_triples;", "  DROP TABLE IF EXISTS idp_sbx.kpi_store.epm_store_markers;",
         "  DROP TABLE IF EXISTS idp_sbx.tech_graph.tech_graph_triples;", "  DROP TABLE IF EXISTS idp_sbx.tech_graph.tech_graph_markers;"]
-    assert world.lines[-1] == ("reset done: enterprise, neo4j and fuseki hold nothing of the KPI Store. Not emptied: databricks. To load again, "
-                               "run: py -m kpi_store.runner")
+    assert world.lines[-1] == ("reset: NOT DONE. Not emptied: databricks; its line above says why. enterprise, neo4j and fuseki hold "
+                               "nothing of the KPI Store. Run the same command again, or leave a store out on purpose with --skip "
+                               "databricks")
     assert world.workspace.statements == [] and len(world.workspace.store) == 6
     world.lines.clear()
-    assert world.go(stores=["databricks"], named=["databricks"]) == 1   # asked for by name: the skip is a failure
-    assert world.lines[-1] == "reset: nothing was deleted. Not emptied: databricks"
-    assert world.go(stores=["databricks"], named=["databricks"], dry_run=True) == 1
+    assert world.go(stores=["databricks"]) == 1
+    assert world.lines[-1] == ("reset: NOT DONE. Nothing was deleted. Not emptied: databricks; its line above says why. Run the "
+                               "same command again, or leave a store out on purpose with --skip databricks")
+    world.lines.clear()
+    assert world.go(stores=["databricks"], dry_run=True) == 1
+    assert world.lines[-1] == ("dry run: nothing was deleted. The reset would leave databricks alone and end with exit code 1; "
+                               "leave a store out on purpose with --skip databricks")
+    assert world.go(stores=["enterprise", "neo4j", "fuseki"]) == 0   # left out on purpose: no failure
+    world.lines.clear()
+    world.enterprise.name = "another"   # a second store that is left alone
+    assert world.go(stores=["enterprise", "databricks"]) == 1
+    assert world.lines[-1] == ("reset: NOT DONE. Nothing was deleted. Not emptied: enterprise and databricks; their lines above "
+                               "say why. Run the same command again, or leave a store out on purpose with --skip "
+                               "enterprise,databricks")
 
 
 # ---- Fuseki: its own process and its own folder ----------------------------------------------------
@@ -282,6 +371,39 @@ def test_a_folder_that_is_not_the_configured_one_is_refused(world, tmp_path):
         reset.check_dataset_folder(world.data / "Data-0001", world.local, world.root)   # a folder inside it
     assert reset.check_dataset_folder(world.data, world.local, world.root) == world.data
     assert (other / "Data-0001").is_dir() and (world.data / "Data-0001" / "nodes.dat").is_file()
+
+
+def test_a_data_folder_reached_through_a_link_is_refused_and_the_folder_checked_is_the_folder_deleted(world, tmp_path, monkeypatch):
+    real = tmp_path / "elsewhere"
+    (real / "fuseki-db" / "Data-0001").mkdir(parents=True)
+    (real / "fuseki-db" / "Data-0001" / "nodes.dat").write_bytes(b"someone else's")
+    link = tmp_path / "linked"
+    link.symlink_to(real, target_is_directory=True)
+    through = stores_support.local_settings(world.folder, release_root=world.root,
+                                            data_folder=f'data_folder = "{(link / "fuseki-db").as_posix()}"')
+    with pytest.raises(reset.ResetFailed, match=r"linked is a link, so \[fuseki\] data_folder does not say which folder would "
+                                                "be deleted; nothing was deleted"):
+        reset.check_dataset_folder(link / "fuseki-db", through, world.root)
+    world.ctx.local = through
+    assert world.go(stores=["fuseki"]) == 1
+    assert world.fuseki.events == [] and (real / "fuseki-db" / "Data-0001" / "nodes.dat").is_file()
+    # The last part as a link is refused too.
+    last = tmp_path / "db-link"
+    last.symlink_to(real / "fuseki-db", target_is_directory=True)
+    direct = stores_support.local_settings(world.folder, release_root=world.root, data_folder=f'data_folder = "{last.as_posix()}"')
+    with pytest.raises(reset.ResetFailed, match="db-link is a link"):
+        reset.check_dataset_folder(last, direct, world.root)
+    # With no link, the path that was checked is the one that is deleted, in its resolved form.
+    roundabout = world.folder / "runs" / ".." / "fuseki-db"   # the same folder, written another way in the settings
+    world.ctx.local = stores_support.local_settings(world.folder, release_root=world.root,
+                                                    data_folder=f'data_folder = "{roundabout.as_posix()}"')
+    assert world.ctx.local.fuseki.data_folder == roundabout and ".." in roundabout.parts
+    deleted = []
+    monkeypatch.setattr(reset, "delete_folder", lambda folder, sleep: deleted.append(folder))
+    checked = reset.check_dataset_folder(roundabout, world.ctx.local, world.root)
+    assert checked == world.data.resolve() and ".." not in checked.parts
+    assert world.go(stores=["fuseki"]) == 0 and deleted == [world.data.resolve()]
+    assert world.lines[-2] == f"fuseki: emptied. process 4242 stopped; {world.data.resolve()} deleted"
 
 
 def test_a_configured_folder_that_holds_more_than_a_dataset_is_refused_before_the_question(world):
@@ -350,8 +472,9 @@ def test_a_store_that_cannot_be_read_is_left_alone_and_the_others_are_emptied(wo
     assert world.go() == 1
     assert world.lines[1] == (f"enterprise: cannot be emptied: the server opened the database another, not {TARGET}; nothing "
                               "was read or written. Name the database itself in [neo4j.enterprise] database, not an alias")
-    assert world.lines[-1] == ("reset done: neo4j, fuseki and databricks hold nothing of the KPI Store. Not emptied: enterprise. To load again, "
-                               "run: py -m kpi_store.runner")
+    assert world.lines[-1] == ("reset: NOT DONE. Not emptied: enterprise; its line above says why. neo4j, fuseki and databricks hold "
+                               "nothing of the KPI Store. Run the same command again, or leave a store out on purpose with --skip "
+                               "enterprise")
     assert len(world.enterprise.nodes) == 10 and world.neo4j.nodes == []
 
 
@@ -388,15 +511,15 @@ def command(tmp_path, monkeypatch):
 
 def test_reset_runs_no_step_and_names_all_four_stores(command):
     assert command.main("--reset") == 0
-    assert command.calls == [(["enterprise", "neo4j", "fuseki", "databricks"], {"yes": False, "dry_run": False, "named": ()})]
+    assert command.calls == [(["enterprise", "neo4j", "fuseki", "databricks"], {"yes": False, "dry_run": False})]
     assert command.steps == []
 
 
 def test_only_and_skip_take_store_names_with_reset_and_step_names_without(command, capsys):
     assert command.main("--reset", "--only", "databricks,enterprise", "--yes") == 0
     assert command.main("--reset", "--skip", "databricks", "--dry-run") == 0
-    assert command.calls == [(["enterprise", "databricks"], {"yes": True, "dry_run": False, "named": ["databricks", "enterprise"]}),
-                             (["enterprise", "neo4j", "fuseki"], {"yes": False, "dry_run": True, "named": ()})]
+    assert command.calls == [(["enterprise", "databricks"], {"yes": True, "dry_run": False}),
+                             (["enterprise", "neo4j", "fuseki"], {"yes": False, "dry_run": True})]
     for argv, said in ((("--reset", "--only", "zip"), "unknown store zip; the stores are enterprise, neo4j, fuseki, databricks"),
                        (("--only", "databricks"), "unknown step databricks; the steps are cut, check, zip"),
                        (("--reset", "--skip", "enterprise,neo4j,fuseki,databricks"), "--only and --skip leave no store to reset"),

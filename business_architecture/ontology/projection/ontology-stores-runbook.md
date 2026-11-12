@@ -864,13 +864,24 @@ Use this section to show the load again from nothing, for example in a demonstra
 | Store | What the command deletes | What it keeps |
 |---|---|---|
 | Neo4j Enterprise | In `businessprocessarchitecturegraph`: every node that carries the KPI Store's marks, with its relationships. "The limits" lists the marks. | Every node without the marks, and the constraint `n10s_unique_uri`. |
-| The local Neo4j | The nodes that the load wrote, with their relationships. Then every constraint. | A node that the load did not write. The constraints then stay too. The next load deletes both, because the load empties this database. |
+| The local Neo4j | The nodes that the load wrote, with their relationships. Then the constraint `n10s_unique_uri`, which is the only constraint that the load makes. | A node that the load did not write, and every other constraint. The output lists both. |
 | Fuseki | It stops the Fuseki that the load started. Then it deletes the folder `C:\kpi-store-local\fuseki-db`. | A Fuseki that you started yourself. The command does not stop it, and it then leaves the folder. |
 | Databricks | The tables `epm_triples` and `epm_store_markers` in `idp_sbx.kpi_store`. The tables `tech_graph_triples` and `tech_graph_markers` in `idp_sbx.tech_graph`. | The two schemas, the volume `releases` with the zip and every report, and the notebook. |
 
 The command never changes the release folder, `C:\kpi-store-local\runs` or `C:\kpi-store-local\lpg-out`.
 
-The reset is `kpi_store/reset.py`. It has no deletion rule of its own. On Enterprise it deletes by the marks that the copy uses, and it passes the copy's guard. In Databricks every statement passes `Gate`, as in "The limits".
+The reset is `kpi_store/reset.py`. It has no deletion rule of its own. In both Neo4j databases it deletes by the marks that the copy uses, and on Enterprise it passes the copy's guard. In Databricks every statement passes `Gate`, as in "The limits".
+
+The reset leaves a store alone in four cases. It then empties the other stores and ends with exit code 1.
+
+| Case | Why the reset leaves the store alone |
+|---|---|
+| The store does not answer, or a setting for it is missing. | The reset cannot read what the store holds. |
+| A relationship in a Neo4j database joins a KPI Store node to a node without the marks. | The delete removes a node with its relationships, so it would remove a relationship that another writer made. The reset counts such relationships before it asks, and again right before the delete. It deletes nothing in that database while one exists. The line gives their number and the labels at the far end. This holds for Enterprise and for the local Neo4j. |
+| Any part of the path in `[fuseki]` `data_folder` is a link, or the folder holds a file that is no part of a Fuseki dataset. | The settings must name the folder that is deleted. The reset resolves the path once, checks that folder, and deletes that same folder. |
+| `kpi_store.toml` names no `warehouse_id`. | The reset runs SQL from your machine only through a SQL warehouse. It prints the four `DROP TABLE` statements for you to run. |
+
+The exit code is 0 only when every store that the command names holds nothing of the KPI Store at the end. This holds for a store that you named and for a store that the default chose. To leave a store out on purpose, use `--skip` and its name.
 
 1. See what the command will delete. This reads the four stores and deletes nothing.
 
@@ -882,14 +893,14 @@ The reset is `kpi_store/reset.py`. It has no deletion rule of its own. On Enterp
    reset (dry run): what would be deleted in enterprise, neo4j, fuseki and databricks. Nothing is deleted yet
    enterprise: in the database businessprocessarchitecturegraph, delete <count> node(s) that carry the KPI Store's marks, with their relationships (<the count for each label>)
      the uniqueness constraint that the copy made stays; the next copy uses it
-   neo4j: in the local database <your local database>, delete <count> node(s) that the load wrote, with their relationships (<the count for each label>), then drop its 1 constraint(s)
+   neo4j: in the local database <your local database>, delete <count> node(s) that the load wrote, with their relationships (<the count for each label>), then drop the constraint that the load made (n10s_unique_uri)
    fuseki: stop the Fuseki that the load started, then delete the dataset folder <your Fuseki data folder> (<count> graph(s), <count> triples)
    databricks: drop 4 table(s): <the four tables with the rows of each>
    kept: the release folder, the run folder with every run's files and reports, and in Databricks the two schemas, the volume with the zip and the reports, and the notebook
    dry run: nothing was deleted
    ```
 
-2. Check each line. A line that says `cannot be emptied` names a store that the reset will leave alone, and the reason.
+2. Check each line. A line that says `cannot be emptied` or `cannot be read` names a store that the reset will leave alone, and the reason. The last line then says that the reset would end with exit code 1.
 3. Run the reset. **This step deletes.** It prints the same lines again and then asks.
 
    ```powershell skip reason="destructive: empties the four stores that the later steps of this guide read"
@@ -920,10 +931,13 @@ The reset empties the stores one after another, and it cannot undo a deletion.
 
 | What you see | What it means | What to do |
 |---|---|---|
-| A store's line says `cannot be emptied` or `cannot be read` | The reset left that store alone. It emptied the others and ended with exit code 1. | Do what the line says, then run the same command again. |
-| A store's line says `FAILED`, then `reset: STOPPED at` and the store's name | The reset stopped there. The last line names the stores it did not reach. | Run the same command again. A store that is already empty has nothing to delete. |
-| The `databricks` line prints four `DROP TABLE` statements | `kpi_store.toml` names no `warehouse_id`, so the reset cannot run SQL from your machine. | Set `warehouse_id` and run the reset again, or run the four statements in a Databricks SQL editor. |
-| The `enterprise` line says that nodes without the marks stay | Another writer's nodes are in the database. The reset does not delete them, and the next copy stops while they are there. | Ask the owner of those nodes. |
+| A store's line says `cannot be emptied` or `cannot be read`, and the last line starts with `reset: NOT DONE` | The reset left that store alone. It emptied the others and ended with exit code 1. | Do what the line says, then run the same command again. To leave the store out on purpose, add `--skip` and its name. |
+| A store's line says `FAILED`, then `reset: STOPPED at` and the store's name | The reset stopped there with exit code 1. That store may be partly emptied. The last line names the stores it did not reach. | Run the same command again. A store that is already empty has nothing to delete. |
+| A store's line says `STOPPED by Ctrl+C` | You pressed Ctrl+C while that store was being emptied. It may be partly emptied. The last line names the stores that the reset did not reach. The exit code is 1. | Run the same command again. |
+| The `databricks` line prints four `DROP TABLE` statements | `kpi_store.toml` names no `warehouse_id`, so the reset cannot run SQL from your machine. The exit code is 1. | Set `warehouse_id` and run the reset again. Or run the four statements in a Databricks SQL editor, and add `--skip databricks` to the reset. |
+| A Neo4j line says that relationships join a KPI Store node to a node without its marks | Another writer attached its own nodes to KPI Store nodes. The reset deleted nothing in that database. | Ask the owner of those nodes to remove the relationships, then run the same command again. |
+| The `enterprise` line says that nodes without the marks stay | Another writer's nodes are in the database, with no relationship to a KPI Store node. The reset does not delete them, and the next copy stops while they are there. | Ask the owner of those nodes. |
+| The `neo4j` line says that constraints that the load did not make stay | Someone made another constraint in the local database. The reset leaves it. The next load drops it, because the load empties this database. | Nothing, unless the constraint is yours to keep. Then move that work to another database. |
 
 ## How to undo
 

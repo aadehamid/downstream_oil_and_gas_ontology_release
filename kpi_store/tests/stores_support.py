@@ -72,6 +72,7 @@ class FakeNeo4j:
         self.name, self.ident = name, ident
         self.nodes = []          # [(labels, props)]
         self.constraints = []    # constraint names
+        self.links = []          # [(labels of a node without the KPI Store's marks, its relationships to KPI Store nodes)]
         self.relationships = 0   # between Resource nodes
         self.statements = []
         self.closed = False
@@ -104,8 +105,15 @@ class FakeNeo4j:
 
         def own(labels, props):
             return owns(labels, props, params) or any(label in always for label in labels)
-        if text == "SHOW CONSTRAINTS YIELD name RETURN count(*) AS n":
-            return Result([{"n": len(self.constraints)}])
+        if text == "SHOW CONSTRAINTS YIELD name RETURN name":
+            return Result([{"name": name} for name in self.constraints])
+        dropped = re.fullmatch(r"DROP CONSTRAINT `(\w+)` IF EXISTS", text)
+        if dropped:
+            self.constraints = [name for name in self.constraints if name != dropped.group(1)]
+            return Result([])
+        if text.startswith("MATCH (n) WHERE NOT coalesce((n:Resource AND ") and text.endswith(
+                "RETURN labels(far) AS labels, count(DISTINCT r) AS n"):
+            return Result([{"labels": list(labels), "n": n} for labels, n in self.links])
         if text.startswith("CALL db.info() YIELD name"):
             return Result([{"name": self.name}])
         if text.startswith("CALL db.info() YIELD id"):

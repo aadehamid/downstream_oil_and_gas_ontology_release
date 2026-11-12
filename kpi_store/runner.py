@@ -63,8 +63,9 @@ the release folder, the run folder and, in Databricks, the schemas, the volume a
 run then loads every store again.
 
 Exit 0 when every requested step ran and passed, 1 when a step failed, 2 on bad settings or arguments, 3 when the
-run stopped for a person to act (the last line says what to do). A reset ends with 0 when the stores it named
-hold nothing of the KPI Store, and with 1 when one could not be emptied or the word was not typed.
+run stopped for a person to act (the last line says what to do). A reset ends with 0 when every store of
+its selection holds nothing of the KPI Store. It ends with 1 when a store was left alone or failed, when Ctrl+C
+stopped it, or when the word was not typed; --skip leaves a store out on purpose.
 """
 import argparse
 import csv
@@ -991,7 +992,7 @@ def main(argv=None, **context_options):
         stores = [s for s in reset.STORES if (args.only is None or s in args.only) and s not in args.skip]
         if not stores:
             ap.error("--only and --skip leave no store to reset")
-        return reset.run(ctx, stores, yes=args.yes, dry_run=args.dry_run, named=args.only or ())
+        return reset.run(ctx, stores, yes=args.yes, dry_run=args.dry_run)
     names = selected(args.only, args.start, args.skip)
     if args.mode == "check":   # the notebook loads nothing in this mode, so the stores are not loaded either
         names = [n for n in names if n not in LOCAL_LOADS]
