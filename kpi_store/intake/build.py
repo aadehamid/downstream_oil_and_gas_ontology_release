@@ -31,6 +31,7 @@ from kpi_store.intake import answers, catalogue, examples, page, picklists, work
 
 FORM_HTML, FORM_XLSX = "kpi-intake-form.html", "kpi-intake-form.xlsx"
 EXPLAINER, ARCHITECT = "what-we-will-ask-you.md", "for-the-architect.md"
+GUIDE = page.GUIDE      # written by hand; the build links to it and never writes it
 
 
 class BuildError(Exception):
@@ -60,6 +61,8 @@ def explainer_text(cat):
             lines += [block["p"], ""]
         if "ol" in block:
             lines += [f"{n}. {item}" for n, item in enumerate(block["ol"], 1)] + [""]
+    # The page's own last line. The HTML form shows the same explainer and has its own link to the guide.
+    lines += [f"[How to use the form]({GUIDE}) shows how the form is filled, saved and checked.", ""]
     return "\n".join(lines)
 
 
@@ -67,9 +70,10 @@ def _cell(text):
     return str(text).replace("|", "\\|").replace("\n", " ")
 
 
-def architect_text(cat):
+def architect_text(cat, lists=None):
     """The Architect's page: the two fixed words, each section's technical name, what each question feeds, the
-    facts a new KPI needs with the questions that supply them, and the facts that have no place yet."""
+    facts a new KPI needs with the questions that supply them, the facts that have no place yet and, with the
+    built lists, what the organization's settings hide from and add to them."""
     out = ["# For the Architect: what each question feeds", "",
            "This page maps the KPI intake form to the ontology. The business never sees it. It is built from `catalogue.toml`, so change the text there and run the build command of [the guide](README.md).", "",
            "The check of a filled form changes nothing in the ontology. In this release you apply a complete intake by hand, with the release steps of [`HOW-TO-UPDATE.md`](../HOW-TO-UPDATE.md).", "",
@@ -102,7 +106,64 @@ def architect_text(cat):
     for gap in cat.gaps:
         out.append(f'| {_cell(gap["fact"])} | {gap["question"] or "Not asked"} | {_cell(gap["note"])} |')
     out.append("")
+    if lists is not None:
+        out += lists_text(cat, lists)
     return "\n".join(out)
+
+
+QUESTION_OF_LIST = {"sources": "3.5", "roles": "6.1 and P5", "data-products": "6.6 and D6", "systems": "7.4"}
+
+
+def lists_text(cat, lists):
+    """The Architect's section on the four lists that settings.toml can change: what each offers, hides and adds
+    today. It is rebuilt with the pack, so an entry the ontology gains and the settings hide shows here."""
+    out = ["## The lists your settings change", "",
+           "Four of the forms' lists come from the ontology. `settings.toml` says, under `[pick_list.<name>]`, what your organization hides from each and adds to each. The ontology is not changed. This table is rebuilt with the pack and shows each list as it stands.", "",
+           "The Architect, or whoever maintains the form, edits `settings.toml`. The business users never do. Edit it when a role title or a definition changes, when the domain list changes, or when an entry of a list is to be hidden or added. Then run `py -m kpi_store.intake build`.", "",
+           "| List | Questions | Offered | Hidden | Added |", "|---|---|---|---|---|"]
+    detail = []
+    for name, module in catalogue.SETTINGS_LISTS.items():
+        items = lists[name]
+        change = cat.pick_lists.get(name) or {}
+        hidden = [i for i in items if i.get("hidden")]
+        added = [i["label"].removesuffix(catalogue.ADDED_MARK) for i in items if i.get("added")]
+        out.append(f'| `{name}` | {QUESTION_OF_LIST[name]} | {len(items) - len(hidden)} of {len(items)} | {len(hidden)} | {", ".join(added) or "None"} |')
+        if change.get("hide_tiers"):
+            counts = {tier: sum(1 for i in hidden if i.get("tier") == tier) for tier in change["hide_tiers"]}
+            detail.append(f'- `{name}` hides the sources of these evidence tiers: ' + ", ".join(f"{tier} ({count})" for tier, count in counts.items()) + ".")
+        named = [i["label"] for i in hidden if i.get("tier") not in change.get("hide_tiers", [])]
+        if change.get("keep_only") and len(named) > 40:      # too many to name: the list of sources
+            detail.append(f"- `{name}` offers only the {len(items) - len(hidden)} entries that `keep_only` names, and so hides the other {len(named)}.")
+        elif named:
+            how = "offers only the entries that `keep_only` names, and so hides" if change.get("keep_only") else "hides"
+            detail.append(f'- `{name}` {how}: {"; ".join(_cell(label) for label in named)}.')
+        relabelled = [i for i in items if i.get("was") and not i.get("hidden")]
+        if relabelled:
+            detail.append(f"- `{name}` shows {len(relabelled)} {'entry' if len(relabelled) == 1 else 'entries'} under a label of your settings (`labels`): "
+                          + "; ".join(_cell(i["label"]) for i in relabelled) + ". The answers file keeps each entry's id.")
+        gained = [i for i in items if i.get("aliases")]
+        if gained:
+            detail.append(f'- `{name}`: the ontology now holds {", ".join(_cell(i["label"]) for i in gained)}. The entry under `add` is no longer offered a second time. '
+                          "An answer saved under it is read as the ontology's entry, and the check says so. "
+                          "Remove the entry from `add` once no form in progress uses it.")
+        for item in gained:
+            if item.get("hidden"):
+                how = "`keep_only` does not name it. Add its name to `keep_only` to offer it" if change.get("keep_only") else "its evidence tier is hidden"
+                detail.append(f'- `{name}`: {_cell(item["label"])} is in the ontology and is not offered, because {how}.')
+        if added:
+            detail.append(f'- `{name}` adds: {", ".join(added)}. Each is offered with the mark "{catalogue.ADDED_MARK.strip(" ()")}". '
+                          f"When a form names one, the check tells you to add it to the `{module}` module before you apply the KPI.")
+    out += [""] + detail + [""]
+    out += ["Keep the lists in step with the ontology:", "",
+            "- A hidden entry stays known. A form that already holds it still checks, with a note.",
+            "- A list with `keep_only` offers nothing new by itself. When a release of `data-product` adds a data product, the rebuild adds its name to the hidden entries above. Add the name to `keep_only` to offer it.",
+            "- A list with `hide` offers every new entry of the ontology as soon as the pack is rebuilt.",
+            "- A list uses `keep_only`, or `hide` and `hide_tiers`, never both.",
+            "- When you have added an entry to the ontology under the same label, rebuild. Leave the entry under `add` for now: the forms offer the ontology's entry only, and an answer that a form in progress saved under the added entry is read as the ontology's. The list above then names the entry. Remove it from `add` once no form in progress uses it. After that, such an answer no longer checks.",
+            "- The build stops when `add` names an entry that `hide` names, when an added entry matches more than one entry, or when two added entries share a label.",
+            "- One rule reads every saved answer: a saved value names an entry when it is the entry's id, an id your settings once added it under, its label of today or a label it had before, with or without the mark of a hidden or a new entry.",
+            "- `KNOWN-OPEN-ITEMS.md` lists the changes to the ontology that these settings stand in for.", ""]
+    return out
 
 
 def outputs(root, pack):
@@ -112,7 +173,7 @@ def outputs(root, pack):
     refuse_links(pack, [pack / name for name in (picklists.FILE, FORM_HTML, FORM_XLSX, EXPLAINER, ARCHITECT)] + [pack / "examples" / examples.FILE])
     cat = catalogue.load(pack)
     release = picklists.Release(root)      # parsed once, for the lists and for the examples
-    built = picklists.build(root, release)
+    built = picklists.apply_settings(picklists.build(root, release), cat.pick_lists)
     lists = built["lists"]
     filled = [(spec, examples.build(release, lists, cat, spec)) for spec in examples.specs(pack)]
     column = examples.example_column(cat, lists, [intake for _, intake in filled])
@@ -121,7 +182,7 @@ def outputs(root, pack):
         (pack / FORM_HTML, "text", page.render(cat, built, column)),
         (pack / FORM_XLSX, "workbook", workbook.build(cat, lists, column)),
         (pack / EXPLAINER, "text", explainer_text(cat)),
-        (pack / ARCHITECT, "text", architect_text(cat)),
+        (pack / ARCHITECT, "text", architect_text(cat, lists)),
     ]
     for spec, intake in filled:
         out.append((pack / "examples" / f'{spec["file"]}.json', "text", answers.dumps(intake)))

@@ -10,10 +10,11 @@ lists that a question names. Two builds of the same inputs give the same bytes o
 import json
 from pathlib import Path
 
-from kpi_store.intake.catalogue import FORMS
+from kpi_store.intake.catalogue import ADDED_MARK, FORMS, HIDDEN_MARK, SETTINGS_LISTS
 
 TEMPLATE = Path(__file__).resolve().parent / "form.html"
 MARK = "/* EMBEDDED_DATA */"
+GUIDE = "how-to-use-the-form.html"      # the hand-written guide, in the pack folder beside the built form
 
 
 def data(cat, built, examples):
@@ -55,6 +56,10 @@ def data(cat, built, examples):
         "kind_rules": cat.kind_rules,
         "explainer": cat.explainer,
         "lists": lists,
+        "guide": GUIDE,
+        "added_modules": SETTINGS_LISTS,
+        "added_mark": ADDED_MARK,
+        "hidden_mark": HIDDEN_MARK,
         "term_names": {module: {key: sorted(names) for key, names in held.items()} for module, held in sorted(term_names.items())},
     }
 

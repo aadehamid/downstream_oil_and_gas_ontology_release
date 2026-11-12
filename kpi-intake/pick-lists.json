@@ -135,10 +135,12 @@
     "label": "Backcasting & Refining Continuous Improvement"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/bpa",
     "label": "BP&A"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/brand-data-integration",
     "label": "Brand Data & Integration"
    },
@@ -151,10 +153,12 @@
     "label": "Customer Master"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/devsecops",
     "label": "DevSecOps"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/ess",
     "label": "ES&S"
    },
@@ -163,30 +167,37 @@
     "label": "External Market Data"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/field-operations",
     "label": "Field Operations"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/gathering-compression",
     "label": "Gathering & Compression"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/gis",
     "label": "GIS"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/hess",
     "label": "HES&S"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/hr",
     "label": "HR"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/it",
     "label": "IT"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/legal",
     "label": "Legal"
    },
@@ -199,10 +210,12 @@
     "label": "Logistic Execution"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/loss-control",
     "label": "Loss Control"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/marine-rail-ops",
     "label": "Marine & Rail Ops"
    },
@@ -211,6 +224,7 @@
     "label": "Master Pricing"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/measurement-lab",
     "label": "Measurement & Lab"
    },
@@ -219,30 +233,37 @@
     "label": "Operational Margin"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/operations-administration",
     "label": "Operations & Administration"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/ops-intel",
     "label": "Ops Intel"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/ops-support",
     "label": "Ops Support"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/ot-communication-platform",
     "label": "OT Communication Platform"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/ot-compute-platforms",
     "label": "OT Compute Platforms"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/ot-platform-development",
     "label": "OT Platform Development"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/ot-windows-platforms",
     "label": "OT Windows Platforms"
    },
@@ -251,18 +272,22 @@
     "label": "Physical Trading"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/pipeline-ops-integrity",
     "label": "Pipeline Ops & Integrity"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/pipeline-ot",
     "label": "Pipeline OT"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/pipeline-ras",
     "label": "Pipeline RA&S"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/processing-fractionation",
     "label": "Processing & Fractionation"
    },
@@ -271,10 +296,12 @@
     "label": "Product Availability & Allocations"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/quality-assurance",
     "label": "Quality Assurance"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/midstream-quality-assurance",
     "label": "Quality Assurance (Software)"
    },
@@ -287,10 +314,12 @@
     "label": "Regional Production & Distribution Planning"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/reliability-center",
     "label": "Reliability Center"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/retail-payments",
     "label": "Retail Payments"
    },
@@ -299,30 +328,37 @@
     "label": "Revenue Accounting & Scheduling"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/sbd",
     "label": "S&BD"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/supply-chain",
     "label": "SC"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/service-management",
     "label": "Service Management"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/terminal-automation",
     "label": "Terminal Automation"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/terminal-ops-it",
     "label": "Terminal Ops (IT)"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/terminal-ot",
     "label": "Terminal OT"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/data-product/product/truck-ops",
     "label": "Truck Ops"
    }
@@ -7680,6 +7716,7 @@
    },
    {
     "group": "Role register",
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/organization/role/black-oil-manager",
     "label": "Black Oil Manager"
    },
@@ -7974,6 +8011,11 @@
     "label": "Trader"
    },
    {
+    "added": true,
+    "id": "new:value-chain-optimization-director",
+    "label": "Value Chain Optimization Director (new, not yet in the ontology)"
+   },
+   {
     "group": "Role register",
     "id": "https://w3id.org/mpc/ontology/modules/organization/role/vp-clean-products-crude-trading-ngls-asphalt-petchem",
     "label": "VP (Clean Products, Crude Trading, NGLs, Asphalt, Petchem) (deprecated)"
@@ -7991,226 +8033,271 @@
   ],
   "sources": [
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-cftc-p180-001",
     "label": "17 CFR Part 180 - Prohibition Against Manipulation (rule 180.1 manipulative and deceptive devices; 180.2 price manipulation; CEA section 6(c) implementation)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-cftc-p45-001",
     "label": "17 CFR Part 45 - Swap Data Recordkeeping and Reporting Requirements (creation data 45.3, continuation data 45.4); supporting interpretation: CFTC Part 45 fact sheet and 2020 amendment materials",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-ftc-adm-001",
     "label": "Advertising and Marketing — FTC Business Guidance (truth-in-advertising and substantiation, clear-and-conspicuous disclosure, endorsements, online advertising, CAN-SPAM, Telemarketing Sales Rule)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-api-653-001",
     "label": "API Standard 653 - Tank Inspection, Repair, Alteration, and Reconstruction (in-service aboveground storage tanks)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-fasb-asc815-001",
     "label": "ASC Topic 815, Derivatives and Hedging (derivative recognition and fair value measurement; hedge accounting; normal purchases and normal sales scope exception)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-aspentech-aspen-petroleum-scheduler",
     "label": "AspenTech, Aspen Petroleum Scheduler, https://www.aspentech.com/en/products/msc/aspen-petroleum-scheduler, retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-aspentech-aspen-pims-brochure",
     "label": "AspenTech, Aspen PIMS brochure (AT-06696, 2021), https://www.aspentech.com/-/media/aspentech/home/resources/brochure/pdfs/fy21/q3/at-03906-bro-aspen-pims.pdf, retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-aspentech-ppims-course",
     "label": "AspenTech, course RPA206, Multi-Period Refinery Modeling with Aspen PPIMS, https://esupport.aspentech.com/UniversityCourse?Id=a3p0B0000004YnsQAE, retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-aspentech-mpims-course",
     "label": "AspenTech, course RPA207 on Aspen MPIMS, https://esupport.aspentech.com/UniversityCourse?Id=a3p0B0000004YwmQAE, retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-aveva-pi-system",
     "label": "AVEVA, AVEVA PI System, https://www.aveva.com/en/products/aveva-pi-system/ (published 2026-09-23), retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-cftc-gloss-001",
     "label": "CFTC Glossary (futures, options, and derivatives terms)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/cme-fresh-from-the-trading-room-2026-07-14",
     "label": "CME Group, Fresh from the Trading Room: Papering over the cracks (2026-07-14), https://www.cmegroup.com/newsletters/fresh-from-the-trading-room/2026-07-14.html, retrieved 2026-10-19",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/cme-trading-crack-spreads-2024",
     "label": "CME Group, Trading Crack Spreads (2024), https://www.cmegroup.com/articles/2024/trading-crack-spreads.html, retrieved 2026-10-19",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-doe-sprassay-001",
     "label": "Crude Oil Assay Manual (5th Edition) - standardized crude oil assay characterization and test-method framework",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-ascm-cscp-001",
     "label": "CSCP Exam Content Manual",
     "tier": "framework"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/data-product-portfolio",
     "label": "Data product portfolio, business_architecture/business_process/data_product_portfolio.json, generated 2026-08-05, from: Data Product Lines & Data Portfolio slide (Commercial / Midstream / Corporate...",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-databricks-introduction",
     "label": "Databricks, What is Databricks?, https://docs.databricks.com/aws/en/introduction/ (updated 2026-09-11), retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/databricks-medallion-architecture",
     "label": "Databricks, What is the medallion lakehouse architecture?, updated 2026-09-11, https://docs.databricks.com/aws/en/lakehouse/medallion",
     "tier": "framework"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-lnl-t2s-001",
     "label": "Downstream Oil Products Distribution Planning: A Portuguese Case Study",
     "tier": "framework"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/downstream-process-map",
     "label": "Downstream process map, business_architecture/business_process/downstream_process_map.json",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-dtn-refined-fuels",
     "label": "DTN, Refined Fuels, https://www.dtn.com/refined-fuels/, retrieved 2026-10-28",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-epa-er-001",
     "label": "Emergency Response",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-epa-emtr-001",
     "label": "Emissions Trading (program resources: how emissions trading programs work; allowance markets)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-emk3-senergy",
     "label": "EMK3, Overview, https://www.emk3.com/Pages/Overview.aspx, retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-ccro-001",
     "label": "Energy Credit Industry Standards - credit risk best-practices white paper series (incl. Credit Risk Best Practices)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-epa-emts-001",
     "label": "EPA Moderated Transaction System (EMTS) requirements - RIN generation, separation, trade, and retirement transaction reporting",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-fasb-asc326-001",
     "label": "Financial Instruments — Credit Losses (Topic 326) — ASU 2016-13, the current expected credit loss (CECL) model (amendment document; the authoritative codification is FASB ASC 326, access-controlled)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-gasbuddy-about",
     "label": "GasBuddy, About GasBuddy, https://www.gasbuddy.com/about, retrieved 2026-10-28",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/gleif-lei",
     "label": "GLEIF LEI records (Level 1 and Level 2), golden copy published 2026-10-13",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-eia-gloss-001",
     "label": "Glossary and petroleum table definitions",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-gravitate",
     "label": "Gravitate, https://gravitate.energy/, retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-ei-hm31-001",
     "label": "HM 31 - Guide to hydrocarbon management in petroleum refinery operations",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-ei-hm32-001",
     "label": "HM 32 - Guide to hydrocarbon management at petroleum product marketing and distribution terminals",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-lenels2-onguard",
     "label": "Honeywell, LenelS2 OnGuard, https://buildings.honeywell.com/us/en/brands/our-brands/lenels2/security-products/onguard, retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-doe-rppl-001",
     "label": "How it Works: Refined Petroleum Product Pipelines (backgrounder)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-orp-dpsc-001",
     "label": "Integrated planning of downstream petroleum supply chain: a multi-objective stochastic approach",
     "tier": "framework"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-ion-rightangle",
     "label": "ION, RightAngle, https://iongroup.com/products/commodities/rightangle/ (page modified 2026-08-10), retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-isda-ma-001",
     "label": "ISDA Master Agreements and User Guides (master agreement, schedule, confirmations, credit support structure)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/kpi-classification-evidence",
     "label": "KPI or operational metric, business_architecture/reference/industry-view/kpi-classification-evidence.md",
     "tier": "peers"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/datamesh-architecture-innoq",
     "label": "L. Visengeriyeva, J. Christ and S. Harrer (INNOQ), Data Mesh Architecture, https://www.datamesh-architecture.com/, retrieved 2026-10-25",
     "tier": "framework"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-bimco-ld-001",
     "label": "Laytime Definitions for Charter Parties 2013 (laytime, demurrage, despatch, Notice of Readiness, and related terms)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-lexisnexis-bridger-insight-xg",
     "label": "LexisNexis Risk Solutions, Bridger Insight XG, https://risk.lexisnexis.com/products/bridger-insight-xg, retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/odps-4-0",
     "label": "Linux Foundation, Open Data Product Standard 4.0, released 2025-07-24, https://opendataproducts.org/v4.0/",
     "tier": "framework"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-eia-lfmm-001",
     "label": "Liquid Fuels Market Module refinery LP modeling white paper",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-api-mpms-001",
     "label": "Manual of Petroleum Measurement Standards (incl. Chapter 3, Tank Gauging)",
     "tier": "industry"
@@ -8221,51 +8308,63 @@
     "tier": "mpc"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/purview-data-products",
     "label": "Microsoft Purview, Create and manage data products, updated 2026-09-09, https://learn.microsoft.com/en-us/purview/unified-catalog-data-products-create-manage",
     "tier": "framework"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-microsoft-excel",
     "label": "Microsoft, Microsoft Excel, https://www.microsoft.com/en-us/microsoft-365/excel, retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-microsoft-powerpoint",
     "label": "Microsoft, Microsoft PowerPoint, https://www.microsoft.com/en-us/microsoft-365/powerpoint, retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-microsoft-teams",
     "label": "Microsoft, Microsoft Teams, https://www.microsoft.com/en-us/microsoft-teams/group-chat-software, retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-microsoft-outlook-business",
     "label": "Microsoft, Outlook for business, https://www.microsoft.com/en-us/microsoft-365/outlook/outlook-for-business, retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-ccro-002b",
     "label": "Model Risk in Energy (white paper, Edition 1.0)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-cmu-refplan-001",
     "label": "Modeling for Integrated Refinery Planning with Crude-oil Scheduling",
     "tier": "framework"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/core-2-3-0-process-definitions",
     "label": "MPC core 2.3.0, the names and definitions of the processes each system supports, business_architecture/ontology/releases/previous/core/2.3.0/core.ttl",
     "tier": "process-authority"
    },
    {
     "id": "https://w3id.org/mpc/ontology/source/mpc-economics-crack-spread-kpi-definition",
-    "label": "MPC Economics, 3-2-1 Crack Spread KPI Definition, provided by the subject matter expert on 2026-10-20, business_architecture/reference/internal/crack-spread-kpi-definition.md",
-    "tier": "process-authority"
+    "label": "MPC Economics, 3-2-1 Crack Spread KPI Definition",
+    "tier": "process-authority",
+    "was": [
+     "MPC Economics, 3-2-1 Crack Spread KPI Definition, provided by the subject matter expert on 2026-10-20, business_architecture/reference/internal/crack-spread-kpi-definition.md"
+    ]
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/mpc-performance-measures-evidence",
     "label": "MPC performance measures, business_architecture/reference/mpc/mpc-performance-measures-evidence.md",
     "tier": "mpc"
@@ -8276,246 +8375,297 @@
     "tier": "mpc"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-ofac-001",
     "label": "OFAC sanctions programs and screening lists (SDN and consolidated lists; risk-based sanctions compliance program guidance for U.S. persons)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/office-lanes",
     "label": "Office lanes, business_architecture/business_process/office_lanes.json",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-iea-omr-001",
     "label": "Oil Market Report (monthly series)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-oracle-hyperion-planning-11-2",
     "label": "Oracle, Hyperion Planning User's Guide, Release 11.2.0 (F12986-01, December 2019), chapter 1, https://docs.oracle.com/en/applications/enterprise-performance-management/11.2/pustd/GUID102XD8E9FC8A10...",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-pci-dss-001",
     "label": "Payment Card Industry Data Security Standard (PCI DSS) — payment-card account data security requirements and scoping guidance",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-eia-pmm-001",
     "label": "Petroleum Marketing Monthly (refiner, reseller, and retailer price and volume statistics by product and marketing category; EIA-782A/B survey basis)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-pmpa-001",
     "label": "Petroleum Marketing Practices Act — franchise protections for branded motor-fuel distributors and retailers (15 U.S.C. §2801 et seq.)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/phmsa-marathon-pipeline-noa-2024-09-26",
     "label": "PHMSA, Notice of Amendment to Marathon Pipeline LLC, 2024-09-26, https://primis.phmsa.dot.gov/enforcement-documents/32024055NOA/32024055NOA_Notice%20of%20Amendment_09262024_(23-264547)_text.pdf, re...",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/drop-tank-points-release-2018-04-23",
     "label": "Points International and Drop Tank, Points Partners With Drop Tank To Power Marathon's New Rewards Program, press release, 2018-04-23, https://www.globenewswire.com/news-release/2018/04/23/1485563/...",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-ftc-rp-001",
     "label": "Price Discrimination: Robinson-Patman Violations — FTC Guide to the Antitrust Laws (Robinson-Patman Act, 15 U.S.C. §13)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-apqc-pcf-001",
     "label": "Process Classification Framework",
     "tier": "framework"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-osha-psm-001",
     "label": "Process Safety Management of Highly Hazardous Chemicals",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-profisee-platform",
     "label": "Profisee, Platform, https://profisee.com/platform/, retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-irs-p510-001",
     "label": "Publication 510, Excise Taxes (federal motor-fuels excise taxes, fuel tax credits and refunds; Form 720 regime)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-quorum-flowcal",
     "label": "Quorum Software, FLOWCAL, https://www.quorumsoftware.com/solutions/flowcal/, retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-quorum-software",
     "label": "Quorum Software, https://www.quorumsoftware.com/, retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-snf-refps-001",
     "label": "Refinery planning and scheduling",
     "tier": "framework"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-bjce-refps-001",
     "label": "Refinery production planning and scheduling: the refining coordination case",
     "tier": "framework"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-epa-ff-001",
     "label": "Registration of Fuels and Fuel Additives — 40 CFR Part 79 (Clean Air Act §211: registration prior to introduction into US commerce; tiered testing; §79.11/§79.21 application requirements)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-reg-b-001",
     "label": "Regulation B — Equal Credit Opportunity Act (12 CFR Part 1002), including business-credit adverse-action notification and record-retention provisions",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-epa-rec-001",
     "label": "Renewable Energy Certificates (RECs) and Energy Attribute Tracking Systems (Green Power Markets)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-epa-rfs-001",
     "label": "Renewable Fuel Standard program (overview; Renewable Identification Numbers under the RFS)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-fasb-asc606-001",
     "label": "Revenue from Contracts with Customers (Topic 606) — ASU 2014-09 (amendment document; the authoritative codification is FASB ASC 606, access-controlled)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-ccro-002a",
     "label": "Risk Management Standards for Energy Market Participants (Version 1.0, 2012)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-ferc-rto-001",
     "label": "RTOs and ISOs (regional transmission organizations and independent system operators; two-settlement market design context)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-salesforce",
     "label": "Salesforce, What is Salesforce?, https://www.salesforce.com/products/what-is-salesforce/ (page modified 2026-09-24), retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-sap-s4hana-help",
     "label": "SAP, Conversion Guide for SAP S/4HANA 2025, document version 3.0 (2026-10-07), https://help.sap.com/doc/2b87656c4eee4284a5eb8976c0fe88fc/2025/en-US/CONV_OP2025.pdf, retrieved 2026-10-26",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-sap-information-steward",
     "label": "SAP, SAP Information Steward, https://www.sap.com/products/data-cloud/data-profiling-steward.html, retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-sap-mdg",
     "label": "SAP, SAP Master Data Governance, https://www.sap.com/products/data-cloud/master-data-governance.html, retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-eia-steo-001",
     "label": "Short-Term Energy Outlook and model documentation (petroleum product consumption modules)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-sirion",
     "label": "Sirion, https://www.sirion.ai/, retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-w3c-skos-001",
     "label": "SKOS Simple Knowledge Organization System Reference",
     "tier": "framework"
    },
    {
+    "hidden": true,
     "id": "urn:epm:comment:6115309253",
     "label": "Source-author answer, comment 6115309253",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "urn:epm:comment:6116668059",
     "label": "Source-author answer, comment 6116668059",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/step3c-definition-workbook",
     "label": "Step 3c definition workbook, approved row",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/sme-review-2026-10-25-item-g",
     "label": "the subject matter expert's answers to the item G questions, session of 2026-10-25, (the review comments of a subject matter expert reviewing the documents)",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/decision-owner-customer-inputs",
     "label": "the subject matter expert's customer inputs (seven files), as the party module holds them in its customer roles, data flows and attributes",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/decision-owner-customer-inputs-2026-10-27",
     "label": "the subject matter expert's customer inputs of 2026-10-27 (including two Dealer Master documents), as the party module holds them",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/decision-owner-pricing-assets-2026-10-25",
     "label": "the subject matter expert's Databricks pricing metric views, their lineage and the Genie agents' instructions (idp_sbx sandbox), shared on 2026-10-25 (the decision of 2026-10-25)",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/sme-review-2026-10-24-systems",
     "label": "the subject matter expert's identifications of systems, session of 2026-10-24, (the review comments of a subject matter expert reviewing the documents)",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/vendor-thomson-reuters-onesource-determination",
     "label": "Thomson Reuters, ONESOURCE Determination, https://tax.thomsonreuters.com/en/products/onesource-determination (published 2026-01-12), retrieved 2026-10-25",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-uspto-001",
     "label": "Trademark and patent basics — USPTO guidance (IP types; federal trademark registration effects: presumption of ownership and nationwide rights; examination and likelihood-of-confusion refusal; owne...",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-fmcsa-001",
     "label": "U.S. DOT motor-carrier safety and hazardous-materials transportation regulatory context: FMCSA Federal Motor Carrier Safety Regulations (49 CFR Parts 300-399) and applicable PHMSA Hazardous Materia...",
     "tier": "industry"
    },
    {
     "id": "https://w3id.org/mpc/ontology/source/planner-measure-list-2026-10-18",
-    "label": "Value Chain Optimization Decision Support and Visualization (VCO DSV): the planning team's measure list, as the subject matter expert sent it on 2026-10-18 (the decision of 2026-10-18)",
-    "tier": "process-authority"
+    "label": "Value Chain Optimization Decision Support and Visualization: the planning team's measure list",
+    "tier": "process-authority",
+    "was": [
+     "Value Chain Optimization Decision Support and Visualization (VCO DSV): the planning team's measure list, as the subject matter expert sent it on 2026-10-18 (the decision of 2026-10-18)"
+    ]
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/value-stream-commercial-lifecycle",
     "label": "Value stream Commercial Hydrocarbon Lifecycle, business_architecture/business_process/value_stream_commercial_lifecycle.json, generated 2026-08-05, from: Commercial Business Process Lifecycle slide...",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/value-stream-order-to-cash",
     "label": "Value stream Order to Cash, business_architecture/business_process/value_stream_order_to_cash.json, generated 2026-08-05, from: Domains/O2C/02_O2C Process Taxonomy.pptx (9 process groups / capabili...",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/w3c-prov-o",
     "label": "W3C, PROV-O: The PROV Ontology, W3C Recommendation, 30 April 2013, https://www.w3.org/TR/prov-o/",
     "tier": "framework"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/src-naesb-wgq-001",
     "label": "Wholesale Gas Quadrant Business Practice Standards (nominations, flowing gas, invoicing)",
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/dehghani-data-mesh-2019",
     "label": "Z. Dehghani, How to Move Beyond a Monolithic Data Lake to a Distributed Data Mesh, martinfowler.com, 20 May 2019, https://martinfowler.com/articles/data-monolith-to-mesh.html",
     "tier": "framework"
@@ -8559,6 +8709,7 @@
     "label": "Customer Portal"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/system/system/databricks",
     "label": "Databricks"
    },
@@ -8599,18 +8750,22 @@
     "label": "MPR"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/system/system/ms-excel",
     "label": "MS Excel"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/system/system/ms-outlook",
     "label": "MS Outlook"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/system/system/ms-powerpoint",
     "label": "MS PowerPoint"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/modules/system/system/ms-teams",
     "label": "MS Teams"
    },
@@ -8677,6 +8832,11 @@
    {
     "id": "https://w3id.org/mpc/ontology/modules/system/system/sap",
     "label": "SAP S/4HANA"
+   },
+   {
+    "added": true,
+    "id": "new:sharepoint",
+    "label": "SharePoint (new, not yet in the ontology)"
    },
    {
     "id": "https://w3id.org/mpc/ontology/modules/system/system/sirion",

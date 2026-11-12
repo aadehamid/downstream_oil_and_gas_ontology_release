@@ -3,10 +3,11 @@
     py -m kpi_store.intake build            write the forms, the pick lists, the two generated pages and the examples
     py -m kpi_store.intake build --check    write nothing; exit 1 when a committed file differs from a fresh build
     py -m kpi_store.intake check <file>     say what a filled form (answers JSON or workbook) still lacks
+    py -m kpi_store.intake folders <place>  make the shared KPI-intake folder a team keeps its answers files in
 
 The questions live in kpi-intake/catalogue.toml and the organization's own lists in kpi-intake/settings.toml.
-Everything else in kpi-intake/ except README.md, the JSON Schema and examples/examples.toml is built from those two
-files and the release packages.
+Everything else in kpi-intake/ except README.md, the guide how-to-use-the-form.html, the JSON Schema and
+examples/examples.toml is built from those two files and the release packages.
 
 Where each part is:
 
@@ -19,6 +20,7 @@ Where each part is:
     page.py        the HTML form, from form.html
     examples.py    the filled examples, from the ontology
     build.py       the one command that writes or compares all of them
+    folders.py     the shared folder for a team that works offline
 
 The check changes nothing in the ontology. The Architect applies a complete intake by hand, with HOW-TO-UPDATE.md.
 """

@@ -9,12 +9,19 @@ Every item has an `id` (the term's IRI, or a module's name) and a `label` (what 
 within a list, because a workbook cell holds the label and the reader must find the id again.
 
 A deprecated term stays in its list with "(deprecated)" in its label, so the lists count what the ontology holds.
+
+apply_settings() then marks the lists with what the organization's settings.toml says under [pick_list.<name>]. A
+hidden entry stays in its list with "hidden": true, so the forms do not offer it and the check still knows it. An
+added entry joins its list with "added": true, an id that starts with "new:" and a label that says it is new. When
+the ontology has since gained an entry of the same label, the added entry is not offered a second time: its id
+becomes an alias of the ontology's entry ("aliases" on that entry), so an answer saved under it is still read.
 """
 import json
 from collections import Counter, defaultdict
 from pathlib import Path
 
 from kpi_store import ontology_view
+from kpi_store.intake.catalogue import ADDED, ADDED_MARK, SETTINGS_LISTS, CatalogueError
 
 BASE = "https://w3id.org/mpc/ontology/"
 CORE = BASE + "modules/core/"
@@ -258,6 +265,90 @@ def build(root, release=None):
     }
     return {"release": ontology_view.release_name(root), "versions": dict(sorted(release.versions.items())),
             "lists": lists, "terms": _terms(release)}
+
+
+def apply_settings(built, pick_lists):
+    """Marks the built lists with the settings of [pick_list.<name>], in place, and returns `built`.
+
+    `hide`, `keep_only` and `labels` name an entry by its label as the ontology gives it, by its id, or by the last
+    part of its id. `hide_tiers` names the evidence tiers of the sources to hide. `labels` gives an entry the label
+    the forms and the check show in place of the ontology's. The entry keeps its id, and its earlier label stays
+    known under "was", so a workbook filled before the change still reads. Raises CatalogueError when a name matches no entry of its list, so a
+    misspelt name cannot hide nothing unnoticed. An added entry that matches an entry of the ontology, by the
+    entry's label of today, its ontology label or the last part of its id, becomes an alias of that entry and is
+    not offered a second time. The entry stays hidden when `keep_only` or `hide_tiers` leaves it out. Raises too
+    when an added entry matches several entries, or an entry that `hide` names. rules.py states how a stored
+    value then finds its entry."""
+    problems = []
+    for name in SETTINGS_LISTS:
+        change = pick_lists.get(name) or {}
+        items = built["lists"][name]
+        where = f"settings.toml, [pick_list.{name}]"
+
+        def matched(key):
+            wanted = list(change.get(key, []))
+            found = {w: [i for i in items if w in (i["id"], i["label"], i["id"].rstrip("/").rsplit("/", 1)[-1])] for w in wanted}
+            for w in wanted:
+                if not found[w]:
+                    problems.append(f"{where}: `{key}` names {w!r}, which is no entry of the list. Write the label as the list shows it, or the id.")
+            return {i["id"] for hits in found.values() for i in hits}
+
+        ontology_label = {i["id"]: i["label"] for i in items}
+        hidden = matched("hide")
+        named_hidden = set(hidden)       # the entries `hide` names itself
+        if change.get("keep_only"):
+            kept = matched("keep_only")
+            hidden |= {i["id"] for i in items if i["id"] not in kept}
+        tiers = set(change.get("hide_tiers", []))
+        for tier in sorted(tiers - {i.get("tier") for i in items}):
+            problems.append(f"{where}: `hide_tiers` names {tier!r}, which is no tier of a source in the list")
+        hidden |= {i["id"] for i in items if i.get("tier") in tiers}
+        for item in items:
+            if item["id"] in hidden:
+                item["hidden"] = True
+        renamed = {}
+        for wanted, label in (change.get("labels") or {}).items():
+            hits = [i for i in items if wanted in (i["id"], i["label"], i["id"].rstrip("/").rsplit("/", 1)[-1])]
+            if not hits:
+                problems.append(f"{where}: `labels` names {wanted!r}, which is no entry of the list. Write the label as the ontology gives it, or the id.")
+            for item in hits:
+                renamed[item["id"]] = label.strip()
+        for item in items:
+            if item["id"] in renamed and renamed[item["id"]] != item["label"]:
+                item["was"], item["label"] = sorted(set(item.get("was", [])) | {item["label"]}), renamed[item["id"]]
+        shown = [i["label"].casefold() for i in items]
+        for label in sorted({l for l in shown if shown.count(l) > 1}):
+            problems.append(f"{where}: `labels` gives two entries the label {label!r}. Each entry needs a label of its own.")
+        taken = set()
+        for entry in change.get("add", []):
+            key = entry["label"].strip().casefold()
+            if key in taken:
+                problems.append(f"{where}: two added entries have the label {entry['label']!r}")
+                continue
+            taken.add(key)
+            # The ontology may have gained this entry since it was added: under the same label, under a label the
+            # settings have since changed, or under the same short id.
+            same = [i for i in items if not i.get("added") and (
+                key in {n.strip().casefold() for n in [i["label"], ontology_label[i["id"]]]}
+                or i["id"].rstrip("/").rsplit("/", 1)[-1] == entry["id"])]
+            if len(same) > 1:
+                problems.append(f"{where}: the added entry {entry['label']!r} matches {len(same)} entries of the list: "
+                                + ", ".join(repr(i["label"]) for i in same) + ". Give it a label or an id that only one of them has, or remove it.")
+            elif same and same[0]["id"] in named_hidden:
+                problems.append(f"{where}: `hide` hides {same[0]['label']!r} and `add` adds it. Remove one of the two.")
+            elif same:
+                # Answers saved under the added id, or under its label, are read as the ontology's entry. The entry
+                # keeps what the settings say of it otherwise: it stays hidden when keep_only does not name it.
+                item = same[0]
+                item["aliases"] = sorted(set(item.get("aliases", [])) | {ADDED + entry["id"]})
+                if entry["label"].strip() != item["label"]:
+                    item["was"] = sorted(set(item.get("was", [])) | {entry["label"].strip()})
+            else:
+                items.append({"id": ADDED + entry["id"], "label": entry["label"].strip() + ADDED_MARK, "added": True})
+        built["lists"][name] = sorted(items, key=lambda item: (item["label"].casefold(), item["id"]))
+    if problems:
+        raise CatalogueError("\n".join(problems))
+    return built
 
 
 def dumps(data):

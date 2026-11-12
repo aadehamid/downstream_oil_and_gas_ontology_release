@@ -8,7 +8,9 @@ for the second answer to 6.1 or "3.5.detail" for the extra text of 3.5. The read
 a person may sort or widen the sheet without breaking it, and must not delete column G.
 
 A choice cell holds the label a person sees. The reader turns it back into the item's id. A label it does not
-know stays as typed, and the check then reports it.
+know stays as typed, and the check then reports it. A dropdown does not offer an entry that the organization's
+settings hide. A cell that already holds one keeps it, with the mark in its label, and the reader still knows it.
+The blank form starts a question that has a default with that answer.
 
 Two builds of the same content are not the same bytes, because the file format stores the time of writing. So
 same_content() compares what matters: the sheet names and their visibility, every cell's value, the dropdowns and
@@ -21,7 +23,7 @@ from pathlib import Path
 
 from kpi_store.intake import rules
 from kpi_store.intake.answers import AnswersError, Intake
-from kpi_store.intake.catalogue import CHOICE_TYPES, DEFAULT_ROWS, FORMS, MANY_TYPES
+from kpi_store.intake.catalogue import ADDED_MARK, CHOICE_TYPES, DEFAULT_ROWS, FORMS, HIDDEN_MARK, MANY_TYPES
 
 START, SIGN_OFF, ROLES, LISTS = "Start", "Sign-off", "Roles", "lists"
 OTHER_FORMS = [f for f in FORMS if f != "kpi-intake"]    # each has one sheet, named as FORMS names it
@@ -103,8 +105,8 @@ def build(cat, lists, examples=None, intake=None, others=None):
         ranges[question["id"]] = f"={LISTS}!${letter}$2:${letter}${len(labels) + 1}"
 
     def label_of(question, value):
-        offered = {o["id"]: o["label"] for o in rules.options(cat, lists, question)}
-        return offered.get(value, value)
+        offered = {o["id"]: o["label"] for o in rules.options(cat, lists, question, hidden=True)}
+        return offered.get(value) or offered.get(rules.resolver(cat, lists, question).get(value, ("",))[0], value)
 
     def section_rows(ws, row, section, held):
         """The rows of one section, from `row` on. Returns the next free row."""
@@ -125,7 +127,7 @@ def build(cat, lists, examples=None, intake=None, others=None):
                 row += 1
                 first = n == 0
                 put(ws, row, 1, number)
-                put(ws, row, 2, text + ("\n" + question["note"] if first and question.get("note") else ""))
+                put(ws, row, 2, text + "".join("\n" + question[key] for key in ("help", "note") if first and question.get(key)))
                 put(ws, row, 3, cat.asked_of(question) + "\n" + cat.requirement(question) if first else "")
                 put(ws, row, 5, question["why"] if first else "")
                 put(ws, row, 6, examples.get(question["id"], "") if first else "")
@@ -134,6 +136,8 @@ def build(cat, lists, examples=None, intake=None, others=None):
                     value = "".join(rules.values(held, key)[:1])
                 else:
                     value = answer[n] if n < len(answer) else ""
+                    if not value and blank and question.get("default"):
+                        value = question["default"]
                     if question["type"] in CHOICE_TYPES:
                         value = label_of(question, value) if value else ""
                         validations.setdefault(question["id"], []).append(f"D{row}")
@@ -193,6 +197,7 @@ def build(cat, lists, examples=None, intake=None, others=None):
     put(ws, row, KEY_COLUMN, "example_of")
 
     held = intake.answers if intake else {}
+    blank = intake is None      # only the blank form starts with the default answers
     for section in cat.sections:
         if section["form"] != "kpi-intake":
             continue
@@ -287,6 +292,13 @@ def same_content(path, wb):
     return snapshot(on_disk) == snapshot(_reloaded(wb))
 
 
+def label_ids(cat, lists, question):
+    """{text: id} for every text a cell of this question may hold, by the one rule of rules.py. A text stored while
+    the entry was only an addition of the settings gives that added id, so the check can say what it read."""
+    added_id = {item["id"]: item["aliases"][0] for item in lists.get(question.get("source", ""), []) if item.get("aliases")}
+    return {text: added_id[entry] if gained else entry for text, (entry, gained) in rules.resolver(cat, lists, question).items()}
+
+
 def _text(value):
     """A cell's value as the text a person typed. A date cell gives its ISO date."""
     if value is None:
@@ -355,7 +367,7 @@ def read(path, cat, lists, form="kpi-intake"):
             intake.answers[base] = texts[0]
             continue
         if question["type"] in CHOICE_TYPES:
-            ids = {o["label"]: o["id"] for o in rules.options(cat, lists, question)}
+            ids = label_ids(cat, lists, question)
             texts = [ids.get(text, text) for text in texts]
         intake.answers[base] = rules.as_answer(question, texts)
     intake.kpi_name = "".join(rules.values(intake.answers, "2.1")[:1])

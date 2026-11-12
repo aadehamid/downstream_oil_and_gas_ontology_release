@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to use the KPI intake form</title>
+<!--
+  This page is written by hand. It is the guide for the people who fill the KPI intake form for the first time.
+  It loads nothing from anywhere: no script, no font, no image. It opens from a shared folder with no network.
+
+  Keep it true to the form. Every statement about a button, the draft or a file's name was observed in the form
+  (kpi-intake-form.html) and is proved by kpi_store/intake/browser_check.py. When the form changes, change this page.
+  The three buttons and the two status lines drawn below copy the form's own words and colours.
+
+  The look follows the form: one tinted frame, the page on a white sheet, system faces, one hue on what matters.
+  A <pre> block here is a command that scripts/doc_snippets.py runs. Its data-snippet attribute is its tag.
+-->
+<style>
+:root {
+  color-scheme: light;
+  --frame: #eef2f3;
+  --surface: #ffffff;
+  --raised: #f0f3f5;
+  --active: #dde4e7;
+  --border: #c3ccd1;
+  --rule: #d6dde1;
+  --control: #76828b;
+  --ink: #14181b;
+  --muted: #47515a;
+  --accent: #1b6c80;
+  --accent-tint: #e2eff2;
+  --stop-bg: #fff5d9;
+  --stop-line: #94690a;
+  --stop-ink: #5c3803;
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
+  --gap: 24px;
+  /* The column: 232 for a section's name, 32 between, 824 for its content. 232 + 32 + 824 = 1088. */
+  --column: 1088px;
+  --name: 232px;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--frame); color: var(--ink); font: 16px/1.55 var(--font); }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+code, pre, .file { font-family: var(--mono); font-size: 0.9375em; }
+code, .file { overflow-wrap: anywhere; }
+h1, h2, h3, p, ol, ul, dl, dd, table, pre, figure { margin: 0; }
+strong { font-weight: 600; }
+
+/* The frame: a 48px bar on the tint, and the page on a white sheet inset 8px. No shadow. */
+.bar { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 24px; }
+.bar svg { flex: none; width: 22px; height: 22px; fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.bar .product { font-weight: 600; }
+.bar .here { color: var(--muted); }
+.bar .here::before { content: "/"; margin: 0 10px 0 0; color: var(--control); }
+.bar a { margin-left: auto; display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; }
+.sheet { margin: 0 8px 8px; padding: 32px 24px 56px; border: 1px solid var(--rule); border-radius: 16px; background: var(--surface); }
+.column { max-width: var(--column); margin: 0 auto; }
+
+.title h1 { font-size: 24px; line-height: 1.25; font-weight: 600; }
+.title p { max-width: 70ch; margin-top: 6px; color: var(--muted); }
+
+/* The tasks: where a reader who came to do one thing starts. */
+.tasks { display: flex; flex-wrap: wrap; gap: 8px; margin-top: var(--gap); }
+.tasks a { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 16px; border: 1px solid var(--control); border-radius: 6px; color: var(--ink); font-weight: 600; text-decoration: none; }
+.tasks a:hover { background: var(--raised); }
+
+/* The cycle: one container split by rules. The step this form is carries the one hue. */
+.body ol.cycle { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 0; list-style: none; border: 1px solid var(--rule); border-radius: 10px; }
+.body ol.cycle li { max-width: none; margin: 0; padding: 12px 14px; border-left: 1px solid var(--rule); color: var(--muted); }
+.body ol.cycle li:first-child { border-left: 0; }
+.body ol.cycle li[aria-current] { color: var(--ink); font-weight: 600; border-bottom: 2px solid var(--accent); border-bottom-left-radius: 10px; }
+.body ol.cycle span { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
+
+/* A section: its name on the left edge, its content beside it. */
+section { display: grid; grid-template-columns: var(--name) minmax(0, 1fr); column-gap: 32px; margin-top: 40px; padding-top: 28px; border-top: 1px solid var(--rule); }
+section > header h2 { font-size: 18px; line-height: 1.3; font-weight: 600; }
+section > header p { margin-top: 6px; color: var(--muted); font-size: 15px; }
+.body > * + * { margin-top: 16px; }
+.body p, .body li, .body dd { max-width: 72ch; }
+.body h3 { margin-top: 28px; font-size: 16px; font-weight: 600; }
+.body h3:first-child { margin-top: 0; }
+.body ol, .body ul { padding-left: 22px; }
+.body li + li { margin-top: 8px; }
+.body ol.steps > li::marker { font-weight: 600; color: var(--accent); }
+
+/* The route of one answers file: five places, in order. */
+.body ol.route { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 28px; padding: 0; list-style: none; }
+.body ol.route li { position: relative; max-width: none; margin: 0; padding: 12px 14px 14px; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+.body ol.route li + li::before { content: "\2192"; position: absolute; left: -23px; top: 12px; color: var(--muted); font-size: 18px; line-height: 1; }
+.body ol.route li:last-child { background: var(--accent-tint); border-color: var(--accent); }
+.route .step { display: block; margin-bottom: 2px; color: var(--accent); font-weight: 600; font-size: 14px; }
+.route .file { display: block; font-weight: 600; font-size: 14px; }
+.route .who { display: block; margin-top: 4px; color: var(--muted); font-size: 14px; line-height: 1.4; }
+
+table { width: 100%; border-collapse: collapse; font-size: 15px; line-height: 1.45; font-variant-numeric: tabular-nums; }
+th, td { padding: 10px 16px 10px 0; text-align: left; vertical-align: top; border-top: 1px solid var(--rule); }
+thead th { border-top: 0; padding-top: 0; color: var(--muted); font-size: 13px; font-weight: 400; }
+tbody th { font-weight: 600; white-space: nowrap; }
+td:last-child, th:last-child { padding-right: 0; }
+.wrap { overflow-x: auto; }
+
+pre { padding: 12px 14px; border: 1px solid var(--rule); border-radius: 8px; background: var(--raised); line-height: 1.5; overflow-x: auto; white-space: pre; }
+pre.out { background: var(--surface); color: var(--muted); }
+
+/* The form's own buttons and lines, drawn with its words and colours. They are pictures: they do nothing here. */
+.ui { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 16px 28px; align-items: start; }
+.ui-dock { display: grid; gap: 10px; max-width: 420px; padding: 14px 16px; border-radius: 10px; background: var(--frame); }
+.ui-status { padding: 8px 10px; border-radius: 8px; background: var(--active); font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+.ui-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ui-button { flex: 1 1 auto; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 10px; border: 1px solid var(--control); border-radius: 6px; background: var(--surface); font-weight: 500; }
+.ui-button.primary { flex-basis: 100%; border-color: var(--ink); background: var(--ink); color: #ffffff; }
+.ui-button.quiet { border-color: transparent; background: none; text-decoration: underline; text-underline-offset: 4px; }
+.ui-draft { color: var(--muted); font-size: 14px; line-height: 1.35; }
+.ui-caption { margin-top: 8px; color: var(--muted); font-size: 14px; }
+dl.buttons { display: grid; gap: 14px; }
+dl.buttons dt { font-weight: 600; }
+dl.buttons dd { margin-top: 2px; }
+
+.foot { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--rule); color: var(--muted); font-size: 14px; }
+
+@media screen and (max-width: 899px) {
+  .bar { padding: 0 16px; }
+  .bar .here { display: none; }
+  .sheet { margin: 0; padding: 24px 16px 40px; border-width: 1px 0 0; border-radius: 0; }
+  section { display: block; margin-top: 32px; padding-top: 24px; }
+  section > header { margin-bottom: 14px; }
+  .body ol.cycle { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .body ol.cycle li { border-left: 0; border-top: 1px solid var(--rule); }
+  .body ol.cycle li:nth-child(-n+2) { border-top: 0; }
+  .body ol.cycle li:nth-child(even) { border-left: 1px solid var(--rule); }
+  .body ol.cycle li[aria-current] { border-bottom-left-radius: 0; border-top-left-radius: 10px; }
+  .body ol.route { grid-template-columns: 1fr; gap: 28px 0; }
+  .body ol.route li + li::before { content: "\2193"; left: 16px; top: -24px; }
+  .ui { grid-template-columns: 1fr; }
+  .ui-dock { max-width: 340px; }
+  /* A table of three columns becomes one block for each row. */
+  table.stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  table.stack tr { display: block; padding: 12px 0; border-top: 1px solid var(--rule); }
+  table.stack tbody tr:first-child { border-top: 0; padding-top: 0; }
+  table.stack th, table.stack td { display: block; padding: 0; border: 0; white-space: normal; }
+  table.stack td { margin-top: 4px; }
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  table.stack td[data-label]::before { content: attr(data-label) ": "; color: var(--muted); }
+}
+@media print {
+  body { background: #ffffff; font-size: 11pt; }
+  .bar a { display: none; }
+  .bar { padding: 0; height: auto; margin-bottom: 8pt; }
+  .sheet { margin: 0; padding: 0; border: 0; border-radius: 0; }
+  section { display: block; margin-top: 18pt; padding-top: 12pt; }
+  section > header { margin-bottom: 8pt; break-after: avoid; }
+  .tasks { display: none; }
+  thead { display: table-header-group; }
+  tr, li, pre, dl.buttons > div { break-inside: avoid; }
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  h2, h3 { break-after: avoid; }
+  .ui { display: block; }
+  .ui figure { margin-bottom: 10pt; }
+  .ui-status { border: 1px solid var(--border); }
+  a { color: inherit; text-decoration: none; }
+  .body ol.route li:last-child { background: none; }
+}
+</style>
+</head>
+<body>
+<div class="bar">
+  <svg viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2.6c3.9 4.6 7 8.3 7 12.4a7 7 0 0 1-14 0c0-4.1 3.1-7.800 7-12.400z"/><path d="M10 17.6h6M10 14.2h3.4"/></svg>
+  <span class="product">KPI intake form</span><span class="here">How to use the form</span>
+  <a href="kpi-intake-form.html">Open the form</a>
+</div>
+<main class="sheet">
+<div class="column">
+
+<div class="title">
+  <h1>How to use the KPI intake form</h1>
+  <p>One form holds one KPI. You fill it in a browser, save it as one answers file, and put that file in a shared folder. The form works offline and sends nothing anywhere.</p>
+  <p>The ontology is the company's shared model of business terms and their links. This form collects the information needed to add one KPI to it.</p>
+</div>
+
+<nav class="tasks" aria-label="What do you want to do?">
+  <a href="#start">Start</a>
+  <a href="#save">Save</a>
+  <a href="#continue">Continue</a>
+  <a href="#hand-over">Hand over</a>
+  <a href="#find">Find a checked KPI</a>
+</nav>
+
+<section id="short">
+  <header><h2>Where the files are</h2><p>The blank form, and the journey of one KPI's answers file.</p></header>
+  <div class="body">
+    <p>Open the blank form from the folder <span class="file">the-form</span>. Your answers never go into that folder. They go into an answers file, which moves through four places:</p>
+    <ol class="route">
+      <li><span class="step">1</span><span class="file">Downloads</span><span class="who">Your browser downloads the answers file, usually to Downloads.</span></li>
+      <li><span class="step">2</span><span class="file">1-in-progress</span><span class="who">You move the file here after every save.</span></li>
+      <li><span class="step">3</span><span class="file">2-ready-for-check</span><span class="who">The Business analyst moves it here when the form is filled and the business has signed.</span></li>
+      <li><span class="step">4</span><span class="file">3-checked</span><span class="who">The Architect moves it here when the check says it is complete.</span></li>
+    </ol>
+    <p>The answers file is the record. Save it whenever you stop.</p>
+  </div>
+</section>
+
+<section id="set-up">
+  <header><h2>Before you start</h2><p>The shared folder, the people, and one rule for sharing a file.</p></header>
+  <div class="body">
+    <p>The Architect sets up the shared folder once and gives the team its location. If you already have that location, go to <a href="#start">Start a new KPI</a>. The Architect's steps are in <a href="#architect">For the Architect</a>.</p>
+    <p>The folder is named <span class="file">KPI-intake</span> and always has these four folders in it.</p>
+    <div class="wrap">
+    <table class="stack">
+      <thead><tr><th>Folder</th><th>What it holds</th><th>Who puts it here</th></tr></thead>
+      <tbody>
+        <tr><th scope="row"><span class="file">the-form</span></th><td>The blank form (<span class="file">kpi-intake-form.html</span>), the same form for Excel (<span class="file">kpi-intake-form.xlsx</span>) and this guide. Save nothing here.</td><td data-label="Who puts it here">The Architect</td></tr>
+        <tr><th scope="row"><span class="file">1-in-progress</span></th><td>Answers files that are still being filled, and files the Architect has returned with their reports.</td><td data-label="Who puts it here">Whoever saved the file last</td></tr>
+        <tr><th scope="row"><span class="file">2-ready-for-check</span></th><td>Answers files that are filled, and signed by the business.</td><td data-label="Who puts it here">The Business analyst</td></tr>
+        <tr><th scope="row"><span class="file">3-checked</span></th><td>Answers files that passed the check. Beside each file is the report of its check.</td><td data-label="Who puts it here">The Architect</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>The name of an answers file</h3>
+    <p>Keep the name the form gives. It is the KPI's name in small letters, then <span class="file">.kpi-intake.json</span>. For the KPI "Crack Spreads Pricing" the form proposes:</p>
+    <pre data-snippet="text skip reason=&quot;illustration: the name the form proposes for one KPI's answers file&quot;">crack-spreads-pricing.kpi-intake.json</pre>
+
+    <h3>One person at a time</h3>
+    <p>One KPI has one file. One person edits a KPI's file at a time. Agree who has it next. Each person loads the latest file from the shared folder before editing, and puts the new file there in place of the older one. The shared folder keeps the latest file only. It keeps no history of earlier answers or earlier check reports.</p>
+
+    <h3>The people</h3>
+    <p>Before the interview, open the form's tab "The roles". It says what each role does. Find out who fills each role for this KPI. Ask the Program manager for the request number and its date.</p>
+  </div>
+</section>
+
+<section id="start">
+  <header><h2>Start a new KPI</h2><p>From the blank form to the first answers.</p></header>
+  <div class="body">
+    <ol class="steps">
+      <li>Open <span class="file">the-form</span> in the shared folder and double-click <span class="file">kpi-intake-form.html</span>. It opens in your browser.</li>
+      <li>Select the tab "KPI intake". If it contains earlier work, save that work first. Press "Clear this form", then "Clear", before you start the new KPI.</li>
+      <li>Open "Request details" at the top. Fill in the request number and date that the Program manager gave you.</li>
+      <li>Complete sections 1 to 6 with the people named beside each question. Each question says who answers it and why it is asked, and shows an example answer.</li>
+      <li>Where a question offers a list, choose from the list. You can choose an entry marked "new, not yet in the ontology".</li>
+      <li><a href="#save">Save</a> when you stop.</li>
+    </ol>
+
+    <h3>If the right answer is not in a list</h3>
+    <p>Choose the last option of the list. It is named "Not in the list", "The step is missing", "A role that is not in the list" or "A document that is not in the list". Write the missing name where the form asks for it.</p>
+    <p>If a notice then sends you to "Domain activation" or "Process map request", save the KPI file first. Complete the named form and save it separately: it has its own file. Give both files to the Architect. Go on with the KPI after the Architect confirms that the missing item is ready.</p>
+  </div>
+</section>
+
+<section id="save">
+  <header><h2>Save</h2><p>The form asks your browser for a download. You put the file in the shared folder.</p></header>
+  <div class="body">
+    <ol class="steps">
+      <li>Press "Save answers to file".</li>
+      <li>If your browser asks where to save, choose <span class="file">1-in-progress</span> in the shared folder. If it does not ask, it puts the file in its download folder, which is usually <span class="file">Downloads</span>.</li>
+      <li>Read the message above the buttons. It names the file.</li>
+      <li>Check that the file is where you expect. If it is in <span class="file">Downloads</span>, move it to <span class="file">1-in-progress</span>, in place of the older file of that KPI.</li>
+    </ol>
+    <div class="ui-dock" data-ui aria-hidden="true"><div class="ui-status">Download requested: crack-spreads-pricing.kpi-intake.json. Check that the file appears in your chosen folder.</div></div>
+    <p>The form cannot see whether the download arrived, so look for the file yourself. If <span class="file">Downloads</span> already holds a file of the same name, your browser may add a number such as (1) to the new one. Move the newest file and take the number out of its name.</p>
+  </div>
+</section>
+
+<section id="continue">
+  <header><h2>Continue later</h2><p>Load the saved file. The browser's draft is a second chance, not the plan.</p></header>
+  <div class="body">
+    <p>Before you stop, save the answers file to the shared folder. To continue, open the form and load that file. This works on any computer.</p>
+    <ol class="steps">
+      <li>Open the form from <span class="file">the-form</span>.</li>
+      <li>If the form contains work you need to keep, save it first. Loading replaces the answers for the form held in the file, and does not ask first.</li>
+      <li>Press "Load answers file" and choose the file in <span class="file">1-in-progress</span>.</li>
+      <li>Read the message above the buttons. It says "Loaded" and the file's name. If it says answers were left out, keep the original file and ask the Architect before you replace it.</li>
+      <li>Go on with the questions, then <a href="#save">save</a> again.</li>
+    </ol>
+
+    <h3>The browser's draft</h3>
+    <p>The browser may also restore a local draft. The form tries to keep one as you type. When you open the same form file again in the same browser, your answers may be back, and the form then says:</p>
+    <div class="ui-dock" data-ui aria-hidden="true"><div class="ui-status">Your unsaved draft was restored from this browser.</div></div>
+    <ul>
+      <li>The draft is not shared with your team. Someone who uses the same browser profile may see it.</li>
+      <li>Another computer and another browser do not have it.</li>
+      <li>The browser may refuse to keep it, for example in a private window, and the form does not tell you. It goes when someone clears the browser's data.</li>
+      <li>When you clear the form or load a file, the earlier draft of that form is gone.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="buttons">
+  <header><h2>The three buttons</h2><p>At the bottom left on a computer, or along the bottom on a phone.</p></header>
+  <div class="body">
+    <div class="ui">
+      <figure>
+        <div class="ui-dock" data-ui aria-hidden="true">
+          <div class="ui-actions">
+            <span class="ui-button primary">Save answers to file</span>
+            <span class="ui-button">Load answers file</span>
+            <span class="ui-button quiet">Clear this form</span>
+          </div>
+          <div class="ui-draft">Browser draft only. Save a file to share.</div>
+        </div>
+        <figcaption class="ui-caption">Example only. These buttons do not work in this guide.</figcaption>
+      </figure>
+      <dl class="buttons">
+        <div><dt>Save answers to file</dt><dd>Asks your browser to download one file with every answer, signature and comment of the open form. The form and the draft stay as they are.</dd></div>
+        <div><dt>Load answers file</dt><dd>Asks you for a saved file. It opens the form named inside that file and replaces that form's answers. <strong>It does not ask first.</strong> The saved file is not changed.</dd></div>
+        <div><dt>Clear this form</dt><dd>Asks "Clear this form?" first. "Clear" removes the earlier entries of the open form and restores its starting values, such as the status "Draft". "Cancel" keeps everything. A saved file is not changed.</dd></div>
+      </dl>
+    </div>
+    <p>Three tabs are forms: "KPI intake", "Domain activation" and "Process map request". Save and Clear work on the open form. Load opens the form named inside the saved file and replaces that form's answers. The other forms keep their answers.</p>
+  </div>
+</section>
+
+<section id="hand-over">
+  <header><h2>Hand over</h2><p>From the business interview to Digital IT, and then to the Architect.</p></header>
+  <div class="body">
+    <ol class="steps">
+      <li>Complete sections 1 to 6 with the people named beside each question.</li>
+      <li>Ask the Data Owner and the Domain Owner to sign. Each signature is a name and a date in the sign-off block.</li>
+      <li>Save the file and put it in <span class="file">1-in-progress</span>.</li>
+      <li>Ask Digital IT to load that file, complete section 7, save it, and put it back in <span class="file">1-in-progress</span>.</li>
+      <li>The Business analyst checks that every section's line says "Required answers complete", then moves the file to <span class="file">2-ready-for-check</span> and tells the Architect.</li>
+    </ol>
+
+    <h3>What the Architect does</h3>
+    <p>The Architect checks the answers first. The check lists each thing that is still open.</p>
+    <ul>
+      <li>If answers or business signatures are missing, the Architect returns the file and its report to <span class="file">1-in-progress</span>.</li>
+      <li>If only the Architect's approval remains, the Architect reviews, signs, saves and checks again.</li>
+      <li>When the check says "the intake is complete and signed", the Architect moves the file and its report to <span class="file">3-checked</span>.</li>
+    </ul>
+    <p>The check's commands are in <a href="#architect">For the Architect</a>.</p>
+
+    <h3>Fix a returned file</h3>
+    <p>If the Architect returns a file, open its report in <span class="file">1-in-progress</span>. The report's name ends in <span class="file">.check.txt</span>. Load the matching answers file, resolve the listed items, save, and move the file to <span class="file">2-ready-for-check</span> for another check.</p>
+
+    <h3>What "complete" means</h3>
+    <ul>
+      <li>Every required question that applies has an answer.</li>
+      <li>No answer sends the request somewhere else first: to a domain activation or to a process map request.</li>
+      <li>The KPI's name is not already a measure in the ontology.</li>
+      <li>Every signature the form needs has a name and a date.</li>
+    </ul>
+
+    <h3>Who signs</h3>
+    <div class="wrap">
+    <table class="stack">
+      <thead><tr><th>Who</th><th>What the signature confirms</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Data Owner</th><td data-label="What the signature confirms">The KPI's definition is right.</td><td data-label="When">Every KPI</td></tr>
+        <tr><th scope="row">Domain Owner</th><td data-label="What the signature confirms">The KPI belongs to my domain.</td><td data-label="When">Every KPI</td></tr>
+        <tr><th scope="row">Domain Owner, a second time</th><td data-label="What the signature confirms">I have decided between two definitions.</td><td data-label="When">Only when the check finds a conflicting definition</td></tr>
+        <tr><th scope="row">Architect</th><td data-label="What the signature confirms">The form is complete, and I approve the change.</td><td data-label="When">Every KPI, last</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<section id="find">
+  <header><h2>Find a checked KPI</h2><p>What is in 3-checked, and what it proves.</p></header>
+  <div class="body">
+    <p>To find a checked KPI, open <span class="file">3-checked</span>. Find its answers file by the KPI's name. Open the matching <span class="file">.check.txt</span> file to read the check's result. To read the answers, open the form and load the answers file.</p>
+    <p>A file in <span class="file">3-checked</span> means the intake passed its check. It does not prove that the KPI is already in the ontology. The Architect adds the KPI by hand afterwards. Some answers have no place in the ontology yet and stay in the file, so keep every file in <span class="file">3-checked</span>.</p>
+  </div>
+</section>
+
+<section id="excel">
+  <header><h2>If you prefer Excel</h2><p>The same form as a workbook.</p></header>
+  <div class="body">
+    <p><span class="file">kpi-intake-form.xlsx</span> has the same questions and lists. Copy it to <span class="file">1-in-progress</span> first. Name the copy after the KPI and end the name with <span class="file">.kpi-intake.xlsx</span>. Then fill in the yellow cells and save as usual. The check reads a workbook the same way as an answers file. Use one of the two for a KPI, not both: the HTML form cannot load a workbook.</p>
+  </div>
+</section>
+
+<section id="wrong">
+  <header><h2>If something goes wrong</h2><p>Three things that happen, and what to do.</p></header>
+  <div class="body">
+    <h3>A file will not load</h3>
+    <p>The form says "This file is not a KPI intake answers file" and gives the reason. Your answers on screen are not changed. Check that you chose a file whose name ends in <span class="file">.kpi-intake.json</span>, and not the report or a workbook. If it is the right file, give it to the Architect.</p>
+
+    <h3>The form opens with someone else's answers, or with an older KPI</h3>
+    <p>The browser has restored a draft. If that work is not saved, press "Save answers to file" first. Then press "Clear this form" and "Clear", or load the file you want.</p>
+
+    <h3>A role, a system or another entry is missing from a list</h3>
+    <p>Follow <a href="#start">If the right answer is not in a list</a>, and tell the Architect. The Architect can add the entry to the form's lists. The form then offers it, marked "new, not yet in the ontology".</p>
+  </div>
+</section>
+
+<section id="cycle">
+  <header><h2>Where this form sits</h2><p>The first of six steps.</p></header>
+  <div class="body">
+    <ol class="cycle" aria-label="The six steps of the KPI cycle. This form is the first.">
+      <li aria-current="step">Intake<span>This form</span></li>
+      <li>Govern &amp; Link</li>
+      <li>Compute</li>
+      <li>Serve &amp; Access</li>
+      <li>Monitor</li>
+      <li>Change Management</li>
+    </ol>
+  </div>
+</section>
+
+<section id="architect">
+  <header><h2>For the Architect</h2><p>The commands. Each runs from the release's top folder and needs Python.</p></header>
+  <div class="body">
+    <h3>Make the shared folder</h3>
+    <p>This command makes <span class="file">KPI-intake</span> inside the location you name, with its four folders, and copies the two forms and this guide into <span class="file">the-form</span>. The dot means the current folder.</p>
+    <pre data-snippet="powershell run=release-copy">py -m kpi_store.intake folders .</pre>
+    <pre class="out" data-snippet="text expect">made KPI-intake/the-form
+made KPI-intake/1-in-progress
+made KPI-intake/2-ready-for-check
+made KPI-intake/3-checked
+copied KPI-intake/the-form/kpi-intake-form.html
+copied KPI-intake/the-form/kpi-intake-form.xlsx
+copied KPI-intake/the-form/how-to-use-the-form.html
+wrote KPI-intake/READ-ME.txt
+KPI-intake is ready</pre>
+    <p>For a shared drive, name its location in place of the dot. Put it in quotes when it has a space:</p>
+    <pre data-snippet="text skip reason=&quot;illustration: the same command for a made-up location on a shared drive&quot;">py -m kpi_store.intake folders "S:/Commercial Planning/Shared"</pre>
+    <p>Run the command again when the form changes. It replaces the three files in <span class="file">the-form</span> and changes nothing in the numbered folders. You can also make the folders by hand.</p>
+
+    <h3>Check a file</h3>
+    <p>This is the check of the example that ships with the release. <code>--report</code> also writes the report beside the file, under the same name with <span class="file">.check.txt</span> in place of <span class="file">.json</span>. For a workbook the name ends with <span class="file">.kpi-intake.workbook.check.txt</span>.</p>
+    <pre data-snippet="powershell run=release-copy">py -m kpi_store.intake check kpi-intake/examples/crack-spreads-pricing.json --report</pre>
+    <pre class="out" data-snippet="text expect">KPI intake check: Crack Spreads Pricing
+...
+Result: the intake is complete and signed.
+This check changes nothing in the ontology. The Architect applies a complete intake by hand, with HOW-TO-UPDATE.md.
+The report is also in crack-spreads-pricing.check.txt, beside the file.</pre>
+    <p>For a file in the shared folder, name it where it is:</p>
+    <pre data-snippet="text skip reason=&quot;illustration: the same command for a file in a made-up shared folder&quot;">py -m kpi_store.intake check "S:/Commercial Planning/Shared/KPI-intake/2-ready-for-check/crack-spreads-pricing.kpi-intake.json" --report</pre>
+    <p>The check changes nothing in the ontology. Add a complete KPI by hand, with the steps of <span class="file">HOW-TO-UPDATE.md</span> in the release.</p>
+
+    <h3>When the check says the pick lists are older than the release</h3>
+    <p>A module of the ontology was released after the form was built. Rebuild the form and copy it to the shared folder again:</p>
+    <pre data-snippet="powershell run=release-copy">py -m kpi_store.intake build
+py -m kpi_store.intake folders .</pre>
+    <pre class="out" data-snippet="text expect">the intake pack is current; nothing was written
+KPI-intake is current; nothing was changed</pre>
+    <p>Here both commands found nothing to do. After a release, each prints the files it wrote.</p>
+  </div>
+</section>
+
+<section id="groups">
+  <header><h2>Optional reference: where each part of the KPI is recorded</h2><p>For readers who know the seven field groups of the KPI specification.</p></header>
+  <div class="body">
+    <p>These groups are not the numbered sections of the form. Each number below opens that question in the form.</p>
+    <div class="wrap">
+    <table class="stack">
+      <thead><tr><th>Group</th><th>What it holds, in plain words</th><th>Questions of the form</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Identity</th><td>The KPI's ID, its name and its data domain.</td><td data-label="Questions">An ID it already has: <a href="kpi-intake-form.html#q-3.6">3.6</a>. Name: <a href="kpi-intake-form.html#q-2.1">2.1</a>. Domain: <a href="kpi-intake-form.html#q-1.5">1.5</a></td></tr>
+        <tr><th scope="row">Meaning</th><td>The definition, and the business objective the KPI helps to track (the strategic objective).</td><td data-label="Questions">Definition: <a href="kpi-intake-form.html#q-2.2">2.2</a> to <a href="kpi-intake-form.html#q-2.4">2.4</a>. Objective: <a href="kpi-intake-form.html#q-2.5">2.5</a></td></tr>
+        <tr><th scope="row">Calculation</th><td>The formula in words. The grain: what one individual value describes. The dimensions: the breakdowns people read it by.</td><td data-label="Questions">Formula: <a href="kpi-intake-form.html#q-3.1">3.1</a>. Unit: <a href="kpi-intake-form.html#q-3.2">3.2</a>. Grain: <a href="kpi-intake-form.html#q-3.8">3.8</a>. How often, and the breakdowns: <a href="kpi-intake-form.html#q-3.3">3.3</a>. Compared against: <a href="kpi-intake-form.html#q-3.4">3.4</a></td></tr>
+        <tr><th scope="row">Accountability</th><td>The owner, who is accountable. The steward, who maintains the definition. The status.</td><td data-label="Questions">Owner: <a href="kpi-intake-form.html#q-6.8">6.8</a>. Steward: <a href="kpi-intake-form.html#q-6.9">6.9</a>. Status: <a href="kpi-intake-form.html#q-3.9">3.9</a></td></tr>
+        <tr><th scope="row">Assurance</th><td>The lineage: which tables and systems the values come from. The quality checks. The lifecycle: when it is reviewed and when it stops being used.</td><td data-label="Questions">Lineage: <a href="kpi-intake-form.html#q-7.1">7.1</a> to <a href="kpi-intake-form.html#q-7.4">7.4</a>. Checks: <a href="kpi-intake-form.html#q-3.10">3.10</a>. Review: <a href="kpi-intake-form.html#q-3.11">3.11</a></td></tr>
+        <tr><th scope="row">Targets</th><td>The agreed limits (thresholds) and the dates they apply from.</td><td data-label="Questions">Limits: <a href="kpi-intake-form.html#q-3.12">3.12</a>. Dates: <a href="kpi-intake-form.html#q-3.13">3.13</a></td></tr>
+        <tr><th scope="row">Access</th><td>The data product, the view that gives the values (the semantic view), and an API: a way for a program to read the values.</td><td data-label="Questions">Data product: <a href="kpi-intake-form.html#q-6.6">6.6</a>. View: <a href="kpi-intake-form.html#q-7.1">7.1</a>. AI assistant or report: <a href="kpi-intake-form.html#q-7.8">7.8</a>. API or file feed: <a href="kpi-intake-form.html#q-7.10">7.10</a></td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p>A question shows only when it applies, and only while the tab "KPI intake" is open. The status starts at "Draft". The form does not change it when someone signs.</p>
+  </div>
+</section>
+
+<p class="foot">This guide belongs to KPI Store 1.1. The Architect's notes are in <span class="file">README.md</span> and <span class="file">for-the-architect.md</span>, in the folder <span class="file">kpi-intake</span> of the release.</p>
+
+</div>
+</main>
+</body>
+</html>

@@ -50,6 +50,8 @@ kpi_store/tests/test_intake_build.py::test_the_page_shows_who_answers_why_and_an
 kpi_store/tests/test_intake_build.py::test_the_workbook_has_a_sheet_per_section_dropdowns_and_a_hidden_lists_sheet
 kpi_store/tests/test_intake_build.py::test_the_crack_spreads_example_quotes_the_ontology_word_for_word
 kpi_store/tests/test_intake_build.py::test_the_margin_example_walks_all_five_tests
+kpi_store/tests/test_intake_build.py::test_the_architects_page_says_what_the_settings_hide_and_add
+kpi_store/tests/test_intake_build.py::test_the_forms_offer_what_the_settings_leave_and_add
 # The documents' examples show the versions and counts of the release as shipped, and scripts/doc_snippets.toml
 # records which release that is. On any other release scripts/check.sh runs no block of the documents. After you
 # bring the examples up to date: py scripts/doc_snippets.py describe-release --write

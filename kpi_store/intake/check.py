@@ -17,15 +17,17 @@ release packages:
     conflicting definition  that term's definition differs: the Domain Owner decides and signs
     area and process        the chosen process belongs to another business area than the answer to 1.1
     values                  an id or a list value that the ontology does not hold
+    to add first            an answer that the organization's settings added and the ontology does not hold yet
     sign-off                a signature, or the record of a consultation, is missing
 """
+import dataclasses
 import difflib
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from kpi_store.intake import rules
-from kpi_store.intake.catalogue import CHOICE_TYPES, FORMS
+from kpi_store.intake.catalogue import ADDED_MARK, CHOICE_TYPES, FORMS, HIDDEN_MARK, SETTINGS_LISTS
 
 CLOSE = 0.88        # two names at least this alike are shown to a person as a possible match
 APPLY = "This check changes nothing in the ontology. The Architect applies a complete intake by hand, with HOW-TO-UPDATE.md."
@@ -67,7 +69,7 @@ def _sections(cat, lists, intake, report):
         questions = cat.questions_of(section=section["id"])
         asked = [q for q in questions if rules.is_asked(cat, answers, q)]
         skipped = [q for q in questions if q not in asked]
-        missing, invalid, extra = [], [], []
+        missing, invalid, extra, notes = [], [], [], []
         for q in asked:
             if q["required"] == "required" and not rules.is_complete(cat, answers, q):
                 if "per" in q and rules.values(answers, q["id"]):
@@ -79,6 +81,7 @@ def _sections(cat, lists, intake, report):
             elif rules.detail_required(q, answers) and rules.values(answers, q["id"]) and not rules.values(answers, q["id"] + ".detail"):
                 missing.append(f'{q["id"]} also needs: {q["detail"]["label"]}')
             invalid += _invalid(cat, lists, answers, q)
+            notes += _hidden(cat, lists, answers, q)
         for q in skipped:
             if rules.values(answers, q["id"]):
                 extra.append(f'{q["id"]} has an answer, but its rule says it is not asked ({cat.requirement(q)}). Remove the answer or correct the earlier one.')
@@ -97,6 +100,8 @@ def _sections(cat, lists, intake, report):
         for line in extra:
             report.say("  " + line)
             report.block(line)
+        for line in notes:
+            report.say("  Note: " + line)
         if skipped:
             report.say("  Rightly skipped: " + "; ".join(f'{q["id"]} ({cat.requirement(q)})' for q in skipped if not rules.values(answers, q["id"])))
         if not (missing or invalid or extra):
@@ -108,8 +113,8 @@ def _invalid(cat, lists, answers, question):
     """Each value of a choice question that its list does not hold, as a sentence."""
     if question["type"] not in CHOICE_TYPES:
         return []
-    offered = {o["id"]: o for o in rules.options(cat, lists, question)}
-    under = {o["id"] for o in rules.options(cat, lists, question, answers)} if question.get("under") else None
+    offered = {o["id"]: o for o in rules.options(cat, lists, question, hidden=True)}
+    under = {o["id"] for o in rules.options(cat, lists, question, answers, hidden=True)} if question.get("under") else None
     out = []
     held = rules.values(answers, question["id"])
     if question["type"] == "choice" and len(held) > 1:
@@ -122,6 +127,37 @@ def _invalid(cat, lists, answers, question):
         elif "(deprecated)" in offered[value]["label"]:
             out.append(f'{question["id"]}: "{offered[value]["label"]}" is deprecated in the ontology. Choose the term that replaced it.')
     return out
+
+
+def _hidden(cat, lists, answers, question):
+    """Each answer that names an entry the organization's settings now hide, as a sentence. The answer stands."""
+    if question["type"] not in CHOICE_TYPES:
+        return []
+    offered = {o["id"]: o for o in rules.options(cat, lists, question, hidden=True)}
+    return [f'{question["id"]}: "{offered[v]["label"].removesuffix(HIDDEN_MARK)}" is hidden in this organization\'s settings. '
+            "The forms no longer offer it. The answer was given before, and it stands."
+            for v in rules.values(answers, question["id"]) if offered.get(v, {}).get("hidden")]
+
+
+def _to_add(cat, lists, intake, report):
+    """The answers that name an entry the organization's settings added. The ontology does not hold it yet, so the
+    Architect adds it before the KPI is applied. It does not stop the intake from being complete."""
+    lines = []
+    for question in cat.questions_of(intake.form):
+        module = SETTINGS_LISTS.get(question.get("source"))
+        if not module or not rules.is_asked(cat, intake.answers, question):
+            continue
+        offered = {o["id"]: o for o in rules.options(cat, lists, question, hidden=True)}
+        for value in rules.values(intake.answers, question["id"]):
+            if offered.get(value, {}).get("added"):
+                name = offered[value]["label"].removesuffix(ADDED_MARK)
+                lines.append(f'{question["id"]} names "{name}". The organization\'s settings added it, and the ontology does not hold it yet. '
+                             f"Add it to the {module} module with HOW-TO-UPDATE.md before you apply this KPI.")
+    if lines:
+        report.say("To add to the ontology first")
+        for line in lines:
+            report.say("  For the Architect: " + line)
+        report.say()
 
 
 def _routing(cat, lists, intake, report):
@@ -239,11 +275,34 @@ def _sign_off(cat, intake, report, consult, conflict):
     report.say()
 
 
+def _resolve(cat, lists, intake):
+    """The intake with each answer on a list the settings can change read as its entry's id of today, by the one
+    rule of rules.py, and a sentence for each answer stored under an addition the ontology has since gained. The
+    file itself is not changed."""
+    answers, notes = dict(intake.answers), []
+    for question in cat.questions_of(intake.form):
+        if question["type"] not in CHOICE_TYPES or question.get("source") not in SETTINGS_LISTS or question["id"] not in answers:
+            continue
+        known = rules.resolver(cat, lists, question)
+        labels = {item["id"]: item["label"] for item in lists[question["source"]]}
+        read = []
+        for value in rules.positions(answers, question["id"]):
+            if value in known and not value.startswith("@"):
+                value, gained = known[value]
+                if gained:
+                    notes.append(f'{question["id"]}: "{labels[value]}" is now in the ontology; the answer was read as that entry.')
+            if value not in read or "per" in question:
+                read.append(value)
+        answers[question["id"]] = rules.as_answer(question, read)
+    return dataclasses.replace(intake, answers=answers), notes
+
+
 def check(cat, data, intake, stale=None):
     """The report on one filled form. `data` is the built pick lists; `stale` names the modules whose packages are
     newer than the lists."""
     lists, terms = data["lists"], data.get("terms", [])
     report = Report()
+    intake, renamed = _resolve(cat, lists, intake)
     first = "2.1" if intake.form == "kpi-intake" else cat.questions_of(intake.form)[0]["id"]
     name = intake.kpi_name or "; ".join(rules.values(intake.answers, first)[:2])
     report.say(f'{FORMS[intake.form]} check: {name or "(no name yet)"}')
@@ -256,6 +315,8 @@ def check(cat, data, intake, stale=None):
         report.block("the pick lists are older than the release packages")
     for key in intake.unknown_keys:
         report.say(f"Note: the workbook holds an answer under {key}, which is no question of this form. It was not read.")
+    for line in renamed:
+        report.say("Note: " + line)
     report.say()
     _sections(cat, lists, intake, report)
     if intake.form == "kpi-intake":
@@ -267,6 +328,7 @@ def check(cat, data, intake, stale=None):
             report.say("Kind of measure: not decided yet. Answer section 4.")
         report.say()
     consult = _routing(cat, lists, intake, report)
+    _to_add(cat, lists, intake, report)
     conflict = False
     if intake.form == "kpi-intake":
         more, conflict = _derived(cat, lists, terms, intake, report)

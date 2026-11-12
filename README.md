@@ -95,7 +95,7 @@ The runbook says when to run each command and what it prints. This table says on
 | `py -m kpi_store.copy_enterprise` | Copies the checked graph from the local Neo4j to the one named database on Neo4j Enterprise, and checks the copy |
 | `py -m kpi_store.sync_check` | Says whether each store holds the release in this folder: current, or behind |
 | `py -m kpi_store.questions.run ask <question> --settings <file> --mapping <file> --out <folder>` | Asks one of the four cross-graph questions (`q1`, `q4`, `q6`, `q7`) and writes its rows. The other subcommands are `discover`, `confirm` and `check`, which make and check the mapping file that `ask` needs. `py -m kpi_store.questions.run --help` lists them |
-| `py -m kpi_store.intake check <file>` | Says what a filled KPI intake form still lacks. `py -m kpi_store.intake build` rebuilds the forms from the catalogue and the release packages |
+| `py -m kpi_store.intake check <file>` | Says what a filled KPI intake form still lacks. `py -m kpi_store.intake build` rebuilds the forms from the catalogue and the release packages. `py -m kpi_store.intake folders <place>` makes the shared folder a team keeps its answers files in |
 | `bash scripts/check.sh` | Proves that this copy of the release is valid |
 
 ## Run the checks

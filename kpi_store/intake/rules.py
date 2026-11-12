@@ -5,8 +5,23 @@ from the same catalogue data, and a browser proof checks that the two agree on t
 
 An answer is a text or a list of texts. A choice holds the id of the chosen item. A special option's id starts
 with "@" (for example "@not-in-list").
+
+How a stored value finds its entry. An answers file and a browser draft store an entry's id; a workbook cell
+stores its label. The organization's settings can hide an entry, give it another label, or add one that the
+ontology later gains, so a value stored under earlier settings may no longer be the entry's id or label of today.
+One rule reads them all, and resolver() below is that rule:
+
+    A stored value names an entry when it is the entry's id, an id the settings once added it under ("new:<id>"),
+    its label of today, or a label it had before (the ontology's own label, or the label of the `add` entry), and
+    a label counts with or without the mark of a hidden entry or of a new entry at its end.
+
+Every such value is read as the entry's one id of today. The check (check._resolve), the workbook reader
+(workbook.read) and the HTML form (resolverOf in form.html, for a loaded file and a restored draft) all read a
+stored value through this rule. picklists.apply_settings writes what the rule needs on each entry: "aliases" (the
+added ids) and "was" (the earlier labels). A value that was stored under an added id or under a label with the
+"new" mark, for an entry the ontology has since gained, is also flagged, so the reader can say what it did.
 """
-from kpi_store.intake.catalogue import CHOICE_TYPES, INACTIVE, MANY_TYPES
+from kpi_store.intake.catalogue import ADDED_MARK, CHOICE_TYPES, HIDDEN_MARK, INACTIVE, MANY_TYPES, SETTINGS_LISTS
 
 
 def values(answers, key):
@@ -40,10 +55,12 @@ def is_asked(cat, answers, question, _seen=None):
     return True
 
 
-def options(cat, lists, question, answers=None):
+def options(cat, lists, question, answers=None, hidden=False):
     """What a choice question offers, as items with an id and a label: the list's items that the question's levels
     allow, then the question's special options. With answers, a question that says `under` offers only the
-    entries under the chosen process."""
+    entries under the chosen process. An entry that the organization's settings hide is not offered. With
+    hidden=True it is there too, with the mark in its label, for a reader that must know an answer given before
+    the entry was hidden."""
     source = question.get("source")
     if question["type"] not in CHOICE_TYPES:
         return []
@@ -51,7 +68,7 @@ def options(cat, lists, question, answers=None):
     if fixed is not None:
         items = [dict(item, label=item["label"] + (" (not active)" if item.get("active") is False else "")) for item in fixed]
     else:
-        items = list(lists[source])
+        items = [dict(i, label=i["label"] + HIDDEN_MARK) if i.get("hidden") else i for i in lists[source] if hidden or not i.get("hidden")]
         if "levels" in question:
             low, high = question["levels"]
             items = [i for i in items if low <= i["level"] <= high]
@@ -61,6 +78,31 @@ def options(cat, lists, question, answers=None):
                 by_id = {i["id"]: i for i in lists[source]}
                 items = [i for i in items if _is_under(by_id, i, top[0])]
     return items + [{"id": o["id"], "label": o["label"]} for o in question.get("option", [])]
+
+
+def resolver(cat, lists, question):
+    """{stored value: (the entry's id, gained)} for a choice question, by the one rule of this module's docstring.
+    `gained` is True for a value stored while the entry was only an addition of the settings."""
+    out = {}
+    if question["type"] not in CHOICE_TYPES:
+        return out
+    offered = options(cat, lists, question, hidden=True)
+    for option in offered:
+        out[option["id"]] = (option["id"], False)
+    for option in offered:
+        out.setdefault(option["label"], (option["id"], False))
+    source = question.get("source", "")
+    if source not in SETTINGS_LISTS:
+        return out
+    for item in lists[source]:
+        plain = item["label"].removesuffix(ADDED_MARK) if item.get("added") else item["label"]
+        gained = bool(item.get("aliases"))
+        for name in [plain] + list(item.get("was", [])):
+            for mark in ("", HIDDEN_MARK, ADDED_MARK):
+                out.setdefault(name + mark, (item["id"], gained and mark == ADDED_MARK))
+        for alias in item.get("aliases", []):
+            out.setdefault(alias, (item["id"], True))
+    return out
 
 
 def _is_under(by_id, item, ancestor):

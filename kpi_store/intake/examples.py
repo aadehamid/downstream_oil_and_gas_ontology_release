@@ -127,6 +127,13 @@ def build(release, lists, cat, spec):
         if key.removesuffix(".detail") not in cat.by_id:
             raise ExampleError(f"examples.toml gives an answer to {key}, which is no question")
         answers[key] = value
+    # An entry that the organization's settings hide is left out of an example, because the forms do not offer it.
+    for question in cat.questions:
+        source = question.get("source", "")
+        if source in lists and question["id"] in answers and "per" not in question:
+            hidden = {i["id"] for i in lists[source] if i.get("hidden")}
+            held = answers[question["id"]]
+            answers[question["id"]] = [v for v in held if v not in hidden] if isinstance(held, list) else ("" if held in hidden else held)
     answers = {k: v for k, v in answers.items() if v not in ("", [])}
     return Intake(form="kpi-intake", catalogue_version=cat.version, kpi_name=answers.get("2.1", ""),
                   request=dict(spec.get("request", {})), answers=answers,
@@ -141,7 +148,7 @@ def answer_text(cat, lists, intake, question):
     held = rules.positions(intake.answers, question["id"])
     if not any(held):
         return ""
-    labels = {o["id"]: o["label"] for o in rules.options(cat, lists, question)}
+    labels = {o["id"]: o["label"] for o in rules.options(cat, lists, question, hidden=True)}
     lines = [labels.get(v, v) for v in held if v]
     detail = "".join(rules.values(intake.answers, question["id"] + ".detail")[:1])
     if detail:

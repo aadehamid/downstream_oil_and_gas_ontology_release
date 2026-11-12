@@ -10,15 +10,16 @@ The pack does not change the ontology. A complete, signed form goes to the Archi
 |---|---|
 | [`kpi-intake-form.html`](kpi-intake-form.html) | The form as one page. Open it in a browser. It works offline and sends nothing anywhere |
 | `kpi-intake-form.xlsx` | The same form as an Excel workbook, for people who prefer Excel |
+| [`how-to-use-the-form.html`](how-to-use-the-form.html) | The guide for the people who fill the form: the shared folder, the three buttons, the draft, and what happens to a saved file. Read it first |
 | [`what-we-will-ask-you.md`](what-we-will-ask-you.md) | One page to send to the people you invite, before the interview |
 | [`for-the-architect.md`](for-the-architect.md) | What each question feeds in the ontology, and the facts that have no place there yet |
 | `examples/` | Two filled forms, each as an answers file and as a workbook: Crack Spreads Pricing and R&M Margin per Barrel |
 | `catalogue.toml` | Every question, with its section, its rule and its reason. The forms are built from it |
-| `settings.toml` | What belongs to your organization: the role titles and definitions, the domain list, and who may see a KPI |
+| `settings.toml` | What belongs to your organization: the role titles and definitions, the domain list, who may see a KPI, the statuses, and what you hide from or add to the ontology's lists |
 | `pick-lists.json` | The lists the forms offer, read from the release packages |
 | `answers.schema.json` | The shape of an answers file, as a JSON Schema |
 
-The HTML form, the workbook, the two pages, the pick lists and the examples are built by one command. Do not edit them by hand. "Change the form" below says what to edit.
+The HTML form, the workbook, the two pages, the pick lists and the examples are built by one command. Do not edit them by hand. "Change the form" below says what to edit. The guide `how-to-use-the-form.html` is written by hand.
 
 ## Two words: business area and domain
 
@@ -58,7 +59,7 @@ One form is for one KPI.
 5. The Business analyst asks the questions of sections 1 to 6 in order and records each answer. Each question says who answers it and why it is asked, and shows an example answer.
 6. Where a question offers a list, choose from the list. If the right answer is not there, choose "Not in the list". The form then says what happens next and who does it, and gives a button that opens the smaller form.
 7. Leave a question that does not apply. The HTML form hides it. In the workbook, the "Asked of" column gives each question's rule.
-8. Save the answers. In the HTML form, press "Save answers to file", which downloads a file such as `days-of-cover.kpi-intake.json`. In Excel, save the workbook under the KPI's name.
+8. Save the answers. In the HTML form, press "Save answers to file", which downloads a file such as `crack-spreads-pricing.kpi-intake.json`. Move it from the download folder to the shared folder, as "The shared folder" below says. In Excel, save the workbook under the KPI's name.
 9. Run the check on the saved file, as "Check a filled form" shows. Settle what it lists.
 10. The Data Owner reads the form and signs the definition. The Domain Owner confirms the domain.
 11. Digital IT fills in section 7 in the same file. To go on in the HTML form, press "Load answers file" and choose the saved file.
@@ -72,20 +73,49 @@ The request's number, date, requester and invited people are under "Request deta
 
 The HTML form opens in the light theme. The theme list beside "Version" changes it to dark or to the system's setting, and the browser remembers the choice. A printed form is always light. In a narrow window or at a high zoom, a "View" list replaces the tabs and a "Sections" button opens the section list.
 
-The interview for sections 1 to 6 takes about 50 minutes for a typical KPI:
+The interview for sections 1 to 6 takes about 65 minutes for a typical KPI:
 
 | Section | What it settles | Questions | Asked for a typical KPI | Minutes |
 |---|---|---|---|---|
 | 1. The business area | The business area, the process, the step and the domain | 6 | 5 to 6 | 8 |
-| 2. What the KPI means | One name and one meaning, and what it counts and leaves out | 4 | 4 | 11 |
-| 3. The facts about it | How it is worked out, its unit, how often it is stated, its written source, who may see it | 7 | 7 | 10 |
+| 2. What the KPI means | One name and one meaning, what it counts and leaves out, and the strategic objective it serves | 5 | 5 | 13 |
+| 3. The facts about it | How it is worked out, its unit, how often it is stated, its grain, its written source, who may see it, its status, its quality rule, its review and its thresholds | 13 | 12 to 13 | 17 |
 | 4. Where it belongs | The kind of measure, by up to five yes or no questions | 9 | 4 to 6 | 6 |
 | 5. Other names for it | Other names, and the measures it is mistaken for | 4 | 4 | 6 |
-| 6. What it connects to | The roles that use it, other processes, value stream steps and the data product | 7 | 4 to 6 | 11 |
-| Total | | 37 | about 28 | 52 |
-| 7. Where the data lives (IT only) | The view or table that gives the values | 9 | 3 to 9 | 20 to 30 |
+| 6. What it connects to | The roles that use it, its named owner and steward, other processes, value stream steps and the data product | 9 | 6 to 8 | 14 |
+| Total | | 46 | about 39 | 64 |
+| 7. Where the data lives (IT only) | The view or table that gives the values, and an API if there is one | 10 | 4 to 10 | 20 to 30 |
 
 Section 7 takes Digital IT 20 to 30 minutes with no business person present.
+
+## The shared folder
+
+A team that works offline keeps its answers files in one shared folder with a fixed layout. [`how-to-use-the-form.html`](how-to-use-the-form.html) explains it to the people who use it. This command makes the folder `KPI-intake` in the place you name, here the release's top folder, and copies the two forms and the guide into it:
+
+```powershell run=release-copy
+py -m kpi_store.intake folders .
+```
+
+```text expect
+made KPI-intake/the-form
+made KPI-intake/1-in-progress
+made KPI-intake/2-ready-for-check
+made KPI-intake/3-checked
+copied KPI-intake/the-form/kpi-intake-form.html
+copied KPI-intake/the-form/kpi-intake-form.xlsx
+copied KPI-intake/the-form/how-to-use-the-form.html
+wrote KPI-intake/READ-ME.txt
+KPI-intake is ready
+```
+
+| Folder | What it holds | Who puts a file in |
+|---|---|---|
+| `the-form` | The HTML form, the Excel form and the guide | The Architect, with this command |
+| `1-in-progress` | Answers files that are still being filled | The Business analyst, after every save |
+| `2-ready-for-check` | Answers files that are filled, and signed by the business | The Business analyst |
+| `3-checked` | Complete answers files, each with the report of its check | The Architect |
+
+An answers file keeps the name the form gives it, such as `crack-spreads-pricing.kpi-intake.json`. Run the command again after you rebuild the pack. It replaces the three files in `the-form` and changes nothing in the numbered folders.
 
 ## Check a filled form
 
@@ -103,7 +133,7 @@ py -m kpi_store.intake check kpi-intake/examples/crack-spreads-pricing.json
 
 ```text expect
 KPI intake check: Crack Spreads Pricing
-Catalogue 1.0. Pick lists of KPI Store 1.1.
+Catalogue 1.2. Pick lists of KPI Store 1.1.
 
 1. The business area
   Answered 5 of the 6 questions that apply.
@@ -138,20 +168,23 @@ Result: the intake is complete and signed.
 This check changes nothing in the ontology. The Architect applies a complete intake by hand, with HOW-TO-UPDATE.md.
 ```
 
+Add `--report` to also write the report beside the file, under the same name with `.check.txt` in place of `.json`. The report of a workbook also says "workbook" and names the form: `rm-margin-per-barrel.xlsx` gives `rm-margin-per-barrel.kpi-intake.workbook.check.txt`. So an answers file and a workbook of one KPI, and two forms of one workbook, never share a report. The Architect keeps that report with the file in `3-checked`.
+
 The check prints, section by section, what is missing and which questions the rules rightly skipped. Then it prints the kind of measure, where an answer routes the request, what it found in the ontology, and who has signed. The last lines give the result.
 
 | Exit status | Meaning |
 |---|---|
 | 0 | The form is complete and signed |
 | 1 | Something is still to settle. The result lists each thing |
-| 2 | The file could not be read |
+| 2 | A tool error: the file, the pack or the release could not be read, or the report could not be written. The message says which |
 
 The check looks for these things in the ontology:
 
 - **The same measure.** The name, or one of its other names, is already a measure. The form stops, and the request becomes a change to that measure. A name that is only close is shown for a person to judge.
 - **The same name in another module.** The check asks you to consult Enterprise Data Governance and to record the date and the outcome in the sign-off block. If that term's definition differs, the Domain Owner decides between the two and signs.
 - **Area and process.** The chosen process belongs to another business area than the answer to 1.1.
-- **Values.** An answer names something that the lists do not hold, or a term the ontology marks as deprecated.
+- **Values.** An answer names something that the lists do not hold, or a term the ontology marks as deprecated. An answer that names an entry your settings now hide still passes, with a note.
+- **To add first.** An answer names an entry that your settings added and the ontology does not hold yet. The check tells the Architect to add it to its module with `HOW-TO-UPDATE.md` before the KPI is applied. It does not stop the intake from being complete.
 - **Sign-off.** A signature needs a name and a date.
 
 If a module was released after the pick lists were built, the check stops and asks you to rebuild them first.
@@ -193,15 +226,17 @@ When a domain activation is signed, set that domain to `active = true` in `setti
 3. The Architect rebuilds this pack, so that the lists offer the new KPI.
 4. Keep the filled form. It holds the signers' names and the answers that the ontology has no place for.
 
-Keep your organization's filled forms in one folder of your own copy, such as `kpi-intake/filled/`.
+Keep your organization's filled forms in the shared folder, as "The shared folder" above says. A client's filled form does not belong in the release folder.
 
 ## Change the form
 
 Three files are yours to edit. After any change, rebuild.
 
-- `settings.toml` holds the role titles and definitions, the domain list and the answers to "who may see it". Change a title or a definition there and keep the `id`.
+- `settings.toml` holds the role titles and definitions, the domain list, the answers to "who may see it", the statuses, and what your organization hides from or adds to the ontology's lists. Change a title or a definition there and keep the `id`.
 - `catalogue.toml` holds the questions. Its first lines explain the file. You can change any text, a rule, a time estimate or the sign-off block. A new question needs an `id` that no other question has.
 - `examples/examples.toml` names the measures that the two examples copy.
+
+The Architect, or whoever maintains the form, edits `settings.toml`. The business users never do. Edit it when a role title or a definition changes, when the domain list changes, or when an entry of a list is to be hidden or added. Then run `py -m kpi_store.intake build`, and copy the new form to the shared folder with `py -m kpi_store.intake folders <place>`, as "The shared folder" above shows.
 
 A question takes its list from one of three places, which its `source` names:
 
@@ -229,6 +264,41 @@ A domain with `active = false` stays in the list, marked "not active". Choosing 
   outcome = "domain-activation"
   notice = "This domain is not active yet. The KPI cannot be added until the domain is activated."
 ```
+
+### Hide or add an entry of one of the ontology's lists
+
+Four lists come from the ontology: `sources` (question 3.5), `roles` (6.1), `data-products` (6.6) and `systems` (7.4). A table `[pick_list.<name>]` in `settings.toml` says what your organization hides from a list and what it adds. The ontology is not changed. This is the table for the roles as shipped. It hides one role and adds one that the ontology does not hold yet:
+
+```toml excerpt=kpi-intake/settings.toml
+[pick_list.roles]
+hide = ["Black Oil Manager"]
+
+[[pick_list.roles.add]]
+id = "value-chain-optimization-director"
+label = "Value Chain Optimization Director"
+```
+
+| Key | What it does |
+|---|---|
+| `hide` | The forms do not offer these entries. Name each by its label, as the ontology gives it, by its id, or by the last part of its id |
+| `hide_tiers` | For `sources` only: hides every source of these evidence tiers |
+| `keep_only` | The opposite of `hide`: the forms offer only these entries. A list uses `keep_only`, or `hide` and `hide_tiers`, never both |
+| `labels` | The label the forms and the check show for an entry, in place of the ontology's. The answers file still keeps the entry's id, and a workbook filled under the earlier label still reads |
+| `add` | An entry with an `id` and a `label`. The forms offer it, marked "new, not yet in the ontology" |
+
+After the build, [`for-the-architect.md`](for-the-architect.md) shows the list as the forms offer it. This is its line for the roles: 64 of the 65 entries are offered, one is hidden, and one is added.
+
+```markdown excerpt=kpi-intake/for-the-architect.md
+| `roles` | 6.1 and P5 | 64 of 65 | 1 | Value Chain Optimization Director |
+```
+
+A hidden entry stays known. An answers file that already holds it still passes the check, with the note "hidden in this organization's settings". When a form names an added entry, the check tells the Architect to add it to the ontology first. The build stops when a name under `hide` or `keep_only` matches no entry, so a misspelt name cannot go unnoticed. It also stops when `add` names an entry that `hide` names, when an added entry matches more than one entry, or when two added entries share a label.
+
+When the ontology has gained an added entry under the same label, rebuild and leave the entry under `add` for now. The forms then offer the ontology's entry only. An answer that a form in progress saved under the added entry is read as the ontology's entry, and the check says "is now in the ontology; the answer was read as that entry". `for-the-architect.md` names each such entry. Remove it from `add` once no form in progress uses it. The entry is matched by its label, by the label the ontology gives it when your `labels` table shows it under another, or by the last part of its id. When the list uses `keep_only`, add the entry's name there to offer it; until then it is hidden, and saved answers are still read.
+
+One rule reads every saved answer, in an answers file, a browser draft and a workbook: a saved value names an entry when it is the entry's id, an id your settings once added it under, its label of today or a label it had before, with or without the mark of a hidden or a new entry.
+
+Question 6.1 still has the option "A role that is not in the list", which sends the request to a process map request. Use `add` for a role your organization has already decided on, and that option for a role the interview finds.
 
 The two examples use the domains `market-price` and `financial-performance`. When you replace the list, also change the two `"1.5"` lines in `examples/examples.toml` to domains of your own.
 
@@ -266,11 +336,11 @@ Two builds of the same files write the same bytes for every text file. A workboo
 {
   "format": 1,
   "form": "kpi-intake",
-  "catalogue_version": "1.0",
+  "catalogue_version": "1.2",
   "kpi_name": "Crack Spreads Pricing",
 ```
 
-`answers` holds each answer under its question's number. A question with several answers holds a list. A chosen item is stored by its id, which for a list of the ontology is the term's IRI. The extra text of a question is under the number with `.detail`, such as `3.5.detail`. `sign_offs` holds each signer's name and date, and `consulted` holds the date and outcome of each consultation.
+`answers` holds each answer under its question's number. A question with several answers holds a list. A chosen item is stored by its id, which for a list of the ontology is the term's IRI. The id of an entry that `settings.toml` adds starts with `new:`. The extra text of a question is under the number with `.detail`, such as `3.5.detail`. `sign_offs` holds each signer's name and date, and `consulted` holds the date and outcome of each consultation.
 
 In the workbook, column G of each sheet is hidden and names each row. The check finds the answers by it, so do not delete it.
 
@@ -308,5 +378,10 @@ intake  13 other form  pass
 intake  14 detail      pass
 intake  15 conflict    pass
 intake  16 bad draft   pass
-the intake form passed all 16 proofs
+intake  17 hidden      pass
+intake  18 added       pass
+intake  19 new fields  pass
+intake  20 guide       pass
+intake  21 alias       pass
+the intake form passed all 21 proofs
 ```

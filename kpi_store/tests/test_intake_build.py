@@ -49,7 +49,8 @@ def test_the_pick_lists_hold_the_counts_of_this_release(committed):
     # Counted by hand from the newest packages: core 2.4.0, kpi 1.3.0, organization 2.2.0, value-stream 1.2.0,
     # data-product 1.2.0, system 1.5.0 and integration 2.5.0.
     lists = committed["lists"]
-    assert {name: len(items) for name, items in lists.items()} == {
+    # An entry that settings.toml adds is not the ontology's, so it is not counted here.
+    assert {name: sum(1 for item in items if not item.get("added")) for name, items in lists.items()} == {
         "business-areas": 7, "processes": 707, "measures": 41, "roles": 64, "value-stream-steps": 58,
         "measure-relationships": 3, "data-products": 49, "platform-tables": 33, "layers": 4, "data-product-kinds": 2,
         "systems": 49, "sources": 106, "modules": 13, "areas-and-modules": 20}
@@ -59,7 +60,7 @@ def test_the_pick_lists_hold_the_counts_of_this_release(committed):
     assert by_level == {0: 2, 1: 10, 2: 13, 3: 48, 4: 137, 5: 474, 6: 23}      # 71 at levels 1 to 3, 634 at 4 to 6
     assert sum(1 for p in lists["processes"] if p["area"]) == 485
     assert [a["label"] for a in lists["business-areas"] if not a["in_use"]] == ["IT Services"]
-    assert sum(1 for r in lists["roles"] if r["group"] == "Planning persona") == 4
+    assert sum(1 for r in lists["roles"] if r.get("group") == "Planning persona") == 4
     assert sum(1 for r in lists["roles"] if r["label"].endswith("(deprecated)")) == 3
     assert "Distribution Planner" in [r["label"] for r in lists["roles"]]
     assert "Distribution Planner (planning persona)" in [r["label"] for r in lists["roles"]]
@@ -166,8 +167,9 @@ def test_the_page_is_one_offline_file_with_lf_line_ends():
     assert "<pre" not in text                               # the document check would read a <pre> as a command
     data = json.loads(text.split('<script id="intake-data" type="application/json">')[1].split("</script>")[0])
     assert list(data["forms"]) == ["kpi-intake", "domain-activation", "process-map-request"]
-    assert data["release"] == "KPI Store 1.1" and data["catalogue_version"] == "1.0"
-    assert len(data["questions"]) == 63 and data["lists"]["processes"]
+    assert data["release"] == "KPI Store 1.1" and data["catalogue_version"] == "1.2"
+    assert len(data["questions"]) == 73 and data["lists"]["processes"]
+    assert data["guide"] == "how-to-use-the-form.html" and (PACK / data["guide"]).is_file()     # the guide, beside the form
     # The names of the other modules' terms, and whether each has a definition, with no definition text.
     core = data["term_names"]["core"]
     assert set(core) == {"defined", "undefined"} and all(isinstance(name, str) for names in core.values() for name in names)
@@ -245,7 +247,7 @@ def test_a_filled_workbook_reads_back_as_the_same_answers(cat, committed):
         assert from_workbook.as_dict() == from_json.as_dict(), name
     # The blank form reads as a form with no answer, not as an error.
     blank = answers.read(PACK / build.FORM_XLSX, cat, committed["lists"])
-    assert blank.answers == {} and blank.sign_offs == {}
+    assert blank.answers == {"3.9": "draft"} and blank.sign_offs == {}      # the status starts at Draft
     buffer = io.BytesIO()
     load_workbook(PACK / build.FORM_XLSX).save(buffer)        # a workbook saved again by a person still reads
     assert answers.read(PACK / build.FORM_XLSX, cat, committed["lists"], "domain-activation").answers == {}
@@ -304,8 +306,13 @@ def test_the_crack_spreads_example_quotes_the_ontology_word_for_word():
     assert a["6.5"][0].startswith("MPC's market benchmarks are the Gulf Coast, Mid-Continent and West Coast 3-2-1 crack spreads; MPC FY2025 10-K, Item 7")
     assert a["6.6"].endswith("/product/master-pricing") and a["6.7"] == "yes"
     assert a["7.1"].endswith("/table/view-mpr-mips-crack-spread-price-fact-metrics-vw") and a["7.8"] == "Crack Spread Price Analytics"
-    # The answers the ontology does not hold say so.
-    assert all(a[q].startswith("Illustration: ") for q in ("1.4", "3.2", "4.9"))
+    # The answers the ontology does not hold say so. The grain, the quality rule and the status follow the reference.
+    assert all(a[q].startswith("Illustration: ") for q in ("1.4", "2.5", "3.2", "3.8", "3.10", "3.11", "4.9", "6.8", "6.9"))
+    assert a["3.8"] == "Illustration: One value for each day and each Price Master record. It rolls up by price group, price sheet and price batch."
+    assert a["3.10"].startswith("Illustration: Active records only. Soft-deleted rows are excluded.") and a["3.9"] == "draft"
+    assert "3.12" not in a and "3.13" not in a and "7.10" not in a
+    # settings.toml hides the measure's other source, so the example names only the planning team's measure list.
+    assert a["3.5"] == ["https://w3id.org/mpc/ontology/source/planner-measure-list-2026-10-18"]
 
 
 def test_the_margin_example_walks_all_five_tests():
@@ -322,6 +329,16 @@ def test_the_margin_example_walks_all_five_tests():
     assert [r.rsplit("/", 1)[-1] for r in a["6.4"]] == ["informs", "measures-performance"]
     assert a["5.4"] == "MPC 7" and a["6.6"] == "@none-yet" and a["7.1"] == "@no-data-yet"
     assert "6.7" not in a and "3.6" not in a
+    assert a["3.12"][0].startswith("Illustration: Realized margin per barrel below the month's forecast")
+    assert a["3.13"] == "Illustration: Starts 2026-01-01. No end date." and a["6.8"] == "Illustration: Value Chain Optimization Director, Commercial"
+    # settings.toml hides both sources the package gives this measure. The example names the MPC Form 10-K instead,
+    # and that is true to the package: the measure's citation there, quoted in 3.5's detail, cites MPC-S01, the 10-K.
+    assert a["3.5"] == ["https://w3id.org/mpc/ontology/source/mpc-s01"] and a["3.5.detail"] == "MPC-S01 p. 51; MPC-S17; KI-01"
+    package = (ROOT / "business_architecture/ontology/releases/kpi/1.3.0/kpi.ttl").read_text(encoding="utf-8")
+    block = package.split("\nmeasure:rm-margin-per-barrel a ", 1)[1].split(" .\n", 1)[0]
+    assert 'dcterms:bibliographicCitation "MPC-S01 p. 51; MPC-S17; KI-01"' in block
+    assert "src:mpc-s01" not in block      # the package itself does not name the 10-K as this measure's source; the comment says so
+    assert "MPC-S01 p. 51" in data["comment"]
 
 
 def test_an_example_of_a_measure_the_ontology_lacks_is_refused(cat, committed):
@@ -337,7 +354,8 @@ def test_the_explainer_is_one_short_page(cat):
     text = build.explainer_text(cat)
     assert text.startswith("# What we will ask you and why\n\nYou have been asked to an interview about a KPI.")
     assert "1. Which part of the business the KPI belongs to, which process it is about, and which data domain it belongs to.\n" in text
-    assert 250 <= len(text.split()) <= 350      # one page
+    assert text.endswith("[How to use the form](how-to-use-the-form.html) shows how the form is filled, saved and checked.\n")
+    assert 250 <= len(text.split()) <= 400      # one page
 
 
 def test_the_architects_page_maps_every_question_and_lists_the_facts_with_no_place(cat):
@@ -349,9 +367,169 @@ def test_the_architects_page_maps_every_question_and_lists_the_facts_with_no_pla
     assert "| F1 Name | `skos:prefLabel`, exactly one, English | kpi | required | 2.1 |  |" in text
     assert "The ontology's property is named `core:businessDomain`" in text
     for fact in ("The domain of a KPI", "The business area of a measure", "The decision the KPI supports", "The unit, as a value of its own",
-                 "Who may see the KPI", "The topic, or family, of the KPI", "The accountable owner of a KPI", "The target of a KPI",
-                 "The direction of a good value"):
+                 "Who may see the KPI", "The topic, or family, of the KPI", "The named owner of a KPI", "The thresholds of a KPI",
+                 "The direction of a good value", "The strategic objective a measure serves", "The grain, as a value of its own"):
         assert f"\n| {fact} | " in text, fact
+    assert "## The lists your settings change" not in text      # that section needs the built lists
+
+
+def test_the_architects_page_says_what_the_settings_hide_and_add(cat, committed):
+    # Counted by hand from the owner's decisions and the packages: 4 of 106 sources are offered,
+    # one of 64 roles is hidden and one added, 13 of 49 catalog entries are data products, 5 of 49 systems are hidden
+    # and one added.
+    text = build.architect_text(cat, committed["lists"])
+    for row in ("| `sources` | 3.5 | 4 of 106 | 102 | None |", "| `roles` | 6.1 and P5 | 64 of 65 | 1 | Value Chain Optimization Director |",
+                "| `data-products` | 6.6 and D6 | 13 of 49 | 36 | None |", "| `systems` | 7.4 | 45 of 50 | 5 | SharePoint |"):
+        assert row in text, row
+    assert "- `sources` offers only the 4 entries that `keep_only` names, and so hides the other 102." in text
+    assert "- `sources` shows 2 entries under a label of your settings (`labels`): MPC Economics, 3-2-1 Crack Spread KPI Definition; " in text
+    assert "- `roles` hides: Black Oil Manager." in text
+    assert "- `systems` hides: Databricks; MS Excel; MS Outlook; MS PowerPoint; MS Teams." in text
+    assert "`data-products` offers only the entries that `keep_only` names, and so hides: BP&A; Brand Data & Integration;" in text
+
+
+def test_the_forms_offer_what_the_settings_leave_and_add(cat, committed):
+    lists = committed["lists"]
+    offered = {q: [o["label"] for o in rules.options(cat, lists, cat.by_id[q])] for q in ("3.5", "6.1", "6.6", "7.4")}
+    assert offered["3.5"] == [
+        "Marathon Petroleum Corporation, Form 10-K for the fiscal year ended 2025-12-31",
+        "MPC Economics, 3-2-1 Crack Spread KPI Definition",
+        "MPLX LP, Form 10-K for the fiscal year ended 2025-12-31",
+        "Value Chain Optimization Decision Support and Visualization: the planning team's measure list",
+        "A document that is not in the list"]
+    assert sorted(s["id"].rsplit("/", 1)[-1] for s in lists["sources"] if not s.get("hidden")) == [
+        "mpc-economics-crack-spread-kpi-definition", "mpc-s01", "mplx-s01", "planner-measure-list-2026-10-18"]
+    assert "Black Oil Manager" not in offered["6.1"] and "Value Chain Optimization Director (new, not yet in the ontology)" in offered["6.1"]
+    assert not any(label.startswith("Value Chain Optimization (") for label in offered["6.1"])
+    assert offered["6.6"] == [
+        "Backcasting & Refining Continuous Improvement", "Commercial Risk", "Customer Master", "External Market Data",
+        "Local Production Planning & Crude Scheduling", "Logistic Execution", "Master Pricing", "Operational Margin", "Physical Trading",
+        "Product Availability & Allocations", "Rack Pricing", "Regional Production & Distribution Planning",
+        "Revenue Accounting & Scheduling", "None yet", "Not in the list"]
+    assert not {"Databricks", "MS Excel", "MS Outlook", "MS PowerPoint", "MS Teams"} & set(offered["7.4"])
+    assert "SharePoint (new, not yet in the ontology)" in offered["7.4"] and "MIPS" in offered["7.4"] and len(offered["7.4"]) == 45
+    # Every view the ontology holds under a data product is under one the form still offers, so 6.6 can name it.
+    kept = {p["id"] for p in lists["data-products"] if not p.get("hidden")}
+    assert {t["product"] for t in lists["platform-tables"] if t["product"]} <= kept
+    # The workbook's dropdowns offer the same, and the page holds the marks.
+    from openpyxl import load_workbook
+    sheet = load_workbook(PACK / build.FORM_XLSX)["lists"]
+    column = next(c for c in sheet.iter_cols() if c[0].value == "7.4")
+    assert [cell.value for cell in column[1:] if cell.value] == offered["7.4"]
+    data = page.data(cat, committed, {})
+    assert data["added_modules"] == {"sources": "integration", "roles": "organization", "data-products": "data-product", "systems": "system"}
+    assert sum(1 for s in data["lists"]["systems"] if s.get("hidden")) == 5
+
+
+def test_the_folders_command_makes_the_shared_folder_and_keeps_what_is_in_it(tmp_path, capsys):
+    from kpi_store.intake import folders
+    assert main(["folders", str(tmp_path)]) == 0
+    out = capsys.readouterr().out
+    top = tmp_path / "KPI-intake"
+    assert sorted(p.name for p in top.iterdir()) == ["1-in-progress", "2-ready-for-check", "3-checked", "READ-ME.txt", "the-form"]
+    assert sorted(p.name for p in (top / "the-form").iterdir()) == ["how-to-use-the-form.html", "kpi-intake-form.html", "kpi-intake-form.xlsx"]
+    assert (top / "the-form" / "kpi-intake-form.html").read_bytes() == (PACK / "kpi-intake-form.html").read_bytes()
+    assert "made KPI-intake/1-in-progress\n" in out and out.endswith("KPI-intake is ready\n")
+    assert "2-ready-for-check\n  Answers files the Business analyst has finished." in (top / "READ-ME.txt").read_text(encoding="utf-8")
+    # A second run changes nothing. A file a person keeps there is left alone, and an older form is replaced.
+    kept = top / "1-in-progress" / "crack-spreads-pricing.kpi-intake.json"
+    kept.write_text("{}", encoding="utf-8")
+    assert main(["folders", str(tmp_path)]) == 0
+    assert capsys.readouterr().out == "KPI-intake is current; nothing was changed\n"
+    (top / "the-form" / "kpi-intake-form.html").write_text("an older form", encoding="utf-8")
+    assert main(["folders", str(tmp_path)]) == 0
+    assert capsys.readouterr().out == "replaced KPI-intake/the-form/kpi-intake-form.html\nKPI-intake is ready\n"
+    assert kept.read_text(encoding="utf-8") == "{}"
+    # A place that is no folder is refused in words.
+    assert main(["folders", str(tmp_path / "nowhere")]) == 2
+    assert "is not a folder" in capsys.readouterr().err
+    assert [name for name, _ in folders.FOLDERS] == ["the-form", "1-in-progress", "2-ready-for-check", "3-checked"]
+
+
+@pytest.mark.parametrize("linked", ["KPI-intake", "KPI-intake/the-form", "KPI-intake/3-checked", "KPI-intake/READ-ME.txt",
+                                    "KPI-intake/the-form/kpi-intake-form.html"])
+def test_the_folders_command_refuses_a_link_and_changes_nothing(tmp_path, capsys, linked):
+    place, outside = tmp_path / "shared", tmp_path / "outside"
+    place.mkdir()
+    outside.mkdir()
+    is_file = linked.endswith((".txt", ".html"))
+    target = outside / ("kept.txt" if is_file else "folder")
+    if is_file:
+        target.write_text("kept as it was", encoding="utf-8")
+    else:
+        target.mkdir()
+    link = place / linked
+    link.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        link.symlink_to(target, target_is_directory=not is_file)
+    except OSError:
+        pytest.skip("this system does not let the test make a link")
+    before = sorted(p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*"))
+    assert main(["folders", str(place)]) == 2
+    err = capsys.readouterr().err
+    assert "is a link." in err and "Nothing was changed." in err and "report" not in err
+    assert sorted(p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*")) == before      # nothing was made, inside or outside
+    if is_file:
+        assert target.read_text(encoding="utf-8") == "kept as it was"
+    # The place itself may be reached by a link: that is the operator's choice.
+    way = tmp_path / "way-in"
+    link.unlink()
+    way.symlink_to(place, target_is_directory=True)
+    assert main(["folders", str(way)]) == 0
+    assert (place / "KPI-intake" / "the-form" / "kpi-intake-form.html").is_file()
+
+
+def test_a_build_that_cannot_write_a_file_says_so_and_how_to_repair_the_pack(copy, capsys, monkeypatch):
+    def refuse(*args, **kwargs):
+        raise PermissionError(13, "Permission denied")
+    main(["build", "--pack", str(copy)])
+    capsys.readouterr()
+    path = copy / "catalogue.toml"
+    text = path.read_text(encoding="utf-8")
+    path.write_text(text.replace('text = "What do you call this KPI?"', 'text = "What is the KPI called?"'), encoding="utf-8", newline="\n")
+    monkeypatch.setattr(workbook, "save", refuse)         # as when the workbook is open in Excel
+    try:
+        assert main(["build", "--pack", str(copy)]) == 2
+        err = capsys.readouterr().err
+        assert err.startswith("stopped: the build could not read or write a file: ") and "Traceback" not in err
+        assert "may already be new" in err and "run the build again: it repairs the pack" in err
+    finally:
+        monkeypatch.undo()
+        path.write_text(text, encoding="utf-8", newline="\n")
+        assert main(["build", "--pack", str(copy)]) == 0          # running it again repairs the pack
+        assert main(["build", "--check", "--pack", str(copy)]) == 0
+        capsys.readouterr()
+
+
+def test_a_failure_to_make_the_folders_is_not_called_a_report_failure(tmp_path, capsys, monkeypatch):
+    def refuse(*args, **kwargs):
+        raise PermissionError(13, "Permission denied")
+    monkeypatch.setattr("shutil.copyfile", refuse)
+    assert main(["folders", str(tmp_path)]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("stopped: the shared folder could not be made or filled: ") and "report" not in err
+
+
+def test_the_architects_page_names_an_added_entry_the_ontology_has_gained(cat):
+    import copy as copies
+    from kpi_store.intake import catalogue as c
+    data = made_up.data()
+    data["lists"]["systems"].append({"id": made_up.X + "sys/sharepoint", "label": "SharePoint"})
+    settings = copies.copy(cat)
+    settings.pick_lists = {"systems": {"add": [{"id": "sharepoint", "label": "SharePoint"}]}}
+    built = picklists.apply_settings(data, settings.pick_lists)
+    text = "\n".join(build.lists_text(settings, built["lists"]))
+    # Not named by keep_only: the page says the entry is in the ontology, why it is not offered, and how to offer it.
+    kept = copies.copy(cat)
+    kept.pick_lists = {"systems": {"add": [{"id": "sharepoint", "label": "SharePoint"}], "keep_only": ["Stock Ledger"]}}
+    data2 = made_up.data()
+    data2["lists"]["systems"].append({"id": made_up.X + "sys/sharepoint", "label": "SharePoint"})
+    text2 = "\n".join(build.lists_text(kept, picklists.apply_settings(data2, kept.pick_lists)["lists"]))
+    assert "- `systems`: SharePoint is in the ontology and is not offered, because `keep_only` does not name it. Add its name to `keep_only` to offer it." in text2
+    assert "- `systems`: the ontology now holds SharePoint." in text2
+    assert ("- `systems`: the ontology now holds SharePoint. The entry under `add` is no longer offered a second time. An answer saved under it "
+            "is read as the ontology's entry, and the check says so. Remove the entry from `add` once no form in progress uses it.") in text
+    assert "| `systems` | 7.4 | 2 of 2 | 0 | None |" in text and c.ADDED_MARK not in text.split("Keep the lists")[0].split("|---|")[1]
 
 
 # ---- The build writes only inside the pack folder -----------------------------------------------------------------
