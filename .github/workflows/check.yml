@@ -1,7 +1,8 @@
 # Runs on every pull request, and every job must pass.
 # check: the release's check script, scripts/check.sh, on Linux and on Windows under Git Bash. The job sets no
 #   encoding variable, so on Windows Python reads text as cp1252 unless the code names UTF-8, as on most machines.
-# stores: the store loads on Windows, as a person runs them, against servers the job starts on the runner.
+# stores: the store loads, the runner and the reset on Windows, as a person runs them, against servers the job starts on
+#   the runner. Then the document test for the blocks that need the Neo4j server or a Windows account.
 name: check
 on:
   pull_request:
@@ -38,10 +39,18 @@ jobs:
         if: matrix.os == 'ubuntu-24.04'
         run: bash scripts/check-pinned.sh
 
-  # The store loads on Windows, with the commands a person runs: the setup check, the Fuseki load, the Neo4j load,
-  # the copy to a second database, and the sync check. The servers run on the runner and listen on 127.0.0.1 only.
+  # The store loads on Windows, with the commands a person runs: the setup check, the Fuseki load, then the runner for
+  # the Fuseki load, the Neo4j load and the copy to a second database, the sync check, the reset, the load again and
+  # the replace. The servers run on the runner and listen on 127.0.0.1 only.
   # One Neo4j Enterprise server (evaluation licence) holds both databases: neo4j, with the n10s and APOC plugins,
   # stands for the local Neo4j, and businessprocessarchitecturegraph stands for the Enterprise target.
+  #
+  # What cannot run here: every Databricks step. This repository and its CI hold no token and no password of a
+  # workspace, so the runner's steps volume, upload, notebook and report are left out, and so are the reset of
+  # Databricks, the technical graph, and the two Databricks checks of the setup check. The runner's own sync step reads
+  # Databricks too, so it is left out and the sync check runs as its own command for the three local stores. The
+  # runner's check step is the job `check` above, 35 minutes on Windows; it is left out here to keep this job inside
+  # its time limit. scripts/DOC-SNIPPETS.md, "Blocks the test does not run", lists what stays unrun.
   stores:
     runs-on: windows-2025
     timeout-minutes: 60
@@ -186,12 +195,96 @@ jobs:
           PY
       - name: setup check, the Neo4j checks
         run: py -m kpi_store.setup_check --only neo4j-local --only neo4j-plugins --only neo4j-enterprise
-      - name: Neo4j load
-        run: time py -m kpi_store.load_neo4j --json
-      - name: copy to the second database
-        run: time py -m kpi_store.copy_enterprise --json
+      # The runner, as one command. Its neo4j step is the Neo4j load with every check, and its enterprise step is the
+      # copy to the second database: the two commands this job ran one by one before.
+      - name: runner, the steps that need no Databricks
+        run: time py -m kpi_store.runner --skip check,volume,upload,notebook,report,sync
       - name: sync check, Jena and both Neo4j databases
         run: time py -m kpi_store.sync_check --store jena --store neo4j --store enterprise --no-tech-graph
+      - name: reset, dry run
+        run: py -m kpi_store.runner --reset --dry-run --skip databricks
+      # The reset asks for the word reset. Here the word comes through standard input, as a person types it.
+      - name: reset of the Enterprise database, with the typed word
+        run: printf 'reset\n' | py -m kpi_store.runner --reset --only enterprise
+      - name: reset of the three local stores, with --yes
+        run: py -m kpi_store.runner --reset --skip databricks --yes
+      # After the reset the two Neo4j databases read unmarked and Fuseki, which the reset stopped, reads unreachable.
+      - name: sync check after the reset, which must read unmarked and unreachable
+        run: |
+          py -m kpi_store.sync_check --store jena --store neo4j --store enterprise --no-tech-graph --json > "$LOCAL/after-reset.json" || true
+          cat "$LOCAL/after-reset.json"
+          py - "$LOCAL/after-reset.json" <<'PY'
+          import json, sys
+          with open(sys.argv[1], encoding="utf-8") as f:
+              rows = {row["store"]: row["status"] for row in json.load(f)}
+          want = {"jena": "unreachable", "neo4j": "unmarked", "enterprise": "unmarked"}
+          wrong = {store: (rows.get(store), status) for store, status in want.items() if rows.get(store) != status}
+          sys.exit(f"after the reset, (found, expected) by store: {wrong}" if wrong else 0)
+          PY
+      - name: runner again, which loads the emptied stores
+        run: time py -m kpi_store.runner --skip check,volume,upload,notebook,report,sync
+      # --replace-enterprise is for a database that holds KPI Store nodes of another release, or a copy that was cut
+      # off halfway. This makes the second case: it deletes 100 of the copied nodes. The copy must then stop and
+      # change nothing, and it must pass with the replace allowed.
+      - name: make the Enterprise copy incomplete, as a copy that was cut off halfway leaves it
+        run: |
+          py - <<'PY'
+          import os, neo4j
+          with neo4j.GraphDatabase.driver("bolt://127.0.0.1:17687", auth=("neo4j", os.environ["KPI_CI_NEO4J_PASSWORD"])) as driver:
+              done = driver.execute_query("MATCH (n:Resource) WITH n LIMIT 100 DETACH DELETE n", database_="businessprocessarchitecturegraph")
+              print("deleted", done.summary.counters.nodes_deleted, "nodes")
+          PY
+      - name: the enterprise step, which must stop on the incomplete copy
+        run: |
+          if py -m kpi_store.runner --only enterprise > "$LOCAL/stopped.log" 2>&1; then cat "$LOCAL/stopped.log"; echo "the copy did not stop"; exit 1; fi
+          cat "$LOCAL/stopped.log"
+          grep -q "^enterprise: FAILED" "$LOCAL/stopped.log"
+      - name: the enterprise step again, with the replace allowed
+        run: |
+          py -m kpi_store.runner --from enterprise --replace-enterprise --skip sync | tee "$LOCAL/replaced.log"
+          grep -q "^enterprise: copied" "$LOCAL/replaced.log"
+      - name: sync check, which must read current
+        run: time py -m kpi_store.sync_check --store jena --store neo4j --store enterprise --no-tech-graph
+      # The document test, for the blocks of the runbook and of the two hand-written pages that need this job's Neo4j
+      # server or a Windows account that may be changed: the two setx commands and the cd of the runbook, the Cypher
+      # of "How to undo" (on a database of its own, made and dropped here), and the four commands of the cross-graph
+      # questions (on a composite database over two made-up graphs, made and dropped here). The packages are those
+      # of scripts/check.sh. C:\kpi-store-1.1 is the folder the runbook unpacks the release into.
+      - name: document test, the blocks that need the Neo4j server or a Windows account
+        env:
+          KPI_STORE_TEST_NEO4J_URI: bolt://127.0.0.1:17687
+          KPI_STORE_TEST_NEO4J_USER: neo4j
+          DOC_SNIPPETS_WINDOWS_ACCOUNT: "1"
+          PYTHONIOENCODING: utf-8
+        run: |
+          mkdir -p /c/kpi-store-1.1
+          export KPI_STORE_TEST_NEO4J_PASSWORD="$KPI_CI_NEO4J_PASSWORD"
+          uv run -q --no-project --with pytest --with pytest-xdist --with rdflib --with pyshacl --with openpyxl --with jsonschema --with "markdown-it-py>=4,<5" --with pyyaml==6.0.3 --with sqlglot==30.31.0 --with pyoxigraph==0.5.13 --with neo4j \
+            python scripts/doc_snippets.py check --verbose \
+            business_architecture/ontology/projection/ontology-stores-runbook.md \
+            business_architecture/ontology/epm-ontology-guide.html \
+            business_architecture/ontology/epm-walkthrough.html | tee "$LOCAL/doc-test.log"
+          # A block whose context is off is counted, not failed. These must have run here.
+          for ran in "cmd run=windows-account: ran" "powershell run=windows-account: ran" "cypher run=enterprise-database: ran" \
+                     "cypher run=scratch-database: ran" "epm-ontology-guide.html:[0-9]*: powershell run=questions: ran" \
+                     "epm-walkthrough.html:[0-9]*: powershell run=questions: ran"; do
+            grep -q "$ran" "$LOCAL/doc-test.log" || { echo "no block reads: $ran"; exit 1; }
+          done
+      - name: the two variables that the runbook's setx commands set
+        shell: pwsh
+        run: |
+          $account = Get-ItemProperty -Path HKCU:\Environment
+          "PY_PYTHON = $($account.PY_PYTHON)"
+          "KPI_STORE_LOCAL = $($account.KPI_STORE_LOCAL)"
+          if ($account.PY_PYTHON -ne "3.12" -or $account.KPI_STORE_LOCAL -ne "C:\kpi-store-local\stores.toml") { exit 1 }
+      # The runbook installs the Databricks command line with winget. The list of software on this runner image does
+      # not name winget, so this step only finds out whether the command runs here, and never fails the job. The two
+      # --accept options answer the questions that winget asks a person on its first use. Until this step passes,
+      # the runbook's block stays skipped as windows-only.
+      - name: winget, to learn whether this runner can run the runbook's install command
+        continue-on-error: true
+        shell: cmd
+        run: winget install Databricks.DatabricksCLI --accept-source-agreements --accept-package-agreements --disable-interactivity
       - name: stop Fuseki
         if: always()
         run: py -m kpi_store.load_fuseki --stop || true
