@@ -724,7 +724,7 @@ If you do change the namespace, do it first, before other changes, and with the 
 1. Raise `core` and every module to the next major version, following the sections above.
 2. Replace the base in the sources: the module folders, the process map's identity map, the builders, the folder `projection`, the shapes and the regression queries.
 3. Leave `releases\previous` alone. Those packages keep the old IRIs, because a released package never changes.
-4. Write every package again in the order `dependents.py core` prints, and run the full check.
+4. Write every package again in the order `dependents.py core` prints. Then rebuild the catalog, the projection manifest and the KPI intake pack, as steps 7 and 8 of "The release steps" say, and run the full check.
 
 ## What you can ignore
 
