@@ -1,4 +1,4 @@
-"""Open the HTML intake form in a real browser and prove the sixteen things a person filling it relies on.
+"""Open the HTML intake form in a real browser and prove the twenty things a person filling it relies on.
 
     uv run --no-project --with playwright==1.65.0 python kpi_store/intake/browser_check.py
 
@@ -27,12 +27,20 @@ Each proof starts from a fresh load of kpi-intake/kpi-intake-form.html, with emp
                  once the KPI has a definition of its own; a name whose term has no definition does not
  16 bad draft    a browser draft with a malformed form, a missing form or a missing field is not restored, in
                  whole, and the form still works
+ 17 hidden       an entry that settings.toml hides is not offered; a loaded file that holds one shows it, marked,
+                 and saves it again
+ 18 added        an entry that settings.toml adds is offered, marked new; choosing it shows a notice that does not
+                 route the request, and the check of the saved file tells the Architect to add it to the ontology
+ 19 new fields   the status starts at Draft, also after "Clear this form"; the effective date is asked only when a
+                 threshold is given; the objective, the grain, the owner and the steward count as required
+ 20 guide        "How to use this form" links to the guide beside the form, which opens with no network request
 
 Every expected value below is written by hand from the catalogue and the release packages. The script exits 1
 when a proof fails and names it. scripts/check.sh does not run it, because it needs a browser.
 """
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -40,6 +48,9 @@ from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "kpi-intake" / "kpi-intake-form.html"
+GUIDE = "how-to-use-the-form.html"
+BLACK_OIL = "https://w3id.org/mpc/ontology/modules/organization/role/black-oil-manager"
+NEW_ROLE = "new:value-chain-optimization-director"
 EXAMPLE = ROOT / "kpi-intake" / "examples" / "crack-spreads-pricing.json"
 COMMERCIAL = "https://w3id.org/mpc/ontology/modules/core/business-domain/commercial"
 REFINERY_OPTIMIZATION = "https://w3id.org/mpc/ontology/process/CM-1-1-4-7"
@@ -98,11 +109,11 @@ def choose(page, question, value):
 def load(s):
     page = s.open()
     same(page.locator("h1").inner_text(), "KPI intake form", "the page's heading")
-    holds(page.locator("#release-line").text_content(), "KPI Store 1.1, catalogue 1.0", "the release line")
+    holds(page.locator("#release-line").text_content(), "KPI Store 1.1, catalogue 1.1", "the release line")
     same(page.locator("#tabs [role=tab]").all_inner_texts(),
          ["KPI intake", "Domain activation", "Process map request", "The roles", "What we will ask you"], "the tabs")
     same(page.locator("[data-section]").count(), 7, "sections of the KPI form")
-    same(page.locator("[data-question]").count(), 46, "questions of the KPI form")
+    same(page.locator("[data-question]").count(), 56, "questions of the KPI form")
     holds(page.locator(".brand-line").inner_text(), "Works offline. Sends nothing.", "the line under the name")
     same(page.locator("#save").inner_text(), "Save answers to file", "the save button")
     same(page.locator("#load").inner_text(), "Load answers file", "the load button")
@@ -115,12 +126,14 @@ def load(s):
 
 def fill(s):
     page = s.open()
-    holds(page.locator('[data-section="2"] .section-progress').inner_text(), "2 required answers left · 2 optional unanswered", "section 2 before")
+    holds(page.locator('[data-section="2"] .section-progress').inner_text(), "3 required answers left · 2 optional unanswered", "section 2 before")
     card(page, "2.1").locator("input").fill("Tank Turnover")
     card(page, "2.2").locator("textarea").fill("How many times the stored volume is replaced in a month.")
-    same(page.locator('[data-section="2"] .section-progress').inner_text(), "Required answers complete · 2 optional unanswered", "section 2 after")
+    same(page.locator('[data-section="2"] .section-progress').inner_text(), "1 required answer left · 2 optional unanswered", "section 2 after")
+    card(page, "2.5").locator("textarea").fill("Never run a terminal out of product.")
+    same(page.locator('[data-section="2"] .section-progress').inner_text(), "Required answers complete · 2 optional unanswered", "section 2 with its objective")
     choose(page, "3.7", "anyone")
-    holds(page.locator('[data-nav="3"] .nav-count').inner_text(), "4 required answers left", "the section list")
+    holds(page.locator('[data-nav="3"] .nav-count').inner_text(), "5 required answers left", "the section list")
     card(page, "2.1").locator("input").fill("crack spread")
     holds(card(page, "2.1").locator('[data-notice="same-measure"]').inner_text(), '"Crack Spreads Pricing" has this name', "the notice for a name the ontology holds")
     s.shot(page, "2-fill")
@@ -151,9 +164,9 @@ def conditional(s):
     assert card(page, "4.4").is_hidden(), "4.4 shows although 4.3 decided the kind"
     assert card(page, "6.7").is_visible(), "6.7 is hidden for a market indicator"
     choose(page, "4.1", "no")
-    for hidden in ("4.2", "4.3", "3.1", "3.2", "3.3", "6.7"):
+    for hidden in ("4.2", "4.3", "3.1", "3.2", "3.3", "3.8", "6.7"):
         assert card(page, hidden).is_hidden(), f"{hidden} shows although 4.1 is no"
-    holds(page.locator('[data-section="3"] .section-skipped').inner_text(), "3 questions do not apply", "the skipped line of section 3")
+    holds(page.locator('[data-section="3"] .section-skipped').inner_text(), "5 questions do not apply", "the skipped line of section 3")
     s.shot(page, "4-conditional")
 
 
@@ -189,9 +202,9 @@ def save(s):
     data = json.loads(Path(download.value.path()).read_text(encoding="utf-8"))
     same(data["format"], 1, "format")
     same(data["form"], "kpi-intake", "form")
-    same(data["catalogue_version"], "1.0", "catalogue version")
+    same(data["catalogue_version"], "1.1", "catalogue version")
     same(data["kpi_name"], "Tank Turnover", "KPI name")
-    same(data["answers"], {"2.1": "Tank Turnover", "4.1": "yes", "4.2": "yes", "5.1": ["turns", "stock turn"]}, "answers")
+    same(data["answers"], {"2.1": "Tank Turnover", "3.9": "draft", "4.1": "yes", "4.2": "yes", "5.1": ["turns", "stock turn"]}, "answers")
     same(data["sign_offs"], {"data-owner": {"name": "A name", "date": "2026-11-11"}}, "sign-offs")
     holds(page.locator("#status").inner_text(), "Saved tank-turnover.kpi-intake.json", "the status line")
 
@@ -332,7 +345,7 @@ def bad_file(s):
         same(card(page, "2.1").locator("input").input_value(), "Tank Turnover", f"2.1 after the refused file ({what})")
     # The form still works after the refusals.
     card(page, "2.2").locator("textarea").fill("How many times the stored volume is replaced in a month.")
-    same(page.locator('[data-section="2"] .section-progress').inner_text(), "Required answers complete · 2 optional unanswered", "section 2 after the refusals")
+    same(page.locator('[data-section="2"] .section-progress').inner_text(), "1 required answer left · 2 optional unanswered", "section 2 after the refusals")
     # A good file may hold markup in an answer. The form shows it as the text it is.
     offer('{"format":1,"form":"kpi-intake","answers":{"2.1":"<img src=x onerror=alert(1)><b>bold</b>","5.1":["<i>x</i>"]},"request":{"number":"<u>7</u>"}}')
     page.wait_for_function("document.getElementById('status').textContent.startsWith('Loaded offered.json')")
@@ -462,16 +475,165 @@ def bad_draft(s):
     page.evaluate("text => localStorage.setItem('kpi-intake-draft-1', text)", seeded(process_map_request=None))
     page.reload()
     card(page, "2.1").locator("input").fill("Days of Cover")
-    holds(page.locator('[data-section="2"] .section-progress').inner_text(), "1 required answer left", "section 2 after the refused draft")
+    holds(page.locator('[data-section="2"] .section-progress').inner_text(), "2 required answers left", "section 2 after the refused draft")
     page.reload()
     same(card(page, "2.1").locator("input").input_value(), "Days of Cover", "2.1 from the new draft")
     s.shot(page, "16-bad-draft")
 
 
+def search(page, question, text):
+    box = card(page, question)
+    box.locator(".picker-search").fill(text)
+    return box
+
+
+def hidden(s):
+    page = s.open()
+    # Black Oil Manager is a role of the ontology that settings.toml hides. The list has 64 roles and the new one.
+    box = search(page, "6.1", "Black Oil")
+    same(box.locator(f'.picker-list input[value="{BLACK_OIL}"]').count(), 0, "the hidden role among the options")
+    same(box.locator(".picker-more").inner_text(), "Nothing in the list matches.", "the list searched for the hidden role")
+    box = search(page, "6.1", "Asphalt")
+    same(box.locator(".picker-list .option-label").first.inner_text(), "Asphalt Manager", "a role the settings leave")
+    # The sources: 19 of MPC and of the process map, and the document that is not in the list. No other tier.
+    same(card(page, "3.5").locator(".picker-list input").count(), 20, "documents offered in 3.5")
+    labels = card(page, "3.5").locator(".picker-list .option-label").all_inner_texts()
+    assert any(label.startswith("Marathon Petroleum Corporation, Form 10-K") for label in labels), "the MPC 10-K is not offered in 3.5"
+    assert not any("industry-view" in label for label in labels), "a peer or industry source is offered in 3.5"
+    same(labels[-1], "A document that is not in the list", "the last option of 3.5")
+    # The data products: 13, then "None yet" and "Not in the list".
+    same(card(page, "6.6").locator(".picker-list input").count(), 15, "options of 6.6")
+    assert "HR" not in card(page, "6.6").locator(".picker-list .option-label").all_inner_texts(), "a functional area is offered in 6.6"
+    # The systems show when the view is new: 44 of the ontology and SharePoint. Databricks and the office tools are hidden.
+    choose(page, "7.1", "@not-in-list")
+    for office in ("MS Excel", "MS Outlook", "MS PowerPoint", "MS Teams"):
+        same(search(page, "7.4", office).locator(".picker-more").inner_text(), "Nothing in the list matches.", f"the list searched for {office}")
+    same(search(page, "7.4", "Databricks").locator(".picker-more").inner_text(), "Nothing in the list matches.", "the list searched for Databricks")
+    same(search(page, "7.4", "MIPS").locator(".picker-list .option-label").all_inner_texts(), ["MIPS"], "a source system the settings leave")
+    # A file saved before the role was hidden still loads. The form shows the role, marked, and saves it again.
+    older = {"format": 1, "form": "kpi-intake", "answers": {"2.1": "Tank Turnover", "6.1": [BLACK_OIL]}}
+    page.locator("#load-file").set_input_files({"name": "older.kpi-intake.json", "mimeType": "application/json", "buffer": json.dumps(older).encode("utf-8")})
+    page.wait_for_function("document.getElementById('status').textContent.startsWith('Loaded older.kpi-intake.json')")
+    same(card(page, "6.1").locator(".picker-chosen .chosen-label").all_inner_texts(), ["Black Oil Manager (hidden in this organization's settings)"], "the hidden role a file holds")
+    with page.expect_download() as download:
+        page.locator("#save").click()
+    same(json.loads(Path(download.value.path()).read_text(encoding="utf-8"))["answers"]["6.1"], [BLACK_OIL], "the hidden role saved again")
+    card(page, "6.1").locator(".picker-chosen button").click()
+    same(search(page, "6.1", "Black Oil").locator(".picker-more").inner_text(), "Nothing in the list matches.", "the hidden role after it was removed")
+    s.shot(page, "17-hidden")
+
+
+def added(s):
+    page = s.open()
+    card(page, "2.1").locator("input").fill("Tank Turnover")
+    box = search(page, "6.1", "Value Chain Optimization D")
+    option = box.locator(f'.picker-list input[value="{NEW_ROLE}"]')
+    same(box.locator(".picker-list .option-label").all_inner_texts(), ["Value Chain Optimization Director (new, not yet in the ontology)", "A role that is not in the list"], "the added role, and the option that stays")
+    option.check()
+    note = card(page, "6.1").locator('[data-notice="to-add"]')
+    same(note.locator(".notice-title").inner_text(), "New: the Architect adds it to the ontology first", "the notice's title")
+    holds(note.locator(".notice-text").inner_text(), '"Value Chain Optimization Director" is new. The ontology does not hold it yet. Go on with the form.', "the notice")
+    assert "HOW-TO-UPDATE.md" not in note.locator(".notice-text").inner_text(), "the notice shows HOW-TO-UPDATE.md to the business"
+    holds(note.locator(".notice-analyst p").text_content(), "to the organization module with HOW-TO-UPDATE.md", "the line for the analyst")
+    same(card(page, "6.1").locator('[data-notice="process-map-request"]').count(), 0, "a process map request for the added role")
+    assert "Routed" not in page.locator('[data-section="6"] .section-progress').inner_text(), "the added role routes the request"
+    # SharePoint is the system the settings add.
+    choose(page, "7.1", "@not-in-list")
+    box = search(page, "7.4", "SharePoint")
+    same(box.locator(".picker-list .option-label").all_inner_texts(), ["SharePoint (new, not yet in the ontology)"], "the added system")
+    box.locator('.picker-list input[value="new:sharepoint"]').check()
+    holds(card(page, "7.4").locator('[data-notice="to-add"] .notice-analyst p').text_content(), "to the system module with HOW-TO-UPDATE.md", "the line for the analyst on 7.4")
+    # The check of the saved file tells the Architect, and does not ask for a process map request.
+    with page.expect_download() as download:
+        page.locator("#save").click()
+    saved = Path(download.value.path())
+    same(json.loads(saved.read_text(encoding="utf-8"))["answers"]["6.1"], [NEW_ROLE], "the added role in the saved file")
+    target = saved.with_name("tank-turnover.kpi-intake.json")
+    target.write_bytes(saved.read_bytes())
+    done = subprocess.run([sys.executable, "-m", "kpi_store.intake", "check", str(target)], cwd=ROOT, capture_output=True, text=True, encoding="utf-8")
+    same(done.returncode, 1, "the exit status of the check of a form that is not complete yet")
+    holds(done.stdout, 'To add to the ontology first\n  For the Architect: 6.1 names "Value Chain Optimization Director". The organization\'s settings added it, '
+          "and the ontology does not hold it yet. Add it to the organization module with HOW-TO-UPDATE.md before you apply this KPI.", "the check's message for the role")
+    holds(done.stdout, '  For the Architect: 7.4 names "SharePoint".', "the check's message for the system")
+    assert "6.1 routes the request" not in done.stdout and "Not in the ontology" not in done.stdout, "the check refuses or routes the added entries"
+    s.shot(page, "18-added")
+
+
+def new_fields(s):
+    page = s.open()
+    three = page.locator('[data-section="3"] .section-progress')
+    assert card(page, "3.9").locator('input[value="draft"]').is_checked(), "the status does not start at Draft"
+    same(card(page, "3.9").locator(".picker-list .option-label").all_inner_texts(), ["Draft", "Certified", "Retired"], "the statuses")
+    # Seven required questions, one of them answered by its default; five optional ones.
+    same(three.inner_text(), "6 required answers left · 5 optional unanswered", "section 3 of a new form")
+    same(card(page, "3.8").locator(".q-rule").inner_text(), 'Required if 4.1 is not "no"', "the rule of the grain")
+    for optional in ("3.10", "3.11", "3.12"):
+        same(card(page, optional).locator(".q-rule").inner_text(), "Optional", f"the rule of {optional}")
+    # The effective date is asked only when a threshold is given, and is then required.
+    assert card(page, "3.13").is_hidden(), "3.13 shows before a threshold is given"
+    card(page, "3.12").locator("textarea").fill("Low: under 5 days of cover")
+    assert card(page, "3.13").is_visible(), "3.13 stays hidden after a threshold is given"
+    same(three.inner_text(), "7 required answers left · 4 optional unanswered", "section 3 with a threshold and no date")
+    card(page, "3.13").locator("input").fill("From 2026-01-01")
+    card(page, "3.8").locator("input").fill("One value for each day and each terminal.")
+    same(three.inner_text(), "5 required answers left · 4 optional unanswered", "section 3 with the grain and the date")
+    # The owner and the steward are required; the objective too (proof 2). The API is optional.
+    six = page.locator('[data-section="6"] .section-progress')
+    same(six.inner_text(), "3 required answers left · 3 optional unanswered", "section 6 of a new form")
+    card(page, "6.8").locator("input").fill("Supply Operations Manager")
+    card(page, "6.9").locator("input").fill("Inventory Representative")
+    same(six.inner_text(), "1 required answer left · 3 optional unanswered", "section 6 with the owner and the steward")
+    same(page.locator('[data-section="7"] .section-progress').inner_text(), "1 required answer left · 3 optional unanswered", "section 7 of a new form")
+    same(card(page, "7.10").locator(".q-rule").inner_text(), "Optional", "the rule of the API question")
+    same(card(page, "7.8").locator(".q-text").inner_text(), "Which AI assistant or report answers from this view?", "question 7.8")
+    same(card(page, "2.5").locator(".q-rule").inner_text(), "Required", "the rule of the objective")
+    with page.expect_download() as download:
+        page.locator("#save").click()
+    same(json.loads(Path(download.value.path()).read_text(encoding="utf-8"))["answers"],
+         {"3.8": "One value for each day and each terminal.", "3.9": "draft", "3.12": ["Low: under 5 days of cover"], "3.13": "From 2026-01-01",
+          "6.8": "Supply Operations Manager", "6.9": "Inventory Representative"}, "the saved answers")
+    # "Clear this form" empties the form and puts the status back at Draft.
+    choose(page, "3.9", "certified")
+    page.locator("#clear").click()
+    page.locator("#clear-confirm").click()
+    assert card(page, "3.9").locator('input[value="draft"]').is_checked(), "the status after Clear is not Draft"
+    same(card(page, "6.8").locator("input").input_value(), "", "6.8 after Clear")
+    s.shot(page, "19-new-fields")
+
+
+def guide(s):
+    page = s.open()
+    link = page.locator("#guide-link")
+    same(link.inner_text(), "How to use this form", "the link's words")
+    same(link.get_attribute("href"), GUIDE, "the link's address, beside the form")
+    same(link.get_attribute("target"), "_blank", "the link opens beside the form, so the answers stay")
+    target = Path(s.url.removeprefix("file://")).parent / GUIDE if not sys.platform.startswith("win") else None
+    guide_url = s.url.rsplit("/", 1)[0] + "/" + GUIDE
+    # The guide is its own page: open it apart, count what it asks the network for, and read its heading.
+    context = s.browser.new_context(viewport={"width": 1280, "height": 900})
+    asked, errors = [], []
+    context.route(lambda url: not url.startswith(("file:", "data:", "blob:", "about:")), lambda route: (asked.append(route.request.url), route.abort()))
+    other = context.new_page()
+    other.on("pageerror", lambda error: errors.append(str(error)))
+    other.on("request", lambda request: request.url != guide_url and not request.url.startswith("data:") and asked.append(request.url))
+    other.goto(guide_url)
+    same(other.locator("h1").inner_text(), "How to use the KPI intake form", "the guide's heading")
+    same(other.locator('a[href="kpi-intake-form.html"]').count() > 0, True, "the guide links back to the form")
+    same(asked, [], "what the guide asked the network or the disk for")
+    same(errors, [], "errors on the guide")
+    assert target is None or target.is_file(), "the guide is not beside the form"
+    context.close()
+    # Phone width: the link is a target of 44 px.
+    phone_page = s.open(width=390, height=844)
+    assert phone_page.locator("#guide-link").bounding_box()["height"] >= 44, "the guide link is under 44 px high at 390 px"
+    assert not phone_page.evaluate("document.documentElement.scrollWidth > innerWidth"), "the form scrolls sideways at 390 px with the link"
+
+
 PROOFS = [("1 load", load), ("2 fill", fill), ("3 narrow list", narrow_list), ("4 conditional", conditional),
           ("5 routing", routing), ("6 save", save), ("7 load file", load_file), ("8 draft", draft), ("9 phone", phone),
           ("10 theme", theme), ("11 next step", next_step), ("12 bad file", bad_file), ("13 other form", other_form),
-          ("14 detail", detail), ("15 conflict", conflict), ("16 bad draft", bad_draft)]
+          ("14 detail", detail), ("15 conflict", conflict), ("16 bad draft", bad_draft), ("17 hidden", hidden),
+          ("18 added", added), ("19 new fields", new_fields), ("20 guide", guide)]
 
 
 def launch(playwright, channels):

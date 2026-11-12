@@ -38,7 +38,7 @@ def test_a_complete_signed_form_passes(report_of):
     assert report.complete, report.text()
     text = report.text()
     assert text.startswith("KPI intake check: Days of Cover\n")
-    assert "2. What the KPI means\n  Answered 2 of the 4 questions that apply.\n  Nothing is missing.\n" in text
+    assert "2. What the KPI means\n  Answered 3 of the 5 questions that apply.\n  Nothing is missing.\n" in text
     assert "Kind of measure: operational metric (decided by 4.6, test 5)." in text
     assert "  The name is new, and the chosen process agrees with the business area.\n" in text
     assert "Result: the intake is complete and signed.\n" in text
@@ -64,9 +64,10 @@ def test_a_conditional_question_is_rightly_skipped(report_of):
     assert '  Rightly skipped: 4.4 (Required if 4.3 is "no"); 4.5 (Required if 4.4 is "no"); 4.6 (Required if 4.5 is "no"); 4.7 (Required if 4.6 is "no")\n' in text
     assert "Kind of measure: market indicator (decided by 4.3, test 3)." in text
     # 4.1 "no" makes it a tracker or report: 3.1 to 3.3 and the other tests are skipped, and need no answer.
-    report = report_of(made_up.intake(change={"4.1": "no"}, remove=["3.1", "3.2", "3.3", "4.2", "4.3", "4.4", "4.5", "4.6", "4.7"]))
+    report = report_of(made_up.intake(change={"4.1": "no"}, remove=["3.1", "3.2", "3.3", "3.8", "4.2", "4.3", "4.4", "4.5", "4.6", "4.7"]))
     assert report.complete, report.text()
-    assert '  Rightly skipped: 3.1 (Required if 4.1 is not "no"); 3.2 (Required if 4.1 is not "no"); 3.3 (Required if 4.1 is not "no")\n' in report.text()
+    assert ('  Rightly skipped: 3.1 (Required if 4.1 is not "no"); 3.2 (Required if 4.1 is not "no"); 3.3 (Required if 4.1 is not "no"); '
+            '3.8 (Required if 4.1 is not "no"); 3.13 (Required if 3.12 has an answer)\n') in report.text()
     assert "Kind of measure: tracker or report (decided by 4.1, test 1)." in report.text()
 
 
@@ -287,3 +288,72 @@ def test_the_command_exits_0_only_for_a_complete_form(tmp_path, capsys, monkeypa
     assert "Result: not complete. 3 things to settle:" in capsys.readouterr().out
     assert main(["check", str(tmp_path / "missing.json")]) == 2
     assert "stopped: " in capsys.readouterr().err
+
+
+def test_the_questions_of_the_field_groups_are_required_or_optional_as_decided(report_of):
+    # The objective, the grain, the status, the owner and the steward are required. The rest are optional.
+    report = report_of(made_up.intake(remove=["2.5", "3.8", "3.9", "6.8", "6.9"]))
+    assert report.blocking == ["2.5 is missing", "3.8 is missing", "3.9 is missing", "6.8 is missing", "6.9 is missing"]
+    assert "    6.8 Who is the named owner of this KPI? Give the position title, or" in report.text()
+    # A threshold needs the date it applies from. The quality rule, the review and the API are optional.
+    report = report_of(made_up.intake(change={"3.12": ["Low: under 5 days"]}))
+    assert report.blocking == ["3.13 is missing"]
+    full = {"3.10": "Counted tanks only.", "3.11": "Reviewed each year.", "3.12": ["Low: under 5 days"], "3.13": "From 2026-01-01.",
+            "7.10": "The stock API."}
+    report = report_of(made_up.intake(change=full))
+    assert report.complete, report.text()
+    assert "3. The facts about it\n  Answered 11 of the 13 questions that apply.\n  Nothing is missing.\n" in report.text()
+    # A status that the settings file does not hold is named.
+    report = report_of(made_up.intake(change={"3.9": "approved"}))
+    assert report.blocking == ['3.9: "approved" is not in the list of status.']
+
+
+def _with_settings(cat, tmp_path, kind, intake, pick_lists):
+    """The report on a form, read from JSON or a workbook, against the made-up lists marked with these settings."""
+    from kpi_store.intake import picklists
+    data = picklists.apply_settings(made_up.data(), pick_lists)
+    path = tmp_path / f"filled.{kind}"
+    if kind == "json":
+        path.write_text(answers.dumps(intake), encoding="utf-8", newline="\n")
+    else:
+        workbook.save(workbook.build(cat, data["lists"], {}, intake), path)
+    return check.check(cat, data, answers.read(path, cat, data["lists"]))
+
+
+@pytest.mark.parametrize("kind", ["json", "xlsx"])
+def test_an_answer_the_settings_now_hide_still_checks_with_a_note(cat, tmp_path, kind):
+    hide = {"roles": {"hide": ["Stock Planner"]}}
+    report = _with_settings(cat, tmp_path, kind, made_up.intake(), hide)
+    assert report.complete, report.text()
+    assert ('  Note: 6.1: "Stock Planner" is hidden in this organization\'s settings. The forms no longer offer it. '
+            "The answer was given before, and it stands.\n") in report.text()
+    assert "Not in the ontology" not in report.text()
+
+
+@pytest.mark.parametrize("kind", ["json", "xlsx"])
+def test_an_answer_the_settings_added_tells_the_architect_to_add_it_first(cat, tmp_path, kind):
+    add = {"roles": {"add": [{"id": "night-planner", "label": "Night Planner"}]}}
+    report = _with_settings(cat, tmp_path, kind, made_up.intake(change={"6.1": [made_up.ROLE_PLANNER, "new:night-planner"]}), add)
+    assert report.complete, report.text()        # it does not stop the intake, and it is no process map request
+    assert ('To add to the ontology first\n  For the Architect: 6.1 names "Night Planner". The organization\'s settings added it, and the '
+            "ontology does not hold it yet. Add it to the organization module with HOW-TO-UPDATE.md before you apply this KPI.\n") in report.text()
+    assert "Process map request" not in report.text()
+    # The free-text option still works, and still routes to the process map request.
+    report = _with_settings(cat, tmp_path, kind, made_up.intake(change={"6.1": ["@not-in-list"], "6.1.detail": "Night Planner"}), add)
+    assert report.blocking == ["6.1 routes the request: process map request needed"]
+    # Without the setting, the same id is an unknown value.
+    report = _with_settings(cat, tmp_path, kind, made_up.intake(change={"6.1": ["new:night-planner"]}), {})
+    assert report.blocking == ['6.1: "new:night-planner" is not in the list of roles.']
+
+
+def test_the_report_option_writes_the_report_beside_the_file(tmp_path, capsys, monkeypatch):
+    import shutil
+    monkeypatch.setattr("kpi_store.intake.picklists.stale_modules", lambda data, root: {})
+    filled = tmp_path / "crack-spreads-pricing.kpi-intake.json"
+    shutil.copy(catalogue.PACK / "examples" / "crack-spreads-pricing.json", filled)
+    assert main(["check", str(filled), "--report"]) == 0
+    out = capsys.readouterr().out
+    saved = tmp_path / "crack-spreads-pricing.kpi-intake.check.txt"
+    assert out.endswith("The report is also in crack-spreads-pricing.kpi-intake.check.txt, beside the file.\n")
+    assert saved.read_text(encoding="utf-8") + out.splitlines()[-1] + "\n" == out
+    assert "Result: the intake is complete and signed." in saved.read_text(encoding="utf-8")

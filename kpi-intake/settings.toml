@@ -1,5 +1,7 @@
-# The settings of the KPI intake form that belong to one organization: the role titles and definitions, and the
-# pick lists that the ontology does not hold. catalogue.toml holds the questions and names these lists.
+# The settings of the KPI intake form that belong to one organization: the role titles and definitions, the pick
+# lists that the ontology does not hold, and what the organization hides from or adds to the ontology's lists.
+# catalogue.toml holds the questions and names these lists.
+# The Architect, or whoever maintains the form, edits this file. The business users never do.
 # After you change this file, rebuild the forms:
 #
 #     py -m kpi_store.intake build
@@ -97,6 +99,75 @@ label = "Anyone in the company"
 [[list.visibility]]
 id = "restricted"
 label = "Restricted"
+
+# ---- The status of a KPI ---------------------------------------------------------------------------------------
+# Question 3.9 offers these and starts at "Draft". Rename a label to your organization's own word and keep the id.
+# If you change the id "draft", change `default` on question 3.9 in catalogue.toml too.
+
+[[list.status]]
+id = "draft"
+label = "Draft"
+
+[[list.status]]
+id = "certified"
+label = "Certified"
+
+[[list.status]]
+id = "retired"
+label = "Retired"
+
+# ---- The lists that come from the ontology ---------------------------------------------------------------------
+# Four of the forms' lists come from the ontology: sources (question 3.5), roles (6.1), data-products (6.6) and
+# systems (7.4). Here you say, for each list, what your organization hides and what it adds. The ontology itself
+# is not changed.
+#
+#   hide        entries the forms do not offer. Name each by its label, as the list shows it, or by its id.
+#   hide_tiers  for sources only: hide every source of these evidence tiers.
+#   keep_only   the opposite of hide: offer only these entries and hide every other one.
+#   add         an entry the ontology does not hold yet. The forms offer it, marked "new, not yet in the
+#               ontology". The check tells the Architect to add it to the ontology before the KPI is applied.
+#
+# A hidden entry stays known: an answers file that already holds it still checks, with a note. The build stops when
+# a name here matches no entry, so a misspelt name cannot go unnoticed. for-the-architect.md lists what each list
+# hides and adds, after every build. README.md shows a worked example under "Change the form".
+
+# Question 3.5 offers the MPC documents and the process map's own documents. The industry, framework and peer
+# sources stay in the ontology and are hidden here.
+[pick_list.sources]
+hide_tiers = ["industry", "framework", "peers"]
+
+[pick_list.roles]
+hide = ["Black Oil Manager"]
+
+[[pick_list.roles.add]]
+id = "value-chain-optimization-director"
+label = "Value Chain Optimization Director"
+
+# The ontology's data-product catalog also lists functional areas and portfolios. Question 6.6 offers only the
+# entries that are data products. A data product the ontology gains later is hidden until you add its name here.
+[pick_list.data-products]
+keep_only = [
+  "Master Pricing",
+  "Rack Pricing",
+  "External Market Data",
+  "Operational Margin",
+  "Customer Master",
+  "Physical Trading",
+  "Commercial Risk",
+  "Product Availability & Allocations",
+  "Backcasting & Refining Continuous Improvement",
+  "Local Production Planning & Crude Scheduling",
+  "Regional Production & Distribution Planning",
+  "Logistic Execution",
+  "Revenue Accounting & Scheduling",
+]
+
+[pick_list.systems]
+hide = ["Databricks", "MS Excel", "MS Outlook", "MS PowerPoint", "MS Teams"]
+
+[[pick_list.systems.add]]
+id = "sharepoint"
+label = "SharePoint"
 
 # ---- The domains -----------------------------------------------------------------------------------------------
 # THIS LIST IS AN EXAMPLE. Replace it with your organization's own data domains before you use the form.

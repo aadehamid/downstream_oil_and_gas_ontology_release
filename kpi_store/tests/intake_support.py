@@ -65,11 +65,12 @@ def data(terms=()):
 COMPLETE = {
     "1.1": AREA_SUPPLY, "1.2": P_PLAN, "1.3": P_PLAN_STEP, "1.4": "Planners decide when to order more.", "1.5": "market-price",
     "2.1": "Days of Cover", "2.2": "How many days the stock on hand lasts at the planned rate of use.",
+    "2.5": "Never run a site out of stock.",
     "3.1": "Stock on hand divided by planned daily use.", "3.2": "days", "3.3": "Daily, by site.",
-    "3.5": [SOURCE], "3.5.detail": "Chapter 3, page 12.", "3.7": "anyone",
+    "3.5": [SOURCE], "3.5.detail": "Chapter 3, page 12.", "3.7": "anyone", "3.8": "One value for each day and each tank.", "3.9": "draft",
     "4.1": "yes", "4.2": "no", "4.3": "no", "4.4": "no", "4.5": "no", "4.6": "no", "4.7": "no",
     "4.8": "It is a ratio with no target and no named owner.",
-    "5.4": "none", "6.1": [ROLE_PLANNER], "7.1": "@no-data-yet",
+    "5.4": "none", "6.1": [ROLE_PLANNER], "6.8": "Stock Planning Lead", "6.9": "Stock Planner", "7.1": "@no-data-yet",
 }
 SIGNED = {"data-owner": {"name": "A signer", "date": "2026-11-11"},
           "domain-confirmation": {"name": "A second signer", "date": "2026-11-11"},
@@ -82,5 +83,5 @@ def intake(change=None, remove=(), sign_offs=None, **fields):
     answers.update(change or {})
     for key in remove:
         answers.pop(key, None)
-    return Intake(form="kpi-intake", catalogue_version="1.0", kpi_name=answers.get("2.1", ""), answers=answers,
+    return Intake(form="kpi-intake", catalogue_version="1.1", kpi_name=answers.get("2.1", ""), answers=answers,
                   sign_offs=copy.deepcopy(SIGNED if sign_offs is None else sign_offs), **fields)

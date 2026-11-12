@@ -10,7 +10,7 @@
 # and the time estimates. The role titles and the lists your organization sets for itself are in settings.toml. A new question
 # needs an id that no other question has. README.md in this folder explains each field under "Change the form".
 
-version = "1.0"
+version = "1.1"
 release = "KPI Store 1.1"
 
 # ---- The fixed choices -----------------------------------------------------------------------------------------
@@ -155,9 +155,9 @@ technical_name = "the controlled vocabulary"
 audience = "business"
 about = "Here we agree on one name and one meaning for the KPI. Every later fact is attached to this meaning. If two teams mean different things by the same name, the KPI would count the wrong thing, and people would have to correct every report that used it."
 who = "The Data Owner gives the definition and later signs it. The Business analyst drafts the wording."
-done_when = "The KPI has one name, a definition of one or two sentences that does not repeat the name, and a statement of what it counts and what it leaves out. The completeness check has compared the name with the terms the ontology already holds."
-typical = "4"
-minutes = "11"
+done_when = "The KPI has one name, a definition of one or two sentences that does not repeat the name, a statement of what it counts and what it leaves out, and the strategic objective it serves. The completeness check has compared the name with the terms the ontology already holds."
+typical = "5"
+minutes = "13"
 
 [[section]]
 id = "3"
@@ -165,11 +165,11 @@ form = "kpi-intake"
 name = "The facts about it"
 technical_name = "the metadata"
 audience = "business"
-about = "Here we record a fixed set of facts about the KPI: how it is worked out, its unit, how often and at what level it is stated, what it is compared with, and where its definition is written. With these facts, a reader can check a definition and tell which document it came from."
+about = "Here we record a fixed set of facts about the KPI: how it is worked out, its unit, how often and at what level it is stated, what it is compared with, and where its definition is written. We also record its status, what makes it trustworthy, when it is reviewed, and any thresholds. With these facts, a reader can check a definition, tell which document it came from, and know whether to rely on the number yet."
 who = "The Data Steward answers."
-done_when = "The form says in words how the KPI is worked out, with its unit, and names a written source with a date. A KPI with no written source cannot go forward."
-typical = "7"
-minutes = "10"
+done_when = "The form says in words how the KPI is worked out, with its unit and its grain, names a written source with a date, and gives the KPI's status. A KPI with no written source cannot go forward."
+typical = "12 to 13"
+minutes = "17"
 
 [[section]]
 id = "4"
@@ -189,7 +189,7 @@ form = "kpi-intake"
 name = "Other names for it"
 technical_name = "the thesaurus (question 5.2 feeds a typed property, because the ontology has no skos:related link)"
 audience = "business"
-about = "Here we collect the other words people use for the KPI, and the nearby measures people mistake it for. With the other names, a person who searches with their own word finds the KPI. With the \"not this\" list, an assistant or a report does not answer with the wrong number."
+about = "Here we collect the other words people use for the KPI, and the nearby measures people mistake it for. With the other names, a person who searches with their own word finds the KPI. With the \"not this\" list, an AI assistant or a report does not answer with the wrong number."
 who = "The Data Steward answers."
 done_when = "The form lists every other name the attendees know, and gives one sentence of difference for each measure the KPI is mistaken for."
 typical = "4"
@@ -201,11 +201,11 @@ form = "kpi-intake"
 name = "What it connects to"
 technical_name = "the ontology (the typed links to roles, processes, value stream steps and data products)"
 audience = "business"
-about = "Here we link the KPI to the roles that use it, to the other places in the business where it is used, and to the data product that gives it. These links let a person ask \"who uses this number, and where does it come from\" and get one answer."
+about = "Here we link the KPI to the roles that use it, to its named owner and steward, to the other places in the business where it is used, and to the data product that gives it. These links let a person ask \"who uses this number, who answers for it, and where does it come from\" and get one answer."
 who = "The Data Owner answers. The Data Product Owner names the data product in 6.6."
-done_when = "The form names at least one role that uses the KPI. Each value stream step it names has a relationship and a written basis. The form names the data product, or says that none exists yet."
-typical = "4 to 6"
-minutes = "11"
+done_when = "The form names at least one role that uses the KPI, and its owner and its steward. Each value stream step it names has a relationship and a written basis. The form names the data product, or says that none exists yet."
+typical = "6 to 8"
+minutes = "14"
 
 [[section]]
 id = "7"
@@ -217,7 +217,7 @@ about = "Here Digital IT names the view or table that gives the KPI's values, an
 who = "Digital IT answers. The Data Product Owner confirms 7.1 if the view is new. The Architect checks that every name exists in the workspace."
 done_when = "The form names one view or table that exists in the workspace under that exact name, or says that the KPI has no data yet. The first is not required. A KPI can be defined before anyone builds it."
 warning = "The load compares the ontology with the workspace. An object, a column or a table link that the ontology names and the workspace lacks stops the load. Name only what exists."
-typical = "3 to 9"
+typical = "4 to 10"
 minutes = "20 to 30"
 
 [[section]]
@@ -478,6 +478,17 @@ why = "What is left out is where most disputes about a number start."
 feeds = "`pop:excludes`."
 fact = ["F21"]
 
+[[question]]
+id = "2.5"
+section = "2"
+text = "Which strategic objective does this KPI serve? Write \"none stated\" if the business has named none."
+asked_of = ["data-owner"]
+type = "long_text"
+required = "required"
+why = "The objective tells every reader why the business watches this number."
+feeds = "Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). For a measure whose kind is KPI, question 4.6 names the document that records the objective."
+fact = []
+
 # ---- Section 3 -------------------------------------------------------------------------------------------------
 
 [[question]]
@@ -513,8 +524,9 @@ asked_of = ["data-steward"]
 type = "text"
 required = "required"
 ask_when = [{ question = "4.1", is_not = "no" }]
-why = "A daily figure by site and a monthly company figure are different things to build and to read."
-feeds = "`kpi:grain`."
+note = "This question is about reporting: how often the number is stated, and the breakdowns people read it by. Question 3.8 asks for the grain, which is what one value stands for."
+why = "A daily figure by market hub and a monthly figure by refining region are different things to build and to read."
+feeds = "`kpi:grain`. Despite the property's name, it holds how often the KPI is stated and its breakdowns. The grain of 3.8 has no property yet."
 fact = ["F15"]
 
 [[question]]
@@ -583,6 +595,79 @@ fact = []
   when = "restricted"
   outcome = "restricted-review"
   notice = "A restricted KPI needs Privacy, Security, Compliance and Risk in the request before sign-off. Record the date and the outcome of their review in the sign-off block."
+
+[[question]]
+id = "3.8"
+section = "3"
+text = "What is its grain: what does one value stand for? Name the smallest time period and the smallest business object that has a value of its own."
+asked_of = ["data-steward"]
+type = "text"
+required = "required"
+ask_when = [{ question = "4.1", is_not = "no" }]
+why = "Two people who add up the same KPI from different grains get different totals."
+feeds = "Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). `kpi:grain` holds the answer to 3.3."
+fact = []
+
+[[question]]
+id = "3.9"
+section = "3"
+text = "What is the KPI's status? It stays \"Draft\" until the Data Owner certifies it."
+asked_of = ["data-steward"]
+type = "choice"
+source = "settings:status"
+default = "draft"
+required = "required"
+why = "Readers must know whether they can rely on the KPI yet."
+example = "The ontology holds no status of this kind, so the filled examples mark their answer as an illustration."
+feeds = "Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md)."
+fact = []
+
+[[question]]
+id = "3.10"
+section = "3"
+text = "What rule must the data meet for the number to be trusted?"
+asked_of = ["data-steward"]
+type = "long_text"
+required = "optional"
+why = "A reader trusts a number when they know which records it counts and which it drops."
+feeds = "Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md)."
+fact = []
+
+[[question]]
+id = "3.11"
+section = "3"
+text = "When is the KPI reviewed, and what would retire it?"
+asked_of = ["data-steward"]
+type = "long_text"
+required = "optional"
+why = "A KPI that nobody reviews is still reported after it has stopped meaning anything."
+feeds = "Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md)."
+fact = []
+
+[[question]]
+id = "3.12"
+section = "3"
+text = "Does it have thresholds: levels that call for attention or action? Write one line for each, with the level and its value."
+asked_of = ["data-steward"]
+type = "list"
+rows = 4
+required = "optional"
+why = "A threshold tells the reader when the number needs attention."
+example = "The Crack Spreads Pricing example leaves this empty: a market indicator has no threshold of its own."
+feeds = "Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). The closed shape forbids a value on a measure, so a threshold stays in the form's file."
+fact = []
+
+[[question]]
+id = "3.13"
+section = "3"
+text = "From what date do those thresholds apply, and until when if they end?"
+asked_of = ["data-steward"]
+type = "text"
+required = "required"
+ask_when = [{ question = "3.12", answered = true }]
+why = "A threshold changes over time, and a reader must know which one was in force."
+feeds = "Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md)."
+fact = []
 
 # ---- Section 4 -------------------------------------------------------------------------------------------------
 
@@ -659,8 +744,9 @@ type = "choice"
 source = "choices:yes-no"
 required = "required"
 ask_when = [{ question = "4.5", is = "no" }]
+note = "The objective itself is the answer to 2.5, and the named owner is the answer to 6.8. Ask here only whether a recorded decision names this measure, and which document records it."
 why = "A measure becomes a KPI by a recorded decision, not by its formula."
-feeds = "\"Yes\" gives kind KPI, test 5, and a `KPI-` identifier. The document goes to `dcterms:bibliographicCitation`. \"No\" gives kind operational metric, test 5. The target's value is never recorded."
+feeds = "\"Yes\" gives kind KPI, test 5, and a `KPI-` identifier. The document goes to `dcterms:bibliographicCitation`. \"No\" gives kind operational metric, test 5. The ontology never records a target's value. Thresholds stay in the form's file (3.12)."
 fact = ["F5", "F6", "F11"]
 
   [question.detail]
@@ -857,7 +943,7 @@ type = "choice"
 source = "data-products"
 required = "optional"
 why = "It tells IT where to look, and it tells readers whom to ask about the data."
-feeds = "Narrows 7.1. `dcterms:isPartOf` of the view in 7.1. `con:publishesMeasure` if a catalog row publishes the KPI."
+feeds = "Tells Digital IT where to look for the view of 7.1. `dcterms:isPartOf` of the view in 7.1. `con:publishesMeasure` if a catalog row publishes the KPI."
 fact = ["F26", "F27"]
 
   [[question.option]]
@@ -897,6 +983,30 @@ fact = ["F28"]
   outcome = "note"
   notice = "The series need modelling in the market-data module. The Architect does that outside this form."
 
+[[question]]
+id = "6.8"
+section = "6"
+text = "Who is the named owner of this KPI? Give the position title, or the person."
+note = "A position title is enough. A person's name stays in the form's file and never goes into the ontology."
+asked_of = ["data-owner"]
+type = "text"
+required = "required"
+why = "One named owner answers for the KPI: what it means, and what is done when it moves."
+feeds = "Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). The ontology records roles and never a person's name."
+fact = []
+
+[[question]]
+id = "6.9"
+section = "6"
+text = "Who is the named steward of this KPI? Give the position title, or the person."
+note = "A position title is enough. A person's name stays in the form's file and never goes into the ontology."
+asked_of = ["data-owner"]
+type = "text"
+required = "required"
+why = "The steward keeps the KPI's facts current and is the first to ask about its data."
+feeds = "Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). The ontology records roles and never a person's name."
+fact = []
+
 # ---- Section 7 -------------------------------------------------------------------------------------------------
 
 [[question]]
@@ -907,7 +1017,7 @@ asked_of = ["digital-it"]
 type = "choice"
 source = "platform-tables"
 required = "required"
-why = "An assistant may quote a value only through the view the ontology binds to the KPI."
+why = "An AI assistant may quote a value only through the view the ontology binds to the KPI."
 feeds = "`dp:servesMeasure` (the `serves_measures` column of `data-product/pricing/tables.csv`)."
 fact = ["F25"]
 
@@ -1027,7 +1137,7 @@ fact = []
 [[question]]
 id = "7.8"
 section = "7"
-text = "Which assistant or report answers from this view?"
+text = "Which AI assistant or report answers from this view?"
 asked_of = ["digital-it"]
 type = "text"
 required = "optional"
@@ -1047,6 +1157,18 @@ why = "The table facts need a source, like the definition."
 example = "Not asked for the filled examples. An answer names the document and its date."
 feeds = "`dcterms:source` on the platform table, which the shape requires. A new source needs a tier in `integration`."
 fact = ["F26"]
+
+[[question]]
+id = "7.10"
+section = "7"
+text = "Is there an API, or another way to reach the values besides the view? Name it, or leave this empty."
+asked_of = ["digital-it"]
+type = "text"
+required = "optional"
+why = "It tells a builder how to read the KPI without opening the view by hand."
+example = "The ontology holds no access path, so the filled examples leave this empty. An answer names the API and the place where it is described."
+feeds = "Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md)."
+fact = []
 
 # ---- Domain activation -----------------------------------------------------------------------------------------
 
@@ -1286,10 +1408,10 @@ title = "What we will ask you and why"
 p = "You have been asked to an interview about a KPI. This page says what to expect."
 
 [[explainer.block]]
-p = "We keep one shared record of what each KPI means: its name, its definition, where it is used and where its data comes from. Reports, dashboards and assistants read that record, so they all give the same answer to \"what does this number mean\". To add a KPI to the record, we need facts that only the people who use the KPI can give."
+p = "We keep one shared record of what each KPI means: its name, its definition, where it is used and where its data comes from. Reports, dashboards and AI assistants read that record, so they all give the same answer to \"what does this number mean\". To add a KPI to the record, we need facts that only the people who use the KPI can give."
 
 [[explainer.block]]
-p = "A business analyst will ask you about 28 questions. The interview takes 45 to 60 minutes. You do not need to prepare a document. It helps if you bring the place where the KPI is written down today: a report, a policy or a list."
+p = "A business analyst will ask you about 39 questions. The interview takes 60 to 75 minutes. You do not need to prepare a document. It helps if you bring the place where the KPI is written down today: a report, a policy or a list."
 
 [[explainer.block]]
 p = "We will ask six things."
@@ -1297,15 +1419,15 @@ p = "We will ask six things."
 [[explainer.block]]
 ol = [
   "Which part of the business the KPI belongs to, which process it is about, and which data domain it belongs to.",
-  "What it means, in one or two sentences, and what it counts and leaves out.",
-  "How it is worked out in words, its unit, and how often it is stated.",
-  "What kind of number it is. For example, a market price you cannot control, a comparison with a plan, or a KPI with a target and an owner.",
+  "What it means, in one or two sentences, what it counts and leaves out, and which strategic objective it serves.",
+  "How it is worked out in words, its unit, how often it is stated and at what grain, its status, and any thresholds.",
+  "What kind of number it is. For example, a market benchmark you cannot control such as a crack spread, a comparison with a plan, or a KPI with a target and an owner.",
   "What other names people use for it, and which numbers people mistake it for.",
-  "Who uses it, and which data product gives it.",
+  "Who uses it, who its named owner and steward are, and which data product gives it.",
 ]
 
 [[explainer.block]]
-p = "We will not ask for values, targets or formulas in code. The record holds what a KPI means. The systems hold the numbers."
+p = "We will not ask for the KPI's values or for formulas in code. If it has thresholds, we note them. The record holds what a KPI means. The systems hold the numbers."
 
 [[explainer.block]]
 p = "Where we can, you will choose from a list. If the right answer is not in the list, say so. It means the record lacks something, and we add it before your KPI."
@@ -1611,14 +1733,54 @@ question = "7.7"
 note = "It needs a minor version of `data-product` with a new property."
 
 [[gap]]
-fact = "The accountable owner of a KPI"
-question = ""
-note = "Question 4.6 asks only for the document that records the owner."
+fact = "The strategic objective a measure serves"
+question = "2.5"
+note = "For a KPI, question 4.6 names the document that records the objective. The objective's own words stay in the form's file."
 
 [[gap]]
-fact = "The target of a KPI"
-question = ""
-note = "The closed shape forbids a target on a measure. Question 4.6 asks only for the document that records it."
+fact = "The grain, as a value of its own"
+question = "3.8"
+note = "`kpi:grain` holds how often the KPI is stated and its breakdowns (3.3). The answer stays in the form's file."
+
+[[gap]]
+fact = "The status of a KPI: draft, certified or retired"
+question = "3.9"
+note = "The answer stays in the form's file. The status list is in settings.toml."
+
+[[gap]]
+fact = "The quality rule of a KPI"
+question = "3.10"
+note = "The answer stays in the form's file."
+
+[[gap]]
+fact = "When a KPI is reviewed and what retires it"
+question = "3.11"
+note = "The answer stays in the form's file."
+
+[[gap]]
+fact = "The thresholds of a KPI"
+question = "3.12"
+note = "The closed shape forbids a value on a measure. Question 4.6 names the document that records a KPI's target. The thresholds stay in the form's file."
+
+[[gap]]
+fact = "The dates from which the thresholds apply"
+question = "3.13"
+note = "The answer stays in the form's file."
+
+[[gap]]
+fact = "The named owner of a KPI"
+question = "6.8"
+note = "For a KPI, question 4.6 names the document that records the accountable owner. The owner's title or name stays in the form's file."
+
+[[gap]]
+fact = "The named steward of a KPI"
+question = "6.9"
+note = "The answer stays in the form's file."
+
+[[gap]]
+fact = "An API or another access path to the KPI's values"
+question = "7.10"
+note = "The answer stays in the form's file."
 
 [[gap]]
 fact = "The direction of a good value"

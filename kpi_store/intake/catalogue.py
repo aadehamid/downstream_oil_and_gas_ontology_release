@@ -9,6 +9,10 @@ A pick list has one of three sources, and a question names it in `source`:
     "choices:<name>"    a short fixed list in the catalogue, the same in every organization
     "settings:<name>"   a list the organization sets for itself in settings.toml; an item may say active = false
 
+The organization can also change what four of the ontology's lists offer, under [pick_list.<name>] in
+settings.toml: hide entries, keep only some, or add an entry the ontology does not hold yet. This module reads
+and validates those settings. picklists.apply_settings marks the lists with them when the pack is built.
+
 Standard library only (tomllib).
 """
 import tomllib
@@ -25,6 +29,13 @@ ONTOLOGY_LISTS = (
     "data-products", "platform-tables", "layers", "data-product-kinds", "systems", "sources", "modules",
     "areas-and-modules",
 )
+# The lists of the ontology that settings.toml may change, each with the module that holds its entries. An entry the
+# settings add must go into that module before a KPI that names it is applied.
+SETTINGS_LISTS = {"sources": "integration", "roles": "organization", "data-products": "data-product", "systems": "system"}
+PICK_LIST_KEYS = ("hide", "hide_tiers", "keep_only", "add")
+ADDED = "new:"              # the start of the id of an entry that settings.toml adds
+ADDED_MARK = " (new, not yet in the ontology)"
+HIDDEN_MARK = " (hidden in this organization's settings)"
 INACTIVE = "@inactive"      # a route's `when` that matches any chosen item whose settings say active = false
 DEFAULT_ROWS = 5            # rows the workbook gives a question with several answers
 
@@ -50,6 +61,7 @@ class Catalogue:
     facts: list
     gaps: list
     architect_notes: list = field(default_factory=list)
+    pick_lists: dict = field(default_factory=dict)   # {list name: {hide, hide_tiers, keep_only, add}} from settings.toml
     by_id: dict = field(default_factory=dict)
 
     def section(self, section_id):
@@ -133,7 +145,8 @@ def load(folder=PACK):
         sections=raw["section"], questions=raw["question"], choices=raw.get("choices", {}),
         settings_lists=settings.get("list", {}), outcomes=raw["outcome"], sign_off=raw["sign_off"],
         request_fields=raw["request_field"], kind_rules=raw["kind_rule"], explainer=raw["explainer"],
-        facts=raw["fact"], gaps=raw["gap"], architect_notes=raw.get("architect", {}).get("notes", []))
+        facts=raw["fact"], gaps=raw["gap"], architect_notes=raw.get("architect", {}).get("notes", []),
+        pick_lists=settings.get("pick_list", {}))
     for question in cat.questions:
         cat.by_id.setdefault(question.get("id"), question)
     problems = _problems(cat)
@@ -159,6 +172,7 @@ def _problems(cat):
         ids = [i.get("id") for i in items]
         if len(set(ids)) != len(ids) or not all(i.get("id") and i.get("label") for i in items):
             out.append(f"the list {name!r} needs an id and a label on every item, and no id twice")
+    out += _pick_list_problems(cat.pick_lists)
     for role_id, role in cat.roles.items():
         for key in ("title", "short", "definition", "in_intake"):
             if not role.get(key):
@@ -228,6 +242,8 @@ def _problems(cat):
                 out.append(f"{where}: `{key}` names the question {q[key]!r}, which does not exist")
         if "per" in q and q.get("type") not in MANY_TYPES:
             out.append(f"{where}: `per` needs a question with several answers")
+        if "default" in q and (q.get("type") != "choice" or q["default"] not in known):
+            out.append(f"{where}: its default {q['default']!r} is none of its options, or the question is not a single choice")
         detail = q.get("detail")
         if detail is not None:
             if not detail.get("label") or detail.get("type") not in ("text", "long_text"):
@@ -262,6 +278,39 @@ def _problems(cat):
             out.append(f"the outcome {name!r} names {outcome['consult']!r}, which the sign-off block does not hold")
         if not outcome.get("title") or "blocks" not in outcome:
             out.append(f"the outcome {name!r} needs a title and `blocks`")
+    return out
+
+
+def _pick_list_problems(pick_lists):
+    """Every way the [pick_list.<name>] tables of settings.toml are wrong in themselves, as sentences. Whether a
+    hidden or kept entry exists in its list is checked when the lists are built (picklists.apply_settings)."""
+    out = []
+    if not isinstance(pick_lists, dict):
+        return ["settings.toml: `pick_list` must hold one table for each list, such as [pick_list.roles]"]
+    for name, change in pick_lists.items():
+        where = f"settings.toml, [pick_list.{name}]"
+        if name not in SETTINGS_LISTS:
+            out.append(f"{where}: the lists that settings.toml can change are {', '.join(SETTINGS_LISTS)}")
+            continue
+        if not isinstance(change, dict) or set(change) - set(PICK_LIST_KEYS):
+            out.append(f"{where}: it takes only {', '.join(PICK_LIST_KEYS)}")
+            continue
+        for key in ("hide", "hide_tiers", "keep_only"):
+            held = change.get(key, [])
+            if not isinstance(held, list) or not all(isinstance(v, str) and v.strip() for v in held):
+                out.append(f"{where}: `{key}` is a list of texts")
+        if "hide_tiers" in change and name != "sources":
+            out.append(f"{where}: `hide_tiers` is for the list of sources only")
+        if change.get("keep_only") and (change.get("hide") or change.get("hide_tiers")):
+            out.append(f"{where}: use `keep_only`, or `hide` and `hide_tiers`, not both")
+        added = change.get("add", [])
+        ids = [a.get("id") for a in added if isinstance(a, dict)]
+        if (not isinstance(added, list) or len(ids) != len(added) or len(set(ids)) != len(ids)
+                or not all(isinstance(a.get("id"), str) and a["id"].strip() and isinstance(a.get("label"), str) and a["label"].strip()
+                           and not set(a) - {"id", "label"} for a in added)):
+            out.append(f"{where}: each added entry needs an id and a label, nothing else, and no id twice")
+        elif any(a["id"].startswith("@") or ":" in a["id"] or "/" in a["id"] for a in added):
+            out.append(f"{where}: the id of an added entry is a short name of its own, such as \"sharepoint\"")
     return out
 
 

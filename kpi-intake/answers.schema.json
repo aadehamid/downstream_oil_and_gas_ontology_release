@@ -17,7 +17,7 @@
     },
     "answers": {
       "type": "object",
-      "description": "The answers by question id. The extra text of a question is under \"<id>.detail\". A choice holds the id of the chosen item, as pick-lists.json or settings.toml gives it. A special option's id starts with @.",
+      "description": "The answers by question id. The extra text of a question is under \"<id>.detail\". A choice holds the id of the chosen item, as pick-lists.json or settings.toml gives it. A special option's id starts with @. The id of an entry that settings.toml adds to a list of the ontology starts with new:.",
       "additionalProperties": {
         "oneOf": [
           {"type": "string"},

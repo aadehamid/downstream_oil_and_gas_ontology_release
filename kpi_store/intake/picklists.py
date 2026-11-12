@@ -9,12 +9,17 @@ Every item has an `id` (the term's IRI, or a module's name) and a `label` (what 
 within a list, because a workbook cell holds the label and the reader must find the id again.
 
 A deprecated term stays in its list with "(deprecated)" in its label, so the lists count what the ontology holds.
+
+apply_settings() then marks the lists with what the organization's settings.toml says under [pick_list.<name>]. A
+hidden entry stays in its list with "hidden": true, so the forms do not offer it and the check still knows it. An
+added entry joins its list with "added": true, an id that starts with "new:" and a label that says it is new.
 """
 import json
 from collections import Counter, defaultdict
 from pathlib import Path
 
 from kpi_store import ontology_view
+from kpi_store.intake.catalogue import ADDED, ADDED_MARK, SETTINGS_LISTS, CatalogueError
 
 BASE = "https://w3id.org/mpc/ontology/"
 CORE = BASE + "modules/core/"
@@ -258,6 +263,49 @@ def build(root, release=None):
     }
     return {"release": ontology_view.release_name(root), "versions": dict(sorted(release.versions.items())),
             "lists": lists, "terms": _terms(release)}
+
+
+def apply_settings(built, pick_lists):
+    """Marks the built lists with the settings of [pick_list.<name>], in place, and returns `built`.
+
+    `hide` and `keep_only` name an entry by its label, as the list shows it, or by its id. `hide_tiers` names the
+    evidence tiers of the sources to hide. Raises CatalogueError when a name matches no entry of its list, so a
+    misspelt name cannot hide nothing unnoticed, and when an added entry repeats a label the list already has."""
+    problems = []
+    for name in SETTINGS_LISTS:
+        change = pick_lists.get(name) or {}
+        items = built["lists"][name]
+        where = f"settings.toml, [pick_list.{name}]"
+
+        def matched(key):
+            wanted = list(change.get(key, []))
+            found = {w: [i for i in items if w in (i["id"], i["label"])] for w in wanted}
+            for w in wanted:
+                if not found[w]:
+                    problems.append(f"{where}: `{key}` names {w!r}, which is no entry of the list. Write the label as the list shows it, or the id.")
+            return {i["id"] for hits in found.values() for i in hits}
+
+        hidden = matched("hide")
+        if change.get("keep_only"):
+            kept = matched("keep_only")
+            hidden |= {i["id"] for i in items if i["id"] not in kept}
+        tiers = set(change.get("hide_tiers", []))
+        for tier in sorted(tiers - {i.get("tier") for i in items}):
+            problems.append(f"{where}: `hide_tiers` names {tier!r}, which is no tier of a source in the list")
+        hidden |= {i["id"] for i in items if i.get("tier") in tiers}
+        for item in items:
+            if item["id"] in hidden:
+                item["hidden"] = True
+        labels = {i["label"].casefold() for i in items}
+        for entry in change.get("add", []):
+            if entry["label"].casefold() in labels:
+                problems.append(f"{where}: the list already holds {entry['label']!r}, so it cannot be added")
+                continue
+            items.append({"id": ADDED + entry["id"], "label": entry["label"] + ADDED_MARK, "added": True})
+        built["lists"][name] = sorted(items, key=lambda item: (item["label"].casefold(), item["id"]))
+    if problems:
+        raise CatalogueError("\n".join(problems))
+    return built
 
 
 def dumps(data):

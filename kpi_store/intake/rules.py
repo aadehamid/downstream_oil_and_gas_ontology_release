@@ -6,7 +6,7 @@ from the same catalogue data, and a browser proof checks that the two agree on t
 An answer is a text or a list of texts. A choice holds the id of the chosen item. A special option's id starts
 with "@" (for example "@not-in-list").
 """
-from kpi_store.intake.catalogue import CHOICE_TYPES, INACTIVE, MANY_TYPES
+from kpi_store.intake.catalogue import CHOICE_TYPES, HIDDEN_MARK, INACTIVE, MANY_TYPES
 
 
 def values(answers, key):
@@ -40,10 +40,12 @@ def is_asked(cat, answers, question, _seen=None):
     return True
 
 
-def options(cat, lists, question, answers=None):
+def options(cat, lists, question, answers=None, hidden=False):
     """What a choice question offers, as items with an id and a label: the list's items that the question's levels
     allow, then the question's special options. With answers, a question that says `under` offers only the
-    entries under the chosen process."""
+    entries under the chosen process. An entry that the organization's settings hide is not offered. With
+    hidden=True it is there too, with the mark in its label, for a reader that must know an answer given before
+    the entry was hidden."""
     source = question.get("source")
     if question["type"] not in CHOICE_TYPES:
         return []
@@ -51,7 +53,7 @@ def options(cat, lists, question, answers=None):
     if fixed is not None:
         items = [dict(item, label=item["label"] + (" (not active)" if item.get("active") is False else "")) for item in fixed]
     else:
-        items = list(lists[source])
+        items = [dict(i, label=i["label"] + HIDDEN_MARK) if i.get("hidden") else i for i in lists[source] if hidden or not i.get("hidden")]
         if "levels" in question:
             low, high = question["levels"]
             items = [i for i in items if low <= i["level"] <= high]

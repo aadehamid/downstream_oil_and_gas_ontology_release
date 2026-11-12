@@ -8,7 +8,9 @@ for the second answer to 6.1 or "3.5.detail" for the extra text of 3.5. The read
 a person may sort or widen the sheet without breaking it, and must not delete column G.
 
 A choice cell holds the label a person sees. The reader turns it back into the item's id. A label it does not
-know stays as typed, and the check then reports it.
+know stays as typed, and the check then reports it. A dropdown does not offer an entry that the organization's
+settings hide. A cell that already holds one keeps it, with the mark in its label, and the reader still knows it.
+The blank form starts a question that has a default with that answer.
 
 Two builds of the same content are not the same bytes, because the file format stores the time of writing. So
 same_content() compares what matters: the sheet names and their visibility, every cell's value, the dropdowns and
@@ -103,7 +105,7 @@ def build(cat, lists, examples=None, intake=None, others=None):
         ranges[question["id"]] = f"={LISTS}!${letter}$2:${letter}${len(labels) + 1}"
 
     def label_of(question, value):
-        offered = {o["id"]: o["label"] for o in rules.options(cat, lists, question)}
+        offered = {o["id"]: o["label"] for o in rules.options(cat, lists, question, hidden=True)}
         return offered.get(value, value)
 
     def section_rows(ws, row, section, held):
@@ -134,6 +136,8 @@ def build(cat, lists, examples=None, intake=None, others=None):
                     value = "".join(rules.values(held, key)[:1])
                 else:
                     value = answer[n] if n < len(answer) else ""
+                    if not value and blank and question.get("default"):
+                        value = question["default"]
                     if question["type"] in CHOICE_TYPES:
                         value = label_of(question, value) if value else ""
                         validations.setdefault(question["id"], []).append(f"D{row}")
@@ -193,6 +197,7 @@ def build(cat, lists, examples=None, intake=None, others=None):
     put(ws, row, KEY_COLUMN, "example_of")
 
     held = intake.answers if intake else {}
+    blank = intake is None      # only the blank form starts with the default answers
     for section in cat.sections:
         if section["form"] != "kpi-intake":
             continue
@@ -355,7 +360,7 @@ def read(path, cat, lists, form="kpi-intake"):
             intake.answers[base] = texts[0]
             continue
         if question["type"] in CHOICE_TYPES:
-            ids = {o["label"]: o["id"] for o in rules.options(cat, lists, question)}
+            ids = {o["label"]: o["id"] for o in rules.options(cat, lists, question, hidden=True)}
             texts = [ids.get(text, text) for text in texts]
         intake.answers[base] = rules.as_answer(question, texts)
     intake.kpi_name = "".join(rules.values(intake.answers, "2.1")[:1])

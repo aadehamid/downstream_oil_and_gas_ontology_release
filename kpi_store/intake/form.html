@@ -142,6 +142,7 @@ details[open] > summary .chev { transform: rotate(90deg); }
 .mark { width: 26px; height: 26px; fill: none; stroke: var(--accent); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .brand h1 { grid-column: 2 / -1; }
 .brand-line { grid-column: 1 / -1; margin: 4px 0 2px; color: var(--muted); }
+.brand-line a { display: block; width: fit-content; margin-top: 2px; padding: 4px 0; color: var(--accent); font-weight: 600; text-underline-offset: 3px; }
 .theme-pick { grid-column: 3; grid-row: 3; align-self: start; }
 .theme-pick span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .theme-pick select { width: auto; font-size: var(--fs-body); }
@@ -381,6 +382,7 @@ td:last-child, th:last-child { padding-right: 0; }
   .layout { display: flex; flex-direction: column; }
   .side, .stage { display: contents; }
   .brand { order: 1; padding: 12px 16px 4px; }
+  .brand-line a { padding: 12px 0; }
   .view-pick { order: 2; display: block; padding: 4px 16px 8px; }
   .view-pick label { display: block; margin-bottom: 4px; color: var(--muted); }
   .view-pick select { font-size: var(--fs-body); font-weight: 600; }
@@ -471,7 +473,7 @@ td:last-child, th:last-child { padding-right: 0; }
     <header class="brand top">
       <svg class="mark" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2.6c3.9 4.6 7 8.3 7 12.4a7 7 0 0 1-14 0c0-4.1 3.1-7.8 7-12.4z"/><path d="M10 17.6h6M10 14.2h3.4"/></svg>
       <h1>KPI intake form</h1>
-      <p class="brand-line">Works offline. Sends nothing.</p>
+      <p class="brand-line">Works offline. Sends nothing. <a id="guide-link" href="#" target="_blank" rel="noopener">How to use this form</a></p>
       <label class="theme-pick"><span>Theme</span>
         <select id="theme" aria-label="Theme"><option value="light">Light theme</option><option value="dark">Dark theme</option><option value="system">System theme</option></select>
       </label>
@@ -672,8 +674,13 @@ const SHOWN = 40;              // options a long list shows at once
 const LONG = 8;                // a list with more options than this gets a search box
 const $ = (id) => document.getElementById(id);
 
-function emptyForm() { return { answers: {}, request: {}, sign_offs: {}, consulted: {}, example_of: "", comment: "" }; }
-let state = Object.fromEntries(FORMS.map((f) => [f, emptyForm()]));
+// An empty form. With a form's name, each question of that form that has a default starts with it.
+function emptyForm(form) {
+  const answers = {};
+  if (form) for (const q of DATA.questions) if (q.default && DATA.sections.find((s) => s.id === q.section).form === form) answers[q.id] = q.default;
+  return { answers, request: {}, sign_offs: {}, consulted: {}, example_of: "", comment: "" };
+}
+let state = Object.fromEntries(FORMS.map((f) => [f, emptyForm(f)]));
 let view = FORMS[0];
 const showAll = {};            // question id -> true when the reader asked for the whole list
 const narrow = matchMedia("(max-width: 999px)");   // the folded frame of a phone, a narrow window or a zoomed page
@@ -735,10 +742,15 @@ function isUnder(byId, item, ancestor) {
   return false;
 }
 // What a question offers: every item its levels allow (narrowed = false), or only those the earlier answers
-// leave (narrowed = true), then its special options.
+// leave (narrowed = true), then its special options. An entry that the organization's settings hide is not offered.
+// It stays, with a mark in its label, only while an answer holds it, so that a loaded file shows what it chose.
 function optionsOf(q, answers, narrowed) {
   if (!isChoice(q)) return [];
   let items = baseList(q);
+  if (items.some((i) => i.hidden)) {
+    const held = values(answers, q.id);
+    items = items.filter((i) => !i.hidden || !narrowed || held.includes(i.id)).map((i) => i.hidden ? Object.assign({}, i, { label: i.label + DATA.hidden_mark }) : i);
+  }
   if (q.levels) items = items.filter((i) => i.level >= q.levels[0] && i.level <= q.levels[1]);
   if (narrowed && q.under) {
     const top = realValues(answers, q.under)[0];
@@ -925,8 +937,9 @@ function drawPer(q, box) {
     if (isChoice(q)) {
       control = document.createElement("select");
       control.append(new Option("Choose", ""));
-      for (const o of optionsOf(q, answers, false)) control.append(new Option(o.label, o.id));
-      control.value = positions(answers, q.id)[i] || "";
+      const mine = positions(answers, q.id)[i] || "";
+      for (const o of optionsOf(q, answers, false)) if (!o.hidden || o.id === mine) control.append(new Option(o.label, o.id));
+      control.value = mine;
       control.addEventListener("change", () => set(control.value));
     } else {
       control = document.createElement("input");
@@ -1221,15 +1234,24 @@ function refresh() {
         // The check finds a conflict only when both definitions are there and differ: the term's, and the answer to 2.2.
         mayConflict = !!term && term.defined && values(answers, "2.2").length > 0;
       }
+      // An answer that the organization's settings added: the ontology does not hold it yet.
+      const module = isChoice(q) ? DATA.added_modules[q.source] : "";
+      const added = module ? optionsOf(q, answers, false).filter((o) => o.added && values(answers, q.id).includes(o.id)) : [];
       for (const hit of hits) if (DATA.outcomes[hit.route.outcome].blocks) routed.push(DATA.forms[hit.route.outcome] ? "Routed: " + DATA.forms[hit.route.outcome].toLowerCase() : DATA.outcomes[hit.route.outcome].title);
       if (same) routed.push("Stopped: the ontology holds this measure");
       // The notices are drawn again only when they change, so a part a reader opened in one stays open.
       const there = q.id === "2.1" ? elsewhere : "";
-      const drawn = JSON.stringify([hits.map((hit) => [hit.route.outcome, hit.route.notice]), same ? same.label : "", there]);
+      const drawn = JSON.stringify([hits.map((hit) => [hit.route.outcome, hit.route.notice]), same ? same.label : "", there, added.map((o) => o.id)]);
       if (box.dataset.drawn !== drawn) {
         box.dataset.drawn = drawn;
         box.replaceChildren();
         for (const hit of hits) routeNotice(box, hit);
+        for (const o of added) {
+          const name = o.label.replace(DATA.added_mark, "");
+          notice(box, "to-add", "New: the Architect adds it to the ontology first",
+            `"${name}" is new. The ontology does not hold it yet. Go on with the form. The Architect adds it before this KPI is applied.`, false,
+            { analyst: `The Architect adds "${name}" to the ${module} module with HOW-TO-UPDATE.md. The check lists it under "To add to the ontology first".` });
+        }
         if (same) notice(box, "same-measure", "The ontology already holds this measure", `"${same.label}" has this name. Stop the form. The request becomes a change to that measure.`, true);
         if (there) notice(box, "same-name", `This name exists in the ${there} module`,
           "The check will ask you to consult Enterprise Data Governance and to record the outcome in the sign-off block. If the two definitions differ, the Domain Owner decides between them and signs.",
@@ -1378,7 +1400,7 @@ function readFile(text, name) {
   const answers = {}, ignored = [];
   for (const [id, v] of Object.entries(data.answers)) { if (known.has(id)) answers[id] = v; else ignored.push(brief(id)); }
   const elsewhere = data.form !== view;
-  state[data.form] = Object.assign(emptyForm(), {
+  state[data.form] = Object.assign(emptyForm(), {      // no defaults: the form shows what the file holds
     answers, request: data.request || {}, sign_offs: data.sign_offs || {}, consulted: data.consulted || {},
     example_of: data.example_of || "", comment: data.comment || "",
   });
@@ -1404,7 +1426,7 @@ $("clear").addEventListener("click", () => {
 $("clear-cancel").addEventListener("click", () => $("clear-dialog").close());
 $("clear-confirm").addEventListener("click", () => {
   $("clear-dialog").close();
-  state[view] = emptyForm();
+  state[view] = emptyForm(view);
   show(view);
   say("The form is empty.");
 });
@@ -1487,6 +1509,7 @@ function startFrame() {
 
 // ---- Start -----------------------------------------------------------------------------------------------------
 $("release-line").textContent = `${DATA.release}, catalogue ${DATA.catalogue_version}.`;
+$("guide-link").setAttribute("href", DATA.guide);      // the guide lies beside the built form, not beside this template
 for (const [name, title] of VIEWS) {
   const tab = clone("tpl-tab");
   tab.dataset.view = name;

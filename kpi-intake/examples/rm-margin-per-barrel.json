@@ -1,7 +1,7 @@
 {
   "format": 1,
   "form": "kpi-intake",
-  "catalogue_version": "1.0",
+  "catalogue_version": "1.1",
   "kpi_name": "R&M Margin per Barrel",
   "request": {
     "number": "EXAMPLE-2",
@@ -19,16 +19,24 @@
     "2.2": "MPC's Refining & Marketing margin (sales revenue less the cost of refinery inputs and purchased products) per barrel of net refinery throughput.",
     "2.3": "Sales revenue less the cost of refinery inputs and purchased products, per barrel of net refinery throughput. From 2026 the margin includes impacts from derivative activity.",
     "2.4": "Inter-refinery transfer volumes, which the regional per-barrel figures leave out of net refinery throughput.",
+    "2.5": "Illustration: Grow the refining and marketing margin on every barrel sold.",
     "3.1": "R&M margin ($) / net refinery throughput (bbl); from 2026 the margin includes impacts from derivative activity",
     "3.2": "Illustration: US dollars per barrel",
     "3.3": "quarterly and annual, company and region",
     "3.4": "R&M Margin Indicator; prior periods",
     "3.5": [
-      "https://w3id.org/mpc/ontology/source/kpi-classification-evidence",
       "https://w3id.org/mpc/ontology/source/mpc-performance-measures-evidence"
     ],
     "3.5.detail": "MPC-S01 p. 51; MPC-S17; KI-01",
     "3.7": "anyone",
+    "3.8": "Illustration: One value for each month and each refining region.",
+    "3.9": "draft",
+    "3.10": "Illustration: Closed accounting periods only. A month that is still open is excluded.",
+    "3.11": "Illustration: Reviewed each year with the plan. Retired when the segment's margin is no longer reported per barrel.",
+    "3.12": [
+      "Illustration: Review level: the realized margin per barrel is below the forecast for the month."
+    ],
+    "3.13": "Illustration: From 2026-01-01, until it is replaced.",
     "4.1": "yes",
     "4.2": "no",
     "4.3": "no",
@@ -66,6 +74,8 @@
       "MPC reports R&M margin per barrel for 2023 to 2025; MPC FY2025 10-K, Item 7 (reference/mpc/mpc-fy2025-10k-fact-sheet.md, section 8)"
     ],
     "6.6": "@none-yet",
+    "6.8": "Illustration: Value Chain Optimization Director",
+    "6.9": "Illustration: Business Planning and Analysis",
     "7.1": "@no-data-yet"
   },
   "sign_offs": {
@@ -84,5 +94,5 @@
   },
   "consulted": {},
   "example_of": "rm-margin-per-barrel",
-  "comment": "A shipped example. Every answer is quoted from the ontology, except these illustrations, which the ontology does not hold: 1.4, 3.2, 3.7, 4.9 and 6.1. The domain in 1.5 comes from the example domain list in settings.toml. The ontology names no role, no data product and no view for this measure. The signer names are placeholders."
+  "comment": "A shipped example. Every answer is quoted from the ontology, except these illustrations, which the ontology does not hold: 1.4, 2.5, 3.2, 3.7 to 3.13, 4.9, 6.1, 6.8 and 6.9. The domain in 1.5 comes from the example domain list in settings.toml. A source that settings.toml hides is left out of 3.5. The ontology names no role, no data product and no view for this measure. The signer names are placeholders."
 }

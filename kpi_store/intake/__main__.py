@@ -1,4 +1,5 @@
-"""The command line of the intake pack: `py -m kpi_store.intake build` and `py -m kpi_store.intake check <file>`."""
+"""The command line of the intake pack: `py -m kpi_store.intake build`, `py -m kpi_store.intake check <file>` and
+`py -m kpi_store.intake folders <place>`."""
 import argparse
 import sys
 from pathlib import Path
@@ -9,14 +10,17 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(prog="py -m kpi_store.intake", description="The KPI intake pack: build its forms, or check a filled form.")
+    parser = argparse.ArgumentParser(prog="py -m kpi_store.intake", description="The KPI intake pack: build its forms, check a filled form, or set up the shared folder.")
     sub = parser.add_subparsers(dest="command", required=True)
     build = sub.add_parser("build", help="write the forms, the pick lists, the generated pages and the examples")
     build.add_argument("--check", action="store_true", help="write nothing; exit 1 when a committed file differs from a fresh build")
     check = sub.add_parser("check", help="say what a filled form still lacks; exit 0 only when it is complete and signed")
     check.add_argument("file", help="an answers file (.json) or a filled workbook (.xlsx)")
     check.add_argument("--form", choices=list(FORMS), help="the form to read from a workbook (default: kpi-intake)")
-    for command in (build, check):
+    check.add_argument("--report", action="store_true", help="also write the report beside the file, as <file's name>.check.txt")
+    folders = sub.add_parser("folders", help="make the shared KPI-intake folder in the place you name, with the forms and the guide in it")
+    folders.add_argument("place", help="an existing folder, such as your team's shared drive")
+    for command in (build, check, folders):
         command.add_argument("--root", default=str(ROOT), help="the release folder (default: the one this code is in)")
         command.add_argument("--pack", help="the pack's folder (default: kpi-intake in the release folder)")
     args = parser.parse_args(argv)
@@ -28,19 +32,39 @@ def main(argv=None):
             stream.reconfigure(encoding="utf-8", errors="replace")
     from kpi_store.intake.answers import AnswersError
     from kpi_store.ontology_view import ReleaseError
-    errors = (CatalogueError, AnswersError, ReleaseError)
+    from kpi_store.intake.folders import FoldersError
+    errors = (CatalogueError, AnswersError, ReleaseError, FoldersError)
     try:
         if args.command == "build":
             from kpi_store.intake import build as builder
             from kpi_store.intake.examples import ExampleError
             errors += (builder.BuildError, ExampleError)
             return builder.main(root, pack, args.check)
+        if args.command == "folders":
+            from kpi_store.intake import folders as shared
+            top, done = shared.create(args.place, pack)
+            for line in done:
+                print(line)
+            print(f"{top.name} is ready" if done else f"{top.name} is current; nothing was changed")
+            return 0
         from kpi_store.intake import check as checker
         report = checker.run(args.file, pack, args.form, root)
+        saved = None
+        if args.report:
+            saved = Path(args.file).with_name(Path(args.file).stem + ".check.txt")
+            if saved.is_symlink():
+                raise AnswersError(f"{saved} is a link, so the report was not written there")
+            with saved.open("w", encoding="utf-8", newline="\n") as f:
+                f.write(report.text())
     except errors as e:
         print(f"stopped: {e}", file=sys.stderr)
         return 2
+    except OSError as e:
+        print(f"stopped: the report could not be written: {e}", file=sys.stderr)
+        return 2
     sys.stdout.write(report.text())
+    if saved:
+        print(f"The report is also in {saved.name}, beside the file.")
     return 0 if report.complete else 1
 
 
