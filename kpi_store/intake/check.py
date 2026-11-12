@@ -1,0 +1,299 @@
+"""The completeness check of a filled intake form.
+
+    py -m kpi_store.intake check <answers.json or filled.xlsx> [--form domain-activation] [--pack <folder>]
+
+It reads the form, in either format, and says in plain words, section by section, what is missing, which
+questions the rules rightly skipped, where an answer routes the request, and what the derived checks found. It
+ends with exit status 0 only when the intake is complete and signed, 1 when something is still to do, and 2 when
+the file cannot be read.
+
+It changes nothing in the ontology. The Architect applies a complete intake by hand, with HOW-TO-UPDATE.md.
+
+The derived checks compare the form with kpi-intake/pick-lists.json, which the build command writes from the
+release packages:
+
+    same measure            the name, or a name close to it, is already a measure
+    same name elsewhere     the name is a term of another module: consult Enterprise Data Governance
+    conflicting definition  that term's definition differs: the Domain Owner decides and signs
+    area and process        the chosen process belongs to another business area than the answer to 1.1
+    values                  an id or a list value that the ontology does not hold
+    sign-off                a signature, or the record of a consultation, is missing
+"""
+import difflib
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from kpi_store.intake import rules
+from kpi_store.intake.catalogue import CHOICE_TYPES, FORMS
+
+CLOSE = 0.88        # two names at least this alike are shown to a person as a possible match
+APPLY = "This check changes nothing in the ontology. The Architect applies a complete intake by hand, with HOW-TO-UPDATE.md."
+
+
+@dataclass
+class Report:
+    lines: list = field(default_factory=list)
+    blocking: list = field(default_factory=list)     # each thing that keeps the intake from being complete
+
+    @property
+    def complete(self):
+        return not self.blocking
+
+    def say(self, text=""):
+        self.lines.append(text)
+
+    def block(self, text):
+        self.blocking.append(text)
+
+    def text(self):
+        return "\n".join(self.lines) + "\n"
+
+
+def _norm(name):
+    """A name as the check compares it: lower case, with punctuation and doubled spaces removed."""
+    return " ".join(re.sub(r"[^a-z0-9&]+", " ", name.lower()).split())
+
+
+def _short(text, limit=70):
+    return text if len(text) <= limit else text[:limit - 3].rstrip() + "..."
+
+
+def _label(cat, lists, question, value):
+    offered = {o["id"]: o["label"] for o in rules.options(cat, lists, question)}
+    return offered.get(value, value)
+
+
+def _sections(cat, lists, intake, report):
+    answers = intake.answers
+    for section in cat.sections:
+        if section["form"] != intake.form:
+            continue
+        questions = cat.questions_of(section=section["id"])
+        asked = [q for q in questions if rules.is_asked(cat, answers, q)]
+        skipped = [q for q in questions if q not in asked]
+        missing, invalid, extra = [], [], []
+        for q in asked:
+            if q["required"] == "required" and not rules.is_complete(cat, answers, q):
+                if "per" in q and rules.values(answers, q["id"]):
+                    missing.append(f'{q["id"]} needs one answer for each answer to {q["per"]}: {_short(q["text"])}')
+                elif rules.values(answers, q["id"]) and rules.detail_required(q, answers):
+                    missing.append(f'{q["id"]} also needs: {q["detail"]["label"]}')
+                else:
+                    missing.append(f'{q["id"]} {_short(q["text"])}')
+            elif rules.detail_required(q, answers) and rules.values(answers, q["id"]) and not rules.values(answers, q["id"] + ".detail"):
+                missing.append(f'{q["id"]} also needs: {q["detail"]["label"]}')
+            invalid += _invalid(cat, lists, answers, q)
+        for q in skipped:
+            if rules.values(answers, q["id"]):
+                extra.append(f'{q["id"]} has an answer, but its rule says it is not asked ({cat.requirement(q)}). Remove the answer or correct the earlier one.')
+        done = sum(1 for q in asked if rules.values(answers, q["id"]))
+        title = f'{section["id"]}. {section["name"]}' if intake.form == "kpi-intake" else section["name"]
+        report.say(title)
+        report.say(f"  Answered {done} of the {len(asked)} questions that apply.")
+        if missing:
+            report.say("  Missing:")
+            for line in missing:
+                report.say("    " + line)
+                report.block(f"{line.split(' ', 1)[0]} is missing")
+        for line in invalid:
+            report.say("  Not in the ontology: " + line)
+            report.block(line)
+        for line in extra:
+            report.say("  " + line)
+            report.block(line)
+        if skipped:
+            report.say("  Rightly skipped: " + "; ".join(f'{q["id"]} ({cat.requirement(q)})' for q in skipped if not rules.values(answers, q["id"])))
+        if not (missing or invalid or extra):
+            report.say("  Nothing is missing.")
+        report.say()
+
+
+def _invalid(cat, lists, answers, question):
+    """Each value of a choice question that its list does not hold, as a sentence."""
+    if question["type"] not in CHOICE_TYPES:
+        return []
+    offered = {o["id"]: o for o in rules.options(cat, lists, question)}
+    under = {o["id"] for o in rules.options(cat, lists, question, answers)} if question.get("under") else None
+    out = []
+    held = rules.values(answers, question["id"])
+    if question["type"] == "choice" and len(held) > 1:
+        out.append(f'{question["id"]} takes one answer and has {len(held)}.')
+    for value in held:
+        if value not in offered:
+            out.append(f'{question["id"]}: "{_short(value)}" is not in the list of {question["source"].split(":")[-1].replace("-", " ")}.')
+        elif under is not None and value not in under:
+            out.append(f'{question["id"]}: "{offered[value]["label"]}" is not under the process chosen in {question["under"]}.')
+        elif "(deprecated)" in offered[value]["label"]:
+            out.append(f'{question["id"]}: "{offered[value]["label"]}" is deprecated in the ontology. Choose the term that replaced it.')
+    return out
+
+
+def _routing(cat, lists, intake, report):
+    taken = rules.routes(cat, lists, intake.answers, intake.form)
+    report.say("Routing")
+    if not taken:
+        report.say("  No answer routes this request elsewhere.")
+    needs = set()
+    for question, route, label in taken:
+        outcome = cat.outcomes[route["outcome"]]
+        report.say(f'  {outcome["title"]}: {question["id"]} is "{label}". {route["notice"]}')
+        if outcome.get("next"):
+            report.say("    " + outcome["next"])
+        if outcome["blocks"]:
+            report.block(f'{question["id"]} routes the request: {outcome["title"].lower()}')
+        if outcome.get("consult"):
+            needs.add(outcome["consult"])
+    report.say()
+    return needs
+
+
+def _derived(cat, lists, terms, intake, report):
+    """The checks of the KPI form against the ontology. Returns what they require of the sign-off:
+    (the consultations to record, whether the Domain Owner must sign)."""
+    answers = intake.answers
+    report.say("Checks against the ontology")
+    found = False
+    name = "".join(rules.values(answers, "2.1")[:1])
+    definition = "".join(rules.values(answers, "2.2")[:1])
+    consult, conflict = set(), False
+    if name:
+        wanted = _norm(name)
+        for measure in lists["measures"]:
+            names = [measure["label"]] + measure.get("other_names", [])
+            exact = wanted in {_norm(n) for n in names}
+            same_text = bool(definition) and _norm(definition) == _norm(measure.get("definition", ""))
+            close = max(difflib.SequenceMatcher(None, wanted, _norm(n)).ratio() for n in names)
+            if exact or same_text:
+                found = True
+                why = "has this name" if exact else "has this definition"
+                if intake.example_of and intake.example_of == measure.get("notation"):
+                    report.say(f'  Same measure: the ontology already holds "{measure["label"]}". This file is a shipped example '
+                               "of that measure, filled in as if it were new, so the match is expected.")
+                else:
+                    report.say(f'  Same measure: the measure "{measure["label"]}" already {why}. '
+                               "Stop the form. The request becomes a change to that measure.")
+                    report.block(f'the measure "{measure["label"]}" already {why}')
+            elif close >= CLOSE:
+                found = True
+                report.say(f'  Close match: the measure "{measure["label"]}" has a name close to "{name}". '
+                           "Confirm with the Data Owner that the two are different measures.")
+        for term in terms:
+            if wanted in {_norm(n) for n in term["names"]}:
+                found = True
+                consult.add("enterprise-data-governance")
+                report.say(f'  Same name in another module: the {term["module"]} module holds a term named "{name}" ({term["id"]}). '
+                           "Consult Enterprise Data Governance and record the outcome in the sign-off block.")
+                if term.get("definition") and definition and _norm(term["definition"]) != _norm(definition):
+                    conflict = True
+                    report.say(f'    Its definition differs: "{_short(term["definition"], 160)}" '
+                               "The Domain Owner decides between the two and signs.")
+    area = "".join(rules.real_values(answers, "1.1")[:1])
+    process = "".join((rules.real_values(answers, "1.3") or rules.real_values(answers, "1.2"))[:1])
+    by_id = {p["id"]: p for p in lists["processes"]}
+    if area and process in by_id:
+        entry = by_id[process]
+        areas = [entry["area"]] if entry["area"] else entry["areas"]
+        names = {a["id"]: a["label"] for a in lists["business-areas"]}
+        if areas and area not in areas:
+            found = True
+            line = (f'the process "{entry["label"]}" belongs to {" and ".join(names.get(a, a) for a in areas)}, '
+                    f'and the answer to 1.1 is {names.get(area, area)}')
+            report.say(f"  Area and process: {line}. Return the form to the Business analyst.")
+            report.block(line)
+        elif not areas:
+            found = True
+            report.say(f'  Area and process: the process "{entry["label"]}" carries no business area in the ontology, '
+                       "so the answer to 1.1 could not be compared.")
+    register = {r["id"] for r in lists["roles"] if r.get("group") == "Role register"}
+    outside = [r for r in rules.real_values(answers, "6.1") if r in register]
+    if outside:
+        found = True
+        report.say(f"  Roles: {len(outside)} of the chosen roles are in the role register. The kpi builder writes only the four "
+                   "planning personas today, so the Architect must extend it before these roles can be recorded.")
+    if not found:
+        report.say("  The name is new, and the chosen process agrees with the business area.")
+    report.say()
+    return consult, conflict
+
+
+def _sign_off(cat, intake, report, consult, conflict):
+    report.say("Sign-off")
+    for signer in cat.signers(intake.form):
+        needed = signer["when"] == "always" or conflict or intake.form != "kpi-intake"
+        given = intake.sign_offs.get(signer["id"], {})
+        signed = bool(given.get("name", "").strip() and given.get("date", "").strip())
+        meaning = signer.get("activation_meaning") if intake.form == "domain-activation" and signer.get("activation_meaning") else signer["meaning"]
+        role = f'{cat.roles[signer["role"]]["short"]} ("{meaning}")'
+        if signed:
+            report.say(f'  {role}: signed on {given["date"].strip()}.')
+        elif needed:
+            report.say(f"  {role}: not signed. A signature needs a name and a date.")
+            report.block(f'the {cat.roles[signer["role"]]["short"]} has not signed: "{meaning}"')
+        else:
+            report.say(f"  {role}: not needed. {signer['required'].split('.')[0]}.")
+    for item in cat.sign_off["consulted"]:
+        if intake.form != "kpi-intake" or item["id"] not in consult:
+            continue
+        given = intake.consulted.get(item["id"], {})
+        if given.get("date", "").strip() and given.get("outcome", "").strip():
+            report.say(f'  {item["who"]}: consulted on {given["date"].strip()}. Outcome: {given["outcome"].strip()}')
+        else:
+            report.say(f'  {item["who"]}: to consult. Record the date and the outcome.')
+            report.block(f'{item["who"]} must be consulted, and the form records no date and outcome')
+    report.say()
+
+
+def check(cat, data, intake, stale=None):
+    """The report on one filled form. `data` is the built pick lists; `stale` names the modules whose packages are
+    newer than the lists."""
+    lists, terms = data["lists"], data.get("terms", [])
+    report = Report()
+    first = "2.1" if intake.form == "kpi-intake" else cat.questions_of(intake.form)[0]["id"]
+    name = intake.kpi_name or "; ".join(rules.values(intake.answers, first)[:2])
+    report.say(f'{FORMS[intake.form]} check: {name or "(no name yet)"}')
+    report.say(f'Catalogue {cat.version}. Pick lists of {data.get("release", cat.release)}.')
+    if intake.catalogue_version and intake.catalogue_version != cat.version:
+        report.say(f"Note: the form was filled with catalogue {intake.catalogue_version}. This check uses {cat.version}.")
+    if stale:
+        changed = ", ".join(f"{m} ({old} then, {new} now)" for m, (old, new) in stale.items())
+        report.say(f"The pick lists are older than the release packages: {changed}. Rebuild them first: py -m kpi_store.intake build")
+        report.block("the pick lists are older than the release packages")
+    for key in intake.unknown_keys:
+        report.say(f"Note: the workbook holds an answer under {key}, which is no question of this form. It was not read.")
+    report.say()
+    _sections(cat, lists, intake, report)
+    if intake.form == "kpi-intake":
+        rule = rules.kind(cat, intake.answers)
+        if rule:
+            report.say(f'Kind of measure: {rule["kind"]} (decided by {rule["question"]}, test {rule["test"]}).'
+                       + (" " + rule["note"] if rule.get("note") else ""))
+        else:
+            report.say("Kind of measure: not decided yet. Answer section 4.")
+        report.say()
+    consult = _routing(cat, lists, intake, report)
+    conflict = False
+    if intake.form == "kpi-intake":
+        more, conflict = _derived(cat, lists, terms, intake, report)
+        consult |= more
+    _sign_off(cat, intake, report, consult, conflict)
+    if report.complete:
+        report.say("Result: the intake is complete and signed.")
+    else:
+        count = len(report.blocking)
+        report.say(f"Result: not complete. {count} {'thing' if count == 1 else 'things'} to settle:")
+        for line in report.blocking:
+            report.say("  - " + line)
+    report.say(APPLY)
+    return report
+
+
+def run(path, pack, form=None, root=None):
+    """Reads the pack and the file, and returns the report. Raises CatalogueError, AnswersError or ReleaseError."""
+    from kpi_store.intake import answers, catalogue, picklists
+    pack = Path(pack)
+    cat = catalogue.load(pack)
+    data = picklists.load(pack)
+    intake = answers.read(path, cat, data["lists"], form)
+    stale = picklists.stale_modules(data, root) if root else None
+    return check(cat, data, intake, stale)

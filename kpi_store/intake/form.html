@@ -1,0 +1,861 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="kpi_store/intake/build.py">
+<title>KPI intake form</title>
+<!--
+  This page is built by `py -m kpi_store.intake build` from kpi_store/intake/form.html (this template),
+  kpi-intake/catalogue.toml, kpi-intake/settings.toml and the release packages. Do not edit the built page.
+
+  For a design pass. Three parts are kept apart:
+    1. The <style> block below. Every colour, size and space is a custom property on :root.
+    2. The markup: the page frame in <body> and the <template> elements, one per repeated part.
+    3. The data (<script id="intake-data">) and the behaviour (<script id="intake-script">).
+  The script finds elements by id, by data-* attribute and by the class names inside the templates. A design
+  pass may change any style, add wrappers and classes, and reorder elements inside a template. It must keep
+  each id, each data-* attribute and each class name that the templates carry today.
+-->
+<style>
+:root {
+  --page: #ffffff;
+  --ink: #1b1f24;
+  --muted: #59636e;
+  --line: #d5dae0;
+  --panel: #f5f7f9;
+  --accent: #0b5cad;
+  --accent-ink: #ffffff;
+  --warn-bg: #fff4d6;
+  --warn-line: #b7791f;
+  --stop-bg: #fde8e8;
+  --stop-line: #b42318;
+  --ok: #1a7f37;
+  --radius: 6px;
+  --gap: 16px;
+  --text: 16px;
+  --small: 14px;
+  --measure: 760px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html { font-size: var(--text); }
+body { margin: 0; background: var(--page); color: var(--ink); font-family: var(--font); line-height: 1.5; overflow-wrap: anywhere; }
+h1, h2, h3 { line-height: 1.25; margin: 0; }
+h1 { font-size: 1.25rem; }
+h2 { font-size: 1.35rem; }
+h3 { font-size: 1.05rem; }
+p { margin: 0 0 calc(var(--gap) / 2); }
+a { color: var(--accent); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { min-height: 44px; padding: 8px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--page); cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+input[type="text"], input[type="search"], input[type="date"], select, textarea { width: 100%; max-width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--page); }
+textarea { min-height: 96px; resize: vertical; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+.top { position: sticky; top: 0; z-index: 2; background: var(--page); border-bottom: 1px solid var(--line); }
+.top-row { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--gap) / 2); padding: 10px var(--gap); max-width: 1180px; margin: 0 auto; }
+.top-title { flex: 1 1 220px; }
+.top-release { color: var(--muted); font-size: var(--small); margin: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 var(--gap); max-width: 1180px; margin: 0 auto; }
+.tabs button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; }
+.tabs button[aria-selected="true"] { border-bottom-color: var(--accent); font-weight: 600; }
+.status { max-width: 1180px; margin: 0 auto; padding: 0 var(--gap); color: var(--muted); font-size: var(--small); min-height: 1.5em; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap); max-width: 1180px; margin: 0 auto; padding: var(--gap); }
+.contents { font-size: var(--small); }
+.contents ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.contents a { display: block; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); text-decoration: none; color: inherit; }
+.contents progress { width: 100%; height: 6px; }
+.contents .nav-count { display: block; color: var(--muted); }
+.view { min-width: 0; max-width: var(--measure); }
+@media (min-width: 900px) {
+  .layout.with-contents { grid-template-columns: 250px minmax(0, 1fr); }
+  .contents { position: sticky; top: 130px; align-self: start; }
+}
+
+.intro, .section, .block { border: 1px solid var(--line); border-radius: var(--radius); padding: var(--gap); margin-bottom: var(--gap); }
+.section-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.section-progress { color: var(--muted); font-size: var(--small); margin: 0; }
+.section-facts { margin: 0 0 var(--gap); font-size: var(--small); }
+.section-facts dt { font-weight: 600; margin-top: 6px; }
+.section-facts dd { margin: 0; }
+.section-warning { background: var(--warn-bg); border-left: 4px solid var(--warn-line); padding: 8px 12px; }
+.section-skipped { color: var(--muted); font-size: var(--small); }
+
+.question { border-top: 1px solid var(--line); padding: var(--gap) 0; }
+.q-head { display: flex; gap: 10px; align-items: baseline; }
+.q-number { font-weight: 700; color: var(--accent); flex: none; }
+.q-meta { color: var(--muted); font-size: var(--small); margin: 4px 0 8px; }
+.q-rule::before { content: " · "; }
+.q-note { background: var(--warn-bg); border-left: 4px solid var(--warn-line); padding: 6px 10px; font-size: var(--small); }
+.q-why { font-size: var(--small); color: var(--muted); margin-top: 8px; }
+.q-example { font-size: var(--small); margin-top: 4px; }
+.q-example p { white-space: pre-line; background: var(--panel); padding: 8px 10px; border-radius: var(--radius); margin: 6px 0 0; }
+.q-detail { margin-top: 10px; }
+.q-detail label, .field label { display: block; font-size: var(--small); font-weight: 600; margin-bottom: 4px; }
+.hint { color: var(--muted); font-size: var(--small); margin: 4px 0 0; }
+
+.picker-chosen { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.picker-chosen li { display: flex; align-items: center; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 2px 4px 2px 10px; font-size: var(--small); }
+.picker-chosen button { min-height: 32px; padding: 2px 8px; }
+.picker-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: 300px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+.picker-list.short { max-height: none; border: 0; }
+.picker-list label { display: flex; gap: 10px; align-items: flex-start; padding: 9px 10px; min-height: 44px; cursor: pointer; }
+.picker-list li + li { border-top: 1px solid var(--line); }
+.picker-list.short li + li { border-top: 0; }
+.picker-list input { margin-top: 4px; flex: none; }
+.option-about { display: block; color: var(--muted); font-size: var(--small); }
+.picker-more { color: var(--muted); font-size: var(--small); margin: 6px 0 0; }
+.per-row { margin-bottom: 10px; }
+.per-row label { display: block; font-size: var(--small); font-weight: 600; margin-bottom: 4px; }
+
+.notice { border-left: 4px solid var(--warn-line); background: var(--warn-bg); padding: 8px 12px; margin-top: 10px; }
+.notice.blocks { border-left-color: var(--stop-line); background: var(--stop-bg); }
+.notice-title { font-weight: 700; display: block; }
+.kind { background: var(--panel); border-radius: var(--radius); padding: 8px 12px; margin: 0 0 var(--gap); }
+
+.field { margin-bottom: 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.signer { border-top: 1px solid var(--line); padding: 12px 0; }
+.signer-meaning { font-style: italic; }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: var(--small); }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.explainer { max-width: 640px; }
+.explainer ol { padding-left: 1.4em; }
+@media print { .top, .contents { position: static; } .actions, .tabs { display: none; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-row">
+    <div class="top-title">
+      <h1>KPI intake form</h1>
+      <p class="top-release" id="release-line"></p>
+    </div>
+    <div class="actions">
+      <button type="button" class="primary" id="save">Save answers</button>
+      <button type="button" id="load">Load answers</button>
+      <button type="button" id="clear">Start again</button>
+      <input type="file" id="load-file" accept=".json,application/json" hidden>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Views"></nav>
+  <p class="status" id="status" role="status" aria-live="polite"></p>
+</header>
+
+<div class="layout" id="layout">
+  <nav class="contents" id="contents" aria-label="Sections"><ol id="contents-list"></ol></nav>
+  <main class="view" id="view"></main>
+</div>
+
+<!-- One tab of the top navigation. -->
+<template id="tpl-tab"><button type="button" role="tab" data-view=""></button></template>
+
+<!-- One line of the section list, with the section's progress. -->
+<template id="tpl-nav"><li><a href="#" data-nav=""><span class="nav-name"></span><span class="nav-count"></span><progress max="1" value="0"></progress></a></li></template>
+
+<!-- The start of a form: what it is for, and the request's own fields. -->
+<template id="tpl-intro">
+  <section class="intro" data-part="intro">
+    <h2 class="intro-title"></h2>
+    <p class="intro-text"></p>
+    <p class="notice" data-part="example-mark" hidden></p>
+    <div class="grid" data-part="request"></div>
+    <div class="field"><label for="comment">Comment</label><textarea id="comment" data-field="comment"></textarea></div>
+  </section>
+</template>
+
+<!-- One section of a form. -->
+<template id="tpl-section">
+  <section class="section" data-section="">
+    <header class="section-head"><h2 class="section-title"></h2><p class="section-progress"></p></header>
+    <p class="section-about"></p>
+    <dl class="section-facts">
+      <dt>Who takes part</dt><dd class="section-who"></dd>
+      <dt>Done when</dt><dd class="section-done"></dd>
+    </dl>
+    <p class="section-warning" hidden></p>
+    <p class="kind" data-part="kind" hidden></p>
+    <div class="questions"></div>
+    <p class="section-skipped" hidden></p>
+  </section>
+</template>
+
+<!-- One question. -->
+<template id="tpl-question">
+  <article class="question" data-question="">
+    <header class="q-head"><span class="q-number"></span><h3 class="q-text"></h3></header>
+    <p class="q-meta"><span class="q-asked"></span><span class="q-rule"></span></p>
+    <p class="q-note" hidden></p>
+    <div class="q-input"></div>
+    <div class="q-detail" hidden><label class="q-detail-label"></label></div>
+    <div class="q-notices"></div>
+    <p class="q-why"></p>
+    <details class="q-example" hidden><summary>Example answer</summary><p></p></details>
+  </article>
+</template>
+
+<!-- A pick list: the chosen items, a search box for a long list, and the options. -->
+<template id="tpl-picker">
+  <div class="picker">
+    <ul class="picker-chosen"></ul>
+    <label class="picker-all" hidden><input type="checkbox" data-part="show-all"> Show every process, not only this business area's</label>
+    <input type="search" class="picker-search" placeholder="Type to search the list" aria-label="Search the list" hidden>
+    <ul class="picker-list"></ul>
+    <p class="picker-more" hidden></p>
+  </div>
+</template>
+<template id="tpl-option"><li><label><input><span><span class="option-label"></span><span class="option-about"></span></span></label></li></template>
+<template id="tpl-chosen"><li><span class="chosen-label"></span><button type="button" aria-label="Remove">Remove</button></li></template>
+
+<!-- A notice under a question: where an answer routes the request, or what a check found. -->
+<template id="tpl-notice"><p class="notice" data-notice=""><span class="notice-title"></span><span class="notice-text"></span></p></template>
+
+<!-- The sign-off block. -->
+<template id="tpl-signoff">
+  <section class="section" data-part="signoff">
+    <h2>Sign-off</h2>
+    <p class="signoff-intro"></p>
+    <div data-part="signers"></div>
+    <div data-part="consulted-block">
+      <h3>Consulted</h3>
+      <p>Two groups are consulted and do not sign. Record the date and the outcome of each.</p>
+      <div data-part="consulted"></div>
+    </div>
+  </section>
+</template>
+<template id="tpl-signer">
+  <div class="signer" data-signer="">
+    <h3 class="signer-role"></h3>
+    <p class="signer-meaning"></p>
+    <p class="hint signer-required"></p>
+    <div class="grid">
+      <div class="field"><label>Name</label><input type="text" data-sign="name" autocomplete="off"></div>
+      <div class="field"><label>Date</label><input type="date" data-sign="date"></div>
+    </div>
+  </div>
+</template>
+<template id="tpl-consulted">
+  <div class="signer" data-consulted="">
+    <h3 class="signer-role"></h3>
+    <p class="hint signer-required"></p>
+    <div class="grid">
+      <div class="field"><label>Date</label><input type="date" data-consult="date"></div>
+      <div class="field"><label>Outcome</label><input type="text" data-consult="outcome" autocomplete="off"></div>
+    </div>
+  </div>
+</template>
+
+<!-- The role table and the explainer. -->
+<template id="tpl-roles">
+  <section class="block" data-part="roles">
+    <h2>The roles</h2>
+    <p>Each definition is the organization's own. The last column says what the role does in the intake.</p>
+    <div class="table-wrap"><table><thead><tr><th>Role</th><th>Definition</th><th>In the intake</th></tr></thead><tbody></tbody></table></div>
+  </section>
+</template>
+<template id="tpl-explainer"><section class="block explainer" data-part="explainer"><h2></h2><div class="explainer-body"></div></section></template>
+
+<script id="intake-data" type="application/json">/* EMBEDDED_DATA */</script>
+<script id="intake-script">
+"use strict";
+// ---- The data and the state ------------------------------------------------------------------------------------
+const DATA = JSON.parse(document.getElementById("intake-data").textContent);
+const FORMS = Object.keys(DATA.forms);
+const BY_ID = Object.fromEntries(DATA.questions.map((q) => [q.id, q]));
+const DRAFT_KEY = "kpi-intake-draft-1";
+const SHOWN = 40;              // options a long list shows at once
+const LONG = 8;                // a list with more options than this gets a search box
+const $ = (id) => document.getElementById(id);
+
+function emptyForm() { return { answers: {}, request: {}, sign_offs: {}, consulted: {}, example_of: "", comment: "" }; }
+let state = Object.fromEntries(FORMS.map((f) => [f, emptyForm()]));
+let view = FORMS[0];
+const showAll = {};            // question id -> true when the reader asked for the whole list
+
+function current() { return state[view]; }
+function formOf(q) { return DATA.sections.find((s) => s.id === q.section).form; }
+function questionsOf(form) { return DATA.questions.filter((q) => formOf(q) === form); }
+
+// ---- The rules (the same as kpi_store/intake/rules.py) ---------------------------------------------------------
+function values(answers, key) {
+  const v = answers[key];
+  if (v === undefined || v === null) return [];
+  return (Array.isArray(v) ? v : [v]).map((x) => String(x).trim()).filter(Boolean);
+}
+function positions(answers, key) {
+  const v = answers[key];
+  if (v === undefined || v === null) return [];
+  return (Array.isArray(v) ? v : [v]).map((x) => String(x).trim());
+}
+function realValues(answers, key) { return values(answers, key).filter((v) => !v.startsWith("@")); }
+function isAsked(q, answers, seen) {
+  seen = seen || new Set();
+  for (const cond of q.ask_when || []) {
+    const target = BY_ID[cond.question];
+    const asked = !seen.has(target.id) && isAsked(target, answers, new Set([...seen, q.id]));
+    const held = asked ? values(answers, target.id) : [];
+    if ("is" in cond && !held.includes(cond.is)) return false;
+    if ("is_not" in cond && held.includes(cond.is_not)) return false;
+    if ("answered" in cond && (held.length > 0) !== cond.answered) return false;
+  }
+  return true;
+}
+function isChoice(q) { return q.type === "choice" || q.type === "multi_choice"; }
+function isMany(q) { return q.type === "multi_choice" || q.type === "list"; }
+function baseList(q) {
+  const [kind, name] = q.source.includes(":") ? q.source.split(":") : ["", q.source];
+  if (kind === "choices") return DATA.choices[name];
+  if (kind === "settings") return DATA.settings_lists[name].map((i) => Object.assign({}, i, { label: i.label + (i.active === false ? " (not active)" : "") }));
+  return DATA.lists[name];
+}
+function isUnder(byId, item, ancestor) {
+  let at = byId[item.parent];
+  while (at) { if (at.id === ancestor) return true; at = byId[at.parent]; }
+  return false;
+}
+// What a question offers: every item its levels allow (narrowed = false), or only those the earlier answers
+// leave (narrowed = true), then its special options.
+function optionsOf(q, answers, narrowed) {
+  if (!isChoice(q)) return [];
+  let items = baseList(q);
+  if (q.levels) items = items.filter((i) => i.level >= q.levels[0] && i.level <= q.levels[1]);
+  if (narrowed && q.under) {
+    const top = realValues(answers, q.under)[0];
+    if (top) { const byId = Object.fromEntries(baseList(q).map((i) => [i.id, i])); items = items.filter((i) => isUnder(byId, i, top)); }
+  }
+  if (narrowed && q.narrow_by && !showAll[q.id]) {
+    const area = realValues(answers, q.narrow_by)[0];
+    const inArea = area ? items.filter((i) => (i.areas || []).includes(area)) : [];
+    if (inArea.length) items = inArea;
+  }
+  return items.concat(q.option || []);
+}
+function perMissing(q, answers) {
+  const mine = positions(answers, q.id);
+  return positions(answers, q.per).filter((v, i) => v && !v.startsWith("@") && !mine[i]);
+}
+function detailRequired(q, answers) {
+  if (!q.detail || q.detail.required_when === "never") return false;
+  return q.detail.required_when === "always" || values(answers, q.id).includes(q.detail.required_when);
+}
+function isComplete(q, answers) {
+  if (q.per) { if (perMissing(q, answers).length) return false; }
+  else if (!values(answers, q.id).length) return false;
+  return !detailRequired(q, answers) || values(answers, q.id + ".detail").length > 0;
+}
+function kindOf(answers) {
+  for (const rule of DATA.kind_rules) {
+    const q = BY_ID[rule.question];
+    if (isAsked(q, answers) && values(answers, q.id).includes(rule.answer)) return rule;
+  }
+  return null;
+}
+function routesOf(q, answers) {
+  if (!q.route || !isAsked(q, answers)) return [];
+  const offered = Object.fromEntries(optionsOf(q, answers, false).map((o) => [o.id, o]));
+  const held = values(answers, q.id);
+  const out = [];
+  for (const route of q.route) {
+    for (const v of held) {
+      const hit = route.when === "@inactive" ? (offered[v] || {}).active === false : v === route.when;
+      if (hit) out.push({ route, label: (offered[v] || {}).label || v });
+    }
+  }
+  return out;
+}
+function norm(name) { return name.toLowerCase().replace(/[^a-z0-9&]+/g, " ").trim().replace(/\s+/g, " "); }
+
+// ---- Small helpers ---------------------------------------------------------------------------------------------
+function clone(id) { return document.getElementById(id).content.firstElementChild.cloneNode(true); }
+function say(text) { $("status").textContent = text; }
+function saveDraft() {
+  // A draft survives a reload when the browser allows storage. A private window may refuse it.
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ state, view })); } catch (e) { /* the form still works */ }
+}
+function loadDraft() {
+  try {
+    const held = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
+    if (held && held.state) {
+      for (const f of FORMS) if (held.state[f]) state[f] = Object.assign(emptyForm(), held.state[f]);
+      if (FORMS.includes(held.view)) view = held.view;
+      return true;
+    }
+  } catch (e) { /* no draft */ }
+  return false;
+}
+
+// ---- Changing an answer ----------------------------------------------------------------------------------------
+function dependents(id) { return DATA.questions.filter((q) => q.narrow_by === id || q.under === id || q.per === id); }
+function setAnswer(q, value) {
+  const answers = current().answers;
+  if (Array.isArray(value) ? value.length === 0 : value === "") delete answers[q.id]; else answers[q.id] = value;
+  for (const dep of dependents(q.id)) {
+    if (dep.under === q.id) {
+      const allowed = new Set(optionsOf(dep, answers, true).map((o) => o.id));
+      if (values(answers, dep.id).some((v) => !allowed.has(v))) delete answers[dep.id];
+    }
+    redraw(dep);
+  }
+  changed();
+}
+// A multi-choice answer changes by one item, so the answers of the questions that follow it step by step
+// (q.per) stay beside the step they belong to.
+function toggle(q, id, on) {
+  const answers = current().answers;
+  const held = positions(answers, q.id);
+  const at = held.indexOf(id);
+  const followers = DATA.questions.filter((d) => d.per === q.id);
+  if (on && at < 0) {
+    held.push(id);
+    for (const d of followers) { const mine = positions(answers, d.id); while (mine.length < held.length) mine.push(""); answers[d.id] = mine; }
+  } else if (!on && at >= 0) {
+    held.splice(at, 1);
+    for (const d of followers) { const mine = positions(answers, d.id); mine.splice(at, 1); if (mine.some(Boolean)) answers[d.id] = mine; else delete answers[d.id]; }
+  }
+  setAnswer(q, held);
+}
+function changed() { saveDraft(); refresh(); }
+
+// ---- Drawing one question's input ------------------------------------------------------------------------------
+function redraw(q) {
+  const card = document.querySelector(`[data-question="${q.id}"]`);
+  if (card) drawInput(q, card.querySelector(".q-input"));
+}
+function drawInput(q, box) {
+  box.replaceChildren();
+  const answers = current().answers;
+  if (q.per) return drawPer(q, box);
+  if (isChoice(q)) return box.append(picker(q));
+  if (q.type === "list") {
+    const area = document.createElement("textarea");
+    area.name = q.id;
+    area.setAttribute("aria-label", q.text);
+    area.value = positions(answers, q.id).join("\n");
+    area.addEventListener("input", () => setAnswer(q, area.value.split("\n").map((s) => s.trim()).filter(Boolean)));
+    const hint = document.createElement("p");
+    hint.className = "hint";
+    hint.textContent = "Write one answer on each line.";
+    return box.append(area, hint);
+  }
+  const input = document.createElement(q.type === "long_text" ? "textarea" : "input");
+  if (q.type !== "long_text") input.type = "text";
+  input.name = q.id;
+  input.autocomplete = "off";
+  input.setAttribute("aria-label", q.text);
+  input.value = values(answers, q.id)[0] || "";
+  input.addEventListener("input", () => setAnswer(q, input.value));
+  box.append(input);
+}
+// One row for each step chosen in the question this one follows.
+function drawPer(q, box) {
+  const answers = current().answers;
+  const base = BY_ID[q.per];
+  const labels = Object.fromEntries(optionsOf(base, answers, false).map((o) => [o.id, o.label]));
+  const steps = positions(answers, base.id);
+  let rows = 0;
+  steps.forEach((step, i) => {
+    if (!step || step.startsWith("@")) return;
+    rows += 1;
+    const row = document.createElement("div");
+    row.className = "per-row";
+    const label = document.createElement("label");
+    label.textContent = labels[step] || step;
+    const set = (text) => { const mine = positions(answers, q.id); while (mine.length < steps.length) mine.push(""); mine[i] = text; answers[q.id] = mine; changed(); };
+    let control;
+    if (isChoice(q)) {
+      control = document.createElement("select");
+      control.append(new Option("Choose", ""));
+      for (const o of optionsOf(q, answers, false)) control.append(new Option(o.label, o.id));
+      control.value = positions(answers, q.id)[i] || "";
+      control.addEventListener("change", () => set(control.value));
+    } else {
+      control = document.createElement("input");
+      control.type = "text";
+      control.autocomplete = "off";
+      control.value = positions(answers, q.id)[i] || "";
+      control.addEventListener("input", () => set(control.value.trim()));
+    }
+    control.name = `${q.id}#${i + 1}`;
+    control.id = `per-${q.id}-${i}`;
+    label.htmlFor = control.id;
+    row.append(label, control);
+    box.append(row);
+  });
+  if (!rows) { const hint = document.createElement("p"); hint.className = "hint"; hint.textContent = `Answer ${base.id} first.`; box.append(hint); }
+}
+function picker(q) {
+  const node = clone("tpl-picker");
+  const chosen = node.querySelector(".picker-chosen");
+  const search = node.querySelector(".picker-search");
+  const list = node.querySelector(".picker-list");
+  const more = node.querySelector(".picker-more");
+  const all = node.querySelector(".picker-all");
+  const multi = q.type === "multi_choice";
+  function draw() {
+    const answers = current().answers;
+    const offered = optionsOf(q, answers, true);
+    const labels = Object.fromEntries(optionsOf(q, answers, false).map((o) => [o.id, o.label]));
+    const held = values(answers, q.id);
+    const long = offered.length > LONG;
+    search.hidden = !long;
+    list.classList.toggle("short", !long);
+    all.hidden = !(q.narrow_by && realValues(answers, q.narrow_by).length);
+    all.querySelector("input").checked = !!showAll[q.id];
+    chosen.replaceChildren();
+    if (long) for (const id of held) {
+      const item = clone("tpl-chosen");
+      item.querySelector(".chosen-label").textContent = labels[id] || id;
+      item.querySelector("button").setAttribute("aria-label", `Remove ${labels[id] || id}`);
+      item.querySelector("button").addEventListener("click", () => { multi ? toggle(q, id, false) : setAnswer(q, ""); draw(); });
+      chosen.append(item);
+    }
+    const term = search.value.trim().toLowerCase();
+    const special = offered.filter((o) => o.id.startsWith("@"));
+    const hits = offered.filter((o) => !o.id.startsWith("@") && (!term || o.label.toLowerCase().includes(term)));
+    const shown = hits.slice(0, long ? SHOWN : hits.length).concat(special);
+    list.replaceChildren();
+    for (const o of shown) {
+      const item = clone("tpl-option");
+      const input = item.querySelector("input");
+      input.type = multi ? "checkbox" : "radio";
+      input.name = q.id;
+      input.value = o.id;
+      input.checked = held.includes(o.id);
+      input.addEventListener("change", () => { multi ? toggle(q, o.id, input.checked) : setAnswer(q, o.id); draw(); });
+      item.querySelector(".option-label").textContent = o.label;
+      item.querySelector(".option-about").textContent = o.description || "";
+      list.append(item);
+    }
+    const left = hits.length - Math.min(hits.length, long ? SHOWN : hits.length);
+    more.hidden = !(left > 0 || (!hits.length && term));
+    more.textContent = left > 0 ? `${left} more. Type to narrow the list.` : "Nothing in the list matches.";
+  }
+  search.addEventListener("input", draw);
+  all.querySelector("input").addEventListener("change", (e) => { showAll[q.id] = e.target.checked; draw(); });
+  draw();
+  return node;
+}
+
+// ---- Drawing a form --------------------------------------------------------------------------------------------
+function drawQuestion(q) {
+  const card = clone("tpl-question");
+  card.dataset.question = q.id;
+  card.id = "q-" + q.id;
+  card.querySelector(".q-number").textContent = q.id;
+  card.querySelector(".q-text").textContent = q.text;
+  card.querySelector(".q-asked").textContent = "Asked of: " + q.asked_of_text;
+  card.querySelector(".q-rule").textContent = q.requirement;
+  const note = card.querySelector(".q-note");
+  if (q.note) { note.textContent = q.note; note.hidden = false; }
+  card.querySelector(".q-why").textContent = "Why we ask: " + q.why;
+  if (q.example) { const ex = card.querySelector(".q-example"); ex.hidden = false; ex.querySelector("p").textContent = q.example; }
+  drawInput(q, card.querySelector(".q-input"));
+  if (q.detail) {
+    const box = card.querySelector(".q-detail");
+    const label = box.querySelector(".q-detail-label");
+    const input = document.createElement(q.detail.type === "long_text" ? "textarea" : "input");
+    if (q.detail.type !== "long_text") input.type = "text";
+    input.name = q.id + ".detail";
+    input.id = "detail-" + q.id;
+    input.autocomplete = "off";
+    label.textContent = q.detail.label;
+    label.htmlFor = input.id;
+    input.value = values(current().answers, q.id + ".detail")[0] || "";
+    input.addEventListener("input", () => { const a = current().answers; if (input.value.trim()) a[q.id + ".detail"] = input.value; else delete a[q.id + ".detail"]; changed(); });
+    box.append(input);
+  }
+  return card;
+}
+function drawForm(form) {
+  const main = $("view");
+  main.replaceChildren();
+  const held = state[form];
+  const intro = clone("tpl-intro");
+  intro.querySelector(".intro-title").textContent = DATA.forms[form];
+  intro.querySelector(".intro-text").textContent = form === FORMS[0]
+    ? "One form is for one KPI. Sections 1 to 6 are for the business. Section 7 is for Digital IT, after the business has signed. Save the answers to a file when you stop, and load the file to go on."
+    : "Fill in this form only when the KPI form sends you here. Save it to its own file.";
+  const requestBox = intro.querySelector('[data-part="request"]');
+  for (const item of DATA.request_fields) {
+    const field = document.createElement("div");
+    field.className = "field";
+    const label = document.createElement("label");
+    const input = document.createElement("input");
+    input.type = item.id === "date" ? "date" : "text";
+    input.id = "request-" + item.id;
+    input.dataset.request = item.id;
+    input.autocomplete = "off";
+    input.value = held.request[item.id] || "";
+    input.addEventListener("input", () => { held.request[item.id] = input.value; saveDraft(); });
+    label.htmlFor = input.id;
+    label.textContent = item.label;
+    field.append(label, input);
+    requestBox.append(field);
+  }
+  const comment = intro.querySelector('[data-field="comment"]');
+  comment.value = held.comment || "";
+  comment.addEventListener("input", () => { held.comment = comment.value; saveDraft(); });
+  const mark = intro.querySelector('[data-part="example-mark"]');
+  if (held.example_of) { mark.hidden = false; mark.textContent = `This file is a shipped example. It copies the measure "${held.example_of}", which the ontology already holds, as if it were new.`; }
+  main.append(intro);
+
+  const nav = $("contents-list");
+  nav.replaceChildren();
+  for (const section of DATA.sections.filter((s) => s.form === form)) {
+    const node = clone("tpl-section");
+    node.dataset.section = section.id;
+    node.id = "section-" + section.id;
+    node.querySelector(".section-title").textContent = form === FORMS[0] ? `${section.id}. ${section.name}` : section.name;
+    node.querySelector(".section-about").textContent = section.about;
+    node.querySelector(".section-who").textContent = section.who;
+    node.querySelector(".section-done").textContent = section.done_when;
+    if (section.warning) { const w = node.querySelector(".section-warning"); w.hidden = false; w.textContent = "Warning for IT. " + section.warning; }
+    const box = node.querySelector(".questions");
+    for (const q of DATA.questions.filter((x) => x.section === section.id)) box.append(drawQuestion(q));
+    main.append(node);
+    const line = clone("tpl-nav");
+    const link = line.querySelector("a");
+    link.href = "#section-" + section.id;
+    link.dataset.nav = section.id;
+    line.querySelector(".nav-name").textContent = form === FORMS[0] ? `${section.id}. ${section.name}` : section.name;
+    nav.append(line);
+  }
+
+  const block = clone("tpl-signoff");
+  block.id = "signoff";
+  block.querySelector(".signoff-intro").textContent = DATA.sign_off.intro;
+  const signers = block.querySelector('[data-part="signers"]');
+  for (const signer of DATA.sign_off.signer.filter((s) => s.forms.includes(form))) {
+    const node = clone("tpl-signer");
+    node.dataset.signer = signer.id;
+    node.querySelector(".signer-role").textContent = DATA.roles.find((r) => r.id === signer.role).short;
+    node.querySelector(".signer-meaning").textContent = `"${form === "domain-activation" && signer.activation_meaning ? signer.activation_meaning : signer.meaning}"`;
+    node.querySelector(".signer-required").textContent = "Required: " + signer.required;
+    node.querySelectorAll("[data-sign]").forEach((input) => {
+      const key = input.dataset.sign;
+      input.id = `sign-${signer.id}-${key}`;
+      input.previousElementSibling.htmlFor = input.id;
+      input.value = (held.sign_offs[signer.id] || {})[key] || "";
+      input.addEventListener("input", () => { held.sign_offs[signer.id] = Object.assign({ name: "", date: "" }, held.sign_offs[signer.id], { [key]: input.value }); changed(); });
+    });
+    signers.append(node);
+  }
+  const consultedBlock = block.querySelector('[data-part="consulted-block"]');
+  consultedBlock.hidden = form !== FORMS[0];
+  const consulted = block.querySelector('[data-part="consulted"]');
+  for (const item of DATA.sign_off.consulted) {
+    const node = clone("tpl-consulted");
+    node.dataset.consulted = item.id;
+    node.querySelector(".signer-role").textContent = item.who;
+    node.querySelector(".signer-required").textContent = "When: " + item.when_text;
+    node.querySelectorAll("[data-consult]").forEach((input) => {
+      const key = input.dataset.consult;
+      input.id = `consult-${item.id}-${key}`;
+      input.previousElementSibling.htmlFor = input.id;
+      input.value = (held.consulted[item.id] || {})[key] || "";
+      input.addEventListener("input", () => { held.consulted[item.id] = Object.assign({ date: "", outcome: "" }, held.consulted[item.id], { [key]: input.value }); saveDraft(); });
+    });
+    consulted.append(node);
+  }
+  main.append(block);
+  const line = clone("tpl-nav");
+  line.querySelector("a").href = "#signoff";
+  line.querySelector("a").dataset.nav = "signoff";
+  line.querySelector(".nav-name").textContent = "Sign-off";
+  nav.append(line);
+  refresh();
+}
+
+// ---- What changes with every answer: which questions show, the notices, the progress -----------------------------
+function notice(box, key, title, text, blocks) {
+  const node = clone("tpl-notice");
+  node.dataset.notice = key;
+  node.classList.toggle("blocks", !!blocks);
+  node.querySelector(".notice-title").textContent = title;
+  node.querySelector(".notice-text").textContent = text;
+  box.append(node);
+}
+function refresh() {
+  if (!FORMS.includes(view)) return;
+  const held = current();
+  const answers = held.answers;
+  for (const section of DATA.sections.filter((s) => s.form === view)) {
+    const node = document.querySelector(`[data-section="${section.id}"]`);
+    if (!node) continue;
+    let asked = 0, done = 0, missing = 0, skipped = 0;
+    for (const q of DATA.questions.filter((x) => x.section === section.id)) {
+      const card = node.querySelector(`[data-question="${q.id}"]`);
+      const on = isAsked(q, answers);
+      card.hidden = !on;
+      if (!on) { skipped += 1; continue; }
+      asked += 1;
+      if (values(answers, q.id).length) done += 1;
+      if (q.required === "required" && !isComplete(q, answers)) missing += 1;
+      const detail = card.querySelector(".q-detail");
+      if (q.detail) detail.hidden = !(q.detail.required_when === "always" || detailRequired(q, answers) || values(answers, q.id + ".detail").length);
+      const box = card.querySelector(".q-notices");
+      box.replaceChildren();
+      for (const hit of routesOf(q, answers)) {
+        const outcome = DATA.outcomes[hit.route.outcome];
+        notice(box, hit.route.outcome, outcome.title + ". ", hit.route.notice + (outcome.next ? " " + outcome.next : ""), outcome.blocks);
+      }
+      if (q.id === "2.1") {
+        const name = norm(values(answers, "2.1")[0] || "");
+        const same = name && DATA.lists.measures.find((m) => [m.label].concat(m.other_names || []).some((n) => norm(n) === name));
+        if (same && same.notation !== held.example_of) notice(box, "same-measure", "The ontology already holds this measure. ", `"${same.label}" has this name. Stop the form. The request becomes a change to that measure.`, true);
+      }
+    }
+    const text = `${done} of ${asked} answered` + (missing ? `, ${missing} required still missing` : "");
+    node.querySelector(".section-progress").textContent = text;
+    const skippedLine = node.querySelector(".section-skipped");
+    skippedLine.hidden = !skipped;
+    skippedLine.textContent = skipped === 1 ? "1 question does not apply and is hidden." : `${skipped} questions do not apply and are hidden.`;
+    const kindLine = node.querySelector('[data-part="kind"]');
+    if (section.id === "4") {
+      const rule = kindOf(answers);
+      kindLine.hidden = false;
+      kindLine.textContent = rule ? `Kind of measure: ${rule.kind} (decided by ${rule.question}).` + (rule.note ? " " + rule.note : "") : "Kind of measure: not decided yet.";
+    }
+    const link = document.querySelector(`[data-nav="${section.id}"]`);
+    if (link) {
+      link.querySelector(".nav-count").textContent = text;
+      const bar = link.querySelector("progress");
+      bar.max = Math.max(asked, 1);
+      bar.value = done;
+    }
+  }
+  const signers = DATA.sign_off.signer.filter((s) => s.forms.includes(view));
+  const signed = signers.filter((s) => { const g = held.sign_offs[s.id] || {}; return (g.name || "").trim() && (g.date || "").trim(); }).length;
+  const link = document.querySelector('[data-nav="signoff"]');
+  if (link) {
+    link.querySelector(".nav-count").textContent = `${signed} of ${signers.length} signed`;
+    const bar = link.querySelector("progress");
+    bar.max = signers.length;
+    bar.value = signed;
+  }
+}
+
+// ---- The other views -------------------------------------------------------------------------------------------
+function drawRoles() {
+  const node = clone("tpl-roles");
+  const body = node.querySelector("tbody");
+  for (const role of DATA.roles) {
+    const row = document.createElement("tr");
+    for (const text of [role.title, role.definition, role.in_intake]) { const cell = document.createElement("td"); cell.textContent = text; row.append(cell); }
+    body.append(row);
+  }
+  $("view").replaceChildren(node);
+}
+function drawExplainer() {
+  const node = clone("tpl-explainer");
+  node.querySelector("h2").textContent = DATA.explainer.title;
+  const body = node.querySelector(".explainer-body");
+  for (const block of DATA.explainer.block) {
+    if (block.p) { const p = document.createElement("p"); p.textContent = block.p; body.append(p); }
+    if (block.ol) { const ol = document.createElement("ol"); for (const text of block.ol) { const li = document.createElement("li"); li.textContent = text; ol.append(li); } body.append(ol); }
+  }
+  $("view").replaceChildren(node);
+}
+const VIEWS = FORMS.map((f) => [f, DATA.forms[f]]).concat([["roles", "The roles"], ["explainer", "What we will ask you"]]);
+function show(name) {
+  view = name;
+  const isForm = FORMS.includes(name);
+  $("layout").classList.toggle("with-contents", isForm);
+  $("contents").hidden = !isForm;
+  for (const tab of document.querySelectorAll("[data-view]")) tab.setAttribute("aria-selected", String(tab.dataset.view === name));
+  for (const id of ["save", "clear"]) $(id).disabled = !isForm;
+  if (isForm) drawForm(name); else if (name === "roles") drawRoles(); else drawExplainer();
+  saveDraft();
+}
+
+// ---- Save, load, start again -----------------------------------------------------------------------------------
+function asFile(form) {
+  const held = state[form];
+  const answers = {};
+  for (const q of questionsOf(form)) {
+    if (!isAsked(q, held.answers)) continue;              // an answer to a question that no longer applies is not saved
+    const v = held.answers[q.id];
+    if (isMany(q)) { const list = positions(held.answers, q.id); if (list.some(Boolean)) answers[q.id] = q.per ? list : list.filter(Boolean); }
+    else if (values(held.answers, q.id).length) answers[q.id] = String(v).trim();
+    const detail = values(held.answers, q.id + ".detail")[0];
+    if (detail) answers[q.id + ".detail"] = detail;
+  }
+  const first = form === FORMS[0] ? "2.1" : questionsOf(form)[0].id;
+  const pick = (map, keys) => Object.fromEntries(Object.entries(map).filter(([, v]) => keys.some((k) => (v[k] || "").trim())).map(([id, v]) => [id, Object.fromEntries(keys.map((k) => [k, (v[k] || "").trim()]))]));
+  return {
+    format: 1, form, catalogue_version: DATA.catalogue_version,
+    kpi_name: form === FORMS[0] ? (values(answers, first)[0] || "") : values(answers, first).join("; "),
+    request: Object.fromEntries(DATA.request_fields.map((f) => [f.id, (held.request[f.id] || "").trim()])),
+    answers, sign_offs: pick(held.sign_offs, ["name", "date"]), consulted: pick(held.consulted, ["date", "outcome"]),
+    example_of: held.example_of || "", comment: held.comment || "",
+  };
+}
+function fileName(data) {
+  const slug = (data.kpi_name || "untitled").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "untitled";
+  return `${slug}.${data.form}.json`;
+}
+function save() {
+  const data = asFile(view);
+  const blob = new Blob([JSON.stringify(data, null, 2) + "\n"], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = fileName(data);
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  say(`Saved ${link.download}. Check it with: py -m kpi_store.intake check ${link.download}`);
+}
+function readFile(text, name) {
+  let data;
+  try { data = JSON.parse(text); } catch (e) { return say(`${name} is not a JSON file.`); }
+  const ok = data && data.format === 1 && FORMS.includes(data.form) && data.answers && typeof data.answers === "object" && !Array.isArray(data.answers);
+  if (!ok) return say(`${name} is not an answers file of this form.`);
+  state[data.form] = Object.assign(emptyForm(), {
+    answers: data.answers, request: data.request || {}, sign_offs: data.sign_offs || {}, consulted: data.consulted || {},
+    example_of: data.example_of || "", comment: data.comment || "",
+  });
+  show(data.form);
+  say(`Loaded ${name}.` + (data.catalogue_version && data.catalogue_version !== DATA.catalogue_version ? ` It was saved with catalogue ${data.catalogue_version}; this form is ${DATA.catalogue_version}.` : ""));
+}
+$("save").addEventListener("click", save);
+$("load").addEventListener("click", () => $("load-file").click());
+$("load-file").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => { readFile(String(reader.result), file.name); e.target.value = ""; };
+  reader.readAsText(file);
+});
+let armed = false;
+$("clear").addEventListener("click", () => {
+  // The first press asks, the second clears. A stray click cannot empty the form.
+  if (!armed) { armed = true; $("clear").textContent = "Press again to empty this form"; setTimeout(() => { armed = false; $("clear").textContent = "Start again"; }, 4000); return; }
+  armed = false;
+  $("clear").textContent = "Start again";
+  state[view] = emptyForm();
+  show(view);
+  say("The form is empty.");
+});
+
+// ---- Start -----------------------------------------------------------------------------------------------------
+$("release-line").textContent = `${DATA.release}, catalogue ${DATA.catalogue_version}. This page works offline and sends nothing anywhere.`;
+for (const [name, title] of VIEWS) {
+  const tab = clone("tpl-tab");
+  tab.dataset.view = name;
+  tab.textContent = title;
+  tab.addEventListener("click", () => show(name));
+  $("tabs").append(tab);
+}
+const restored = loadDraft();
+show(view);
+if (restored) say("Your unsaved draft was restored from this browser.");
+</script>
+</body>
+</html>

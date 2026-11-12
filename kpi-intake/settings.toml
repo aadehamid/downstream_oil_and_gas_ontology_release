@@ -1,0 +1,155 @@
+# The settings of the KPI intake form that belong to one organization: the role titles and definitions, and the
+# pick lists that the ontology does not hold. catalogue.toml holds the questions and names these lists.
+# After you change this file, rebuild the forms:
+#
+#     py -m kpi_store.intake build
+#
+# A list is a table of items under [[list.<name>]]. A question offers it with source = "settings:<name>".
+# Each item has an id, which the answers file keeps, and a label, which the forms show. An item may say
+# active = false. The forms still show such an item, marked "not active", and a question can route on it with
+# when = "@inactive" in its route. README.md in this folder shows a worked list under "Change the form".
+
+# ---- The roles -------------------------------------------------------------------------------------------------
+# A question names a role by its id. Change a title or a definition here, and keep the id.
+# The first seven titles and definitions are the organization's own governance titles and definitions, word for
+# word. Another organization replaces them here. The last three are delivery roles and have no definition in that
+# model.
+
+[[role]]
+id = "global-process-owner"
+title = "Global Process Owner (or a named delegate)"
+short = "Global Process Owner"
+definition = "Global Process Owners own and govern end-to-end business processes, holding single accountability across the process. They sit in the executive layer, setting direction, priorities, and sponsoring success."
+in_intake = "Says which business area, process and step the KPI is about, and signs a process map request."
+
+[[role]]
+id = "domain-owner"
+title = "Domain Owner"
+short = "Domain Owner"
+definition = "Domain Owners are senior business leaders accountable for the effectiveness of their domain. They set the direction and priorities to ensure trusted, valuable, and compliant data enables business outcomes."
+in_intake = "Confirms that a KPI belongs to the domain. Signs a domain activation, and signs any KPI where two definitions conflict."
+
+[[role]]
+id = "data-owner"
+title = "Data Owner"
+short = "Data Owner"
+definition = "Data Owners are accountable for a specific subset of the domains data. Approves definitions, access, and quality targets."
+in_intake = "Says what the KPI means and what it connects to, and signs the KPI's definition."
+
+[[role]]
+id = "data-product-owner"
+title = "Data Product Owner"
+short = "Data Product Owner"
+definition = "Data Product Owners define, build, and govern data products that deliver trusted, discoverable, and valuable data to consumers. They own the product vision, requirements, quality, contracts, and lifecycle from design to adoption."
+in_intake = "Says which data product serves the KPI."
+
+[[role]]
+id = "data-steward"
+title = "Data Steward"
+short = "Data Steward"
+definition = "Data Stewards operationalize data governance within their domain by managing business meaning, metadata quality, data quality, compliance, and issue resolution to ensure trusted data and data products."
+in_intake = "Gives the facts about the KPI and its other names."
+
+[[role]]
+id = "digital-it"
+title = "Digital IT"
+short = "Digital IT"
+definition = "The Digital IT team designs, builds, and operates enterprise platforms, applications, and data solutions"
+in_intake = "Says where the data lives, in section 7."
+
+[[role]]
+id = "enterprise-data-governance"
+title = "Enterprise Data Governance"
+short = "Enterprise Data Governance"
+definition = "Enterprise Data Governance sets the vision, policies, standards, and operating model for data governance across the organization. It enables consistency, compliance, quality, and interoperability so data can be trusted, shared, and used to drive business outcomes. (and promote data as an asset)"
+in_intake = "Is consulted when the check finds the KPI's name in another module of the ontology."
+
+[[role]]
+id = "business-analyst"
+title = "Business analyst"
+short = "Business analyst"
+definition = "Delivery role"
+in_intake = "Interviews, fills the form and drafts the texts the others confirm."
+
+[[role]]
+id = "program-manager"
+title = "Program manager"
+short = "Program manager"
+definition = "Delivery role"
+in_intake = "Owns the request, decides who attends and proposes which domain to ask."
+
+[[role]]
+id = "architect"
+title = "Architect (sits in Digital IT)"
+short = "Architect"
+definition = "Delivery role"
+in_intake = "Reviews the form, runs the completeness check and signs the change."
+
+# ---- Who may see a KPI -----------------------------------------------------------------------------------------
+# Replace these two choices with your organization's own classification levels. Question 3.7 routes the answer
+# "restricted" to the Privacy, Security, Compliance and Risk reviews. If you rename that level, change the route
+# of question 3.7 in catalogue.toml to name its id.
+
+[[list.visibility]]
+id = "anyone"
+label = "Anyone in the company"
+
+[[list.visibility]]
+id = "restricted"
+label = "Restricted"
+
+# ---- The domains -----------------------------------------------------------------------------------------------
+# THIS LIST IS AN EXAMPLE. Replace it with your organization's own data domains before you use the form.
+# A domain is a data domain: a body of data with one Domain Owner. It is not a business area. The ontology holds
+# no list of domains, so question 1.5 reads this one.
+# Each domain has a name (the label), one line on the data it covers, and active = true or false. A KPI can be
+# added only to an active domain. Choosing a domain that is not active routes the request to domain activation.
+# When a domain activation form is signed, set that domain to active = true here and rebuild the forms.
+
+[[list.domains]]
+id = "customer"
+label = "Customer"
+description = "Who the company sells to: accounts, sites, contracts and the terms agreed with each."
+active = false
+
+[[list.domains]]
+id = "product"
+label = "Product"
+description = "What the company makes and sells: grades, specifications and product codes."
+active = false
+
+[[list.domains]]
+id = "market-price"
+label = "Market Price"
+description = "Prices set outside the company: crude and product benchmarks, differentials and crack spreads."
+active = true
+
+[[list.domains]]
+id = "supply-and-demand-plan"
+label = "Supply and Demand Plan"
+description = "The plans for crude supply, refinery runs and product demand, with their versions."
+active = false
+
+[[list.domains]]
+id = "refinery-production"
+label = "Refinery Production"
+description = "What the refineries ran and made: throughput, yields, unit rates and capacity."
+active = false
+
+[[list.domains]]
+id = "logistics"
+label = "Logistics"
+description = "How crude and products move and where they are held: shipments, terminals and inventory."
+active = false
+
+[[list.domains]]
+id = "asset-and-turnaround"
+label = "Asset and Turnaround"
+description = "The equipment of the refineries and terminals, with its maintenance and planned shutdowns."
+active = false
+
+[[list.domains]]
+id = "financial-performance"
+label = "Financial Performance"
+description = "Results in money: margins, costs and earnings by segment, region and period."
+active = true
