@@ -121,9 +121,13 @@ label = "Retired"
 # systems (7.4). Here you say, for each list, what your organization hides and what it adds. The ontology itself
 # is not changed.
 #
-#   hide        entries the forms do not offer. Name each by its label, as the list shows it, or by its id.
+#   hide        entries the forms do not offer. Name each by its label, as the ontology gives it, by its id, or
+#               by the last part of its id.
 #   hide_tiers  for sources only: hide every source of these evidence tiers.
-#   keep_only   the opposite of hide: offer only these entries and hide every other one.
+#   keep_only   the opposite of hide: offer only these entries and hide every other one. A list uses keep_only,
+#               or hide and hide_tiers, never both.
+#   labels      the label the forms and the check show for an entry, in place of the ontology's. The answers file
+#               still keeps the entry's id, and a workbook filled under the earlier label still reads.
 #   add         an entry the ontology does not hold yet. The forms offer it, marked "new, not yet in the
 #               ontology". The check tells the Architect to add it to the ontology before the KPI is applied.
 #
@@ -131,10 +135,21 @@ label = "Retired"
 # a name here matches no entry, so a misspelt name cannot go unnoticed. for-the-architect.md lists what each list
 # hides and adds, after every build. README.md shows a worked example under "Change the form".
 
-# Question 3.5 offers the MPC documents and the process map's own documents. The industry, framework and peer
-# sources stay in the ontology and are hidden here.
+# Question 3.5 offers four documents. Every other source stays in the ontology and is hidden here: the industry,
+# framework and peer sources, and the working records of the ontology's own build.
 [pick_list.sources]
-hide_tiers = ["industry", "framework", "peers"]
+keep_only = [
+  "mpc-economics-crack-spread-kpi-definition",
+  "mpc-s01",
+  "mplx-s01",
+  "planner-measure-list-2026-10-18",
+]
+
+[pick_list.sources.labels]
+"mpc-economics-crack-spread-kpi-definition" = "MPC Economics, 3-2-1 Crack Spread KPI Definition"
+"mpc-s01" = "Marathon Petroleum Corporation, Form 10-K for the fiscal year ended 2025-12-31"
+"mplx-s01" = "MPLX LP, Form 10-K for the fiscal year ended 2025-12-31"
+"planner-measure-list-2026-10-18" = "Value Chain Optimization Decision Support and Visualization: the planning team's measure list"
 
 [pick_list.roles]
 hide = ["Black Oil Manager"]

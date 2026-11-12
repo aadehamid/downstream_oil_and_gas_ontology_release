@@ -132,9 +132,15 @@ def lists_text(cat, lists):
             counts = {tier: sum(1 for i in hidden if i.get("tier") == tier) for tier in change["hide_tiers"]}
             detail.append(f'- `{name}` hides the sources of these evidence tiers: ' + ", ".join(f"{tier} ({count})" for tier, count in counts.items()) + ".")
         named = [i["label"] for i in hidden if i.get("tier") not in change.get("hide_tiers", [])]
-        if named:
+        if change.get("keep_only") and len(named) > 40:      # too many to name: the list of sources
+            detail.append(f"- `{name}` offers only the {len(items) - len(hidden)} entries that `keep_only` names, and so hides the other {len(named)}.")
+        elif named:
             how = "offers only the entries that `keep_only` names, and so hides" if change.get("keep_only") else "hides"
             detail.append(f'- `{name}` {how}: {"; ".join(_cell(label) for label in named)}.')
+        relabelled = [i for i in items if i.get("was") and not i.get("hidden")]
+        if relabelled:
+            detail.append(f"- `{name}` shows {len(relabelled)} {'entry' if len(relabelled) == 1 else 'entries'} under a label of your settings (`labels`): "
+                          + "; ".join(_cell(i["label"]) for i in relabelled) + ". The answers file keeps each entry's id.")
         gained = [(i["label"], alias) for i in items for alias in i.get("aliases", [])]
         if gained:
             detail.append(f'- `{name}`: the ontology now holds {", ".join(_cell(label) for label, _ in gained)}. The entry under `add` is no longer offered a second time. '
@@ -148,6 +154,7 @@ def lists_text(cat, lists):
             "- A hidden entry stays known. A form that already holds it still checks, with a note.",
             "- A list with `keep_only` offers nothing new by itself. When a release of `data-product` adds a data product, the rebuild adds its name to the hidden entries above. Add the name to `keep_only` to offer it.",
             "- A list with `hide` offers every new entry of the ontology as soon as the pack is rebuilt.",
+            "- A list uses `keep_only`, or `hide` and `hide_tiers`, never both.",
             "- When you have added an entry to the ontology under the same label, rebuild. Leave the entry under `add` for now: the forms offer the ontology's entry only, and an answer that a form in progress saved under the added entry is read as the ontology's. The list above then names the entry. Remove it from `add` once no form in progress uses it. After that, such an answer no longer checks.",
             "- The build stops when `add` names an entry that `hide` hides, or when two added entries share a label.",
             "- `KNOWN-OPEN-ITEMS.md` lists the changes to the ontology that these settings stand in for.", ""]

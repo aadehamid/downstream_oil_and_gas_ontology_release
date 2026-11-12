@@ -1,7 +1,7 @@
 {
   "format": 1,
   "form": "kpi-intake",
-  "catalogue_version": "1.1",
+  "catalogue_version": "1.2",
   "kpi_name": "Crack Spreads Pricing",
   "request": {
     "number": "EXAMPLE-1",
@@ -32,8 +32,8 @@
     "3.7": "anyone",
     "3.8": "Illustration: One value for each day and each Price Master record. It rolls up by price group, price sheet and price batch.",
     "3.9": "draft",
-    "3.10": "Illustration: Active records only. Soft-deleted rows are excluded.",
-    "3.11": "Illustration: Reviewed once a year by the Data Owner. Retired when the benchmark it is built from is no longer published.",
+    "3.10": "Illustration: Active records only. Soft-deleted rows are excluded. If the check fails, the day's values are held back.",
+    "3.11": "Illustration: Once a year. It stops being used when the benchmark it is built from is no longer published.",
     "4.1": "yes",
     "4.2": "no",
     "4.3": "yes",
@@ -70,8 +70,8 @@
     ],
     "6.6": "https://w3id.org/mpc/ontology/modules/data-product/product/master-pricing",
     "6.7": "yes",
-    "6.8": "Illustration: Economics and Planning Manager",
-    "6.9": "Illustration: Pricing Representative",
+    "6.8": "Illustration: Economics and Planning Manager, Commercial",
+    "6.9": "Illustration: Pricing Representative, Commercial",
     "7.1": "https://w3id.org/mpc/ontology/modules/data-product/table/view-mpr-mips-crack-spread-price-fact-metrics-vw",
     "7.8": "Crack Spread Price Analytics"
   },

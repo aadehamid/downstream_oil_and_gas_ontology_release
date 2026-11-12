@@ -32,7 +32,7 @@ ONTOLOGY_LISTS = (
 # The lists of the ontology that settings.toml may change, each with the module that holds its entries. An entry the
 # settings add must go into that module before a KPI that names it is applied.
 SETTINGS_LISTS = {"sources": "integration", "roles": "organization", "data-products": "data-product", "systems": "system"}
-PICK_LIST_KEYS = ("hide", "hide_tiers", "keep_only", "add")
+PICK_LIST_KEYS = ("hide", "hide_tiers", "keep_only", "add", "labels")
 ADDED = "new:"              # the start of the id of an entry that settings.toml adds
 ADDED_MARK = " (new, not yet in the ontology)"
 HIDDEN_MARK = " (hidden in this organization's settings)"
@@ -303,6 +303,9 @@ def _pick_list_problems(pick_lists):
             out.append(f"{where}: `hide_tiers` is for the list of sources only")
         if change.get("keep_only") and (change.get("hide") or change.get("hide_tiers")):
             out.append(f"{where}: use `keep_only`, or `hide` and `hide_tiers`, not both")
+        labels = change.get("labels", {})
+        if not isinstance(labels, dict) or not all(isinstance(v, str) and v.strip() for v in labels.values()):
+            out.append(f"{where}: `labels` gives an entry the label the forms show, as \"<the entry>\" = \"<the label>\"")
         added = change.get("add", [])
         ids = [a.get("id") for a in added if isinstance(a, dict)]
         if (not isinstance(added, list) or len(ids) != len(added) or len(set(ids)) != len(ids)

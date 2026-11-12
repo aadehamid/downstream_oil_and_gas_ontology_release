@@ -294,7 +294,7 @@ def test_the_questions_of_the_field_groups_are_required_or_optional_as_decided(r
     # The objective, the grain, the status, the owner and the steward are required. The rest are optional.
     report = report_of(made_up.intake(remove=["2.5", "3.8", "3.9", "6.8", "6.9"]))
     assert report.blocking == ["2.5 is missing", "3.8 is missing", "3.9 is missing", "6.8 is missing", "6.9 is missing"]
-    assert "    6.8 Who is the named owner of this KPI? Give the position title, or" in report.text()
+    assert "    6.8 Who is accountable for this KPI's meaning and the action taken on" in report.text()
     # A threshold needs the date it applies from. The quality rule, the review and the API are optional.
     report = report_of(made_up.intake(change={"3.12": ["Low: under 5 days"]}))
     assert report.blocking == ["3.13 is missing"]

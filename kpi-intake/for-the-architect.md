@@ -42,26 +42,26 @@ The ontology has no place for a KPI's domain yet, and holds no list of domains. 
 | 2.2 | In one or two sentences, what does it measure? Please do not use the KPI's own name. | Required | `skos:definition`. |
 | 2.3 | What does it count? | Optional | `pop:includes`. |
 | 2.4 | What does it leave out? | Optional | `pop:excludes`. |
-| 2.5 | Which strategic objective does this KPI serve? Write "none stated" if the business has named none. | Required | Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). For a measure whose kind is KPI, question 4.6 names the document that records the objective. |
+| 2.5 | Which business objective does this KPI help you track? Write "None stated" if no objective has been agreed. | Required | Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). For a measure whose kind is KPI, question 4.6 names the document that records the objective. |
 | 3.1 | How is it worked out, in words? What is divided by what, or taken from what? | Required if 4.1 is not "no" | `kpi:basis`. |
 | 3.2 | What unit is it stated in? | Required if 4.1 is not "no" | Added to `kpi:basis`. The ontology has no unit list and no unit property. The answer also stays in the form's file. |
-| 3.3 | How often is it stated, and broken down by what? | Required if 4.1 is not "no" | `kpi:grain`. Despite the property's name, it holds how often the KPI is stated and its breakdowns. The grain of 3.8 has no property yet. |
+| 3.3 | How often do people receive this KPI, and which breakdowns do they need in the report? | Required if 4.1 is not "no" | `kpi:grain`. Despite the property's name, it holds how often the KPI is stated and its breakdowns. The grain of 3.8 has no property yet. |
 | 3.4 | What do you compare it against? | Optional | `kpi:comparedAgainst`. |
 | 3.5 | Where is this definition written down? Choose the document, then give its date and the page or section. | Required | `dcterms:source`, `dcterms:bibliographicCitation`, `pop:populationEvidence`. A new document also needs a tier in `authority/source-tiers.csv`, which the Architect assigns. |
 | 3.6 | Does it already have an ID or a code in a report, a dashboard or a system? Write it, or write "no". | Optional | `skos:note`. The Architect assigns `dcterms:identifier`. |
 | 3.7 | Who may see this KPI: anyone in the company, or only a restricted group? | Required | No property. The answer stays in the form's file. |
-| 3.8 | What is its grain: what does one value stand for? Name the smallest time period and the smallest business object that has a value of its own. | Required if 4.1 is not "no" | Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). `kpi:grain` holds the answer to 3.3. |
-| 3.9 | What is the KPI's status? It stays "Draft" until the Data Owner certifies it. | Required | Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). |
-| 3.10 | What rule must the data meet for the number to be trusted? | Optional | Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). |
-| 3.11 | When is the KPI reviewed, and what would retire it? | Optional | Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). |
-| 3.12 | Does it have thresholds: levels that call for attention or action? Write one line for each, with the level and its value. | Optional | Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). The closed shape forbids a value on a measure, so a threshold stays in the form's file. |
-| 3.13 | From what date do those thresholds apply, and until when if they end? | Required if 3.12 has an answer | Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). |
+| 3.8 | What does one individual KPI value describe? Name its time period and the item or combination of items it covers. | Required if 4.1 is not "no" | Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). `kpi:grain` holds the answer to 3.3. |
+| 3.9 | What status has the Data Owner confirmed? Leave "Draft" selected until certification is confirmed. | Required | Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). |
+| 3.10 | What agreed data checks must pass before this KPI is used? Say what happens if a check fails. | Optional | Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). |
+| 3.11 | When should the Data Owner review this KPI? What agreed change would mean it should stop being used? | Optional | Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). |
+| 3.12 | What agreed limits call for attention or action? For each, give the condition, value, unit and action. Leave blank if none are agreed. | Optional | Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). The closed shape forbids a value on a measure, so a threshold stays in the form's file. |
+| 3.13 | When does each threshold start? Give its end date, or write "No end date". Use YYYY-MM-DD. | Required if 3.12 has an answer | Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). |
 | 4.1 | Is it a number with a way to work it out, a unit and a time period? | Required | "No" gives `kpi:measureKind` tracker or report, or not a measure when it is a request for a tool, with `kpi:classificationTest` 1. The form then skips 3.1 to 3.3 and 4.2 to 4.7. |
 | 4.2 | Does it appear only when something happens, like a warning? | Required if 4.1 is "yes" | "Yes" gives kind alert, test 2. |
 | 4.3 | Is its value set by an outside market or a published benchmark that the business cannot influence? | Required if 4.2 is "no" | "Yes" gives kind market indicator, test 3. |
 | 4.4 | Is it worked out from market prices and the planning model, to start or to rank a decision, with no target? | Required if 4.3 is "no" | "Yes" gives kind decision-support indicator, test 3. |
 | 4.5 | Does it compare actual results, or a plan, with a plan, a forecast, an earlier plan or history, for one period? | Required if 4.4 is "no" | "Yes" gives kind plan-variance diagnostic, test 4. |
-| 4.6 | Has the business named it as one of the few measures of a stated objective, with a target and an accountable owner? If yes, which document records that decision? | Required if 4.5 is "no" | "Yes" gives kind KPI, test 5, and a `KPI-` identifier. The document goes to `dcterms:bibliographicCitation`. "No" gives kind operational metric, test 5. The ontology never records a target's value. Thresholds stay in the form's file (3.12). |
+| 4.6 | Has the business formally chosen this measure to track that objective, with a target and an accountable owner? | Required if 4.5 is "no" | "Yes" gives kind KPI, test 5, and a `KPI-` identifier. The document goes to `dcterms:bibliographicCitation`. "No" gives kind operational metric, test 5. The ontology never records a target's value. Thresholds stay in the form's file (3.12). |
 | 4.7 | If it is not a KPI today, is it a strong candidate to become one? | Required if 4.6 is "no" | `kpi:kpiCandidate`. False for every kind but operational metric. |
 | 4.8 | In one or two sentences, why does it belong to that kind? | Required | `kpi:classificationReason`. |
 | 4.9 | Which topic, or family of KPIs, does it belong to, if any? | Optional | No property. The measure list is flat. The answer stays in the form's file. |
@@ -76,8 +76,8 @@ The ontology has no place for a KPI's domain yet, and holds no list of domains. 
 | 6.5 | For each of those steps, what document tells us so? | Required if 6.3 has an answer | `dcterms:bibliographicCitation` on the link, which the shape requires. |
 | 6.6 | Which data product gives this number? | Optional | Tells Digital IT where to look for the view of 7.1. `dcterms:isPartOf` of the view in 7.1. `con:publishesMeasure` if a catalog row publishes the KPI. |
 | 6.7 | Is the number published as several named series, such as one for each region or market? | Asked only when the kind is market indicator | `mkt:seriesOf`, `mkt:priceOf`, `mkt:enumerates` in `market-data`. Not filled from this form. |
-| 6.8 | Who is the named owner of this KPI? Give the position title, or the person. | Required | Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). The ontology records roles and never a person's name. |
-| 6.9 | Who is the named steward of this KPI? Give the position title, or the person. | Required | Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). The ontology records roles and never a person's name. |
+| 6.8 | Who is accountable for this KPI's meaning and the action taken on it? Give their position and business area, or their name. | Required | Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). The ontology records roles and never a person's name. |
+| 6.9 | Who maintains this KPI's definition and handles questions about its data? Give their position and business area, or their name. | Required | Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). The ontology records roles and never a person's name. |
 | 7.1 | Which view or table gives this KPI's values? Give the full name. | Required | `dp:servesMeasure` (the `serves_measures` column of `data-product/pricing/tables.csv`). |
 | 7.2 | If it is not in the list: what is its full name, and which layer is it in? | Required if 7.1 is "not in the list" | A new row in `tables.csv`: `dp:fullName`, `dp:layer`, `skos:prefLabel`. |
 | 7.3 | Which tables or views is it built from? | Required if 7.1 is "not in the list" | `prov:wasDerivedFrom` (`lineage.csv`). |
@@ -87,7 +87,7 @@ The ontology has no place for a KPI's domain yet, and holds no list of domains. 
 | 7.7 | Which measure or column of the view holds the KPI, and with what filter? | Optional | No property today. Release 1.1 lists such a link as a proposal that needs a minor version of `data-product`. |
 | 7.8 | Which AI assistant or report answers from this view? | Optional | `prov:used` from a `prov:SoftwareAgent` in `data-product`. |
 | 7.9 | What shows that these facts are right: a discovery run, a design document or a workspace export, and of what date? | Required if 7.1 is "not in the list" | `dcterms:source` on the platform table, which the shape requires. A new source needs a tier in `integration`. |
-| 7.10 | Is there an API, or another way to reach the values besides the view? Name it, or leave this empty. | Optional | Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). |
+| 7.10 | Besides the view or table in 7.1, is there an API or file feed that supplies these values? Give its name and where its documentation is kept. Leave blank if none. | Optional | Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). |
 
 ### Domain activation
 
@@ -198,12 +198,13 @@ The Architect, or whoever maintains the form, edits `settings.toml`. The busines
 
 | List | Questions | Offered | Hidden | Added |
 |---|---|---|---|---|
-| `sources` | 3.5 | 19 of 106 | 87 | None |
+| `sources` | 3.5 | 4 of 106 | 102 | None |
 | `roles` | 6.1 and P5 | 64 of 65 | 1 | Value Chain Optimization Director |
 | `data-products` | 6.6 and D6 | 13 of 49 | 36 | None |
 | `systems` | 7.4 | 45 of 50 | 5 | SharePoint |
 
-- `sources` hides the sources of these evidence tiers: industry (72), framework (14), peers (1).
+- `sources` offers only the 4 entries that `keep_only` names, and so hides the other 102.
+- `sources` shows 2 entries under a label of your settings (`labels`): MPC Economics, 3-2-1 Crack Spread KPI Definition; Value Chain Optimization Decision Support and Visualization: the planning team's measure list. The answers file keeps each entry's id.
 - `roles` hides: Black Oil Manager.
 - `roles` adds: Value Chain Optimization Director. Each is offered with the mark "new, not yet in the ontology". When a form names one, the check tells you to add it to the `organization` module before you apply the KPI.
 - `data-products` offers only the entries that `keep_only` names, and so hides: BP&A; Brand Data & Integration; DevSecOps; ES&S; Field Operations; Gathering & Compression; GIS; HES&S; HR; IT; Legal; Loss Control; Marine & Rail Ops; Measurement & Lab; Operations & Administration; Ops Intel; Ops Support; OT Communication Platform; OT Compute Platforms; OT Platform Development; OT Windows Platforms; Pipeline Ops & Integrity; Pipeline OT; Pipeline RA&S; Processing & Fractionation; Quality Assurance; Quality Assurance (Software); Reliability Center; Retail Payments; S&BD; SC; Service Management; Terminal Automation; Terminal Ops (IT); Terminal OT; Truck Ops.
@@ -215,6 +216,7 @@ Keep the lists in step with the ontology:
 - A hidden entry stays known. A form that already holds it still checks, with a note.
 - A list with `keep_only` offers nothing new by itself. When a release of `data-product` adds a data product, the rebuild adds its name to the hidden entries above. Add the name to `keep_only` to offer it.
 - A list with `hide` offers every new entry of the ontology as soon as the pack is rebuilt.
+- A list uses `keep_only`, or `hide` and `hide_tiers`, never both.
 - When you have added an entry to the ontology under the same label, rebuild. Leave the entry under `add` for now: the forms offer the ontology's entry only, and an answer that a form in progress saved under the added entry is read as the ontology's. The list above then names the entry. Remove it from `add` once no form in progress uses it. After that, such an answer no longer checks.
 - The build stops when `add` names an entry that `hide` hides, or when two added entries share a label.
 - `KNOWN-OPEN-ITEMS.md` lists the changes to the ontology that these settings stand in for.

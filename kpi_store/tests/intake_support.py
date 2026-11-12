@@ -83,5 +83,5 @@ def intake(change=None, remove=(), sign_offs=None, **fields):
     answers.update(change or {})
     for key in remove:
         answers.pop(key, None)
-    return Intake(form="kpi-intake", catalogue_version="1.1", kpi_name=answers.get("2.1", ""), answers=answers,
+    return Intake(form="kpi-intake", catalogue_version="1.2", kpi_name=answers.get("2.1", ""), answers=answers,
                   sign_offs=copy.deepcopy(SIGNED if sign_offs is None else sign_offs), **fields)

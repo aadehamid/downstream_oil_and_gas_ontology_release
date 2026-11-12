@@ -167,7 +167,7 @@ def test_the_page_is_one_offline_file_with_lf_line_ends():
     assert "<pre" not in text                               # the document check would read a <pre> as a command
     data = json.loads(text.split('<script id="intake-data" type="application/json">')[1].split("</script>")[0])
     assert list(data["forms"]) == ["kpi-intake", "domain-activation", "process-map-request"]
-    assert data["release"] == "KPI Store 1.1" and data["catalogue_version"] == "1.1"
+    assert data["release"] == "KPI Store 1.1" and data["catalogue_version"] == "1.2"
     assert len(data["questions"]) == 73 and data["lists"]["processes"]
     assert data["guide"] == "how-to-use-the-form.html" and (PACK / data["guide"]).is_file()     # the guide, beside the form
     # The names of the other modules' terms, and whether each has a definition, with no definition text.
@@ -309,9 +309,9 @@ def test_the_crack_spreads_example_quotes_the_ontology_word_for_word():
     # The answers the ontology does not hold say so. The grain, the quality rule and the status follow the reference.
     assert all(a[q].startswith("Illustration: ") for q in ("1.4", "2.5", "3.2", "3.8", "3.10", "3.11", "4.9", "6.8", "6.9"))
     assert a["3.8"] == "Illustration: One value for each day and each Price Master record. It rolls up by price group, price sheet and price batch."
-    assert a["3.10"] == "Illustration: Active records only. Soft-deleted rows are excluded." and a["3.9"] == "draft"
+    assert a["3.10"].startswith("Illustration: Active records only. Soft-deleted rows are excluded.") and a["3.9"] == "draft"
     assert "3.12" not in a and "3.13" not in a and "7.10" not in a
-    # settings.toml hides the peer sources, so the example names only the planning team's measure list.
+    # settings.toml hides the measure's other source, so the example names only the planning team's measure list.
     assert a["3.5"] == ["https://w3id.org/mpc/ontology/source/planner-measure-list-2026-10-18"]
 
 
@@ -329,8 +329,16 @@ def test_the_margin_example_walks_all_five_tests():
     assert [r.rsplit("/", 1)[-1] for r in a["6.4"]] == ["informs", "measures-performance"]
     assert a["5.4"] == "MPC 7" and a["6.6"] == "@none-yet" and a["7.1"] == "@no-data-yet"
     assert "6.7" not in a and "3.6" not in a
-    assert a["3.12"] == ["Illustration: Review level: the realized margin per barrel is below the forecast for the month."]
-    assert a["3.13"] == "Illustration: From 2026-01-01, until it is replaced." and a["6.8"] == "Illustration: Value Chain Optimization Director"
+    assert a["3.12"][0].startswith("Illustration: Realized margin per barrel below the month's forecast")
+    assert a["3.13"] == "Illustration: Starts 2026-01-01. No end date." and a["6.8"] == "Illustration: Value Chain Optimization Director, Commercial"
+    # settings.toml hides both sources the package gives this measure. The example names the MPC Form 10-K instead,
+    # and that is true to the package: the measure's citation there, quoted in 3.5's detail, cites MPC-S01, the 10-K.
+    assert a["3.5"] == ["https://w3id.org/mpc/ontology/source/mpc-s01"] and a["3.5.detail"] == "MPC-S01 p. 51; MPC-S17; KI-01"
+    package = (ROOT / "business_architecture/ontology/releases/kpi/1.3.0/kpi.ttl").read_text(encoding="utf-8")
+    block = package.split("\nmeasure:rm-margin-per-barrel a ", 1)[1].split(" .\n", 1)[0]
+    assert 'dcterms:bibliographicCitation "MPC-S01 p. 51; MPC-S17; KI-01"' in block
+    assert "src:mpc-s01" not in block      # the package itself does not name the 10-K as this measure's source; the comment says so
+    assert "MPC-S01 p. 51" in data["comment"]
 
 
 def test_an_example_of_a_measure_the_ontology_lacks_is_refused(cat, committed):
@@ -366,14 +374,15 @@ def test_the_architects_page_maps_every_question_and_lists_the_facts_with_no_pla
 
 
 def test_the_architects_page_says_what_the_settings_hide_and_add(cat, committed):
-    # Counted by hand from the owner's decisions and the packages: 19 of 106 sources are MPC's or the process map's,
+    # Counted by hand from the owner's decisions and the packages: 4 of 106 sources are offered,
     # one of 64 roles is hidden and one added, 13 of 49 catalog entries are data products, 5 of 49 systems are hidden
     # and one added.
     text = build.architect_text(cat, committed["lists"])
-    for row in ("| `sources` | 3.5 | 19 of 106 | 87 | None |", "| `roles` | 6.1 and P5 | 64 of 65 | 1 | Value Chain Optimization Director |",
+    for row in ("| `sources` | 3.5 | 4 of 106 | 102 | None |", "| `roles` | 6.1 and P5 | 64 of 65 | 1 | Value Chain Optimization Director |",
                 "| `data-products` | 6.6 and D6 | 13 of 49 | 36 | None |", "| `systems` | 7.4 | 45 of 50 | 5 | SharePoint |"):
         assert row in text, row
-    assert "- `sources` hides the sources of these evidence tiers: industry (72), framework (14), peers (1)." in text
+    assert "- `sources` offers only the 4 entries that `keep_only` names, and so hides the other 102." in text
+    assert "- `sources` shows 2 entries under a label of your settings (`labels`): MPC Economics, 3-2-1 Crack Spread KPI Definition; " in text
     assert "- `roles` hides: Black Oil Manager." in text
     assert "- `systems` hides: Databricks; MS Excel; MS Outlook; MS PowerPoint; MS Teams." in text
     assert "`data-products` offers only the entries that `keep_only` names, and so hides: BP&A; Brand Data & Integration;" in text
@@ -382,8 +391,14 @@ def test_the_architects_page_says_what_the_settings_hide_and_add(cat, committed)
 def test_the_forms_offer_what_the_settings_leave_and_add(cat, committed):
     lists = committed["lists"]
     offered = {q: [o["label"] for o in rules.options(cat, lists, cat.by_id[q])] for q in ("3.5", "6.1", "6.6", "7.4")}
-    assert len(offered["3.5"]) == 20 and offered["3.5"][-1] == "A document that is not in the list"
-    assert {s["tier"] for s in lists["sources"] if not s.get("hidden")} == {"mpc", "process-authority"}
+    assert offered["3.5"] == [
+        "Marathon Petroleum Corporation, Form 10-K for the fiscal year ended 2025-12-31",
+        "MPC Economics, 3-2-1 Crack Spread KPI Definition",
+        "MPLX LP, Form 10-K for the fiscal year ended 2025-12-31",
+        "Value Chain Optimization Decision Support and Visualization: the planning team's measure list",
+        "A document that is not in the list"]
+    assert sorted(s["id"].rsplit("/", 1)[-1] for s in lists["sources"] if not s.get("hidden")) == [
+        "mpc-economics-crack-spread-kpi-definition", "mpc-s01", "mplx-s01", "planner-measure-list-2026-10-18"]
     assert "Black Oil Manager" not in offered["6.1"] and "Value Chain Optimization Director (new, not yet in the ontology)" in offered["6.1"]
     assert not any(label.startswith("Value Chain Optimization (") for label in offered["6.1"])
     assert offered["6.6"] == [

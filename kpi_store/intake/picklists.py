@@ -270,8 +270,10 @@ def build(root, release=None):
 def apply_settings(built, pick_lists):
     """Marks the built lists with the settings of [pick_list.<name>], in place, and returns `built`.
 
-    `hide` and `keep_only` name an entry by its label, as the list shows it, or by its id. `hide_tiers` names the
-    evidence tiers of the sources to hide. Raises CatalogueError when a name matches no entry of its list, so a
+    `hide`, `keep_only` and `labels` name an entry by its label as the ontology gives it, by its id, or by the last
+    part of its id. `hide_tiers` names the evidence tiers of the sources to hide. `labels` gives an entry the label
+    the forms and the check show in place of the ontology's. The entry keeps its id, and its earlier label stays
+    known under "was", so a workbook filled before the change still reads. Raises CatalogueError when a name matches no entry of its list, so a
     misspelt name cannot hide nothing unnoticed, and when an added entry has the label of an entry the same
     settings hide. An added entry with the label of an entry the list offers becomes an alias of that entry."""
     problems = []
@@ -282,7 +284,7 @@ def apply_settings(built, pick_lists):
 
         def matched(key):
             wanted = list(change.get(key, []))
-            found = {w: [i for i in items if w in (i["id"], i["label"])] for w in wanted}
+            found = {w: [i for i in items if w in (i["id"], i["label"], i["id"].rstrip("/").rsplit("/", 1)[-1])] for w in wanted}
             for w in wanted:
                 if not found[w]:
                     problems.append(f"{where}: `{key}` names {w!r}, which is no entry of the list. Write the label as the list shows it, or the id.")
@@ -299,6 +301,19 @@ def apply_settings(built, pick_lists):
         for item in items:
             if item["id"] in hidden:
                 item["hidden"] = True
+        renamed = {}
+        for wanted, label in (change.get("labels") or {}).items():
+            hits = [i for i in items if wanted in (i["id"], i["label"], i["id"].rstrip("/").rsplit("/", 1)[-1])]
+            if not hits:
+                problems.append(f"{where}: `labels` names {wanted!r}, which is no entry of the list. Write the label as the ontology gives it, or the id.")
+            for item in hits:
+                renamed[item["id"]] = label.strip()
+        for item in items:
+            if item["id"] in renamed and renamed[item["id"]] != item["label"]:
+                item["was"], item["label"] = sorted(set(item.get("was", [])) | {item["label"]}), renamed[item["id"]]
+        shown = [i["label"].casefold() for i in items]
+        for label in sorted({l for l in shown if shown.count(l) > 1}):
+            problems.append(f"{where}: `labels` gives two entries the label {label!r}. Each entry needs a label of its own.")
         held = {i["label"].strip().casefold(): i for i in items}
         taken = set()
         for entry in change.get("add", []):

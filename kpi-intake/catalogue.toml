@@ -8,9 +8,9 @@
 #
 # What you can change here without touching code: any text, the rules, the routing outcomes, the sign-off block
 # and the time estimates. The role titles and the lists your organization sets for itself are in settings.toml. A new question
-# needs an id that no other question has. README.md in this folder explains each field under "Change the form".
+# needs an id that no other question has. A question may carry `help`, one line the forms show under its answer. README.md in this folder explains each field under "Change the form".
 
-version = "1.1"
+version = "1.2"
 release = "KPI Store 1.1"
 
 # ---- The fixed choices -----------------------------------------------------------------------------------------
@@ -155,7 +155,7 @@ technical_name = "the controlled vocabulary"
 audience = "business"
 about = "Here we agree on one name and one meaning for the KPI. Every later fact is attached to this meaning. If two teams mean different things by the same name, the KPI would count the wrong thing, and people would have to correct every report that used it."
 who = "The Data Owner gives the definition and later signs it. The Business analyst drafts the wording."
-done_when = "The KPI has one name, a definition of one or two sentences that does not repeat the name, a statement of what it counts and what it leaves out, and the strategic objective it serves. The completeness check has compared the name with the terms the ontology already holds."
+done_when = "The KPI has one name, a definition of one or two sentences that does not repeat the name, a statement of what it counts and what it leaves out, and the business objective it helps to track. The completeness check has compared the name with the terms the ontology already holds."
 typical = "5"
 minutes = "13"
 
@@ -481,7 +481,7 @@ fact = ["F21"]
 [[question]]
 id = "2.5"
 section = "2"
-text = "Which strategic objective does this KPI serve? Write \"none stated\" if the business has named none."
+text = "Which business objective does this KPI help you track? Write \"None stated\" if no objective has been agreed."
 asked_of = ["data-owner"]
 type = "long_text"
 required = "required"
@@ -519,12 +519,12 @@ fact = ["F14"]
 [[question]]
 id = "3.3"
 section = "3"
-text = "How often is it stated, and broken down by what?"
+text = "How often do people receive this KPI, and which breakdowns do they need in the report?"
 asked_of = ["data-steward"]
 type = "text"
 required = "required"
 ask_when = [{ question = "4.1", is_not = "no" }]
-note = "This question is about reporting: how often the number is stated, and the breakdowns people read it by. Question 3.8 asks for the grain, which is what one value stands for."
+help = "Illustration: 3.3 is \"Monthly, by refinery\". 3.8 is \"One value for each day, refinery and product\"."
 why = "A daily figure by market hub and a monthly figure by refining region are different things to build and to read."
 feeds = "`kpi:grain`. Despite the property's name, it holds how often the KPI is stated and its breakdowns. The grain of 3.8 has no property yet."
 fact = ["F15"]
@@ -599,19 +599,21 @@ fact = []
 [[question]]
 id = "3.8"
 section = "3"
-text = "What is its grain: what does one value stand for? Name the smallest time period and the smallest business object that has a value of its own."
+text = "What does one individual KPI value describe? Name its time period and the item or combination of items it covers."
+help = "This is the KPI's grain. Illustration: 3.3 is \"Monthly, by refinery\". 3.8 is \"One value for each day, refinery and product\"."
 asked_of = ["data-steward"]
 type = "text"
 required = "required"
 ask_when = [{ question = "4.1", is_not = "no" }]
-why = "Two people who add up the same KPI from different grains get different totals."
+why = "This tells builders which values can be compared or combined."
 feeds = "Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md). `kpi:grain` holds the answer to 3.3."
 fact = []
 
 [[question]]
 id = "3.9"
 section = "3"
-text = "What is the KPI's status? It stays \"Draft\" until the Data Owner certifies it."
+text = "What status has the Data Owner confirmed? Leave \"Draft\" selected until certification is confirmed."
+help = "The form does not change this status when someone signs."
 asked_of = ["data-steward"]
 type = "choice"
 source = "settings:status"
@@ -625,18 +627,20 @@ fact = []
 [[question]]
 id = "3.10"
 section = "3"
-text = "What rule must the data meet for the number to be trusted?"
+text = "What agreed data checks must pass before this KPI is used? Say what happens if a check fails."
+help = "Record the agreed rule. If none is agreed, leave this blank."
 asked_of = ["data-steward"]
 type = "long_text"
 required = "optional"
-why = "A reader trusts a number when they know which records it counts and which it drops."
+why = "These checks tell readers whether the data is fit to use."
 feeds = "Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md)."
 fact = []
 
 [[question]]
 id = "3.11"
 section = "3"
-text = "When is the KPI reviewed, and what would retire it?"
+text = "When should the Data Owner review this KPI? What agreed change would mean it should stop being used?"
+help = "Record the agreed rule. If none is agreed, leave this blank."
 asked_of = ["data-steward"]
 type = "long_text"
 required = "optional"
@@ -647,7 +651,8 @@ fact = []
 [[question]]
 id = "3.12"
 section = "3"
-text = "Does it have thresholds: levels that call for attention or action? Write one line for each, with the level and its value."
+text = "What agreed limits call for attention or action? For each, give the condition, value, unit and action. Leave blank if none are agreed."
+help = "Illustration, not a real limit: \"Crude utilization below 90 percent: tell the Economics and Planning Manager.\""
 asked_of = ["data-steward"]
 type = "list"
 rows = 4
@@ -660,7 +665,8 @@ fact = []
 [[question]]
 id = "3.13"
 section = "3"
-text = "From what date do those thresholds apply, and until when if they end?"
+text = "When does each threshold start? Give its end date, or write \"No end date\". Use YYYY-MM-DD."
+help = "If all thresholds share the same dates, state that once."
 asked_of = ["data-steward"]
 type = "text"
 required = "required"
@@ -738,13 +744,13 @@ fact = ["F5", "F6"]
 [[question]]
 id = "4.6"
 section = "4"
-text = "Has the business named it as one of the few measures of a stated objective, with a target and an accountable owner? If yes, which document records that decision?"
+text = "Has the business formally chosen this measure to track that objective, with a target and an accountable owner?"
+help = "Record the objective in 2.5 and the owner in 6.8. Here, name the document recording the decision."
 asked_of = ["data-owner"]
 type = "choice"
 source = "choices:yes-no"
 required = "required"
 ask_when = [{ question = "4.5", is = "no" }]
-note = "The objective itself is the answer to 2.5, and the named owner is the answer to 6.8. Ask here only whether a recorded decision names this measure, and which document records it."
 why = "A measure becomes a KPI by a recorded decision, not by its formula."
 feeds = "\"Yes\" gives kind KPI, test 5, and a `KPI-` identifier. The document goes to `dcterms:bibliographicCitation`. \"No\" gives kind operational metric, test 5. The ontology never records a target's value. Thresholds stay in the form's file (3.12)."
 fact = ["F5", "F6", "F11"]
@@ -986,8 +992,8 @@ fact = ["F28"]
 [[question]]
 id = "6.8"
 section = "6"
-text = "Who is the named owner of this KPI? Give the position title, or the person."
-note = "A position title is enough. A person's name stays in the form's file and never goes into the ontology."
+text = "Who is accountable for this KPI's meaning and the action taken on it? Give their position and business area, or their name."
+help = "A position is enough. A person's name stays in the answers file and never goes into the ontology."
 asked_of = ["data-owner"]
 type = "text"
 required = "required"
@@ -998,8 +1004,8 @@ fact = []
 [[question]]
 id = "6.9"
 section = "6"
-text = "Who is the named steward of this KPI? Give the position title, or the person."
-note = "A position title is enough. A person's name stays in the form's file and never goes into the ontology."
+text = "Who maintains this KPI's definition and handles questions about its data? Give their position and business area, or their name."
+help = "A position is enough. A person's name stays in the answers file and never goes into the ontology."
 asked_of = ["data-owner"]
 type = "text"
 required = "required"
@@ -1161,12 +1167,13 @@ fact = ["F26"]
 [[question]]
 id = "7.10"
 section = "7"
-text = "Is there an API, or another way to reach the values besides the view? Name it, or leave this empty."
+text = "Besides the view or table in 7.1, is there an API or file feed that supplies these values? Give its name and where its documentation is kept. Leave blank if none."
+help = "List reports and AI assistants in 7.8."
 asked_of = ["digital-it"]
 type = "text"
 required = "optional"
 why = "It tells a builder how to read the KPI without opening the view by hand."
-example = "The ontology holds no access path, so the filled examples leave this empty. An answer names the API and the place where it is described."
+example = "The ontology holds no access path, so the filled examples leave this empty."
 feeds = "Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md)."
 fact = []
 
@@ -1419,15 +1426,15 @@ p = "We will ask six things."
 [[explainer.block]]
 ol = [
   "Which part of the business the KPI belongs to, which process it is about, and which data domain it belongs to.",
-  "What it means, in one or two sentences, what it counts and leaves out, and which strategic objective it serves.",
-  "How it is worked out in words, its unit, how often it is stated and at what grain, its status, and any thresholds.",
+  "What it means, in one or two sentences, what it counts and leaves out, and which business objective it helps you track.",
+  "How it is worked out in words, its unit, how often people receive it, what one value describes, its status, and any agreed limits.",
   "What kind of number it is. For example, a market benchmark you cannot control such as a crack spread, a comparison with a plan, or a KPI with a target and an owner.",
   "What other names people use for it, and which numbers people mistake it for.",
-  "Who uses it, who its named owner and steward are, and which data product gives it.",
+  "Who uses it, who is accountable for it, who maintains it, and which data product gives it.",
 ]
 
 [[explainer.block]]
-p = "We will not ask for the KPI's values or for formulas in code. If it has thresholds, we note them. The record holds what a KPI means. The systems hold the numbers."
+p = "We will not ask for the KPI's values or for formulas in code. If limits are agreed for it, we note them. The record holds what a KPI means. The systems hold the numbers."
 
 [[explainer.block]]
 p = "Where we can, you will choose from a list. If the right answer is not in the list, say so. It means the record lacks something, and we add it before your KPI."

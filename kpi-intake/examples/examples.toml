@@ -24,11 +24,11 @@ comment = "A shipped example. Every answer is quoted from the ontology, except t
   "3.7" = "anyone"
   "3.8" = "Illustration: One value for each day and each Price Master record. It rolls up by price group, price sheet and price batch."
   "3.9" = "draft"
-  "3.10" = "Illustration: Active records only. Soft-deleted rows are excluded."
-  "3.11" = "Illustration: Reviewed once a year by the Data Owner. Retired when the benchmark it is built from is no longer published."
+  "3.10" = "Illustration: Active records only. Soft-deleted rows are excluded. If the check fails, the day's values are held back."
+  "3.11" = "Illustration: Once a year. It stops being used when the benchmark it is built from is no longer published."
   "4.9" = "Illustration: Market margin potential"
-  "6.8" = "Illustration: Economics and Planning Manager"
-  "6.9" = "Illustration: Pricing Representative"
+  "6.8" = "Illustration: Economics and Planning Manager, Commercial"
+  "6.9" = "Illustration: Pricing Representative, Commercial"
 
   [example.sign_offs]
   data-owner = { name = "Placeholder for the Data Owner's name", date = "2026-11-11" }
@@ -38,7 +38,7 @@ comment = "A shipped example. Every answer is quoted from the ontology, except t
 [[example]]
 measure = "rm-margin-per-barrel"
 file = "rm-margin-per-barrel"
-comment = "A shipped example. Every answer is quoted from the ontology, except these illustrations, which the ontology does not hold: 1.4, 2.5, 3.2, 3.7 to 3.13, 4.9, 6.1, 6.8 and 6.9. The domain in 1.5 comes from the example domain list in settings.toml. A source that settings.toml hides is left out of 3.5. The ontology names no role, no data product and no view for this measure. The signer names are placeholders."
+comment = "A shipped example. Every answer is quoted from the ontology, except these illustrations, which the ontology does not hold: 1.4, 2.5, 3.2, 3.7 to 3.13, 4.9, 6.1, 6.8 and 6.9. The domain in 1.5 comes from the example domain list in settings.toml. settings.toml hides both sources the ontology gives this measure, so 3.5 names the MPC Form 10-K, which the measure's citation in the ontology cites as MPC-S01 p. 51. The ontology names no role, no data product and no view for this measure. The signer names are placeholders."
 
   [example.request]
   number = "EXAMPLE-2"
@@ -48,19 +48,20 @@ comment = "A shipped example. Every answer is quoted from the ontology, except t
 
   [example.illustration]
   "1.5" = "financial-performance"
+  "3.5" = ["https://w3id.org/mpc/ontology/source/mpc-s01"]
   "1.4" = "Illustration: Sales planners compare the realized margin per barrel with the forecast to explain the gap."
   "2.5" = "Illustration: Grow the refining and marketing margin on every barrel sold."
   "3.2" = "Illustration: US dollars per barrel"
   "3.7" = "anyone"
   "3.8" = "Illustration: One value for each month and each refining region."
   "3.9" = "draft"
-  "3.10" = "Illustration: Closed accounting periods only. A month that is still open is excluded."
-  "3.11" = "Illustration: Reviewed each year with the plan. Retired when the segment's margin is no longer reported per barrel."
-  "3.12" = ["Illustration: Review level: the realized margin per barrel is below the forecast for the month."]
-  "3.13" = "Illustration: From 2026-01-01, until it is replaced."
+  "3.10" = "Illustration: Closed accounting periods only. A month that is still open is excluded. If the check fails, the month is not reported."
+  "3.11" = "Illustration: Each year, with the plan. It stops being used when the segment's margin is no longer reported per barrel."
+  "3.12" = ["Illustration: Realized margin per barrel below the month's forecast, in US dollars per barrel: review it with Business Planning and Analysis."]
+  "3.13" = "Illustration: Starts 2026-01-01. No end date."
   "4.9" = "Illustration: Pricing"
-  "6.8" = "Illustration: Value Chain Optimization Director"
-  "6.9" = "Illustration: Business Planning and Analysis"
+  "6.8" = "Illustration: Value Chain Optimization Director, Commercial"
+  "6.9" = "Illustration: Business Planning and Analysis, Finance"
   "6.1" = ["https://w3id.org/mpc/ontology/modules/kpi/persona/mid-term-planner"]
 
   [example.sign_offs]

@@ -133,7 +133,7 @@ py -m kpi_store.intake check kpi-intake/examples/crack-spreads-pricing.json
 
 ```text expect
 KPI intake check: Crack Spreads Pricing
-Catalogue 1.1. Pick lists of KPI Store 1.1.
+Catalogue 1.2. Pick lists of KPI Store 1.1.
 
 1. The business area
   Answered 5 of the 6 questions that apply.
@@ -280,9 +280,10 @@ label = "Value Chain Optimization Director"
 
 | Key | What it does |
 |---|---|
-| `hide` | The forms do not offer these entries. Name each by its label, as the list shows it, or by its id |
+| `hide` | The forms do not offer these entries. Name each by its label, as the ontology gives it, by its id, or by the last part of its id |
 | `hide_tiers` | For `sources` only: hides every source of these evidence tiers |
-| `keep_only` | The opposite of `hide`: the forms offer only these entries |
+| `keep_only` | The opposite of `hide`: the forms offer only these entries. A list uses `keep_only`, or `hide` and `hide_tiers`, never both |
+| `labels` | The label the forms and the check show for an entry, in place of the ontology's. The answers file still keeps the entry's id, and a workbook filled under the earlier label still reads |
 | `add` | An entry with an `id` and a `label`. The forms offer it, marked "new, not yet in the ontology" |
 
 After the build, [`for-the-architect.md`](for-the-architect.md) shows the list as the forms offer it. This is its line for the roles: 64 of the 65 entries are offered, one is hidden, and one is added.
@@ -333,7 +334,7 @@ Two builds of the same files write the same bytes for every text file. A workboo
 {
   "format": 1,
   "form": "kpi-intake",
-  "catalogue_version": "1.1",
+  "catalogue_version": "1.2",
   "kpi_name": "Crack Spreads Pricing",
 ```
 

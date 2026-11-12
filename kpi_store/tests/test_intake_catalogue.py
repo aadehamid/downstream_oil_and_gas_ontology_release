@@ -28,7 +28,7 @@ def test_the_catalogue_holds_the_approved_questions(cat):
     # ten questions for the seven field groups: 2.5, 3.8 to 3.13, 6.8, 6.9 and 7.10.
     per_section = {s["id"]: len(cat.questions_of(section=s["id"])) for s in cat.sections}
     assert per_section == {"1": 6, "2": 5, "3": 13, "4": 9, "5": 4, "6": 9, "7": 10, "D": 10, "P": 7}
-    assert cat.version == "1.1"
+    assert cat.version == "1.2"      # 1.1 added the ten questions; 1.2 reworded them
     assert [s["name"] for s in cat.sections][:7] == [
         "The business area", "What the KPI means", "The facts about it", "Where it belongs", "Other names for it",
         "What it connects to", "Where the data lives (IT only)"]
@@ -163,18 +163,25 @@ def test_the_questions_of_the_seven_field_groups_keep_their_numbers_and_rules(ca
         question = cat.by_id[qid]
         assert (question["asked_of"], cat.requirement(question)) == ([role], rule), qid
         assert question["feeds"].startswith("Recorded on the form; the ontology has no place for it yet (see KNOWN-OPEN-ITEMS.md)."), qid
-    assert cat.by_id["2.5"]["text"].startswith("Which strategic objective does this KPI serve?")
+    assert cat.by_id["2.5"]["text"].startswith("Which business objective does this KPI help you track?")
     assert cat.by_id["7.8"]["text"] == "Which AI assistant or report answers from this view?"
     # The status is a choice of the settings file and starts at Draft. No older question changed its number.
     assert cat.by_id["3.9"]["default"] == "draft"
     assert [(i["id"], i["label"]) for i in cat.settings_lists["status"]] == [("draft", "Draft"), ("certified", "Certified"), ("retired", "Retired")]
-    assert cat.by_id["3.3"]["text"] == "How often is it stated, and broken down by what?"
-    assert cat.by_id["4.6"]["text"].startswith("Has the business named it as one of the few measures of a stated objective")
+    assert cat.by_id["3.3"]["text"] == "How often do people receive this KPI, and which breakdowns do they need in the report?"
+    assert cat.by_id["4.6"]["text"] == "Has the business formally chosen this measure to track that objective, with a target and an accountable owner?"
+    # What a reader must see is under the answer, not under "For the analyst".
+    assert cat.by_id["3.9"]["help"] == "The form does not change this status when someone signs."
+    assert cat.by_id["4.6"]["help"].startswith("Record the objective in 2.5 and the owner in 6.8.")
+    assert "note" not in cat.by_id["6.8"] and "never goes into the ontology" in cat.by_id["6.8"]["help"]
+    assert "Illustration, not a real limit" in cat.by_id["3.12"]["help"] and "YYYY-MM-DD" in cat.by_id["3.13"]["text"]
 
 
 def test_the_settings_hide_and_add_entries_of_the_ontologys_lists(cat):
     # Copied by hand from the owner's decisions on questions 3.5, 6.1, 6.6 and 7.4.
-    assert cat.pick_lists["sources"] == {"hide_tiers": ["industry", "framework", "peers"]}
+    assert cat.pick_lists["sources"]["keep_only"] == ["mpc-economics-crack-spread-kpi-definition", "mpc-s01", "mplx-s01", "planner-measure-list-2026-10-18"]
+    assert cat.pick_lists["sources"]["labels"]["mpc-s01"] == "Marathon Petroleum Corporation, Form 10-K for the fiscal year ended 2025-12-31"
+    assert set(cat.pick_lists["sources"]) == {"keep_only", "labels"}
     assert cat.pick_lists["roles"] == {"hide": ["Black Oil Manager"],
                                        "add": [{"id": "value-chain-optimization-director", "label": "Value Chain Optimization Director"}]}
     assert len(cat.pick_lists["data-products"]["keep_only"]) == 13
@@ -190,6 +197,7 @@ def test_the_settings_hide_and_add_entries_of_the_ontologys_lists(cat):
     ('[pick_list.data-products]\nkeep_only = [', '[pick_list.data-products]\nhide = ["HR"]\nkeep_only = [', "use `keep_only`, or `hide` and `hide_tiers`, not both"),
     ('id = "sharepoint"\nlabel = "SharePoint"', 'id = "sharepoint"', "each added entry needs an id and a label"),
     ('id = "sharepoint"', 'id = "new:sharepoint"', "the id of an added entry is a short name of its own"),
+    ('"mpc-s01" = "Marathon', '"mpc-s01" = 7\n"x" = "Marathon', "`labels` gives an entry the label the forms show"),
     ('id = "sharepoint"\nlabel = "SharePoint"', 'id = "sharepoint"\nlabel = "SharePoint"\n\n[[pick_list.systems.add]]\nid = "sharepoint-online"\nlabel = " sharepoint "',
      "two added entries have the same label"),
 ])
@@ -234,3 +242,40 @@ def test_an_added_entry_the_ontology_has_gained_becomes_an_alias_and_is_not_offe
     assert [o["label"] for o in rules.options(cat, built["lists"], question)] == ["Billing Clerk", "Stock Planner", "A role that is not in the list"]
     assert rules.aliases(built["lists"], question) == {"new:billing-clerk": next(r for r in built["lists"]["roles"] if r["id"] == made_up.ROLE_CLERK)}
     assert not any(r.get("added") for r in built["lists"]["roles"])
+
+
+def test_an_entry_can_be_shown_under_a_label_of_the_settings_and_is_still_found_by_its_older_label(cat, tmp_path):
+    from kpi_store.intake import answers, check, picklists, workbook
+    # The workbook is filled before the settings rename the role, so its cell holds "Stock Planner".
+    before = made_up.data()
+    path = tmp_path / "filled.xlsx"
+    workbook.save(workbook.build(cat, before["lists"], {}, made_up.intake()), path)
+    after = picklists.apply_settings(made_up.data(), {"roles": {"labels": {"planner": "Planner of stock"}, "hide": ["Billing Clerk"]},
+                                                       "sources": {"keep_only": ["manual"], "labels": {made_up.SOURCE: "The stock manual"}}})
+    question = cat.by_id["6.1"]
+    assert [o["label"] for o in rules.options(cat, after["lists"], question)] == ["Planner of stock", "A role that is not in the list"]
+    ids = workbook.label_ids(cat, after["lists"], question)
+    assert ids["Stock Planner"] == ids["Planner of stock"] == made_up.ROLE_PLANNER      # the old label, the new label, one entry
+    assert ids["Billing Clerk"] == ids["Billing Clerk (hidden in this organization's settings)"] == made_up.ROLE_CLERK
+    intake = answers.read(path, cat, after["lists"])
+    assert intake.answers["6.1"] == [made_up.ROLE_PLANNER] and intake.answers["3.5"] == [made_up.SOURCE]
+    report = check.check(cat, after, intake)
+    assert report.complete, report.text()
+    # A workbook built after the change shows the new label, and reads back as the same id.
+    workbook.save(workbook.build(cat, after["lists"], {}, made_up.intake()), path)
+    from openpyxl import load_workbook
+    cells = [c.value for row in load_workbook(path)["6 What it connects to"].iter_rows() for c in row]
+    assert "Planner of stock" in cells
+    assert answers.read(path, cat, after["lists"]).answers["6.1"] == [made_up.ROLE_PLANNER]
+    # An added entry that the ontology gained under a label the settings then changed is still read as that entry.
+    gained = made_up.data()
+    gained["lists"]["roles"].append({"id": made_up.X + "role/night", "label": "Night Planner", "group": "Role register"})
+    both = picklists.apply_settings(gained, {"roles": {"add": [{"id": "night", "label": "Night Shift Planner"}], "labels": {"Night Planner": "Night Shift Planner"}}})
+    assert rules.aliases(both["lists"], question)["new:night"]["id"] == made_up.X + "role/night"
+    assert workbook.label_ids(cat, both["lists"], question)["Night Shift Planner (new, not yet in the ontology)"] == "new:night"
+    # A label that two entries would share, and a name that matches no entry, stop the build.
+    for change, message in (({"roles": {"labels": {"planner": "Billing Clerk"}}}, "`labels` gives two entries the label"),
+                            ({"roles": {"labels": {"ghost": "A ghost"}}}, "`labels` names 'ghost', which is no entry of the list")):
+        with pytest.raises(catalogue.CatalogueError) as error:
+            picklists.apply_settings(made_up.data(), change)
+        assert message in str(error.value)

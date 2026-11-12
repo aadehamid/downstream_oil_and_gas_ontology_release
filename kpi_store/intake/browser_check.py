@@ -112,7 +112,7 @@ def choose(page, question, value):
 def load(s):
     page = s.open()
     same(page.locator("h1").inner_text(), "KPI intake form", "the page's heading")
-    holds(page.locator("#release-line").text_content(), "KPI Store 1.1, catalogue 1.1", "the release line")
+    holds(page.locator("#release-line").text_content(), "KPI Store 1.1, catalogue 1.2", "the release line")
     same(page.locator("#tabs [role=tab]").all_inner_texts(),
          ["KPI intake", "Domain activation", "Process map request", "The roles", "What we will ask you"], "the tabs")
     same(page.locator("[data-section]").count(), 7, "sections of the KPI form")
@@ -205,11 +205,12 @@ def save(s):
     data = json.loads(Path(download.value.path()).read_text(encoding="utf-8"))
     same(data["format"], 1, "format")
     same(data["form"], "kpi-intake", "form")
-    same(data["catalogue_version"], "1.1", "catalogue version")
+    same(data["catalogue_version"], "1.2", "catalogue version")
     same(data["kpi_name"], "Tank Turnover", "KPI name")
     same(data["answers"], {"2.1": "Tank Turnover", "3.9": "draft", "4.1": "yes", "4.2": "yes", "5.1": ["turns", "stock turn"]}, "answers")
     same(data["sign_offs"], {"data-owner": {"name": "A name", "date": "2026-11-11"}}, "sign-offs")
-    holds(page.locator("#status").inner_text(), "Saved tank-turnover.kpi-intake.json", "the status line")
+    # The form asked the browser for a download. It cannot know that the file was kept, and does not say so.
+    same(page.locator("#status").inner_text(), "Download requested: tank-turnover.kpi-intake.json. Check that the file appears in your chosen folder.", "the status line")
 
 
 def load_file(s):
@@ -498,12 +499,13 @@ def hidden(s):
     same(box.locator(".picker-more").inner_text(), "Nothing in the list matches.", "the list searched for the hidden role")
     box = search(page, "6.1", "Asphalt")
     same(box.locator(".picker-list .option-label").first.inner_text(), "Asphalt Manager", "a role the settings leave")
-    # The sources: 19 of MPC and of the process map, and the document that is not in the list. No other tier.
-    same(card(page, "3.5").locator(".picker-list input").count(), 20, "documents offered in 3.5")
-    labels = card(page, "3.5").locator(".picker-list .option-label").all_inner_texts()
-    assert any(label.startswith("Marathon Petroleum Corporation, Form 10-K") for label in labels), "the MPC 10-K is not offered in 3.5"
-    assert not any("industry-view" in label for label in labels), "a peer or industry source is offered in 3.5"
-    same(labels[-1], "A document that is not in the list", "the last option of 3.5")
+    # The sources: four documents under plain labels, and the document that is not in the list.
+    same(card(page, "3.5").locator(".picker-list .option-label").all_inner_texts(), [
+        "Marathon Petroleum Corporation, Form 10-K for the fiscal year ended 2025-12-31",
+        "MPC Economics, 3-2-1 Crack Spread KPI Definition",
+        "MPLX LP, Form 10-K for the fiscal year ended 2025-12-31",
+        "Value Chain Optimization Decision Support and Visualization: the planning team's measure list",
+        "A document that is not in the list"], "documents offered in 3.5")
     # The data products: 13, then "None yet" and "Not in the list".
     same(card(page, "6.6").locator(".picker-list input").count(), 15, "options of 6.6")
     assert "HR" not in card(page, "6.6").locator(".picker-list .option-label").all_inner_texts(), "a functional area is offered in 6.6"
@@ -538,8 +540,11 @@ def added(s):
     same(box.locator(".picker-list .option-label").all_inner_texts(), ["Value Chain Optimization Director (new, not yet in the ontology)", "A role that is not in the list"], "the added role, and the option that stays")
     option.check()
     note = card(page, "6.1").locator('[data-notice="to-add"]')
-    same(note.locator(".notice-title").inner_text(), "New: the Architect adds it to the ontology first", "the notice's title")
-    holds(note.locator(".notice-text").inner_text(), '"Value Chain Optimization Director" is new. The ontology does not hold it yet. Go on with the form.', "the notice")
+    same(note.locator(".notice-title").inner_text(), "You can continue with this entry", "the notice's title")
+    same(note.locator(".notice-text").inner_text(), '"Value Chain Optimization Director" is available in this form but is not yet in the ontology. '
+         "Continue filling in the KPI. The Architect must add this entry before adding the KPI.", "the notice")
+    # The notice fades in. Once it has arrived it is as readable as the form's other text.
+    page.wait_for_function("getComputedStyle(document.querySelector('[data-notice=\"to-add\"]')).opacity === '1' && document.querySelector('[data-notice=\"to-add\"]').getAnimations().length === 0")
     assert "HOW-TO-UPDATE.md" not in note.locator(".notice-text").inner_text(), "the notice shows HOW-TO-UPDATE.md to the business"
     holds(note.locator(".notice-analyst p").text_content(), "to the organization module with HOW-TO-UPDATE.md", "the line for the analyst")
     same(card(page, "6.1").locator('[data-notice="process-map-request"]').count(), 0, "a process map request for the added role")
@@ -593,6 +598,10 @@ def new_fields(s):
     same(page.locator('[data-section="7"] .section-progress').inner_text(), "1 required answer left · 3 optional unanswered", "section 7 of a new form")
     same(card(page, "7.10").locator(".q-rule").inner_text(), "Optional", "the rule of the API question")
     same(card(page, "7.8").locator(".q-text").inner_text(), "Which AI assistant or report answers from this view?", "question 7.8")
+    # What a reader must know is under the answer, in sight, and not under "For the analyst".
+    same(card(page, "3.9").locator(".q-help").inner_text(), "The form does not change this status when someone signs.", "the help of 3.9")
+    assert card(page, "6.8").locator(".q-help").is_visible() and card(page, "6.8").locator(".q-analyst").is_hidden(), "the note on names is not in sight under 6.8"
+    assert card(page, "2.1").locator(".q-help").is_hidden(), "a question with no help shows an empty line"
     same(card(page, "2.5").locator(".q-rule").inner_text(), "Required", "the rule of the objective")
     with page.expect_download() as download:
         page.locator("#save").click()
@@ -626,10 +635,19 @@ def guide(s):
     other.goto(guide_url)
     same(other.locator("h1").inner_text(), "How to use the KPI intake form", "the guide's heading")
     same(other.locator('a[href="kpi-intake-form.html"]').count() > 0, True, "the guide links back to the form")
+    same(other.locator(".tasks a").all_inner_texts(), ["Start", "Save", "Continue", "Hand over", "Find a checked KPI"], "the guide's task links")
+    for href in other.locator(".tasks a").evaluate_all("links => links.map(a => a.getAttribute('href'))"):
+        same(other.locator(href).count(), 1, f"the section {href} of the guide")
+    holds(other.locator("#save .ui-status").inner_text(), "Download requested: crack-spreads-pricing.kpi-intake.json. Check that the file appears in your chosen folder.", "the save message the guide shows")
+    same(other.locator('#groups a[href="kpi-intake-form.html#q-3.8"]').count(), 1, "the guide's link to question 3.8")
     same(asked, [], "what the guide asked the network or the disk for")
     same(errors, [], "errors on the guide")
     assert target is None or target.is_file(), "the guide is not beside the form"
     context.close()
+    # A link of the guide to one question opens the form at that question.
+    at = s.open()
+    at.goto(s.url + "#q-3.8")
+    at.wait_for_function("(() => { const r = document.getElementById('q-3.8').getBoundingClientRect(); return r.top >= 0 && r.top < innerHeight; })()")
     # Phone width: the link is a target of 44 px.
     phone_page = s.open(width=390, height=844)
     assert phone_page.locator("#guide-link").bounding_box()["height"] >= 44, "the guide link is under 44 px high at 390 px"

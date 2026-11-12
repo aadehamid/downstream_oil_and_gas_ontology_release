@@ -8123,6 +8123,7 @@
     "tier": "framework"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/data-product-portfolio",
     "label": "Data product portfolio, business_architecture/business_process/data_product_portfolio.json, generated 2026-08-05, from: Data Product Lines & Data Portfolio slide (Commercial / Midstream / Corporate...",
     "tier": "process-authority"
@@ -8146,6 +8147,7 @@
     "tier": "framework"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/downstream-process-map",
     "label": "Downstream process map, business_architecture/business_process/downstream_process_map.json",
     "tier": "process-authority"
@@ -8348,16 +8350,21 @@
     "tier": "framework"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/core-2-3-0-process-definitions",
     "label": "MPC core 2.3.0, the names and definitions of the processes each system supports, business_architecture/ontology/releases/previous/core/2.3.0/core.ttl",
     "tier": "process-authority"
    },
    {
     "id": "https://w3id.org/mpc/ontology/source/mpc-economics-crack-spread-kpi-definition",
-    "label": "MPC Economics, 3-2-1 Crack Spread KPI Definition, provided by the subject matter expert on 2026-10-20, business_architecture/reference/internal/crack-spread-kpi-definition.md",
-    "tier": "process-authority"
+    "label": "MPC Economics, 3-2-1 Crack Spread KPI Definition",
+    "tier": "process-authority",
+    "was": [
+     "MPC Economics, 3-2-1 Crack Spread KPI Definition, provided by the subject matter expert on 2026-10-20, business_architecture/reference/internal/crack-spread-kpi-definition.md"
+    ]
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/mpc-performance-measures-evidence",
     "label": "MPC performance measures, business_architecture/reference/mpc/mpc-performance-measures-evidence.md",
     "tier": "mpc"
@@ -8374,6 +8381,7 @@
     "tier": "industry"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/office-lanes",
     "label": "Office lanes, business_architecture/business_process/office_lanes.json",
     "tier": "process-authority"
@@ -8559,41 +8567,49 @@
     "tier": "framework"
    },
    {
+    "hidden": true,
     "id": "urn:epm:comment:6115309253",
     "label": "Source-author answer, comment 6115309253",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "urn:epm:comment:6116668059",
     "label": "Source-author answer, comment 6116668059",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/step3c-definition-workbook",
     "label": "Step 3c definition workbook, approved row",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/sme-review-2026-10-25-item-g",
     "label": "the subject matter expert's answers to the item G questions, session of 2026-10-25, (the review comments of a subject matter expert reviewing the documents)",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/decision-owner-customer-inputs",
     "label": "the subject matter expert's customer inputs (seven files), as the party module holds them in its customer roles, data flows and attributes",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/decision-owner-customer-inputs-2026-10-27",
     "label": "the subject matter expert's customer inputs of 2026-10-27 (including two Dealer Master documents), as the party module holds them",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/decision-owner-pricing-assets-2026-10-25",
     "label": "the subject matter expert's Databricks pricing metric views, their lineage and the Genie agents' instructions (idp_sbx sandbox), shared on 2026-10-25 (the decision of 2026-10-25)",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/sme-review-2026-10-24-systems",
     "label": "the subject matter expert's identifications of systems, session of 2026-10-24, (the review comments of a subject matter expert reviewing the documents)",
     "tier": "process-authority"
@@ -8618,15 +8634,20 @@
    },
    {
     "id": "https://w3id.org/mpc/ontology/source/planner-measure-list-2026-10-18",
-    "label": "Value Chain Optimization Decision Support and Visualization (VCO DSV): the planning team's measure list, as the subject matter expert sent it on 2026-10-18 (the decision of 2026-10-18)",
-    "tier": "process-authority"
+    "label": "Value Chain Optimization Decision Support and Visualization: the planning team's measure list",
+    "tier": "process-authority",
+    "was": [
+     "Value Chain Optimization Decision Support and Visualization (VCO DSV): the planning team's measure list, as the subject matter expert sent it on 2026-10-18 (the decision of 2026-10-18)"
+    ]
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/value-stream-commercial-lifecycle",
     "label": "Value stream Commercial Hydrocarbon Lifecycle, business_architecture/business_process/value_stream_commercial_lifecycle.json, generated 2026-08-05, from: Commercial Business Process Lifecycle slide...",
     "tier": "process-authority"
    },
    {
+    "hidden": true,
     "id": "https://w3id.org/mpc/ontology/source/value-stream-order-to-cash",
     "label": "Value stream Order to Cash, business_architecture/business_process/value_stream_order_to_cash.json, generated 2026-08-05, from: Domains/O2C/02_O2C Process Taxonomy.pptx (9 process groups / capabili...",
     "tier": "process-authority"

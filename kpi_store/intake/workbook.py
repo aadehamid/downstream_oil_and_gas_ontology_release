@@ -127,7 +127,7 @@ def build(cat, lists, examples=None, intake=None, others=None):
                 row += 1
                 first = n == 0
                 put(ws, row, 1, number)
-                put(ws, row, 2, text + ("\n" + question["note"] if first and question.get("note") else ""))
+                put(ws, row, 2, text + "".join("\n" + question[key] for key in ("help", "note") if first and question.get(key)))
                 put(ws, row, 3, cat.asked_of(question) + "\n" + cat.requirement(question) if first else "")
                 put(ws, row, 5, question["why"] if first else "")
                 put(ws, row, 6, examples.get(question["id"], "") if first else "")
@@ -306,6 +306,11 @@ def label_ids(cat, lists, question):
                 ids.setdefault(option["label"].removesuffix(mark), option["id"])
     for alias, item in rules.aliases(lists, question).items():
         ids.setdefault(item["label"] + ADDED_MARK, alias)
+    # The label an entry had before the settings gave it another, also with the mark of a hidden entry.
+    for item in lists.get(question.get("source", ""), []):
+        for old in item.get("was", []):
+            ids.setdefault(old, item["id"])
+            ids.setdefault(old + HIDDEN_MARK, item["id"])
     return ids
 
 

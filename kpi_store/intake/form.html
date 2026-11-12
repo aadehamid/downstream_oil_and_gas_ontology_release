@@ -573,6 +573,7 @@ td:last-child, th:last-child { padding-right: 0; }
     <div class="q-answer">
       <details class="q-analyst" hidden><summary><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg>For the analyst</summary><p class="q-note" hidden></p></details>
       <div class="q-input"></div>
+      <p class="hint q-help" hidden></p>
       <div class="q-detail" hidden><label class="q-detail-label"></label><span class="q-detail-need" hidden>Required</span></div>
       <div class="q-notices"></div>
     </div>
@@ -1043,6 +1044,7 @@ function drawQuestion(q) {
   card.querySelector(".q-rule").textContent = q.requirement;
   const note = card.querySelector(".q-note");
   if (q.note) { note.textContent = q.note; note.hidden = false; card.querySelector(".q-analyst").hidden = false; }
+  if (q.help) { const help = card.querySelector(".q-help"); help.textContent = q.help; help.hidden = false; }
   card.querySelector(".q-why-text").textContent = q.why;
   if (q.example) { const ex = card.querySelector(".q-example"); ex.hidden = false; ex.querySelector("p").textContent = q.example; }
   drawInput(q, card.querySelector(".q-input"));
@@ -1268,8 +1270,8 @@ function refresh() {
         for (const hit of hits) routeNotice(box, hit);
         for (const o of added) {
           const name = o.label.replace(DATA.added_mark, "");
-          notice(box, "to-add", "New: the Architect adds it to the ontology first",
-            `"${name}" is new. The ontology does not hold it yet. Go on with the form. The Architect adds it before this KPI is applied.`, false,
+          notice(box, "to-add", "You can continue with this entry",
+            `"${name}" is available in this form but is not yet in the ontology. Continue filling in the KPI. The Architect must add this entry before adding the KPI.`, false,
             { analyst: `The Architect adds "${name}" to the ${module} module with HOW-TO-UPDATE.md. The check lists it under "To add to the ontology first".` });
         }
         if (same) notice(box, "same-measure", "The ontology already holds this measure", `"${same.label}" has this name. Stop the form. The request becomes a change to that measure.`, true);
@@ -1405,7 +1407,8 @@ function save() {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-  say(`Saved ${link.download}. Check it with: py -m kpi_store.intake check ${link.download}`);
+  // The browser was asked for a download. The page cannot know whether, or where, the file was kept.
+  say(`Download requested: ${link.download}. Check that the file appears in your chosen folder.`);
 }
 function readFile(text, name) {
   // The file is checked whole before any of it is shown. A file that fails leaves every answer as it was.
