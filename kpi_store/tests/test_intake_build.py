@@ -60,7 +60,7 @@ def test_the_pick_lists_hold_the_counts_of_this_release(committed):
     assert by_level == {0: 2, 1: 10, 2: 13, 3: 48, 4: 137, 5: 474, 6: 23}      # 71 at levels 1 to 3, 634 at 4 to 6
     assert sum(1 for p in lists["processes"] if p["area"]) == 485
     assert [a["label"] for a in lists["business-areas"] if not a["in_use"]] == ["IT Services"]
-    assert sum(1 for r in lists["roles"] if r["group"] == "Planning persona") == 4
+    assert sum(1 for r in lists["roles"] if r.get("group") == "Planning persona") == 4
     assert sum(1 for r in lists["roles"] if r["label"].endswith("(deprecated)")) == 3
     assert "Distribution Planner" in [r["label"] for r in lists["roles"]]
     assert "Distribution Planner (planning persona)" in [r["label"] for r in lists["roles"]]
