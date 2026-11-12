@@ -270,8 +270,49 @@ def test_a_relationship_attached_after_the_question_stops_the_delete(world, stor
     assert db.nodes == before and not db.writes()
 
 
+@pytest.mark.parametrize("store, nodes", [("enterprise", 8), ("neo4j", 12)])
+def test_the_check_for_another_writers_relationship_runs_in_the_transaction_of_each_batch(world, monkeypatch, store, nodes):
+    monkeypatch.setattr(reset, "BATCH", 5)
+    db = getattr(world, store)
+    assert world.go(stores=[store]) == 0
+    # Batches of 5: each transaction checks first, then deletes, then commits. A batch that is not full is the last.
+    assert db.transactions == {8: [["guard", "delete 5", "commit"], ["guard", "delete 3", "commit"]],
+                               12: [["guard", "delete 5", "commit"], ["guard", "delete 5", "commit"], ["guard", "delete 2", "commit"]]}[nodes]
+    assert db.count("Resource") == 0
+
+
+@pytest.mark.parametrize("store, left", [("enterprise", 5), ("neo4j", 7)])
+def test_a_relationship_attached_between_two_batches_stops_the_delete_there(world, monkeypatch, store, left):
+    monkeypatch.setattr(reset, "BATCH", 5)
+    db = getattr(world, store)
+    db.on_commit = lambda: setattr(db, "links", [(["Invoice"], 1)])   # another writer, after the first batch is committed
+    assert world.go(stores=[store]) == 1
+    assert db.transactions == [["guard", "delete 5", "commit"], ["guard", "rollback"]]
+    assert len(db.nodes) == left   # 10 less 5, or 12 less 5: the second batch was not deleted
+    assert "1 relationship(s) join a KPI Store node to a node without its marks (at the far end: 1 Invoice)" in world.lines[-2]
+    assert "5 node(s) were deleted before this was found, and no more." in world.lines[-2] and "Nothing was deleted" not in world.lines[-2]
+
+
+def test_a_delete_that_fails_rolls_its_transaction_back(world, monkeypatch):
+    real = world.neo4j.run
+    def run(query, parameters=None, **kwargs):
+        if "DETACH DELETE" in query:
+            raise ConnectionError("made up")
+        return real(query, parameters, **kwargs)
+    world.neo4j.run = run
+    assert world.go(stores=["neo4j"]) == 1
+    assert world.neo4j.transactions == [["guard", "rollback"]] and len(world.neo4j.nodes) == 12
+
+
 def test_the_copys_own_delete_is_unchanged():
     from kpi_store import copy_enterprise as ce
+    # The reset's two statements pass the copy's guard as they are sent to Enterprise.
+    ce.check_statement("MATCH (n) WHERE NOT " + ce.own_predicate() + " WITH n AS far MATCH (far)-[r]-(n) WHERE " + ce.own_predicate()
+                       + " RETURN labels(far) AS labels, count(DISTINCT r) AS n")
+    assert reset.FOREIGN_LINKS.format(own="X") == ("MATCH (n) WHERE NOT X WITH n AS far MATCH (far)-[r]-(n) WHERE X "
+                                                   "RETURN labels(far) AS labels, count(DISTINCT r) AS n")
+    ce.check_statement("MATCH (n) WHERE " + ce.own_predicate() + " WITH n LIMIT 1000 DETACH DELETE n RETURN count(*) AS c")
+    assert reset.BATCH == 1000
     assert ce.own_predicate().startswith("coalesce((n:Resource AND ")
     db = stores_support.FakeNeo4j()
     ce.remove_own(db, PARAMS | {"store": "enterprise"})
@@ -281,11 +322,11 @@ def test_the_copys_own_delete_is_unchanged():
 # ---- Ctrl+C ----------------------------------------------------------------------------------------
 
 def test_ctrl_c_during_a_store_names_it_and_the_stores_not_reached(world, monkeypatch):
-    def stopped(session, params, rules):
+    def stopped(session, params, rules, where):
         if session.name == "neo4j":
             raise KeyboardInterrupt
         world.enterprise.nodes = [n for n in world.enterprise.nodes if n[0] == ["Invoice"]]
-    monkeypatch.setattr(reset.copy_enterprise, "remove_own", stopped)
+    monkeypatch.setattr(reset, "delete_own", stopped)
     assert world.go() == 1
     assert world.lines[-2:] == [
         "neo4j: STOPPED by Ctrl+C while it was being emptied. It may be partly emptied",
@@ -479,11 +520,11 @@ def test_a_store_that_cannot_be_read_is_left_alone_and_the_others_are_emptied(wo
 
 
 def test_a_failure_stops_the_reset_and_names_the_stores_it_did_not_reach(world, monkeypatch):
-    def fails(session, params, rules):
+    def fails(session, params, rules, where):
         if session.name == "neo4j":
             raise ConnectionError("bolt://made-up-host:7687 refused")
         world.enterprise.nodes = [n for n in world.enterprise.nodes if n[0] == ["Invoice"]]
-    monkeypatch.setattr(reset.copy_enterprise, "remove_own", fails)
+    monkeypatch.setattr(reset, "delete_own", fails)
     assert world.go() == 1
     assert world.lines[-3].startswith("enterprise: emptied. 8 node(s) deleted")
     assert world.lines[-2:] == [

@@ -73,6 +73,8 @@ class FakeNeo4j:
         self.nodes = []          # [(labels, props)]
         self.constraints = []    # constraint names
         self.links = []          # [(labels of a node without the KPI Store's marks, its relationships to KPI Store nodes)]
+        self.transactions = []   # one list per explicit transaction: "guard", "delete <n>", then "commit" or "rollback"
+        self.on_commit = None    # called after each commit: another writer's chance to change the database
         self.relationships = 0   # between Resource nodes
         self.statements = []
         self.closed = False
@@ -94,6 +96,30 @@ class FakeNeo4j:
 
     def __exit__(self, *exc):
         self.close()
+
+    def begin_transaction(self):
+        """An explicit transaction. Its statements run on the database at once; the events are what the tests read."""
+        db, events = self, []
+        self.transactions.append(events)
+
+        class Transaction:
+            def run(self, query, parameters=None, **kwargs):
+                text = " ".join(getattr(query, "text", query).split())
+                result = db.run(query, parameters, **kwargs)
+                if text.endswith("RETURN labels(far) AS labels, count(DISTINCT r) AS n"):
+                    events.append("guard")
+                elif "DETACH DELETE" in text:
+                    events.append(f"delete {result.single()['c']}")
+                return result
+
+            def commit(self):
+                events.append("commit")
+                if db.on_commit:
+                    db.on_commit()
+
+            def rollback(self):
+                events.append("rollback")
+        return Transaction()
 
     def run(self, query, parameters=None, **kwargs):
         text = " ".join(getattr(query, "text", query).split())
@@ -130,6 +156,11 @@ class FakeNeo4j:
         if text.startswith("MATCH (n) WHERE coalesce((n:Resource AND ") and text.endswith("CALL (n) { DETACH DELETE n } IN TRANSACTIONS OF 1000 ROWS"):
             self.nodes = [(l, p) for l, p in self.nodes if not own(l, p)]
             return Result([])
+        batch = re.search(r"WITH n LIMIT (\d+) DETACH DELETE n RETURN count\(\*\) AS c$", text)
+        if text.startswith("MATCH (n) WHERE coalesce((n:Resource AND ") and batch:
+            mine = [i for i, (l, p) in enumerate(self.nodes) if own(l, p)][:int(batch.group(1))]
+            self.nodes = [node for i, node in enumerate(self.nodes) if i not in mine]
+            return Result([{"c": len(mine)}])
         if text == "MATCH (n) RETURN count(n) AS n":
             return Result([{"n": len(self.nodes)}])
         if text == "MATCH (n:Resource) RETURN count(n) AS n":

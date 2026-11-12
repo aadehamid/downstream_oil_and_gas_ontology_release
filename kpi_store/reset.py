@@ -24,9 +24,11 @@ What stays, always: the release folder, the run folder with every run's files an
 folder, and in Databricks the two schemas, the volume with the zip and the reports, and the notebook. The next load
 needs them, and the reports are a record.
 
-No store gets a deletion rule of its own here. Each deletion goes the way the load of that store already goes:
-  enterprise  copy_enterprise.remove_own, on the copy's guarded session (open_target). It is the delete of a replace.
-  neo4j       the same remove_own with the local load's store name. The load's own wipe is not used: it drops
+No store gets a rule of its own here for what may be deleted. Each deletion uses the rule of that store's load:
+  enterprise  the copy's marks (copy_enterprise.own_predicate), on the copy's guarded session (open_target). These
+              are the marks a replace deletes by. The statement is the reset's own (delete_own), because it runs
+              in transactions that also hold the check described below; the copy's remove_own is unchanged.
+  neo4j       the same marks with the local load's store name. The load's own wipe is not used: it drops
               every constraint of the database, and the reset drops only the ones the load makes.
   fuseki      load_fuseki.stop, which signals only the process that the load started.
   databricks  DROP TABLE IF EXISTS through load_databricks.Gate, which refuses a write outside the two schemas.
@@ -42,8 +44,18 @@ purpose, name it with --skip. Three cases leave a store alone:
   check reads it. The reset then prints the four statements to run by hand.
 - A Neo4j database in which a relationship joins a KPI Store node to a node without the marks. The delete removes
   a node with its relationships, so it would remove that relationship, which another writer made. The reset counts
-  such relationships first, and again right before the delete, and deletes nothing in that database while there
-  is one. The copy stops on a node without the marks in the same way.
+  such relationships before the question, and again at the start of each transaction that deletes a batch of
+  nodes (delete_own). When it finds one it deletes no further node in that database. The copy stops on a node
+  without the marks in the same way.
+
+The checks come immediately before the deletes, and that is all they are. Run the reset when nothing else writes
+to these stores. Two things are not caught:
+- A relationship that another writer commits in the instant between a batch's check and its delete. The two are in
+  one transaction, but Neo4j reads committed data and does not hold the check's answer, so the delete takes that
+  relationship with its node.
+- A part of the Fuseki folder's path that is replaced by a link in the instant between the check of the folder
+  and its delete.
+Nothing here locks a store against another writer.
 
 The stores are emptied one after another, and a deletion is not undone. When one store fails, or Ctrl+C stops the
 reset, it stops there, says which store may be partly emptied, names the stores it did not reach, and leaves the
@@ -85,6 +97,7 @@ LOAD_CONSTRAINTS = ("n10s_unique_uri",)
 # renamed first and n is bound again to the near one.
 FOREIGN_LINKS = ("MATCH (n) WHERE NOT {own} WITH n AS far MATCH (far)-[r]-(n) WHERE {own} "
                  "RETURN labels(far) AS labels, count(DISTINCT r) AS n")
+BATCH = copy_enterprise.BATCH   # nodes per transaction of delete_own, as in the copy's own delete
 STOP_WAIT_SECONDS = 30   # how long the reset waits for the stopped Fuseki to end before it gives up
 DELETE_TRIES = 10        # Windows frees a stopped program's files a moment after it ends, so the delete is tried again
 KEPT = ("kept: the release folder, the run folder with every run's files and reports, and in Databricks the two "
@@ -113,10 +126,11 @@ def count_text(counts):
 
 # ---- the two Neo4j databases --------------------------------------------------------------------------
 
-def refuse_foreign_links(session, params, rules, where):
-    """Raises ResetFailed when a relationship joins a KPI Store node to a node without the marks. remove_own deletes
-    a node with its relationships, and such a relationship is another writer's, so the whole database is left as it
-    is. where names the database in the message."""
+def refuse_foreign_links(session, params, rules, where, deleted=0):
+    """Raises ResetFailed when a relationship joins a KPI Store node to a node without the marks. The delete removes
+    a node with its relationships, and such a relationship is another writer's, so no node, or no further node,
+    is deleted. session is a session or a transaction. where names the database in the message, and deleted is the
+    number of nodes that earlier batches of the same delete already removed."""
     found = session.run(FOREIGN_LINKS.format(own=copy_enterprise.own_predicate(rules)), **params).data()
     total = sum(row["n"] for row in found)
     if not total:
@@ -128,7 +142,37 @@ def refuse_foreign_links(session, params, rules, where):
     by_count = ", ".join(f"{n} {label}" for label, n in sorted(far.items(), key=lambda item: (-item[1], item[0])))
     raise ResetFailed(f"in {where}, {total} relationship(s) join a KPI Store node to a node without its marks (at the "
                       f"far end: {by_count}). The delete would remove them with the node, and they are another writer's. "
-                      "Nothing was deleted. Ask their owner to remove them, then run the reset again")
+                      + (f"{deleted} node(s) were deleted before this was found, and no more. " if deleted else "Nothing was deleted. ")
+                      + "Ask their owner to remove them, then run the reset again")
+
+
+def delete_own(session, params, rules, where):
+    """Deletes the KPI Store's nodes, by the copy's marks, in batches of BATCH nodes. Returns the number deleted.
+
+    Each batch is one explicit transaction that first runs the check for another writer's relationship and then
+    deletes. So the time between a check and its delete is one transaction, and never the wait at the question
+    or the length of an earlier batch. This does not make the two atomic. Neo4j's transactions read committed
+    data: a relationship that another writer commits after the check has read and before the delete reaches its
+    node is deleted with the node. The check also covers the whole database in every batch, not only that batch's
+    nodes, so a relationship found after the first batch stops the delete with the earlier batches gone.
+
+    The copy's own remove_own is not used and not changed: it is one statement that commits its batches itself
+    (CALL ... IN TRANSACTIONS), and such a statement cannot run inside an explicit transaction."""
+    statement = f"MATCH (n) WHERE {copy_enterprise.own_predicate(rules)} WITH n LIMIT {int(BATCH)} DETACH DELETE n RETURN count(*) AS c"
+    deleted = 0
+    while True:
+        tx = session.begin_transaction()
+        try:
+            refuse_foreign_links(tx, params, rules, where, deleted)
+            n = tx.run(statement, **params).single()["c"]
+            tx.commit()
+        except BaseException:   # Ctrl+C too: the batch that was open is not left half-done
+            with contextlib.suppress(Exception):
+                tx.rollback()
+            raise
+        deleted += n
+        if n < BATCH:   # a batch that is not full was the last one
+            return deleted
 
 
 def marks(ctx, code, store):
@@ -156,9 +200,8 @@ def plan_enterprise(ctx, code, connect):
     def empty():
         with session() as target:
             before = copy_enterprise.holdings(target, params, rules)
-            # Counted again right before the delete: the question may have waited a long time for its answer.
-            refuse_foreign_links(target, params, rules, f"the database {database}")
-            copy_enterprise.remove_own(target, params, rules)
+            # The check for another writer's relationship runs again inside each batch's transaction.
+            delete_own(target, params, rules, f"the database {database}")
             after = copy_enterprise.holdings(target, params, rules)   # read back: the delete must have left none
         if after["own"]:
             raise ResetFailed(f"the database {database} still holds {sum(after['own'].values())} node(s) with the KPI "
@@ -202,8 +245,8 @@ def plan_neo4j(ctx, code, connect):
 
     def empty():
         with connect(cfg) as driver, driver.session(database=cfg.database) as session:
-            before, mine, others = read(session)   # read again right before the delete
-            copy_enterprise.remove_own(session, params, rules)
+            before, mine, others = read(session)   # read again: the question may have waited a long time
+            delete_own(session, params, rules, where)   # checks once more inside each batch's transaction
             # The load's own wipe would drop every constraint here. Only the load's constraints go, each by its
             # name; LOAD_CONSTRAINTS holds fixed names, so no name from the database reaches the statement.
             for name in mine:
@@ -317,8 +360,9 @@ def plan_fuseki(ctx):
             waited += 1
         said = [f"process {pid} stopped"] if outcome == "stopped" else []
         if folder is not None and folder.exists():
-            # Checked again here, right before the delete: the question may have waited a long time for its answer.
-            # What is deleted is the resolved path that this check returns, not the text of the settings.
+            # Checked again here, immediately before the delete: the question may have waited a long time for its
+            # answer. What is deleted is the resolved path that this check returns, not the text of the settings.
+            # A part of the path that is swapped for a link between this check and the delete is not caught.
             checked = check_dataset_folder(folder, ctx.local, ctx.release_root)
             delete_folder(checked, ctx.sleep)
             said.append(f"{checked} deleted")
