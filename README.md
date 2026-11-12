@@ -85,6 +85,7 @@ The runbook says when to run each command and what it prints. This table says on
 |---|---|
 | `py -m kpi_store.setup_check` | Checks the one-time setup of the machine and prints the fix for each failure |
 | `py -m kpi_store.runner` | Runs the whole chain, from a cleared report to the sync check |
+| `py -m kpi_store.runner --reset` | Empties the four stores after it shows what it will delete and you type `reset`, so the next run loads them again from nothing |
 | `py -m kpi_store.cut` | Turns a cleared report into a correction version of the ontology |
 | `py -m kpi_store.load_fuseki` | Loads the release into the local Fuseki and proves by a hash that the store holds exactly the release |
 | `py -m kpi_store.load_neo4j` | Empties the local Neo4j database, loads the release into it and runs every check there |

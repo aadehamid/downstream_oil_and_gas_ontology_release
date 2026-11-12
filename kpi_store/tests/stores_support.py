@@ -71,6 +71,10 @@ class FakeNeo4j:
     def __init__(self, name="neo4j", ident="db-1"):
         self.name, self.ident = name, ident
         self.nodes = []          # [(labels, props)]
+        self.constraints = []    # constraint names
+        self.links = []          # [(labels of a node without the KPI Store's marks, its relationships to KPI Store nodes)]
+        self.transactions = []   # one list per explicit transaction: "guard", "delete <n>", then "commit" or "rollback"
+        self.on_commit = None    # called after each commit: another writer's chance to change the database
         self.relationships = 0   # between Resource nodes
         self.statements = []
         self.closed = False
@@ -93,10 +97,49 @@ class FakeNeo4j:
     def __exit__(self, *exc):
         self.close()
 
+    def begin_transaction(self):
+        """An explicit transaction. Its statements run on the database at once; the events are what the tests read."""
+        db, events = self, []
+        self.transactions.append(events)
+
+        class Transaction:
+            def run(self, query, parameters=None, **kwargs):
+                text = " ".join(getattr(query, "text", query).split())
+                result = db.run(query, parameters, **kwargs)
+                if text.endswith("RETURN labels(far) AS labels, count(DISTINCT r) AS n"):
+                    events.append("guard")
+                elif "DETACH DELETE" in text:
+                    events.append(f"delete {result.single()['c']}")
+                return result
+
+            def commit(self):
+                events.append("commit")
+                if db.on_commit:
+                    db.on_commit()
+
+            def rollback(self):
+                events.append("rollback")
+        return Transaction()
+
     def run(self, query, parameters=None, **kwargs):
         text = " ".join(getattr(query, "text", query).split())
         params = dict(parameters or {}, **kwargs)
         self.statements.append(text)
+        # A rule with no condition, "(n:<label> AND true)", makes every node of that label the KPI Store's: the
+        # reset of the local database adds such rules for the n10s plugin's configuration nodes.
+        always = re.findall(r"\(n:(\w+) AND true\)", text)
+
+        def own(labels, props):
+            return owns(labels, props, params) or any(label in always for label in labels)
+        if text == "SHOW CONSTRAINTS YIELD name RETURN name":
+            return Result([{"name": name} for name in self.constraints])
+        dropped = re.fullmatch(r"DROP CONSTRAINT `(\w+)` IF EXISTS", text)
+        if dropped:
+            self.constraints = [name for name in self.constraints if name != dropped.group(1)]
+            return Result([])
+        if text.startswith("MATCH (n) WHERE NOT coalesce((n:Resource AND ") and text.endswith(
+                "RETURN labels(far) AS labels, count(DISTINCT r) AS n"):
+            return Result([{"labels": list(labels), "n": n} for labels, n in self.links])
         if text.startswith("CALL db.info() YIELD name"):
             return Result([{"name": self.name}])
         if text.startswith("CALL db.info() YIELD id"):
@@ -104,15 +147,20 @@ class FakeNeo4j:
         if text.startswith("MATCH (n) WITH labels(n) AS labels, coalesce((n:Resource AND ") and text.endswith("RETURN own, labels, count(*) AS n"):
             groups = {}
             for labels, props in self.nodes:
-                key = (owns(labels, props, params), tuple(labels))
+                key = (own(labels, props), tuple(labels))
                 groups[key] = groups.get(key, 0) + 1
             return Result([{"own": own, "labels": list(labels), "n": n} for (own, labels), n in groups.items()])
         if text.startswith("MATCH (n) WHERE NOT coalesce((n:Resource AND ") and text.endswith("LIMIT 5"):
-            foreign = [(l, p) for l, p in self.nodes if not owns(l, p, params)]
+            foreign = [(l, p) for l, p in self.nodes if not own(l, p)]
             return Result([{"labels": list(l), "uri": p.get("uri")} for l, p in foreign[:5]])
         if text.startswith("MATCH (n) WHERE coalesce((n:Resource AND ") and text.endswith("CALL (n) { DETACH DELETE n } IN TRANSACTIONS OF 1000 ROWS"):
-            self.nodes = [(l, p) for l, p in self.nodes if not owns(l, p, params)]
+            self.nodes = [(l, p) for l, p in self.nodes if not own(l, p)]
             return Result([])
+        batch = re.search(r"WITH n LIMIT (\d+) DETACH DELETE n RETURN count\(\*\) AS c$", text)
+        if text.startswith("MATCH (n) WHERE coalesce((n:Resource AND ") and batch:
+            mine = [i for i, (l, p) in enumerate(self.nodes) if own(l, p)][:int(batch.group(1))]
+            self.nodes = [node for i, node in enumerate(self.nodes) if i not in mine]
+            return Result([{"c": len(mine)}])
         if text == "MATCH (n) RETURN count(n) AS n":
             return Result([{"n": len(self.nodes)}])
         if text == "MATCH (n:Resource) RETURN count(n) AS n":

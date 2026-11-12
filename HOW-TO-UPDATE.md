@@ -686,6 +686,7 @@ Your packages are the master copy. Each store is a copy that falls behind when y
 1. After every release, run the runner. It loads Databricks, Fuseki, the local Neo4j and Enterprise, and then runs the sync check.
 2. To see later which store is behind, run the sync check alone. The runbook's "The sync check" shows the command and how to read each line.
 3. To repair a store, run the runner again. Do not fix a store by hand.
+4. To load every store again from nothing, for example to show the load, follow the runbook's "Empty every store and load again".
 
 A release is done only when every line of the sync check reads `current`.
 
