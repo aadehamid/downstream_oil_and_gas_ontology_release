@@ -861,12 +861,16 @@ function loadDraft() {
 // the entry's id, an id the settings once added it under, its label of today or a label it had before, and a label
 // counts with or without the mark of a hidden or of a new entry. The map gives [the entry's id, gained], where
 // gained says the value was stored while the entry was only an addition of the settings.
+// A label without the mark at its end. Only the end counts: a label may hold the mark's words inside it.
+function withoutMark(label, mark) {
+  return label.endsWith(mark) ? label.slice(0, label.length - mark.length) : label;
+}
 function resolverOf(q) {
   const map = new Map();
   const items = DATA.lists[q.source];
   for (const item of items) map.set(item.id, [item.id, false]);
   for (const item of items) {
-    const plain = item.added ? item.label.replace(DATA.added_mark, "") : item.label;
+    const plain = item.added ? withoutMark(item.label, DATA.added_mark) : item.label;
     const gained = (item.aliases || []).length > 0;
     for (const name of [plain].concat(item.was || [])) {
       for (const mark of ["", DATA.hidden_mark, DATA.added_mark]) if (!map.has(name + mark)) map.set(name + mark, [item.id, gained && mark === DATA.added_mark]);
@@ -1291,7 +1295,7 @@ function refresh() {
         box.replaceChildren();
         for (const hit of hits) routeNotice(box, hit);
         for (const o of added) {
-          const name = o.label.replace(DATA.added_mark, "");
+          const name = withoutMark(o.label, DATA.added_mark);
           notice(box, "to-add", "You can continue with this entry",
             `"${name}" is available in this form but is not yet in the ontology. Continue filling in the KPI. The Architect must add this entry before adding the KPI.`, false,
             { analyst: `The Architect adds "${name}" to the ${module} module with HOW-TO-UPDATE.md. The check lists it under "To add to the ontology first".` });

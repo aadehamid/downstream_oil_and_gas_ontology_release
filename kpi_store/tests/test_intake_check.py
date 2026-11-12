@@ -4,6 +4,8 @@ Each case is read once from an answers file and once from a filled workbook. Bot
 The pick lists are the made-up ones of intake_support; the catalogue is the release's own.
 """
 import json
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -455,3 +457,28 @@ def test_a_release_folder_without_its_packages_is_a_tool_error_in_words(tmp_path
     assert main(["check", str(example), "--root", str(tmp_path)]) == 2
     err = capsys.readouterr().err
     assert err.startswith("stopped: ") and "Traceback" not in err and len(err.strip().splitlines()) == 1
+
+
+def test_a_report_that_cannot_be_printed_is_a_tool_error(monkeypatch, capsys):
+    # A closed pipe must not look like "the form is not complete" (exit 1) or end in a traceback.
+    class Closed:
+        def write(self, text):
+            raise BrokenPipeError(32, "Broken pipe")
+
+        def flush(self):
+            pass
+
+    example = catalogue.PACK / "examples" / "crack-spreads-pricing.json"
+    monkeypatch.setattr(sys, "stdout", Closed())
+    assert main(["check", str(example)]) == 2
+    monkeypatch.undo()
+    err = capsys.readouterr().err
+    assert err.startswith("stopped: the report could not be printed") and "Traceback" not in err
+
+
+def test_the_form_takes_a_mark_off_the_end_of_a_label_only():
+    # rules.resolver removes a mark only at the end of a label. The form's script must do the same: String.replace
+    # would remove the first place the mark's words appear, and a label may hold those words inside it.
+    script = (Path(check.__file__).parent / "form.html").read_text(encoding="utf-8")
+    assert "function withoutMark(label, mark)" in script and "label.endsWith(mark)" in script
+    assert ".replace(DATA.added_mark" not in script and ".replace(DATA.hidden_mark" not in script

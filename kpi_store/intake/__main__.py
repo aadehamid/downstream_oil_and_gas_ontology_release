@@ -99,9 +99,14 @@ def main(argv=None):
     except OSError as e:      # the last line of defence: a tool error is never exit 1, which means "not complete"
         print(f"stopped: the {args.command} command could not read or write a file: {e}", file=sys.stderr)
         return 2
-    sys.stdout.write(report.text())
-    if saved:
-        print(f"The report is also in {saved.name}, beside the file.")
+    try:
+        sys.stdout.write(report.text())
+        if saved:
+            print(f"The report is also in {saved.name}, beside the file.")
+        sys.stdout.flush()
+    except OSError as e:      # a closed pipe, for one: still a tool error, never "not complete"
+        print(f"stopped: the report could not be printed: {e}", file=sys.stderr)
+        return 2
     return 0 if report.complete else 1
 
 
