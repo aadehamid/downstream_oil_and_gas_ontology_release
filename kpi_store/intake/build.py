@@ -85,9 +85,9 @@ def outputs(root, pack):
     """Every generated file as (path, kind, content): the text of a text file, or the workbook of an .xlsx."""
     pack = Path(pack)
     cat = catalogue.load(pack)
-    built = picklists.build(root)
+    release = picklists.Release(root)      # parsed once, for the lists and for the examples
+    built = picklists.build(root, release)
     lists = built["lists"]
-    release = picklists.Release(root)
     filled = [(spec, examples.build(release, lists, cat, spec)) for spec in examples.specs(pack)]
     column = examples.example_column(cat, lists, [intake for _, intake in filled])
     out = [

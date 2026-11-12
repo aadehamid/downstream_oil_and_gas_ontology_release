@@ -362,6 +362,3 @@ def read(path, cat, lists, form="kpi-intake"):
     if form != "kpi-intake":      # the Start sheet's comment and example mark belong to the KPI form
         intake.comment = intake.example_of = ""
     return intake
-
-
-__all__ = ["build", "read", "save", "same_content", "snapshot", "sheet_title", "FORMS"]

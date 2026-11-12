@@ -59,11 +59,6 @@ def _short(text, limit=70):
     return text if len(text) <= limit else text[:limit - 3].rstrip() + "..."
 
 
-def _label(cat, lists, question, value):
-    offered = {o["id"]: o["label"] for o in rules.options(cat, lists, question)}
-    return offered.get(value, value)
-
-
 def _sections(cat, lists, intake, report):
     answers = intake.answers
     for section in cat.sections:

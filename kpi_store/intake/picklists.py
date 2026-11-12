@@ -233,9 +233,9 @@ def _terms(release):
     return terms
 
 
-def build(root):
+def build(root, release=None):
     """The pick lists, the term index and the versions they were read from, as plain data."""
-    release = Release(root)
+    release = release or Release(root)
     processes = _processes(release)
     areas = _business_areas(release, processes)
     modules = [{"id": m, "label": m} for m in sorted(release.versions)]
