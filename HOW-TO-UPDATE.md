@@ -139,6 +139,7 @@ The runner calls the cut tool for you. To see what a cut does, run the tool on t
      technical-graph 1.1.0 -> 1.1.1-correction.1
      value-stream 1.2.0 -> 1.2.1-correction.1
      integration 2.5.0 -> 2.5.1-correction.1
+   The cut also rebuilds the KPI intake pack (kpi-intake/), whose pick lists come from these packages.
    ```
 
 3. Cut. At the first prompt type `Change_Value_Amount`, which confirms the breaking change. At the second prompt type `yes`.
@@ -165,7 +166,7 @@ The runner calls the cut tool for you. To see what a cut does, run the tool on t
    data-product-1.2.1-correction.1
    ```
 
-5. Run the full check on the corrected copy.
+5. Run the full check on the corrected copy. The documents' examples show the release as shipped, so on a corrected copy the check reads them and runs none. Updating the examples is part of preparing a new zip: `scripts/DOC-SNIPPETS.md` says how, under "The release the examples describe".
 
    ```bash run=correction
    bash scripts/check.sh
@@ -311,7 +312,7 @@ The versions in the commands are those of the release as you received it. Read t
    ...
    ```
 
-9. In a Git copy, stage the change. Then run the full check.
+9. In a Git copy, stage the change. Then run the full check. After a release of a module the check reads the documents' examples and runs none, as after a cut. Before you send the release on as a new zip, bring the examples up to date and record the release they describe (`scripts/DOC-SNIPPETS.md`, "The release the examples describe").
 
    ```bash run=slow
    git add -A

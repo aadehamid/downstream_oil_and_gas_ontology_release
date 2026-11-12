@@ -342,6 +342,117 @@ def test_the_nested_variable_alone_never_turns_the_check_off(tmp_path):
     assert proved.skipped == {"not run: a check started by a block runs no block": 1}
 
 
+# -- the release the examples describe
+
+CATALOG = "releases/catalog.ttl"
+
+
+def describing(catalog_text):
+    """The test registry, saying that the examples describe the release whose catalog holds this text."""
+    return REGISTRY + f'\n[describes]\nfile = "{CATALOG}"\nsha256 = "{hashlib.sha256(catalog_text.encode()).hexdigest()}"\n'
+
+
+# A block that fails when it runs, and the output it would have to print. On the release the documents describe
+# both count as failed. On any other release neither is run or compared.
+WOULD_FAIL = fence("python run=scratch", "raise SystemExit('the example shows another version')") + fence("text expect", "version 1.2.0")
+
+
+def test_on_the_release_the_examples_describe_the_check_runs_every_block(tmp_path):
+    text = fence("python run=scratch", "print('version 1.2.0')") + fence("text expect", "version 1.2.0")
+    for catalog in ("one release\n", "one release\r\n"):   # a checkout on Windows gives the same digest
+        (tmp_path / "tree" / "releases").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "tree" / CATALOG).write_bytes(catalog.encode())
+        result = check(tmp_path, text, registry=describing("one release\n"))
+        assert result.failures == [] and (result.ran, result.checked) == (1, 1) and not result.release_changed
+    assert len(check(tmp_path, WOULD_FAIL, registry=describing("one release\n")).failures) == 2
+    # A folder with no catalog holds no release to compare, so the check runs as it always did.
+    (tmp_path / "tree" / CATALOG).unlink()
+    assert len(check(tmp_path, WOULD_FAIL, registry=describing("one release\n")).failures) == 2
+
+
+def test_on_a_changed_release_the_check_runs_no_block_and_still_parses(tmp_path):
+    """After a correction or a new version the catalog differs. An example may then rightly show something else,
+    so the default check parses and compares files, runs nothing and says so."""
+    text = WOULD_FAIL + fence("json parse", "{}") + fence("json parse", "{not json")
+    result = check(tmp_path, text, files={CATALOG: "a correction version\n"}, registry=describing("one release\n"))
+    assert result.release_changed and not result.nested
+    assert result.failures[0].startswith("guide.md:10: the block is not valid json") and len(result.failures) == 1
+    assert (result.ran, result.checked, result.failed_blocks) == (0, 1, 1)
+    assert result.skipped == {"not run: the release changed since the documents were written": 2}
+
+
+def test_on_a_changed_release_the_strict_check_fails_and_still_runs_the_blocks(tmp_path):
+    then, now = hashlib.sha256(b"one release\n").hexdigest(), hashlib.sha256(b"a correction version\n").hexdigest()
+    result = check(tmp_path, WOULD_FAIL, files={CATALOG: "a correction version\n"}, registry=describing("one release\n"), strict=True)
+    assert result.failures[0] == (f"the documents' examples describe another release than this one: the registry holds {then} and "
+                                  f"{CATALOG} gives {now}. Bring the examples up to date with this release, then run: "
+                                  "py scripts/doc_snippets.py describe-release --write")
+    assert len(result.failures) == 3 and not result.release_changed   # the builder also sees each example to change
+
+
+def test_the_command_says_that_the_release_changed_and_exits_0(tmp_path, capsys):
+    (tmp_path / "releases").mkdir()
+    (tmp_path / CATALOG).write_text("a correction version\n", encoding="utf-8", newline="\n")
+    (tmp_path / "guide.md").write_text(WOULD_FAIL, encoding="utf-8", newline="\n")
+    registry = tmp_path / "registry.toml"
+    registry.write_text(describing("one release\n"), encoding="utf-8", newline="\n")
+    assert d.main(["--root", str(tmp_path), "check", "guide.md"], registry_path=registry) == 0
+    assert capsys.readouterr().out == (
+        "2 blocks: 0 run (0 status-only), 0 checked, 2 skipped (not run: the release changed since the documents were written 2)\n"
+        "note: the release changed since the documents were written, so this check ran no block. An example may show a version "
+        "or a count of the release as it was then. scripts/DOC-SNIPPETS.md says how to bring the examples up to date "
+        "(\"The release the examples describe\").\n")
+    assert d.main(["--root", str(tmp_path), "check", "--strict", "guide.md"], registry_path=registry) == 1
+
+
+def test_describe_release_says_whether_the_digest_is_this_releases_and_writes_it_on_request(tmp_path, capsys):
+    (tmp_path / "releases").mkdir()
+    (tmp_path / CATALOG).write_text("a correction version\n", encoding="utf-8", newline="\n")
+    registry = tmp_path / "registry.toml"
+    registry.write_text(describing("one release\n"), encoding="utf-8", newline="\n")
+    now = hashlib.sha256(b"a correction version\n").hexdigest()
+    args = ["--root", str(tmp_path), "describe-release"]
+    for flags in ([], ["--check"]):
+        assert d.main(args + flags, registry_path=registry) == 1
+        assert capsys.readouterr().out.startswith("FAIL the documents' examples describe another release: registry.toml holds ")
+    assert registry.read_text(encoding="utf-8") == describing("one release\n")   # nothing was written
+    assert d.main(args + ["--write"], registry_path=registry) == 0
+    assert capsys.readouterr().out == f"wrote {now} to registry.toml: the documents' examples now describe this release\n"
+    # Only the digest changed, and the file keeps LF line ends.
+    assert registry.read_bytes() == describing("a correction version\n").encode()
+    for flags in ([], ["--check"], ["--write"]):
+        assert d.main(args + flags, registry_path=registry) == 0
+        assert capsys.readouterr().out == f"the documents' examples describe this release ({CATALOG}, SHA-256 {now})\n"
+    # A folder with no catalog, and a registry that names no release, are both said plainly.
+    (tmp_path / CATALOG).unlink()
+    assert d.main(args, registry_path=registry) == 1
+    assert capsys.readouterr().out == f"FAIL the file {CATALOG} does not exist, so this folder holds no release to describe\n"
+    registry.write_text(REGISTRY, encoding="utf-8", newline="\n")
+    assert d.main(args + ["--write"], registry_path=registry) == 1
+    assert capsys.readouterr().out == "FAIL registry.toml has no [describes] table, so it names no release\n"
+
+
+def test_a_describes_table_needs_a_relative_file_and_a_digest(tmp_path):
+    path = tmp_path / "r.toml"
+    for table, why in (('file = "catalog.ttl"\n', "needs file"), ('file = "/catalog.ttl"\nsha256 = "' + "0" * 64 + '"\n', "needs file"),
+                       ('file = "catalog.ttl"\nsha256 = "ABC"\n', "sha256 must be 64 hexadecimal digits"),
+                       ('file = "catalog.ttl"\nsha256 = "' + "0" * 64 + '"\nmore = 1\n', "needs file")):
+        path.write_text("[describes]\n" + table, encoding="utf-8", newline="\n")
+        with pytest.raises(d.RegistryError, match=why):
+            d.load_registry(path)
+
+
+def test_the_registry_describes_the_release_as_shipped():
+    """Pinned (scripts/pinned-tests.txt): the digest in the registry is this release's, so the check of the release
+    as shipped runs every block. After a correction or a new version it differs, and scripts/check.sh then runs no
+    block. A release cannot be built with a stale digest, because scripts/check-pinned.sh runs this test."""
+    registry = d.load_registry()
+    assert registry.describes == "business_architecture/ontology/releases/catalog.ttl"
+    assert d.release_digest(d.ROOT, registry) == registry.sha256, (
+        "the documents' examples describe another release. Bring them up to date, then run: "
+        "py scripts/doc_snippets.py describe-release --write")
+
+
 def test_the_static_check_runs_nothing_but_still_reads_the_tags(tmp_path):
     text = fence("python run=scratch status-only", "raise SystemExit(1)") + fence("python run=nowhere status-only", "pass")
     result = check(tmp_path, text, static=True)

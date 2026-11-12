@@ -15,11 +15,18 @@ from .match import has_fixed_text, normalise, output_matches
 from .pages import extract_html, html_documents, is_page
 from .parsers import PARSERS
 from .registry import (NESTED, NESTED_FILE, PARSE_LANGS, PLACEHOLDER, REGISTRY, ROOT, RUN_LANGS, SAFE_VALUE, Registry,
-                       load_registry)
+                       load_registry, release_digest)
 from .run import CopyError, NotSimple, Runner, command_lines, family, split_command
 
 OUTPUT_TAIL = 40
 NESTED_NOTE = "this check was started by a block of another check, so it ran no block"
+REFRESH = "py scripts/doc_snippets.py describe-release --write"
+RELEASE_CHANGED = "not run: the release changed since the documents were written"
+RELEASE_NOTE = ("note: the release changed since the documents were written, so this check ran no block. An example may show "
+                "a version or a count of the release as it was then. scripts/DOC-SNIPPETS.md says how to bring the examples "
+                "up to date (\"The release the examples describe\").")
+RELEASE_STRICT = ("the documents' examples describe another release than this one: the registry holds {then} and {file} "
+                  "gives {now}. Bring the examples up to date with this release, then run: " + REFRESH)
 
 
 @dataclass
@@ -32,6 +39,7 @@ class Result:
     by_document: dict = field(default_factory=dict)
     failed_blocks: int = 0
     nested: bool = False        # a block of another check started this one, so it ran nothing
+    release_changed: bool = False   # the release is not the one the examples describe, so the check ran nothing
 
     @property
     def total(self) -> int:
@@ -68,6 +76,8 @@ class Checker:
     def check(self, docs=None) -> Result:
         if not self._started_by_a_block():
             return self.result
+        if not self.result.nested:
+            self._release_described()
         docs = documents(self.root) + html_documents(self.root) if not docs else list(docs)
         with tempfile.TemporaryDirectory(prefix="doc-snippets-") as tmp:
             self.runner = Runner(self.root, self.registry, self.environ, Path(tmp).resolve())
@@ -93,6 +103,20 @@ class Checker:
         self.static, self.result.nested = True, True
         self.static_reason = "not run: a check started by a block runs no block"
         return True
+
+    def _release_described(self):
+        """Compares the release with the one the registry says the examples describe (registry.release_digest).
+        On another release the check runs no block, because an example may rightly differ there. With `strict`,
+        which the release's builder uses, it fails instead and still runs the blocks, so the builder sees each
+        example that needs a change."""
+        now = release_digest(self.root, self.registry)
+        if now is None or now == self.registry.sha256:
+            return
+        if self.strict:
+            self._fail(None, RELEASE_STRICT.format(then=self.registry.sha256, file=self.registry.describes, now=now))
+            return
+        self.static, self.result.release_changed = True, True
+        self.static_reason = RELEASE_CHANGED
 
     def _check_document(self, doc: str):
         path = self.root / doc
