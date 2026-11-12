@@ -1,4 +1,4 @@
-"""Open both ontology pages in a real browser and prove the eight things a reader relies on.
+"""Open both ontology pages in a real browser and prove the things a reader relies on.
 
     uv run --no-project --with playwright==1.65.0 python business_architecture/ontology/viewer/browser_check.py
 
@@ -16,6 +16,23 @@ For viewer/index.html and for horoi_viewer/index.html it proves, each from a fre
   7 way back      the browser's Back button and the breadcrumb return to where the reader was
   8 deep link     a link to a term opens that term directly
   + narrow        at 390 px the page has no sideways scroll
+
+For viewer/index.html it also proves:
+
+  9 keys          in search, Enter opens the first result, and the arrow keys choose another result for Enter
+  10 prefix       search finds a term by its prefixed name, tg:replaces
+  11 shortcut     the search box names its shortcut, and Ctrl+K and Cmd+K open the search
+  12 no term      All ontology shows a "Choose a term" panel until the reader selects a term
+  13 namespaces   a prefix that the packages give several namespaces finds the terms of each one
+
+For horoi_viewer/index.html it also proves:
+
+  9 ranking       search lists an exact label match first, then the labels that start with the search text
+  10 names        each module has the name the full ontology viewer gives it
+  11 measure      a measure's page shows "What points to this term" directly under its definition
+  12 language     a definition shows no "en" language tag
+  13 slash key    the "/" key opens Find a term with the cursor in its search box, except while the reader types
+  14 wording      the page calls the other page the full ontology viewer
 
 Every expected value below is written by hand from the release packages. The script exits 1 when a proof fails
 and names it.
@@ -56,6 +73,50 @@ PROCESS = "https://w3id.org/mpc/ontology/process/CM-1-1-4-7-4"
 PROCESS_LABEL = "Capture Product/Crude/Feedstock Price"
 # One of the two views whose dp:servesMeasure names the measure: the measure's source on the data platform.
 SOURCE_VIEW = "idp_sbx.semantic_sem_commercial.mips_mpr_executive_summary_fact_vw"
+# The kpi measure whose definition names Crude Market Pricing. Of the 15 other terms that hold that text, its label
+# comes first in alphabetical order.
+SECOND_RESULT = "https://w3id.org/mpc/ontology/modules/kpi/measure/additional-market-prices"
+SECOND_RESULT_LABEL = "Additional Market Prices (Renewables, NGLs)"
+# The packages give some prefixes more than one namespace. "role" names organization/role/ first and
+# party/party-role/ second. "kind" names five, and kpi/measure-kind/ is the third.
+ROLES = "https://w3id.org/mpc/ontology/modules/organization/role/"
+PARTY_ROLES = "https://w3id.org/mpc/ontology/modules/party/party-role/"
+# Only party/party-role/ has a carrier.
+CARRIER = PARTY_ROLES + "carrier"
+# The six terms whose local name starts with "su": three under each namespace.
+ROLES_SU = {
+    ROLES + "supply-coordinator": "Supply Coordinator",
+    ROLES + "supply-operations-director": "Supply Operations Director",
+    ROLES + "supply-operations-manager": "Supply Operations Manager",
+    PARTY_ROLES + "sub-jobber": "Sub-Jobber",
+    PARTY_ROLES + "supplier": "Supplier",
+    PARTY_ROLES + "surety": "Surety",
+}
+KPI_KIND = "https://w3id.org/mpc/ontology/modules/kpi/measure-kind/kpi"
+# The first term in the list of All ontology.
+ABBREVIATION = "https://w3id.org/mpc/ontology/modules/party/attribute/rightangle/create/abbreviation"
+# The party module's site type whose label is "Terminal", and its class whose label is "customer account".
+TERMINAL = "https://w3id.org/mpc/ontology/modules/party/site-type/terminal"
+CUSTOMER_ACCOUNT = "https://w3id.org/mpc/ontology/modules/party/CustomerAccount"
+# The labels of 32 terms start with "terminal" in either case: 4 in data-product, 13 in party, 1 in system,
+# 2 in value-stream, 3 in core and 9 in logical-model. One of the 32 is "Terminal" itself.
+TERMINAL_LABELS = 32
+# Each module's dcterms:title, the name the full ontology viewer shows on Module overview.
+MODULE_NAMES = {
+    "core": "MPC Core Process Ontology",
+    "data-product": "MPC Data Product Module",
+    "integration": "MPC Integration Vocabularies",
+    "kpi": "MPC KPI Module",
+    "lane": "MPC Lane Module",
+    "logical-model": "MPC Logical Model Module",
+    "market-data": "MPC Market Data Module",
+    "organization": "MPC Organization Module",
+    "party": "MPC Party Module",
+    "ref-mpc": "MPC Reference Instances: Marathon Petroleum Corporation",
+    "system": "MPC System Module",
+    "technical-graph": "MPC Technical Graph Module",
+    "value-stream": "MPC Value Stream Module",
+}
 
 
 def same(found, expected, what):
@@ -216,6 +277,89 @@ def viewer_narrow(s):
     s.shot(page, "6-term-page-390")
 
 
+def viewer_keys(s):
+    page = s.open()
+    viewer_search(page, MEASURE_LABEL, MEASURE)
+    same(page.locator("#global-results button.active").get_attribute("data-result"), MEASURE, "the result Enter opens")
+    page.locator("#global-query").press("Enter")
+    same(page.locator("#global-search").evaluate("dialog => dialog.open"), False, "the search is open after Enter")
+    same(page.locator("#iri").text_content(), MEASURE, "the term Enter opened")
+    # The second result is the next label in alphabetical order that holds the search text.
+    viewer_search(page, MEASURE_LABEL, MEASURE)
+    page.locator("#global-query").press("ArrowDown")
+    same(page.locator("#global-results button.active").count(), 1, "highlighted results")
+    same(page.locator("#global-results button.active").get_attribute("data-result"), SECOND_RESULT, "the result after Down")
+    page.locator("#global-query").press("ArrowDown")
+    page.locator("#global-query").press("ArrowUp")
+    same(page.locator("#global-results button.active").get_attribute("data-result"), SECOND_RESULT, "the result after Down, Down, Up")
+    page.locator("#global-query").press("Enter")
+    same(page.locator("#iri").text_content(), SECOND_RESULT, "the term Enter opened after the arrow keys")
+    same(page.locator("#title").inner_text(), SECOND_RESULT_LABEL, "its label")
+
+
+def viewer_prefix(s):
+    page = s.open()
+    hit = viewer_search(page, "tg:replaces", REPLACES)
+    same(page.locator("#global-results button").first.get_attribute("data-result"), REPLACES, "the first result")
+    hit.click()
+    same(page.locator("#iri").text_content(), REPLACES, "the term opened from the search for tg:replaces")
+    # The filter beside the term list reads a prefixed name the same way.
+    page.locator("#breadcrumbs button", has_text="Search results").click()
+    page.locator("#global-search-close").click()
+    page.locator("#query").fill("tg:replaces")
+    same(page.locator("#results button[data-term]").first.get_attribute("data-term"), REPLACES, "the first term of the filtered list")
+
+
+def viewer_shortcut(s):
+    page = s.open()
+    same(page.locator("#global-query").get_attribute("placeholder"), "Search ontology (Ctrl+K)", "the search box's placeholder")
+    for keys in ("Control+k", "Meta+k"):
+        same(page.locator("#global-search").evaluate("dialog => dialog.open"), False, f"the search is open before {keys}")
+        page.keyboard.press(keys)
+        same(page.locator("#global-search").evaluate("dialog => dialog.open"), True, f"the search is open after {keys}")
+        same(page.evaluate("document.activeElement.id"), "global-query", f"the part that has the cursor after {keys}")
+        page.locator("#global-search-close").click()
+
+
+def viewer_no_term(s):
+    page = s.open()
+    page.locator("#view-browse").click()
+    same(page.locator("#choose-term").is_visible(), True, "the panel is shown")
+    same(page.locator("#choose-term h2").inner_text(), "Choose a term", "the panel's heading")
+    same(
+        page.locator("#choose-term p").inner_text(),
+        "Search in Find a term, or open Module overview in the navigation and pick a module. "
+        "Then select a term in the list to read its definition and relationships.",
+        "the panel's text",
+    )
+    for part in ("#title", "#copy", "#definition", "#graph"):
+        same(page.locator(part).is_visible(), False, f"{part} is shown before a term is chosen")
+    s.shot(page, "7-no-term")
+    page.locator(f'#results button[data-term="{ABBREVIATION}"]').click()
+    same(page.locator("#title").inner_text(), "Abbreviation", "the term chosen from the list")
+    same(page.locator("#choose-term").is_visible(), False, "the panel is shown after a term is chosen")
+    same(page.locator("#definition").is_visible(), True, "the definition is shown")
+
+
+def viewer_namespaces(s):
+    page = s.open()
+    # A term under the prefix's second namespace.
+    hit = viewer_search(page, "role:carrier", CARRIER)
+    same(page.locator("#global-count").inner_text(), "1 of 1 matching terms", "the count for role:carrier")
+    hit.click()
+    same(page.locator("#iri").text_content(), CARRIER, "the term opened from the search for role:carrier")
+    same(page.locator("#title").inner_text(), "Carrier", "its label")
+    # A term under the third of five namespaces.
+    viewer_search(page, "kind:kpi", KPI_KIND)
+    same(page.locator("#global-results button").first.get_attribute("data-result"), KPI_KIND, "the first result for kind:kpi")
+    # One search text that both namespaces of a prefix hold.
+    page.locator("#global-query").fill("role:su")  # the search is still open
+    same(page.locator("#global-count").inner_text(), "6 of 6 matching terms", "the count for role:su")
+    buttons = page.locator("#global-results button")
+    found = {buttons.nth(i).get_attribute("data-result"): buttons.nth(i).inner_text().splitlines()[0] for i in range(buttons.count())}
+    same(found, ROLES_SU, "the terms found for role:su")
+
+
 # ---- horoi_viewer/index.html --------------------------------------------------------------------------------
 
 
@@ -271,7 +415,7 @@ def reference_modules(s):
     same(found, MODULES, "the modules and their versions")
     s.shot(page.locator(".module-directory"), "2-module-list")
     page.locator(".module-directory a.tile.technical-graph").click()
-    reference_heading(page, "Technical graph", "the module page")
+    reference_heading(page, "MPC Technical Graph Module", "the module page")
     same(page.locator("#content .eyebrow").first.text_content(), "technical-graph · 1.1.0", "its version line")
     page.wait_for_function("scrollY < 5")  # the page scrolls back to its top smoothly; wait for that to end
     s.shot(page, "2-module-overview")
@@ -325,13 +469,13 @@ def reference_back(s):
     reference_heading(page, PROCESS_LABEL, "the term the relationship link opened")
     page.go_back()
     reference_heading(page, MEASURE_LABEL, "the term after Back")
-    same(page.locator(".crumb").inner_text(), "Overview / Measures and KPIs / Business concepts", "the breadcrumb")
+    same(page.locator(".crumb").inner_text(), "Overview / MPC KPI Module / Business concepts", "the breadcrumb")
     page.go_back()
     same(page.locator("#search").input_value(), MEASURE_LABEL, "the search text after a second Back")
     page.go_forward()
     reference_heading(page, MEASURE_LABEL, "the term after Forward")
-    page.locator(".crumb a", has_text="Measures and KPIs").click()
-    reference_heading(page, "Measures and KPIs", "the module page its breadcrumb opens")
+    page.locator(".crumb a", has_text="MPC KPI Module").click()
+    reference_heading(page, "MPC KPI Module", "the module page its breadcrumb opens")
     same(page.locator("#content .eyebrow").first.text_content(), "kpi · 1.3.0", "its version line")
     page.locator(".crumb a", has_text="Overview").click()
     page.locator(".module-directory").wait_for()
@@ -343,7 +487,7 @@ def reference_deep_link(s):
     reference_heading(page, MEASURE_LABEL, "the term a direct link opens")
     same(page.locator("#term-iri").inner_text(), MEASURE, "its identifier")
     page = s.open("#module=technical-graph")
-    reference_heading(page, "Technical graph", "the module a direct link opens")
+    reference_heading(page, "MPC Technical Graph Module", "the module a direct link opens")
 
 
 def reference_narrow(s):
@@ -357,11 +501,126 @@ def reference_narrow(s):
     s.shot(page, "6-term-page-390")
 
 
-PROOFS = ["1 load", "2 release", "3 modules", "4 search", "5 term page", "6 follow", "7 way back", "8 deep link", "+ narrow"]
+def reference_ranking(s):
+    page = s.open("#browse")
+    reference_search(page, "terminal", TERMINAL)
+    holds(page.locator("#result-count").inner_text(), "176 results.", "the result count")
+    same(page.locator("#results li > a").first.get_attribute("href"), term_link(TERMINAL), "the first result for terminal")
+    labels = page.locator("#results li > a").all_inner_texts()
+    starts = [label.lower().startswith("terminal") for label in labels]
+    same(starts[:TERMINAL_LABELS], [True] * TERMINAL_LABELS, "the labels that start with the search text come next")
+    same(starts[TERMINAL_LABELS], False, "the next label starts with the search text")
+    reference_search(page, "customer account", CUSTOMER_ACCOUNT)
+    same(page.locator("#results li > a").first.get_attribute("href"), term_link(CUSTOMER_ACCOUNT), "the first result for customer account")
+
+
+def reference_names(s):
+    page = s.open()
+    tiles = page.locator(".module-directory a.tile")
+    found = {}
+    for i in range(tiles.count()):
+        found[tiles.nth(i).locator(".eyebrow").text_content().split(" · ")[0]] = tiles.nth(i).locator("h2").inner_text()
+    same(found, MODULE_NAMES, "the module names on the overview")
+    page = s.open("#browse")
+    options = page.locator("#module-filter option").all_inner_texts()
+    same(options, ["All modules", *MODULE_NAMES.values()], "the module names in the search filter")
+
+
+def section_headings(page):
+    return page.locator("#content > section.section > h2").all_inner_texts()
+
+
+def reference_measure(s):
+    page = s.open(term_link(MEASURE))
+    reference_heading(page, MEASURE_LABEL, "the measure's page")
+    same(page.locator(".term-definition + *").evaluate("part => part.querySelector('h2')?.innerText"), "What points to this term", "the part directly under the definition")
+    same(section_headings(page), ["What points to this term", "Where this term fits", "Follow its connections"], "the sections of a measure's page")
+    # A term that is not a measure keeps the order it had.
+    page = s.open(term_link(PROCESS))
+    reference_heading(page, PROCESS_LABEL, "the process's page")
+    same(section_headings(page), ["Where this term fits", "Follow its connections", "What points to this term"], "the sections of a process's page")
+
+
+def reference_language(s):
+    page = s.open(term_link(MEASURE))
+    reference_heading(page, MEASURE_LABEL, "the measure's page")
+    same(page.locator(".term-definition").inner_text().strip(), MEASURE_DEFINITION, "the definition block")
+    same(page.locator(".term-definition .lang").count(), 0, "language tags in the definition block")
+    same(page.evaluate("[...document.querySelectorAll('#content .lang')].filter(tag => !tag.closest('#facts')).length"), 0, "language tags outside the recorded facts")
+    # The table of recorded facts still states each literal's language.
+    page.locator("#facts > summary").click()
+    holds(page.locator("#facts").inner_text(), "Language: en", "the recorded facts")
+
+
+def reference_slash(s):
+    page = s.open()
+    page.locator(".module-directory").wait_for()
+    page.keyboard.press("/")
+    page.locator("#search").wait_for()
+    same(page.evaluate("document.activeElement.id"), "search", "the part that has the cursor after /")
+    holds(page.url, "#browse", "the address after /")
+    same(page.locator("#search").input_value(), "", "the search text after /")
+    # In the search box the key types a slash.
+    page.keyboard.type("a/b")
+    same(page.locator("#search").input_value(), "a/b", "the search text after typing a/b")
+    # On Find a term the key puts the cursor back in the search box.
+    page.locator("#module-filter").select_option("kpi")
+    page.locator("#result-count").click()
+    page.keyboard.press("/")
+    same(page.evaluate("document.activeElement.id"), "search", "the part that has the cursor after / on Find a term")
+    same(page.locator("#search").input_value(), "a/b", "the search text after / on Find a term")
+
+
+def reference_wording(s):
+    page = s.open("#modules")
+    reference_heading(page, "Modules and connections", "the modules page")
+    holds(page.locator("#content").inner_text(), "The full ontology viewer remains available from the footer.", "the modules page")
+    same(page.locator("footer a").first.inner_text(), "Open the full ontology viewer", "the footer link")
+    page = s.open(term_link(MEASURE))
+    reference_heading(page, MEASURE_LABEL, "the measure's page")
+    same(page.locator("#content .actions a").last.inner_text(), "Open this term in the full ontology viewer", "the link to the other page")
+    # Every other name for that page is gone from the page's own text. The ontology data is not searched.
+    own_text = page.evaluate("[...document.querySelectorAll('script:not([id]), body > :not(script)')].map(part => part.textContent).join(' ')")
+    for name in ("original ontology viewer", "original viewer", "full viewer", "Full viewer"):
+        assert name not in own_text, f"the page still says {name!r}"
+
+
 PAGES = {
-    "viewer": [viewer_load, viewer_release, viewer_modules, viewer_search_proof, viewer_term, viewer_follow, viewer_back, viewer_deep_link, viewer_narrow],
-    "reference": [reference_load, reference_release, reference_modules, reference_search_proof, reference_term, reference_follow, reference_back, reference_deep_link, reference_narrow],
+    "viewer": [
+        ("1 load", viewer_load),
+        ("2 release", viewer_release),
+        ("3 modules", viewer_modules),
+        ("4 search", viewer_search_proof),
+        ("5 term page", viewer_term),
+        ("6 follow", viewer_follow),
+        ("7 way back", viewer_back),
+        ("8 deep link", viewer_deep_link),
+        ("9 keys", viewer_keys),
+        ("10 prefix", viewer_prefix),
+        ("11 shortcut", viewer_shortcut),
+        ("12 no term", viewer_no_term),
+        ("13 namespaces", viewer_namespaces),
+        ("+ narrow", viewer_narrow),
+    ],
+    "reference": [
+        ("1 load", reference_load),
+        ("2 release", reference_release),
+        ("3 modules", reference_modules),
+        ("4 search", reference_search_proof),
+        ("5 term page", reference_term),
+        ("6 follow", reference_follow),
+        ("7 way back", reference_back),
+        ("8 deep link", reference_deep_link),
+        ("9 ranking", reference_ranking),
+        ("10 names", reference_names),
+        ("11 measure", reference_measure),
+        ("12 language", reference_language),
+        ("13 slash key", reference_slash),
+        ("14 wording", reference_wording),
+        ("+ narrow", reference_narrow),
+    ],
 }
+TOTAL = sum(len(proofs) for proofs in PAGES.values())
 
 
 def launch(playwright, channels):
@@ -375,9 +634,9 @@ def launch(playwright, channels):
 
 
 def check_page(browser, name, path, shots):
-    """Run the nine proofs on one page. Returns the proofs that failed, each with its reason."""
+    """Run one page's proofs. Returns the proofs that failed, each with its reason."""
     session, failed = Session(browser, path, shots, name), []
-    for proof, run in zip(PROOFS, PAGES[name]):
+    for proof, run in PAGES[name]:
         before = len(session.errors), len(session.requests)
         try:
             run(session)
@@ -389,7 +648,7 @@ def check_page(browser, name, path, shots):
             reason = f"network request: {session.requests[before[1]]}"
         if not reason and session.errors[before[0]:]:
             reason = f"console error: {session.errors[before[0]]}"
-        print(f"{name:9}  {proof:11}  {'FAIL  ' + reason if reason else 'pass'}")
+        print(f"{name:9}  {proof:13}  {'FAIL  ' + reason if reason else 'pass'}")
         if reason:
             failed.append(f"{name} {proof}")
     return failed
@@ -412,9 +671,9 @@ def main(argv=None):
         finally:
             browser.close()
     if failed:
-        print(f"{len(failed)} of 18 proofs failed: {', '.join(failed)}", file=sys.stderr)
+        print(f"{len(failed)} of {TOTAL} proofs failed: {', '.join(failed)}", file=sys.stderr)
         return 1
-    print("both pages passed all 18 proofs")
+    print(f"both pages passed all {TOTAL} proofs")
     return 0
 
 

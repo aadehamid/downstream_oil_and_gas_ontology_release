@@ -333,3 +333,29 @@ def test_the_page_is_written_as_utf8_with_lf_line_ends(tmp_path):
     raw = out.read_bytes()
     assert b"\r" not in raw
     assert "café → dépôt".encode("utf-8") in raw
+
+
+def test_the_data_lists_each_prefix_the_packages_declare(tmp_path):
+    # Search reads a prefixed name through these pairs. Two packages may give one prefix two namespaces.
+    package(tmp_path)
+    package(
+        tmp_path,
+        module="party",
+        ttl="@prefix x: <https://example.test/party/> .\n@prefix : <https://example.test/none/> .\nPREFIX up: <https://example.test/up/>\nx:Role a <http://www.w3.org/2002/07/owl#Class> .\n",
+    )
+    assert viewer.build_data(tmp_path)["prefixes"] == [
+        ("owl", "http://www.w3.org/2002/07/owl#"),
+        ("rdfs", "http://www.w3.org/2000/01/rdf-schema#"),
+        ("skos", "http://www.w3.org/2004/02/skos/core#"),
+        ("up", "https://example.test/up/"),
+        ("x", "https://example.test/"),
+        ("x", "https://example.test/party/"),
+    ]
+
+
+def test_the_committed_page_reads_tg_as_the_technical_graph_namespace():
+    # Written by hand from the first lines of releases/technical-graph/1.1.0/technical-graph.ttl.
+    text = PAGE.read_text(encoding="utf-8")
+    data = json.loads(text.split('<script id="ontology-data" type="application/json">')[1].split("</script>")[0])
+    assert ["tg", "https://w3id.org/mpc/ontology/modules/technical-graph/"] in data["prefixes"]
+    assert 'placeholder="Search ontology (Ctrl+K)"' in text

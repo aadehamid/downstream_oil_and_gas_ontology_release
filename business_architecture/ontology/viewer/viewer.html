@@ -105,6 +105,9 @@
       #global-results h3 { margin: 20px 0 8px; }
       #global-results button { display: block; width: 100%; text-align: left; margin: 4px 0; }
       #global-results small { display: block; margin-top: 4px; }
+      #global-results button.active { border-color: var(--accent); background: #e0e9eb; }
+      #detail[data-empty] > :not(#choose-term), #detail:not([data-empty]) > #choose-term { display: none; }
+      #choose-term { max-width: 520px; }
       .diagram-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }
       .diagram-tools output { color: var(--muted); min-width: 4ch; }
       .diagram-dialog { width: 100vw; height: 100vh; max-width: none; max-height: none; margin: 0; padding: 16px; border: 0; border-radius: 0; }
@@ -667,7 +670,11 @@
         <div id="results"></div>
         <button id="pagination" hidden>Show more</button>
       </aside>
-      <main id="detail" aria-label="Selected term">
+      <main id="detail" aria-label="Selected term" data-empty>
+        <section id="choose-term" aria-labelledby="choose-term-heading">
+          <h2 id="choose-term-heading">Choose a term</h2>
+          <p>Search in Find a term, or open Module overview in the navigation and pick a module. Then select a term in the list to read its definition and relationships.</p>
+        </section>
         <button class="mobile-only" id="back">Back to terms</button>
         <button id="return-overview" hidden></button>
         <div class="term-header">
@@ -715,7 +722,7 @@
     <dialog id="global-search" aria-labelledby="global-search-title">
       <div class="search-heading"><h2 id="global-search-title">Search ontology</h2><button id="global-search-close">Close</button></div>
       <label for="global-query">Find a module, view or term</label>
-      <input id="global-query" type="search" placeholder="Search labels, definitions or IRIs" autocomplete="off" />
+      <input id="global-query" type="search" placeholder="Search ontology (Ctrl+K)" autocomplete="off" />
       <div class="search-filters">
         <div><label for="global-type">Term type</label><select id="global-type"><option value="">All types</option></select></div>
         <label class="inline"><input id="global-support" type="checkbox" />Include evidence and constraints</label>
@@ -861,6 +868,23 @@
             .toLowerCase(),
         ]),
       );
+      // A prefix can name more than one namespace, because each package declares its own.
+      const namespaces = new Map();
+      for (const [prefix, namespace] of data.prefixes) {
+        const key = prefix.toLowerCase();
+        if (!namespaces.has(key)) namespaces.set(key, []);
+        namespaces.get(key).push(namespace.toLowerCase());
+      }
+      // The lower-case IRIs that a prefixed name such as tg:replaces can stand for.
+      function prefixedIris(query) {
+        const parts = /^([a-z][\w.-]*):(\S*)$/.exec(query);
+        return parts ? (namespaces.get(parts[1]) || []).map((namespace) => namespace + parts[2]) : [];
+      }
+      // A term matches when its text holds the query, or its IRI starts with the IRI a prefixed name stands for.
+      function termMatcher(query) {
+        const iris = prefixedIris(query);
+        return (n) => searchText.get(n.id).includes(query) || iris.some((iri) => n.id.toLowerCase().startsWith(iri));
+      }
       function element(tag, text, cls) {
         const e = document.createElement(tag);
         if (text !== undefined) e.textContent = text;
@@ -889,13 +913,14 @@
       }
       function filtered() {
         const q = $("query").value.trim().toLowerCase(),
-          m = $("module").value;
+          m = $("module").value,
+          matches = termMatcher(q);
         return ordered.filter(
           (n) =>
             ($("support").checked || !supporting.has(n.kind)) &&
             (!$("term-type").value || n.kind === $("term-type").value) &&
             (!m || n.modules.some((x) => x.name === m)) &&
-            (!q || searchText.get(n.id).includes(q)),
+            (!q || matches(n)),
         );
       }
       const VS = "https://w3id.org/mpc/ontology/modules/value-stream/";
@@ -1494,6 +1519,7 @@
         if (!document.body.classList.contains("show-detail"))
           listScroll = window.scrollY;
         selected = n;
+        $("detail").removeAttribute("data-empty");
         graphLimit = 8;
         $("title").textContent = n.label;
         $("kind").textContent = n.kind;
@@ -1682,10 +1708,11 @@
           .map(info => ({id:"module:"+info.name,label:info.node?.label || info.name,detail:info.name})), showOverview);
         const views = ["lifecycle", "model", ...streams.map(s => "stream:"+s.id)];
         group("Business views", views.filter(id => matches(overviewTitle(id))).map(id => ({id,label:overviewTitle(id)})), showOverview);
+        const termMatches = termMatcher(query), iris = prefixedIris(query);
         const found = query ? ordered.filter(n => ($( "global-support").checked || !supporting.has(n.kind)) &&
-          (!kind || n.kind === kind) && searchText.get(n.id).includes(query)) : [];
+          (!kind || n.kind === kind) && termMatches(n)) : [];
         found.sort((a,b) => {
-          const rank = n => n.label.toLowerCase() === query ? 0 : n.label.toLowerCase().startsWith(query) ? 1 : 2;
+          const rank = n => n.label.toLowerCase() === query || iris.includes(n.id.toLowerCase()) ? 0 : n.label.toLowerCase().startsWith(query) ? 1 : 2;
           return rank(a)-rank(b) || a.label.localeCompare(b.label) || a.id.localeCompare(b.id);
         });
         group("Terms", found.slice(0, globalLimit).map(n => ({id:n.id,label:n.label,detail:n.kind+" · "+n.modules.map(m=>m.name).join(", ")})), id => {
@@ -1694,7 +1721,26 @@
         $("global-count").textContent = query ? Math.min(globalLimit,found.length)+" of "+found.length+" matching terms" : "Enter a label, definition or IRI to search terms.";
         $("global-more").hidden = found.length <= globalLimit;
         if (query && !results.childElementCount) results.append(element("p", "No matches. Try another name or phrase."));
+        highlightResult(0);
       }
+      // The highlighted result is the one Enter opens: the first result, until an arrow key moves the highlight.
+      let activeResult = 0;
+      function highlightResult(index) {
+        const buttons = [...$("global-results").querySelectorAll("button")];
+        activeResult = Math.max(0, Math.min(index, buttons.length - 1));
+        buttons.forEach((button, i) => {
+          button.id = "global-result-" + i;
+          button.classList.toggle("active", i === activeResult);
+        });
+        if (buttons.length) $("global-query").setAttribute("aria-activedescendant", "global-result-" + activeResult);
+        else $("global-query").removeAttribute("aria-activedescendant");
+        return buttons[activeResult];
+      }
+      $("global-query").onkeydown = event => {
+        const step = {ArrowDown: 1, ArrowUp: -1}[event.key];
+        if (step) {event.preventDefault(); highlightResult(activeResult + step)?.scrollIntoView({block: "nearest"});}
+        else if (event.key === "Enter") {event.preventDefault(); highlightResult(activeResult)?.click();}
+      };
       $("global-search-open").onclick = openSearch;
       $("global-search-close").onclick = () => $("global-search").close();
       $("global-query").oninput = () => {globalLimit=80;renderSearch();};
@@ -1875,15 +1921,9 @@
       try {
         first = byId.get(decodeURIComponent(location.hash.slice(1)));
       } catch {}
-      first =
-        first ||
-        ordered.find(
-          (n) =>
-            n.kind === "Concept" && n.modules.some((m) => m.name === "core"),
-        ) ||
-        ordered[0];
-      select(first.id);
-      if (!location.hash) document.body.classList.remove("show-detail");
+      // Without a term in the address, no term is chosen: the detail area shows the "Choose a term" panel.
+      if (first) select(first.id);
+      else renderList();
       window.onhashchange();
       history.replaceState({trail}, "");
     </script>
