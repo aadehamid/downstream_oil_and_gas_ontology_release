@@ -168,6 +168,9 @@ def test_the_page_is_one_offline_file_with_lf_line_ends():
     assert list(data["forms"]) == ["kpi-intake", "domain-activation", "process-map-request"]
     assert data["release"] == "KPI Store 1.1" and data["catalogue_version"] == "1.0"
     assert len(data["questions"]) == 63 and data["lists"]["processes"]
+    # The names of the other modules' terms, with no definition: "Margin Management" is a process of the core module.
+    assert "Margin Management" in data["term_names"]["core"]
+    assert all(isinstance(name, str) for names in data["term_names"].values() for name in names)
     assert [d["label"] for d in data["settings_lists"]["domains"] if d["active"]] == ["Market Price", "Financial Performance"]
 
 

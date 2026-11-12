@@ -32,6 +32,11 @@ def data(cat, built, examples):
     for name in used:
         # The definition of a measure is for the check. The page compares names only.
         lists[name] = [{k: v for k, v in item.items() if k != "definition"} for item in built["lists"][name]]
+    # The names of the terms that the other modules hold, by module. The page looks the KPI's name up in them, as
+    # the check does, to say that the Domain Owner's second signature may be needed. The definitions stay out.
+    term_names = {}
+    for term in built.get("terms", []):
+        term_names.setdefault(term["module"], set()).update(term["names"])
     return {
         "release": cat.release,
         "catalogue_version": cat.version,
@@ -48,6 +53,7 @@ def data(cat, built, examples):
         "kind_rules": cat.kind_rules,
         "explainer": cat.explainer,
         "lists": lists,
+        "term_names": {module: sorted(names) for module, names in sorted(term_names.items())},
     }
 
 

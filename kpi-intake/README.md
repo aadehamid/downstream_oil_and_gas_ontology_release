@@ -64,9 +64,9 @@ One form is for one KPI.
 11. Digital IT fills in section 7 in the same file. To go on in the HTML form, press "Load answers file" and choose the saved file.
 12. The Architect runs the check again and signs last.
 
-The HTML form keeps an unsaved draft in the browser, so a reload does not lose it. The draft stays on that one machine and browser. The saved file is the record. "Clear this form" asks first, then empties the form in view. It changes no saved file.
+The HTML form keeps an unsaved draft in the browser, so a reload does not lose it. A draft that the form cannot read is not restored, in whole, and the form says so. The draft stays on that one machine and browser. The saved file is the record. "Clear this form" asks first, then empties the form in view. It changes no saved file.
 
-Each section's line in the HTML form counts the required answers left, then the optional questions that have no answer. A section whose answer routes the request shows "Routed" and the form the request goes to. The sign-off line counts only the signatures the form needs. The Domain Owner's second signature on the KPI form is needed only when the check finds a conflicting definition, and the form says so.
+Each section's line in the HTML form counts the required answers left, then the optional questions that have no answer. An answer that needs more text, such as the name of a missing step, counts as a required answer left until that text is there. A section whose answer routes the request shows "Routed" and the form the request goes to. The sign-off line counts only the signatures the form needs. The Domain Owner's second signature on the KPI form is needed only when the check finds a conflicting definition, and the form says so. The form holds the names of the other modules' terms and not their definitions. When the KPI's name is one of them, the form counts that signature as needed until the check has run.
 
 The request's number, date, requester and invited people are under "Request details" at the top of the form. That part closes to one line once it is filled. Each section's introduction is under "About this section".
 
@@ -305,5 +305,8 @@ intake  10 theme       pass
 intake  11 next step   pass
 intake  12 bad file    pass
 intake  13 other form  pass
-the intake form passed all 13 proofs
+intake  14 detail      pass
+intake  15 conflict    pass
+intake  16 bad draft   pass
+the intake form passed all 16 proofs
 ```

@@ -275,6 +275,8 @@ a[data-state="routed"] progress::-moz-progress-bar { background: var(--stop-line
 .q-analyst summary { font-weight: 500; color: var(--muted); }
 .q-note { margin: 0 0 8px 4px; color: var(--muted); }
 .q-detail { margin-top: 14px; }
+.q-detail label { display: inline-block; margin-right: 10px; }
+.q-detail-need { display: inline-block; margin-bottom: 6px; padding: 0 10px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); }
 .q-why { margin: 0; color: var(--muted); line-height: 1.45; }
 .q-why-label { display: block; color: var(--ink); font-weight: 600; }
 .q-example { margin: 4px 0 0 -4px; }
@@ -332,7 +334,7 @@ a[data-state="routed"] progress::-moz-progress-bar { background: var(--stop-line
 .signer-label { color: var(--muted); font-size: var(--fs-body); font-weight: 500; }
 .signer-label:empty { display: none; }
 .signer-meaning { margin: 8px 0 0; font-family: var(--font-said); font-size: 1.25rem; line-height: 1.4; }
-.signer-status { display: inline-block; margin: 8px 0 0; padding: 2px 12px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); }
+.signer-status { display: inline-block; margin: 8px 0 0; padding: 3px 12px; border: 1px solid var(--border); border-radius: 14px; color: var(--muted); }
 .signer-lines { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 16px; }
 .consulted-block { margin-top: 8px; padding-top: 24px; border-top: 1px solid var(--border); }
 .consulted-block > p { margin: 8px 0 4px; color: var(--muted); }
@@ -569,7 +571,7 @@ td:last-child, th:last-child { padding-right: 0; }
     <div class="q-answer">
       <details class="q-analyst" hidden><summary><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg>For the analyst</summary><p class="q-note" hidden></p></details>
       <div class="q-input"></div>
-      <div class="q-detail" hidden><label class="q-detail-label"></label></div>
+      <div class="q-detail" hidden><label class="q-detail-label"></label><span class="q-detail-need" hidden>Required</span></div>
       <div class="q-notices"></div>
     </div>
   </article>
@@ -675,6 +677,11 @@ let state = Object.fromEntries(FORMS.map((f) => [f, emptyForm()]));
 let view = FORMS[0];
 const showAll = {};            // question id -> true when the reader asked for the whole list
 const narrow = matchMedia("(max-width: 999px)");   // the folded frame of a phone, a narrow window or a zoomed page
+// Each name of a term that a module other than the measures holds, as the check compares names, with its module.
+const TERM_MODULE = new Map();
+for (const [module, names] of Object.entries(DATA.term_names || {})) {
+  for (const name of names) if (!TERM_MODULE.has(norm(name))) TERM_MODULE.set(norm(name), module);
+}
 // What each of the two Domain Owner signatures of the KPI form is for.
 const SIGNER_LABELS = { "domain-confirmation": "Domain confirmation", "domain-owner": "Conflicting definitions" };
 // The next step of an answer that sends the request to one of the two smaller forms.
@@ -812,16 +819,23 @@ function saveDraft() {
   // A draft survives a reload when the browser allows storage. A private window may refuse it.
   try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ state, view })); } catch (e) { /* the form still works */ }
 }
+// "ok" when a draft was restored, "bad" when there was one and any part of it was malformed, "" when there was none.
+// A draft is restored whole or not at all, and the view it names is opened only when it is restored.
 function loadDraft() {
-  try {
-    const held = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
-    if (held && held.state) {
-      for (const f of FORMS) if (held.state[f] && !partsProblem(held.state[f])) state[f] = Object.assign(emptyForm(), held.state[f]);
-      if (FORMS.includes(held.view)) view = held.view;
-      return true;
-    }
-  } catch (e) { /* no draft */ }
-  return false;
+  let text = null;
+  try { text = localStorage.getItem(DRAFT_KEY); } catch (e) { return ""; }
+  if (!text) return "";
+  let held = null;
+  try { held = JSON.parse(text); } catch (e) { held = null; }
+  const whole = isObject(held) && isObject(held.state) && FORMS.every((f) => !(f in held.state) || !partsProblem(held.state[f]));
+  if (!whole) {
+    // The next change writes a new draft over it, so the unread one is kept aside under another key.
+    try { localStorage.setItem(DRAFT_KEY + "-unread", text); } catch (e) { /* it is lost with the next change */ }
+    return "bad";
+  }
+  for (const f of FORMS) if (held.state[f]) state[f] = Object.assign(emptyForm(), held.state[f]);
+  if (FORMS.includes(held.view)) view = held.view;
+  return "ok";
 }
 
 // ---- Changing an answer ----------------------------------------------------------------------------------------
@@ -1155,8 +1169,9 @@ function routeNotice(box, hit) {
   // The catalogue's next step is added unless the notice already says it.
   const next = outcome.next && !hit.route.notice.includes(outcome.next.slice(0, 40)) ? " " + outcome.next : "";
   notice(box, id, outcome.title, hit.route.notice + next, outcome.blocks,
-    consult ? { reviewers: consult.who.split(/,\s*|\s+and\s+/).filter(Boolean), open: "Go to the sign-off block", go: () => { $("signoff").scrollIntoView(); $("signoff").querySelector("[data-consult]").focus({ preventScroll: true }); } } : {});
+    consult ? { reviewers: consult.who.split(/,\s*|\s+and\s+/).filter(Boolean), open: "Go to the sign-off block", go: goToSignoff } : {});
 }
+function goToSignoff() { $("signoff").scrollIntoView(); $("signoff").querySelector("[data-consult]").focus({ preventScroll: true }); }
 // A signature is needed for every KPI, or only when the check finds a conflict. A smaller form needs each of its own.
 function isNeeded(signer, form) { return signer.when === "always" || form !== FORMS[0]; }
 function left(count) { return count ? `${count} required ${count === 1 ? "answer" : "answers"} left` : "Required answers complete"; }
@@ -1165,6 +1180,7 @@ function refresh() {
   const held = current();
   const answers = held.answers;
   let formLeft = 0;
+  let elsewhere = "";            // the module that already holds the KPI's name as a term, when one does
   for (const section of DATA.sections.filter((s) => s.form === view)) {
     const node = document.querySelector(`[data-section="${section.id}"]`);
     if (!node) continue;
@@ -1175,10 +1191,17 @@ function refresh() {
       const on = isAsked(q, answers);
       card.hidden = !on;
       if (!on) { skipped += 1; continue; }
+      // The count follows the check: a required question that is not complete is left, and so is an answered
+      // question, required or not, whose answer makes its extra text required while that text is missing.
+      const owesDetail = detailRequired(q, answers) && values(answers, q.id).length > 0;
       if (q.required === "required") { required += 1; if (!isComplete(q, answers)) missing += 1; }
+      else if (owesDetail) { required += 1; if (!values(answers, q.id + ".detail").length) missing += 1; }
       else if (!values(answers, q.id).length) optional += 1;
       const detail = card.querySelector(".q-detail");
-      if (q.detail) detail.hidden = !(q.detail.required_when === "always" || detailRequired(q, answers) || values(answers, q.id + ".detail").length);
+      if (q.detail) {
+        detail.hidden = !(q.detail.required_when === "always" || detailRequired(q, answers) || values(answers, q.id + ".detail").length);
+        detail.querySelector(".q-detail-need").hidden = !(q.required === "required" ? detailRequired(q, answers) : owesDetail);
+      }
       const box = card.querySelector(".q-notices");
       const hits = routesOf(q, answers);
       let same = null;
@@ -1186,16 +1209,21 @@ function refresh() {
         const name = norm(values(answers, "2.1")[0] || "");
         same = name && DATA.lists.measures.find((m) => [m.label].concat(m.other_names || []).some((n) => norm(n) === name));
         if (same && same.notation === held.example_of) same = null;
+        elsewhere = TERM_MODULE.get(name) || "";
       }
       for (const hit of hits) if (DATA.outcomes[hit.route.outcome].blocks) routed.push(DATA.forms[hit.route.outcome] ? "Routed: " + DATA.forms[hit.route.outcome].toLowerCase() : DATA.outcomes[hit.route.outcome].title);
       if (same) routed.push("Stopped: the ontology holds this measure");
       // The notices are drawn again only when they change, so a part a reader opened in one stays open.
-      const drawn = JSON.stringify([hits.map((hit) => [hit.route.outcome, hit.route.notice]), same ? same.label : ""]);
+      const there = q.id === "2.1" ? elsewhere : "";
+      const drawn = JSON.stringify([hits.map((hit) => [hit.route.outcome, hit.route.notice]), same ? same.label : "", there]);
       if (box.dataset.drawn !== drawn) {
         box.dataset.drawn = drawn;
         box.replaceChildren();
         for (const hit of hits) routeNotice(box, hit);
         if (same) notice(box, "same-measure", "The ontology already holds this measure", `"${same.label}" has this name. Stop the form. The request becomes a change to that measure.`, true);
+        if (there) notice(box, "same-name", `This name exists in the ${there} module`,
+          "The check will ask you to consult Enterprise Data Governance and to record the outcome in the sign-off block. If the two definitions differ, the Domain Owner decides between them and signs.",
+          false, { open: "Go to the sign-off block", go: goToSignoff });
       }
     }
     // Ready is not the same as answered: the line counts the required answers left, then the optional ones, and
@@ -1227,10 +1255,18 @@ function refresh() {
   $("sections-now").dataset.form = left(formLeft);
   const signers = DATA.sign_off.signer.filter((s) => s.forms.includes(view));
   const isSigned = (s) => { const g = held.sign_offs[s.id] || {}; return !!((g.name || "").trim() && (g.date || "").trim()); };
-  // Only the signatures that are needed count. One that waits for the check is named apart.
-  const needed = signers.filter((s) => isNeeded(s, view));
+  // Only the signatures that are needed count. The conflict signature is needed when the check finds that another
+  // module defines the KPI's name differently. The page holds those names and not their definitions, so a name
+  // that another module holds makes that signature count until the check has run. With no such name it is named apart.
+  const conflict = signers.filter((s) => !isNeeded(s, view));
+  const needed = elsewhere ? signers : signers.filter((s) => isNeeded(s, view));
   const signed = needed.filter(isSigned).length;
-  const waiting = signers.filter((s) => !isNeeded(s, view)).map((s) => isSigned(s) ? "conflict signature recorded" : "conflict review pending check");
+  for (const s of conflict) {
+    const status = document.querySelector(`[data-signer="${s.id}"] .signer-status`);
+    if (status) status.textContent = elsewhere ? `Needed if the check confirms: the name exists in the ${elsewhere} module` : "Only if the check finds a conflicting definition";
+  }
+  const waiting = conflict.map((s) => elsewhere ? (isSigned(s) ? "" : "the conflict signature is needed if the check confirms")
+    : (isSigned(s) ? "conflict signature recorded" : "conflict review pending check")).filter(Boolean);
   const line = document.querySelector('[data-part="signoff-progress"]');
   if (line) line.textContent = [`${signed} of ${needed.length} required signatures recorded`].concat(waiting).join(" · ");
   const link = document.querySelector('[data-nav="signoff"]');
@@ -1451,7 +1487,8 @@ for (const [name, title] of VIEWS) {
 startFrame();
 const restored = loadDraft();
 show(view);
-if (restored) say("Your unsaved draft was restored from this browser.");
+if (restored === "ok") say("Your unsaved draft was restored from this browser.");
+if (restored === "bad") say("The browser draft could not be read and was not restored.", "problem");
 </script>
 </body>
 </html>

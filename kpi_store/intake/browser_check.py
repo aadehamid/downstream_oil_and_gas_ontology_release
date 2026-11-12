@@ -1,4 +1,4 @@
-"""Open the HTML intake form in a real browser and prove the thirteen things a person filling it relies on.
+"""Open the HTML intake form in a real browser and prove the sixteen things a person filling it relies on.
 
     uv run --no-project --with playwright==1.65.0 python kpi_store/intake/browser_check.py
 
@@ -22,6 +22,9 @@ Each proof starts from a fresh load of kpi-intake/kpi-intake-form.html, with emp
  11 next step    a routing notice names who answers, keeps settings.toml out of sight and opens the right form
  12 bad file     a malformed answers file is refused in words, changes no answer and leaves the form working
  13 other form   a domain activation file loaded from the KPI form opens in its own form and leaves the KPI answers
+ 14 detail       an optional answer that needs more text counts as a required answer left until the text is there
+ 15 conflict     a KPI name that another module holds makes the Domain Owner's second signature count
+ 16 bad draft    a browser draft with one malformed form is not restored, in whole, and the form still works
 
 Every expected value below is written by hand from the catalogue and the release packages. The script exits 1
 when a proof fails and names it. scripts/check.sh does not run it, because it needs a browser.
@@ -352,9 +355,85 @@ def other_form(s):
     s.shot(page, "13-other-form")
 
 
+def detail(s):
+    page = s.open()
+    progress = page.locator('[data-section="1"] .section-progress')
+    same(progress.inner_text(), "4 required answers left · 2 optional unanswered", "section 1 before")
+    # 1.3 is optional. "The step is missing" makes its extra text required, as the check has it.
+    choose(page, "1.3", "@not-in-list")
+    same(progress.inner_text(), "Routed: process map request · 5 required answers left · 1 optional unanswered", "section 1 with the step's name missing")
+    assert card(page, "1.3").locator(".q-detail-need").is_visible(), "1.3 does not say that its extra text is required"
+    choose(page, "1.1", COMMERCIAL)
+    choose(page, "1.2", REFINERY_OPTIMIZATION)
+    card(page, "1.4").locator("textarea").fill("Planners read the number before they set the refinery plan.")
+    choose(page, "1.5", "market-price")
+    same(progress.inner_text(), "Routed: process map request · 1 required answer left · 1 optional unanswered", "section 1 with only the step's name missing")
+    same(page.locator('[data-nav="1"] progress').get_attribute("value"), "4", "the bar of section 1 with one of five left")
+    card(page, "1.3").locator(".q-detail input").fill("Check the posted price")
+    same(progress.inner_text(), "Routed: process map request · 1 optional unanswered", "section 1 with the step's name given")
+    # 4.6 is required, and "yes" makes its extra text required: the same count covers it.
+    for question, answer in (("4.1", "yes"), ("4.2", "no"), ("4.3", "no"), ("4.4", "no"), ("4.5", "no"), ("4.6", "yes")):
+        choose(page, question, answer)
+    card(page, "4.8").locator("textarea").fill("The business named it as a measure of a stated objective.")
+    four = page.locator('[data-section="4"] .section-progress')
+    same(four.inner_text(), "1 required answer left · 1 optional unanswered", "section 4 without the document of 4.6")
+    card(page, "4.6").locator(".q-detail input").fill("The 2026 objectives paper")
+    same(four.inner_text(), "Required answers complete · 1 optional unanswered", "section 4 with the document of 4.6")
+    s.shot(page, "14-detail")
+
+
+def conflict(s):
+    page = s.open()
+    line = page.locator('[data-nav="signoff"]')
+    status = page.locator('[data-signer="domain-owner"] .signer-status')
+
+    def sign(signer):
+        page.locator(f'[data-signer="{signer}"] [data-sign="name"]').fill("A name")
+        page.locator(f'[data-signer="{signer}"] [data-sign="date"]').fill("2026-11-12")
+
+    card(page, "2.1").locator("input").fill("Tank Turnover")
+    for signer in ("data-owner", "domain-confirmation", "architect"):
+        sign(signer)
+    same(line.locator(".nav-count").inner_text(), "3 of 3 required signed", "the sign-off line for a new name")
+    same(status.inner_text(), "Only if the check finds a conflicting definition", "the conflict signature for a new name")
+    # "Margin Management" is a process of the core module, so the check will ask Enterprise Data Governance, and
+    # the Domain Owner must sign if the two definitions differ.
+    card(page, "2.1").locator("input").fill("margin management")
+    same(status.inner_text(), "Needed if the check confirms: the name exists in the core module", "the conflict signature for a name of another module")
+    same(line.locator(".nav-count").inner_text(), "3 of 4 required signed", "the sign-off line for a name of another module")
+    same(line.get_attribute("data-state"), "open", "the state of the sign-off line")
+    holds(page.locator('[data-part="signoff-progress"]').inner_text(), "3 of 4 required signatures recorded", "the sign-off count")
+    holds(card(page, "2.1").locator('[data-notice="same-name"]').inner_text(), "Enterprise Data Governance", "the notice for a name of another module")
+    sign("domain-owner")
+    same(line.locator(".nav-count").inner_text(), "4 of 4 required signed", "the sign-off line with the conflict signature")
+    with page.expect_download() as download:
+        page.locator("#save").click()
+    saved = json.loads(Path(download.value.path()).read_text(encoding="utf-8"))
+    same(saved["sign_offs"]["domain-owner"], {"name": "A name", "date": "2026-11-12"}, "the conflict signature in the saved file")
+    s.shot(page, "15-conflict")
+
+
+def bad_draft(s):
+    page = s.open()
+    good = {"answers": {"2.1": "Tank Turnover"}, "request": {}, "sign_offs": {}, "consulted": {}, "example_of": "", "comment": ""}
+    bad = dict(good, answers={"D1": {"toString": "x"}})
+    seed = json.dumps({"state": {"kpi-intake": good, "domain-activation": bad}, "view": "domain-activation"})
+    page.evaluate("text => localStorage.setItem('kpi-intake-draft-1', text)", seed)
+    page.reload()
+    same(page.locator("#status").inner_text(), "The browser draft could not be read and was not restored.", "the status line")
+    same(page.locator('[data-view="kpi-intake"]').get_attribute("aria-selected"), "true", "the view after the refused draft")
+    same(card(page, "2.1").locator("input").input_value(), "", "2.1 after the refused draft")
+    card(page, "2.1").locator("input").fill("Days of Cover")
+    holds(page.locator('[data-section="2"] .section-progress').inner_text(), "1 required answer left", "section 2 after the refused draft")
+    page.reload()
+    same(card(page, "2.1").locator("input").input_value(), "Days of Cover", "2.1 from the new draft")
+    s.shot(page, "16-bad-draft")
+
+
 PROOFS = [("1 load", load), ("2 fill", fill), ("3 narrow list", narrow_list), ("4 conditional", conditional),
           ("5 routing", routing), ("6 save", save), ("7 load file", load_file), ("8 draft", draft), ("9 phone", phone),
-          ("10 theme", theme), ("11 next step", next_step), ("12 bad file", bad_file), ("13 other form", other_form)]
+          ("10 theme", theme), ("11 next step", next_step), ("12 bad file", bad_file), ("13 other form", other_form),
+          ("14 detail", detail), ("15 conflict", conflict), ("16 bad draft", bad_draft)]
 
 
 def launch(playwright, channels):
