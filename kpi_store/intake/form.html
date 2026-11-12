@@ -1,0 +1,1505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="kpi_store/intake/build.py">
+<title>KPI intake form</title>
+<!--
+  This page is built by `py -m kpi_store.intake build` from kpi_store/intake/form.html (this template),
+  kpi-intake/catalogue.toml, kpi-intake/settings.toml and the release packages. Do not edit the built page.
+
+  For a design pass. Three parts are kept apart:
+    1. The <style> block below. Every colour, size and space is a custom property on :root.
+    2. The markup: the page frame in <body> and the <template> elements, one per repeated part.
+    3. The data (<script id="intake-data">) and the behaviour (<script id="intake-script">).
+  The script finds elements by id, by data-* attribute and by the class names inside the templates. A design
+  pass may change any style, add wrappers and classes, and reorder elements inside a template. It must keep
+  each id, each data-* attribute and each class name that the templates carry today.
+
+  The look. The window is one tinted frame: the section list on the left and the row of views on top. The form
+  lies on a white sheet inside it. The words a person says aloud or signs (each question, each signer's
+  statement) are set in the serif face; everything the form itself says is in the sans face. The one hue is on
+  what was answered: the progress bars, the chosen options and the question numbers. The page is read from a
+  projector, so no text of the interview is under 16px. The page loads no font, image or style from anywhere,
+  so both faces are system faces.
+
+  The theme. Both palettes are tokens: the light one on :root, the dark one on :root[data-theme="dark"]. The
+  script sets data-theme from the Theme selector (Light, Dark or System). Print is always light.
+-->
+<style>
+:root {
+  color-scheme: light;
+
+  /* Colour. The frame is one low step of the accent's hue; the sheet is white. */
+  --frame: #eef2f3;
+  --surface: #ffffff;
+  --raised: #f0f3f5;
+  --active: #dde4e7;
+  --border: #c3ccd1;
+  --rule: #d6dde1;
+  --control: #76828b;
+  --ink: #14181b;
+  --muted: #47515a;
+  --accent: #1b6c80;
+  --accent-tint: #e2eff2;
+  --accent-line: #8fbcc8;
+  --primary: #14181b;
+  --primary-ink: #ffffff;
+  --stop-bg: #fff5d9;
+  --stop-line: #94690a;
+  --stop-ink: #5c3803;
+  --focus: #1b6c80;
+  --veil: rgba(20, 24, 27, 0.45);
+
+  /* Type. */
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-said: "Iowan Old Style", "Sitka Text", Charter, Cambria, Georgia, serif;
+  --fs-body: 16px;
+  --fs-answer: 18px;
+  --fs-said: 24px;
+  --fs-section: 26px;
+  --fs-title: 30px;
+
+  /* Space and shape. */
+  --side-width: 336px;
+  --dock-h: 248px;
+  --bar: 56px;
+  --inset: 8px;
+  --pad: 40px;
+  --gap: 16px;
+  --hang: 60px;
+  --aside: 320px;
+  --aside-gap: 40px;
+  --measure: 1120px;
+  --control-height: 44px;
+  --radius-sheet: 16px;
+  --radius-card: 10px;
+  --radius-control: 6px;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --frame: #0b0d0e;
+  --surface: #15191b;
+  --raised: #20262a;
+  --active: #2f383d;
+  --border: #46525a;
+  --rule: #343e44;
+  --control: #8b96a0;
+  --ink: #f2f4f5;
+  --muted: #b6bfc5;
+  --accent: #6cc3d5;
+  --accent-tint: #143640;
+  --accent-line: #357484;
+  --primary: #f2f4f5;
+  --primary-ink: #111415;
+  --stop-bg: #2c2410;
+  --stop-line: #a8882c;
+  --stop-ink: #f5d896;
+  --focus: #6cc3d5;
+  --veil: rgba(0, 0, 0, 0.6);
+}
+
+/* ---- Base ---------------------------------------------------------------------------------------------------- */
+* { box-sizing: border-box; }
+html { font-size: var(--fs-body); scroll-behavior: smooth; scroll-padding-top: calc(var(--bar) + 12px); }
+body { margin: 0; background: var(--frame); color: var(--ink); font-family: var(--font); line-height: 1.5; overflow-wrap: anywhere; -webkit-text-size-adjust: 100%; }
+h1, h2, h3 { line-height: 1.25; margin: 0; }
+h1 { font-size: 1.0625rem; font-weight: 650; }
+h2 { font-size: var(--fs-section); font-weight: 650; letter-spacing: -0.01em; }
+h3 { font-size: 1.125rem; font-weight: 600; }
+p { margin: 0 0 calc(var(--gap) / 2); }
+a { color: var(--accent); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { min-height: var(--control-height); padding: 8px 14px; border: 1px solid var(--control); border-radius: var(--radius-control); background: var(--surface); font-weight: 500; cursor: pointer; }
+button:hover { background: var(--raised); }
+button:active { background: var(--active); }
+button.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); }
+button.primary:hover, button.primary:active { background: var(--primary); opacity: 0.88; }
+button.quiet { border-color: transparent; background: none; color: var(--ink); text-decoration: underline; text-underline-offset: 4px; }
+button.quiet:hover { background: var(--active); }
+button:disabled, button:disabled:hover { background: var(--active); border-color: transparent; color: var(--muted); opacity: 1; text-decoration: none; cursor: not-allowed; }
+input[type="text"], input[type="search"], input[type="date"], select, textarea { width: 100%; max-width: 100%; min-height: var(--control-height); padding: 9px 12px; border: 1px solid var(--control); border-radius: var(--radius-control); background: var(--surface); font-size: var(--fs-answer); }
+input[type="text"]:hover, input[type="search"]:hover, input[type="date"]:hover, select:hover, textarea:hover { border-color: var(--ink); }
+input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; accent-color: var(--accent); }
+textarea { min-height: 96px; resize: vertical; field-sizing: content; }
+::placeholder { color: var(--muted); opacity: 1; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+[hidden] { display: none !important; }
+.skip { position: absolute; left: 12px; top: -80px; z-index: 9; padding: 10px 14px; border-radius: var(--radius-control); background: var(--primary); color: var(--primary-ink); }
+.skip:focus { top: 12px; }
+
+/* A part that opens: a line to press, with a chevron that turns. */
+summary { display: inline-flex; align-items: center; gap: 8px; min-height: var(--control-height); padding: 4px 10px 4px 4px; border-radius: var(--radius-control); font-weight: 600; list-style: none; cursor: pointer; }
+summary::-webkit-details-marker { display: none; }
+summary:hover { background: var(--raised); }
+.chev { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+details[open] > summary .chev { transform: rotate(90deg); }
+
+/* ---- The frame: the section list on the left, the views on top, the file buttons below the list -------------------- */
+.side { position: fixed; inset: 0 auto var(--dock-h) 0; width: var(--side-width); display: flex; flex-direction: column; gap: 12px; padding: 16px 16px 0; }
+.brand { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; column-gap: 10px; row-gap: 2px; align-items: center; padding: 0 8px; }
+.mark { width: 26px; height: 26px; fill: none; stroke: var(--accent); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.brand h1 { grid-column: 2 / -1; }
+.brand-line { grid-column: 1 / -1; margin: 4px 0 2px; color: var(--muted); }
+.theme-pick { grid-column: 3; grid-row: 3; align-self: start; }
+.theme-pick span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.theme-pick select { width: auto; font-size: var(--fs-body); }
+.about { grid-column: 1 / 3; grid-row: 3; margin-left: -4px; }
+.about[open] { grid-column: 1 / -1; grid-row: 4; }
+.about[open] ~ .theme-pick, .brand:has(.about[open]) .theme-pick { grid-row: 3; }
+.about summary { font-weight: 500; color: var(--muted); }
+.top-release { margin: 0 0 4px 4px; color: var(--muted); }
+.view-pick, .sections-toggle, .sections-close { display: none; }
+
+.contents { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0 -8px 0 -6px; padding: 2px 4px 2px 6px; }
+@supports not selector(::-webkit-scrollbar) { .contents { scrollbar-width: thin; scrollbar-color: var(--control) transparent; } }
+.contents::-webkit-scrollbar { width: 10px; }
+.contents::-webkit-scrollbar-thumb { border: 2px solid var(--frame); border-radius: 5px; background: var(--control); }
+.contents ol, .signoff-nav { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.contents a, .signoff-nav a { position: relative; display: grid; gap: 0; padding: 5px 10px 8px; border-radius: 8px; text-decoration: none; color: inherit; }
+.contents a:hover, .signoff-nav a:hover, .contents a[aria-current], .signoff-nav a[aria-current] { background: var(--active); }
+.nav-name { font-weight: 600; line-height: 1.35; }
+.nav-count { display: block; color: var(--muted); line-height: 1.35; font-variant-numeric: tabular-nums; }
+a[data-state="routed"] .nav-count { color: var(--stop-ink); font-weight: 600; }
+:root[data-theme="dark"] a[data-state="routed"] .nav-count { color: var(--stop-ink); }
+.side progress, .dock progress { display: block; width: 100%; height: 5px; margin-top: 5px; border: 0; border-radius: 3px; background: var(--active); appearance: none; -webkit-appearance: none; overflow: hidden; }
+a:hover progress, a[aria-current] progress { background: var(--surface); }
+progress::-webkit-progress-bar { background: transparent; }
+progress::-webkit-progress-value { background: var(--accent); border-radius: 3px; }
+progress::-moz-progress-bar { background: var(--accent); border-radius: 3px; }
+a[data-state="routed"] progress::-webkit-progress-value { background: var(--stop-line); }
+a[data-state="routed"] progress::-moz-progress-bar { background: var(--stop-line); }
+/* The IT section stands apart from the six business sections. */
+.contents li:has([data-nav="7"]) { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+
+.dock { position: fixed; inset: auto auto 0 0; width: var(--side-width); display: grid; gap: 10px; padding: 0 16px 14px; }
+.signoff-nav { margin: 0 -6px; padding-top: 8px; border-top: 1px solid var(--border); }
+.signoff-nav:empty { display: none; }
+.status { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--active); color: var(--ink); line-height: 1.4; }
+.status:empty { display: none; }
+.status[data-kind="problem"] { border: 1px solid var(--stop-line); background: var(--stop-bg); color: var(--stop-ink); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions button { flex: 1 1 auto; padding-inline: 10px; }
+.actions .primary { flex-basis: 100%; }
+.draft-note { margin: 0; color: var(--muted); line-height: 1.35; }
+
+.stage { min-width: 0; margin-left: var(--side-width); padding: 0 var(--inset) var(--inset) 0; }
+/* The row of views wraps to a second line before it would hide a view. */
+.tabs { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; align-content: center; gap: 0 2px; min-height: var(--bar); padding: 0 calc(var(--pad) - 12px); background: var(--frame); }
+.tabs button { position: relative; flex: none; height: var(--control-height); min-height: 0; padding: 0 12px; border: 0; border-radius: var(--radius-control); background: none; color: var(--muted); white-space: nowrap; }
+.tabs button:hover { color: var(--ink); background: none; }
+.tabs button:focus-visible { outline-offset: -4px; }
+.tabs button[aria-selected="true"] { color: var(--ink); }
+.tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 5px; height: 2px; background: var(--ink); }
+/* Three groups: the KPI form, the two smaller forms an answer can route to, and the two pages to read. */
+.tabs [data-view="domain-activation"], .tabs [data-view="roles"] { margin-left: 21px; }
+.tabs [data-view="domain-activation"]::before, .tabs [data-view="roles"]::before { content: ""; position: absolute; left: -11px; top: 12px; bottom: 12px; width: 1px; background: var(--control); }
+
+.view { min-width: 0; min-height: calc(100vh - var(--bar) - var(--inset)); padding: 32px var(--pad) 56px; border: 1px solid var(--border); border-radius: var(--radius-sheet); background: var(--surface); }
+.view > * { max-width: var(--measure); margin-inline: auto; }
+.view:focus { outline: none; }
+
+/* The question before the form is emptied. */
+.confirm { width: min(440px, calc(100vw - 32px)); padding: 24px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--surface); color: var(--ink); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18); } /* taste-skill-ignore: a dialog floats */
+.confirm::backdrop { background: var(--veil); }
+.confirm h2 { font-size: 1.375rem; }
+.confirm p { margin: 10px 0 20px; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.confirm-actions button { min-width: 96px; }
+
+/* ---- The start of a form -------------------------------------------------------------------------------------- */
+.intro-title { font-size: var(--fs-title); letter-spacing: -0.015em; }
+.intro-text { max-width: 72ch; margin: 8px 0 0; }
+.intro-follow { max-width: 72ch; margin: 4px 0 0; color: var(--muted); }
+/* A smaller form says first, in a panel, that it is filled in only when the KPI form sends you to it. */
+.layout:has(.tabs [data-view="domain-activation"][aria-selected="true"]) .intro-text,
+.layout:has(.tabs [data-view="process-map-request"][aria-selected="true"]) .intro-text { max-width: none; margin: 12px 0 8px; padding: 12px 14px; border: 1px solid var(--accent-line); border-radius: var(--radius-card); background: var(--accent-tint); }
+.request { margin-top: 14px; border: 1px solid var(--border); border-radius: var(--radius-card); }
+.request > summary { display: flex; min-height: 52px; padding: 4px 16px 4px 12px; border-radius: var(--radius-card); }
+.request-word { flex: none; }
+.request-summary { min-width: 0; overflow: hidden; color: var(--muted); font-weight: 400; white-space: nowrap; text-overflow: ellipsis; }
+.request[open] .request-summary { display: none; }
+.request > .grid, .request > .field { margin: 4px 16px 16px; }
+.request .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.request textarea { min-height: 62px; }
+.field { margin-bottom: 12px; }
+.field label, .q-detail label, .per-row label { display: block; margin-bottom: 6px; font-weight: 600; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--gap); }
+.grid .field { margin: 0; }
+.hint { margin: 6px 0 0; color: var(--muted); }
+
+/* ---- A section ------------------------------------------------------------------------------------------------ */
+.section { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
+.section-head { display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr) var(--aside); column-gap: var(--aside-gap); row-gap: 4px; align-items: start; }
+.section-lead { grid-column: 1; }
+.section-progress { margin: 6px 0 0; color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.section-progress[data-state="complete"] { color: var(--accent); }
+.section-progress[data-state="routed"] { color: var(--stop-ink); font-weight: 600; }
+.section-facts { margin: 0; line-height: 1.45; }
+.section-facts dt { font-weight: 600; }
+.section-facts dt + dd { margin: 2px 0 0; color: var(--muted); }
+.section-part { grid-column: 2; grid-row: 1 / span 2; padding-top: 6px; }
+.section-more { grid-column: 1; margin-left: -4px; }
+.section-more > :not(summary) { margin-left: 4px; }
+.section-about { max-width: 72ch; margin: 4px 0 12px; }
+.section-more .section-facts { max-width: 72ch; margin-bottom: 8px; }
+.section-warning, .kind { margin: 16px 0 0; padding: 12px 14px; border-radius: var(--radius-card); }
+.section-warning { border: 1px solid var(--stop-line); background: var(--stop-bg); color: var(--stop-ink); }
+.kind { background: var(--raised); font-weight: 600; }
+.questions { margin-top: 16px; }
+.section-skipped { margin: 0; padding: 16px 0 4px; border-top: 1px solid var(--rule); color: var(--muted); }
+
+/* The IT section is a panel of its own: the business does not fill it in. */
+[data-section="7"] { margin-top: 40px; padding: 28px 32px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--raised); }
+[data-section="7"] .question, [data-section="7"] .section-skipped { border-top-color: var(--border); }
+[data-section="7"] .q-example p, [data-section="7"] summary:hover { background: var(--active); }
+
+/* ---- A question: what is asked aloud and who answers it; why we ask and an example; then the answer ----------------- */
+.question { display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr) var(--aside); column-gap: var(--aside-gap); row-gap: 14px; align-items: start; padding: 24px 0 28px; border-top: 1px solid var(--rule); animation: arrive 0.18s ease-out; }
+@keyframes arrive { from { opacity: 0; } }
+.q-ask, .q-answer { grid-column: 1; min-width: 0; padding-left: var(--hang); }
+.q-side { grid-column: 2; grid-row: 1 / span 2; min-width: 0; padding-top: 6px; }
+.q-head { display: grid; grid-template-columns: var(--hang) minmax(0, 1fr); align-items: baseline; margin-left: calc(-1 * var(--hang)); }
+.q-number { color: var(--accent); font-size: 1.0625rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.q-text { font-family: var(--font-said); font-size: var(--fs-said); font-weight: 400; line-height: 1.3; letter-spacing: 0; }
+.q-meta { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 14px; margin: 12px 0 0; }
+.q-who { display: grid; grid-template-columns: 20px minmax(0, 1fr); column-gap: 8px; align-items: start; }
+.q-who svg { width: 20px; height: 20px; margin-top: 2px; fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.q-who-label { color: var(--muted); }
+.q-asked { font-weight: 650; }
+.q-asked-more { display: block; color: var(--muted); }
+.q-asked-more:empty { display: none; }
+.q-rule { margin-left: auto; padding: 1px 10px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); }
+.q-analyst { margin: -6px 0 8px -4px; }
+.q-analyst summary { font-weight: 500; color: var(--muted); }
+.q-note { margin: 0 0 8px 4px; color: var(--muted); }
+.q-detail { margin-top: 14px; }
+.q-detail label { display: inline-block; margin-right: 10px; }
+.q-detail-need { display: inline-block; margin-bottom: 6px; padding: 0 10px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); }
+.q-why { margin: 0; color: var(--muted); line-height: 1.45; }
+.q-why-label { display: block; color: var(--ink); font-weight: 600; }
+.q-example { margin: 4px 0 0 -4px; }
+.q-example p { margin: 2px 0 0 4px; padding: 10px 12px; border-radius: 8px; background: var(--raised); white-space: pre-line; }
+
+/* ---- A pick list ---------------------------------------------------------------------------------------------- */
+.picker { font-size: var(--fs-answer); }
+.picker-chosen { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.picker-chosen:not(:empty) { margin-bottom: 10px; }
+.picker-chosen li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 2px 4px 2px 12px; border: 1px solid var(--accent-line); border-radius: 8px; background: var(--accent-tint); font-weight: 500; }
+.picker-chosen button { flex: none; padding: 2px 12px; border: 0; background: none; font-size: var(--fs-body); font-weight: 500; text-decoration: underline; text-underline-offset: 4px; }
+.picker-chosen button:hover { background: none; color: var(--accent); }
+.picker-all { display: flex; align-items: center; gap: 10px; min-height: var(--control-height); font-size: var(--fs-body); cursor: pointer; }
+.picker-list { list-style: none; margin: 8px 0 0; padding: 4px; max-height: 330px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--border); border-radius: var(--radius-card); }
+.picker-list label { display: flex; gap: 12px; align-items: flex-start; min-height: var(--control-height); padding: 9px 12px; border-radius: var(--radius-control); cursor: pointer; }
+.picker-list label:hover { background: var(--raised); }
+.picker-list label:has(input:checked) { background: var(--accent-tint); }
+.picker-list input { flex: none; margin: 3px 0 0; }
+.picker-list.short { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; max-height: none; margin: 0; padding: 0; overflow: visible; border: 0; border-radius: 0; }
+/* Options that each carry a line of description read better as one column. */
+.picker-list.short:has(.option-about:not(:empty)) { grid-template-columns: minmax(0, 1fr); }
+.picker-list.short label { height: 100%; border: 1px solid var(--control); border-radius: 8px; background: var(--surface); }
+.picker-list.short label:hover { border-color: var(--ink); background: var(--surface); }
+.picker-list.short label:has(input:checked) { border-color: var(--accent); background: var(--accent-tint); outline: 1px solid var(--accent); outline-offset: -2px; }
+.option-about { display: block; margin-top: 1px; color: var(--muted); font-size: var(--fs-body); }
+.picker-more { margin: 8px 0 0; color: var(--muted); font-size: var(--fs-body); }
+.per-row { margin-bottom: 12px; }
+
+/* ---- A notice: where an answer routes the request, or what a check found ------------------------------------------ */
+.notice { margin: 16px 0 0; padding: 14px 16px; border: 1px solid var(--accent-line); border-radius: var(--radius-card); background: var(--accent-tint); }
+.notice[data-notice] { display: grid; grid-template-columns: 24px minmax(0, 1fr); column-gap: 12px; align-items: start; animation: arrive 0.18s ease-out; }
+.notice > svg { width: 24px; height: 24px; margin-top: 1px; fill: none; stroke: var(--accent); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.notice .mark-stops { display: none; }
+.notice.blocks { border-color: var(--stop-line); background: var(--stop-bg); color: var(--stop-ink); }
+.notice.blocks > svg { stroke: var(--stop-ink); }
+.notice.blocks .mark-stops { display: block; }
+.notice.blocks .mark-routes { display: none; }
+.notice-body > * { margin: 0; }
+.notice-body > * + * { margin-top: 8px; }
+.notice-title { font-size: 1.125rem; font-weight: 650; line-height: 1.35; }
+.notice-reviewers { display: flex; flex-wrap: wrap; gap: 6px 8px; padding: 0; list-style: none; }
+.notice-reviewers li { padding: 2px 12px; border: 1px solid currentColor; border-radius: 999px; font-weight: 600; }
+.notice-open { margin-top: 12px !important; border-color: currentColor; background: var(--surface); color: var(--ink); font-weight: 600; }
+.notice-analyst { margin-left: -4px; }
+.notice-analyst summary { font-weight: 500; }
+.notice-analyst summary:hover { background: none; text-decoration: underline; }
+.notice-analyst p { margin: 0 0 0 4px; }
+
+/* ---- The sign-off block: a page one signs ------------------------------------------------------------------------- */
+.signoff { margin-top: 40px; padding: 28px 32px 24px; border: 1px solid var(--border); border-radius: var(--radius-card); }
+.signoff-intro { max-width: 72ch; margin: 8px 0 0; color: var(--muted); }
+.signoff-progress { margin: 10px 0 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.signer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 480px); column-gap: var(--aside-gap); row-gap: 12px; align-items: end; padding: 22px 0 24px; border-top: 1px solid var(--rule); break-inside: avoid; }
+.signer-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.signer-label { color: var(--muted); font-size: var(--fs-body); font-weight: 500; }
+.signer-label:empty { display: none; }
+.signer-meaning { margin: 8px 0 0; font-family: var(--font-said); font-size: 1.25rem; line-height: 1.4; }
+.signer-status { display: inline-block; margin: 8px 0 0; padding: 3px 12px; border: 1px solid var(--border); border-radius: 14px; color: var(--muted); }
+.signer-lines { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 16px; }
+.consulted-block { margin-top: 8px; padding-top: 24px; border-top: 1px solid var(--border); }
+.consulted-block > p { margin: 8px 0 4px; color: var(--muted); }
+.consulted-block .signer { align-items: start; }
+.consulted-lines { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 16px; }
+
+/* ---- The role table and the explainer ----------------------------------------------------------------------------- */
+.block > h2 { font-size: var(--fs-title); letter-spacing: -0.015em; }
+.block > p { max-width: 72ch; margin: 10px 0 0; color: var(--muted); }
+.table-wrap { margin-top: 20px; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 16px 28px 16px 0; text-align: left; vertical-align: top; border-bottom: 1px solid var(--rule); }
+th { padding-block: 8px; color: var(--muted); font-weight: 500; border-bottom-color: var(--border); }
+td:first-child { width: 22%; font-weight: 600; }
+td:nth-child(2) { width: 45%; }
+td:last-child, th:last-child { padding-right: 0; }
+.explainer > h2, .explainer-body { max-width: 68ch; margin-inline: 0; }
+.explainer-body { margin-top: 20px; font-size: 1.125rem; line-height: 1.6; }
+.explainer-body p { margin: 0 0 14px; }
+.explainer ol { margin: 0 0 14px; padding-left: 1.5em; }
+.explainer li { margin-bottom: 8px; padding-left: 4px; }
+
+/* ---- A laptop: the notes move between the question and its answer ------------------------------------------------------ */
+@media screen and (max-width: 1279px) {
+  :root { --pad: 32px; }
+  html { scroll-padding-top: calc(2 * var(--control-height) + 20px); }
+  .section-head, .question { grid-template-rows: none; grid-template-columns: minmax(0, 1fr); }
+  .section-part, .q-side { grid-column: 1; grid-row: auto; }
+  .section-part { padding: 6px 0 0; }
+  .q-side { padding: 0 0 0 var(--hang); }
+  .request .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .signer { grid-template-columns: minmax(0, 1fr); align-items: start; }
+  .tabs button { padding: 0 9px; }
+  .tabs button[aria-selected="true"]::after { left: 9px; right: 9px; }
+  .tabs [data-view="domain-activation"], .tabs [data-view="roles"] { margin-left: 17px; }
+  .tabs [data-view="domain-activation"]::before, .tabs [data-view="roles"]::before { left: -9px; }
+}
+
+/* ---- A phone, a narrow window or a zoomed page: the frame folds into a view selector and a Sections button ------------- */
+@media screen and (max-width: 999px) {
+  :root { --pad: 16px; --hang: 0px; --fs-said: 22px; --fs-title: 26px; --fs-section: 23px; }
+  html { scroll-padding-top: 68px; }
+  body { padding-bottom: var(--dock-h); }
+  .layout { display: flex; flex-direction: column; }
+  .side, .stage { display: contents; }
+  .brand { order: 1; padding: 12px 16px 4px; }
+  .view-pick { order: 2; display: block; padding: 4px 16px 8px; }
+  .view-pick label { display: block; margin-bottom: 4px; color: var(--muted); }
+  .view-pick select { font-size: var(--fs-body); font-weight: 600; }
+  .tabs { display: none; }
+  .sections-toggle { order: 3; position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 6px 16px; border-width: 1px 0; border-color: var(--border); border-radius: 0; background: var(--frame); text-align: left; }
+  .sections-toggle:hover { background: var(--frame); }
+  .sections-word { flex: none; font-weight: 650; }
+  .sections-now { flex: 1 1 auto; min-width: 0; color: var(--muted); font-weight: 400; line-height: 1.3; }
+  .sections-toggle .chev { transform: rotate(90deg); }
+  .contents { display: none; }
+  .layout.sections-open .contents { display: block; position: fixed; inset: 0 0 var(--dock-h) 0; z-index: 5; margin: 0; padding: 12px 12px 24px; overflow-y: auto; background: var(--frame); }
+  .sections-close { display: block; margin: 0 4px 10px auto; }
+  .contents li:has([data-nav="signoff"]) { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+  .contents a { padding: 10px 12px 12px; }
+  .view { order: 4; min-height: 0; padding: 20px var(--pad) 40px; border-width: 0 0 1px; border-radius: 0; }
+  .dock { order: 5; inset: auto 0 0 0; z-index: 6; width: auto; gap: 8px; padding: 8px 16px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: var(--frame); }
+  .actions .primary { flex: 1 1 auto; }
+  .request .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-section="7"], .signoff { margin-inline: -8px; padding: 20px 16px; }
+  .q-head { display: block; }
+  .q-number { display: block; margin-bottom: 4px; }
+  .q-rule { margin-left: 0; }
+  .consulted-lines { grid-template-columns: minmax(0, 1fr); }
+  /* The role table becomes one block for each role. */
+  thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  tr { display: block; padding: 16px 0; border-bottom: 1px solid var(--rule); }
+  td, td:first-child, td:nth-child(2) { display: block; width: auto; padding: 0; border: 0; }
+  td + td { margin-top: 6px; }
+  td:last-child { color: var(--muted); }
+  td:last-child::before { content: "In the intake: "; font-weight: 600; }
+}
+@media screen and (max-width: 599px) {
+  .request .grid, .signer-lines { grid-template-columns: minmax(0, 1fr); }
+}
+/* A narrow and short window, such as a laptop zoomed to 200%: the bar keeps only its buttons. */
+@media screen and (max-width: 999px) and (max-height: 520px) {
+  .draft-note { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* ---- Print, or save as PDF: the form alone, always light, with every answer in full ------------------------------------- */
+@media print {
+  @page { margin: 15mm; }
+  :root, :root[data-theme="dark"] {
+    color-scheme: light;
+    --frame: #ffffff; --surface: #ffffff; --raised: #f0f3f5; --active: #dde4e7; --border: #c3ccd1; --rule: #d6dde1; --control: #76828b;
+    --ink: #14181b; --muted: #47515a; --accent: #1b6c80; --accent-tint: #e2eff2; --accent-line: #8fbcc8;
+    --stop-bg: #fff5d9; --stop-line: #94690a; --stop-ink: #5c3803;
+    --hang: 40px; --fs-said: 17px; --fs-body: 12.5px; --fs-answer: 13px; --fs-section: 19px; --fs-title: 22px; --control-height: 30px;
+  }
+  body { background: none; }
+  .skip, .tabs, .contents, .dock, .theme-pick, .view-pick, .sections-toggle, .confirm, .notice-open, .chev { display: none; }
+  .side { position: static; width: auto; padding: 0 0 12px; }
+  .brand { padding: 0; }
+  .stage { margin: 0; padding: 0; }
+  .view { min-height: 0; padding: 0; border: 0; border-radius: 0; }
+  .view > * { max-width: none; }
+  .section-head, .question { grid-template-rows: none; grid-template-columns: minmax(0, 1fr); row-gap: 8px; }
+  .section-part, .q-side { grid-column: 1; grid-row: auto; }
+  .question { padding: 14px 0; break-inside: avoid; animation: none; }
+  .section-head { break-inside: avoid; }
+  .q-side { padding: 0 0 0 var(--hang); }
+  .request .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-section="7"], .signoff { padding: 18px; }
+  .signer { grid-template-columns: minmax(0, 1fr) 46%; padding: 14px 0; }
+  .signoff { break-before: page; }
+  /* A long list prints only what was chosen, and every part that opens prints open. */
+  .picker-search, .picker-all, .picker-more, .picker-chosen { display: none; }
+  .picker-list { max-height: none; overflow: visible; }
+  .picker-list:not(.short) { min-height: var(--control-height); }
+  .picker-list:not(.short) li:not(:has(input:checked)) { display: none; }
+  .picker-list label { min-height: 0; padding: 5px 8px; }
+  summary { min-height: 0; padding: 0; }
+  .about, .section-more, .q-example, .q-analyst, .notice-analyst { margin-left: 0; }
+  .request-summary { display: none; }
+  details::details-content { display: block; height: auto; content-visibility: visible; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#view">Skip to the form</a>
+<div class="layout" id="layout">
+  <div class="side">
+    <header class="brand top">
+      <svg class="mark" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2.6c3.9 4.6 7 8.3 7 12.4a7 7 0 0 1-14 0c0-4.1 3.1-7.8 7-12.4z"/><path d="M10 17.6h6M10 14.2h3.4"/></svg>
+      <h1>KPI intake form</h1>
+      <p class="brand-line">Works offline. Sends nothing.</p>
+      <label class="theme-pick"><span>Theme</span>
+        <select id="theme" aria-label="Theme"><option value="light">Light theme</option><option value="dark">Dark theme</option><option value="system">System theme</option></select>
+      </label>
+      <details class="about"><summary><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg>Version</summary><p class="top-release" id="release-line"></p></details>
+    </header>
+    <div class="view-pick"><label for="view-select">View</label><select id="view-select"></select></div>
+    <button type="button" class="sections-toggle" id="sections-toggle" aria-expanded="false" aria-controls="contents"><span class="sections-word">Sections</span><span class="sections-now" id="sections-now"></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg></button>
+    <nav class="contents" id="contents" aria-label="Sections">
+      <button type="button" class="sections-close" id="sections-close">Close the section list</button>
+      <ol id="contents-list"></ol>
+    </nav>
+  </div>
+  <div class="stage">
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Views"></nav>
+    <main class="view" id="view" tabindex="-1"></main>
+  </div>
+  <div class="dock" id="dock">
+    <ol class="signoff-nav" id="signoff-nav" aria-label="Sign-off"></ol>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+    <div class="actions">
+      <button type="button" class="primary" id="save">Save answers to file</button>
+      <button type="button" id="load">Load answers file</button>
+      <button type="button" class="quiet" id="clear">Clear this form</button>
+      <input type="file" id="load-file" accept=".json,application/json" hidden>
+    </div>
+    <p class="draft-note">Browser draft only. Save a file to share.</p>
+  </div>
+</div>
+<dialog class="confirm" id="clear-dialog" aria-labelledby="clear-title" aria-describedby="clear-text">
+  <h2 id="clear-title">Clear this form?</h2>
+  <p id="clear-text"></p>
+  <div class="confirm-actions">
+    <button type="button" id="clear-cancel" autofocus>Cancel</button>
+    <button type="button" class="primary" id="clear-confirm">Clear</button>
+  </div>
+</dialog>
+
+<!-- One tab of the top navigation. -->
+<template id="tpl-tab"><button type="button" role="tab" data-view=""></button></template>
+
+<!-- One line of the section list, with the section's progress. -->
+<template id="tpl-nav"><li><a href="#" data-nav=""><span class="nav-name"></span><span class="nav-count"></span><progress max="1" value="0"></progress></a></li></template>
+
+<!-- The start of a form: what it is for, and the request's own fields in a part that closes once they are filled. -->
+<template id="tpl-intro">
+  <section class="intro" data-part="intro">
+    <h2 class="intro-title"></h2>
+    <p class="intro-text"></p>
+    <p class="intro-follow">Follow-up questions appear when an answer needs them.</p>
+    <p class="notice" data-part="example-mark" hidden></p>
+    <details class="request" data-part="request-details">
+      <summary><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg><span class="request-word">Request details</span><span class="request-summary" data-part="request-summary"></span></summary>
+      <div class="grid" data-part="request"></div>
+      <div class="field"><label for="comment">Comment</label><textarea id="comment" data-field="comment"></textarea></div>
+    </details>
+  </section>
+</template>
+
+<!-- One section of a form: its name, its progress and who takes part; what it is for and when it is done open on request. -->
+<template id="tpl-section">
+  <section class="section" data-section="">
+    <header class="section-head">
+      <div class="section-lead">
+        <h2 class="section-title"></h2>
+        <p class="section-progress"></p>
+      </div>
+      <dl class="section-facts section-part">
+        <dt>Who takes part</dt><dd class="section-who"></dd>
+      </dl>
+      <details class="section-more">
+        <summary><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg>About this section</summary>
+        <p class="section-about"></p>
+        <dl class="section-facts">
+          <dt>Done when</dt><dd class="section-done"></dd>
+        </dl>
+      </details>
+    </header>
+    <p class="section-warning" hidden></p>
+    <p class="kind" data-part="kind" hidden></p>
+    <div class="questions"></div>
+    <p class="section-skipped" hidden></p>
+  </section>
+</template>
+
+<!-- One question, in reading order: the question as asked aloud and who answers it; why we ask and an example; the
+     answer. On a wide window the second part stands beside the other two. -->
+<template id="tpl-question">
+  <article class="question" data-question="">
+    <div class="q-ask">
+      <header class="q-head"><span class="q-number"></span><h3 class="q-text"></h3></header>
+      <p class="q-meta"><span class="q-who"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="6.6" r="3.3"/><path d="M3.6 17.4c.6-3.3 3.2-5.2 6.4-5.2s5.800 1.900 6.400 5.200"/></svg><span><span class="q-who-label">Who answers: </span><span class="q-asked"></span><span class="q-asked-more"></span></span></span><span class="q-rule"></span></p>
+    </div>
+    <div class="q-side">
+      <p class="q-why"><span class="q-why-label">Why we ask</span><span class="q-why-text"></span></p>
+      <details class="q-example" hidden><summary><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg>Show example answer</summary><p></p></details>
+    </div>
+    <div class="q-answer">
+      <details class="q-analyst" hidden><summary><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg>For the analyst</summary><p class="q-note" hidden></p></details>
+      <div class="q-input"></div>
+      <div class="q-detail" hidden><label class="q-detail-label"></label><span class="q-detail-need" hidden>Required</span></div>
+      <div class="q-notices"></div>
+    </div>
+  </article>
+</template>
+
+<!-- A pick list: the chosen items, a search box for a long list, and the options. -->
+<template id="tpl-picker">
+  <div class="picker">
+    <ul class="picker-chosen"></ul>
+    <label class="picker-all" hidden><input type="checkbox" data-part="show-all"> Show every process, not only this business area's</label>
+    <input type="search" class="picker-search" placeholder="Type to search the list" aria-label="Search the list" hidden>
+    <ul class="picker-list"></ul>
+    <p class="picker-more" hidden></p>
+  </div>
+</template>
+<template id="tpl-option"><li><label><input><span><span class="option-label"></span><span class="option-about"></span></span></label></li></template>
+<template id="tpl-chosen"><li><span class="chosen-label"></span><button type="button" aria-label="Remove">Remove</button></li></template>
+
+<!-- A notice under a question: where an answer routes the request, or what a check found. It says what is needed, who
+     does it, and gives a button to the form that does it. The first mark shows on a notice that sends the request on its
+     way; the second on one that stops the form until something else is done. -->
+<template id="tpl-notice">
+  <div class="notice" data-notice="">
+    <svg class="mark-routes" viewBox="0 0 22 22" aria-hidden="true"><path d="M4 18v-5.5a4 4 0 0 1 4-4h10"/><path d="M14 4.5l4 4-4 4"/></svg><svg class="mark-stops" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M7.4 11h7.2"/></svg>
+    <div class="notice-body">
+      <p class="notice-title"></p>
+      <p class="notice-text"></p>
+      <p class="notice-who" hidden></p>
+      <ul class="notice-reviewers" aria-label="Reviewers" hidden></ul>
+      <button type="button" class="notice-open" hidden></button>
+      <details class="notice-analyst" hidden><summary><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg>For the analyst</summary><p></p></details>
+    </div>
+  </div>
+</template>
+
+<!-- The sign-off block. -->
+<template id="tpl-signoff">
+  <section class="section signoff" data-part="signoff">
+    <h2>Sign-off</h2>
+    <p class="signoff-intro"></p>
+    <p class="signoff-progress" data-part="signoff-progress"></p>
+    <div data-part="signers"></div>
+    <div class="consulted-block" data-part="consulted-block">
+      <h3>Consulted</h3>
+      <p>Two groups are consulted and do not sign. Record the date and the outcome of each.</p>
+      <div data-part="consulted"></div>
+    </div>
+  </section>
+</template>
+<!-- One signer: the role, what the signature is for and the statement on the left, the name and the date on the right.
+     Each label stays just before its input in the markup: the script pairs them that way. -->
+<template id="tpl-signer">
+  <div class="signer" data-signer="">
+    <div class="signer-what">
+      <h3 class="signer-head"><span class="signer-role"></span><span class="signer-label"></span></h3>
+      <p class="signer-meaning"></p>
+      <p class="hint signer-required"></p>
+      <p class="signer-status" hidden></p>
+    </div>
+    <div class="grid signer-lines">
+      <div class="field"><label>Name</label><input type="text" data-sign="name" autocomplete="off"></div>
+      <div class="field"><label>Date</label><input type="date" data-sign="date"></div>
+    </div>
+  </div>
+</template>
+<template id="tpl-consulted">
+  <div class="signer" data-consulted="">
+    <div class="signer-what">
+      <h3 class="signer-role"></h3>
+      <p class="hint signer-required"></p>
+    </div>
+    <div class="grid consulted-lines">
+      <div class="field"><label>Date</label><input type="date" data-consult="date"></div>
+      <div class="field"><label>Outcome</label><input type="text" data-consult="outcome" autocomplete="off"></div>
+    </div>
+  </div>
+</template>
+
+<!-- The role table and the explainer. -->
+<template id="tpl-roles">
+  <section class="block" data-part="roles">
+    <h2>The roles</h2>
+    <p>Each definition is the organization's own. The last column says what the role does in the intake.</p>
+    <div class="table-wrap"><table><thead><tr><th>Role</th><th>Definition</th><th>In the intake</th></tr></thead><tbody></tbody></table></div>
+  </section>
+</template>
+<template id="tpl-explainer"><section class="block explainer" data-part="explainer"><h2></h2><div class="explainer-body"></div></section></template>
+
+<script id="intake-data" type="application/json">/* EMBEDDED_DATA */</script>
+<script id="intake-script">
+"use strict";
+// ---- The data and the state ------------------------------------------------------------------------------------
+const DATA = JSON.parse(document.getElementById("intake-data").textContent);
+const FORMS = Object.keys(DATA.forms);
+const BY_ID = Object.fromEntries(DATA.questions.map((q) => [q.id, q]));
+const DRAFT_KEY = "kpi-intake-draft-1";
+const SHOWN = 40;              // options a long list shows at once
+const LONG = 8;                // a list with more options than this gets a search box
+const $ = (id) => document.getElementById(id);
+
+function emptyForm() { return { answers: {}, request: {}, sign_offs: {}, consulted: {}, example_of: "", comment: "" }; }
+let state = Object.fromEntries(FORMS.map((f) => [f, emptyForm()]));
+let view = FORMS[0];
+const showAll = {};            // question id -> true when the reader asked for the whole list
+const narrow = matchMedia("(max-width: 999px)");   // the folded frame of a phone, a narrow window or a zoomed page
+// Each name of a term that a module other than the measures holds, as the check compares names, with its module and
+// whether a term of that name has a definition. Where several terms share a name, one with a definition is kept.
+const TERM = new Map();
+for (const [module, held] of Object.entries(DATA.term_names || {})) {
+  for (const [defined, names] of [[true, held.defined || []], [false, held.undefined || []]]) {
+    for (const name of names) { const key = norm(name); if (!TERM.has(key) || (defined && !TERM.get(key).defined)) TERM.set(key, { module, defined }); }
+  }
+}
+// What each of the two Domain Owner signatures of the KPI form is for.
+const SIGNER_LABELS = { "domain-confirmation": "Domain confirmation", "domain-owner": "Conflicting definitions" };
+// The next step of an answer that sends the request to one of the two smaller forms.
+const ROUTE_STEPS = {
+  "domain-activation": { title: "Domain activation required before this KPI can be added", open: "Open the domain activation form" },
+  "process-map-request": { title: "Process map request required before this KPI can be added", open: "Open the process map request" },
+};
+
+function current() { return state[view]; }
+function formOf(q) { return DATA.sections.find((s) => s.id === q.section).form; }
+function questionsOf(form) { return DATA.questions.filter((q) => formOf(q) === form); }
+
+// ---- The rules (the same as kpi_store/intake/rules.py) ---------------------------------------------------------
+function values(answers, key) {
+  const v = answers[key];
+  if (v === undefined || v === null) return [];
+  return (Array.isArray(v) ? v : [v]).map((x) => String(x).trim()).filter(Boolean);
+}
+function positions(answers, key) {
+  const v = answers[key];
+  if (v === undefined || v === null) return [];
+  return (Array.isArray(v) ? v : [v]).map((x) => String(x).trim());
+}
+function realValues(answers, key) { return values(answers, key).filter((v) => !v.startsWith("@")); }
+function isAsked(q, answers, seen) {
+  seen = seen || new Set();
+  for (const cond of q.ask_when || []) {
+    const target = BY_ID[cond.question];
+    const asked = !seen.has(target.id) && isAsked(target, answers, new Set([...seen, q.id]));
+    const held = asked ? values(answers, target.id) : [];
+    if ("is" in cond && !held.includes(cond.is)) return false;
+    if ("is_not" in cond && held.includes(cond.is_not)) return false;
+    if ("answered" in cond && (held.length > 0) !== cond.answered) return false;
+  }
+  return true;
+}
+function isChoice(q) { return q.type === "choice" || q.type === "multi_choice"; }
+function isMany(q) { return q.type === "multi_choice" || q.type === "list"; }
+function baseList(q) {
+  const [kind, name] = q.source.includes(":") ? q.source.split(":") : ["", q.source];
+  if (kind === "choices") return DATA.choices[name];
+  if (kind === "settings") return DATA.settings_lists[name].map((i) => Object.assign({}, i, { label: i.label + (i.active === false ? " (not active)" : "") }));
+  return DATA.lists[name];
+}
+function isUnder(byId, item, ancestor) {
+  let at = byId[item.parent];
+  while (at) { if (at.id === ancestor) return true; at = byId[at.parent]; }
+  return false;
+}
+// What a question offers: every item its levels allow (narrowed = false), or only those the earlier answers
+// leave (narrowed = true), then its special options.
+function optionsOf(q, answers, narrowed) {
+  if (!isChoice(q)) return [];
+  let items = baseList(q);
+  if (q.levels) items = items.filter((i) => i.level >= q.levels[0] && i.level <= q.levels[1]);
+  if (narrowed && q.under) {
+    const top = realValues(answers, q.under)[0];
+    if (top) { const byId = Object.fromEntries(baseList(q).map((i) => [i.id, i])); items = items.filter((i) => isUnder(byId, i, top)); }
+  }
+  if (narrowed && q.narrow_by && !showAll[q.id]) {
+    const area = realValues(answers, q.narrow_by)[0];
+    const inArea = area ? items.filter((i) => (i.areas || []).includes(area)) : [];
+    if (inArea.length) items = inArea;
+  }
+  return items.concat(q.option || []);
+}
+function perMissing(q, answers) {
+  const mine = positions(answers, q.id);
+  return positions(answers, q.per).filter((v, i) => v && !v.startsWith("@") && !mine[i]);
+}
+function detailRequired(q, answers) {
+  if (!q.detail || q.detail.required_when === "never") return false;
+  return q.detail.required_when === "always" || values(answers, q.id).includes(q.detail.required_when);
+}
+function isComplete(q, answers) {
+  if (q.per) { if (perMissing(q, answers).length) return false; }
+  else if (!values(answers, q.id).length) return false;
+  return !detailRequired(q, answers) || values(answers, q.id + ".detail").length > 0;
+}
+function kindOf(answers) {
+  for (const rule of DATA.kind_rules) {
+    const q = BY_ID[rule.question];
+    if (isAsked(q, answers) && values(answers, q.id).includes(rule.answer)) return rule;
+  }
+  return null;
+}
+function routesOf(q, answers) {
+  if (!q.route || !isAsked(q, answers)) return [];
+  const offered = Object.fromEntries(optionsOf(q, answers, false).map((o) => [o.id, o]));
+  const held = values(answers, q.id);
+  const out = [];
+  for (const route of q.route) {
+    for (const v of held) {
+      const hit = route.when === "@inactive" ? (offered[v] || {}).active === false : v === route.when;
+      if (hit) out.push({ route, label: (offered[v] || {}).label || v });
+    }
+  }
+  return out;
+}
+function norm(name) { return name.toLowerCase().replace(/[^a-z0-9&]+/g, " ").trim().replace(/\s+/g, " "); }
+
+// ---- Small helpers ---------------------------------------------------------------------------------------------
+function clone(id) { return document.getElementById(id).content.firstElementChild.cloneNode(true); }
+function say(text, kind) { $("status").textContent = text; $("status").dataset.kind = kind || ""; }
+
+// ---- Reading what a file or a draft holds ----------------------------------------------------------------------
+const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+const isText = (v) => typeof v === "string";
+const brief = (text) => String(text).slice(0, 40);
+// What is wrong with the parts of one form, in words, or "" when each part has the type answers.schema.json gives.
+function partsProblem(held) {
+  if (!isObject(held)) return "it is not a JSON object";
+  if (!isObject(held.answers)) return 'it has no "answers" object';
+  for (const [id, v] of Object.entries(held.answers)) {
+    if (!(isText(v) || (Array.isArray(v) && v.every(isText)))) return `the answer to ${brief(id)} is neither a text nor a list of texts`;
+  }
+  for (const key of ["catalogue_version", "kpi_name", "example_of", "comment"]) {
+    if (key in held && !isText(held[key])) return `"${key}" is not a text`;
+  }
+  if ("request" in held && !(isObject(held.request) && Object.values(held.request).every(isText))) return '"request" does not hold a text for each field';
+  for (const key of ["sign_offs", "consulted"]) {
+    if (!(key in held)) continue;
+    const ok = isObject(held[key]) && Object.values(held[key]).every((entry) => isObject(entry) && Object.values(entry).every(isText));
+    if (!ok) return `"${key}" does not hold texts for each entry`;
+  }
+  return "";
+}
+function fileProblem(data) {
+  if (!isObject(data)) return "it is not a JSON object";
+  if (data.format !== 1) return 'its "format" is not 1';
+  if (!FORMS.includes(data.form)) return 'its "form" names none of the three forms';
+  return partsProblem(data);
+}
+function saveDraft() {
+  // A draft survives a reload when the browser allows storage. A private window may refuse it.
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ state, view })); } catch (e) { /* the form still works */ }
+}
+// "ok" when a draft was restored, "bad" when there was one and any part of it was malformed, "" when there was none.
+// A draft is restored whole or not at all, and the view it names is opened only when it is restored.
+function loadDraft() {
+  let text = null;
+  try { text = localStorage.getItem(DRAFT_KEY); } catch (e) { return ""; }
+  if (!text) return "";
+  let held = null;
+  try { held = JSON.parse(text); } catch (e) { held = null; }
+  // Whole means: every form is there, each with every part that emptyForm() gives, and each part of the right type.
+  const parts = Object.keys(emptyForm());
+  const whole = isObject(held) && isObject(held.state)
+    && FORMS.every((f) => isObject(held.state[f]) && parts.every((part) => part in held.state[f]) && !partsProblem(held.state[f]));
+  if (!whole) {
+    // The next change writes a new draft over it, so the unread one is kept aside under another key.
+    try { localStorage.setItem(DRAFT_KEY + "-unread", text); } catch (e) { /* it is lost with the next change */ }
+    return "bad";
+  }
+  for (const f of FORMS) state[f] = Object.assign(emptyForm(), held.state[f]);
+  if (FORMS.includes(held.view)) view = held.view;
+  return "ok";
+}
+
+// ---- Changing an answer ----------------------------------------------------------------------------------------
+function dependents(id) { return DATA.questions.filter((q) => q.narrow_by === id || q.under === id || q.per === id); }
+function setAnswer(q, value) {
+  const answers = current().answers;
+  if (Array.isArray(value) ? value.length === 0 : value === "") delete answers[q.id]; else answers[q.id] = value;
+  for (const dep of dependents(q.id)) {
+    if (dep.under === q.id) {
+      const allowed = new Set(optionsOf(dep, answers, true).map((o) => o.id));
+      if (values(answers, dep.id).some((v) => !allowed.has(v))) delete answers[dep.id];
+    }
+    redraw(dep);
+  }
+  changed();
+}
+// A multi-choice answer changes by one item, so the answers of the questions that follow it step by step
+// (q.per) stay beside the step they belong to.
+function toggle(q, id, on) {
+  const answers = current().answers;
+  const held = positions(answers, q.id);
+  const at = held.indexOf(id);
+  const followers = DATA.questions.filter((d) => d.per === q.id);
+  if (on && at < 0) {
+    held.push(id);
+    for (const d of followers) { const mine = positions(answers, d.id); while (mine.length < held.length) mine.push(""); answers[d.id] = mine; }
+  } else if (!on && at >= 0) {
+    held.splice(at, 1);
+    for (const d of followers) { const mine = positions(answers, d.id); mine.splice(at, 1); if (mine.some(Boolean)) answers[d.id] = mine; else delete answers[d.id]; }
+  }
+  setAnswer(q, held);
+}
+function changed() { saveDraft(); refresh(); }
+
+// ---- Drawing one question's input ------------------------------------------------------------------------------
+function redraw(q) {
+  const card = document.querySelector(`[data-question="${q.id}"]`);
+  if (card) drawInput(q, card.querySelector(".q-input"));
+}
+function drawInput(q, box) {
+  box.replaceChildren();
+  const answers = current().answers;
+  if (q.per) return drawPer(q, box);
+  if (isChoice(q)) return box.append(picker(q));
+  if (q.type === "list") {
+    const area = document.createElement("textarea");
+    area.name = q.id;
+    area.setAttribute("aria-label", q.text);
+    area.value = positions(answers, q.id).join("\n");
+    area.addEventListener("input", () => setAnswer(q, area.value.split("\n").map((s) => s.trim()).filter(Boolean)));
+    const hint = document.createElement("p");
+    hint.className = "hint";
+    hint.textContent = "Write one answer on each line.";
+    return box.append(area, hint);
+  }
+  const input = document.createElement(q.type === "long_text" ? "textarea" : "input");
+  if (q.type !== "long_text") input.type = "text";
+  input.name = q.id;
+  input.autocomplete = "off";
+  input.setAttribute("aria-label", q.text);
+  input.value = values(answers, q.id)[0] || "";
+  input.addEventListener("input", () => setAnswer(q, input.value));
+  box.append(input);
+}
+// One row for each step chosen in the question this one follows.
+function drawPer(q, box) {
+  const answers = current().answers;
+  const base = BY_ID[q.per];
+  const labels = Object.fromEntries(optionsOf(base, answers, false).map((o) => [o.id, o.label]));
+  const steps = positions(answers, base.id);
+  let rows = 0;
+  steps.forEach((step, i) => {
+    if (!step || step.startsWith("@")) return;
+    rows += 1;
+    const row = document.createElement("div");
+    row.className = "per-row";
+    const label = document.createElement("label");
+    label.textContent = labels[step] || step;
+    const set = (text) => { const mine = positions(answers, q.id); while (mine.length < steps.length) mine.push(""); mine[i] = text; answers[q.id] = mine; changed(); };
+    let control;
+    if (isChoice(q)) {
+      control = document.createElement("select");
+      control.append(new Option("Choose", ""));
+      for (const o of optionsOf(q, answers, false)) control.append(new Option(o.label, o.id));
+      control.value = positions(answers, q.id)[i] || "";
+      control.addEventListener("change", () => set(control.value));
+    } else {
+      control = document.createElement("input");
+      control.type = "text";
+      control.autocomplete = "off";
+      control.value = positions(answers, q.id)[i] || "";
+      control.addEventListener("input", () => set(control.value.trim()));
+    }
+    control.name = `${q.id}#${i + 1}`;
+    control.id = `per-${q.id}-${i}`;
+    label.htmlFor = control.id;
+    row.append(label, control);
+    box.append(row);
+  });
+  if (!rows) { const hint = document.createElement("p"); hint.className = "hint"; hint.textContent = `Answer ${base.id} first.`; box.append(hint); }
+}
+function picker(q) {
+  const node = clone("tpl-picker");
+  const chosen = node.querySelector(".picker-chosen");
+  const search = node.querySelector(".picker-search");
+  const list = node.querySelector(".picker-list");
+  const more = node.querySelector(".picker-more");
+  const all = node.querySelector(".picker-all");
+  const multi = q.type === "multi_choice";
+  function draw() {
+    const answers = current().answers;
+    const offered = optionsOf(q, answers, true);
+    const labels = Object.fromEntries(optionsOf(q, answers, false).map((o) => [o.id, o.label]));
+    const held = values(answers, q.id);
+    const long = offered.length > LONG;
+    search.hidden = !long;
+    list.classList.toggle("short", !long);
+    all.hidden = !(q.narrow_by && realValues(answers, q.narrow_by).length);
+    all.querySelector("input").checked = !!showAll[q.id];
+    chosen.replaceChildren();
+    if (long) for (const id of held) {
+      const item = clone("tpl-chosen");
+      item.querySelector(".chosen-label").textContent = labels[id] || id;
+      item.querySelector("button").setAttribute("aria-label", `Remove ${labels[id] || id}`);
+      item.querySelector("button").addEventListener("click", () => { multi ? toggle(q, id, false) : setAnswer(q, ""); draw(); });
+      chosen.append(item);
+    }
+    const term = search.value.trim().toLowerCase();
+    const special = offered.filter((o) => o.id.startsWith("@"));
+    const hits = offered.filter((o) => !o.id.startsWith("@") && (!term || o.label.toLowerCase().includes(term)));
+    const shown = hits.slice(0, long ? SHOWN : hits.length).concat(special);
+    list.replaceChildren();
+    for (const o of shown) {
+      const item = clone("tpl-option");
+      const input = item.querySelector("input");
+      input.type = multi ? "checkbox" : "radio";
+      input.name = q.id;
+      input.value = o.id;
+      input.checked = held.includes(o.id);
+      input.addEventListener("change", () => { multi ? toggle(q, o.id, input.checked) : setAnswer(q, o.id); draw(); });
+      item.querySelector(".option-label").textContent = o.label;
+      item.querySelector(".option-about").textContent = o.description || "";
+      list.append(item);
+    }
+    const left = hits.length - Math.min(hits.length, long ? SHOWN : hits.length);
+    more.hidden = !(left > 0 || (!hits.length && term));
+    more.textContent = left > 0 ? `${left} more. Type to narrow the list.` : "Nothing in the list matches.";
+  }
+  search.addEventListener("input", draw);
+  all.querySelector("input").addEventListener("change", (e) => { showAll[q.id] = e.target.checked; draw(); });
+  draw();
+  return node;
+}
+
+// ---- Drawing a form --------------------------------------------------------------------------------------------
+function drawQuestion(q) {
+  const card = clone("tpl-question");
+  card.dataset.question = q.id;
+  card.id = "q-" + q.id;
+  card.querySelector(".q-number").textContent = q.id;
+  card.querySelector(".q-text").textContent = q.text;
+  // Who answers: the role first, then any sentence about how the roles work together.
+  const cut = q.asked_of_text.indexOf(". ");
+  card.querySelector(".q-asked").textContent = cut < 0 ? q.asked_of_text : q.asked_of_text.slice(0, cut + 1);
+  card.querySelector(".q-asked-more").textContent = cut < 0 ? "" : q.asked_of_text.slice(cut + 2);
+  card.querySelector(".q-rule").textContent = q.requirement;
+  const note = card.querySelector(".q-note");
+  if (q.note) { note.textContent = q.note; note.hidden = false; card.querySelector(".q-analyst").hidden = false; }
+  card.querySelector(".q-why-text").textContent = q.why;
+  if (q.example) { const ex = card.querySelector(".q-example"); ex.hidden = false; ex.querySelector("p").textContent = q.example; }
+  drawInput(q, card.querySelector(".q-input"));
+  if (q.detail) {
+    const box = card.querySelector(".q-detail");
+    const label = box.querySelector(".q-detail-label");
+    const input = document.createElement(q.detail.type === "long_text" ? "textarea" : "input");
+    if (q.detail.type !== "long_text") input.type = "text";
+    input.name = q.id + ".detail";
+    input.id = "detail-" + q.id;
+    input.autocomplete = "off";
+    label.textContent = q.detail.label;
+    label.htmlFor = input.id;
+    input.value = values(current().answers, q.id + ".detail")[0] || "";
+    input.addEventListener("input", () => { const a = current().answers; if (input.value.trim()) a[q.id + ".detail"] = input.value; else delete a[q.id + ".detail"]; changed(); });
+    box.append(input);
+  }
+  return card;
+}
+function drawForm(form) {
+  const main = $("view");
+  main.replaceChildren();
+  const held = state[form];
+  const intro = clone("tpl-intro");
+  intro.querySelector(".intro-title").textContent = DATA.forms[form];
+  intro.querySelector(".intro-text").textContent = form === FORMS[0]
+    ? "One form is for one KPI. Sections 1 to 6 are for the business. Section 7 is for Digital IT, after the business has signed. Save the answers to a file when you stop, and load the file to go on."
+    : "Fill in this form only when the KPI form sends you here. Save it to its own file.";
+  const requestBox = intro.querySelector('[data-part="request"]');
+  // The request details stay open while they are empty. Once filled, they close to one line.
+  const requestLine = intro.querySelector('[data-part="request-summary"]');
+  const summarize = () => { requestLine.textContent = DATA.request_fields.map((f) => (held.request[f.id] || "").trim()).filter(Boolean).join(" · "); };
+  summarize();
+  intro.querySelector('[data-part="request-details"]').open = !requestLine.textContent && !(held.comment || "").trim();
+  for (const item of DATA.request_fields) {
+    const field = document.createElement("div");
+    field.className = "field";
+    const label = document.createElement("label");
+    const input = document.createElement("input");
+    input.type = item.id === "date" ? "date" : "text";
+    input.id = "request-" + item.id;
+    input.dataset.request = item.id;
+    input.autocomplete = "off";
+    input.value = held.request[item.id] || "";
+    input.addEventListener("input", () => { held.request[item.id] = input.value; summarize(); saveDraft(); });
+    label.htmlFor = input.id;
+    label.textContent = item.label;
+    field.append(label, input);
+    requestBox.append(field);
+  }
+  const comment = intro.querySelector('[data-field="comment"]');
+  comment.value = held.comment || "";
+  comment.addEventListener("input", () => { held.comment = comment.value; saveDraft(); });
+  const mark = intro.querySelector('[data-part="example-mark"]');
+  if (held.example_of) { mark.hidden = false; mark.textContent = `This file is a shipped example. It copies the measure "${held.example_of}", which the ontology already holds, as if it were new.`; }
+  main.append(intro);
+
+  const nav = $("contents-list");
+  nav.replaceChildren();
+  for (const section of DATA.sections.filter((s) => s.form === form)) {
+    const node = clone("tpl-section");
+    node.dataset.section = section.id;
+    node.id = "section-" + section.id;
+    node.querySelector(".section-title").textContent = form === FORMS[0] ? `${section.id}. ${section.name}` : section.name;
+    node.querySelector(".section-about").textContent = section.about;
+    node.querySelector(".section-who").textContent = section.who;
+    node.querySelector(".section-done").textContent = section.done_when;
+    if (section.warning) { const w = node.querySelector(".section-warning"); w.hidden = false; w.textContent = "Warning for IT. " + section.warning; }
+    const box = node.querySelector(".questions");
+    for (const q of DATA.questions.filter((x) => x.section === section.id)) box.append(drawQuestion(q));
+    main.append(node);
+    const line = clone("tpl-nav");
+    const link = line.querySelector("a");
+    link.href = "#section-" + section.id;
+    link.dataset.nav = section.id;
+    line.querySelector(".nav-name").textContent = form === FORMS[0] ? `${section.id}. ${section.name}` : section.name;
+    nav.append(line);
+  }
+
+  const block = clone("tpl-signoff");
+  block.id = "signoff";
+  block.querySelector(".signoff-intro").textContent = DATA.sign_off.intro;
+  const signers = block.querySelector('[data-part="signers"]');
+  for (const signer of DATA.sign_off.signer.filter((s) => s.forms.includes(form))) {
+    const node = clone("tpl-signer");
+    node.dataset.signer = signer.id;
+    node.querySelector(".signer-role").textContent = DATA.roles.find((r) => r.id === signer.role).short;
+    node.querySelector(".signer-meaning").textContent = `"${form === "domain-activation" && signer.activation_meaning ? signer.activation_meaning : signer.meaning}"`;
+    node.querySelector(".signer-required").textContent = "Required: " + signer.required;
+    // A signature that only a conflict calls for says so, until the check has found one.
+    const needed = isNeeded(signer, form);
+    node.querySelector(".signer-label").textContent = form === FORMS[0] ? SIGNER_LABELS[signer.id] || "" : "";
+    node.querySelector(".signer-required").hidden = !needed;
+    node.querySelector(".signer-status").hidden = needed;
+    node.querySelector(".signer-status").textContent = "Only if the check finds a conflicting definition";
+    node.querySelectorAll("[data-sign]").forEach((input) => {
+      const key = input.dataset.sign;
+      input.id = `sign-${signer.id}-${key}`;
+      input.previousElementSibling.htmlFor = input.id;
+      input.value = (held.sign_offs[signer.id] || {})[key] || "";
+      input.addEventListener("input", () => { held.sign_offs[signer.id] = Object.assign({ name: "", date: "" }, held.sign_offs[signer.id], { [key]: input.value }); changed(); });
+    });
+    signers.append(node);
+  }
+  const consultedBlock = block.querySelector('[data-part="consulted-block"]');
+  consultedBlock.hidden = form !== FORMS[0];
+  const consulted = block.querySelector('[data-part="consulted"]');
+  for (const item of DATA.sign_off.consulted) {
+    const node = clone("tpl-consulted");
+    node.dataset.consulted = item.id;
+    node.querySelector(".signer-role").textContent = item.who;
+    node.querySelector(".signer-required").textContent = "When: " + item.when_text;
+    node.querySelectorAll("[data-consult]").forEach((input) => {
+      const key = input.dataset.consult;
+      input.id = `consult-${item.id}-${key}`;
+      input.previousElementSibling.htmlFor = input.id;
+      input.value = (held.consulted[item.id] || {})[key] || "";
+      input.addEventListener("input", () => { held.consulted[item.id] = Object.assign({ date: "", outcome: "" }, held.consulted[item.id], { [key]: input.value }); saveDraft(); });
+    });
+    consulted.append(node);
+  }
+  main.append(block);
+  const line = clone("tpl-nav");
+  line.querySelector("a").href = "#signoff";
+  line.querySelector("a").dataset.nav = "signoff";
+  line.querySelector(".nav-name").textContent = "Sign-off";
+  // The sign-off line has its own fixed row under the section list. A folded frame keeps it at the end of the list.
+  $("signoff-nav").replaceChildren(line);
+  placeSignoff();
+  refresh();
+}
+
+// ---- What changes with every answer: which questions show, the notices, the progress -----------------------------
+// `more` may add: who does the next step, the reviewers to bring in, a button to the next step, and a line for the analyst.
+function notice(box, key, title, text, blocks, more) {
+  const node = clone("tpl-notice");
+  node.dataset.notice = key;
+  node.classList.toggle("blocks", !!blocks);
+  node.querySelector(".notice-title").textContent = title;
+  node.querySelector(".notice-text").textContent = text;
+  more = more || {};
+  if (more.who) { const who = node.querySelector(".notice-who"); who.hidden = false; who.textContent = more.who; }
+  if (more.reviewers) {
+    const list = node.querySelector(".notice-reviewers");
+    list.hidden = false;
+    for (const name of more.reviewers) { const item = document.createElement("li"); item.textContent = name; list.append(item); }
+  }
+  if (more.open) { const button = node.querySelector(".notice-open"); button.hidden = false; button.textContent = more.open; button.addEventListener("click", more.go); }
+  if (more.analyst) { const aside = node.querySelector(".notice-analyst"); aside.hidden = false; aside.querySelector("p").textContent = more.analyst; }
+  box.append(node);
+}
+function routeNotice(box, hit) {
+  const id = hit.route.outcome;
+  const outcome = DATA.outcomes[id];
+  const step = ROUTE_STEPS[id];
+  if (step) {
+    // The request goes to a smaller form: say who answers and signs it, and open it from here.
+    const target = DATA.sections.find((s) => s.form === id);
+    return notice(box, id, step.title, hit.route.notice, outcome.blocks,
+      { who: target.who, open: step.open, go: () => { show(id); scrollTo(0, 0); $("view").focus(); }, analyst: outcome.next });
+  }
+  const consult = DATA.sign_off.consulted.find((c) => c.id === outcome.consult);
+  // The catalogue's next step is added unless the notice already says it.
+  const next = outcome.next && !hit.route.notice.includes(outcome.next.slice(0, 40)) ? " " + outcome.next : "";
+  notice(box, id, outcome.title, hit.route.notice + next, outcome.blocks,
+    consult ? { reviewers: consult.who.split(/,\s*|\s+and\s+/).filter(Boolean), open: "Go to the sign-off block", go: goToSignoff } : {});
+}
+function goToSignoff() { $("signoff").scrollIntoView(); $("signoff").querySelector("[data-consult]").focus({ preventScroll: true }); }
+// A signature is needed for every KPI, or only when the check finds a conflict. A smaller form needs each of its own.
+function isNeeded(signer, form) { return signer.when === "always" || form !== FORMS[0]; }
+function left(count) { return count ? `${count} required ${count === 1 ? "answer" : "answers"} left` : "Required answers complete"; }
+function refresh() {
+  if (!FORMS.includes(view)) return;
+  const held = current();
+  const answers = held.answers;
+  let formLeft = 0;
+  let elsewhere = "";            // the module that already holds the KPI's name as a term, when one does
+  let mayConflict = false;       // true when that term and the KPI both have a definition, so the two may differ
+  for (const section of DATA.sections.filter((s) => s.form === view)) {
+    const node = document.querySelector(`[data-section="${section.id}"]`);
+    if (!node) continue;
+    let required = 0, missing = 0, optional = 0, skipped = 0;
+    const routed = [];
+    for (const q of DATA.questions.filter((x) => x.section === section.id)) {
+      const card = node.querySelector(`[data-question="${q.id}"]`);
+      const on = isAsked(q, answers);
+      card.hidden = !on;
+      if (!on) { skipped += 1; continue; }
+      // The count follows the check: a required question that is not complete is left, and so is an answered
+      // question, required or not, whose answer makes its extra text required while that text is missing.
+      const owesDetail = detailRequired(q, answers) && values(answers, q.id).length > 0;
+      if (q.required === "required") { required += 1; if (!isComplete(q, answers)) missing += 1; }
+      else if (owesDetail) { required += 1; if (!values(answers, q.id + ".detail").length) missing += 1; }
+      else if (!values(answers, q.id).length) optional += 1;
+      const detail = card.querySelector(".q-detail");
+      if (q.detail) {
+        detail.hidden = !(q.detail.required_when === "always" || detailRequired(q, answers) || values(answers, q.id + ".detail").length);
+        detail.querySelector(".q-detail-need").hidden = !(q.required === "required" ? detailRequired(q, answers) : owesDetail);
+      }
+      const box = card.querySelector(".q-notices");
+      const hits = routesOf(q, answers);
+      let same = null;
+      if (q.id === "2.1") {
+        const name = norm(values(answers, "2.1")[0] || "");
+        same = name && DATA.lists.measures.find((m) => [m.label].concat(m.other_names || []).some((n) => norm(n) === name));
+        if (same && same.notation === held.example_of) same = null;
+        const term = TERM.get(name);
+        elsewhere = term ? term.module : "";
+        // The check finds a conflict only when both definitions are there and differ: the term's, and the answer to 2.2.
+        mayConflict = !!term && term.defined && values(answers, "2.2").length > 0;
+      }
+      for (const hit of hits) if (DATA.outcomes[hit.route.outcome].blocks) routed.push(DATA.forms[hit.route.outcome] ? "Routed: " + DATA.forms[hit.route.outcome].toLowerCase() : DATA.outcomes[hit.route.outcome].title);
+      if (same) routed.push("Stopped: the ontology holds this measure");
+      // The notices are drawn again only when they change, so a part a reader opened in one stays open.
+      const there = q.id === "2.1" ? elsewhere : "";
+      const drawn = JSON.stringify([hits.map((hit) => [hit.route.outcome, hit.route.notice]), same ? same.label : "", there]);
+      if (box.dataset.drawn !== drawn) {
+        box.dataset.drawn = drawn;
+        box.replaceChildren();
+        for (const hit of hits) routeNotice(box, hit);
+        if (same) notice(box, "same-measure", "The ontology already holds this measure", `"${same.label}" has this name. Stop the form. The request becomes a change to that measure.`, true);
+        if (there) notice(box, "same-name", `This name exists in the ${there} module`,
+          "The check will ask you to consult Enterprise Data Governance and to record the outcome in the sign-off block. If the two definitions differ, the Domain Owner decides between them and signs.",
+          false, { open: "Go to the sign-off block", go: goToSignoff });
+      }
+    }
+    // Ready is not the same as answered: the line counts the required answers left, then the optional ones, and
+    // a section whose answer routes the request elsewhere says so instead of looking complete.
+    const stage = routed.length ? "routed" : missing ? "open" : "complete";
+    const routes = [...new Set(routed)].join(" · ");
+    const text = (routed.length ? routes + (missing ? " · " + left(missing) : "") : left(missing)) + (optional ? ` · ${optional} optional unanswered` : "");
+    formLeft += missing;
+    node.querySelector(".section-progress").textContent = text;
+    node.querySelector(".section-progress").dataset.state = stage;
+    const skippedLine = node.querySelector(".section-skipped");
+    skippedLine.hidden = !skipped;
+    skippedLine.textContent = skipped === 1 ? "1 question does not apply and is hidden." : `${skipped} questions do not apply and are hidden.`;
+    const kindLine = node.querySelector('[data-part="kind"]');
+    if (section.id === "4") {
+      const rule = kindOf(answers);
+      kindLine.hidden = false;
+      kindLine.textContent = rule ? `Kind of measure: ${rule.kind} (decided by ${rule.question}).` + (rule.note ? " " + rule.note : "") : "Kind of measure: not decided yet.";
+    }
+    const link = document.querySelector(`[data-nav="${section.id}"]`);
+    if (link) {
+      link.dataset.state = stage;
+      link.querySelector(".nav-count").textContent = routed.length ? routes : left(missing);
+      const bar = link.querySelector("progress");
+      bar.max = Math.max(required, 1);
+      bar.value = required ? required - missing : 1;
+    }
+  }
+  $("sections-now").dataset.form = left(formLeft);
+  const signers = DATA.sign_off.signer.filter((s) => s.forms.includes(view));
+  const isSigned = (s) => { const g = held.sign_offs[s.id] || {}; return !!((g.name || "").trim() && (g.date || "").trim()); };
+  // Only the signatures that are needed count. The conflict signature is needed when the check finds that another
+  // module defines the KPI's name differently. The page holds those names and whether each has a definition, and
+  // not the definitions. So when both definitions are there, that signature counts until the check has run, though
+  // the check may then find the two equal. Otherwise it is named apart.
+  const conflict = signers.filter((s) => !isNeeded(s, view));
+  const needed = mayConflict ? signers : signers.filter((s) => isNeeded(s, view));
+  const signed = needed.filter(isSigned).length;
+  for (const s of conflict) {
+    const status = document.querySelector(`[data-signer="${s.id}"] .signer-status`);
+    if (status) status.textContent = mayConflict ? `Needed if the check confirms: the name exists in the ${elsewhere} module` : "Only if the check finds a conflicting definition";
+  }
+  const waiting = conflict.map((s) => mayConflict ? (isSigned(s) ? "" : "the conflict signature is needed if the check confirms")
+    : (isSigned(s) ? "conflict signature recorded" : "conflict review pending check")).filter(Boolean);
+  const line = document.querySelector('[data-part="signoff-progress"]');
+  if (line) line.textContent = [`${signed} of ${needed.length} required signatures recorded`].concat(waiting).join(" · ");
+  const link = document.querySelector('[data-nav="signoff"]');
+  if (link) {
+    link.dataset.state = signed === needed.length ? "complete" : "open";
+    link.querySelector(".nav-count").textContent = `${signed} of ${needed.length} required signed`;
+    const bar = link.querySelector("progress");
+    bar.max = Math.max(needed.length, 1);
+    bar.value = signed;
+  }
+  soon();
+}
+
+// ---- The other views -------------------------------------------------------------------------------------------
+function drawRoles() {
+  const node = clone("tpl-roles");
+  const body = node.querySelector("tbody");
+  for (const role of DATA.roles) {
+    const row = document.createElement("tr");
+    for (const text of [role.title, role.definition, role.in_intake]) { const cell = document.createElement("td"); cell.textContent = text; row.append(cell); }
+    body.append(row);
+  }
+  $("view").replaceChildren(node);
+}
+function drawExplainer() {
+  const node = clone("tpl-explainer");
+  node.querySelector("h2").textContent = DATA.explainer.title;
+  const body = node.querySelector(".explainer-body");
+  for (const block of DATA.explainer.block) {
+    if (block.p) { const p = document.createElement("p"); p.textContent = block.p; body.append(p); }
+    if (block.ol) { const ol = document.createElement("ol"); for (const text of block.ol) { const li = document.createElement("li"); li.textContent = text; ol.append(li); } body.append(ol); }
+  }
+  $("view").replaceChildren(node);
+}
+const VIEWS = FORMS.map((f) => [f, DATA.forms[f]]).concat([["roles", "The roles"], ["explainer", "What we will ask you"]]);
+function show(name) {
+  view = name;
+  const isForm = FORMS.includes(name);
+  $("layout").classList.toggle("with-contents", isForm);
+  $("contents").hidden = !isForm;
+  for (const tab of document.querySelectorAll("[data-view]")) tab.setAttribute("aria-selected", String(tab.dataset.view === name));
+  for (const id of ["save", "clear"]) $(id).disabled = !isForm;
+  $("view-select").value = name;
+  for (const id of ["signoff-nav", "sections-toggle"]) $(id).hidden = !isForm;
+  closeSections();
+  if (isForm) drawForm(name); else if (name === "roles") drawRoles(); else drawExplainer();
+  saveDraft();
+}
+
+// ---- Save, load, clear ----------------------------------------------------------------------------------------
+function asFile(form) {
+  const held = state[form];
+  const answers = {};
+  for (const q of questionsOf(form)) {
+    if (!isAsked(q, held.answers)) continue;              // an answer to a question that no longer applies is not saved
+    const v = held.answers[q.id];
+    if (isMany(q)) { const list = positions(held.answers, q.id); if (list.some(Boolean)) answers[q.id] = q.per ? list : list.filter(Boolean); }
+    else if (values(held.answers, q.id).length) answers[q.id] = String(v).trim();
+    const detail = values(held.answers, q.id + ".detail")[0];
+    if (detail) answers[q.id + ".detail"] = detail;
+  }
+  const first = form === FORMS[0] ? "2.1" : questionsOf(form)[0].id;
+  const pick = (map, keys) => Object.fromEntries(Object.entries(map).filter(([, v]) => keys.some((k) => (v[k] || "").trim())).map(([id, v]) => [id, Object.fromEntries(keys.map((k) => [k, (v[k] || "").trim()]))]));
+  return {
+    format: 1, form, catalogue_version: DATA.catalogue_version,
+    kpi_name: form === FORMS[0] ? (values(answers, first)[0] || "") : values(answers, first).join("; "),
+    request: Object.fromEntries(DATA.request_fields.map((f) => [f.id, (held.request[f.id] || "").trim()])),
+    answers, sign_offs: pick(held.sign_offs, ["name", "date"]), consulted: pick(held.consulted, ["date", "outcome"]),
+    example_of: held.example_of || "", comment: held.comment || "",
+  };
+}
+function fileName(data) {
+  const slug = (data.kpi_name || "untitled").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "untitled";
+  return `${slug}.${data.form}.json`;
+}
+function save() {
+  const data = asFile(view);
+  const blob = new Blob([JSON.stringify(data, null, 2) + "\n"], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = fileName(data);
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  say(`Saved ${link.download}. Check it with: py -m kpi_store.intake check ${link.download}`);
+}
+function readFile(text, name) {
+  // The file is checked whole before any of it is shown. A file that fails leaves every answer as it was.
+  const refuse = (what) => say(`This file is not a KPI intake answers file: ${what}.`, "problem");
+  let data;
+  try { data = JSON.parse(text); } catch (e) { return refuse("it is not JSON"); }
+  const problem = fileProblem(data);
+  if (problem) return refuse(problem);
+  // An answer under an id that the file's form does not ask is left out, and the status line lists it.
+  const known = new Set();
+  for (const q of questionsOf(data.form)) { known.add(q.id); if (q.detail) known.add(q.id + ".detail"); }
+  const answers = {}, ignored = [];
+  for (const [id, v] of Object.entries(data.answers)) { if (known.has(id)) answers[id] = v; else ignored.push(brief(id)); }
+  const elsewhere = data.form !== view;
+  state[data.form] = Object.assign(emptyForm(), {
+    answers, request: data.request || {}, sign_offs: data.sign_offs || {}, consulted: data.consulted || {},
+    example_of: data.example_of || "", comment: data.comment || "",
+  });
+  show(data.form);
+  say(`Loaded ${name}` + (elsewhere ? ` into the ${DATA.forms[data.form]} form.` : ".")
+    + (data.catalogue_version && data.catalogue_version !== DATA.catalogue_version ? ` It was saved with catalogue ${data.catalogue_version}; this form is ${DATA.catalogue_version}.` : "")
+    + (ignored.length ? ` Left out ${ignored.length} ${ignored.length === 1 ? "answer" : "answers"} that this form does not ask: ${ignored.slice(0, 8).join(", ")}${ignored.length > 8 ? " and more" : ""}.` : ""));
+}
+$("save").addEventListener("click", save);
+$("load").addEventListener("click", () => $("load-file").click());
+$("load-file").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => { readFile(String(reader.result), file.name); e.target.value = ""; };
+  reader.readAsText(file);
+});
+// "Clear this form" asks first, in the page: Cancel keeps every answer, Clear empties the form in view.
+$("clear").addEventListener("click", () => {
+  $("clear-text").textContent = `This empties the ${DATA.forms[view]} form in this browser: every answer, signature and comment. A file you saved is not changed.`;
+  $("clear-dialog").showModal();
+});
+$("clear-cancel").addEventListener("click", () => $("clear-dialog").close());
+$("clear-confirm").addEventListener("click", () => {
+  $("clear-dialog").close();
+  state[view] = emptyForm();
+  show(view);
+  say("The form is empty.");
+});
+
+// ---- The frame: the theme, the section in view, and the folded navigation of a narrow window ---------------------
+// None of this changes an answer, a draft or a rule.
+const THEME_KEY = "kpi-intake-theme";
+const darkScheme = matchMedia("(prefers-color-scheme: dark)");
+// Light, Dark or System. The choice sets data-theme on the root, and the styles hold both palettes.
+function applyTheme() {
+  const choice = $("theme").value;
+  document.documentElement.dataset.theme = choice === "system" ? (darkScheme.matches ? "dark" : "light") : choice;
+}
+function startTheme() {
+  let held = null;
+  try { held = localStorage.getItem(THEME_KEY); } catch (e) { /* the choice then lasts for this visit only */ }
+  $("theme").value = ["light", "dark", "system"].includes(held) ? held : "light";
+  applyTheme();
+  $("theme").addEventListener("change", () => {
+    try { localStorage.setItem(THEME_KEY, $("theme").value); } catch (e) { /* the theme still changes */ }
+    applyTheme();
+  });
+  darkScheme.addEventListener("change", applyTheme);
+}
+// The line of the section list whose section is on screen carries aria-current, and the Sections button of a folded
+// frame names that section and what it still needs.
+let queued = false, lastLine = null;
+function markSection() {
+  queued = false;
+  let at = null;
+  const links = document.querySelectorAll("[data-nav]");
+  for (const link of links) {
+    const target = document.getElementById(link.getAttribute("href").slice(1));
+    if (target && target.getBoundingClientRect().top <= innerHeight * 0.4) at = link;
+  }
+  for (const link of links) { if (link === at) link.setAttribute("aria-current", "location"); else link.removeAttribute("aria-current"); }
+  const now = $("sections-now");
+  now.textContent = at ? `${at.querySelector(".nav-name").textContent} · ${at.querySelector(".nav-count").textContent}` : now.dataset.form || "";
+  if (at && at !== lastLine && $("contents").contains(at)) {
+    // Keep that line in sight when the list itself scrolls.
+    const line = at.getBoundingClientRect(), box = $("contents").getBoundingClientRect();
+    if (line.bottom > box.bottom) $("contents").scrollTop += line.bottom - box.bottom + 8;
+    else if (line.top < box.top) $("contents").scrollTop -= box.top - line.top + 8;
+  }
+  lastLine = at;
+}
+function soon() { if (!queued) { queued = true; requestAnimationFrame(markSection); } }
+// The sign-off line: its own fixed row beside the file buttons, or the last line of the list in a folded frame.
+function placeSignoff() {
+  const link = document.querySelector('[data-nav="signoff"]');
+  if (link) (narrow.matches ? $("contents-list") : $("signoff-nav")).append(link.parentElement);
+}
+// In a folded frame the Sections button opens the section list over the page, and a choice closes it.
+function openSections() {
+  $("layout").classList.add("sections-open");
+  $("sections-toggle").setAttribute("aria-expanded", "true");
+  $("sections-close").focus();
+}
+function closeSections(back) {
+  if (!$("layout").classList.contains("sections-open")) return;
+  $("layout").classList.remove("sections-open");
+  $("sections-toggle").setAttribute("aria-expanded", "false");
+  if (back) $("sections-toggle").focus();
+}
+// The page leaves room for the bar of file buttons at its real height, whatever it holds.
+function fitDock() { document.documentElement.style.setProperty("--dock-h", $("dock").offsetHeight + "px"); }
+function startFrame() {
+  startTheme();
+  addEventListener("scroll", soon, { passive: true });
+  addEventListener("resize", soon);
+  narrow.addEventListener("change", () => { closeSections(); placeSignoff(); soon(); });
+  $("sections-toggle").addEventListener("click", () => { if ($("layout").classList.contains("sections-open")) closeSections(true); else openSections(); });
+  $("sections-close").addEventListener("click", () => closeSections(true));
+  $("contents").addEventListener("click", (e) => { if (e.target.closest("[data-nav]")) closeSections(); });
+  addEventListener("keydown", (e) => { if (e.key === "Escape") closeSections(true); });
+  $("view-select").addEventListener("change", () => show($("view-select").value));
+  if ("ResizeObserver" in window) new ResizeObserver(fitDock).observe($("dock"));
+  fitDock();
+}
+
+// ---- Start -----------------------------------------------------------------------------------------------------
+$("release-line").textContent = `${DATA.release}, catalogue ${DATA.catalogue_version}.`;
+for (const [name, title] of VIEWS) {
+  const tab = clone("tpl-tab");
+  tab.dataset.view = name;
+  tab.textContent = title;
+  tab.addEventListener("click", () => show(name));
+  $("tabs").append(tab);
+  $("view-select").append(new Option(title, name));
+}
+startFrame();
+const restored = loadDraft();
+show(view);
+if (restored === "ok") say("Your unsaved draft was restored from this browser.");
+if (restored === "bad") say("The browser draft could not be read and was not restored.", "problem");
+</script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+# The filled examples. Each one is a measure the ontology already holds, filled in as if it were new.
+# The build command reads every answer it can from the ontology, word for word, and takes the rest from here.
+# After you change this file, rebuild: py -m kpi_store.intake build
+#
+# `illustration` holds the answers the ontology does not hold. They are made up to show what an answer looks like.
+# The signer names are placeholders, because no file of this release names a person.
+
+[[example]]
+measure = "crack-spreads"
+file = "crack-spreads-pricing"
+comment = "A shipped example. Every answer is quoted from the ontology, except these illustrations, which the ontology does not hold: 1.4, 3.2, 3.7 and 4.9. The domain in 1.5 comes from the example domain list in settings.toml. The signer names are placeholders."
+
+  [example.request]
+  number = "EXAMPLE-1"
+  date = "2026-11-11"
+  requester_role = "Program manager"
+  invited = "Global Process Owner, Data Owner, Data Steward, Data Product Owner"
+
+  [example.illustration]
+  "1.5" = "market-price"
+  "1.4" = "Illustration: Planners read the crack spread to judge the market margin before they set the refinery plan."
+  "3.2" = "Illustration: US dollars per barrel"
+  "3.7" = "anyone"
+  "4.9" = "Illustration: Market margin potential"
+
+  [example.sign_offs]
+  data-owner = { name = "Placeholder for the Data Owner's name", date = "2026-11-11" }
+  domain-confirmation = { name = "Placeholder for the Domain Owner's name", date = "2026-11-11" }
+  architect = { name = "Placeholder for the Architect's name", date = "2026-11-11" }
+
+[[example]]
+measure = "rm-margin-per-barrel"
+file = "rm-margin-per-barrel"
+comment = "A shipped example. Every answer is quoted from the ontology, except these illustrations, which the ontology does not hold: 1.4, 3.2, 3.7, 4.9 and 6.1. The domain in 1.5 comes from the example domain list in settings.toml. The ontology names no role, no data product and no view for this measure. The signer names are placeholders."
+
+  [example.request]
+  number = "EXAMPLE-2"
+  date = "2026-11-11"
+  requester_role = "Program manager"
+  invited = "Global Process Owner, Data Owner, Data Steward, Data Product Owner"
+
+  [example.illustration]
+  "1.5" = "financial-performance"
+  "1.4" = "Illustration: Sales planners compare the realized margin per barrel with the forecast to explain the gap."
+  "3.2" = "Illustration: US dollars per barrel"
+  "3.7" = "anyone"
+  "4.9" = "Illustration: Pricing"
+  "6.1" = ["https://w3id.org/mpc/ontology/modules/kpi/persona/mid-term-planner"]
+
+  [example.sign_offs]
+  data-owner = { name = "Placeholder for the Data Owner's name", date = "2026-11-11" }
+  domain-confirmation = { name = "Placeholder for the Domain Owner's name", date = "2026-11-11" }
+  architect = { name = "Placeholder for the Architect's name", date = "2026-11-11" }

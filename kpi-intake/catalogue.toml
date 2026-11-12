@@ -1,0 +1,1635 @@
+# The KPI intake catalogue. Every question of the KPI intake form is in this file, with its section, the role
+# that answers it, the kind of answer, the rule that says when it is asked, and the reason it is asked.
+#
+# The two forms (kpi-intake-form.html and kpi-intake-form.xlsx), the explainer, the Architect's page and the
+# completeness check are all built from this file. After you change it, rebuild them:
+#
+#     py -m kpi_store.intake build
+#
+# What you can change here without touching code: any text, the rules, the routing outcomes, the sign-off block
+# and the time estimates. The role titles and the lists your organization sets for itself are in settings.toml. A new question
+# needs an id that no other question has. README.md in this folder explains each field under "Change the form".
+
+version = "1.0"
+release = "KPI Store 1.1"
+
+# ---- The fixed choices -----------------------------------------------------------------------------------------
+# Short lists that are the same in every organization. A list that an organization sets for itself, such as the
+# answers to "who may see it", is in settings.toml beside this file, and a question names it as
+# source = "settings:<list>". A list the ontology holds is named by its plain name, such as source = "measures".
+
+[[choices.yes-no]]
+id = "yes"
+label = "Yes"
+
+[[choices.yes-no]]
+id = "no"
+label = "No"
+
+[[choices.environment]]
+id = "sandbox"
+label = "Sandbox"
+
+[[choices.environment]]
+id = "production"
+label = "Production"
+
+# ---- The routing outcomes --------------------------------------------------------------------------------------
+# A route on a question names one of these outcomes. "blocks" says whether the intake can be complete while the
+# outcome stands. "consult" names the entry of the sign-off block that must then record a date and an outcome.
+
+[outcome.domain-activation]
+title = "Domain activation needed"
+blocks = true
+next = "Fill in the domain activation form. The KPI form can be completed after the domain is active in settings.toml."
+
+[outcome.process-map-request]
+title = "Process map request needed"
+blocks = true
+next = "Fill in the process map request for the Global Process Owner and the Architect. The KPI form can be completed after the Architect has added what is missing. This is not a domain activation."
+
+[outcome.restricted-review]
+title = "Restricted: bring in Privacy, Security, Compliance and Risk"
+blocks = false
+consult = "privacy-security-compliance-risk"
+next = "Record the date and the outcome of their review in the sign-off block before the signatures."
+
+[outcome.note]
+title = "For the Architect"
+blocks = false
+next = ""
+
+# ---- The request and the sign-off ------------------------------------------------------------------------------
+
+[[request_field]]
+id = "number"
+label = "Request number"
+
+[[request_field]]
+id = "date"
+label = "Date of the request"
+
+[[request_field]]
+id = "requester_role"
+label = "The requester's role"
+
+[[request_field]]
+id = "invited"
+label = "The people invited"
+
+[sign_off]
+intro = "The check refuses a form that lacks a signature it requires. The form records each signer's role, name and date. The ontology records roles and never a person's name, so the name stays in the form's file."
+
+[[sign_off.signer]]
+id = "data-owner"
+role = "data-owner"
+meaning = "The KPI's definition in this form is right: its name, its meaning, what it counts and what it leaves out."
+required = "Every KPI"
+forms = ["kpi-intake"]
+when = "always"
+
+[[sign_off.signer]]
+id = "domain-confirmation"
+role = "domain-owner"
+meaning = "This KPI belongs to my domain."
+required = "Every KPI"
+forms = ["kpi-intake"]
+when = "always"
+
+[[sign_off.signer]]
+id = "domain-owner"
+role = "domain-owner"
+meaning = "I have decided between the two definitions, and this one stands."
+activation_meaning = "The domain is described rightly in this form, and I am its owner."
+required = "Only when the check finds a definition that conflicts with this one. Always on a domain activation form"
+forms = ["kpi-intake", "domain-activation"]
+when = "conflict"
+
+[[sign_off.signer]]
+id = "global-process-owner"
+role = "global-process-owner"
+meaning = "The processes, steps and roles in this request are right."
+required = "Every process map request"
+forms = ["process-map-request"]
+when = "always"
+
+[[sign_off.signer]]
+id = "architect"
+role = "architect"
+meaning = "The form is complete, and I approve the change to the ontology."
+required = "Every KPI, last"
+forms = ["kpi-intake", "domain-activation", "process-map-request"]
+when = "always"
+
+[[sign_off.consulted]]
+id = "enterprise-data-governance"
+who = "Enterprise Data Governance"
+when_text = "The check finds the same name in another module of the ontology"
+when = "same-name"
+
+[[sign_off.consulted]]
+id = "privacy-security-compliance-risk"
+who = "Privacy, Security, Compliance and Risk"
+when_text = "The answer to 3.7 is \"restricted\""
+when = "restricted"
+
+# ---- The sections ----------------------------------------------------------------------------------------------
+
+[[section]]
+id = "1"
+form = "kpi-intake"
+name = "The business area"
+technical_name = "domain identification"
+audience = "business"
+about = "Here we find the business area and the domain of the KPI, and the process and step where people use it. The business area is the function that runs the process, such as Commercial or Marketing. The domain is the data domain the KPI belongs to, such as Market Price, and it has a Domain Owner. We do this first because the ontology hangs every KPI on a process it already knows, and because every KPI belongs to one domain. If the process or the step is missing, the request goes to the process map first. If the domain is not active, it is activated first."
+who = "The Global Process Owner, or a named delegate, picks the area, the process and the step. The Program manager proposes the domain, and that domain's Domain Owner confirms that the KPI is in its scope. The Domain Owner need not sit in the rest of the interview. The Business analyst shows the lists and records the answers."
+done_when = "The form names one business area, one process, one step and one active domain from the lists, or the request has moved to a process map request or to domain activation."
+typical = "5 to 6"
+minutes = "8"
+
+[[section]]
+id = "2"
+form = "kpi-intake"
+name = "What the KPI means"
+technical_name = "the controlled vocabulary"
+audience = "business"
+about = "Here we agree on one name and one meaning for the KPI. Every later fact is attached to this meaning. If two teams mean different things by the same name, the KPI would count the wrong thing, and people would have to correct every report that used it."
+who = "The Data Owner gives the definition and later signs it. The Business analyst drafts the wording."
+done_when = "The KPI has one name, a definition of one or two sentences that does not repeat the name, and a statement of what it counts and what it leaves out. The completeness check has compared the name with the terms the ontology already holds."
+typical = "4"
+minutes = "11"
+
+[[section]]
+id = "3"
+form = "kpi-intake"
+name = "The facts about it"
+technical_name = "the metadata"
+audience = "business"
+about = "Here we record a fixed set of facts about the KPI: how it is worked out, its unit, how often and at what level it is stated, what it is compared with, and where its definition is written. With these facts, a reader can check a definition and tell which document it came from."
+who = "The Data Steward answers."
+done_when = "The form says in words how the KPI is worked out, with its unit, and names a written source with a date. A KPI with no written source cannot go forward."
+typical = "7"
+minutes = "10"
+
+[[section]]
+id = "4"
+form = "kpi-intake"
+name = "Where it belongs"
+technical_name = "the taxonomy (the measure list is flat, so the taxonomy is the measure's kind)"
+audience = "business"
+about = "Here we sort the KPI into one of eight kinds of measure. The kind tells readers how to treat the number. A market price nobody controls, a comparison with a plan and a KPI with a target and an owner are read in different ways. We ask up to five yes or no questions in order and stop at the first one that decides."
+who = "The Data Owner answers. The Business analyst asks the questions in order and writes the reason."
+done_when = "One question has decided the kind, and the reason is written in one or two sentences. If the kind is KPI, the form names the document that records the target and the accountable owner."
+typical = "4 to 6"
+minutes = "6"
+
+[[section]]
+id = "5"
+form = "kpi-intake"
+name = "Other names for it"
+technical_name = "the thesaurus (question 5.2 feeds a typed property, because the ontology has no skos:related link)"
+audience = "business"
+about = "Here we collect the other words people use for the KPI, and the nearby measures people mistake it for. With the other names, a person who searches with their own word finds the KPI. With the \"not this\" list, an assistant or a report does not answer with the wrong number."
+who = "The Data Steward answers."
+done_when = "The form lists every other name the attendees know, and gives one sentence of difference for each measure the KPI is mistaken for."
+typical = "4"
+minutes = "6"
+
+[[section]]
+id = "6"
+form = "kpi-intake"
+name = "What it connects to"
+technical_name = "the ontology (the typed links to roles, processes, value stream steps and data products)"
+audience = "business"
+about = "Here we link the KPI to the roles that use it, to the other places in the business where it is used, and to the data product that gives it. These links let a person ask \"who uses this number, and where does it come from\" and get one answer."
+who = "The Data Owner answers. The Data Product Owner names the data product in 6.6."
+done_when = "The form names at least one role that uses the KPI. Each value stream step it names has a relationship and a written basis. The form names the data product, or says that none exists yet."
+typical = "4 to 6"
+minutes = "11"
+
+[[section]]
+id = "7"
+form = "kpi-intake"
+name = "Where the data lives (IT only)"
+technical_name = "the knowledge graph"
+audience = "it"
+about = "Here Digital IT names the view or table that gives the KPI's values, and what that view is built from. The business does not take part. IT fills this section after the business has signed sections 1 to 6. The Databricks discovery fills in what it can find first."
+who = "Digital IT answers. The Data Product Owner confirms 7.1 if the view is new. The Architect checks that every name exists in the workspace."
+done_when = "The form names one view or table that exists in the workspace under that exact name, or says that the KPI has no data yet. The first is not required. A KPI can be defined before anyone builds it."
+warning = "The load compares the ontology with the workspace. An object, a column or a table link that the ontology names and the workspace lacks stops the load. Name only what exists."
+typical = "3 to 9"
+minutes = "20 to 30"
+
+[[section]]
+id = "D"
+form = "domain-activation"
+name = "Domain activation"
+technical_name = "a data domain that is not active yet"
+audience = "business"
+about = "Use this form when the answer to question 1.5 of the KPI form is a domain that is not active, or \"not in the list\". A domain is a data domain, such as Customer or Market Price: a body of data with one Domain Owner. The form collects what the organization needs to make the domain active: what data it covers, who owns it, and what it serves. When the Domain Owner and the Architect have signed, the domain is set to active in settings.toml, and the KPI form can go on."
+who = "The Domain Owner answers and signs. The Program manager owns the request. The Business analyst fills the form."
+done_when = "The domain has a name, a statement of the data it covers, a Domain Owner, its Data Owners and Data Stewards, the business areas it serves, at least one first KPI and a written basis with a date. The Domain Owner has signed the activation, and the Architect has signed the change."
+typical = "10"
+minutes = "60"
+
+[[section]]
+id = "P"
+form = "process-map-request"
+name = "Process map request"
+technical_name = "a business area, process, step or role that the process map lacks"
+audience = "business"
+about = "Use this form when a question of the KPI form ends in \"not in the list\" for the business area, the process, the step or a role. It is smaller than a domain activation and it is not one. It collects what the Architect needs to propose the change to the process map. The Architect then does the modelling and releases it."
+who = "The Global Process Owner, or a named delegate, answers and signs. The Program manager owns the request. The Business analyst fills the form."
+done_when = "The form names what is missing, where it sits in the process map, and a document that describes it. The Global Process Owner and the Architect have signed."
+typical = "4 to 7"
+minutes = "30"
+
+# ---- The kind of measure ---------------------------------------------------------------------------------------
+# Section 4 asks up to five tests in order. The first answer below that matches decides the kind.
+
+[[kind_rule]]
+question = "4.1"
+answer = "no"
+kind = "tracker or report"
+test = 1
+note = "A list, a status or a schedule is recorded as a tracker or a report. A request for a tool is not a measure. The Architect decides which of the two it is."
+
+[[kind_rule]]
+question = "4.2"
+answer = "yes"
+kind = "alert"
+test = 2
+
+[[kind_rule]]
+question = "4.3"
+answer = "yes"
+kind = "market indicator"
+test = 3
+
+[[kind_rule]]
+question = "4.4"
+answer = "yes"
+kind = "decision-support indicator"
+test = 3
+
+[[kind_rule]]
+question = "4.5"
+answer = "yes"
+kind = "plan-variance diagnostic"
+test = 4
+
+[[kind_rule]]
+question = "4.6"
+answer = "yes"
+kind = "KPI"
+test = 5
+
+[[kind_rule]]
+question = "4.6"
+answer = "no"
+kind = "operational metric"
+test = 5
+
+# ---- Section 1 -------------------------------------------------------------------------------------------------
+
+[[question]]
+id = "1.1"
+section = "1"
+text = "Which part of the business does this KPI belong to?"
+asked_of = ["global-process-owner"]
+type = "choice"
+source = "business-areas"
+required = "required"
+why = "The area decides which processes and roles the next questions offer."
+feeds = "No property on the measure. The check compares it with `core:businessDomain` of the process chosen in 1.3."
+fact = []
+
+  [[question.option]]
+  id = "@not-in-list"
+  label = "Not in the list"
+
+  [[question.route]]
+  when = "@not-in-list"
+  outcome = "process-map-request"
+  notice = "The ontology does not hold this business area. The KPI cannot be added until the area is in the process map. Stop here and fill in the process map request."
+
+  [question.detail]
+  label = "What is the missing area called?"
+  type = "text"
+  required_when = "@not-in-list"
+
+[[question]]
+id = "1.2"
+section = "1"
+text = "Which process in that area is this KPI about?"
+asked_of = ["global-process-owner"]
+type = "choice"
+source = "processes"
+levels = [1, 3]
+narrow_by = "1.1"
+required = "required"
+why = "A KPI says something about work. We need the work it describes."
+feeds = "Narrows 1.3. Becomes `kpi:informsProcess` when 1.3 has no answer."
+fact = ["F12"]
+
+  [[question.option]]
+  id = "@not-in-list"
+  label = "Not in the list"
+
+  [[question.route]]
+  when = "@not-in-list"
+  outcome = "process-map-request"
+  notice = "The ontology does not hold this process. The KPI cannot be added until the process is in the process map. Stop here and fill in the process map request."
+
+  [question.detail]
+  label = "What is the missing process called?"
+  type = "text"
+  required_when = "@not-in-list"
+
+[[question]]
+id = "1.3"
+section = "1"
+text = "At which step of that process do people use the number?"
+asked_of = ["global-process-owner"]
+type = "choice"
+source = "processes"
+levels = [4, 6]
+under = "1.2"
+required = "optional"
+why = "The step is the most exact place we can attach the KPI to."
+feeds = "`kpi:informsProcess`."
+fact = ["F12"]
+
+  [[question.option]]
+  id = "@not-in-list"
+  label = "The step is missing"
+
+  [[question.route]]
+  when = "@not-in-list"
+  outcome = "process-map-request"
+  notice = "The ontology does not hold this step. Fill in the process map request for the missing step."
+
+  [question.detail]
+  label = "What is the missing step called?"
+  type = "text"
+  required_when = "@not-in-list"
+
+[[question]]
+id = "1.4"
+section = "1"
+text = "What do people decide or do with the number at that step?"
+asked_of = ["global-process-owner"]
+type = "long_text"
+required = "required"
+why = "It checks that we chose the right step, and it shows whether this is a KPI or a report."
+feeds = "A check on the step. The answer stays in the form's file. The ontology has no property for it."
+fact = []
+
+[[question]]
+id = "1.5"
+section = "1"
+text = "Which domain does this KPI belong to?"
+note = "The domain list that ships with this release is an example. Replace it with your organization's domains in settings.toml."
+asked_of = ["domain-owner"]
+asked_of_text = "The Domain Owner of the proposed domain. The Program manager proposes which domain to ask"
+type = "choice"
+source = "settings:domains"
+required = "required"
+why = "Every KPI belongs to exactly one domain, and that domain's owner must agree that it does."
+feeds = "No property yet. The ontology has no place for a KPI's domain. The answer stays in the form's file."
+fact = []
+
+  [[question.option]]
+  id = "@not-in-list"
+  label = "Not in the list"
+
+  [[question.route]]
+  when = "@inactive"
+  outcome = "domain-activation"
+  notice = "This domain is not active yet. The KPI cannot be added until the domain is activated."
+
+  [[question.route]]
+  when = "@not-in-list"
+  outcome = "domain-activation"
+  notice = "The organization has no such domain yet. The KPI cannot be added until the domain is activated."
+
+  [question.detail]
+  label = "What is the missing domain called?"
+  type = "text"
+  required_when = "@not-in-list"
+
+[[question]]
+id = "1.6"
+section = "1"
+text = "Which other domains' data does it use?"
+asked_of = ["data-owner"]
+type = "multi_choice"
+source = "settings:domains"
+rows = 4
+required = "optional"
+why = "A KPI often reads data that another domain owns, and that domain's people must know."
+example = "The filled examples name no other domain. An answer would be \"Refinery Production\"."
+feeds = "No property yet. The answer stays in the form's file."
+fact = []
+
+# ---- Section 2 -------------------------------------------------------------------------------------------------
+
+[[question]]
+id = "2.1"
+section = "2"
+text = "What do you call this KPI?"
+asked_of = ["data-owner"]
+type = "text"
+required = "required"
+why = "One preferred name stops two teams from using two names for one thing."
+feeds = "`skos:prefLabel`. The Architect derives `skos:notation` from it."
+fact = ["F1", "F3"]
+
+[[question]]
+id = "2.2"
+section = "2"
+text = "In one or two sentences, what does it measure? Please do not use the KPI's own name."
+asked_of = ["data-owner"]
+type = "long_text"
+required = "required"
+why = "The definition is what every report and every answer will repeat."
+feeds = "`skos:definition`."
+fact = ["F2"]
+
+[[question]]
+id = "2.3"
+section = "2"
+text = "What does it count?"
+asked_of = ["data-owner"]
+type = "long_text"
+required = "optional"
+why = "Two people can agree on a name and still count different things."
+feeds = "`pop:includes`."
+fact = ["F21"]
+
+[[question]]
+id = "2.4"
+section = "2"
+text = "What does it leave out?"
+asked_of = ["data-owner"]
+type = "long_text"
+required = "optional"
+why = "What is left out is where most disputes about a number start."
+feeds = "`pop:excludes`."
+fact = ["F21"]
+
+# ---- Section 3 -------------------------------------------------------------------------------------------------
+
+[[question]]
+id = "3.1"
+section = "3"
+text = "How is it worked out, in words? What is divided by what, or taken from what?"
+asked_of = ["data-steward"]
+type = "long_text"
+required = "required"
+ask_when = [{ question = "4.1", is_not = "no" }]
+why = "The ontology describes the calculation in words. It never calculates."
+feeds = "`kpi:basis`."
+fact = ["F14"]
+
+[[question]]
+id = "3.2"
+section = "3"
+text = "What unit is it stated in?"
+asked_of = ["data-steward"]
+type = "text"
+required = "required"
+ask_when = [{ question = "4.1", is_not = "no" }]
+why = "A number with no unit cannot be compared with another."
+example = "An answer would be \"US dollars per barrel\". The ontology holds no unit of its own, so the filled examples mark their answer as an illustration."
+feeds = "Added to `kpi:basis`. The ontology has no unit list and no unit property. The answer also stays in the form's file."
+fact = ["F14"]
+
+[[question]]
+id = "3.3"
+section = "3"
+text = "How often is it stated, and broken down by what?"
+asked_of = ["data-steward"]
+type = "text"
+required = "required"
+ask_when = [{ question = "4.1", is_not = "no" }]
+why = "A daily figure by site and a monthly company figure are different things to build and to read."
+feeds = "`kpi:grain`."
+fact = ["F15"]
+
+[[question]]
+id = "3.4"
+section = "3"
+text = "What do you compare it against?"
+asked_of = ["data-steward"]
+type = "text"
+required = "optional"
+why = "A plan, a forecast or history tells the reader what a good value is."
+feeds = "`kpi:comparedAgainst`."
+fact = ["F16"]
+
+[[question]]
+id = "3.5"
+section = "3"
+text = "Where is this definition written down? Choose the document, then give its date and the page or section."
+asked_of = ["data-steward"]
+type = "multi_choice"
+source = "sources"
+rows = 3
+required = "required"
+why = "Every definition must be traceable to a document someone can open."
+feeds = "`dcterms:source`, `dcterms:bibliographicCitation`, `pop:populationEvidence`. A new document also needs a tier in `authority/source-tiers.csv`, which the Architect assigns."
+fact = ["F9", "F11", "F21"]
+
+  [[question.option]]
+  id = "@new-document"
+  label = "A document that is not in the list"
+
+  [[question.route]]
+  when = "@new-document"
+  outcome = "note"
+  notice = "This is a new source document. The Architect gives it an evidence tier before the KPI is added."
+
+  [question.detail]
+  label = "The document, its date and the page or section"
+  type = "text"
+  required_when = "always"
+
+[[question]]
+id = "3.6"
+section = "3"
+text = "Does it already have an ID or a code in a report, a dashboard or a system? Write it, or write \"no\"."
+asked_of = ["data-steward"]
+type = "long_text"
+required = "optional"
+why = "We keep the old code, so that people who know the KPI by it can find it."
+feeds = "`skos:note`. The Architect assigns `dcterms:identifier`."
+fact = ["F22"]
+
+[[question]]
+id = "3.7"
+section = "3"
+text = "Who may see this KPI: anyone in the company, or only a restricted group?"
+asked_of = ["data-steward"]
+type = "choice"
+source = "settings:visibility"
+required = "required"
+why = "Only a restricted KPI needs those reviews, so we ask everyone this one question."
+example = "The ontology holds no such mark, so the filled examples mark their answer as an illustration."
+feeds = "No property. The answer stays in the form's file."
+fact = []
+
+  [[question.route]]
+  when = "restricted"
+  outcome = "restricted-review"
+  notice = "A restricted KPI needs Privacy, Security, Compliance and Risk in the request before sign-off. Record the date and the outcome of their review in the sign-off block."
+
+# ---- Section 4 -------------------------------------------------------------------------------------------------
+
+[[question]]
+id = "4.1"
+section = "4"
+text = "Is it a number with a way to work it out, a unit and a time period?"
+asked_of = ["data-owner"]
+type = "choice"
+source = "choices:yes-no"
+required = "required"
+why = "A list, a status or a schedule is a report. We record it, but not as a measure."
+feeds = "\"No\" gives `kpi:measureKind` tracker or report, or not a measure when it is a request for a tool, with `kpi:classificationTest` 1. The form then skips 3.1 to 3.3 and 4.2 to 4.7."
+fact = ["F5", "F6"]
+
+[[question]]
+id = "4.2"
+section = "4"
+text = "Does it appear only when something happens, like a warning?"
+asked_of = ["data-owner"]
+type = "choice"
+source = "choices:yes-no"
+required = "required"
+ask_when = [{ question = "4.1", is = "yes" }]
+why = "An alert is an event, not a series of values."
+feeds = "\"Yes\" gives kind alert, test 2."
+fact = ["F5", "F6"]
+
+[[question]]
+id = "4.3"
+section = "4"
+text = "Is its value set by an outside market or a published benchmark that the business cannot influence?"
+asked_of = ["data-owner"]
+type = "choice"
+source = "choices:yes-no"
+required = "required"
+ask_when = [{ question = "4.2", is = "no" }]
+why = "Nobody can be held to a target on a number they cannot move."
+feeds = "\"Yes\" gives kind market indicator, test 3."
+fact = ["F5", "F6"]
+
+[[question]]
+id = "4.4"
+section = "4"
+text = "Is it worked out from market prices and the planning model, to start or to rank a decision, with no target?"
+asked_of = ["data-owner"]
+type = "choice"
+source = "choices:yes-no"
+required = "required"
+ask_when = [{ question = "4.3", is = "no" }]
+why = "Some numbers exist to trigger a decision and are not a score of performance."
+feeds = "\"Yes\" gives kind decision-support indicator, test 3."
+fact = ["F5", "F6"]
+
+[[question]]
+id = "4.5"
+section = "4"
+text = "Does it compare actual results, or a plan, with a plan, a forecast, an earlier plan or history, for one period?"
+asked_of = ["data-owner"]
+type = "choice"
+source = "choices:yes-no"
+required = "required"
+ask_when = [{ question = "4.4", is = "no" }]
+why = "A comparison with a plan explains a gap. It is a diagnostic."
+feeds = "\"Yes\" gives kind plan-variance diagnostic, test 4."
+fact = ["F5", "F6"]
+
+[[question]]
+id = "4.6"
+section = "4"
+text = "Has the business named it as one of the few measures of a stated objective, with a target and an accountable owner? If yes, which document records that decision?"
+asked_of = ["data-owner"]
+type = "choice"
+source = "choices:yes-no"
+required = "required"
+ask_when = [{ question = "4.5", is = "no" }]
+why = "A measure becomes a KPI by a recorded decision, not by its formula."
+feeds = "\"Yes\" gives kind KPI, test 5, and a `KPI-` identifier. The document goes to `dcterms:bibliographicCitation`. \"No\" gives kind operational metric, test 5. The target's value is never recorded."
+fact = ["F5", "F6", "F11"]
+
+  [question.detail]
+  label = "The document that records the decision"
+  type = "text"
+  required_when = "yes"
+
+[[question]]
+id = "4.7"
+section = "4"
+text = "If it is not a KPI today, is it a strong candidate to become one?"
+asked_of = ["data-owner"]
+type = "choice"
+source = "choices:yes-no"
+required = "required"
+ask_when = [{ question = "4.6", is = "no" }]
+why = "It marks the measures the business may promote later."
+feeds = "`kpi:kpiCandidate`. False for every kind but operational metric."
+fact = ["F8"]
+
+[[question]]
+id = "4.8"
+section = "4"
+text = "In one or two sentences, why does it belong to that kind?"
+asked_of = ["business-analyst", "data-owner"]
+asked_of_text = "Business analyst drafts, Data Owner confirms"
+type = "long_text"
+required = "required"
+why = "The next reader must see why, and not only which kind."
+feeds = "`kpi:classificationReason`."
+fact = ["F7"]
+
+[[question]]
+id = "4.9"
+section = "4"
+text = "Which topic, or family of KPIs, does it belong to, if any?"
+asked_of = ["data-owner"]
+type = "text"
+required = "optional"
+why = "People look for a KPI among others on the same topic."
+example = "The ontology holds no topic, so the filled examples mark their answer as an illustration."
+feeds = "No property. The measure list is flat. The answer stays in the form's file."
+fact = []
+
+# ---- Section 5 -------------------------------------------------------------------------------------------------
+
+[[question]]
+id = "5.1"
+section = "5"
+text = "What other names or short forms do people use for it?"
+asked_of = ["data-steward"]
+type = "list"
+rows = 6
+required = "optional"
+why = "People search with their own word."
+feeds = "`skos:altLabel`, one for each name."
+fact = ["F18"]
+
+[[question]]
+id = "5.2"
+section = "5"
+text = "Which measures do people mistake it for?"
+asked_of = ["data-steward"]
+type = "multi_choice"
+source = "measures"
+rows = 5
+required = "optional"
+why = "A near neighbour is the most likely wrong answer."
+feeds = "`kpi:notToBeConfusedWith`."
+fact = ["F20"]
+
+[[question]]
+id = "5.3"
+section = "5"
+text = "How does it differ from each of those?"
+asked_of = ["data-steward"]
+type = "long_text"
+required = "required"
+ask_when = [{ question = "5.2", answered = true }]
+why = "The difference is what the reader needs when they have the wrong one."
+feeds = "`skos:scopeNote`. Each measure named in 5.2 also needs a sentence back in its own scope note."
+fact = ["F19"]
+
+[[question]]
+id = "5.4"
+section = "5"
+text = "Does the company publish this number, or one close to it, outside the company? Which one? Write \"none\" if it does not."
+asked_of = ["data-steward"]
+type = "text"
+required = "required"
+why = "Readers compare an internal figure with the published one. They must know whether the two are the same."
+feeds = "`kpi:publicCounterpart`."
+fact = ["F17"]
+
+# ---- Section 6 -------------------------------------------------------------------------------------------------
+
+[[question]]
+id = "6.1"
+section = "6"
+text = "Which roles use this number?"
+asked_of = ["data-owner"]
+type = "multi_choice"
+source = "roles"
+rows = 6
+required = "required"
+why = "The roles are the audience of every report on this KPI."
+feeds = "`kpi:usedBy`."
+fact = ["F13"]
+
+  [[question.option]]
+  id = "@not-in-list"
+  label = "A role that is not in the list"
+
+  [[question.route]]
+  when = "@not-in-list"
+  outcome = "process-map-request"
+  request_questions = ["P5", "P6"]
+  notice = "The ontology does not hold this role. Fill in questions P1, P5, P6 and P7 of the process map request for the missing role."
+
+  [question.detail]
+  label = "What is the missing role called?"
+  type = "text"
+  required_when = "@not-in-list"
+
+[[question]]
+id = "6.2"
+section = "6"
+text = "Is the number used in any other process? Choose each one, or leave this empty."
+asked_of = ["data-owner"]
+type = "multi_choice"
+source = "processes"
+levels = [1, 6]
+rows = 4
+required = "optional"
+why = "A KPI used in two processes must mean the same in both."
+feeds = "More `kpi:informsProcess` links."
+fact = ["F12"]
+
+[[question]]
+id = "6.3"
+section = "6"
+text = "Which steps of a value stream use it?"
+asked_of = ["data-owner"]
+type = "multi_choice"
+source = "value-stream-steps"
+rows = 4
+required = "optional"
+why = "The value stream shows where in the flow of work the number matters."
+feeds = "One `vs:MeasureLink` for each step, with `vs:measure`."
+fact = ["F24"]
+
+  [[question.option]]
+  id = "@not-in-list"
+  label = "The step is missing"
+
+  [[question.route]]
+  when = "@not-in-list"
+  outcome = "process-map-request"
+  notice = "The ontology does not hold this value stream step. Fill in the process map request for the missing step."
+
+[[question]]
+id = "6.4"
+section = "6"
+text = "For each of those steps, how does the step use the number: as an input, as an outside reference to compare against, or as a result it tracks?"
+asked_of = ["data-owner"]
+type = "multi_choice"
+source = "measure-relationships"
+per = "6.3"
+required = "required"
+ask_when = [{ question = "6.3", answered = true }]
+why = "A step that tracks a result answers for it. A step that only reads it does not."
+feeds = "`vs:relationship`: informs, benchmarks or measures performance."
+fact = ["F24"]
+
+[[question]]
+id = "6.5"
+section = "6"
+text = "For each of those steps, what document tells us so?"
+asked_of = ["data-owner"]
+type = "list"
+per = "6.3"
+required = "required"
+ask_when = [{ question = "6.3", answered = true }]
+why = "Each link needs a written basis, like the definition."
+feeds = "`dcterms:bibliographicCitation` on the link, which the shape requires."
+fact = ["F24"]
+
+[[question]]
+id = "6.6"
+section = "6"
+text = "Which data product gives this number?"
+asked_of = ["data-product-owner"]
+type = "choice"
+source = "data-products"
+required = "optional"
+why = "It tells IT where to look, and it tells readers whom to ask about the data."
+feeds = "Narrows 7.1. `dcterms:isPartOf` of the view in 7.1. `con:publishesMeasure` if a catalog row publishes the KPI."
+fact = ["F26", "F27"]
+
+  [[question.option]]
+  id = "@none-yet"
+  label = "None yet"
+
+  [[question.option]]
+  id = "@not-in-list"
+  label = "Not in the list"
+
+  [[question.route]]
+  when = "@not-in-list"
+  outcome = "note"
+  notice = "This is a new data product. Digital IT describes it in section 7."
+
+  [question.detail]
+  label = "What is the new data product called?"
+  type = "text"
+  required_when = "@not-in-list"
+
+[[question]]
+id = "6.7"
+section = "6"
+text = "Is the number published as several named series, such as one for each region or market?"
+asked_of = ["data-owner"]
+type = "choice"
+source = "choices:yes-no"
+required = "required"
+ask_when = [{ question = "4.3", is = "yes" }]
+ask_when_text = "Asked only when the kind is market indicator"
+why = "Each series has its own recipe, and the form for one KPI does not collect recipes."
+feeds = "`mkt:seriesOf`, `mkt:priceOf`, `mkt:enumerates` in `market-data`. Not filled from this form."
+fact = ["F28"]
+
+  [[question.route]]
+  when = "yes"
+  outcome = "note"
+  notice = "The series need modelling in the market-data module. The Architect does that outside this form."
+
+# ---- Section 7 -------------------------------------------------------------------------------------------------
+
+[[question]]
+id = "7.1"
+section = "7"
+text = "Which view or table gives this KPI's values? Give the full name."
+asked_of = ["digital-it"]
+type = "choice"
+source = "platform-tables"
+required = "required"
+why = "An assistant may quote a value only through the view the ontology binds to the KPI."
+feeds = "`dp:servesMeasure` (the `serves_measures` column of `data-product/pricing/tables.csv`)."
+fact = ["F25"]
+
+  [[question.option]]
+  id = "@not-in-list"
+  label = "Not in the list"
+
+  [[question.option]]
+  id = "@no-data-yet"
+  label = "No data yet"
+
+  [[question.route]]
+  when = "@not-in-list"
+  outcome = "note"
+  notice = "The ontology does not hold this view or table. Answer 7.2 to 7.6 and 7.9, so that the Architect can add it."
+
+  [[question.route]]
+  when = "@no-data-yet"
+  outcome = "note"
+  notice = "The KPI has no data yet. It can be defined before anyone builds it."
+
+[[question]]
+id = "7.2"
+section = "7"
+text = "If it is not in the list: what is its full name, and which layer is it in?"
+asked_of = ["digital-it"]
+type = "choice"
+source = "layers"
+required = "required"
+ask_when = [{ question = "7.1", is = "@not-in-list" }]
+why = "The ontology must hold the view before it can bind a KPI to it."
+example = "Not asked for the filled examples. Their view is in the list, in the metric view layer."
+feeds = "A new row in `tables.csv`: `dp:fullName`, `dp:layer`, `skos:prefLabel`."
+fact = ["F26"]
+
+  [question.detail]
+  label = "Its full name, as catalog.schema.name"
+  type = "text"
+  required_when = "always"
+
+[[question]]
+id = "7.3"
+section = "7"
+text = "Which tables or views is it built from?"
+asked_of = ["digital-it"]
+type = "multi_choice"
+source = "platform-tables"
+rows = 4
+required = "required"
+ask_when = [{ question = "7.1", is = "@not-in-list" }]
+why = "The lineage shows what is affected when a table changes."
+example = "Not asked for the filled examples. An answer would be the gold table idp_sbx.gold_commercial_core.mpr_mips_crack_spread_price_fact."
+feeds = "`prov:wasDerivedFrom` (`lineage.csv`)."
+fact = ["F26"]
+
+[[question]]
+id = "7.4"
+section = "7"
+text = "Which source systems does its data come from?"
+asked_of = ["digital-it"]
+type = "multi_choice"
+source = "systems"
+rows = 4
+required = "required"
+ask_when = [{ question = "7.1", is = "@not-in-list" }]
+why = "It names the systems of record behind the number."
+example = "Not asked for the filled examples. An answer would be MIPS, MPR and KittyHawk."
+feeds = "`dp:dependsOnSystem`, or `dp:copiesSystem` for a replica."
+fact = ["F26"]
+
+[[question]]
+id = "7.5"
+section = "7"
+text = "Is it a foundational or a derived data product, and why?"
+asked_of = ["digital-it"]
+type = "choice"
+source = "data-product-kinds"
+required = "required"
+ask_when = [{ question = "7.1", is = "@not-in-list" }, { question = "7.2", is_not = "https://w3id.org/mpc/ontology/modules/data-product/layer/replica" }]
+ask_when_text = "Required if 7.1 is \"not in the list\" and the layer is not replica"
+why = "A derived product adds business logic, and readers must know that."
+example = "Not asked for the filled examples. An answer would be \"Derived. It defines measures (averages, minimum, maximum, range) over the gold crack-spread fact.\""
+feeds = "`dp:dataProductKind`, `dp:classificationTest`, `dp:classificationReason`."
+fact = ["F26"]
+
+  [question.detail]
+  label = "Why"
+  type = "long_text"
+  required_when = "always"
+
+[[question]]
+id = "7.6"
+section = "7"
+text = "Is it in a sandbox or in production?"
+asked_of = ["digital-it"]
+type = "choice"
+source = "choices:environment"
+required = "required"
+ask_when = [{ question = "7.1", is = "@not-in-list" }]
+why = "A sandbox name will change, and the ontology must follow it."
+example = "Not asked for the filled examples. An answer would be \"Sandbox\"."
+feeds = "`dp:sandbox`."
+fact = ["F26"]
+
+[[question]]
+id = "7.7"
+section = "7"
+text = "Which measure or column of the view holds the KPI, and with what filter?"
+asked_of = ["digital-it"]
+type = "text"
+required = "optional"
+why = "One view can hold several measures."
+example = "The ontology holds no such link yet, so the filled examples leave this empty."
+feeds = "No property today. Release 1.1 lists such a link as a proposal that needs a minor version of `data-product`."
+fact = []
+
+[[question]]
+id = "7.8"
+section = "7"
+text = "Which assistant or report answers from this view?"
+asked_of = ["digital-it"]
+type = "text"
+required = "optional"
+why = "It tells us who is affected when the view changes."
+feeds = "`prov:used` from a `prov:SoftwareAgent` in `data-product`."
+fact = ["F26"]
+
+[[question]]
+id = "7.9"
+section = "7"
+text = "What shows that these facts are right: a discovery run, a design document or a workspace export, and of what date?"
+asked_of = ["digital-it"]
+type = "text"
+required = "required"
+ask_when = [{ question = "7.1", is = "@not-in-list" }]
+why = "The table facts need a source, like the definition."
+example = "Not asked for the filled examples. An answer names the document and its date."
+feeds = "`dcterms:source` on the platform table, which the shape requires. A new source needs a tier in `integration`."
+fact = ["F26"]
+
+# ---- Domain activation -----------------------------------------------------------------------------------------
+
+[[question]]
+id = "D1"
+section = "D"
+text = "What is the domain called?"
+asked_of = ["domain-owner"]
+type = "text"
+required = "required"
+why = "It needs one name before a KPI can be tied to it."
+feeds = "The domain's name in settings.toml. The ontology has no place for a domain yet."
+fact = []
+
+[[question]]
+id = "D2"
+section = "D"
+text = "In two or three sentences, what data does the domain cover, and what does it leave to other domains?"
+asked_of = ["domain-owner"]
+type = "long_text"
+required = "required"
+why = "Two domains must not own the same data."
+feeds = "The domain's description in settings.toml."
+fact = []
+
+[[question]]
+id = "D3"
+section = "D"
+text = "Who is the Domain Owner? Give the position."
+asked_of = ["program-manager"]
+type = "text"
+required = "required"
+why = "The Domain Owner confirms every KPI of the domain and signs this form."
+feeds = "Kept in the form's file."
+fact = []
+
+[[question]]
+id = "D4"
+section = "D"
+text = "Who are the Data Owners, and which part of the domain's data does each own? Write one line for each."
+asked_of = ["domain-owner"]
+type = "list"
+rows = 6
+required = "required"
+why = "A Data Owner gives and signs the definition of each KPI on their part of the data."
+feeds = "Kept in the form's file."
+fact = []
+
+[[question]]
+id = "D5"
+section = "D"
+text = "Who are the Data Stewards? Write one line for each."
+asked_of = ["domain-owner"]
+type = "list"
+rows = 6
+required = "required"
+why = "A Data Steward gives the facts about each KPI and its other names."
+feeds = "Kept in the form's file."
+fact = []
+
+[[question]]
+id = "D6"
+section = "D"
+text = "Which data products belong to the domain?"
+asked_of = ["data-product-owner"]
+type = "multi_choice"
+source = "data-products"
+rows = 6
+required = "optional"
+why = "It prepares question 6.6 and section 7 of each KPI form."
+feeds = "`dp:DataProduct` terms in `data-product`. A new one needs a release of that module."
+fact = []
+
+  [[question.option]]
+  id = "@new-data-products"
+  label = "New data products (name them below)"
+
+  [question.detail]
+  label = "Each new data product"
+  type = "long_text"
+  required_when = "@new-data-products"
+
+[[question]]
+id = "D7"
+section = "D"
+text = "Which business areas does the domain serve?"
+asked_of = ["domain-owner"]
+type = "multi_choice"
+source = "business-areas"
+rows = 4
+required = "required"
+why = "A domain's data is used by one or more functions of the business."
+feeds = "Kept in the form's file. The business areas are `core:BusinessDomain` concepts."
+fact = []
+
+[[question]]
+id = "D8"
+section = "D"
+text = "Which processes does the domain serve?"
+asked_of = ["domain-owner"]
+type = "multi_choice"
+source = "processes"
+levels = [1, 3]
+rows = 6
+required = "optional"
+why = "It shows where the domain's KPIs will attach."
+feeds = "Kept in the form's file."
+fact = []
+
+[[question]]
+id = "D9"
+section = "D"
+text = "Which KPIs should be added first?"
+asked_of = ["domain-owner"]
+type = "list"
+rows = 6
+required = "required"
+why = "Each one then gets its own KPI form."
+feeds = "One KPI intake form for each."
+fact = []
+
+[[question]]
+id = "D10"
+section = "D"
+text = "What is the written basis for the domain: a charter or a decision? Give the document and its date."
+asked_of = ["domain-owner"]
+type = "text"
+required = "required"
+why = "A domain is active by a recorded decision, like a KPI."
+feeds = "Kept in the form's file."
+fact = []
+
+# ---- Process map request ---------------------------------------------------------------------------------------
+
+[[question]]
+id = "P1"
+section = "P"
+text = "What is missing from the process map: a business area, a process, a step or a role? Name each one."
+asked_of = ["global-process-owner"]
+type = "list"
+rows = 6
+required = "required"
+why = "The KPI must hang on a process the ontology knows."
+feeds = "A proposal for the process map, then a `core` release: `skos:prefLabel`."
+fact = []
+
+[[question]]
+id = "P2"
+section = "P"
+text = "For each missing process or step, which process in the map sits above it?"
+asked_of = ["global-process-owner"]
+type = "multi_choice"
+source = "processes"
+levels = [0, 6]
+rows = 6
+required = "optional"
+why = "The parent says where the new entry goes in the tree."
+feeds = "`skos:broader` and `core:businessDomain`."
+fact = []
+
+[[question]]
+id = "P3"
+section = "P"
+text = "What is the purpose of each missing process or step, in one sentence?"
+asked_of = ["global-process-owner"]
+type = "list"
+rows = 6
+required = "optional"
+why = "The first sentence becomes the definition."
+feeds = "`skos:definition`."
+fact = []
+
+[[question]]
+id = "P4"
+section = "P"
+text = "What are the steps of each missing process, in order?"
+asked_of = ["global-process-owner"]
+type = "list"
+rows = 12
+required = "optional"
+why = "KPIs attach to steps where they can."
+feeds = "Lower levels of the process map, `core:precedes`."
+fact = []
+
+[[question]]
+id = "P5"
+section = "P"
+text = "Which roles work in these processes?"
+asked_of = ["global-process-owner"]
+type = "multi_choice"
+source = "roles"
+rows = 8
+required = "optional"
+why = "Roles are who uses the KPI and who answers for the work."
+feeds = "`org:Role` in `organization`, with `skos:prefLabel` and `skos:definition`."
+fact = []
+
+  [[question.option]]
+  id = "@new-roles"
+  label = "New roles (describe them below)"
+
+  [question.detail]
+  label = "Each new role, with a one-sentence description"
+  type = "long_text"
+  required_when = "@new-roles"
+
+[[question]]
+id = "P6"
+section = "P"
+text = "For each process, which role does the work, which answers for it, which is consulted, and which is informed? Write one line for each: the process, the role, and one of responsible, accountable, consulted or informed."
+asked_of = ["global-process-owner"]
+type = "list"
+rows = 12
+required = "optional"
+why = "It records who to ask when the KPI moves."
+feeds = "`orgx:ResponsibilityAssignment` with `forProcess`, `assignedRole`, `raciLevel`."
+fact = []
+
+[[question]]
+id = "P7"
+section = "P"
+text = "Which documents describe them: a process manual, a policy, a published report?"
+asked_of = ["global-process-owner"]
+type = "list"
+rows = 6
+required = "required"
+why = "Every fact added needs a written source."
+feeds = "`dcterms:source` IRIs and their tiers in `authority/source-tiers.csv`."
+fact = []
+
+# ---- The explainer (what-we-will-ask-you.md and the "What we will ask you" view of the HTML form) ---------------
+
+[explainer]
+title = "What we will ask you and why"
+
+[[explainer.block]]
+p = "You have been asked to an interview about a KPI. This page says what to expect."
+
+[[explainer.block]]
+p = "We keep one shared record of what each KPI means: its name, its definition, where it is used and where its data comes from. Reports, dashboards and assistants read that record, so they all give the same answer to \"what does this number mean\". To add a KPI to the record, we need facts that only the people who use the KPI can give."
+
+[[explainer.block]]
+p = "A business analyst will ask you about 28 questions. The interview takes 45 to 60 minutes. You do not need to prepare a document. It helps if you bring the place where the KPI is written down today: a report, a policy or a list."
+
+[[explainer.block]]
+p = "We will ask six things."
+
+[[explainer.block]]
+ol = [
+  "Which part of the business the KPI belongs to, which process it is about, and which data domain it belongs to.",
+  "What it means, in one or two sentences, and what it counts and leaves out.",
+  "How it is worked out in words, its unit, and how often it is stated.",
+  "What kind of number it is. For example, a market price you cannot control, a comparison with a plan, or a KPI with a target and an owner.",
+  "What other names people use for it, and which numbers people mistake it for.",
+  "Who uses it, and which data product gives it.",
+]
+
+[[explainer.block]]
+p = "We will not ask for values, targets or formulas in code. The record holds what a KPI means. The systems hold the numbers."
+
+[[explainer.block]]
+p = "Where we can, you will choose from a list. If the right answer is not in the list, say so. It means the record lacks something, and we add it before your KPI."
+
+[[explainer.block]]
+p = "After the interview, the owner of the definition reads the filled form and signs it, and the owner of the domain confirms that the KPI belongs to it. Nothing changes in the record before that."
+
+# ---- The facts the ontology needs for one new KPI (the Architect's page) ---------------------------------------
+# supplied_by names the questions that give the fact. An empty list with derived = true means the Architect or
+# the tooling derives the fact. A test checks that every required fact has a question or is derived.
+
+[[fact]]
+id = "F1"
+name = "Name"
+property = "`skos:prefLabel`, exactly one, English"
+module = "kpi"
+status = "required"
+supplied_by = ["2.1"]
+
+[[fact]]
+id = "F2"
+name = "Definition"
+property = "`skos:definition`, exactly one"
+module = "kpi"
+status = "required"
+supplied_by = ["2.2"]
+
+[[fact]]
+id = "F3"
+name = "Short key"
+property = "`skos:notation`, exactly one"
+module = "kpi"
+status = "required"
+supplied_by = ["2.1"]
+derived = true
+note = "Derived from the name."
+
+[[fact]]
+id = "F4"
+name = "Place in the measure list"
+property = "`skos:inScheme` and `skos:topConceptOf` `kpi:Measures`, `rdf:type`"
+module = "kpi"
+status = "required"
+supplied_by = []
+derived = true
+note = "Fixed values."
+
+[[fact]]
+id = "F5"
+name = "Kind of measure"
+property = "`kpi:measureKind`, exactly one of eight"
+module = "kpi"
+status = "required"
+supplied_by = ["4.1", "4.2", "4.3", "4.4", "4.5", "4.6"]
+note = "Derived from the first answer that decides."
+
+[[fact]]
+id = "F6"
+name = "Which test decided the kind"
+property = "`kpi:classificationTest`, 1 to 5"
+module = "kpi"
+status = "required"
+supplied_by = ["4.1", "4.2", "4.3", "4.4", "4.5", "4.6"]
+note = "Derived."
+
+[[fact]]
+id = "F7"
+name = "Why it has that kind"
+property = "`kpi:classificationReason`, exactly one"
+module = "kpi"
+status = "required"
+supplied_by = ["4.8"]
+
+[[fact]]
+id = "F8"
+name = "KPI candidate"
+property = "`kpi:kpiCandidate`, true or false. Only an operational metric can be true"
+module = "kpi"
+status = "required"
+supplied_by = ["4.7"]
+note = "False unless the kind is operational metric."
+
+[[fact]]
+id = "F9"
+name = "Source"
+property = "`dcterms:source`, at least one IRI. The IRI needs a row in `authority/source-tiers.csv`"
+module = "kpi and integration"
+status = "required"
+supplied_by = ["3.5"]
+note = "A new source document needs a change to the kpi builder and an evidence tier."
+
+[[fact]]
+id = "F10"
+name = "Identifier"
+property = "`dcterms:identifier`, `KPI-nnnn` or `OPM-nnnn`. Required unless the kind is tracker or report, or not a measure"
+module = "kpi"
+status = "required"
+supplied_by = []
+derived = true
+note = "The next free `KPI-` or `OPM-` number."
+
+[[fact]]
+id = "F11"
+name = "Where the source says it"
+property = "`dcterms:bibliographicCitation`, at most one"
+module = "kpi"
+status = "usual"
+supplied_by = ["3.5", "4.6"]
+
+[[fact]]
+id = "F12"
+name = "Process it informs"
+property = "`kpi:informsProcess`, any number"
+module = "kpi, pointing into core"
+status = "usual"
+supplied_by = ["1.2", "1.3", "6.2"]
+
+[[fact]]
+id = "F13"
+name = "Roles that use it"
+property = "`kpi:usedBy`, any number"
+module = "kpi"
+status = "usual"
+supplied_by = ["6.1"]
+note = "The kpi builder accepts only the four planning personas today."
+
+[[fact]]
+id = "F14"
+name = "How it is formed"
+property = "`kpi:basis`, at most one"
+module = "kpi"
+status = "usual"
+supplied_by = ["3.1", "3.2"]
+
+[[fact]]
+id = "F15"
+name = "Grain"
+property = "`kpi:grain`, at most one. Not allowed on a tracker, report or non-measure"
+module = "kpi"
+status = "usual"
+supplied_by = ["3.3"]
+
+[[fact]]
+id = "F16"
+name = "What it is compared against"
+property = "`kpi:comparedAgainst`, at most one"
+module = "kpi"
+status = "usual"
+supplied_by = ["3.4"]
+
+[[fact]]
+id = "F17"
+name = "Closest published measure"
+property = "`kpi:publicCounterpart`, at most one"
+module = "kpi"
+status = "usual"
+supplied_by = ["5.4"]
+
+[[fact]]
+id = "F18"
+name = "Other names"
+property = "`skos:altLabel`, any number"
+module = "kpi"
+status = "optional"
+supplied_by = ["5.1"]
+
+[[fact]]
+id = "F19"
+name = "What it is not"
+property = "`skos:scopeNote`, at most one"
+module = "kpi"
+status = "optional"
+supplied_by = ["5.3"]
+
+[[fact]]
+id = "F20"
+name = "Measures it is mistaken for"
+property = "`kpi:notToBeConfusedWith`, any number"
+module = "kpi"
+status = "optional"
+supplied_by = ["5.2"]
+
+[[fact]]
+id = "F21"
+name = "What it counts and leaves out"
+property = "`pop:includes`, `pop:excludes`, `pop:populationEvidence`"
+module = "kpi"
+status = "optional"
+supplied_by = ["2.3", "2.4", "3.5"]
+
+[[fact]]
+id = "F22"
+name = "An ID another asset gives it"
+property = "`skos:note`, at most one"
+module = "kpi"
+status = "optional"
+supplied_by = ["3.6"]
+
+[[fact]]
+id = "F23"
+name = "Change history"
+property = "`skos:changeNote`"
+module = "kpi"
+status = "optional"
+supplied_by = []
+derived = true
+note = "Derived from the request number."
+
+[[fact]]
+id = "F24"
+name = "Value stream step that uses it"
+property = "A `vs:MeasureLink` on a step, with `vs:measure`, `vs:relationship` and a `dcterms:bibliographicCitation`"
+module = "value-stream"
+status = "optional"
+supplied_by = ["6.3", "6.4", "6.5"]
+note = "The value-stream builder reads the link from the process authority's files, which change by proposal."
+
+[[fact]]
+id = "F25"
+name = "The view that gives its values"
+property = "`dp:servesMeasure` from a platform table to the measure"
+module = "data-product"
+status = "optional"
+supplied_by = ["7.1"]
+
+[[fact]]
+id = "F26"
+name = "Facts about that view"
+property = "`dp:fullName`, `dp:layer`, `prov:wasDerivedFrom`, `dp:dependsOnSystem`, `dcterms:isPartOf`, `dp:sandbox`, `dp:dataProductKind` with its test and reason, `dcterms:source`"
+module = "data-product"
+status = "optional"
+supplied_by = ["6.6", "7.2", "7.3", "7.4", "7.5", "7.6", "7.8", "7.9"]
+note = "Needed only when the view is new."
+
+[[fact]]
+id = "F27"
+name = "The data product that publishes it"
+property = "`con:publishesMeasure`"
+module = "integration"
+status = "optional"
+supplied_by = ["6.6"]
+note = "The ontology holds no instance today."
+
+[[fact]]
+id = "F28"
+name = "Market series behind it"
+property = "`mkt:seriesOf`, `mkt:priceOf`, `mkt:enumerates`. Market indicators only"
+module = "market-data"
+status = "outside this form"
+supplied_by = ["6.7"]
+note = "Not supplied. Question 6.7 only detects the need."
+
+[[fact]]
+id = "F29"
+name = "The metric view that computes it, as built"
+property = "`tg:implements`"
+module = "technical-graph"
+status = "outside this form"
+supplied_by = []
+derived = true
+note = "The discovery finds it. It is a record in the technical graph, not in the ontology."
+
+# Facts the form asks for, or a KPI has, that the ontology has no property for yet.
+
+[[gap]]
+fact = "The domain of a KPI"
+question = "1.5"
+note = "The ontology has no place for a KPI's domain, and holds no list of domains. The list is in settings.toml. A place in the ontology is planned for release 1.2."
+
+[[gap]]
+fact = "The other domains whose data a KPI uses"
+question = "1.6"
+note = "The answer stays in the form's file."
+
+[[gap]]
+fact = "The business area of a measure"
+question = "1.1"
+note = "The check compares the answer with the area of the chosen process. The answer stays in the form's file."
+
+[[gap]]
+fact = "The decision the KPI supports"
+question = "1.4"
+note = "The ontology answers only with the process link. The answer stays in the form's file."
+
+[[gap]]
+fact = "The unit, as a value of its own"
+question = "3.2"
+note = "The unit is words inside `kpi:basis`. The answer also stays in the form's file."
+
+[[gap]]
+fact = "Who may see the KPI"
+question = "3.7"
+note = "The answer stays in the form's file and routes the request to the reviews."
+
+[[gap]]
+fact = "The topic, or family, of the KPI"
+question = "4.9"
+note = "The measure list is flat. The answer stays in the form's file."
+
+[[gap]]
+fact = "The measure or column of the view that holds the KPI, with its filter"
+question = "7.7"
+note = "It needs a minor version of `data-product` with a new property."
+
+[[gap]]
+fact = "The accountable owner of a KPI"
+question = ""
+note = "Question 4.6 asks only for the document that records the owner."
+
+[[gap]]
+fact = "The target of a KPI"
+question = ""
+note = "The closed shape forbids a target on a measure. Question 4.6 asks only for the document that records it."
+
+[[gap]]
+fact = "The direction of a good value"
+question = ""
+note = "The form does not ask for it."
+
+# Paragraphs the Architect's page prints before its tables.
+
+[architect]
+notes = [
+  "Two words are fixed in the intake. A business area is the function that runs a process, such as Commercial or Marketing. A domain is the data domain a KPI belongs to, such as Market Price, where the Domain Owner sits.",
+  "The ontology's property is named `core:businessDomain`, and its list is `core:BusinessDomain`. Despite the name, both hold the business area. Question 1.1 offers that list.",
+  "The ontology has no place for a KPI's domain yet, and holds no list of domains. Question 1.5 offers the list in `settings.toml`, and the answer stays in the form's file. A place in the ontology is planned for release 1.2.",
+]

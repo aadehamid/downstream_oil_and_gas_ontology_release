@@ -300,7 +300,18 @@ The versions in the commands are those of the release as you received it. Read t
    competency coverage on <the core package>: 57 questions; answerable 56, partial 0, waiting 0, parked 1
    ```
 
-8. In a Git copy, stage the change. Then run the full check.
+8. Rebuild the KPI intake pack, so that its lists offer what the release changed. The command needs the `openpyxl` package beside `rdflib` (`py -m pip install openpyxl`). `kpi-intake/README.md` explains the pack.
+
+   ```powershell run=slow
+   py -m kpi_store.intake build
+   ```
+
+   ```text expect
+   wrote kpi-intake/pick-lists.json
+   ...
+   ```
+
+9. In a Git copy, stage the change. Then run the full check.
 
    ```bash run=slow
    git add -A
@@ -314,8 +325,8 @@ The versions in the commands are those of the release as you received it. Read t
 
    After a change, the check prints a note: `projection-report.json describes an earlier build`. That file is the summary of the last Neo4j load, and it now describes the release before your change. The note does not fail the check, and it does not mean the ontology is wrong. It goes away when you have loaded the stores and recorded the new load's report with `py pipeline.py record`. The runbook's section "Record the load's report in the release folder" runs that command.
 
-9. Search your copy for text that the change made stale, and update each document that holds it. No check catches a copy of a sentence.
-10. Load the stores with the runner, and read its last line. The release is done when the sync check reads `current` on every line.
+10. Search your copy for text that the change made stale, and update each document that holds it. No check catches a copy of a sentence.
+11. Load the stores with the runner, and read its last line. The release is done when the sync check reads `current` on every line.
 
     ```powershell skip reason="needs-client-server: loads the client's Databricks and Enterprise database"
     py -m kpi_store.runner

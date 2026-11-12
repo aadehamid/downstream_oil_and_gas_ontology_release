@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "KPI intake answers file",
+  "description": "One filled form of the KPI intake pack, as the HTML form saves it. The completeness check reads this file, or a filled workbook that holds the same content.",
+  "type": "object",
+  "required": ["format", "form", "answers"],
+  "additionalProperties": false,
+  "properties": {
+    "format": {"const": 1, "description": "The version of this file format."},
+    "form": {"enum": ["kpi-intake", "domain-activation", "process-map-request"], "description": "Which of the three forms the file holds."},
+    "catalogue_version": {"type": "string", "description": "The version of catalogue.toml the form was built from."},
+    "kpi_name": {"type": "string", "description": "The answer to question 2.1, repeated so that a person can tell files apart. For the two smaller forms, the answer to their first question."},
+    "request": {
+      "type": "object",
+      "description": "The fields the Program manager fills before the interview: number, date, requester_role, invited.",
+      "additionalProperties": {"type": "string"}
+    },
+    "answers": {
+      "type": "object",
+      "description": "The answers by question id. The extra text of a question is under \"<id>.detail\". A choice holds the id of the chosen item, as pick-lists.json or settings.toml gives it. A special option's id starts with @.",
+      "additionalProperties": {
+        "oneOf": [
+          {"type": "string"},
+          {"type": "array", "items": {"type": "string"}}
+        ]
+      }
+    },
+    "sign_offs": {
+      "type": "object",
+      "description": "Each signature by the signer's id in catalogue.toml.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {"name": {"type": "string"}, "date": {"type": "string"}}
+      }
+    },
+    "consulted": {
+      "type": "object",
+      "description": "Each consultation by its id in catalogue.toml.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {"date": {"type": "string"}, "outcome": {"type": "string"}}
+      }
+    },
+    "example_of": {"type": "string", "description": "Only in the shipped examples: the notation of the measure the example copies. Leave it empty."},
+    "comment": {"type": "string"}
+  }
+}

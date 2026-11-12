@@ -1,0 +1,88 @@
+{
+  "format": 1,
+  "form": "kpi-intake",
+  "catalogue_version": "1.0",
+  "kpi_name": "R&M Margin per Barrel",
+  "request": {
+    "number": "EXAMPLE-2",
+    "date": "2026-11-11",
+    "requester_role": "Program manager",
+    "invited": "Global Process Owner, Data Owner, Data Steward, Data Product Owner"
+  },
+  "answers": {
+    "1.1": "https://w3id.org/mpc/ontology/modules/core/business-domain/marketing",
+    "1.2": "https://w3id.org/mpc/ontology/process/CM-1-3-5",
+    "1.3": "https://w3id.org/mpc/ontology/process/CM-1-3-5-1-4",
+    "1.4": "Illustration: Sales planners compare the realized margin per barrel with the forecast to explain the gap.",
+    "1.5": "financial-performance",
+    "2.1": "R&M Margin per Barrel",
+    "2.2": "MPC's Refining & Marketing margin (sales revenue less the cost of refinery inputs and purchased products) per barrel of net refinery throughput.",
+    "2.3": "Sales revenue less the cost of refinery inputs and purchased products, per barrel of net refinery throughput. From 2026 the margin includes impacts from derivative activity.",
+    "2.4": "Inter-refinery transfer volumes, which the regional per-barrel figures leave out of net refinery throughput.",
+    "3.1": "R&M margin ($) / net refinery throughput (bbl); from 2026 the margin includes impacts from derivative activity",
+    "3.2": "Illustration: US dollars per barrel",
+    "3.3": "quarterly and annual, company and region",
+    "3.4": "R&M Margin Indicator; prior periods",
+    "3.5": [
+      "https://w3id.org/mpc/ontology/source/kpi-classification-evidence",
+      "https://w3id.org/mpc/ontology/source/mpc-performance-measures-evidence"
+    ],
+    "3.5.detail": "MPC-S01 p. 51; MPC-S17; KI-01",
+    "3.7": "anyone",
+    "4.1": "yes",
+    "4.2": "no",
+    "4.3": "no",
+    "4.4": "no",
+    "4.5": "no",
+    "4.6": "no",
+    "4.7": "yes",
+    "4.8": "MPC's non-GAAP realized margin per barrel of net refinery throughput, by region. A financial result measure (Parmenter's RI); MPC's bonus uses a related EBITDA measure instead. The definition changed in 2026 to include derivatives, so it is versioned.",
+    "4.9": "Illustration: Pricing",
+    "5.1": [
+      "R&M margin per barrel",
+      "refining margin per barrel"
+    ],
+    "5.2": [
+      "https://w3id.org/mpc/ontology/modules/kpi/measure/crack-spreads"
+    ],
+    "5.3": "Not a crack spread: it is realized, not a market benchmark.",
+    "5.4": "MPC 7",
+    "6.1": [
+      "https://w3id.org/mpc/ontology/modules/kpi/persona/mid-term-planner"
+    ],
+    "6.2": [
+      "https://w3id.org/mpc/ontology/process/CM-1-1-5"
+    ],
+    "6.3": [
+      "https://w3id.org/mpc/ontology/modules/value-stream/process/market-price-calculation-validation",
+      "https://w3id.org/mpc/ontology/modules/value-stream/process/performance-tracking-analysis"
+    ],
+    "6.4": [
+      "https://w3id.org/mpc/ontology/modules/value-stream/measure-relationship/informs",
+      "https://w3id.org/mpc/ontology/modules/value-stream/measure-relationship/measures-performance"
+    ],
+    "6.5": [
+      "MPC defines R&M margin as the difference between the prices of refined products sold and the costs of crude oil and other charge and blendstocks refined, including transport to the refineries and products purchased for resale; MPC FY2025 10-K, Item 7 (reference/mpc/mpc-fy2025-10k-fact-sheet.md, section 8)",
+      "MPC reports R&M margin per barrel for 2023 to 2025; MPC FY2025 10-K, Item 7 (reference/mpc/mpc-fy2025-10k-fact-sheet.md, section 8)"
+    ],
+    "6.6": "@none-yet",
+    "7.1": "@no-data-yet"
+  },
+  "sign_offs": {
+    "data-owner": {
+      "name": "Placeholder for the Data Owner's name",
+      "date": "2026-11-11"
+    },
+    "domain-confirmation": {
+      "name": "Placeholder for the Domain Owner's name",
+      "date": "2026-11-11"
+    },
+    "architect": {
+      "name": "Placeholder for the Architect's name",
+      "date": "2026-11-11"
+    }
+  },
+  "consulted": {},
+  "example_of": "rm-margin-per-barrel",
+  "comment": "A shipped example. Every answer is quoted from the ontology, except these illustrations, which the ontology does not hold: 1.4, 3.2, 3.7, 4.9 and 6.1. The domain in 1.5 comes from the example domain list in settings.toml. The ontology names no role, no data product and no view for this measure. The signer names are placeholders."
+}

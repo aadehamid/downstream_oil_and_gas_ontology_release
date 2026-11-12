@@ -74,6 +74,8 @@ the decisions the owner delegated. The agent wrote this section.
 
 Saved in `answers/2026-11-11-kpi-store-1.1.md`: every quote in the Decision section above, word for word.
 
+The same file holds a later answer of 2026-11-11 under its own heading: "names and descriptions stay that is fine for this one." It allows the organization's governance role names and role definitions in the KPI intake pack (`kpi-intake/settings.toml`), as an exception to "Client inputs never go in the repo" for this one item. The RACI, the responsibilities, the levels and the hours stay out. The reading of what it allows is the agent's text.
+
 The agent's text, not the owner's words: the owner can reverse any decision made under this delegation.
 
 ## Evidence

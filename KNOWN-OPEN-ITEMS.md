@@ -52,6 +52,18 @@ This page lists what is open in KPI Store 1.1, what has not run yet and what was
 - **Python may leave `__pycache__` folders in the release folder.** The commands that run in their own process do not, and the zip and the checks leave such folders out. In a plain folder they stay on disk.
 - **The questions' mapping file has four soft spots.** Its digest has no key, so a hand edit that also rewrites the digest reads as confirmed. `discover` writes over a mapping that was corrected and not yet confirmed. A path of exactly five steps is accepted and is not proposed. Question 7 returns no rows, with no reason given, when the mapping names a policy's link and neither its name nor a classification.
 
+## The KPI intake pack
+
+`kpi-intake/README.md` explains the pack. These points are not in this release.
+
+- **A complete intake is applied by hand.** The check says whether a filled form is complete and signed, and changes nothing. The Architect adds the KPI with the steps of `HOW-TO-UPDATE.md`. Commands that propose the change from a form and apply it are planned for release 1.2.
+- **The ontology has no place for a KPI's domain, and holds no list of domains.** The form asks for the domain and reads the list from `kpi-intake/settings.toml`, where the list that ships is an example to replace. The property the ontology names "business domain" holds the business area, which is the function that runs a process. A place for the domain is planned for release 1.2.
+- **Eight more facts the form asks for, or a KPI has, have no property in the ontology.** They are the business area of a measure, the decision it supports, its unit as a value of its own, its accountable owner, its target, the direction of a good value, who may see it, and its topic. The form keeps the answers it collects in its own file. `kpi-intake/for-the-architect.md` lists each one.
+- **The kpi builder accepts only the four planning personas for "used by".** The form offers every role the ontology holds, and the check notes each chosen role that the builder cannot write yet.
+- **One KPI may need releases of several modules.** The measure is a version of `kpi`. A value stream step, a new view and a new source document each need a version of `value-stream`, `data-product` or `integration`, and each release gives the modules that depend on it a new patch.
+- **The check of names compares names, not meanings.** It finds a name that a measure or another module's term already has, and a name that is close in spelling. It cannot find the same measure under an unrelated name.
+- **The HTML form was tested in Chrome only.** `kpi_store/intake/browser_check.py` opens it in an installed Chrome or Edge and proves nine things. `scripts/check.sh` does not run it, because it needs a browser. The workbook was read and written with `openpyxl` and has not been opened in Excel by a test.
+
 ## Gaps in the ontology's content
 
 These were found by reading the release against the six stages of `best-practices/README.md`. None stops a load. A released package never changes, so each one waits for a new version of its module, made with the steps of `HOW-TO-UPDATE.md`.
