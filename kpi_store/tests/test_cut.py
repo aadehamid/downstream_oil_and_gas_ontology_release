@@ -452,6 +452,50 @@ def test_the_change_value_rename_goes_through_the_whole_cut_in_a_plain_folder_an
     assert "releases/data-product/1.2.0/CHANGELOG.md" not in exceptions
 
 
+def with_intake_pack(root):
+    """Adds what the cut needs to rebuild the KPI intake pack: the pack and the code that builds it."""
+    shutil.copytree(support.ROOT / "kpi-intake", root / "kpi-intake")
+    shutil.copytree(support.ROOT / "kpi_store", root / "kpi_store", ignore=shutil.ignore_patterns("__pycache__", "tests"))
+    return root / "kpi-intake"
+
+
+@as_shipped
+def test_a_cut_rebuilds_the_kpi_intake_pack_so_its_check_reads_current_pick_lists(tmp_path):
+    """The gap this closes: a cut changed the packages and left the pack's pick lists behind, so the check of a
+    filled form said "the pick lists are older than the release packages" and the documents' examples failed."""
+    from kpi_store.intake import build as intake_build, check as intake_check, picklists
+    root = release_copy(tmp_path)
+    pack = with_intake_pack(root)
+    example = pack / "examples" / "crack-spreads-pricing.json"
+    assert intake_build.stale(root, pack) == [] and intake_check.run(example, pack, root=root).complete
+    path = cleared(tmp_path, {"R002": "accept", **{r: "reject" for r in EXTRAS}})
+    said = []
+    plan_lines = cut.describe(cut.plan(cut.load_report(path)[0], root))
+    assert "The cut also rebuilds the KPI intake pack (kpi-intake/), whose pick lists come from these packages." in plan_lines
+    outcome = cut.cut(path, root, approver="the ontology owner", ask=Answers("Change_Value_Amount", "yes"), say=said.append, now=NOW)
+    assert outcome.status == "cut"
+    # The pack is rebuilt after the catalog and checked against a fresh build before the release is written.
+    order = [said.index(f"... {name}") for name in ("rebuild the catalog", "rebuild the KPI intake pack", "verify the catalog",
+                                                    "verify the KPI intake pack", "write the release")]
+    assert order == sorted(order)
+    assert "kpi-intake/pick-lists.json" in outcome.files
+    lists = picklists.load(pack)
+    assert lists["versions"]["data-product"] == "1.2.1-correction.1" and picklists.stale_modules(lists, root) == {}
+    assert intake_build.stale(root, pack) == []
+    report = intake_check.run(example, pack, root=root)
+    assert report.complete and "older than the release packages" not in report.text()
+
+
+def test_a_release_with_the_intake_pack_needs_openpyxl_and_one_without_it_does_not(tmp_path, monkeypatch):
+    monkeypatch.setattr(cut, "_importable", lambda name: name != "openpyxl")
+    cut._requirements(tmp_path)   # no pack: rdflib and pyshacl are enough
+    for needed in cut.INTAKE_NEEDS:
+        (tmp_path / needed).parent.mkdir(parents=True)
+        (tmp_path / needed).write_text("", encoding="utf-8")
+    with pytest.raises(cut.CutRefused, match=r"the cut needs the Python package openpyxl: py -m pip install openpyxl$"):
+        cut._requirements(tmp_path)
+
+
 def git(root, *args):
     done = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, encoding="utf-8")
     assert done.returncode == 0, done.stderr

@@ -415,6 +415,54 @@ this check was started by a block of another check, so it ran no block
 At the cut, set the variable of every context and add `--strict --all-contexts`. `--all-contexts` fails a block
 whose context cannot run, so nothing is skipped for a missing server.
 
+## The release the examples describe
+
+An example shows what a command printed on the release as it was shipped: a version, a count of triples, a
+refusal that names a version. After a correction, or after a new version of a module, the same command prints
+something else, and that is right. So the registry records which release the examples describe. The `[describes]`
+table of `scripts/doc_snippets.toml` holds the SHA-256 of `business_architecture/ontology/releases/catalog.ttl`,
+the catalog of every release package. `build_catalog.py --write` writes that file, and it changes with every
+package version. The check reads CRLF line ends as LF, so a checkout on Windows gives the same value.
+
+The check compares the recorded value with the catalog it finds.
+
+| The release is | `check` | `check --strict` |
+|---|---|---|
+| the one the examples describe | Runs every block. | Runs every block. |
+| another one | Runs no block and ends with exit 0, unless a tag, a file or a parsed block is wrong. | Fails, and still runs every block. |
+
+On another release the check still reads every tag, compares the `file` and `excerpt` blocks and parses the
+`parse` blocks. It counts each block it did not run under "not run: the release changed since the documents were
+written", and a note after the count says the same. So `scripts/check.sh` passes on a corrected release, and the
+runner can load it.
+
+`check --strict` is for the person who builds a release to send on. It fails with the two values, and it runs
+every block, so that each example that no longer holds fails with its line.
+
+When you prepare a new zip from a changed release, bring the examples up to date:
+
+1. Run `check --strict`, and change each example that fails.
+2. Record the release that the examples now describe:
+
+   ```powershell skip reason="destructive: writes this release's digest into the registry of the release"
+   py scripts/doc_snippets.py describe-release --write
+   ```
+
+With no option, the command writes nothing and says whether the recorded value is this release's. It ends with
+exit 1 when it is not:
+
+```powershell run=release-copy
+py scripts/doc_snippets.py describe-release
+```
+
+```text expect
+the documents' examples describe this release (business_architecture/ontology/releases/catalog.ttl, SHA-256 <a digest>)
+```
+
+`scripts/check-pinned.sh` runs a test that the recorded value is the catalog's, so a release cannot be built with
+an old value. A folder that holds no catalog file has no release to compare, and the check runs there as on the
+release the examples describe.
+
 ## What the check prints
 
 Each failure is one line with the document and the line of the block, then the end of the block's output. The

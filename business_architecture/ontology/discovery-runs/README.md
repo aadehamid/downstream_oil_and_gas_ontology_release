@@ -17,7 +17,7 @@ The order is 1.2.0, 1.2.1-correction.1, 1.2.1-correction.2, 1.2.2. One function 
 
 ## Cut a cleared report
 
-Run the tool from the release's top folder. It needs Python 3.11 or later with `rdflib` and `pyshacl`. It needs no Java, no bash and no Git.
+Run the tool from the release's top folder. It needs Python 3.11 or later with `rdflib`, `pyshacl` and `openpyxl`. It needs no Java, no bash and no Git.
 
 ```powershell run=release-copy
 py -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --decisions kpi_store/tests/fixtures/cut/cleared-decisions.csv --approver "the ontology owner" --plan
@@ -28,6 +28,7 @@ Discovery run 20261111T120000Z-0a1b2c3d of KPI Store 1.1: 28 rows.
 The cut applies (4):
 ...
   integration 2.5.0 -> 2.5.1-correction.1
+The cut also rebuilds the KPI intake pack (kpi-intake/), whose pick lists come from these packages.
 ```
 
 The example names the made-up report and decisions that ship with the tests, and `--plan` changes nothing. For your report, name its two files and leave `--plan` out. `HOW-TO-UPDATE.md`, "See the cut by itself", runs the whole cut on the same report.
@@ -43,7 +44,7 @@ The tool shows each row and what it will change. It then asks two things:
 
 A change is breaking when it changes or removes a name that a query or a load may hold: a column whose new name differs by more than case, an object's name, or the removal of a column, an object or a table edge. A case-only spelling and an added measure are not breaking.
 
-The tool works in a temporary copy of the release. Your folder changes only after every step has passed. If a step fails, your folder is as it was. A report that was cut before changes nothing.
+The tool works in a temporary copy of the release. Besides the ontology's files, it rebuilds the KPI intake pack in `kpi-intake/`, whose pick lists come from the packages, and checks the pack against a fresh build. That is why it needs `openpyxl`: the pack holds Excel forms. Your folder changes only after every step has passed. If a step fails, your folder is as it was. A report that was cut before changes nothing.
 
 In a Git copy the tool commits the change and tags it `data-product-<version>`. The cut ends with its commit and its tag, or it changes nothing. It never pushes. Before it changes a file, the tool checks what Git needs and refuses the cut when one of these is missing:
 
@@ -58,7 +59,7 @@ If the commit itself fails, the tool puts back the files it wrote, from the copi
 
 A plain folder, one with no `.git` folder, needs no Git. The tool writes the same files there.
 
-After a cut, run the full check before you load any store. On Windows, run it in Git Bash:
+After a cut, run the full check before you load any store. The check then reads the documents' examples and runs none of them, because they show the release as shipped; `scripts/DOC-SNIPPETS.md` explains this under "The release the examples describe". On Windows, run the check in Git Bash:
 
 ```bash run=slow
 bash scripts/check.sh

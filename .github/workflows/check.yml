@@ -94,7 +94,7 @@ jobs:
         run: |
           py -0p || true
           py -c "import sys; print(sys.executable, sys.version)"
-          py -m pip install -q rdflib==7.6.0 pyshacl==0.40.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3
+          py -m pip install -q rdflib==7.6.0 pyshacl==0.40.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 openpyxl==3.1.5
       - name: the local settings file, outside the checkout
         run: |
           py -c "import secrets; print(secrets.token_hex(16))" > "$LOCAL/pw"

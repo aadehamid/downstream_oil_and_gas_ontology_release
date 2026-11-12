@@ -1064,13 +1064,14 @@ Versions the cut writes:
   logical-model 1.0.0 -&gt; 1.0.1-correction.1
   technical-graph 1.1.0 -&gt; 1.1.1-correction.1
   value-stream 1.2.0 -&gt; 1.2.1-correction.1
-  integration 2.5.0 -&gt; 2.5.1-correction.1</code></pre>
+  integration 2.5.0 -&gt; 2.5.1-correction.1
+The cut also rebuilds the KPI intake pack (kpi-intake/), whose pick lists come from these packages.</code></pre>
   <p class="rise">Without <code>--plan</code>, the tool shows each row and what it will change, asks for a typed confirmation of each breaking change, and asks for a <code>yes</code>. Then, in a temporary copy of the release, it does all of this, and your folder changes only after every step has passed:</p>
   <ol class="rise">
     <li>It changes the <code>data-product</code> module's tables in <code>data-product/pricing/</code> and rebuilds the module.</li>
     <li>It writes the package at the correction version. A correction to 1.2.0 is <code>1.2.1-correction.1</code>, and the next one is <code>1.2.1-correction.2</code>.</li>
     <li>It gives every module that requires the corrected module a correction version too, because a package names the exact version of each module it requires.</li>
-    <li>It rebuilds the catalog and the projection manifest, runs the competency questions and verifies each written package against a fresh build.</li>
+    <li>It rebuilds the catalog, the projection manifest and the KPI intake pack in <code>kpi-intake/</code>, runs the competency questions and verifies each written package and the pack against a fresh build.</li>
     <li>It writes the discovery-run record in <code>business_architecture/ontology/discovery-runs/</code>: the run, the versions written, every row with its decision, and each change with its value before and after. The record holds names only; evidence text and notes stay in the report.</li>
     <li>In a Git copy it commits and tags the cut. In a plain folder it writes the same files and needs no Git.</li>
   </ol>

@@ -4,6 +4,14 @@
 # The check with --strict fails on these reasons. The cut runs --strict, so none may remain in the release.
 temporary_reasons = ["awaits-the-rewrite"]
 
+# The release the documents' examples describe: the SHA-256 of `file`, the catalog of every release package, which
+# changes with every package version. On a release with another digest the check runs no block, because an example
+# may rightly show another version or count there, and `check --strict` fails. After you bring the examples up to
+# date with a new release, write its digest here with: py scripts/doc_snippets.py describe-release --write
+[describes]
+file = "business_architecture/ontology/releases/catalog.ttl"
+sha256 = "0f2d1d54ee0984eacb3aa6301ecd4d5a8a027f7337369e8feca5e73ae420eb78"
+
 # A skipped block is written `skip reason="<reason>: <detail>"`. Only these reasons are allowed. Each says why a
 # test on this machine cannot run the block. scripts/test_doc_snippets.py pins this list, so a new reason is a
 # deliberate change there too.

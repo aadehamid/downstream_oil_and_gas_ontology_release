@@ -52,7 +52,7 @@ A node that another writer made with all the marks of one row counts as the KPI 
 | Your Windows machine | The folder `C:\kpi-store-local`: each run's files, the Fuseki dataset and the Neo4j load's working files. |
 | The local Neo4j | The database that your local settings name. **The load empties it first.** |
 | Neo4j Enterprise | Nodes and relationships in `businessprocessarchitecturegraph`, and one constraint there, `n10s_unique_uri`. |
-| The release folder | Nothing, except in the cut. The cut writes the correction version and its record. |
+| The release folder | Nothing, except in the cut. The cut writes the correction version and its record, and rebuilds the KPI intake pack in `kpi-intake`. |
 
 The run writes to no table of yours and to no other schema, catalog or database. It reads no token and stores none. Databricks access outside the notebook goes through the sign-in of the Databricks command line.
 
@@ -109,7 +109,7 @@ You do not compare the checksums by hand. The setup check does it and fails on a
 2. Install the packages at the versions the release was tested with. The list is `PACKAGES` in `kpi_store/setup_check.py`, plus `uv`, which the check script uses.
 
    ```powershell run=scratch os=windows status-only
-   py -m pip install rdflib==7.6.0 pyshacl==0.40.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 uv
+   py -m pip install rdflib==7.6.0 pyshacl==0.40.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 openpyxl==3.1.5 uv
    ```
 
    The last line starts with `Successfully installed` and names the packages.
@@ -240,7 +240,7 @@ When the sign-in expires later, a run fails at its first Databricks step. Run th
 
    ```text expect
    ok   python              Python <version>
-   ok   packages            rdflib 7.6.0, pyshacl 0.40.2, pyoxigraph 0.5.13, neo4j 6.4.1, databricks-sdk 0.164.0, sqlglot 30.31.0, pyyaml 6.0.3
+   ok   packages            rdflib 7.6.0, pyshacl 0.40.2, pyoxigraph 0.5.13, neo4j 6.4.1, databricks-sdk 0.164.0, sqlglot 30.31.0, pyyaml 6.0.3, openpyxl 3.1.5
    ok   local-settings      <your local settings file>, outside the release folder
    ok   kpi-store-settings  <your settings file with its schema and volume and SQL warehouse>
    ok   java                Java <version and where it is>
@@ -418,7 +418,7 @@ decided: <the kind of each row that now has your role>
 
 The second run is the same command. It finds the cleared report and hands it to the cut tool. The cut tool shows its plan and asks you two things. After the cut, the run goes on by itself through every load.
 
-**The cut changes the release folder.** It writes `data-product` `1.2.1-correction.1`, and a correction version of each module that requires it: `logical-model`, `technical-graph`, `value-stream` and `integration`. It works in a temporary copy first. Your folder changes only after every step of the cut has passed.
+**The cut changes the release folder.** It writes `data-product` `1.2.1-correction.1`, and a correction version of each module that requires it: `logical-model`, `technical-graph`, `value-stream` and `integration`. It also rebuilds the KPI intake pack in `kpi-intake`, so that the pack's pick lists name the new versions. It works in a temporary copy first. Your folder changes only after every step of the cut has passed.
 
 1. Run the same command again. It takes about 40 minutes.
 
@@ -584,7 +584,7 @@ The commands below ran after the third run, so each finds its work done.
 
 It calls the cut tool, `kpi_store/cut.py`, when a cleared report waits in `runs\pending`. The cut tool reads the report and your decisions, shows its plan, and asks you to approve. It then changes the tables of the `data-product` module, rebuilds the module, and writes the correction version of it and of each module that requires it. It works in a temporary copy and changes the release folder only when every step has passed.
 
-It reads `runs\pending\discovery-report.json` and `discovery-report.to-clear.csv`. It writes new packages under `business_architecture\ontology\releases`, and the record of the cut under `business_architecture\ontology\discovery-runs`. With no report waiting, it does nothing.
+It reads `runs\pending\discovery-report.json` and `discovery-report.to-clear.csv`. It writes new packages under `business_architecture\ontology\releases`, the record of the cut under `business_architecture\ontology\discovery-runs`, and the rebuilt KPI intake pack under `kpi-intake`. With no report waiting, it does nothing.
 
 ```powershell run=first-run
 py -m kpi_store.runner --only cut
@@ -598,7 +598,7 @@ the steps that ran passed; left out: <the other steps> (not run, so not checked)
 
 ### `check`
 
-It runs `scripts/check.sh` with bash. The script rebuilds every package and compares it with the one on disk. It runs the competency questions and every test. It checks that the generated pages equal their sources and that every code block of the documents works.
+It runs `scripts/check.sh` with bash. The script rebuilds every package and compares it with the one on disk. It runs the competency questions and every test. It checks that the generated pages equal their sources and that every code block of the documents works. After a cut it reads the code blocks and runs none, because their examples show the release as shipped. `scripts/DOC-SNIPPETS.md` explains this under "The release the examples describe".
 
 It reads the release folder. It writes only `check.log` in the run's folder. It took about 10 minutes on a Mac and 21 minutes on a Windows machine with 4 cores.
 
