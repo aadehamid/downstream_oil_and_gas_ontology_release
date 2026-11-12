@@ -6,7 +6,7 @@ import hashlib
 import re
 import tomllib
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = ROOT / "scripts" / "doc_snippets.toml"
@@ -63,6 +63,13 @@ class Registry:
     sha256: str = ""            # that file's digest when the examples were last brought up to date
 
 
+def _not_inside(name):
+    """True when a path of the registry is absolute or climbs out, on either system: on Windows "/x" has no drive,
+    so Path.is_absolute alone would let it through."""
+    return (PurePosixPath(name).is_absolute() or PureWindowsPath(name).is_absolute() or name.startswith(("/", "\\"))
+            or ".." in PureWindowsPath(name).parts)
+
+
 def load_registry(path: Path = REGISTRY) -> Registry:
     with path.open("rb") as f:
         data = tomllib.load(f)
@@ -95,7 +102,7 @@ def load_registry(path: Path = REGISTRY) -> Registry:
     describes = dict(data.get("describes", {}))
     if "describes" in data:
         name, digest = describes.get("file"), describes.get("sha256")
-        if set(describes) != {"file", "sha256"} or not isinstance(name, str) or not name or Path(name).is_absolute():
+        if set(describes) != {"file", "sha256"} or not isinstance(name, str) or not name or _not_inside(name):
             raise RegistryError(f"{path.name}: [describes] needs file, a path relative to the release's top folder, and sha256")
         if not isinstance(digest, str) or not SHA256.fullmatch(digest):
             raise RegistryError(f"{path.name}: [describes] sha256 must be 64 hexadecimal digits in lower case")

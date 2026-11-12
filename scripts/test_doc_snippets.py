@@ -435,6 +435,8 @@ def test_describe_release_says_whether_the_digest_is_this_releases_and_writes_it
 def test_a_describes_table_needs_a_relative_file_and_a_digest(tmp_path):
     path = tmp_path / "r.toml"
     for table, why in (('file = "catalog.ttl"\n', "needs file"), ('file = "/catalog.ttl"\nsha256 = "' + "0" * 64 + '"\n', "needs file"),
+                       ('file = "C:/catalog.ttl"\nsha256 = "' + "0" * 64 + '"\n', "needs file"),
+                       ('file = "../catalog.ttl"\nsha256 = "' + "0" * 64 + '"\n', "needs file"),
                        ('file = "catalog.ttl"\nsha256 = "ABC"\n', "sha256 must be 64 hexadecimal digits"),
                        ('file = "catalog.ttl"\nsha256 = "' + "0" * 64 + '"\nmore = 1\n', "needs file")):
         path.write_text("[describes]\n" + table, encoding="utf-8", newline="\n")
