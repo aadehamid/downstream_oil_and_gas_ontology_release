@@ -218,5 +218,6 @@ Keep the lists in step with the ontology:
 - A list with `hide` offers every new entry of the ontology as soon as the pack is rebuilt.
 - A list uses `keep_only`, or `hide` and `hide_tiers`, never both.
 - When you have added an entry to the ontology under the same label, rebuild. Leave the entry under `add` for now: the forms offer the ontology's entry only, and an answer that a form in progress saved under the added entry is read as the ontology's. The list above then names the entry. Remove it from `add` once no form in progress uses it. After that, such an answer no longer checks.
-- The build stops when `add` names an entry that `hide` hides, or when two added entries share a label.
+- The build stops when `add` names an entry that `hide` names, when an added entry matches more than one entry, or when two added entries share a label.
+- One rule reads every saved answer: a saved value names an entry when it is the entry's id, an id your settings once added it under, its label of today or a label it had before, with or without the mark of a hidden or a new entry.
 - `KNOWN-OPEN-ITEMS.md` lists the changes to the ontology that these settings stand in for.

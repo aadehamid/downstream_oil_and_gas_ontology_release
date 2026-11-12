@@ -663,6 +663,10 @@ def alias(s):
     data = json.loads(held)
     gained = "https://example.org/system/sharepoint"
     data["lists"]["systems"] = [i for i in data["lists"]["systems"] if i["id"] != "new:sharepoint"] + [{"id": gained, "label": "SharePoint", "aliases": ["new:sharepoint"]}]
+    # A second entry in another state: the ontology gained it, the settings show it under another label, and
+    # keep_only does not name it, so it is hidden. The build writes these marks (picklists.apply_settings).
+    renamed = "https://example.org/system/price-desk"
+    data["lists"]["systems"].append({"id": renamed, "label": "Price Desk System", "was": ["Price Desk"], "aliases": ["new:price-desk"], "hidden": True})
     folder = Path(tempfile.mkdtemp())
     copy = folder / "kpi-intake-form.html"
     copy.write_text(head + '<script id="intake-data" type="application/json">' + json.dumps(data).replace("<", "\\u003c").replace("&", "\\u0026") + "</script>" + tail, encoding="utf-8")
@@ -688,6 +692,22 @@ def alias(s):
     page.reload()
     same(page.locator("#status").inner_text(), 'Your unsaved draft was restored from this browser. "SharePoint" is now in the ontology; the answer was read as that entry.', "the status line of the draft")
     same(card(page, "7.4").locator(".picker-chosen .chosen-label").all_inner_texts(), ["SharePoint"], "the draft's answer")
+    # The one rule (rules.py), value by value: each stored value is read as the entry's id of today.
+    for stored, entry in (("new:sharepoint", gained), ("SharePoint (new, not yet in the ontology)", gained), ("SharePoint", gained), (gained, gained),
+                          ("new:price-desk", renamed), ("Price Desk (new, not yet in the ontology)", renamed), ("Price Desk", renamed),
+                          ("Price Desk System (hidden in this organization's settings)", renamed), ("@not-in-list", "@not-in-list"),
+                          ("a system nobody knows", "a system nobody knows")):
+        page.evaluate("""stored => { const d = JSON.parse(localStorage.getItem('kpi-intake-draft-1')); d.state['kpi-intake'].answers['7.4'] = [stored];
+                         localStorage.setItem('kpi-intake-draft-1', JSON.stringify(d)); }""", stored)
+        page.reload()
+        with page.expect_download() as download:
+            page.locator("#save").click()
+        same(json.loads(Path(download.value.path()).read_text(encoding="utf-8"))["answers"]["7.4"], [entry], f"the draft value {stored!r}, saved again")
+    # The hidden entry is shown while an answer holds it, and is not offered otherwise.
+    page.evaluate("""stored => { const d = JSON.parse(localStorage.getItem('kpi-intake-draft-1')); d.state['kpi-intake'].answers['7.4'] = [stored];
+                     localStorage.setItem('kpi-intake-draft-1', JSON.stringify(d)); }""", "new:price-desk")
+    page.reload()
+    same(card(page, "7.4").locator(".picker-chosen .chosen-label").all_inner_texts(), ["Price Desk System (hidden in this organization's settings)"], "the hidden entry a draft holds")
     same(errors, [], "errors on the page")
     context.close()
 

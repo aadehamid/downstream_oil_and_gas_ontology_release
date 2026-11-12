@@ -857,17 +857,39 @@ function loadDraft() {
   return "ok";
 }
 
-// An answer that names an entry the settings once added, and the ontology has since gained, is read as the
-// ontology's entry. Returns the labels of the entries read this way.
+// How a stored value finds its entry: the one rule of kpi_store/intake/rules.py. A value names an entry when it is
+// the entry's id, an id the settings once added it under, its label of today or a label it had before, and a label
+// counts with or without the mark of a hidden or of a new entry. The map gives [the entry's id, gained], where
+// gained says the value was stored while the entry was only an addition of the settings.
+function resolverOf(q) {
+  const map = new Map();
+  const items = DATA.lists[q.source];
+  for (const item of items) map.set(item.id, [item.id, false]);
+  for (const item of items) {
+    const plain = item.added ? item.label.replace(DATA.added_mark, "") : item.label;
+    const gained = (item.aliases || []).length > 0;
+    for (const name of [plain].concat(item.was || [])) {
+      for (const mark of ["", DATA.hidden_mark, DATA.added_mark]) if (!map.has(name + mark)) map.set(name + mark, [item.id, gained && mark === DATA.added_mark]);
+    }
+    for (const alias of item.aliases || []) if (!map.has(alias)) map.set(alias, [item.id, true]);
+  }
+  return map;
+}
+// Reads each stored answer of a form on a list the settings can change as its entry's id of today. Returns the
+// labels of the entries that were stored under an addition the ontology has since gained.
 function readAliases(form) {
   const found = [];
   const answers = state[form].answers;
   for (const q of questionsOf(form)) {
-    if (!isChoice(q) || q.source.includes(":") || !(q.id in answers)) continue;
-    const known = {};
-    for (const item of DATA.lists[q.source]) for (const alias of item.aliases || []) known[alias] = item;
-    if (!Object.keys(known).length) continue;
-    const swap = (v) => { if (!known[v]) return v; found.push(known[v].label); return known[v].id; };
+    if (!isChoice(q) || !(q.source in DATA.added_modules) || !(q.id in answers)) continue;
+    const known = resolverOf(q);
+    const labels = Object.fromEntries(DATA.lists[q.source].map((i) => [i.id, i.label]));
+    const swap = (v) => {
+      if (typeof v !== "string" || v.startsWith("@") || !known.has(v)) return v;
+      const [id, gained] = known.get(v);
+      if (gained) found.push(labels[id]);
+      return id;
+    };
     const held = answers[q.id];
     answers[q.id] = Array.isArray(held) ? held.map(swap).filter((v, i, all) => q.per || all.indexOf(v) === i) : swap(held);
   }

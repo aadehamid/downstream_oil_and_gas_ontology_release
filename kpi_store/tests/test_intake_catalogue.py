@@ -226,7 +226,8 @@ def test_a_hidden_entry_is_not_offered_and_an_added_entry_is_offered_marked_new(
         ({"roles": {"hide": ["Billing Clark"]}}, "`hide` names 'Billing Clark', which is no entry of the list"),
         ({"systems": {"keep_only": ["Ledger"]}}, "`keep_only` names 'Ledger'"),
         ({"sources": {"hide_tiers": ["folklore"]}}, "`hide_tiers` names 'folklore', which is no tier"),
-        ({"roles": {"hide": ["Stock Planner"], "add": [{"id": "planner", "label": "stock planner"}]}}, "the settings both hide and add 'stock planner'"),
+        ({"roles": {"hide": ["Stock Planner"], "add": [{"id": "stock", "label": "stock planner"}]}}, "`hide` hides 'Stock Planner' and `add` adds it"),
+        ({"roles": {"add": [{"id": "clerk", "label": "Stock Planner"}]}}, "the added entry 'Stock Planner' matches 2 entries of the list"),
         ({"roles": {"add": [{"id": "a", "label": "Night Planner"}, {"id": "b", "label": "night planner "}]}}, "two added entries have the label"),
     ):
         with pytest.raises(catalogue.CatalogueError) as error:
@@ -240,7 +241,7 @@ def test_an_added_entry_the_ontology_has_gained_becomes_an_alias_and_is_not_offe
     built = picklists.apply_settings(made_up.data(), {"roles": {"add": [{"id": "billing-clerk", "label": "Billing Clerk"}]}})
     question = cat.by_id["6.1"]
     assert [o["label"] for o in rules.options(cat, built["lists"], question)] == ["Billing Clerk", "Stock Planner", "A role that is not in the list"]
-    assert rules.aliases(built["lists"], question) == {"new:billing-clerk": next(r for r in built["lists"]["roles"] if r["id"] == made_up.ROLE_CLERK)}
+    assert rules.resolver(cat, built["lists"], question)["new:billing-clerk"] == (made_up.ROLE_CLERK, True)
     assert not any(r.get("added") for r in built["lists"]["roles"])
 
 
@@ -271,7 +272,7 @@ def test_an_entry_can_be_shown_under_a_label_of_the_settings_and_is_still_found_
     gained = made_up.data()
     gained["lists"]["roles"].append({"id": made_up.X + "role/night", "label": "Night Planner", "group": "Role register"})
     both = picklists.apply_settings(gained, {"roles": {"add": [{"id": "night", "label": "Night Shift Planner"}], "labels": {"Night Planner": "Night Shift Planner"}}})
-    assert rules.aliases(both["lists"], question)["new:night"]["id"] == made_up.X + "role/night"
+    assert rules.resolver(cat, both["lists"], question)["new:night"] == (made_up.X + "role/night", True)
     assert workbook.label_ids(cat, both["lists"], question)["Night Shift Planner (new, not yet in the ontology)"] == "new:night"
     # A label that two entries would share, and a name that matches no entry, stop the build.
     for change, message in (({"roles": {"labels": {"planner": "Billing Clerk"}}}, "`labels` gives two entries the label"),
@@ -279,3 +280,95 @@ def test_an_entry_can_be_shown_under_a_label_of_the_settings_and_is_still_found_
         with pytest.raises(catalogue.CatalogueError) as error:
             picklists.apply_settings(made_up.data(), change)
         assert message in str(error.value)
+
+
+NIGHT = made_up.X + "role/night"
+
+
+def _state(name):
+    """The made-up lists in one state of one role, "Night Planner", and the id every stored value must be read as."""
+    from kpi_store.intake import picklists
+    add = [{"id": "night", "label": "Night Planner"}]
+    data = made_up.data()
+    in_ontology = {"id": NIGHT, "label": "Night Planner", "group": "Role register"}
+    if name == "added":                      # the settings add it; the ontology does not hold it
+        return picklists.apply_settings(data, {"roles": {"add": add}})["lists"], "new:night"
+    data["lists"]["roles"].append(in_ontology)
+    settings = {
+        "kept": {},
+        "hidden": {"roles": {"hide": ["Night Planner"]}},
+        "relabelled": {"roles": {"labels": {"night": "Planner of the night shift"}}},
+        "gained": {"roles": {"add": add}},
+        "gained and relabelled": {"roles": {"add": add, "labels": {"night": "Planner of the night shift"}}},
+        "gained and not kept": {"roles": {"add": add, "keep_only": ["Stock Planner"]}},
+        "gained, relabelled and not kept": {"roles": {"add": add, "keep_only": ["planner"], "labels": {NIGHT: "Planner of the night shift"}}},
+    }[name]
+    return picklists.apply_settings(data, settings)["lists"], NIGHT
+
+
+STORED = {       # state: the values an answers file, a draft or a workbook cell may hold for the entry
+    "added": ["new:night", "Night Planner (new, not yet in the ontology)", "Night Planner"],
+    "kept": [NIGHT, "Night Planner"],
+    "hidden": [NIGHT, "Night Planner", "Night Planner (hidden in this organization's settings)"],
+    "relabelled": [NIGHT, "Night Planner", "Planner of the night shift"],
+    "gained": [NIGHT, "new:night", "Night Planner", "Night Planner (new, not yet in the ontology)"],
+    "gained and relabelled": [NIGHT, "new:night", "Night Planner", "Night Planner (new, not yet in the ontology)", "Planner of the night shift",
+                              "Planner of the night shift (new, not yet in the ontology)"],
+    "gained and not kept": [NIGHT, "new:night", "Night Planner", "Night Planner (new, not yet in the ontology)",
+                            "Night Planner (hidden in this organization's settings)"],
+    "gained, relabelled and not kept": [NIGHT, "new:night", "Night Planner (new, not yet in the ontology)",
+                                        "Planner of the night shift (hidden in this organization's settings)"],
+}
+
+
+@pytest.mark.parametrize("state, stored", [(state, value) for state, values in STORED.items() for value in values])
+@pytest.mark.parametrize("kind", ["json", "xlsx"])
+def test_a_stored_value_finds_its_entry_by_one_rule(cat, tmp_path, state, stored, kind):
+    """The table of rules.py's one rule: each state of an entry, each value that may have been stored for it, read
+    from an answers file and from a workbook cell. Every one is read as the entry's id of today, and the check
+    passes. The same table is proved in the browser for a loaded file and a draft (browser_check.py, proof 21)."""
+    from openpyxl import load_workbook
+    from kpi_store.intake import answers, check, workbook
+    lists, expected = _state(state)
+    data = dict(made_up.data(), lists=lists)
+    question = cat.by_id["6.1"]
+    assert rules.resolver(cat, lists, question)[stored][0] == expected
+    if kind == "json":
+        if not stored.startswith(("new:", made_up.X)):
+            pytest.skip("an answers file stores an id; a label is what a workbook stores")
+        path = tmp_path / "filled.json"
+        path.write_text(answers.dumps(made_up.intake(change={"6.1": [stored]})), encoding="utf-8", newline="\n")
+    else:
+        path = tmp_path / "filled.xlsx"
+        workbook.save(workbook.build(cat, lists, {}, made_up.intake()), path)
+        book = load_workbook(path)
+        sheet = book[workbook.sheet_title(cat.section("6"))]
+        cell = next(row[workbook.ANSWER_COLUMN - 1] for row in sheet.iter_rows() if row[workbook.KEY_COLUMN - 1].value == "6.1#1")
+        cell.value = stored          # what a workbook filled under earlier settings holds
+        book.save(path)
+    report = check.check(cat, data, answers.read(path, cat, lists))
+    assert report.complete, report.text()
+    said = "is now in the ontology; the answer was read as that entry." in report.text()
+    assert said == (state.startswith("gained") and ("new" in stored.split(made_up.X)[0])), report.text()
+    assert ("To add to the ontology first" in report.text()) == (state == "added")
+    assert ("is hidden in this organization's settings" in report.text()) == (state in ("hidden", "gained and not kept", "gained, relabelled and not kept"))
+
+
+def test_an_added_entry_is_matched_to_a_gained_entry_that_the_settings_relabelled_or_do_not_keep(cat):
+    question = cat.by_id["6.1"]
+    # Relabelled: the add entry still has the ontology's label. It becomes an alias; no second "new" entry appears.
+    lists, _ = _state("gained and relabelled")
+    assert [r["id"] for r in lists["roles"] if r.get("added")] == []
+    assert next(r for r in lists["roles"] if r["id"] == NIGHT)["aliases"] == ["new:night"]
+    assert [o["label"] for o in rules.options(cat, lists, question)] == ["Billing Clerk", "Planner of the night shift", "Stock Planner", "A role that is not in the list"]
+    # Not kept: the build goes on, the entry is an alias and stays hidden.
+    lists, _ = _state("gained and not kept")
+    night = next(r for r in lists["roles"] if r["id"] == NIGHT)
+    assert night["hidden"] is True and night["aliases"] == ["new:night"]
+    assert "Night Planner" not in [o["label"] for o in rules.options(cat, lists, question)]
+    # An entry the ontology gained under another label is matched by the last part of its id.
+    from kpi_store.intake import picklists
+    data = made_up.data()
+    data["lists"]["roles"].append({"id": NIGHT, "label": "Night Shift Planner", "group": "Role register"})
+    lists = picklists.apply_settings(data, {"roles": {"add": [{"id": "night", "label": "Night Planner"}]}})["lists"]
+    assert rules.resolver(cat, lists, question)["Night Planner (new, not yet in the ontology)"] == (NIGHT, True)

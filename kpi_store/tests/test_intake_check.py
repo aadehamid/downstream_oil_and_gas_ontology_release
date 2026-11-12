@@ -396,7 +396,7 @@ def test_an_answer_saved_under_an_added_entry_is_read_as_the_entry_the_ontology_
     assert "To add to the ontology first" not in report.text() and "Not in the ontology" not in report.text()
     assert "Roles: 1 of the chosen roles are in the role register." in report.text()        # read as the register's role
     # An answer that holds both the old id and the new one is one answer.
-    both = check._read_aliases(cat, after["lists"], made_up.intake(change={"6.1": [night, "new:night-planner"]}))[0]
+    both = check._resolve(cat, after["lists"], made_up.intake(change={"6.1": [night, "new:night-planner"]}))[0]
     assert both.answers["6.1"] == [night]
     # Once the entry is removed from `add`, the old answer is unknown again, as the Architect's page says.
     report = check.check(cat, gained, made_up.intake(change={"6.1": ["new:night-planner"]}))
@@ -422,15 +422,21 @@ def test_the_reports_of_two_forms_of_one_workbook_do_not_share_a_file(tmp_path, 
     assert main(["check", str(book), "--report"]) == 0
     assert main(["check", str(book), "--form", "domain-activation", "--report"]) == 1
     out = capsys.readouterr().out
-    first, second = tmp_path / "crack-spreads-pricing.kpi-intake.check.txt", tmp_path / "crack-spreads-pricing.kpi-intake.domain-activation.check.txt"
+    first, second = tmp_path / "crack-spreads-pricing.kpi-intake.workbook.check.txt", tmp_path / "crack-spreads-pricing.kpi-intake.domain-activation.workbook.check.txt"
     assert first.read_text(encoding="utf-8").startswith("KPI intake check: Crack Spreads Pricing\n")
     assert second.read_text(encoding="utf-8").startswith("Domain activation check: ")
-    assert "The report is also in crack-spreads-pricing.kpi-intake.domain-activation.check.txt, beside the file.\n" in out
+    assert "The report is also in crack-spreads-pricing.kpi-intake.domain-activation.workbook.check.txt, beside the file.\n" in out
+    # An answers file of the same KPI, beside the workbook, has a report of its own.
+    paired = tmp_path / "crack-spreads-pricing.kpi-intake.json"
+    shutil.copy(catalogue.PACK / "examples" / "crack-spreads-pricing.json", paired)
+    assert main(["check", str(paired), "--report"]) == 0
+    assert report_path(paired) != report_path(book) and report_path(paired).is_file() and first.is_file()
+    assert len(list(tmp_path.glob("*.check.txt"))) == 3
     # The rule: a JSON file holds one form and keeps its name; a workbook's report names the form.
     assert report_path("x.kpi-intake.json").name == "x.kpi-intake.check.txt"
     assert report_path("x.domain-activation.json", "domain-activation").name == "x.domain-activation.check.txt"
-    assert report_path("margin.xlsx").name == "margin.kpi-intake.check.txt"
-    assert report_path("margin.xlsx", "process-map-request").name == "margin.process-map-request.check.txt"
+    assert report_path("margin.xlsx").name == "margin.kpi-intake.workbook.check.txt"
+    assert report_path("margin.xlsx", "process-map-request").name == "margin.process-map-request.workbook.check.txt"
 
 
 def test_a_report_that_cannot_be_written_says_so(tmp_path, capsys, monkeypatch):
@@ -441,3 +447,11 @@ def test_a_report_that_cannot_be_written_says_so(tmp_path, capsys, monkeypatch):
     (tmp_path / "crack-spreads-pricing.kpi-intake.check.txt").mkdir()        # a folder where the report would go
     assert main(["check", str(filled), "--report"]) == 2
     assert "stopped: the report could not be written to " in capsys.readouterr().err
+
+
+def test_a_release_folder_without_its_packages_is_a_tool_error_in_words(tmp_path, capsys):
+    # Exit 1 means "the form is not complete". A release that cannot be read is exit 2, with no traceback.
+    example = catalogue.PACK / "examples" / "crack-spreads-pricing.json"
+    assert main(["check", str(example), "--root", str(tmp_path)]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("stopped: ") and "Traceback" not in err and len(err.strip().splitlines()) == 1

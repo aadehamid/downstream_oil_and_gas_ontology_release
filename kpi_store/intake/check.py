@@ -275,19 +275,22 @@ def _sign_off(cat, intake, report, consult, conflict):
     report.say()
 
 
-def _read_aliases(cat, lists, intake):
-    """The intake with each answer that names an added entry the ontology has since gained read as the ontology's
-    entry, and a sentence for each such answer. The file itself is not changed."""
+def _resolve(cat, lists, intake):
+    """The intake with each answer on a list the settings can change read as its entry's id of today, by the one
+    rule of rules.py, and a sentence for each answer stored under an addition the ontology has since gained. The
+    file itself is not changed."""
     answers, notes = dict(intake.answers), []
     for question in cat.questions_of(intake.form):
-        known = rules.aliases(lists, question) if question["type"] in CHOICE_TYPES else {}
-        if not known or question["id"] not in answers:
+        if question["type"] not in CHOICE_TYPES or question.get("source") not in SETTINGS_LISTS or question["id"] not in answers:
             continue
-        held, read = rules.positions(answers, question["id"]), []
-        for value in held:
-            if value in known:
-                notes.append(f'{question["id"]}: "{known[value]["label"]}" is now in the ontology; the answer was read as that entry.')
-                value = known[value]["id"]
+        known = rules.resolver(cat, lists, question)
+        labels = {item["id"]: item["label"] for item in lists[question["source"]]}
+        read = []
+        for value in rules.positions(answers, question["id"]):
+            if value in known and not value.startswith("@"):
+                value, gained = known[value]
+                if gained:
+                    notes.append(f'{question["id"]}: "{labels[value]}" is now in the ontology; the answer was read as that entry.')
             if value not in read or "per" in question:
                 read.append(value)
         answers[question["id"]] = rules.as_answer(question, read)
@@ -299,7 +302,7 @@ def check(cat, data, intake, stale=None):
     newer than the lists."""
     lists, terms = data["lists"], data.get("terms", [])
     report = Report()
-    intake, renamed = _read_aliases(cat, lists, intake)
+    intake, renamed = _resolve(cat, lists, intake)
     first = "2.1" if intake.form == "kpi-intake" else cat.questions_of(intake.form)[0]["id"]
     name = intake.kpi_name or "; ".join(rules.values(intake.answers, first)[:2])
     report.say(f'{FORMS[intake.form]} check: {name or "(no name yet)"}')

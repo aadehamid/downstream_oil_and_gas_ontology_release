@@ -479,6 +479,28 @@ def test_the_folders_command_refuses_a_link_and_changes_nothing(tmp_path, capsys
     assert (place / "KPI-intake" / "the-form" / "kpi-intake-form.html").is_file()
 
 
+def test_a_build_that_cannot_write_a_file_says_so_and_how_to_repair_the_pack(copy, capsys, monkeypatch):
+    def refuse(*args, **kwargs):
+        raise PermissionError(13, "Permission denied")
+    main(["build", "--pack", str(copy)])
+    capsys.readouterr()
+    path = copy / "catalogue.toml"
+    text = path.read_text(encoding="utf-8")
+    path.write_text(text.replace('text = "What do you call this KPI?"', 'text = "What is the KPI called?"'), encoding="utf-8", newline="\n")
+    monkeypatch.setattr(workbook, "save", refuse)         # as when the workbook is open in Excel
+    try:
+        assert main(["build", "--pack", str(copy)]) == 2
+        err = capsys.readouterr().err
+        assert err.startswith("stopped: the build could not read or write a file: ") and "Traceback" not in err
+        assert "may already be new" in err and "run the build again: it repairs the pack" in err
+    finally:
+        monkeypatch.undo()
+        path.write_text(text, encoding="utf-8", newline="\n")
+        assert main(["build", "--pack", str(copy)]) == 0          # running it again repairs the pack
+        assert main(["build", "--check", "--pack", str(copy)]) == 0
+        capsys.readouterr()
+
+
 def test_a_failure_to_make_the_folders_is_not_called_a_report_failure(tmp_path, capsys, monkeypatch):
     def refuse(*args, **kwargs):
         raise PermissionError(13, "Permission denied")
@@ -497,6 +519,14 @@ def test_the_architects_page_names_an_added_entry_the_ontology_has_gained(cat):
     settings.pick_lists = {"systems": {"add": [{"id": "sharepoint", "label": "SharePoint"}]}}
     built = picklists.apply_settings(data, settings.pick_lists)
     text = "\n".join(build.lists_text(settings, built["lists"]))
+    # Not named by keep_only: the page says the entry is in the ontology, why it is not offered, and how to offer it.
+    kept = copies.copy(cat)
+    kept.pick_lists = {"systems": {"add": [{"id": "sharepoint", "label": "SharePoint"}], "keep_only": ["Stock Ledger"]}}
+    data2 = made_up.data()
+    data2["lists"]["systems"].append({"id": made_up.X + "sys/sharepoint", "label": "SharePoint"})
+    text2 = "\n".join(build.lists_text(kept, picklists.apply_settings(data2, kept.pick_lists)["lists"]))
+    assert "- `systems`: SharePoint is in the ontology and is not offered, because `keep_only` does not name it. Add its name to `keep_only` to offer it." in text2
+    assert "- `systems`: the ontology now holds SharePoint." in text2
     assert ("- `systems`: the ontology now holds SharePoint. The entry under `add` is no longer offered a second time. An answer saved under it "
             "is read as the ontology's entry, and the check says so. Remove the entry from `add` once no form in progress uses it.") in text
     assert "| `systems` | 7.4 | 2 of 2 | 0 | None |" in text and c.ADDED_MARK not in text.split("Keep the lists")[0].split("|---|")[1]

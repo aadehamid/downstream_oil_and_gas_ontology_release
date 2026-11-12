@@ -421,7 +421,7 @@ KPI-intake is ready</pre>
     <p>Run the command again when the form changes. It replaces the three files in <span class="file">the-form</span> and changes nothing in the numbered folders. You can also make the folders by hand.</p>
 
     <h3>Check a file</h3>
-    <p>This is the check of the example that ships with the release. <code>--report</code> also writes the report beside the file, under the same name with <span class="file">.check.txt</span> in place of <span class="file">.json</span>. For a workbook the name ends with <span class="file">.kpi-intake.check.txt</span>.</p>
+    <p>This is the check of the example that ships with the release. <code>--report</code> also writes the report beside the file, under the same name with <span class="file">.check.txt</span> in place of <span class="file">.json</span>. For a workbook the name ends with <span class="file">.kpi-intake.workbook.check.txt</span>.</p>
     <pre data-snippet="powershell run=release-copy">py -m kpi_store.intake check kpi-intake/examples/crack-spreads-pricing.json --report</pre>
     <pre class="out" data-snippet="text expect">KPI intake check: Crack Spreads Pricing
 ...

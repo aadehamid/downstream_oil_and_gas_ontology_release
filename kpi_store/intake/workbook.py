@@ -106,7 +106,7 @@ def build(cat, lists, examples=None, intake=None, others=None):
 
     def label_of(question, value):
         offered = {o["id"]: o["label"] for o in rules.options(cat, lists, question, hidden=True)}
-        return offered.get(value) or rules.aliases(lists, question).get(value, {}).get("label", value)
+        return offered.get(value) or offered.get(rules.resolver(cat, lists, question).get(value, ("",))[0], value)
 
     def section_rows(ws, row, section, held):
         """The rows of one section, from `row` on. Returns the next free row."""
@@ -293,25 +293,10 @@ def same_content(path, wb):
 
 
 def label_ids(cat, lists, question):
-    """{label: id} for every label a cell of this question may hold. A workbook filled before the settings changed
-    holds the label of that time, so an entry is known by its label with and without its mark: the plain label of
-    an entry that is hidden now, and the "new" label of an entry the ontology has since gained."""
-    ids = {}
-    offered = rules.options(cat, lists, question, hidden=True)
-    for option in offered:
-        ids[option["label"]] = option["id"]
-    for option in offered:
-        for mark in (HIDDEN_MARK, ADDED_MARK):
-            if option["label"].endswith(mark):
-                ids.setdefault(option["label"].removesuffix(mark), option["id"])
-    for alias, item in rules.aliases(lists, question).items():
-        ids.setdefault(item["label"] + ADDED_MARK, alias)
-    # The label an entry had before the settings gave it another, also with the mark of a hidden entry.
-    for item in lists.get(question.get("source", ""), []):
-        for old in item.get("was", []):
-            ids.setdefault(old, item["id"])
-            ids.setdefault(old + HIDDEN_MARK, item["id"])
-    return ids
+    """{text: id} for every text a cell of this question may hold, by the one rule of rules.py. A text stored while
+    the entry was only an addition of the settings gives that added id, so the check can say what it read."""
+    added_id = {item["id"]: item["aliases"][0] for item in lists.get(question.get("source", ""), []) if item.get("aliases")}
+    return {text: added_id[entry] if gained else entry for text, (entry, gained) in rules.resolver(cat, lists, question).items()}
 
 
 def _text(value):

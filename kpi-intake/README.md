@@ -168,7 +168,7 @@ Result: the intake is complete and signed.
 This check changes nothing in the ontology. The Architect applies a complete intake by hand, with HOW-TO-UPDATE.md.
 ```
 
-Add `--report` to also write the report beside the file, under the same name with `.check.txt` in place of `.json`. A workbook holds three forms, so its report also names the form: `rm-margin-per-barrel.xlsx` gives `rm-margin-per-barrel.kpi-intake.check.txt`. The Architect keeps that report with the file in `3-checked`.
+Add `--report` to also write the report beside the file, under the same name with `.check.txt` in place of `.json`. The report of a workbook also says "workbook" and names the form: `rm-margin-per-barrel.xlsx` gives `rm-margin-per-barrel.kpi-intake.workbook.check.txt`. So an answers file and a workbook of one KPI, and two forms of one workbook, never share a report. The Architect keeps that report with the file in `3-checked`.
 
 The check prints, section by section, what is missing and which questions the rules rightly skipped. Then it prints the kind of measure, where an answer routes the request, what it found in the ontology, and who has signed. The last lines give the result.
 
@@ -176,7 +176,7 @@ The check prints, section by section, what is missing and which questions the ru
 |---|---|
 | 0 | The form is complete and signed |
 | 1 | Something is still to settle. The result lists each thing |
-| 2 | The file could not be read |
+| 2 | A tool error: the file, the pack or the release could not be read, or the report could not be written. The message says which |
 
 The check looks for these things in the ontology:
 
@@ -292,9 +292,11 @@ After the build, [`for-the-architect.md`](for-the-architect.md) shows the list a
 | `roles` | 6.1 and P5 | 64 of 65 | 1 | Value Chain Optimization Director |
 ```
 
-A hidden entry stays known. An answers file that already holds it still passes the check, with the note "hidden in this organization's settings". When a form names an added entry, the check tells the Architect to add it to the ontology first. The build stops when a name under `hide` or `keep_only` matches no entry, so a misspelt name cannot go unnoticed. It also stops when `add` names an entry that `hide` hides, or when two added entries share a label.
+A hidden entry stays known. An answers file that already holds it still passes the check, with the note "hidden in this organization's settings". When a form names an added entry, the check tells the Architect to add it to the ontology first. The build stops when a name under `hide` or `keep_only` matches no entry, so a misspelt name cannot go unnoticed. It also stops when `add` names an entry that `hide` names, when an added entry matches more than one entry, or when two added entries share a label.
 
-When the ontology has gained an added entry under the same label, rebuild and leave the entry under `add` for now. The forms then offer the ontology's entry only. An answer that a form in progress saved under the added entry is read as the ontology's entry, and the check says "is now in the ontology; the answer was read as that entry". `for-the-architect.md` names each such entry. Remove it from `add` once no form in progress uses it.
+When the ontology has gained an added entry under the same label, rebuild and leave the entry under `add` for now. The forms then offer the ontology's entry only. An answer that a form in progress saved under the added entry is read as the ontology's entry, and the check says "is now in the ontology; the answer was read as that entry". `for-the-architect.md` names each such entry. Remove it from `add` once no form in progress uses it. The entry is matched by its label, by the label the ontology gives it when your `labels` table shows it under another, or by the last part of its id. When the list uses `keep_only`, add the entry's name there to offer it; until then it is hidden, and saved answers are still read.
+
+One rule reads every saved answer, in an answers file, a browser draft and a workbook: a saved value names an entry when it is the entry's id, an id your settings once added it under, its label of today or a label it had before, with or without the mark of a hidden or a new entry.
 
 Question 6.1 still has the option "A role that is not in the list", which sends the request to a process map request. Use `add` for a role your organization has already decided on, and that option for a role the interview finds.
 

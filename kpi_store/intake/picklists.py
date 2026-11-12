@@ -274,8 +274,11 @@ def apply_settings(built, pick_lists):
     part of its id. `hide_tiers` names the evidence tiers of the sources to hide. `labels` gives an entry the label
     the forms and the check show in place of the ontology's. The entry keeps its id, and its earlier label stays
     known under "was", so a workbook filled before the change still reads. Raises CatalogueError when a name matches no entry of its list, so a
-    misspelt name cannot hide nothing unnoticed, and when an added entry has the label of an entry the same
-    settings hide. An added entry with the label of an entry the list offers becomes an alias of that entry."""
+    misspelt name cannot hide nothing unnoticed. An added entry that matches an entry of the ontology, by the
+    entry's label of today, its ontology label or the last part of its id, becomes an alias of that entry and is
+    not offered a second time. The entry stays hidden when `keep_only` or `hide_tiers` leaves it out. Raises too
+    when an added entry matches several entries, or an entry that `hide` names. rules.py states how a stored
+    value then finds its entry."""
     problems = []
     for name in SETTINGS_LISTS:
         change = pick_lists.get(name) or {}
@@ -290,7 +293,9 @@ def apply_settings(built, pick_lists):
                     problems.append(f"{where}: `{key}` names {w!r}, which is no entry of the list. Write the label as the list shows it, or the id.")
             return {i["id"] for hits in found.values() for i in hits}
 
+        ontology_label = {i["id"]: i["label"] for i in items}
         hidden = matched("hide")
+        named_hidden = set(hidden)       # the entries `hide` names itself
         if change.get("keep_only"):
             kept = matched("keep_only")
             hidden |= {i["id"] for i in items if i["id"] not in kept}
@@ -314,7 +319,6 @@ def apply_settings(built, pick_lists):
         shown = [i["label"].casefold() for i in items]
         for label in sorted({l for l in shown if shown.count(l) > 1}):
             problems.append(f"{where}: `labels` gives two entries the label {label!r}. Each entry needs a label of its own.")
-        held = {i["label"].strip().casefold(): i for i in items}
         taken = set()
         for entry in change.get("add", []):
             key = entry["label"].strip().casefold()
@@ -322,12 +326,23 @@ def apply_settings(built, pick_lists):
                 problems.append(f"{where}: two added entries have the label {entry['label']!r}")
                 continue
             taken.add(key)
-            same = held.get(key)
-            if same is not None and same.get("hidden"):
-                problems.append(f"{where}: the settings both hide and add {entry['label']!r}. Remove one of the two.")
-            elif same is not None:
-                # The ontology has gained this entry. Answers saved under the added id are read as the entry.
-                same["aliases"] = sorted(set(same.get("aliases", [])) | {ADDED + entry["id"]})
+            # The ontology may have gained this entry since it was added: under the same label, under a label the
+            # settings have since changed, or under the same short id.
+            same = [i for i in items if not i.get("added") and (
+                key in {n.strip().casefold() for n in [i["label"], ontology_label[i["id"]]]}
+                or i["id"].rstrip("/").rsplit("/", 1)[-1] == entry["id"])]
+            if len(same) > 1:
+                problems.append(f"{where}: the added entry {entry['label']!r} matches {len(same)} entries of the list: "
+                                + ", ".join(repr(i["label"]) for i in same) + ". Give it a label or an id that only one of them has, or remove it.")
+            elif same and same[0]["id"] in named_hidden:
+                problems.append(f"{where}: `hide` hides {same[0]['label']!r} and `add` adds it. Remove one of the two.")
+            elif same:
+                # Answers saved under the added id, or under its label, are read as the ontology's entry. The entry
+                # keeps what the settings say of it otherwise: it stays hidden when keep_only does not name it.
+                item = same[0]
+                item["aliases"] = sorted(set(item.get("aliases", [])) | {ADDED + entry["id"]})
+                if entry["label"].strip() != item["label"]:
+                    item["was"] = sorted(set(item.get("was", [])) | {entry["label"].strip()})
             else:
                 items.append({"id": ADDED + entry["id"], "label": entry["label"].strip() + ADDED_MARK, "added": True})
         built["lists"][name] = sorted(items, key=lambda item: (item["label"].casefold(), item["id"]))

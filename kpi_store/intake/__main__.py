@@ -10,15 +10,22 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def report_path(file, form=None):
-    """Where `check --report` writes: beside the file, under its name with .check.txt in place of its ending. A
-    workbook holds three forms, so the form's name comes before .check.txt, unless the file's name already ends
-    with it. So two forms of one workbook never share a report."""
+    """Where `check --report` writes: beside the file, under its name with .check.txt in place of its ending. For a
+    workbook the name also says the form, unless the file's name already ends with it, and then "workbook":
+    a workbook holds three forms, and a KPI may have an answers file and a workbook of the same name. So no two
+    checks share a report.
+
+        crack-spreads-pricing.kpi-intake.json   crack-spreads-pricing.kpi-intake.check.txt
+        crack-spreads-pricing.kpi-intake.xlsx   crack-spreads-pricing.kpi-intake.workbook.check.txt
+        the same, --form domain-activation      crack-spreads-pricing.kpi-intake.domain-activation.workbook.check.txt
+    """
     file = Path(file)
     stem = file.stem
     if file.suffix.lower() != ".json":
         form = form or "kpi-intake"
         if not stem.endswith("." + form):
             stem += "." + form
+        stem += ".workbook"
     return file.with_name(stem + ".check.txt")
 
 
@@ -53,7 +60,14 @@ def main(argv=None):
             from kpi_store.intake import build as builder
             from kpi_store.intake.examples import ExampleError
             errors += (builder.BuildError, ExampleError)
-            return builder.main(root, pack, args.check)
+            try:
+                return builder.main(root, pack, args.check)
+            except OSError as e:
+                if args.check:
+                    raise builder.BuildError(f"the pack or the release could not be read: {e}") from None
+                raise builder.BuildError(f"the build could not read or write a file: {e}. Files of the pack that it wrote before this one "
+                                         "may already be new. Settle the cause, such as a workbook that is open in Excel, and run the "
+                                         "build again: it repairs the pack.") from None
         if args.command == "folders":
             from kpi_store.intake import folders as shared
             try:
@@ -65,7 +79,10 @@ def main(argv=None):
             print(f"{top.name} is ready" if done else f"{top.name} is current; nothing was changed")
             return 0
         from kpi_store.intake import check as checker
-        report = checker.run(args.file, pack, args.form, root)
+        try:
+            report = checker.run(args.file, pack, args.form, root)
+        except OSError as e:
+            raise ReleaseError(f"the check could not read the pack, the file or the release folder {root}: {e}") from None
         saved = None
         if args.report:
             saved = report_path(args.file, args.form)
@@ -78,6 +95,9 @@ def main(argv=None):
                 raise AnswersError(f"the report could not be written to {saved}: {e}") from None
     except errors as e:
         print(f"stopped: {e}", file=sys.stderr)
+        return 2
+    except OSError as e:      # the last line of defence: a tool error is never exit 1, which means "not complete"
+        print(f"stopped: the {args.command} command could not read or write a file: {e}", file=sys.stderr)
         return 2
     sys.stdout.write(report.text())
     if saved:

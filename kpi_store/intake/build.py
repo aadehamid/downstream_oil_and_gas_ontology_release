@@ -141,11 +141,15 @@ def lists_text(cat, lists):
         if relabelled:
             detail.append(f"- `{name}` shows {len(relabelled)} {'entry' if len(relabelled) == 1 else 'entries'} under a label of your settings (`labels`): "
                           + "; ".join(_cell(i["label"]) for i in relabelled) + ". The answers file keeps each entry's id.")
-        gained = [(i["label"], alias) for i in items for alias in i.get("aliases", [])]
+        gained = [i for i in items if i.get("aliases")]
         if gained:
-            detail.append(f'- `{name}`: the ontology now holds {", ".join(_cell(label) for label, _ in gained)}. The entry under `add` is no longer offered a second time. '
+            detail.append(f'- `{name}`: the ontology now holds {", ".join(_cell(i["label"]) for i in gained)}. The entry under `add` is no longer offered a second time. '
                           "An answer saved under it is read as the ontology's entry, and the check says so. "
                           "Remove the entry from `add` once no form in progress uses it.")
+        for item in gained:
+            if item.get("hidden"):
+                how = "`keep_only` does not name it. Add its name to `keep_only` to offer it" if change.get("keep_only") else "its evidence tier is hidden"
+                detail.append(f'- `{name}`: {_cell(item["label"])} is in the ontology and is not offered, because {how}.')
         if added:
             detail.append(f'- `{name}` adds: {", ".join(added)}. Each is offered with the mark "{catalogue.ADDED_MARK.strip(" ()")}". '
                           f"When a form names one, the check tells you to add it to the `{module}` module before you apply the KPI.")
@@ -156,7 +160,8 @@ def lists_text(cat, lists):
             "- A list with `hide` offers every new entry of the ontology as soon as the pack is rebuilt.",
             "- A list uses `keep_only`, or `hide` and `hide_tiers`, never both.",
             "- When you have added an entry to the ontology under the same label, rebuild. Leave the entry under `add` for now: the forms offer the ontology's entry only, and an answer that a form in progress saved under the added entry is read as the ontology's. The list above then names the entry. Remove it from `add` once no form in progress uses it. After that, such an answer no longer checks.",
-            "- The build stops when `add` names an entry that `hide` hides, or when two added entries share a label.",
+            "- The build stops when `add` names an entry that `hide` names, when an added entry matches more than one entry, or when two added entries share a label.",
+            "- One rule reads every saved answer: a saved value names an entry when it is the entry's id, an id your settings once added it under, its label of today or a label it had before, with or without the mark of a hidden or a new entry.",
             "- `KNOWN-OPEN-ITEMS.md` lists the changes to the ontology that these settings stand in for.", ""]
     return out
 
