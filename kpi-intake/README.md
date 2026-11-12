@@ -56,15 +56,21 @@ One form is for one KPI.
 3. The Program manager sends [`what-we-will-ask-you.md`](what-we-will-ask-you.md) to the people invited.
 4. The Business analyst opens `kpi-intake-form.html` in a browser, or `kpi-intake-form.xlsx` in Excel.
 5. The Business analyst asks the questions of sections 1 to 6 in order and records each answer. Each question says who answers it and why it is asked, and shows an example answer.
-6. Where a question offers a list, choose from the list. If the right answer is not there, choose "Not in the list". The form then says what happens next.
+6. Where a question offers a list, choose from the list. If the right answer is not there, choose "Not in the list". The form then says what happens next and who does it, and gives a button that opens the smaller form.
 7. Leave a question that does not apply. The HTML form hides it. In the workbook, the "Asked of" column gives each question's rule.
-8. Save the answers. In the HTML form, press "Save answers", which downloads a file such as `days-of-cover.kpi-intake.json`. In Excel, save the workbook under the KPI's name.
+8. Save the answers. In the HTML form, press "Save answers to file", which downloads a file such as `days-of-cover.kpi-intake.json`. In Excel, save the workbook under the KPI's name.
 9. Run the check on the saved file, as "Check a filled form" shows. Settle what it lists.
 10. The Data Owner reads the form and signs the definition. The Domain Owner confirms the domain.
-11. Digital IT fills in section 7 in the same file. To go on in the HTML form, press "Load answers" and choose the saved file.
+11. Digital IT fills in section 7 in the same file. To go on in the HTML form, press "Load answers file" and choose the saved file.
 12. The Architect runs the check again and signs last.
 
-The HTML form keeps an unsaved draft in the browser, so a reload does not lose it. The draft stays on that one machine and browser. The saved file is the record.
+The HTML form keeps an unsaved draft in the browser, so a reload does not lose it. The draft stays on that one machine and browser. The saved file is the record. "Clear this form" asks first, then empties the form in view. It changes no saved file.
+
+Each section's line in the HTML form counts the required answers left, then the optional questions that have no answer. A section whose answer routes the request shows "Routed" and the form the request goes to. The sign-off line counts only the signatures the form needs. The Domain Owner's second signature on the KPI form is needed only when the check finds a conflicting definition, and the form says so.
+
+The request's number, date, requester and invited people are under "Request details" at the top of the form. That part closes to one line once it is filled. Each section's introduction is under "About this section".
+
+The HTML form opens in the light theme. The theme list beside "Version" changes it to dark or to the system's setting, and the browser remembers the choice. A printed form is always light. In a narrow window or at a high zoom, a "View" list replaces the tabs and a "Sections" button opens the section list.
 
 The interview for sections 1 to 6 takes about 50 minutes for a typical KPI:
 
@@ -160,7 +166,9 @@ Three answers send the request somewhere before the KPI can be added. The form s
 | The business area, the process, the step or a role is not in the list (1.1, 1.2, 1.3, 6.1, 6.3) | **Process map request.** Fill in the "Process map request" form. It is smaller, and it is not a domain activation | The Global Process Owner answers and signs. The Architect signs and proposes the change to the process map |
 | The KPI is restricted (3.7) | **Review.** Bring Privacy, Security, Compliance and Risk into the request, and record the date and the outcome in the sign-off block | The Program manager |
 
-The two smaller forms are tabs of the HTML form and sheets of the workbook. Each saves to its own answers file. Check a workbook's sheet by naming the form:
+The two smaller forms are tabs of the HTML form and sheets of the workbook. Each saves to its own answers file. "Load answers file" opens a file in the form it was saved from, whichever tab is open, and says which. It leaves out an answer under a number that form does not ask, and lists it. It refuses a file that is not an answers file, says what is wrong, and keeps the answers on the page.
+
+Check a workbook's sheet by naming the form:
 
 ```powershell run=release-copy exit=1
 py -m kpi_store.intake check kpi-intake/kpi-intake-form.xlsx --form domain-activation
@@ -176,7 +184,7 @@ This check changes nothing in the ontology. The Architect applies a complete int
 
 The blank form has eight required questions and two signatures, so the check lists ten things.
 
-When a domain activation is signed, set that domain to `active = true` in `settings.toml` and rebuild the forms. The KPI form can then go on.
+When a domain activation is signed, set that domain to `active = true` in `settings.toml` and rebuild the forms. The KPI form can then go on. This step is the analyst's. The form keeps it out of the notice that the business reads, under "For the analyst".
 
 ## What happens after
 
@@ -252,7 +260,7 @@ Two builds of the same files write the same bytes for every text file. A workboo
 
 ## The answers file
 
-"Save answers" writes one JSON file for one form. [`answers.schema.json`](answers.schema.json) gives its shape. This is the start of the first example:
+"Save answers to file" writes one JSON file for one form. [`answers.schema.json`](answers.schema.json) gives its shape. This is the start of the first example:
 
 ```json excerpt=kpi-intake/examples/crack-spreads-pricing.json
 {
@@ -273,7 +281,7 @@ Each example is a measure the ontology already holds, filled in as if it were ne
 - Crack Spreads Pricing is a market indicator. The third question of section 4 decides its kind, so the rest are skipped. It has a view, a data product and two value stream steps.
 - R&M Margin per Barrel is an operational metric and a KPI candidate. It answers all the questions of section 4. The ontology names no role, no data product and no view for it.
 
-To see an example in the HTML form, press "Load answers" and choose its `.json` file.
+To see an example in the HTML form, press "Load answers file" and choose its `.json` file.
 
 ## Test the form in a browser
 
@@ -293,5 +301,9 @@ intake  6 save         pass
 intake  7 load file    pass
 intake  8 draft        pass
 intake  9 phone        pass
-the intake form passed all 9 proofs
+intake  10 theme       pass
+intake  11 next step   pass
+intake  12 bad file    pass
+intake  13 other form  pass
+the intake form passed all 13 proofs
 ```

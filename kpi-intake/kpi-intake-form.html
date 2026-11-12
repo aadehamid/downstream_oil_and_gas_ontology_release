@@ -20,89 +20,94 @@
   The look. The window is one tinted frame: the section list on the left and the row of views on top. The form
   lies on a white sheet inside it. The words a person says aloud or signs (each question, each signer's
   statement) are set in the serif face; everything the form itself says is in the sans face. The one hue is on
-  what was answered: the progress bars, the chosen options and the question numbers. The page loads no font,
-  image or style from anywhere, so both faces are system faces.
+  what was answered: the progress bars, the chosen options and the question numbers. The page is read from a
+  projector, so no text of the interview is under 16px. The page loads no font, image or style from anywhere,
+  so both faces are system faces.
+
+  The theme. Both palettes are tokens: the light one on :root, the dark one on :root[data-theme="dark"]. The
+  script sets data-theme from the Theme selector (Light, Dark or System). Print is always light.
 -->
 <style>
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
   /* Colour. The frame is one low step of the accent's hue; the sheet is white. */
-  --frame: #f1f4f5;
+  --frame: #eef2f3;
   --surface: #ffffff;
-  --raised: #f3f5f6;
-  --active: #e3e8ea;
-  --border: #dfe4e7;
-  --rule: #e9edef;
-  --control: #87919a;
+  --raised: #f0f3f5;
+  --active: #dde4e7;
+  --border: #c3ccd1;
+  --rule: #d6dde1;
+  --control: #76828b;
   --ink: #14181b;
-  --muted: #525c65;
+  --muted: #47515a;
   --accent: #1b6c80;
-  --accent-tint: #e4f0f3;
-  --accent-line: #a9cdd6;
+  --accent-tint: #e2eff2;
+  --accent-line: #8fbcc8;
   --primary: #14181b;
   --primary-ink: #ffffff;
-  --stop-bg: #fff6dd;
-  --stop-line: #e2bd5c;
-  --stop-ink: #6a4204;
+  --stop-bg: #fff5d9;
+  --stop-line: #94690a;
+  --stop-ink: #5c3803;
   --focus: #1b6c80;
+  --veil: rgba(20, 24, 27, 0.45);
 
   /* Type. */
   --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
   --font-said: "Iowan Old Style", "Sitka Text", Charter, Cambria, Georgia, serif;
   --fs-body: 16px;
-  --fs-small: 14px;
-  --fs-meta: 13px;
-  --fs-said: 21px;
-  --fs-section: 24px;
-  --fs-title: 28px;
+  --fs-answer: 18px;
+  --fs-said: 24px;
+  --fs-section: 26px;
+  --fs-title: 30px;
 
   /* Space and shape. */
-  --side-width: 304px;
-  --bar: 52px;
+  --side-width: 336px;
+  --dock-h: 248px;
+  --bar: 56px;
   --inset: 8px;
   --pad: 40px;
   --gap: 16px;
-  --hang: 56px;
-  --aside: 300px;
-  --aside-gap: 48px;
+  --hang: 60px;
+  --aside: 320px;
+  --aside-gap: 40px;
   --measure: 1120px;
   --control-height: 44px;
   --radius-sheet: 16px;
   --radius-card: 10px;
   --radius-control: 6px;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --frame: #0c0e0f;
-    --surface: #141718;
-    --raised: #1c2022;
-    --active: #272c2f;
-    --border: #272c2f;
-    --rule: #1f2426;
-    --control: #7b858c;
-    --ink: #f1f3f4;
-    --muted: #a9b2b8;
-    --accent: #6cc3d5;
-    --accent-tint: #12313a;
-    --accent-line: #2a5d6b;
-    --primary: #f1f3f4;
-    --primary-ink: #111415;
-    --stop-bg: #2a2210;
-    --stop-line: #6e5718;
-    --stop-ink: #f3d48c;
-    --focus: #6cc3d5;
-  }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --frame: #0b0d0e;
+  --surface: #15191b;
+  --raised: #20262a;
+  --active: #2f383d;
+  --border: #46525a;
+  --rule: #343e44;
+  --control: #8b96a0;
+  --ink: #f2f4f5;
+  --muted: #b6bfc5;
+  --accent: #6cc3d5;
+  --accent-tint: #143640;
+  --accent-line: #357484;
+  --primary: #f2f4f5;
+  --primary-ink: #111415;
+  --stop-bg: #2c2410;
+  --stop-line: #a8882c;
+  --stop-ink: #f5d896;
+  --focus: #6cc3d5;
+  --veil: rgba(0, 0, 0, 0.6);
 }
 
 /* ---- Base ---------------------------------------------------------------------------------------------------- */
 * { box-sizing: border-box; }
-html { font-size: var(--fs-body); scroll-behavior: smooth; scroll-padding-top: calc(var(--bar) + 16px); scrollbar-gutter: stable; }
+html { font-size: var(--fs-body); scroll-behavior: smooth; scroll-padding-top: calc(var(--bar) + 12px); }
 body { margin: 0; background: var(--frame); color: var(--ink); font-family: var(--font); line-height: 1.5; overflow-wrap: anywhere; -webkit-text-size-adjust: 100%; }
 h1, h2, h3 { line-height: 1.25; margin: 0; }
-h1 { font-size: 1rem; font-weight: 600; }
+h1 { font-size: 1.0625rem; font-weight: 650; }
 h2 { font-size: var(--fs-section); font-weight: 650; letter-spacing: -0.01em; }
-h3 { font-size: 1.0625rem; font-weight: 600; }
+h3 { font-size: 1.125rem; font-weight: 600; }
 p { margin: 0 0 calc(var(--gap) / 2); }
 a { color: var(--accent); }
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -111,190 +116,254 @@ button:hover { background: var(--raised); }
 button:active { background: var(--active); }
 button.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); }
 button.primary:hover, button.primary:active { background: var(--primary); opacity: 0.88; }
-button.quiet { border-color: transparent; background: none; color: var(--muted); }
-button.quiet:hover { background: var(--active); color: var(--ink); }
-button:disabled, button:disabled:hover { background: var(--active); border-color: transparent; color: var(--muted); opacity: 1; cursor: not-allowed; }
-input[type="text"], input[type="search"], input[type="date"], select, textarea { width: 100%; max-width: 100%; min-height: var(--control-height); padding: 9px 12px; border: 1px solid var(--control); border-radius: var(--radius-control); background: var(--surface); }
+button.quiet { border-color: transparent; background: none; color: var(--ink); text-decoration: underline; text-underline-offset: 4px; }
+button.quiet:hover { background: var(--active); }
+button:disabled, button:disabled:hover { background: var(--active); border-color: transparent; color: var(--muted); opacity: 1; text-decoration: none; cursor: not-allowed; }
+input[type="text"], input[type="search"], input[type="date"], select, textarea { width: 100%; max-width: 100%; min-height: var(--control-height); padding: 9px 12px; border: 1px solid var(--control); border-radius: var(--radius-control); background: var(--surface); font-size: var(--fs-answer); }
 input[type="text"]:hover, input[type="search"]:hover, input[type="date"]:hover, select:hover, textarea:hover { border-color: var(--ink); }
-input[type="checkbox"], input[type="radio"] { width: 18px; height: 18px; accent-color: var(--accent); }
-textarea { min-height: 92px; resize: vertical; field-sizing: content; }
+input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; accent-color: var(--accent); }
+textarea { min-height: 96px; resize: vertical; field-sizing: content; }
 ::placeholder { color: var(--muted); opacity: 1; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 [hidden] { display: none !important; }
 .skip { position: absolute; left: 12px; top: -80px; z-index: 9; padding: 10px 14px; border-radius: var(--radius-control); background: var(--primary); color: var(--primary-ink); }
 .skip:focus { top: 12px; }
 
-/* ---- The frame: the section list on the left, the views on top ------------------------------------------------ */
-.side { position: fixed; inset: 0 auto 0 0; width: var(--side-width); display: flex; flex-direction: column; gap: 16px; padding: 18px 16px 16px; }
-.brand { display: grid; grid-template-columns: 26px minmax(0, 1fr); column-gap: 10px; row-gap: 8px; align-items: center; padding: 0 10px; }
+/* A part that opens: a line to press, with a chevron that turns. */
+summary { display: inline-flex; align-items: center; gap: 8px; min-height: var(--control-height); padding: 4px 10px 4px 4px; border-radius: var(--radius-control); font-weight: 600; list-style: none; cursor: pointer; }
+summary::-webkit-details-marker { display: none; }
+summary:hover { background: var(--raised); }
+.chev { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+details[open] > summary .chev { transform: rotate(90deg); }
+
+/* ---- The frame: the section list on the left, the views on top, the file buttons below the list -------------------- */
+.side { position: fixed; inset: 0 auto var(--dock-h) 0; width: var(--side-width); display: flex; flex-direction: column; gap: 12px; padding: 16px 16px 0; }
+.brand { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; column-gap: 10px; row-gap: 2px; align-items: center; padding: 0 8px; }
 .mark { width: 26px; height: 26px; fill: none; stroke: var(--accent); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.top-release { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: var(--fs-meta); line-height: 1.4; }
+.brand h1 { grid-column: 2 / -1; }
+.brand-line { grid-column: 1 / -1; margin: 4px 0 2px; color: var(--muted); }
+.theme-pick { grid-column: 3; grid-row: 3; align-self: start; }
+.theme-pick span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.theme-pick select { width: auto; font-size: var(--fs-body); }
+.about { grid-column: 1 / 3; grid-row: 3; margin-left: -4px; }
+.about[open] { grid-column: 1 / -1; grid-row: 4; }
+.about[open] ~ .theme-pick, .brand:has(.about[open]) .theme-pick { grid-row: 3; }
+.about summary { font-weight: 500; color: var(--muted); }
+.top-release { margin: 0 0 4px 4px; color: var(--muted); }
+.view-pick, .sections-toggle, .sections-close { display: none; }
 
-.contents { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0 -6px; padding: 2px 6px; }
-.contents-title { margin: 0 0 6px 10px; color: var(--muted); font-size: var(--fs-meta); font-weight: 500; }
-.contents ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-.contents a { position: relative; display: grid; gap: 1px; padding: 7px 10px 10px; border-radius: 8px; text-decoration: none; color: inherit; }
-.contents a:hover { background: var(--active); }
-.contents a[aria-current] { background: var(--active); }
-.contents a[aria-current] .nav-name { font-weight: 650; }
-.contents .nav-name { font-size: 15px; font-weight: 500; line-height: 1.3; }
-.contents .nav-count { display: block; color: var(--muted); font-size: var(--fs-meta); line-height: 1.35; font-variant-numeric: tabular-nums; }
-.contents progress { display: block; width: 100%; height: 4px; margin-top: 7px; border: 0; border-radius: 2px; background: var(--active); appearance: none; -webkit-appearance: none; overflow: hidden; }
-.contents a:hover progress, .contents a[aria-current] progress { background: var(--surface); }
-.contents progress::-webkit-progress-bar { background: transparent; }
-.contents progress::-webkit-progress-value { background: var(--accent); border-radius: 2px; }
-.contents progress::-moz-progress-bar { background: var(--accent); border-radius: 2px; }
-/* The IT section and the sign-off stand apart from the six business sections. */
-.contents li:has([data-nav="7"]), .contents li:has([data-nav="signoff"]) { margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--border); }
+.contents { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0 -8px 0 -6px; padding: 2px 4px 2px 6px; }
+@supports not selector(::-webkit-scrollbar) { .contents { scrollbar-width: thin; scrollbar-color: var(--control) transparent; } }
+.contents::-webkit-scrollbar { width: 10px; }
+.contents::-webkit-scrollbar-thumb { border: 2px solid var(--frame); border-radius: 5px; background: var(--control); }
+.contents ol, .signoff-nav { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.contents a, .signoff-nav a { position: relative; display: grid; gap: 0; padding: 5px 10px 8px; border-radius: 8px; text-decoration: none; color: inherit; }
+.contents a:hover, .signoff-nav a:hover, .contents a[aria-current], .signoff-nav a[aria-current] { background: var(--active); }
+.nav-name { font-weight: 600; line-height: 1.35; }
+.nav-count { display: block; color: var(--muted); line-height: 1.35; font-variant-numeric: tabular-nums; }
+a[data-state="routed"] .nav-count { color: var(--stop-ink); font-weight: 600; }
+:root[data-theme="dark"] a[data-state="routed"] .nav-count { color: var(--stop-ink); }
+.side progress, .dock progress { display: block; width: 100%; height: 5px; margin-top: 5px; border: 0; border-radius: 3px; background: var(--active); appearance: none; -webkit-appearance: none; overflow: hidden; }
+a:hover progress, a[aria-current] progress { background: var(--surface); }
+progress::-webkit-progress-bar { background: transparent; }
+progress::-webkit-progress-value { background: var(--accent); border-radius: 3px; }
+progress::-moz-progress-bar { background: var(--accent); border-radius: 3px; }
+a[data-state="routed"] progress::-webkit-progress-value { background: var(--stop-line); }
+a[data-state="routed"] progress::-moz-progress-bar { background: var(--stop-line); }
+/* The IT section stands apart from the six business sections. */
+.contents li:has([data-nav="7"]) { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
 
-.dock { display: grid; gap: 10px; margin-top: auto; }
-.status { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--active); color: var(--ink); font-size: var(--fs-meta); line-height: 1.4; }
+.dock { position: fixed; inset: auto auto 0 0; width: var(--side-width); display: grid; gap: 10px; padding: 0 16px 14px; }
+.signoff-nav { margin: 0 -6px; padding-top: 8px; border-top: 1px solid var(--border); }
+.signoff-nav:empty { display: none; }
+.status { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--active); color: var(--ink); line-height: 1.4; }
 .status:empty { display: none; }
+.status[data-kind="problem"] { border: 1px solid var(--stop-line); background: var(--stop-bg); color: var(--stop-ink); }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.actions button { flex: 1 1 auto; }
+.actions button { flex: 1 1 auto; padding-inline: 10px; }
 .actions .primary { flex-basis: 100%; }
+.draft-note { margin: 0; color: var(--muted); line-height: 1.35; }
 
 .stage { min-width: 0; margin-left: var(--side-width); padding: 0 var(--inset) var(--inset) 0; }
-.tabs { position: sticky; top: 0; z-index: 3; display: flex; align-items: stretch; gap: 2px; height: var(--bar); padding: 0 calc(var(--pad) - 12px); background: var(--frame); overflow-x: auto; scrollbar-width: none; }
-.tabs::-webkit-scrollbar { display: none; }
-.tabs button { position: relative; flex: none; min-height: 0; padding: 0 12px; border: 0; border-radius: var(--radius-control); background: none; color: var(--muted); font-size: 15px; white-space: nowrap; }
+/* The row of views wraps to a second line before it would hide a view. */
+.tabs { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; align-content: center; gap: 0 2px; min-height: var(--bar); padding: 0 calc(var(--pad) - 12px); background: var(--frame); }
+.tabs button { position: relative; flex: none; height: var(--control-height); min-height: 0; padding: 0 12px; border: 0; border-radius: var(--radius-control); background: none; color: var(--muted); white-space: nowrap; }
 .tabs button:hover { color: var(--ink); background: none; }
 .tabs button:focus-visible { outline-offset: -4px; }
 .tabs button[aria-selected="true"] { color: var(--ink); }
-.tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 9px; height: 2px; background: var(--ink); }
+.tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 5px; height: 2px; background: var(--ink); }
 /* Three groups: the KPI form, the two smaller forms an answer can route to, and the two pages to read. */
 .tabs [data-view="domain-activation"], .tabs [data-view="roles"] { margin-left: 21px; }
-.tabs [data-view="domain-activation"]::before, .tabs [data-view="roles"]::before { content: ""; position: absolute; left: -11px; top: 17px; bottom: 17px; width: 1px; background: var(--control); }
+.tabs [data-view="domain-activation"]::before, .tabs [data-view="roles"]::before { content: ""; position: absolute; left: -11px; top: 12px; bottom: 12px; width: 1px; background: var(--control); }
 
-.view { min-width: 0; min-height: calc(100vh - var(--bar) - var(--inset)); padding: var(--pad) var(--pad) 56px; border: 1px solid var(--border); border-radius: var(--radius-sheet); background: var(--surface); }
+.view { min-width: 0; min-height: calc(100vh - var(--bar) - var(--inset)); padding: 32px var(--pad) 56px; border: 1px solid var(--border); border-radius: var(--radius-sheet); background: var(--surface); }
 .view > * { max-width: var(--measure); margin-inline: auto; }
+.view:focus { outline: none; }
+
+/* The question before the form is emptied. */
+.confirm { width: min(440px, calc(100vw - 32px)); padding: 24px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--surface); color: var(--ink); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18); } /* taste-skill-ignore: a dialog floats */
+.confirm::backdrop { background: var(--veil); }
+.confirm h2 { font-size: 1.375rem; }
+.confirm p { margin: 10px 0 20px; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.confirm-actions button { min-width: 96px; }
 
 /* ---- The start of a form -------------------------------------------------------------------------------------- */
 .intro-title { font-size: var(--fs-title); letter-spacing: -0.015em; }
-.intro-text { max-width: 70ch; margin: 10px 0 0; font-size: 1.0625rem; }
-.intro .grid { margin-top: 28px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.intro textarea { min-height: 68px; }
-.intro > .field { margin: var(--gap) 0 0; }
+.intro-text { max-width: 72ch; margin: 8px 0 0; }
+.intro-follow { max-width: 72ch; margin: 4px 0 0; color: var(--muted); }
+/* A smaller form says first, in a panel, that it is filled in only when the KPI form sends you to it. */
+.layout:has(.tabs [data-view="domain-activation"][aria-selected="true"]) .intro-text,
+.layout:has(.tabs [data-view="process-map-request"][aria-selected="true"]) .intro-text { max-width: none; margin: 12px 0 8px; padding: 12px 14px; border: 1px solid var(--accent-line); border-radius: var(--radius-card); background: var(--accent-tint); }
+.request { margin-top: 14px; border: 1px solid var(--border); border-radius: var(--radius-card); }
+.request > summary { display: flex; min-height: 52px; padding: 4px 16px 4px 12px; border-radius: var(--radius-card); }
+.request-word { flex: none; }
+.request-summary { min-width: 0; overflow: hidden; color: var(--muted); font-weight: 400; white-space: nowrap; text-overflow: ellipsis; }
+.request[open] .request-summary { display: none; }
+.request > .grid, .request > .field { margin: 4px 16px 16px; }
+.request .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.request textarea { min-height: 62px; }
 .field { margin-bottom: 12px; }
-.field label, .q-detail label, .per-row label { display: block; margin-bottom: 6px; font-size: var(--fs-small); font-weight: 600; }
+.field label, .q-detail label, .per-row label { display: block; margin-bottom: 6px; font-weight: 600; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--gap); }
 .grid .field { margin: 0; }
-.hint { margin: 6px 0 0; color: var(--muted); font-size: var(--fs-small); }
-/* A smaller form says first that it is filled in only when the KPI form sends you to it. */
-.layout:has(.tabs [data-view="domain-activation"][aria-selected="true"]) .intro-text,
-.layout:has(.tabs [data-view="process-map-request"][aria-selected="true"]) .intro-text { max-width: none; margin-top: 14px; padding: 12px 14px; border: 1px solid var(--accent-line); border-radius: var(--radius-card); background: var(--accent-tint); font-size: 1rem; }
+.hint { margin: 6px 0 0; color: var(--muted); }
 
 /* ---- A section ------------------------------------------------------------------------------------------------ */
-.section { margin-top: 44px; padding-top: 40px; border-top: 1px solid var(--border); scroll-margin-top: calc(var(--bar) + 8px); }
-.section-head { display: grid; grid-template-columns: minmax(0, 1fr) var(--aside); column-gap: var(--aside-gap); row-gap: var(--gap); align-items: start; }
-.section-progress { margin: 6px 0 0; color: var(--muted); font-size: var(--fs-small); font-weight: 500; font-variant-numeric: tabular-nums; }
-.section-about { max-width: 70ch; margin: 14px 0 0; }
-.section-facts { margin: 6px 0 0; font-size: var(--fs-small); line-height: 1.45; }
+.section { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
+.section-head { display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr) var(--aside); column-gap: var(--aside-gap); row-gap: 4px; align-items: start; }
+.section-lead { grid-column: 1; }
+.section-progress { margin: 6px 0 0; color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.section-progress[data-state="complete"] { color: var(--accent); }
+.section-progress[data-state="routed"] { color: var(--stop-ink); font-weight: 600; }
+.section-facts { margin: 0; line-height: 1.45; }
 .section-facts dt { font-weight: 600; }
 .section-facts dt + dd { margin: 2px 0 0; color: var(--muted); }
-.section-facts dd + dt { margin-top: 12px; }
-.section-warning, .kind { margin: 24px 0 0; padding: 12px 14px; border-radius: var(--radius-card); }
+.section-part { grid-column: 2; grid-row: 1 / span 2; padding-top: 6px; }
+.section-more { grid-column: 1; margin-left: -4px; }
+.section-more > :not(summary) { margin-left: 4px; }
+.section-about { max-width: 72ch; margin: 4px 0 12px; }
+.section-more .section-facts { max-width: 72ch; margin-bottom: 8px; }
+.section-warning, .kind { margin: 16px 0 0; padding: 12px 14px; border-radius: var(--radius-card); }
 .section-warning { border: 1px solid var(--stop-line); background: var(--stop-bg); color: var(--stop-ink); }
 .kind { background: var(--raised); font-weight: 600; }
-.questions { margin-top: 28px; }
-.section-skipped { margin: 0; padding-top: 16px; border-top: 1px solid var(--rule); color: var(--muted); font-size: var(--fs-small); }
+.questions { margin-top: 16px; }
+.section-skipped { margin: 0; padding: 16px 0 4px; border-top: 1px solid var(--rule); color: var(--muted); }
 
 /* The IT section is a panel of its own: the business does not fill it in. */
-[data-section="7"] { margin-top: 56px; padding: 32px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--raised); }
+[data-section="7"] { margin-top: 40px; padding: 28px 32px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--raised); }
 [data-section="7"] .question, [data-section="7"] .section-skipped { border-top-color: var(--border); }
-[data-section="7"] .q-who, [data-section="7"] .q-example p { background: var(--active); }
+[data-section="7"] .q-example p, [data-section="7"] summary:hover { background: var(--active); }
 
-/* ---- A question: what is asked aloud, who answers it, the answer; beside it, why we ask and an example ----------- */
-.question { display: grid; grid-template-columns: minmax(0, 1fr) var(--aside); column-gap: var(--aside-gap); row-gap: 14px; align-items: start; padding: 28px 0 30px; border-top: 1px solid var(--rule); animation: arrive 0.18s ease-out; }
+/* ---- A question: what is asked aloud and who answers it; why we ask and an example; then the answer ----------------- */
+.question { display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr) var(--aside); column-gap: var(--aside-gap); row-gap: 14px; align-items: start; padding: 24px 0 28px; border-top: 1px solid var(--rule); animation: arrive 0.18s ease-out; }
 @keyframes arrive { from { opacity: 0; } }
-.q-main { min-width: 0; padding-left: var(--hang); }
+.q-ask, .q-answer { grid-column: 1; min-width: 0; padding-left: var(--hang); }
+.q-side { grid-column: 2; grid-row: 1 / span 2; min-width: 0; padding-top: 6px; }
 .q-head { display: grid; grid-template-columns: var(--hang) minmax(0, 1fr); align-items: baseline; margin-left: calc(-1 * var(--hang)); }
-.q-number { color: var(--accent); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.q-number { color: var(--accent); font-size: 1.0625rem; font-weight: 650; font-variant-numeric: tabular-nums; }
 .q-text { font-family: var(--font-said); font-size: var(--fs-said); font-weight: 400; line-height: 1.3; letter-spacing: 0; }
-.q-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 12px 0 16px; color: var(--muted); font-size: var(--fs-small); }
-.q-who { display: inline-flex; align-items: flex-start; gap: 7px; padding: 4px 11px 4px 8px; border-radius: 8px; background: var(--raised); color: var(--ink); font-weight: 500; }
-.q-who svg { flex: none; width: 16px; height: 16px; margin-top: 2px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.q-note { margin: 0 0 14px; color: var(--muted); font-size: var(--fs-small); }
+.q-meta { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 14px; margin: 12px 0 0; }
+.q-who { display: grid; grid-template-columns: 20px minmax(0, 1fr); column-gap: 8px; align-items: start; }
+.q-who svg { width: 20px; height: 20px; margin-top: 2px; fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.q-who-label { color: var(--muted); }
+.q-asked { font-weight: 650; }
+.q-asked-more { display: block; color: var(--muted); }
+.q-asked-more:empty { display: none; }
+.q-rule { margin-left: auto; padding: 1px 10px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); }
+.q-analyst { margin: -6px 0 8px -4px; }
+.q-analyst summary { font-weight: 500; color: var(--muted); }
+.q-note { margin: 0 0 8px 4px; color: var(--muted); }
 .q-detail { margin-top: 14px; }
-.q-side { min-width: 0; padding-top: 5px; color: var(--muted); font-size: var(--fs-small); line-height: 1.45; }
-.q-why { margin: 0; }
-.q-example { margin-top: 6px; }
-.q-example summary { display: inline-block; padding: 5px 0; color: var(--ink); font-weight: 500; cursor: pointer; }
-.q-example summary:hover { color: var(--accent); }
-.q-example p { margin: 4px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--raised); color: var(--ink); white-space: pre-line; }
+.q-why { margin: 0; color: var(--muted); line-height: 1.45; }
+.q-why-label { display: block; color: var(--ink); font-weight: 600; }
+.q-example { margin: 4px 0 0 -4px; }
+.q-example p { margin: 2px 0 0 4px; padding: 10px 12px; border-radius: 8px; background: var(--raised); white-space: pre-line; }
 
 /* ---- A pick list ---------------------------------------------------------------------------------------------- */
+.picker { font-size: var(--fs-answer); }
 .picker-chosen { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .picker-chosen:not(:empty) { margin-bottom: 10px; }
-.picker-chosen li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 6px 5px 12px; border: 1px solid var(--accent-line); border-radius: 8px; background: var(--accent-tint); font-weight: 500; }
-.picker-chosen button { flex: none; min-height: 34px; padding: 2px 10px; border: 0; background: none; font-size: var(--fs-small); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+.picker-chosen li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 2px 4px 2px 12px; border: 1px solid var(--accent-line); border-radius: 8px; background: var(--accent-tint); font-weight: 500; }
+.picker-chosen button { flex: none; padding: 2px 12px; border: 0; background: none; font-size: var(--fs-body); font-weight: 500; text-decoration: underline; text-underline-offset: 4px; }
 .picker-chosen button:hover { background: none; color: var(--accent); }
-.picker-all { display: flex; align-items: center; gap: 10px; min-height: 32px; margin-bottom: 8px; font-size: var(--fs-small); cursor: pointer; }
-.picker-list { list-style: none; margin: 8px 0 0; padding: 4px; max-height: 318px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--border); border-radius: var(--radius-card); }
-.picker-list label { display: flex; gap: 12px; align-items: flex-start; min-height: var(--control-height); padding: 10px 12px; border-radius: var(--radius-control); cursor: pointer; }
+.picker-all { display: flex; align-items: center; gap: 10px; min-height: var(--control-height); font-size: var(--fs-body); cursor: pointer; }
+.picker-list { list-style: none; margin: 8px 0 0; padding: 4px; max-height: 330px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--border); border-radius: var(--radius-card); }
+.picker-list label { display: flex; gap: 12px; align-items: flex-start; min-height: var(--control-height); padding: 9px 12px; border-radius: var(--radius-control); cursor: pointer; }
 .picker-list label:hover { background: var(--raised); }
 .picker-list label:has(input:checked) { background: var(--accent-tint); }
 .picker-list input { flex: none; margin: 3px 0 0; }
-.picker-list.short { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; max-height: none; margin: 0; padding: 0; overflow: visible; border: 0; border-radius: 0; }
+.picker-list.short { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; max-height: none; margin: 0; padding: 0; overflow: visible; border: 0; border-radius: 0; }
 /* Options that each carry a line of description read better as one column. */
 .picker-list.short:has(.option-about:not(:empty)) { grid-template-columns: minmax(0, 1fr); }
 .picker-list.short label { height: 100%; border: 1px solid var(--control); border-radius: 8px; background: var(--surface); }
 .picker-list.short label:hover { border-color: var(--ink); background: var(--surface); }
 .picker-list.short label:has(input:checked) { border-color: var(--accent); background: var(--accent-tint); outline: 1px solid var(--accent); outline-offset: -2px; }
-.option-about { display: block; margin-top: 1px; color: var(--muted); font-size: var(--fs-small); }
-.picker-more { margin: 8px 0 0; color: var(--muted); font-size: var(--fs-small); }
+.option-about { display: block; margin-top: 1px; color: var(--muted); font-size: var(--fs-body); }
+.picker-more { margin: 8px 0 0; color: var(--muted); font-size: var(--fs-body); }
 .per-row { margin-bottom: 12px; }
 
 /* ---- A notice: where an answer routes the request, or what a check found ------------------------------------------ */
-.notice { margin: 16px 0 0; padding: 12px 14px; border: 1px solid var(--accent-line); border-radius: var(--radius-card); background: var(--accent-tint); }
-.notice[data-notice] { display: grid; grid-template-columns: 22px minmax(0, 1fr); column-gap: 10px; align-items: start; animation: arrive 0.18s ease-out; }
-.notice svg { width: 22px; height: 22px; margin-top: 1px; fill: none; stroke: var(--accent); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.notice { margin: 16px 0 0; padding: 14px 16px; border: 1px solid var(--accent-line); border-radius: var(--radius-card); background: var(--accent-tint); }
+.notice[data-notice] { display: grid; grid-template-columns: 24px minmax(0, 1fr); column-gap: 12px; align-items: start; animation: arrive 0.18s ease-out; }
+.notice > svg { width: 24px; height: 24px; margin-top: 1px; fill: none; stroke: var(--accent); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .notice .mark-stops { display: none; }
 .notice.blocks { border-color: var(--stop-line); background: var(--stop-bg); color: var(--stop-ink); }
-.notice.blocks svg { stroke: var(--stop-ink); }
+.notice.blocks > svg { stroke: var(--stop-ink); }
 .notice.blocks .mark-stops { display: block; }
 .notice.blocks .mark-routes { display: none; }
-.notice-title { display: block; font-weight: 650; }
+.notice-body > * { margin: 0; }
+.notice-body > * + * { margin-top: 8px; }
+.notice-title { font-size: 1.125rem; font-weight: 650; line-height: 1.35; }
+.notice-reviewers { display: flex; flex-wrap: wrap; gap: 6px 8px; padding: 0; list-style: none; }
+.notice-reviewers li { padding: 2px 12px; border: 1px solid currentColor; border-radius: 999px; font-weight: 600; }
+.notice-open { margin-top: 12px !important; border-color: currentColor; background: var(--surface); color: var(--ink); font-weight: 600; }
+.notice-analyst { margin-left: -4px; }
+.notice-analyst summary { font-weight: 500; }
+.notice-analyst summary:hover { background: none; text-decoration: underline; }
+.notice-analyst p { margin: 0 0 0 4px; }
 
 /* ---- The sign-off block: a page one signs ------------------------------------------------------------------------- */
-.signoff { margin-top: 56px; padding: 36px 40px 28px; border: 1px solid var(--border); border-radius: var(--radius-card); }
-.signoff-intro { max-width: 70ch; margin: 10px 0 8px; color: var(--muted); }
-.signer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 500px); column-gap: var(--aside-gap); row-gap: 12px; align-items: end; padding: 24px 0 26px; border-top: 1px solid var(--rule); break-inside: avoid; }
-.signer-meaning { margin: 8px 0 0; font-family: var(--font-said); font-size: 1.125rem; line-height: 1.4; }
-.signer-lines { display: grid; grid-template-columns: minmax(0, 1fr) 168px; gap: 20px; }
-.signer-lines .field { display: flex; flex-direction: column-reverse; margin: 0; }
-.signer-lines label { margin: 6px 0 0; color: var(--muted); font-size: var(--fs-meta); font-weight: 500; }
-.signer-lines input { padding: 6px 2px; border-width: 0 0 1.5px; border-color: var(--ink); border-radius: 0; background: none; font-size: 1.125rem; }
-.signer-lines input:focus-visible { outline-offset: 4px; }
-.consulted-block { margin-top: 12px; padding-top: 28px; border-top: 1px solid var(--border); }
+.signoff { margin-top: 40px; padding: 28px 32px 24px; border: 1px solid var(--border); border-radius: var(--radius-card); }
+.signoff-intro { max-width: 72ch; margin: 8px 0 0; color: var(--muted); }
+.signoff-progress { margin: 10px 0 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.signer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 480px); column-gap: var(--aside-gap); row-gap: 12px; align-items: end; padding: 22px 0 24px; border-top: 1px solid var(--rule); break-inside: avoid; }
+.signer-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.signer-label { color: var(--muted); font-size: var(--fs-body); font-weight: 500; }
+.signer-label:empty { display: none; }
+.signer-meaning { margin: 8px 0 0; font-family: var(--font-said); font-size: 1.25rem; line-height: 1.4; }
+.signer-status { display: inline-block; margin: 8px 0 0; padding: 2px 12px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); }
+.signer-lines { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 16px; }
+.consulted-block { margin-top: 8px; padding-top: 24px; border-top: 1px solid var(--border); }
 .consulted-block > p { margin: 8px 0 4px; color: var(--muted); }
 .consulted-block .signer { align-items: start; }
-.consulted-lines { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 20px; }
+.consulted-lines { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 16px; }
 
 /* ---- The role table and the explainer ----------------------------------------------------------------------------- */
 .block > h2 { font-size: var(--fs-title); letter-spacing: -0.015em; }
-.block > p { max-width: 70ch; margin: 10px 0 0; color: var(--muted); }
+.block > p { max-width: 72ch; margin: 10px 0 0; color: var(--muted); }
 .table-wrap { margin-top: 20px; overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 16px 28px 16px 0; text-align: left; vertical-align: top; border-bottom: 1px solid var(--rule); }
-th { padding-block: 8px; color: var(--muted); font-size: var(--fs-meta); font-weight: 500; border-bottom-color: var(--border); }
+th { padding-block: 8px; color: var(--muted); font-weight: 500; border-bottom-color: var(--border); }
 td:first-child { width: 22%; font-weight: 600; }
 td:nth-child(2) { width: 45%; }
 td:last-child, th:last-child { padding-right: 0; }
 .explainer > h2, .explainer-body { max-width: 68ch; margin-inline: 0; }
-.explainer-body { margin-top: 20px; font-size: 1.0625rem; line-height: 1.6; }
+.explainer-body { margin-top: 20px; font-size: 1.125rem; line-height: 1.6; }
 .explainer-body p { margin: 0 0 14px; }
 .explainer ol { margin: 0 0 14px; padding-left: 1.5em; }
 .explainer li { margin-bottom: 8px; padding-left: 4px; }
 
-/* ---- A laptop: the notes move under each answer -------------------------------------------------------------------- */
-@media screen and (max-width: 1239px) {
+/* ---- A laptop: the notes move between the question and its answer ------------------------------------------------------ */
+@media screen and (max-width: 1279px) {
   :root { --pad: 32px; }
-  .section-head, .question { grid-template-columns: minmax(0, 1fr); }
-  .section-facts { margin-top: 4px; padding: 14px 16px; border-radius: var(--radius-card); background: var(--raised); }
-  [data-section="7"] .section-facts { background: var(--active); }
+  html { scroll-padding-top: calc(2 * var(--control-height) + 20px); }
+  .section-head, .question { grid-template-rows: none; grid-template-columns: minmax(0, 1fr); }
+  .section-part, .q-side { grid-column: 1; grid-row: auto; }
+  .section-part { padding: 6px 0 0; }
   .q-side { padding: 0 0 0 var(--hang); }
-  .intro .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .request .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .signer { grid-template-columns: minmax(0, 1fr); align-items: start; }
   .tabs button { padding: 0 9px; }
   .tabs button[aria-selected="true"]::after { left: 9px; right: 9px; }
@@ -302,56 +371,51 @@ td:last-child, th:last-child { padding-right: 0; }
   .tabs [data-view="domain-activation"]::before, .tabs [data-view="roles"]::before { left: -9px; }
 }
 
-/* ---- A short window: the section list tightens so that every line stays in sight -------------------------------------- */
-@media screen and (min-width: 900px) and (max-height: 820px) {
-  .side { gap: 12px; padding-top: 14px; }
-  .contents-title { display: none; }
-  .contents a { padding: 5px 10px 8px; }
-  .contents progress { margin-top: 5px; }
-  .contents li:has([data-nav="7"]), .contents li:has([data-nav="signoff"]) { margin-top: 4px; padding-top: 4px; }
-}
-
-/* ---- A phone or a narrow window: the frame folds away ---------------------------------------------------------------- */
-@media screen and (max-width: 899px) {
-  :root { --pad: 16px; --hang: 0px; --fs-said: 20px; --fs-title: 24px; --fs-section: 22px; }
-  html { scroll-padding-top: 84px; }
-  body { padding-bottom: 72px; }
+/* ---- A phone, a narrow window or a zoomed page: the frame folds into a view selector and a Sections button ------------- */
+@media screen and (max-width: 999px) {
+  :root { --pad: 16px; --hang: 0px; --fs-said: 22px; --fs-title: 26px; --fs-section: 23px; }
+  html { scroll-padding-top: 68px; }
+  body { padding-bottom: var(--dock-h); }
   .layout { display: flex; flex-direction: column; }
   .side, .stage { display: contents; }
-  .brand { order: 1; padding: 14px 16px 6px; }
-  .tabs { order: 2; position: static; padding: 0 7px; }
-  .contents { order: 3; position: sticky; top: 0; z-index: 3; flex: none; margin: 0; padding: 6px 0 8px; overflow: visible; background: var(--frame); }
-  .contents-title { display: none; }
-  .contents ol { display: flex; gap: 6px; padding: 2px 16px; overflow-x: auto; scrollbar-width: none; }
-  .contents ol::-webkit-scrollbar { display: none; }
-  .contents li { flex: none; max-width: 230px; }
-  .contents li:has([data-nav="7"]), .contents li:has([data-nav="signoff"]) { margin: 0 0 0 6px; padding: 0 0 0 12px; border-top: 0; border-left: 1px solid var(--control); }
-  .contents a { padding: 9px 12px 10px; border: 1px solid var(--border); background: var(--surface); }
-  .contents a:hover, .contents a[aria-current] { background: var(--surface); }
-  .contents a[aria-current] { border-color: var(--ink); outline: 1px solid var(--ink); outline-offset: -2px; }
-  .contents a progress, .contents a:hover progress, .contents a[aria-current] progress { background: var(--active); }
-  .contents .nav-name { font-size: var(--fs-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .contents .nav-count { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .view { order: 4; min-height: 0; padding: 24px var(--pad) 40px; border-width: 1px 0; border-radius: 0; }
-  .dock { order: 5; position: fixed; inset: auto 0 0 0; z-index: 4; gap: 8px; padding: 8px 16px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: var(--frame); }
-  .actions { gap: 6px; }
-  .actions button { padding-inline: 10px; font-size: var(--fs-small); }
+  .brand { order: 1; padding: 12px 16px 4px; }
+  .view-pick { order: 2; display: block; padding: 4px 16px 8px; }
+  .view-pick label { display: block; margin-bottom: 4px; color: var(--muted); }
+  .view-pick select { font-size: var(--fs-body); font-weight: 600; }
+  .tabs { display: none; }
+  .sections-toggle { order: 3; position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 6px 16px; border-width: 1px 0; border-color: var(--border); border-radius: 0; background: var(--frame); text-align: left; }
+  .sections-toggle:hover { background: var(--frame); }
+  .sections-word { flex: none; font-weight: 650; }
+  .sections-now { flex: 1 1 auto; min-width: 0; color: var(--muted); font-weight: 400; line-height: 1.3; }
+  .sections-toggle .chev { transform: rotate(90deg); }
+  .contents { display: none; }
+  .layout.sections-open .contents { display: block; position: fixed; inset: 0 0 var(--dock-h) 0; z-index: 5; margin: 0; padding: 12px 12px 24px; overflow-y: auto; background: var(--frame); }
+  .sections-close { display: block; margin: 0 4px 10px auto; }
+  .contents li:has([data-nav="signoff"]) { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+  .contents a { padding: 10px 12px 12px; }
+  .view { order: 4; min-height: 0; padding: 20px var(--pad) 40px; border-width: 0 0 1px; border-radius: 0; }
+  .dock { order: 5; inset: auto 0 0 0; z-index: 6; width: auto; gap: 8px; padding: 8px 16px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: var(--frame); }
   .actions .primary { flex: 1 1 auto; }
-  .section { margin-top: 36px; padding-top: 32px; }
-  [data-section="7"], .signoff { margin-inline: -8px; padding: 24px 16px; }
+  .request .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-section="7"], .signoff { margin-inline: -8px; padding: 20px 16px; }
   .q-head { display: block; }
   .q-number { display: block; margin-bottom: 4px; }
-  .signer-lines, .consulted-lines { grid-template-columns: minmax(0, 1fr); }
+  .q-rule { margin-left: 0; }
+  .consulted-lines { grid-template-columns: minmax(0, 1fr); }
   /* The role table becomes one block for each role. */
   thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   tr { display: block; padding: 16px 0; border-bottom: 1px solid var(--rule); }
   td, td:first-child, td:nth-child(2) { display: block; width: auto; padding: 0; border: 0; }
   td + td { margin-top: 6px; }
-  td:last-child { color: var(--muted); font-size: var(--fs-small); }
+  td:last-child { color: var(--muted); }
   td:last-child::before { content: "In the intake: "; font-weight: 600; }
 }
 @media screen and (max-width: 599px) {
-  .intro .grid { grid-template-columns: minmax(0, 1fr); }
+  .request .grid, .signer-lines { grid-template-columns: minmax(0, 1fr); }
+}
+/* A narrow and short window, such as a laptop zoomed to 200%: the bar keeps only its buttons. */
+@media screen and (max-width: 999px) and (max-height: 520px) {
+  .draft-note { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -359,36 +423,42 @@ td:last-child, th:last-child { padding-right: 0; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 
-/* ---- Print, or save as PDF: the form alone, with every answer in full -------------------------------------------------- */
+/* ---- Print, or save as PDF: the form alone, always light, with every answer in full ------------------------------------- */
 @media print {
   @page { margin: 15mm; }
-  :root { --hang: 40px; --fs-said: 17px; --fs-body: 13px; --fs-small: 11.5px; --fs-meta: 11px; --fs-section: 19px; --fs-title: 22px; --control-height: 30px; }
+  :root, :root[data-theme="dark"] {
+    color-scheme: light;
+    --frame: #ffffff; --surface: #ffffff; --raised: #f0f3f5; --active: #dde4e7; --border: #c3ccd1; --rule: #d6dde1; --control: #76828b;
+    --ink: #14181b; --muted: #47515a; --accent: #1b6c80; --accent-tint: #e2eff2; --accent-line: #8fbcc8;
+    --stop-bg: #fff5d9; --stop-line: #94690a; --stop-ink: #5c3803;
+    --hang: 40px; --fs-said: 17px; --fs-body: 12.5px; --fs-answer: 13px; --fs-section: 19px; --fs-title: 22px; --control-height: 30px;
+  }
   body { background: none; }
-  .skip, .tabs, .contents, .dock { display: none; }
+  .skip, .tabs, .contents, .dock, .theme-pick, .view-pick, .sections-toggle, .confirm, .notice-open, .chev { display: none; }
   .side { position: static; width: auto; padding: 0 0 12px; }
   .brand { padding: 0; }
   .stage { margin: 0; padding: 0; }
   .view { min-height: 0; padding: 0; border: 0; border-radius: 0; }
   .view > * { max-width: none; }
-  .section-head, .question { grid-template-columns: minmax(0, 1fr); row-gap: 8px; }
+  .section-head, .question { grid-template-rows: none; grid-template-columns: minmax(0, 1fr); row-gap: 8px; }
+  .section-part, .q-side { grid-column: 1; grid-row: auto; }
   .question { padding: 14px 0; break-inside: avoid; animation: none; }
-  .section { margin-top: 22px; padding-top: 20px; }
   .section-head { break-inside: avoid; }
   .q-side { padding: 0 0 0 var(--hang); }
-  .q-meta { margin: 6px 0 8px; }
-  .intro .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .request .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   [data-section="7"], .signoff { padding: 18px; }
   .signer { grid-template-columns: minmax(0, 1fr) 46%; padding: 14px 0; }
   .signoff { break-before: page; }
-  /* A long list prints only what was chosen. */
+  /* A long list prints only what was chosen, and every part that opens prints open. */
   .picker-search, .picker-all, .picker-more, .picker-chosen { display: none; }
-  .q-example summary { padding: 0; list-style: none; }
-  .q-example summary::-webkit-details-marker { display: none; }
   .picker-list { max-height: none; overflow: visible; }
   .picker-list:not(.short) { min-height: var(--control-height); }
   .picker-list:not(.short) li:not(:has(input:checked)) { display: none; }
   .picker-list label { min-height: 0; padding: 5px 8px; }
-  .q-example::details-content { display: block; height: auto; content-visibility: visible; }
+  summary { min-height: 0; padding: 0; }
+  .about, .section-more, .q-example, .q-analyst, .notice-analyst { margin-left: 0; }
+  .request-summary { display: none; }
+  details::details-content { display: block; height: auto; content-visibility: visible; }
 }
 </style>
 </head>
@@ -399,27 +469,43 @@ td:last-child, th:last-child { padding-right: 0; }
     <header class="brand top">
       <svg class="mark" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2.6c3.9 4.6 7 8.3 7 12.4a7 7 0 0 1-14 0c0-4.1 3.1-7.8 7-12.4z"/><path d="M10 17.6h6M10 14.2h3.4"/></svg>
       <h1>KPI intake form</h1>
-      <p class="top-release" id="release-line"></p>
+      <p class="brand-line">Works offline. Sends nothing.</p>
+      <label class="theme-pick"><span>Theme</span>
+        <select id="theme" aria-label="Theme"><option value="light">Light theme</option><option value="dark">Dark theme</option><option value="system">System theme</option></select>
+      </label>
+      <details class="about"><summary><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg>Version</summary><p class="top-release" id="release-line"></p></details>
     </header>
+    <div class="view-pick"><label for="view-select">View</label><select id="view-select"></select></div>
+    <button type="button" class="sections-toggle" id="sections-toggle" aria-expanded="false" aria-controls="contents"><span class="sections-word">Sections</span><span class="sections-now" id="sections-now"></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg></button>
     <nav class="contents" id="contents" aria-label="Sections">
-      <p class="contents-title">Sections of this form</p>
+      <button type="button" class="sections-close" id="sections-close">Close the section list</button>
       <ol id="contents-list"></ol>
     </nav>
-    <div class="dock">
-      <p class="status" id="status" role="status" aria-live="polite"></p>
-      <div class="actions">
-        <button type="button" class="primary" id="save">Save answers</button>
-        <button type="button" id="load">Load answers</button>
-        <button type="button" class="quiet" id="clear">Start again</button>
-        <input type="file" id="load-file" accept=".json,application/json" hidden>
-      </div>
-    </div>
   </div>
   <div class="stage">
     <nav class="tabs" id="tabs" role="tablist" aria-label="Views"></nav>
-    <main class="view" id="view"></main>
+    <main class="view" id="view" tabindex="-1"></main>
+  </div>
+  <div class="dock" id="dock">
+    <ol class="signoff-nav" id="signoff-nav" aria-label="Sign-off"></ol>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+    <div class="actions">
+      <button type="button" class="primary" id="save">Save answers to file</button>
+      <button type="button" id="load">Load answers file</button>
+      <button type="button" class="quiet" id="clear">Clear this form</button>
+      <input type="file" id="load-file" accept=".json,application/json" hidden>
+    </div>
+    <p class="draft-note">Browser draft only. Save a file to share.</p>
   </div>
 </div>
+<dialog class="confirm" id="clear-dialog" aria-labelledby="clear-title" aria-describedby="clear-text">
+  <h2 id="clear-title">Clear this form?</h2>
+  <p id="clear-text"></p>
+  <div class="confirm-actions">
+    <button type="button" id="clear-cancel" autofocus>Cancel</button>
+    <button type="button" class="primary" id="clear-confirm">Clear</button>
+  </div>
+</dialog>
 
 <!-- One tab of the top navigation. -->
 <template id="tpl-tab"><button type="button" role="tab" data-view=""></button></template>
@@ -427,30 +513,39 @@ td:last-child, th:last-child { padding-right: 0; }
 <!-- One line of the section list, with the section's progress. -->
 <template id="tpl-nav"><li><a href="#" data-nav=""><span class="nav-name"></span><span class="nav-count"></span><progress max="1" value="0"></progress></a></li></template>
 
-<!-- The start of a form: what it is for, and the request's own fields. -->
+<!-- The start of a form: what it is for, and the request's own fields in a part that closes once they are filled. -->
 <template id="tpl-intro">
   <section class="intro" data-part="intro">
     <h2 class="intro-title"></h2>
     <p class="intro-text"></p>
+    <p class="intro-follow">Follow-up questions appear when an answer needs them.</p>
     <p class="notice" data-part="example-mark" hidden></p>
-    <div class="grid" data-part="request"></div>
-    <div class="field"><label for="comment">Comment</label><textarea id="comment" data-field="comment"></textarea></div>
+    <details class="request" data-part="request-details">
+      <summary><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg><span class="request-word">Request details</span><span class="request-summary" data-part="request-summary"></span></summary>
+      <div class="grid" data-part="request"></div>
+      <div class="field"><label for="comment">Comment</label><textarea id="comment" data-field="comment"></textarea></div>
+    </details>
   </section>
 </template>
 
-<!-- One section of a form: its name and progress and what it is for; beside them, who takes part and when it is done. -->
+<!-- One section of a form: its name, its progress and who takes part; what it is for and when it is done open on request. -->
 <template id="tpl-section">
   <section class="section" data-section="">
     <header class="section-head">
       <div class="section-lead">
         <h2 class="section-title"></h2>
         <p class="section-progress"></p>
-        <p class="section-about"></p>
       </div>
-      <dl class="section-facts">
+      <dl class="section-facts section-part">
         <dt>Who takes part</dt><dd class="section-who"></dd>
-        <dt>Done when</dt><dd class="section-done"></dd>
       </dl>
+      <details class="section-more">
+        <summary><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg>About this section</summary>
+        <p class="section-about"></p>
+        <dl class="section-facts">
+          <dt>Done when</dt><dd class="section-done"></dd>
+        </dl>
+      </details>
     </header>
     <p class="section-warning" hidden></p>
     <p class="kind" data-part="kind" hidden></p>
@@ -459,20 +554,23 @@ td:last-child, th:last-child { padding-right: 0; }
   </section>
 </template>
 
-<!-- One question. On the left: the question as asked aloud, who answers it, and the answer. On the right: why we ask, and an example. -->
+<!-- One question, in reading order: the question as asked aloud and who answers it; why we ask and an example; the
+     answer. On a wide window the second part stands beside the other two. -->
 <template id="tpl-question">
   <article class="question" data-question="">
-    <div class="q-main">
+    <div class="q-ask">
       <header class="q-head"><span class="q-number"></span><h3 class="q-text"></h3></header>
-      <p class="q-meta"><span class="q-who"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="5.2" r="2.7"/><path d="M2.8 14c.5-2.7 2.6-4.2 5.2-4.2s4.7 1.5 5.2 4.2"/></svg><span class="q-asked"></span></span><span class="q-rule"></span></p>
-      <p class="q-note" hidden></p>
+      <p class="q-meta"><span class="q-who"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="6.6" r="3.3"/><path d="M3.6 17.4c.6-3.3 3.2-5.2 6.4-5.2s5.800 1.900 6.400 5.200"/></svg><span><span class="q-who-label">Who answers: </span><span class="q-asked"></span><span class="q-asked-more"></span></span></span><span class="q-rule"></span></p>
+    </div>
+    <div class="q-side">
+      <p class="q-why"><span class="q-why-label">Why we ask</span><span class="q-why-text"></span></p>
+      <details class="q-example" hidden><summary><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg>Show example answer</summary><p></p></details>
+    </div>
+    <div class="q-answer">
+      <details class="q-analyst" hidden><summary><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg>For the analyst</summary><p class="q-note" hidden></p></details>
       <div class="q-input"></div>
       <div class="q-detail" hidden><label class="q-detail-label"></label></div>
       <div class="q-notices"></div>
-    </div>
-    <div class="q-side">
-      <p class="q-why"></p>
-      <details class="q-example" hidden><summary>Example answer</summary><p></p></details>
     </div>
   </article>
 </template>
@@ -490,15 +588,29 @@ td:last-child, th:last-child { padding-right: 0; }
 <template id="tpl-option"><li><label><input><span><span class="option-label"></span><span class="option-about"></span></span></label></li></template>
 <template id="tpl-chosen"><li><span class="chosen-label"></span><button type="button" aria-label="Remove">Remove</button></li></template>
 
-<!-- A notice under a question: where an answer routes the request, or what a check found. The first mark shows on a
-     notice that sends the request on its way; the second on one that stops the form until something else is done. -->
-<template id="tpl-notice"><p class="notice" data-notice=""><svg class="mark-routes" viewBox="0 0 22 22" aria-hidden="true"><path d="M4 18v-5.5a4 4 0 0 1 4-4h10"/><path d="M14 4.5l4 4-4 4"/></svg><svg class="mark-stops" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M7.4 11h7.2"/></svg><span class="notice-body"><span class="notice-title"></span><span class="notice-text"></span></span></p></template>
+<!-- A notice under a question: where an answer routes the request, or what a check found. It says what is needed, who
+     does it, and gives a button to the form that does it. The first mark shows on a notice that sends the request on its
+     way; the second on one that stops the form until something else is done. -->
+<template id="tpl-notice">
+  <div class="notice" data-notice="">
+    <svg class="mark-routes" viewBox="0 0 22 22" aria-hidden="true"><path d="M4 18v-5.5a4 4 0 0 1 4-4h10"/><path d="M14 4.5l4 4-4 4"/></svg><svg class="mark-stops" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M7.4 11h7.2"/></svg>
+    <div class="notice-body">
+      <p class="notice-title"></p>
+      <p class="notice-text"></p>
+      <p class="notice-who" hidden></p>
+      <ul class="notice-reviewers" aria-label="Reviewers" hidden></ul>
+      <button type="button" class="notice-open" hidden></button>
+      <details class="notice-analyst" hidden><summary><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg>For the analyst</summary><p></p></details>
+    </div>
+  </div>
+</template>
 
 <!-- The sign-off block. -->
 <template id="tpl-signoff">
   <section class="section signoff" data-part="signoff">
     <h2>Sign-off</h2>
     <p class="signoff-intro"></p>
+    <p class="signoff-progress" data-part="signoff-progress"></p>
     <div data-part="signers"></div>
     <div class="consulted-block" data-part="consulted-block">
       <h3>Consulted</h3>
@@ -507,14 +619,15 @@ td:last-child, th:last-child { padding-right: 0; }
     </div>
   </section>
 </template>
-<!-- One signer: the role and the statement on the left, the lines to sign on the right. Each label stays just before
-     its input in the markup (the script pairs them that way); the styles show it under the line. -->
+<!-- One signer: the role, what the signature is for and the statement on the left, the name and the date on the right.
+     Each label stays just before its input in the markup: the script pairs them that way. -->
 <template id="tpl-signer">
   <div class="signer" data-signer="">
     <div class="signer-what">
-      <h3 class="signer-role"></h3>
+      <h3 class="signer-head"><span class="signer-role"></span><span class="signer-label"></span></h3>
       <p class="signer-meaning"></p>
       <p class="hint signer-required"></p>
+      <p class="signer-status" hidden></p>
     </div>
     <div class="grid signer-lines">
       <div class="field"><label>Name</label><input type="text" data-sign="name" autocomplete="off"></div>
@@ -561,6 +674,14 @@ function emptyForm() { return { answers: {}, request: {}, sign_offs: {}, consult
 let state = Object.fromEntries(FORMS.map((f) => [f, emptyForm()]));
 let view = FORMS[0];
 const showAll = {};            // question id -> true when the reader asked for the whole list
+const narrow = matchMedia("(max-width: 999px)");   // the folded frame of a phone, a narrow window or a zoomed page
+// What each of the two Domain Owner signatures of the KPI form is for.
+const SIGNER_LABELS = { "domain-confirmation": "Domain confirmation", "domain-owner": "Conflicting definitions" };
+// The next step of an answer that sends the request to one of the two smaller forms.
+const ROUTE_STEPS = {
+  "domain-activation": { title: "Domain activation required before this KPI can be added", open: "Open the domain activation form" },
+  "process-map-request": { title: "Process map request required before this KPI can be added", open: "Open the process map request" },
+};
 
 function current() { return state[view]; }
 function formOf(q) { return DATA.sections.find((s) => s.id === q.section).form; }
@@ -657,7 +778,36 @@ function norm(name) { return name.toLowerCase().replace(/[^a-z0-9&]+/g, " ").tri
 
 // ---- Small helpers ---------------------------------------------------------------------------------------------
 function clone(id) { return document.getElementById(id).content.firstElementChild.cloneNode(true); }
-function say(text) { $("status").textContent = text; }
+function say(text, kind) { $("status").textContent = text; $("status").dataset.kind = kind || ""; }
+
+// ---- Reading what a file or a draft holds ----------------------------------------------------------------------
+const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+const isText = (v) => typeof v === "string";
+const brief = (text) => String(text).slice(0, 40);
+// What is wrong with the parts of one form, in words, or "" when each part has the type answers.schema.json gives.
+function partsProblem(held) {
+  if (!isObject(held)) return "it is not a JSON object";
+  if (!isObject(held.answers)) return 'it has no "answers" object';
+  for (const [id, v] of Object.entries(held.answers)) {
+    if (!(isText(v) || (Array.isArray(v) && v.every(isText)))) return `the answer to ${brief(id)} is neither a text nor a list of texts`;
+  }
+  for (const key of ["catalogue_version", "kpi_name", "example_of", "comment"]) {
+    if (key in held && !isText(held[key])) return `"${key}" is not a text`;
+  }
+  if ("request" in held && !(isObject(held.request) && Object.values(held.request).every(isText))) return '"request" does not hold a text for each field';
+  for (const key of ["sign_offs", "consulted"]) {
+    if (!(key in held)) continue;
+    const ok = isObject(held[key]) && Object.values(held[key]).every((entry) => isObject(entry) && Object.values(entry).every(isText));
+    if (!ok) return `"${key}" does not hold texts for each entry`;
+  }
+  return "";
+}
+function fileProblem(data) {
+  if (!isObject(data)) return "it is not a JSON object";
+  if (data.format !== 1) return 'its "format" is not 1';
+  if (!FORMS.includes(data.form)) return 'its "form" names none of the three forms';
+  return partsProblem(data);
+}
 function saveDraft() {
   // A draft survives a reload when the browser allows storage. A private window may refuse it.
   try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ state, view })); } catch (e) { /* the form still works */ }
@@ -666,7 +816,7 @@ function loadDraft() {
   try {
     const held = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
     if (held && held.state) {
-      for (const f of FORMS) if (held.state[f]) state[f] = Object.assign(emptyForm(), held.state[f]);
+      for (const f of FORMS) if (held.state[f] && !partsProblem(held.state[f])) state[f] = Object.assign(emptyForm(), held.state[f]);
       if (FORMS.includes(held.view)) view = held.view;
       return true;
     }
@@ -833,11 +983,14 @@ function drawQuestion(q) {
   card.id = "q-" + q.id;
   card.querySelector(".q-number").textContent = q.id;
   card.querySelector(".q-text").textContent = q.text;
-  card.querySelector(".q-asked").textContent = "Asked of: " + q.asked_of_text;
+  // Who answers: the role first, then any sentence about how the roles work together.
+  const cut = q.asked_of_text.indexOf(". ");
+  card.querySelector(".q-asked").textContent = cut < 0 ? q.asked_of_text : q.asked_of_text.slice(0, cut + 1);
+  card.querySelector(".q-asked-more").textContent = cut < 0 ? "" : q.asked_of_text.slice(cut + 2);
   card.querySelector(".q-rule").textContent = q.requirement;
   const note = card.querySelector(".q-note");
-  if (q.note) { note.textContent = q.note; note.hidden = false; }
-  card.querySelector(".q-why").textContent = "Why we ask: " + q.why;
+  if (q.note) { note.textContent = q.note; note.hidden = false; card.querySelector(".q-analyst").hidden = false; }
+  card.querySelector(".q-why-text").textContent = q.why;
   if (q.example) { const ex = card.querySelector(".q-example"); ex.hidden = false; ex.querySelector("p").textContent = q.example; }
   drawInput(q, card.querySelector(".q-input"));
   if (q.detail) {
@@ -866,6 +1019,11 @@ function drawForm(form) {
     ? "One form is for one KPI. Sections 1 to 6 are for the business. Section 7 is for Digital IT, after the business has signed. Save the answers to a file when you stop, and load the file to go on."
     : "Fill in this form only when the KPI form sends you here. Save it to its own file.";
   const requestBox = intro.querySelector('[data-part="request"]');
+  // The request details stay open while they are empty. Once filled, they close to one line.
+  const requestLine = intro.querySelector('[data-part="request-summary"]');
+  const summarize = () => { requestLine.textContent = DATA.request_fields.map((f) => (held.request[f.id] || "").trim()).filter(Boolean).join(" · "); };
+  summarize();
+  intro.querySelector('[data-part="request-details"]').open = !requestLine.textContent && !(held.comment || "").trim();
   for (const item of DATA.request_fields) {
     const field = document.createElement("div");
     field.className = "field";
@@ -876,7 +1034,7 @@ function drawForm(form) {
     input.dataset.request = item.id;
     input.autocomplete = "off";
     input.value = held.request[item.id] || "";
-    input.addEventListener("input", () => { held.request[item.id] = input.value; saveDraft(); });
+    input.addEventListener("input", () => { held.request[item.id] = input.value; summarize(); saveDraft(); });
     label.htmlFor = input.id;
     label.textContent = item.label;
     field.append(label, input);
@@ -921,6 +1079,12 @@ function drawForm(form) {
     node.querySelector(".signer-role").textContent = DATA.roles.find((r) => r.id === signer.role).short;
     node.querySelector(".signer-meaning").textContent = `"${form === "domain-activation" && signer.activation_meaning ? signer.activation_meaning : signer.meaning}"`;
     node.querySelector(".signer-required").textContent = "Required: " + signer.required;
+    // A signature that only a conflict calls for says so, until the check has found one.
+    const needed = isNeeded(signer, form);
+    node.querySelector(".signer-label").textContent = form === FORMS[0] ? SIGNER_LABELS[signer.id] || "" : "";
+    node.querySelector(".signer-required").hidden = !needed;
+    node.querySelector(".signer-status").hidden = needed;
+    node.querySelector(".signer-status").textContent = "Only if the check finds a conflicting definition";
     node.querySelectorAll("[data-sign]").forEach((input) => {
       const key = input.dataset.sign;
       input.id = `sign-${signer.id}-${key}`;
@@ -952,51 +1116,96 @@ function drawForm(form) {
   line.querySelector("a").href = "#signoff";
   line.querySelector("a").dataset.nav = "signoff";
   line.querySelector(".nav-name").textContent = "Sign-off";
-  nav.append(line);
+  // The sign-off line has its own fixed row under the section list. A folded frame keeps it at the end of the list.
+  $("signoff-nav").replaceChildren(line);
+  placeSignoff();
   refresh();
 }
 
 // ---- What changes with every answer: which questions show, the notices, the progress -----------------------------
-function notice(box, key, title, text, blocks) {
+// `more` may add: who does the next step, the reviewers to bring in, a button to the next step, and a line for the analyst.
+function notice(box, key, title, text, blocks, more) {
   const node = clone("tpl-notice");
   node.dataset.notice = key;
   node.classList.toggle("blocks", !!blocks);
   node.querySelector(".notice-title").textContent = title;
   node.querySelector(".notice-text").textContent = text;
+  more = more || {};
+  if (more.who) { const who = node.querySelector(".notice-who"); who.hidden = false; who.textContent = more.who; }
+  if (more.reviewers) {
+    const list = node.querySelector(".notice-reviewers");
+    list.hidden = false;
+    for (const name of more.reviewers) { const item = document.createElement("li"); item.textContent = name; list.append(item); }
+  }
+  if (more.open) { const button = node.querySelector(".notice-open"); button.hidden = false; button.textContent = more.open; button.addEventListener("click", more.go); }
+  if (more.analyst) { const aside = node.querySelector(".notice-analyst"); aside.hidden = false; aside.querySelector("p").textContent = more.analyst; }
   box.append(node);
 }
+function routeNotice(box, hit) {
+  const id = hit.route.outcome;
+  const outcome = DATA.outcomes[id];
+  const step = ROUTE_STEPS[id];
+  if (step) {
+    // The request goes to a smaller form: say who answers and signs it, and open it from here.
+    const target = DATA.sections.find((s) => s.form === id);
+    return notice(box, id, step.title, hit.route.notice, outcome.blocks,
+      { who: target.who, open: step.open, go: () => { show(id); scrollTo(0, 0); $("view").focus(); }, analyst: outcome.next });
+  }
+  const consult = DATA.sign_off.consulted.find((c) => c.id === outcome.consult);
+  // The catalogue's next step is added unless the notice already says it.
+  const next = outcome.next && !hit.route.notice.includes(outcome.next.slice(0, 40)) ? " " + outcome.next : "";
+  notice(box, id, outcome.title, hit.route.notice + next, outcome.blocks,
+    consult ? { reviewers: consult.who.split(/,\s*|\s+and\s+/).filter(Boolean), open: "Go to the sign-off block", go: () => { $("signoff").scrollIntoView(); $("signoff").querySelector("[data-consult]").focus({ preventScroll: true }); } } : {});
+}
+// A signature is needed for every KPI, or only when the check finds a conflict. A smaller form needs each of its own.
+function isNeeded(signer, form) { return signer.when === "always" || form !== FORMS[0]; }
+function left(count) { return count ? `${count} required ${count === 1 ? "answer" : "answers"} left` : "Required answers complete"; }
 function refresh() {
   if (!FORMS.includes(view)) return;
   const held = current();
   const answers = held.answers;
+  let formLeft = 0;
   for (const section of DATA.sections.filter((s) => s.form === view)) {
     const node = document.querySelector(`[data-section="${section.id}"]`);
     if (!node) continue;
-    let asked = 0, done = 0, missing = 0, skipped = 0;
+    let required = 0, missing = 0, optional = 0, skipped = 0;
+    const routed = [];
     for (const q of DATA.questions.filter((x) => x.section === section.id)) {
       const card = node.querySelector(`[data-question="${q.id}"]`);
       const on = isAsked(q, answers);
       card.hidden = !on;
       if (!on) { skipped += 1; continue; }
-      asked += 1;
-      if (values(answers, q.id).length) done += 1;
-      if (q.required === "required" && !isComplete(q, answers)) missing += 1;
+      if (q.required === "required") { required += 1; if (!isComplete(q, answers)) missing += 1; }
+      else if (!values(answers, q.id).length) optional += 1;
       const detail = card.querySelector(".q-detail");
       if (q.detail) detail.hidden = !(q.detail.required_when === "always" || detailRequired(q, answers) || values(answers, q.id + ".detail").length);
       const box = card.querySelector(".q-notices");
-      box.replaceChildren();
-      for (const hit of routesOf(q, answers)) {
-        const outcome = DATA.outcomes[hit.route.outcome];
-        notice(box, hit.route.outcome, outcome.title + ". ", hit.route.notice + (outcome.next ? " " + outcome.next : ""), outcome.blocks);
-      }
+      const hits = routesOf(q, answers);
+      let same = null;
       if (q.id === "2.1") {
         const name = norm(values(answers, "2.1")[0] || "");
-        const same = name && DATA.lists.measures.find((m) => [m.label].concat(m.other_names || []).some((n) => norm(n) === name));
-        if (same && same.notation !== held.example_of) notice(box, "same-measure", "The ontology already holds this measure. ", `"${same.label}" has this name. Stop the form. The request becomes a change to that measure.`, true);
+        same = name && DATA.lists.measures.find((m) => [m.label].concat(m.other_names || []).some((n) => norm(n) === name));
+        if (same && same.notation === held.example_of) same = null;
+      }
+      for (const hit of hits) if (DATA.outcomes[hit.route.outcome].blocks) routed.push(DATA.forms[hit.route.outcome] ? "Routed: " + DATA.forms[hit.route.outcome].toLowerCase() : DATA.outcomes[hit.route.outcome].title);
+      if (same) routed.push("Stopped: the ontology holds this measure");
+      // The notices are drawn again only when they change, so a part a reader opened in one stays open.
+      const drawn = JSON.stringify([hits.map((hit) => [hit.route.outcome, hit.route.notice]), same ? same.label : ""]);
+      if (box.dataset.drawn !== drawn) {
+        box.dataset.drawn = drawn;
+        box.replaceChildren();
+        for (const hit of hits) routeNotice(box, hit);
+        if (same) notice(box, "same-measure", "The ontology already holds this measure", `"${same.label}" has this name. Stop the form. The request becomes a change to that measure.`, true);
       }
     }
-    const text = `${done} of ${asked} answered` + (missing ? `, ${missing} required still missing` : "");
+    // Ready is not the same as answered: the line counts the required answers left, then the optional ones, and
+    // a section whose answer routes the request elsewhere says so instead of looking complete.
+    const stage = routed.length ? "routed" : missing ? "open" : "complete";
+    const routes = [...new Set(routed)].join(" · ");
+    const text = (routed.length ? routes + (missing ? " · " + left(missing) : "") : left(missing)) + (optional ? ` · ${optional} optional unanswered` : "");
+    formLeft += missing;
     node.querySelector(".section-progress").textContent = text;
+    node.querySelector(".section-progress").dataset.state = stage;
     const skippedLine = node.querySelector(".section-skipped");
     skippedLine.hidden = !skipped;
     skippedLine.textContent = skipped === 1 ? "1 question does not apply and is hidden." : `${skipped} questions do not apply and are hidden.`;
@@ -1008,21 +1217,31 @@ function refresh() {
     }
     const link = document.querySelector(`[data-nav="${section.id}"]`);
     if (link) {
-      link.querySelector(".nav-count").textContent = text;
+      link.dataset.state = stage;
+      link.querySelector(".nav-count").textContent = routed.length ? routes : left(missing);
       const bar = link.querySelector("progress");
-      bar.max = Math.max(asked, 1);
-      bar.value = done;
+      bar.max = Math.max(required, 1);
+      bar.value = required ? required - missing : 1;
     }
   }
+  $("sections-now").dataset.form = left(formLeft);
   const signers = DATA.sign_off.signer.filter((s) => s.forms.includes(view));
-  const signed = signers.filter((s) => { const g = held.sign_offs[s.id] || {}; return (g.name || "").trim() && (g.date || "").trim(); }).length;
+  const isSigned = (s) => { const g = held.sign_offs[s.id] || {}; return !!((g.name || "").trim() && (g.date || "").trim()); };
+  // Only the signatures that are needed count. One that waits for the check is named apart.
+  const needed = signers.filter((s) => isNeeded(s, view));
+  const signed = needed.filter(isSigned).length;
+  const waiting = signers.filter((s) => !isNeeded(s, view)).map((s) => isSigned(s) ? "conflict signature recorded" : "conflict review pending check");
+  const line = document.querySelector('[data-part="signoff-progress"]');
+  if (line) line.textContent = [`${signed} of ${needed.length} required signatures recorded`].concat(waiting).join(" · ");
   const link = document.querySelector('[data-nav="signoff"]');
   if (link) {
-    link.querySelector(".nav-count").textContent = `${signed} of ${signers.length} signed`;
+    link.dataset.state = signed === needed.length ? "complete" : "open";
+    link.querySelector(".nav-count").textContent = `${signed} of ${needed.length} required signed`;
     const bar = link.querySelector("progress");
-    bar.max = signers.length;
+    bar.max = Math.max(needed.length, 1);
     bar.value = signed;
   }
+  soon();
 }
 
 // ---- The other views -------------------------------------------------------------------------------------------
@@ -1054,11 +1273,14 @@ function show(name) {
   $("contents").hidden = !isForm;
   for (const tab of document.querySelectorAll("[data-view]")) tab.setAttribute("aria-selected", String(tab.dataset.view === name));
   for (const id of ["save", "clear"]) $(id).disabled = !isForm;
+  $("view-select").value = name;
+  for (const id of ["signoff-nav", "sections-toggle"]) $(id).hidden = !isForm;
+  closeSections();
   if (isForm) drawForm(name); else if (name === "roles") drawRoles(); else drawExplainer();
   saveDraft();
 }
 
-// ---- Save, load, start again -----------------------------------------------------------------------------------
+// ---- Save, load, clear ----------------------------------------------------------------------------------------
 function asFile(form) {
   const held = state[form];
   const answers = {};
@@ -1097,16 +1319,26 @@ function save() {
   say(`Saved ${link.download}. Check it with: py -m kpi_store.intake check ${link.download}`);
 }
 function readFile(text, name) {
+  // The file is checked whole before any of it is shown. A file that fails leaves every answer as it was.
+  const refuse = (what) => say(`This file is not a KPI intake answers file: ${what}.`, "problem");
   let data;
-  try { data = JSON.parse(text); } catch (e) { return say(`${name} is not a JSON file.`); }
-  const ok = data && data.format === 1 && FORMS.includes(data.form) && data.answers && typeof data.answers === "object" && !Array.isArray(data.answers);
-  if (!ok) return say(`${name} is not an answers file of this form.`);
+  try { data = JSON.parse(text); } catch (e) { return refuse("it is not JSON"); }
+  const problem = fileProblem(data);
+  if (problem) return refuse(problem);
+  // An answer under an id that the file's form does not ask is left out, and the status line lists it.
+  const known = new Set();
+  for (const q of questionsOf(data.form)) { known.add(q.id); if (q.detail) known.add(q.id + ".detail"); }
+  const answers = {}, ignored = [];
+  for (const [id, v] of Object.entries(data.answers)) { if (known.has(id)) answers[id] = v; else ignored.push(brief(id)); }
+  const elsewhere = data.form !== view;
   state[data.form] = Object.assign(emptyForm(), {
-    answers: data.answers, request: data.request || {}, sign_offs: data.sign_offs || {}, consulted: data.consulted || {},
+    answers, request: data.request || {}, sign_offs: data.sign_offs || {}, consulted: data.consulted || {},
     example_of: data.example_of || "", comment: data.comment || "",
   });
   show(data.form);
-  say(`Loaded ${name}.` + (data.catalogue_version && data.catalogue_version !== DATA.catalogue_version ? ` It was saved with catalogue ${data.catalogue_version}; this form is ${DATA.catalogue_version}.` : ""));
+  say(`Loaded ${name}` + (elsewhere ? ` into the ${DATA.forms[data.form]} form.` : ".")
+    + (data.catalogue_version && data.catalogue_version !== DATA.catalogue_version ? ` It was saved with catalogue ${data.catalogue_version}; this form is ${DATA.catalogue_version}.` : "")
+    + (ignored.length ? ` Left out ${ignored.length} ${ignored.length === 1 ? "answer" : "answers"} that this form does not ask: ${ignored.slice(0, 8).join(", ")}${ignored.length > 8 ? " and more" : ""}.` : ""));
 }
 $("save").addEventListener("click", save);
 $("load").addEventListener("click", () => $("load-file").click());
@@ -1117,59 +1349,109 @@ $("load-file").addEventListener("change", (e) => {
   reader.onload = () => { readFile(String(reader.result), file.name); e.target.value = ""; };
   reader.readAsText(file);
 });
-let armed = false;
+// "Clear this form" asks first, in the page: Cancel keeps every answer, Clear empties the form in view.
 $("clear").addEventListener("click", () => {
-  // The first press asks, the second clears. A stray click cannot empty the form.
-  if (!armed) { armed = true; $("clear").textContent = "Press again to empty this form"; setTimeout(() => { armed = false; $("clear").textContent = "Start again"; }, 4000); return; }
-  armed = false;
-  $("clear").textContent = "Start again";
+  $("clear-text").textContent = `This empties the ${DATA.forms[view]} form in this browser: every answer, signature and comment. A file you saved is not changed.`;
+  $("clear-dialog").showModal();
+});
+$("clear-cancel").addEventListener("click", () => $("clear-dialog").close());
+$("clear-confirm").addEventListener("click", () => {
+  $("clear-dialog").close();
   state[view] = emptyForm();
   show(view);
   say("The form is empty.");
 });
 
+// ---- The frame: the theme, the section in view, and the folded navigation of a narrow window ---------------------
+// None of this changes an answer, a draft or a rule.
+const THEME_KEY = "kpi-intake-theme";
+const darkScheme = matchMedia("(prefers-color-scheme: dark)");
+// Light, Dark or System. The choice sets data-theme on the root, and the styles hold both palettes.
+function applyTheme() {
+  const choice = $("theme").value;
+  document.documentElement.dataset.theme = choice === "system" ? (darkScheme.matches ? "dark" : "light") : choice;
+}
+function startTheme() {
+  let held = null;
+  try { held = localStorage.getItem(THEME_KEY); } catch (e) { /* the choice then lasts for this visit only */ }
+  $("theme").value = ["light", "dark", "system"].includes(held) ? held : "light";
+  applyTheme();
+  $("theme").addEventListener("change", () => {
+    try { localStorage.setItem(THEME_KEY, $("theme").value); } catch (e) { /* the theme still changes */ }
+    applyTheme();
+  });
+  darkScheme.addEventListener("change", applyTheme);
+}
+// The line of the section list whose section is on screen carries aria-current, and the Sections button of a folded
+// frame names that section and what it still needs.
+let queued = false, lastLine = null;
+function markSection() {
+  queued = false;
+  let at = null;
+  const links = document.querySelectorAll("[data-nav]");
+  for (const link of links) {
+    const target = document.getElementById(link.getAttribute("href").slice(1));
+    if (target && target.getBoundingClientRect().top <= innerHeight * 0.4) at = link;
+  }
+  for (const link of links) { if (link === at) link.setAttribute("aria-current", "location"); else link.removeAttribute("aria-current"); }
+  const now = $("sections-now");
+  now.textContent = at ? `${at.querySelector(".nav-name").textContent} · ${at.querySelector(".nav-count").textContent}` : now.dataset.form || "";
+  if (at && at !== lastLine && $("contents").contains(at)) {
+    // Keep that line in sight when the list itself scrolls.
+    const line = at.getBoundingClientRect(), box = $("contents").getBoundingClientRect();
+    if (line.bottom > box.bottom) $("contents").scrollTop += line.bottom - box.bottom + 8;
+    else if (line.top < box.top) $("contents").scrollTop -= box.top - line.top + 8;
+  }
+  lastLine = at;
+}
+function soon() { if (!queued) { queued = true; requestAnimationFrame(markSection); } }
+// The sign-off line: its own fixed row beside the file buttons, or the last line of the list in a folded frame.
+function placeSignoff() {
+  const link = document.querySelector('[data-nav="signoff"]');
+  if (link) (narrow.matches ? $("contents-list") : $("signoff-nav")).append(link.parentElement);
+}
+// In a folded frame the Sections button opens the section list over the page, and a choice closes it.
+function openSections() {
+  $("layout").classList.add("sections-open");
+  $("sections-toggle").setAttribute("aria-expanded", "true");
+  $("sections-close").focus();
+}
+function closeSections(back) {
+  if (!$("layout").classList.contains("sections-open")) return;
+  $("layout").classList.remove("sections-open");
+  $("sections-toggle").setAttribute("aria-expanded", "false");
+  if (back) $("sections-toggle").focus();
+}
+// The page leaves room for the bar of file buttons at its real height, whatever it holds.
+function fitDock() { document.documentElement.style.setProperty("--dock-h", $("dock").offsetHeight + "px"); }
+function startFrame() {
+  startTheme();
+  addEventListener("scroll", soon, { passive: true });
+  addEventListener("resize", soon);
+  narrow.addEventListener("change", () => { closeSections(); placeSignoff(); soon(); });
+  $("sections-toggle").addEventListener("click", () => { if ($("layout").classList.contains("sections-open")) closeSections(true); else openSections(); });
+  $("sections-close").addEventListener("click", () => closeSections(true));
+  $("contents").addEventListener("click", (e) => { if (e.target.closest("[data-nav]")) closeSections(); });
+  addEventListener("keydown", (e) => { if (e.key === "Escape") closeSections(true); });
+  $("view-select").addEventListener("change", () => show($("view-select").value));
+  if ("ResizeObserver" in window) new ResizeObserver(fitDock).observe($("dock"));
+  fitDock();
+}
+
 // ---- Start -----------------------------------------------------------------------------------------------------
-$("release-line").textContent = `${DATA.release}, catalogue ${DATA.catalogue_version}. This page works offline and sends nothing anywhere.`;
+$("release-line").textContent = `${DATA.release}, catalogue ${DATA.catalogue_version}.`;
 for (const [name, title] of VIEWS) {
   const tab = clone("tpl-tab");
   tab.dataset.view = name;
   tab.textContent = title;
   tab.addEventListener("click", () => show(name));
   $("tabs").append(tab);
+  $("view-select").append(new Option(title, name));
 }
+startFrame();
 const restored = loadDraft();
 show(view);
 if (restored) say("Your unsaved draft was restored from this browser.");
-
-// ---- The section in view (appearance only) -----------------------------------------------------------------------
-// Marks the line of the section list whose section is on screen with aria-current, so the styles can show where
-// the reader is. It reads the page and changes nothing else: no answer, no draft and no other part of the script.
-(function () {
-  let queued = false, last = null;
-  function mark() {
-    queued = false;
-    let at = null;
-    const links = document.querySelectorAll("[data-nav]");
-    for (const link of links) {
-      const target = document.getElementById(link.getAttribute("href").slice(1));
-      if (target && target.getBoundingClientRect().top <= innerHeight * 0.4) at = link;
-    }
-    for (const link of links) { if (link === at) link.setAttribute("aria-current", "location"); else link.removeAttribute("aria-current"); }
-    if (at && at !== last) {
-      // Keep that line in sight where the list itself scrolls: down a short window, or sideways on a phone.
-      const line = at.getBoundingClientRect(), box = $("contents").getBoundingClientRect(), row = $("contents-list").getBoundingClientRect();
-      if (line.bottom > box.bottom) $("contents").scrollTop += line.bottom - box.bottom + 8;
-      else if (line.top < box.top) $("contents").scrollTop -= box.top - line.top + 8;
-      if (line.right > row.right || line.left < row.left) $("contents-list").scrollLeft += line.left - row.left - 16;
-    }
-    last = at;
-  }
-  function soon() { if (!queued) { queued = true; requestAnimationFrame(mark); } }
-  addEventListener("scroll", soon, { passive: true });
-  addEventListener("resize", soon);
-  new MutationObserver(soon).observe($("contents-list"), { childList: true });
-  soon();
-})();
 </script>
 </body>
 </html>

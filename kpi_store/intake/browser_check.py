@@ -1,4 +1,4 @@
-"""Open the HTML intake form in a real browser and prove the nine things a person filling it relies on.
+"""Open the HTML intake form in a real browser and prove the thirteen things a person filling it relies on.
 
     uv run --no-project --with playwright==1.65.0 python kpi_store/intake/browser_check.py
 
@@ -8,14 +8,20 @@ Chrome or Microsoft Edge. It downloads no browser. `--shots <folder>` also write
 Each proof starts from a fresh load of kpi-intake/kpi-intake-form.html, with empty storage:
 
   1 load         the page opens from file:// with no console error and no network request
-  2 fill         a typed answer and a chosen answer are counted in the section's progress
+  2 fill         a typed answer and a chosen answer change the count of required answers left
   3 narrow list  the process list follows the business area, and the step list follows the process
   4 conditional  a question that the rules skip is hidden, and comes back when the answer changes
-  5 routing      an inactive domain and a missing process each show their own notice
-  6 save         "Save answers" downloads the answers as a JSON file of the documented shape
-  7 load file    "Load answers" fills the form from the shipped Crack Spreads Pricing example
-  8 draft        an unsaved draft survives a reload
-  9 phone        at 390 px wide the page has no sideways scroll
+  5 routing      an inactive domain and a missing process each show their own notice, and the section says "Routed"
+  6 save         "Save answers to file" downloads the answers as a JSON file of the documented shape
+  7 load file    "Load answers file" fills the form from the shipped Crack Spreads Pricing example, closes the
+                 request details to one line, and counts only the signatures that are needed
+  8 draft        an unsaved draft survives a reload, and "Clear this form" asks before it empties the form
+  9 phone        at 390 px wide the page has no sideways scroll, a selector changes the view, the Sections
+                 button opens the section list, and the page clears the bar of file buttons
+ 10 theme        the form starts light whatever the system says, and remembers the theme a person chooses
+ 11 next step    a routing notice names who answers, keeps settings.toml out of sight and opens the right form
+ 12 bad file     a malformed answers file is refused in words, changes no answer and leaves the form working
+ 13 other form   a domain activation file loaded from the KPI form opens in its own form and leaves the KPI answers
 
 Every expected value below is written by hand from the catalogue and the release packages. The script exits 1
 when a proof fails and names it. scripts/check.sh does not run it, because it needs a browser.
@@ -50,8 +56,8 @@ class Session:
         self.browser, self.url, self.shots = browser, Path(path).resolve().as_uri(), shots
         self.errors, self.requests = [], []
 
-    def open(self, width=1280, height=900):
-        context = self.browser.new_context(viewport={"width": width, "height": height}, accept_downloads=True)
+    def open(self, width=1280, height=900, scheme="light"):
+        context = self.browser.new_context(viewport={"width": width, "height": height}, accept_downloads=True, color_scheme=scheme)
         # Anything that is not the file itself or data inside it would leave the machine: stop it and count it.
         context.route(lambda url: not url.startswith(("file:", "data:", "blob:", "about:")), self._refuse)
         page = context.new_page()
@@ -87,22 +93,29 @@ def choose(page, question, value):
 def load(s):
     page = s.open()
     same(page.locator("h1").inner_text(), "KPI intake form", "the page's heading")
-    holds(page.locator("#release-line").inner_text(), "KPI Store 1.1, catalogue 1.0", "the release line")
+    holds(page.locator("#release-line").text_content(), "KPI Store 1.1, catalogue 1.0", "the release line")
     same(page.locator("#tabs [role=tab]").all_inner_texts(),
          ["KPI intake", "Domain activation", "Process map request", "The roles", "What we will ask you"], "the tabs")
     same(page.locator("[data-section]").count(), 7, "sections of the KPI form")
     same(page.locator("[data-question]").count(), 46, "questions of the KPI form")
+    holds(page.locator(".brand-line").inner_text(), "Works offline. Sends nothing.", "the line under the name")
+    same(page.locator("#save").inner_text(), "Save answers to file", "the save button")
+    same(page.locator("#load").inner_text(), "Load answers file", "the load button")
+    assert page.locator('[data-part="request-details"]').get_attribute("open") is not None, "the empty request details are closed"
+    assert card(page, "1.1").is_visible(), "the first question is not on the page"
+    same(card(page, "1.5").locator(".q-asked").inner_text(), "The Domain Owner of the proposed domain.", "who answers 1.5")
+    holds(card(page, "1.5").locator(".q-asked-more").inner_text(), "The Program manager proposes", "the coordination line of 1.5")
     s.shot(page, "1-load")
 
 
 def fill(s):
     page = s.open()
-    holds(page.locator('[data-section="2"] .section-progress').inner_text(), "0 of 4 answered, 2 required still missing", "section 2 before")
+    holds(page.locator('[data-section="2"] .section-progress').inner_text(), "2 required answers left · 2 optional unanswered", "section 2 before")
     card(page, "2.1").locator("input").fill("Tank Turnover")
     card(page, "2.2").locator("textarea").fill("How many times the stored volume is replaced in a month.")
-    same(page.locator('[data-section="2"] .section-progress').inner_text(), "2 of 4 answered", "section 2 after")
+    same(page.locator('[data-section="2"] .section-progress').inner_text(), "Required answers complete · 2 optional unanswered", "section 2 after")
     choose(page, "3.7", "anyone")
-    holds(page.locator('[data-nav="3"] .nav-count').inner_text(), "1 of 7 answered", "the section list")
+    holds(page.locator('[data-nav="3"] .nav-count').inner_text(), "4 required answers left", "the section list")
     card(page, "2.1").locator("input").fill("crack spread")
     holds(card(page, "2.1").locator('[data-notice="same-measure"]').inner_text(), '"Crack Spreads Pricing" has this name', "the notice for a name the ontology holds")
     s.shot(page, "2-fill")
@@ -143,14 +156,17 @@ def routing(s):
     page = s.open()
     choose(page, "1.5", "customer")
     note = card(page, "1.5").locator('[data-notice="domain-activation"]')
-    holds(note.inner_text(), "Domain activation needed", "the notice for a domain that is not active")
+    holds(note.inner_text(), "Domain activation required before this KPI can be added", "the notice for a domain that is not active")
+    holds(page.locator('[data-section="1"] .section-progress').inner_text(), "Routed: domain activation", "section 1 with an inactive domain")
+    same(page.locator('[data-nav="1"] .nav-count').inner_text(), "Routed: domain activation", "the section list with an inactive domain")
     choose(page, "1.5", "market-price")
     same(card(page, "1.5").locator("[data-notice]").count(), 0, "notices for an active domain")
     choose(page, "1.2", "@not-in-list")
-    holds(card(page, "1.2").locator('[data-notice="process-map-request"]').inner_text(), "Process map request needed", "the notice for a missing process")
+    holds(card(page, "1.2").locator('[data-notice="process-map-request"]').inner_text(), "Process map request required before this KPI can be added", "the notice for a missing process")
     assert card(page, "1.2").locator(".q-detail").is_visible(), "the missing process's name is not asked for"
     choose(page, "3.7", "restricted")
     holds(card(page, "3.7").locator('[data-notice="restricted-review"]').inner_text(), "Privacy, Security, Compliance and Risk", "the notice for a restricted KPI")
+    same(card(page, "3.7").locator(".notice-reviewers li").all_inner_texts(), ["Privacy", "Security", "Compliance", "Risk"], "the reviewers of a restricted KPI")
     s.shot(page, "5-routing")
 
 
@@ -188,6 +204,15 @@ def load_file(s):
     same(page.locator('[data-signer="architect"] [data-sign="date"]').input_value(), "2026-11-11", "the Architect's date")
     holds(page.locator('[data-part="example-mark"]').inner_text(), "shipped example", "the example mark")
     same(card(page, "2.1").locator("[data-notice]").count(), 0, "notices on the example's own name")
+    assert page.locator('[data-part="request-details"]').get_attribute("open") is None, "the filled request details stay open"
+    holds(page.locator('[data-part="request-summary"]').inner_text(), "EXAMPLE-1", "the one line of the request details")
+    # Four signers, one of them only for a conflict: three are needed and all three have signed.
+    same(page.locator('[data-nav="signoff"] .nav-count').inner_text(), "3 of 3 required signed", "the sign-off line")
+    same(page.locator('[data-part="signoff-progress"]').inner_text(), "3 of 3 required signatures recorded · conflict review pending check", "the sign-off count")
+    same(page.locator('[data-signer="domain-confirmation"] .signer-label').inner_text(), "Domain confirmation", "the first Domain Owner block")
+    same(page.locator('[data-signer="domain-owner"] .signer-label').inner_text(), "Conflicting definitions", "the second Domain Owner block")
+    same(page.locator('[data-signer="domain-owner"] .signer-status').inner_text(), "Only if the check finds a conflicting definition", "the conflict signature")
+    same(page.locator('[data-section="1"] .section-progress').inner_text(), "Required answers complete · 1 optional unanswered", "section 1 of the example")
     with page.expect_download() as download:
         page.locator("#save").click()
     saved = json.loads(Path(download.value.path()).read_text(encoding="utf-8"))
@@ -204,22 +229,132 @@ def draft(s):
     assert card(page, "1.5").locator('input[value="market-price"]').is_checked(), "1.5 after a reload"
     holds(page.locator("#status").inner_text(), "draft was restored", "the status line")
     page.locator("#clear").click()
+    assert page.locator("#clear-dialog").is_visible(), "Clear this form does not ask first"
+    page.locator("#clear-cancel").click()
+    same(card(page, "2.1").locator("input").input_value(), "Tank Turnover", "2.1 after Cancel")
     page.locator("#clear").click()
-    same(card(page, "2.1").locator("input").input_value(), "", "2.1 after Start again")
+    page.locator("#clear-confirm").click()
+    same(card(page, "2.1").locator("input").input_value(), "", "2.1 after Clear")
+    assert page.locator("#clear-dialog").is_hidden(), "the question stays after Clear"
 
 
 def phone(s):
     page = s.open(width=390, height=844)
     page.locator("#load-file").set_input_files(str(EXAMPLE))
     card(page, "7.1").scroll_into_view_if_needed()
+    assert page.locator("#tabs").is_hidden(), "the row of tabs shows at 390 px"
+    for name in ("view-select", "sections-toggle", "save", "load", "clear"):
+        height = page.locator(f"#{name}").bounding_box()["height"]
+        assert height >= 44, f"#{name} is {height} px high, under 44"
+    # The Sections button names the section in view, and opens the list with the sign-off line at its end.
+    page.wait_for_function("document.getElementById('sections-now').textContent.startsWith('7. Where the data lives')")
+    assert page.locator("#contents").is_hidden(), "the section list shows before the Sections button is pressed"
+    page.locator("#sections-toggle").click()
+    assert page.locator("#contents").is_visible(), "the Sections button does not open the section list"
+    same(page.locator("#contents-list [data-nav]").count(), 8, "lines of the section list: seven sections and the sign-off")
+    page.locator('#contents-list [data-nav="3"]').click()
+    assert page.locator("#contents").is_hidden(), "the section list stays open after a choice"
+    page.wait_for_function("document.getElementById('sections-now').textContent.startsWith('3. The facts about it')")
+    assert page.evaluate("parseFloat(getComputedStyle(document.body).paddingBottom) >= document.getElementById('dock').offsetHeight - 1"), "the page does not clear the bar of file buttons"
     for tab in ("kpi-intake", "domain-activation", "process-map-request", "roles", "explainer"):
-        page.locator(f'[data-view="{tab}"]').click()
+        page.locator("#view-select").select_option(tab)
+        same(page.locator(f'[data-view="{tab}"]').get_attribute("aria-selected"), "true", f"the view after choosing {tab}")
         assert not page.evaluate("document.documentElement.scrollWidth > innerWidth"), f"the {tab} view scrolls sideways at 390 px"
     s.shot(page, "9-phone")
 
 
+def theme(s):
+    page = s.open(scheme="dark")
+    same(page.locator("html").get_attribute("data-theme"), "light", "the theme of a fresh visit on a dark system")
+    same(page.locator("#theme").input_value(), "light", "the selector of a fresh visit")
+    page.locator("#theme").select_option("dark")
+    same(page.locator("html").get_attribute("data-theme"), "dark", "the theme after choosing Dark")
+    page.reload()
+    same(page.locator("#theme").input_value(), "dark", "the selector after a reload")
+    same(page.locator("html").get_attribute("data-theme"), "dark", "the theme after a reload")
+    page.locator("#theme").select_option("system")
+    same(page.locator("html").get_attribute("data-theme"), "dark", "the System theme on a dark system")
+    page.emulate_media(color_scheme="light")
+    page.wait_for_function("document.documentElement.dataset.theme === 'light'")   # the System theme follows the system
+    s.shot(page, "10-theme")
+
+
+def next_step(s):
+    page = s.open()
+    card(page, "2.1").locator("input").fill("Tank Turnover")
+    choose(page, "1.5", "customer")
+    note = card(page, "1.5").locator('[data-notice="domain-activation"]')
+    holds(note.locator(".notice-who").inner_text(), "The Domain Owner answers and signs.", "who does a domain activation")
+    assert "settings.toml" not in note.inner_text(), "the notice shows settings.toml to the business"
+    holds(note.locator(".notice-analyst p").text_content(), "settings.toml", "the line for the analyst")
+    button = note.locator(".notice-open")
+    same(button.inner_text(), "Open the domain activation form", "the button of the notice")
+    assert button.bounding_box()["height"] >= 44, "the button of the notice is under 44 px high"
+    button.focus()
+    page.keyboard.press("Enter")
+    same(page.locator('[data-view="domain-activation"]').get_attribute("aria-selected"), "true", "the view after the button")
+    assert page.locator('[data-question="D1"]').is_visible(), "the domain activation form is not shown"
+    page.locator('[data-view="kpi-intake"]').click()
+    same(card(page, "2.1").locator("input").input_value(), "Tank Turnover", "2.1 after coming back")
+    choose(page, "1.2", "@not-in-list")
+    card(page, "1.2").locator(".notice-open").click()
+    same(page.locator('[data-view="process-map-request"]').get_attribute("aria-selected"), "true", "the view after the second button")
+    s.shot(page, "11-next-step")
+
+
+def bad_file(s):
+    page = s.open()
+    card(page, "2.1").locator("input").fill("Tank Turnover")
+    refused = "This file is not a KPI intake answers file: "
+
+    def offer(text):
+        page.locator("#load-file").set_input_files({"name": "offered.json", "mimeType": "application/json", "buffer": text.encode("utf-8")})
+
+    for text, what in (
+        ('{"format":1,"form":"kpi-intake","answers":{"2.1":{"toString":"x"}}}', "the answer to 2.1 is neither a text nor a list of texts."),
+        ("not json at all", "it is not JSON."),
+        ("[1, 2]", "it is not a JSON object."),
+        ('{"format":2,"form":"kpi-intake","answers":{}}', 'its "format" is not 1.'),
+        ('{"format":1,"form":"something-else","answers":{}}', 'its "form" names none of the three forms.'),
+        ('{"format":1,"form":"kpi-intake","answers":["2.1"]}', 'it has no "answers" object.'),
+        ('{"format":1,"form":"kpi-intake","answers":{"5.1":["a",3]}}', "the answer to 5.1 is neither a text nor a list of texts."),
+        ('{"format":1,"form":"kpi-intake","answers":{},"comment":{"a":1}}', '"comment" is not a text.'),
+        ('{"format":1,"form":"kpi-intake","answers":{},"request":{"number":7}}', '"request" does not hold a text for each field.'),
+        ('{"format":1,"form":"kpi-intake","answers":{},"sign_offs":{"data-owner":"A name"}}', '"sign_offs" does not hold texts for each entry.'),
+    ):
+        offer(text)
+        page.wait_for_function("text => document.getElementById('status').textContent === text", arg=refused + what)
+        same(card(page, "2.1").locator("input").input_value(), "Tank Turnover", f"2.1 after the refused file ({what})")
+    # The form still works after the refusals.
+    card(page, "2.2").locator("textarea").fill("How many times the stored volume is replaced in a month.")
+    same(page.locator('[data-section="2"] .section-progress').inner_text(), "Required answers complete · 2 optional unanswered", "section 2 after the refusals")
+    # A good file may hold markup in an answer. The form shows it as the text it is.
+    offer('{"format":1,"form":"kpi-intake","answers":{"2.1":"<img src=x onerror=alert(1)><b>bold</b>","5.1":["<i>x</i>"]},"request":{"number":"<u>7</u>"}}')
+    page.wait_for_function("document.getElementById('status').textContent.startsWith('Loaded offered.json')")
+    same(card(page, "2.1").locator("input").input_value(), "<img src=x onerror=alert(1)><b>bold</b>", "2.1 from the file with markup")
+    same(page.locator("#view img, #view b, #view i, #view u").count(), 0, "elements made from the file's text")
+    holds(page.locator('[data-part="request-summary"]').text_content(), "<u>7</u>", "the request line from the file with markup")
+    s.shot(page, "12-bad-file")
+
+
+def other_form(s):
+    page = s.open()
+    card(page, "2.1").locator("input").fill("Tank Turnover")
+    page.locator("#load-file").set_input_files({"name": "logistics.domain-activation.json", "mimeType": "application/json",
+                                                "buffer": b'{"format":1,"form":"domain-activation","answers":{"D1":"Logistics","2.1":"A stray answer"}}'})
+    page.wait_for_function("document.getElementById('status').textContent.startsWith('Loaded')")
+    same(page.locator("#status").inner_text(),
+         "Loaded logistics.domain-activation.json into the Domain activation form. Left out 1 answer that this form does not ask: 2.1.", "the status line")
+    same(page.locator('[data-view="domain-activation"]').get_attribute("aria-selected"), "true", "the view after the load")
+    same(card(page, "D1").locator("input").input_value(), "Logistics", "D1")
+    page.locator('[data-view="kpi-intake"]').click()
+    same(card(page, "2.1").locator("input").input_value(), "Tank Turnover", "2.1 of the KPI form after the load")
+    s.shot(page, "13-other-form")
+
+
 PROOFS = [("1 load", load), ("2 fill", fill), ("3 narrow list", narrow_list), ("4 conditional", conditional),
-          ("5 routing", routing), ("6 save", save), ("7 load file", load_file), ("8 draft", draft), ("9 phone", phone)]
+          ("5 routing", routing), ("6 save", save), ("7 load file", load_file), ("8 draft", draft), ("9 phone", phone),
+          ("10 theme", theme), ("11 next step", next_step), ("12 bad file", bad_file), ("13 other form", other_form)]
 
 
 def launch(playwright, channels):
