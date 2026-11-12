@@ -4,6 +4,8 @@ KPI Store 1.1 is a business ontology for downstream oil and gas, with the code t
 
 To see the ontology first, open [the ontology viewer](viewer/index.html) in a browser. It shows this release as received, works offline and needs no setup. [The viewer's instructions](viewer/README.md) say how to use it.
 
+To ask for a new KPI, start in [`kpi-intake/`](kpi-intake/README.md). It holds the form a business analyst fills in with the business, as a page and as an Excel workbook, and the check that says whether a filled form is complete.
+
 ## What KPI Store does
 
 KPI Store loads the released ontology packages of this folder into three stores. The packages are the master copy, and each store holds a copy of them.
@@ -52,6 +54,7 @@ Follow a guide for every run. This page gives no steps.
 | `business_architecture/domain/` | The business glossary, the data domains, the problem statement, the decision packages and this release's decision records (`kpi-store-decisions/`) |
 | `skills/` | Five agent skills: `ontology` (the method), `ontology-to-lpg` (the projection into a property graph), `rdf-store` (triple stores), `ontology-visualization` (the viewer playbook) and `clear-writing` |
 | `viewer/` and `horoi_viewer/` | Two pages that show the ontology in a browser, offline |
+| `kpi-intake/` | The KPI intake pack: the form for one new KPI as a page and as a workbook, its guide, two filled examples, and the question catalogue the forms are built from. `kpi_store/intake/` holds its code |
 | `best-practices/` | The order of the build, read as six stages from a controlled vocabulary to a knowledge graph, with the reason for the order. Also a guide to the first stage, the controlled vocabulary, with a made-up example |
 | `scripts/` | `check.sh`, the one command that proves your copy is valid, and the tools it runs. `DOC-SNIPPETS.md` says how the code blocks in the documents are tested |
 | `HOW-TO-UPDATE.md` | The guide for every update after the first run |
@@ -91,6 +94,7 @@ The runbook says when to run each command and what it prints. This table says on
 | `py -m kpi_store.copy_enterprise` | Copies the checked graph from the local Neo4j to the one named database on Neo4j Enterprise, and checks the copy |
 | `py -m kpi_store.sync_check` | Says whether each store holds the release in this folder: current, or behind |
 | `py -m kpi_store.questions.run ask <question> --settings <file> --mapping <file> --out <folder>` | Asks one of the four cross-graph questions (`q1`, `q4`, `q6`, `q7`) and writes its rows. The other subcommands are `discover`, `confirm` and `check`, which make and check the mapping file that `ask` needs. `py -m kpi_store.questions.run --help` lists them |
+| `py -m kpi_store.intake check <file>` | Says what a filled KPI intake form still lacks. `py -m kpi_store.intake build` rebuilds the forms from the catalogue and the release packages |
 | `bash scripts/check.sh` | Proves that this copy of the release is valid |
 
 ## Run the checks

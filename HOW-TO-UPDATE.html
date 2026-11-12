@@ -333,13 +333,17 @@ Step 1 passed; loadable.nt &lt;count&gt; triples, inferred.nt 2
 wrote projection-manifest.json
 ...
 competency coverage on &lt;the core package&gt;: 57 questions; answerable 56, partial 0, waiting 0, parked 1</code></pre></li></ol>
-<ol start="8"><li>In a Git copy, stage the change. Then run the full check.
+<ol start="8"><li>Rebuild the KPI intake pack, so that its lists offer what the release changed. The command needs the <code>openpyxl</code> package beside <code>rdflib</code> (<code>py -m pip install openpyxl</code>). <code>kpi-intake/README.md</code> explains the pack.
+<pre><code class="lang-powershell">py -m kpi_store.intake build</code></pre>
+<pre><code class="lang-text">wrote kpi-intake/pick-lists.json
+...</code></pre></li></ol>
+<ol start="9"><li>In a Git copy, stage the change. Then run the full check.
 <pre><code class="lang-bash">git add -A
 bash scripts/check.sh</code></pre>
 <pre><code class="lang-text">...
 all checks passed</code></pre>
 <p>After a change, the check prints a note: <code>projection-report.json describes an earlier build</code>. That file is the summary of the last Neo4j load, and it now describes the release before your change. The note does not fail the check, and it does not mean the ontology is wrong. It goes away when you have loaded the stores and recorded the new load's report with <code>py pipeline.py record</code>. The runbook's section "Record the load's report in the release folder" runs that command.</p></li></ol>
-<ol start="9"><li>Search your copy for text that the change made stale, and update each document that holds it. No check catches a copy of a sentence.</li><li>Load the stores with the runner, and read its last line. The release is done when the sync check reads <code>current</code> on every line.
+<ol start="10"><li>Search your copy for text that the change made stale, and update each document that holds it. No check catches a copy of a sentence.</li><li>Load the stores with the runner, and read its last line. The release is done when the sync check reads <code>current</code> on every line.
 <pre><code class="lang-powershell">py -m kpi_store.runner</code></pre>
 <p>If the <code>enterprise</code> step stops because the database holds the earlier release, see step 4 of "A correction through the loop".</p></li></ol>
 <h2 id="change-a-concept-s-definition">Change a concept's definition<a class="hl" href="#change-a-concept-s-definition" aria-label="Link to this section">#</a></h2>
