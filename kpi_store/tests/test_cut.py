@@ -467,7 +467,9 @@ def test_a_cut_rebuilds_the_kpi_intake_pack_so_its_check_reads_current_pick_list
     root = release_copy(tmp_path)
     pack = with_intake_pack(root)
     example = pack / "examples" / "crack-spreads-pricing.json"
-    assert intake_build.stale(root, pack) == [] and intake_check.run(example, pack, root=root).complete
+    assert intake_build.stale(root, pack) == [], ("the KPI intake pack is older than this tree's packages, so this test cannot start. "
+                                                  "Rebuild it: py -m kpi_store.intake build")
+    assert intake_check.run(example, pack, root=root).complete
     path = cleared(tmp_path, {"R002": "accept", **{r: "reject" for r in EXTRAS}})
     said = []
     plan_lines = cut.describe(cut.plan(cut.load_report(path)[0], root))

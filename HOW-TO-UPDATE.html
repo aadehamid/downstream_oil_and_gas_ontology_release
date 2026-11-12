@@ -413,7 +413,7 @@ spaces = []</code></pre>
 <ol><li>Add a row for each table and view of the area to <code>business_architecture/ontology/data-product/pricing/tables.csv</code>. Use the names the workspace uses.</li><li>Add a row for each hop of the area's lineage to <code>lineage.csv</code>, in the same folder.</li><li>Add a row for each value column to <code>columns.csv</code>, in the same folder.</li><li>Run the builder from <code>business_architecture/ontology/data-product</code>: <code>py build_pricing.py --write</code>. It fails on a name that does not resolve.</li><li>Release <code>data-product</code> as a minor version, with its cascade ("The release steps").</li><li>Run <code>py -m kpi_store.runner</code>. The run now compares the new tables with the workspace.</li></ol>
 <p>The cut tool applies corrections to the tables in <code>data-product/pricing/</code> only. A difference in any other module's content goes through the release steps of this guide, not through the cut.</p>
 <h3 id="release-the-module-at-1-0-0">Release the module at 1.0.0<a class="hl" href="#release-the-module-at-1-0-0" aria-label="Link to this section">#</a></h3>
-<ol><li>Run the module's builder with <code>--write</code>, from the module's folder.</li><li>Write the package: <code>py build_module.py &lt;module&gt; --write</code>, from <code>business_architecture/ontology/release</code>.</li><li>Rebuild the catalog: <code>py build_catalog.py --write</code>, from the same folder.</li><li>Rebuild the projection manifest: <code>py pipeline.py build</code>, from <code>business_architecture/ontology/projection</code>.</li><li>Run the competency questions: <code>py run.py</code>, from <code>business_architecture/ontology/regression</code>.</li><li>Rebuild the pages: <code>py scripts/build_docs_html.py</code>, from the top folder.</li><li>Run the full check. Do not share the module until it prints <code>all checks passed</code>.</li></ol>
+<ol><li>Run the module's builder with <code>--write</code>, from the module's folder.</li><li>Write the package: <code>py build_module.py &lt;module&gt; --write</code>, from <code>business_architecture/ontology/release</code>.</li><li>Rebuild the catalog: <code>py build_catalog.py --write</code>, from the same folder.</li><li>Rebuild the projection manifest: <code>py pipeline.py build</code>, from <code>business_architecture/ontology/projection</code>.</li><li>Run the competency questions: <code>py run.py</code>, from <code>business_architecture/ontology/regression</code>.</li><li>Rebuild the KPI intake pack: <code>py -m kpi_store.intake build</code>, from the top folder. Its lists name the release's modules.</li><li>Rebuild the pages: <code>py scripts/build_docs_html.py</code>, from the top folder.</li><li>Run the full check. Do not share the module until it prints <code>all checks passed</code>.</li></ol>
 <p>A first release needs no cascade. No released module requires the new one yet. A module that should link to it does so in its own next release.</p>
 <h3 id="reload-the-stores">Reload the stores<a class="hl" href="#reload-the-stores" aria-label="Link to this section">#</a></h3>
 <p>The projection takes every module in <code>PACKAGES</code>, so the new module goes into Neo4j with the others. No store needs a setting of its own for it.</p>
@@ -466,15 +466,17 @@ wrote projection-manifest.json</code></pre></li></ol>
 <pre><code class="lang-powershell">cd ../regression
 py run.py</code></pre>
 <pre><code class="lang-text">competency coverage on &lt;the core release&gt;: 58 questions; answerable 57, partial 0, waiting 0, parked 1</code></pre></li></ol>
-<ol start="7"><li>Rebuild the pages, and tell Git about the new files. One test reads which pages Git tracks.
+<ol start="7"><li>Rebuild the KPI intake pack. Its lists name the release's modules, so a new module makes them older than the packages, and the full check then stops on the pack.
 <pre><code class="lang-powershell">cd ../../..
-py scripts/build_docs_html.py
+py -m kpi_store.intake build</code></pre></li></ol>
+<ol start="8"><li>Rebuild the pages, and tell Git about the new files. One test reads which pages Git tracks.
+<pre><code class="lang-powershell">py scripts/build_docs_html.py
 git add -A</code></pre></li></ol>
-<ol start="8"><li>Run the full check. It takes about 10 minutes. On Windows, run it in Git Bash.
+<ol start="9"><li>Run the full check. It takes about 10 minutes. On Windows, run it in Git Bash.
 <pre><code class="lang-bash">bash scripts/check.sh</code></pre>
 <pre><code class="lang-text">...
 all checks passed</code></pre></li></ol>
-<ol start="9"><li>Run the helper again. It refuses a copy that holds the module, and changes nothing.
+<ol start="10"><li>Run the helper again. It refuses a copy that holds the module, and changes nothing.
 <pre><code class="lang-powershell">cd business_architecture/ontology/release
 py onboard_example.py --write</code></pre>
 <pre><code class="lang-text">refused: this release holds the module sample-area already; nothing was changed</code></pre></li></ol>
@@ -501,7 +503,7 @@ py build_logical_model.py --export models/customer-logical-model.erstudio.ttl --
 <h2 id="the-namespace">The namespace<a class="hl" href="#the-namespace" aria-label="Link to this section">#</a></h2>
 <p>The IRIs begin with <code>https://w3id.org/mpc/ontology/</code>. Keep them as working names unless you have a reason to change them. They identify terms and resolve nowhere. A term's IRI is its identity, so a change is a major release of every module.</p>
 <p>If you do change the namespace, do it first, before other changes, and with the ontology owner's approval.</p>
-<ol><li>Raise <code>core</code> and every module to the next major version, following the sections above.</li><li>Replace the base in the sources: the module folders, the process map's identity map, the builders, the folder <code>projection</code>, the shapes and the regression queries.</li><li>Leave <code>releases\previous</code> alone. Those packages keep the old IRIs, because a released package never changes.</li><li>Write every package again in the order <code>dependents.py core</code> prints, and run the full check.</li></ol>
+<ol><li>Raise <code>core</code> and every module to the next major version, following the sections above.</li><li>Replace the base in the sources: the module folders, the process map's identity map, the builders, the folder <code>projection</code>, the shapes and the regression queries.</li><li>Leave <code>releases\previous</code> alone. Those packages keep the old IRIs, because a released package never changes.</li><li>Write every package again in the order <code>dependents.py core</code> prints. Then rebuild the catalog, the projection manifest and the KPI intake pack, as steps 7 and 8 of "The release steps" say, and run the full check.</li></ol>
 <h2 id="what-you-can-ignore">What you can ignore<a class="hl" href="#what-you-can-ignore" aria-label="Link to this section">#</a></h2>
 <p>These describe how the ontology was first built. You need none of them to update it.</p>
 <ul><li>Part 2 of <code>business_architecture/ontology/epm-walkthrough.html</code>, and the folder <code>build</code>, apart from the identity map named above.</li><li>The folder <code>step4</code> and the older core builders, <code>build_core_next.py</code> and <code>build_core_2_1.py</code>, which rebuild earlier releases.</li><li>The folder <code>release/frozen</code>, apart from the copies you add.</li><li><code>business_architecture/domain/decision-packages</code>, questions put to the subject matter expert during the build.</li><li><code>business_architecture/ontology/business-closeout.md</code>, and any note in a README or changelog dated before you received this release.</li></ul>

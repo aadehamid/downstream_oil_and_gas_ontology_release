@@ -519,8 +519,9 @@ The cut tool applies corrections to the tables in `data-product/pricing/` only. 
 3. Rebuild the catalog: `py build_catalog.py --write`, from the same folder.
 4. Rebuild the projection manifest: `py pipeline.py build`, from `business_architecture/ontology/projection`.
 5. Run the competency questions: `py run.py`, from `business_architecture/ontology/regression`.
-6. Rebuild the pages: `py scripts/build_docs_html.py`, from the top folder.
-7. Run the full check. Do not share the module until it prints `all checks passed`.
+6. Rebuild the KPI intake pack: `py -m kpi_store.intake build`, from the top folder. Its lists name the release's modules.
+7. Rebuild the pages: `py scripts/build_docs_html.py`, from the top folder.
+8. Run the full check. Do not share the module until it prints `all checks passed`.
 
 A first release needs no cascade. No released module requires the new one yet. A module that should link to it does so in its own next release.
 
@@ -627,15 +628,21 @@ The commands start in the top folder of the copy.
    competency coverage on <the core release>: 58 questions; answerable 57, partial 0, waiting 0, parked 1
    ```
 
-7. Rebuild the pages, and tell Git about the new files. One test reads which pages Git tracks.
+7. Rebuild the KPI intake pack. Its lists name the release's modules, so a new module makes them older than the packages, and the full check then stops on the pack.
 
    ```powershell run=new-module status-only
    cd ../../..
+   py -m kpi_store.intake build
+   ```
+
+8. Rebuild the pages, and tell Git about the new files. One test reads which pages Git tracks.
+
+   ```powershell run=new-module status-only
    py scripts/build_docs_html.py
    git add -A
    ```
 
-8. Run the full check. It takes about 10 minutes. On Windows, run it in Git Bash.
+9. Run the full check. It takes about 10 minutes. On Windows, run it in Git Bash.
 
    ```bash run=new-module
    bash scripts/check.sh
@@ -646,16 +653,16 @@ The commands start in the top folder of the copy.
    all checks passed
    ```
 
-9. Run the helper again. It refuses a copy that holds the module, and changes nothing.
+10. Run the helper again. It refuses a copy that holds the module, and changes nothing.
 
-   ```powershell run=new-module exit=1
-   cd business_architecture/ontology/release
-   py onboard_example.py --write
-   ```
+    ```powershell run=new-module exit=1
+    cd business_architecture/ontology/release
+    py onboard_example.py --write
+    ```
 
-   ```text expect
-   refused: this release holds the module sample-area already; nothing was changed
-   ```
+    ```text expect
+    refused: this release holds the module sample-area already; nothing was changed
+    ```
 
 The copy now holds the made-up module. Delete the copy when you have read what the helper changed.
 
@@ -717,7 +724,7 @@ If you do change the namespace, do it first, before other changes, and with the 
 1. Raise `core` and every module to the next major version, following the sections above.
 2. Replace the base in the sources: the module folders, the process map's identity map, the builders, the folder `projection`, the shapes and the regression queries.
 3. Leave `releases\previous` alone. Those packages keep the old IRIs, because a released package never changes.
-4. Write every package again in the order `dependents.py core` prints, and run the full check.
+4. Write every package again in the order `dependents.py core` prints. Then rebuild the catalog, the projection manifest and the KPI intake pack, as steps 7 and 8 of "The release steps" say, and run the full check.
 
 ## What you can ignore
 
