@@ -348,3 +348,81 @@ def test_the_architects_page_maps_every_question_and_lists_the_facts_with_no_pla
                  "Who may see the KPI", "The topic, or family, of the KPI", "The accountable owner of a KPI", "The target of a KPI",
                  "The direction of a good value"):
         assert f"\n| {fact} | " in text, fact
+
+
+# ---- The build writes only inside the pack folder -----------------------------------------------------------------
+
+def _linked(tmp_path, name, directory=False):
+    """A fresh copy of the pack in which one generated path is a link to a place outside it. Returns the pack and
+    the outside target. Skips where the system does not let a test make a link, as Windows may."""
+    pack = tmp_path / "kpi-intake"
+    shutil.copytree(PACK, pack)
+    outside = tmp_path / "outside" / name
+    outside.parent.mkdir()
+    inside = pack / name
+    if directory:
+        shutil.copytree(inside, outside)
+        shutil.rmtree(inside)
+    else:
+        outside.write_text("not the pack's file\n", encoding="utf-8", newline="\n")
+        inside.unlink()
+    try:
+        inside.symlink_to(outside, target_is_directory=directory)
+    except OSError:
+        pytest.skip("this system does not let the test make a link")
+    return pack, outside
+
+
+@pytest.mark.parametrize("check", [False, True])
+def test_a_generated_file_that_is_a_link_is_refused_and_its_target_is_unchanged(tmp_path, capsys, check):
+    pack, outside = _linked(tmp_path, "pick-lists.json")
+    assert main(["build", "--pack", str(pack)] + (["--check"] if check else [])) == 2
+    captured = capsys.readouterr()
+    assert captured.err == ("stopped: pick-lists.json in the pack folder is a link. The build writes only inside the pack folder, "
+                            "so it does not follow a link. Remove the link and run the command again.\n")
+    assert captured.out == ""                               # nothing was written or compared before the refusal
+    assert outside.read_text(encoding="utf-8") == "not the pack's file\n"
+    assert (pack / "pick-lists.json").is_symlink()
+
+
+@pytest.mark.parametrize("check", [False, True])
+def test_a_linked_examples_folder_is_refused(tmp_path, capsys, check):
+    pack, outside = _linked(tmp_path, "examples", directory=True)
+    before = {p.name: p.read_bytes() for p in outside.iterdir()}
+    # Make the examples stale, so a build that followed the link would write through it.
+    (outside / "crack-spreads-pricing.json").write_text("{}\n", encoding="utf-8", newline="\n")
+    before["crack-spreads-pricing.json"] = b"{}\n"
+    assert main(["build", "--pack", str(pack)] + (["--check"] if check else [])) == 2
+    assert capsys.readouterr().err.startswith("stopped: examples in the pack folder is a link.")
+    assert before == {p.name: p.read_bytes() for p in outside.iterdir()}
+
+
+def test_a_build_in_a_copied_pack_still_works_also_when_the_pack_folder_itself_is_reached_by_a_link(tmp_path, capsys):
+    pack = tmp_path / "real" / "kpi-intake"
+    shutil.copytree(PACK, pack)
+    (pack / "what-we-will-ask-you.md").unlink()
+    assert main(["build", "--pack", str(pack)]) == 0
+    assert (pack / "what-we-will-ask-you.md").read_bytes() == build.explainer_text(catalogue.load(pack)).encode("utf-8")
+    assert main(["build", "--check", "--pack", str(pack)]) == 0
+    capsys.readouterr()
+    # An operator may keep the pack behind a link of their own. The link to the pack folder is theirs to choose;
+    # only a link below it is refused.
+    link = tmp_path / "my-pack"
+    try:
+        link.symlink_to(pack, target_is_directory=True)
+    except OSError:
+        pytest.skip("this system does not let the test make a link")
+    assert main(["build", "--check", "--pack", str(link)]) == 0
+    assert capsys.readouterr().out.endswith("the intake pack is current\n")
+
+
+def test_an_example_named_to_land_outside_the_pack_is_refused(tmp_path, capsys):
+    pack = tmp_path / "kpi-intake"
+    shutil.copytree(PACK, pack)
+    spec = pack / "examples" / "examples.toml"
+    text = spec.read_text(encoding="utf-8")
+    assert text.count('file = "rm-margin-per-barrel"') == 1
+    spec.write_text(text.replace('file = "rm-margin-per-barrel"', 'file = "../../escaped"'), encoding="utf-8", newline="\n")
+    assert main(["build", "--pack", str(pack)]) == 2
+    assert "is not inside the pack folder" in capsys.readouterr().err
+    assert not (tmp_path / "escaped.json").exists() and not (tmp_path / "escaped.xlsx").exists()

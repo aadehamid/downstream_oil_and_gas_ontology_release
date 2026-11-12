@@ -19,6 +19,10 @@ What it writes, all under kpi-intake/:
 The text files are the same bytes on every system: UTF-8, LF line ends, sorted keys. A workbook is not, because
 its file format stores the time of writing. So a workbook is compared by content (workbook.same_content), and
 the build leaves a workbook alone when its content is already current.
+
+The build writes only inside the pack folder it is given. A generated file, or a folder on the way to it, that
+is a link could send a write somewhere else, so the build refuses it (refuse_links) and --check does the same,
+without reading through the link. The pack folder itself may be reached by a link: that is the operator's choice.
 """
 import sys
 from pathlib import Path
@@ -27,6 +31,26 @@ from kpi_store.intake import answers, catalogue, examples, page, picklists, work
 
 FORM_HTML, FORM_XLSX = "kpi-intake-form.html", "kpi-intake-form.xlsx"
 EXPLAINER, ARCHITECT = "what-we-will-ask-you.md", "for-the-architect.md"
+
+
+class BuildError(Exception):
+    """The build will not write here. The message says why."""
+
+
+def refuse_links(pack, paths):
+    """Raises BuildError when one of the paths, or a folder between the pack folder and it, is a link, or when a
+    path does not resolve to a place inside the pack folder. `pack` may itself be reached by a link."""
+    real = Path(pack).resolve()
+    for path in paths:
+        relative = Path(path).relative_to(pack)
+        at = Path(pack)
+        for part in relative.parts:
+            at = at / part
+            if at.is_symlink():
+                raise BuildError(f"{at.relative_to(pack).as_posix()} in the pack folder is a link. The build writes only inside "
+                                 "the pack folder, so it does not follow a link. Remove the link and run the command again.")
+        if not Path(path).resolve().is_relative_to(real):
+            raise BuildError(f"{relative.as_posix()} is not inside the pack folder {real}. The build writes only inside the pack folder.")
 
 
 def explainer_text(cat):
@@ -84,6 +108,8 @@ def architect_text(cat):
 def outputs(root, pack):
     """Every generated file as (path, kind, content): the text of a text file, or the workbook of an .xlsx."""
     pack = Path(pack)
+    # Before anything under examples/ is read: the examples' own settings file is in that folder.
+    refuse_links(pack, [pack / name for name in (picklists.FILE, FORM_HTML, FORM_XLSX, EXPLAINER, ARCHITECT)] + [pack / "examples" / examples.FILE])
     cat = catalogue.load(pack)
     release = picklists.Release(root)      # parsed once, for the lists and for the examples
     built = picklists.build(root, release)
@@ -100,6 +126,7 @@ def outputs(root, pack):
     for spec, intake in filled:
         out.append((pack / "examples" / f'{spec["file"]}.json', "text", answers.dumps(intake)))
         out.append((pack / "examples" / f'{spec["file"]}.xlsx', "workbook", workbook.build(cat, lists, column, intake)))
+    refuse_links(pack, [path for path, _, _ in out])       # an example's name comes from a file a person edits
     return out
 
 

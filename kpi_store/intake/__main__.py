@@ -28,13 +28,16 @@ def main(argv=None):
             stream.reconfigure(encoding="utf-8", errors="replace")
     from kpi_store.intake.answers import AnswersError
     from kpi_store.ontology_view import ReleaseError
+    errors = (CatalogueError, AnswersError, ReleaseError)
     try:
         if args.command == "build":
             from kpi_store.intake import build as builder
+            from kpi_store.intake.examples import ExampleError
+            errors += (builder.BuildError, ExampleError)
             return builder.main(root, pack, args.check)
         from kpi_store.intake import check as checker
         report = checker.run(args.file, pack, args.form, root)
-    except (CatalogueError, AnswersError, ReleaseError) as e:
+    except errors as e:
         print(f"stopped: {e}", file=sys.stderr)
         return 2
     sys.stdout.write(report.text())
