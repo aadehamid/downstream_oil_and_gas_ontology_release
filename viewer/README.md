@@ -52,38 +52,39 @@ uv run --quiet --no-project --with playwright==1.65.0 python business_architectu
 ```
 
 ```text expect
-viewer     1 load        pass
-viewer     2 release     pass
-viewer     3 modules     pass
-viewer     4 search      pass
-viewer     5 term page   pass
-viewer     6 follow      pass
-viewer     7 way back    pass
-viewer     8 deep link   pass
-viewer     9 keys        pass
-viewer     10 prefix     pass
-viewer     11 shortcut   pass
-viewer     12 no term    pass
-viewer     + narrow      pass
-reference  1 load        pass
-reference  2 release     pass
-reference  3 modules     pass
-reference  4 search      pass
-reference  5 term page   pass
-reference  6 follow      pass
-reference  7 way back    pass
-reference  8 deep link   pass
-reference  9 ranking     pass
-reference  10 names      pass
-reference  11 measure    pass
-reference  12 language   pass
-reference  13 slash key  pass
-reference  14 wording    pass
-reference  + narrow      pass
-both pages passed all 28 proofs
+viewer     1 load         pass
+viewer     2 release      pass
+viewer     3 modules      pass
+viewer     4 search       pass
+viewer     5 term page    pass
+viewer     6 follow       pass
+viewer     7 way back     pass
+viewer     8 deep link    pass
+viewer     9 keys         pass
+viewer     10 prefix      pass
+viewer     11 shortcut    pass
+viewer     12 no term     pass
+viewer     13 namespaces  pass
+viewer     + narrow       pass
+reference  1 load         pass
+reference  2 release      pass
+reference  3 modules      pass
+reference  4 search       pass
+reference  5 term page    pass
+reference  6 follow       pass
+reference  7 way back     pass
+reference  8 deep link    pass
+reference  9 ranking      pass
+reference  10 names       pass
+reference  11 measure     pass
+reference  12 language    pass
+reference  13 slash key   pass
+reference  14 wording     pass
+reference  + narrow       pass
+both pages passed all 29 proofs
 ```
 
-The check opens each page from its file and stops any request that would leave the machine. For each page it proves that the page loads with no console error and no network request, shows the release name, lists the 13 modules at their versions, finds `tg:replaces` and the crude prices measure by search, shows the measure's label, definition and relationships, follows a relationship to the other term, returns with the Back button and the breadcrumb, opens a term from a direct link, and has no sideways scroll at 390 px. It also proves the keys, the prefixed name, the shortcut and the Choose a term panel of this viewer, and the result order, the module names, the measure's page, the hidden language tag, the `/` key and the wording of the reference page. A failed proof prints `FAIL` with the reason, and the command ends with status 1. Add `--shots <folder>` to save a screenshot of each main view, and `--browser msedge` to use Edge.
+The check opens each page from its file and stops any request that would leave the machine. For each page it proves that the page loads with no console error and no network request, shows the release name, lists the 13 modules at their versions, finds `tg:replaces` and the crude prices measure by search, shows the measure's label, definition and relationships, follows a relationship to the other term, returns with the Back button and the breadcrumb, opens a term from a direct link, and has no sideways scroll at 390 px. It also proves the keys, the prefixed name, the shortcut, the Choose a term panel and a prefix with several namespaces (`role:carrier`) in this viewer, and the result order, the module names, the measure's page, the hidden language tag, the `/` key and the wording of the reference page. A failed proof prints `FAIL` with the reason, and the command ends with status 1. Add `--shots <folder>` to save a screenshot of each main view, and `--browser msedge` to use Edge.
 
 The block above runs in the document check only when `DOC_SNIPPETS_SLOW` is set, because it needs a browser and a download. Run it before a release is cut.
 

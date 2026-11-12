@@ -23,6 +23,7 @@ For viewer/index.html it also proves:
   10 prefix       search finds a term by its prefixed name, tg:replaces
   11 shortcut     the search box names its shortcut, and Ctrl+K and Cmd+K open the search
   12 no term      All ontology shows a "Choose a term" panel until the reader selects a term
+  13 namespaces   a prefix that the packages give several namespaces finds the terms of each one
 
 For horoi_viewer/index.html it also proves:
 
@@ -76,6 +77,22 @@ SOURCE_VIEW = "idp_sbx.semantic_sem_commercial.mips_mpr_executive_summary_fact_v
 # comes first in alphabetical order.
 SECOND_RESULT = "https://w3id.org/mpc/ontology/modules/kpi/measure/additional-market-prices"
 SECOND_RESULT_LABEL = "Additional Market Prices (Renewables, NGLs)"
+# The packages give some prefixes more than one namespace. "role" names organization/role/ first and
+# party/party-role/ second. "kind" names five, and kpi/measure-kind/ is the third.
+ROLES = "https://w3id.org/mpc/ontology/modules/organization/role/"
+PARTY_ROLES = "https://w3id.org/mpc/ontology/modules/party/party-role/"
+# Only party/party-role/ has a carrier.
+CARRIER = PARTY_ROLES + "carrier"
+# The six terms whose local name starts with "su": three under each namespace.
+ROLES_SU = {
+    ROLES + "supply-coordinator": "Supply Coordinator",
+    ROLES + "supply-operations-director": "Supply Operations Director",
+    ROLES + "supply-operations-manager": "Supply Operations Manager",
+    PARTY_ROLES + "sub-jobber": "Sub-Jobber",
+    PARTY_ROLES + "supplier": "Supplier",
+    PARTY_ROLES + "surety": "Surety",
+}
+KPI_KIND = "https://w3id.org/mpc/ontology/modules/kpi/measure-kind/kpi"
 # The first term in the list of All ontology.
 ABBREVIATION = "https://w3id.org/mpc/ontology/modules/party/attribute/rightangle/create/abbreviation"
 # The party module's site type whose label is "Terminal", and its class whose label is "customer account".
@@ -324,6 +341,25 @@ def viewer_no_term(s):
     same(page.locator("#definition").is_visible(), True, "the definition is shown")
 
 
+def viewer_namespaces(s):
+    page = s.open()
+    # A term under the prefix's second namespace.
+    hit = viewer_search(page, "role:carrier", CARRIER)
+    same(page.locator("#global-count").inner_text(), "1 of 1 matching terms", "the count for role:carrier")
+    hit.click()
+    same(page.locator("#iri").text_content(), CARRIER, "the term opened from the search for role:carrier")
+    same(page.locator("#title").inner_text(), "Carrier", "its label")
+    # A term under the third of five namespaces.
+    viewer_search(page, "kind:kpi", KPI_KIND)
+    same(page.locator("#global-results button").first.get_attribute("data-result"), KPI_KIND, "the first result for kind:kpi")
+    # One search text that both namespaces of a prefix hold.
+    page.locator("#global-query").fill("role:su")  # the search is still open
+    same(page.locator("#global-count").inner_text(), "6 of 6 matching terms", "the count for role:su")
+    buttons = page.locator("#global-results button")
+    found = {buttons.nth(i).get_attribute("data-result"): buttons.nth(i).inner_text().splitlines()[0] for i in range(buttons.count())}
+    same(found, ROLES_SU, "the terms found for role:su")
+
+
 # ---- horoi_viewer/index.html --------------------------------------------------------------------------------
 
 
@@ -563,6 +599,7 @@ PAGES = {
         ("10 prefix", viewer_prefix),
         ("11 shortcut", viewer_shortcut),
         ("12 no term", viewer_no_term),
+        ("13 namespaces", viewer_namespaces),
         ("+ narrow", viewer_narrow),
     ],
     "reference": [
@@ -611,7 +648,7 @@ def check_page(browser, name, path, shots):
             reason = f"network request: {session.requests[before[1]]}"
         if not reason and session.errors[before[0]:]:
             reason = f"console error: {session.errors[before[0]]}"
-        print(f"{name:9}  {proof:12}  {'FAIL  ' + reason if reason else 'pass'}")
+        print(f"{name:9}  {proof:13}  {'FAIL  ' + reason if reason else 'pass'}")
         if reason:
             failed.append(f"{name} {proof}")
     return failed
