@@ -282,14 +282,13 @@ function relationshipExplanation(id) {
   return `<details class="relationship-definition"><summary>What does ${e(title(id))} mean?</summary><p>${n && definitions(n).length ? e(definition(n)) : "No definition for this relationship is included in this release."}</p></details>`;
 }
 const layer = n => ["Class","Property"].includes(n.kind) ? "Vocabulary" : data.supportingKinds.includes(n.kind) || n.kind === "Metadata" ? "Rules and evidence" : "Business concepts";
-const moduleLabel = m => ({party:"Party · Customer domain",core:"Core · Process map",
-  "data-product":"Data products",integration:"Integration",kpi:"Measures and KPIs",lane:"Office lanes",
-  "logical-model":"Logical models","market-data":"Market data",organization:"Organization and responsibilities",
-  "ref-mpc":"MPC reference facts",system:"Systems","technical-graph":"Technical graph","value-stream":"Value streams"})[m] || m;
 const pageLink = (m, l="") => "#browse?" + new URLSearchParams({module:m, layer:l});
 const moduleLink = m => data.referenceModules.includes(m) ? `#module=${encodeURIComponent(m)}` : `../viewer/index.html#view=module:${encodeURIComponent(m)}`;
 const moduleInfo = m => data.moduleInfo.find(i => i.name === m);
-const valuesHtml = vs => vs.map(v => `<p>${e(v.v)}${v.lang ? `<span class="lang">${e(v.lang)}</span>` : ""}</p>`).join("");
+// The module's own title, which is the name the full ontology viewer shows for it.
+const moduleLabel = m => moduleInfo(m)?.label || m;
+// Every label and definition in the release is English, so only another language is tagged.
+const valuesHtml = vs => vs.map(v => `<p>${e(v.v)}${v.lang && v.lang !== "en" ? `<span class="lang">${e(v.lang)}</span>` : ""}</p>`).join("");
 const crumb = trail => `<div class="crumb"><a href="#overview">Overview</a>${trail.map(x=>` / ${x}`).join("")}</div>`;
 const browseState = {q:"",module:"",layer:"",page:0};
 const readingGroups = ["Business concepts","Vocabulary","Rules and evidence"];
@@ -308,7 +307,7 @@ function intro() {
 }
 function moduleTile(m) {
   const info = moduleInfo(m);
-  return `<a class="tile ${e(m)}" href="${e(moduleLink(m))}"><span class="eyebrow">${e(m)} · ${e(info?.version || "")}</span><h2>${e(moduleLabel(m))}</h2><p>${e(info?.description || "Read this module in the full viewer.")}</p><span class="go">Open module →</span></a>`;
+  return `<a class="tile ${e(m)}" href="${e(moduleLink(m))}"><span class="eyebrow">${e(m)} · ${e(info?.version || "")}</span><h2>${e(moduleLabel(m))}</h2><p>${e(info?.description || "Read this module in the full ontology viewer.")}</p><span class="go">Open module →</span></a>`;
 }
 function layersHtml(m="") {
   const entries = [
@@ -379,7 +378,7 @@ function modulesPage() {
   return `${crumb(["Modules and connections"])}<h1>Modules and connections</h1><p class="lead">A module groups terms for one part of the model. Follow a term's relationship to see how those parts connect.</p>
   <div class="grid">${data.referenceModules.map(moduleTile).join("")}</div>
   <section class="section"><h2>Follow a recorded connection</h2><p>These views show actual statements from the released RDF, grouped by the module at the other end.</p><div class="actions">${data.referenceModules.map(m=>`<a href="#connections=${e(m)}">Connections from ${e(moduleLabel(m))}</a>`).join("")}</div></section>
-  <p class="quiet section">All modules in this source release have local reference pages. The original ontology viewer remains available from the footer.</p>`;
+  <p class="quiet section">All modules in this source release have local reference pages. The full ontology viewer remains available from the footer.</p>`;
 }
 function connectionRows(module) {
   const rows = [];
@@ -428,7 +427,11 @@ function refreshResults() {
   const s=browseState;
   const found=data.nodes.filter(n=>isLocal(n) && (s.layer==="Rules and evidence" ? layer(n)===s.layer : referenceTerms.has(n.id))
     && (!s.module||moduleNames(n).includes(s.module)) && (!s.layer||layer(n)===s.layer)
-    && (n.label+" "+n.id+" "+definition(n)).toLowerCase().includes(s.q.toLowerCase())).sort((a,b)=>a.label.localeCompare(b.label)||a.id.localeCompare(b.id));
+    && (n.label+" "+n.id+" "+definition(n)).toLowerCase().includes(s.q.toLowerCase()));
+  // An exact label match comes first, then the labels that start with the search text, then the rest.
+  const q=s.q.trim().toLowerCase();
+  const rank=n=>{const label=n.label.toLowerCase();return label===q?0:label.startsWith(q)?1:2;};
+  found.sort((a,b)=>rank(a)-rank(b)||a.label.localeCompare(b.label)||a.id.localeCompare(b.id));
   s.page=Math.min(s.page,Math.max(0,Math.ceil(found.length/40)-1));
   const start=s.page*40;
   document.getElementById("result-count").textContent=found.length ? `${found.length} results. Showing ${start+1} to ${Math.min(start+40,found.length)}.` : "No matching terms. Try a shorter name or clear the filters.";
@@ -462,16 +465,20 @@ function termPage(id) {
   }
   const neighbours=outgoing.filter(r=>nodes.has(r.o) && !r.o.startsWith("_:") && !data.supportingKinds.includes(nodes.get(r.o).kind));
   const hierarchy=outgoing.filter(r=>structural.includes(r.p));
+  const pointsHere=`<section class="section"><h2>What points to this term</h2><p>These incoming statements show how other terms use this term. Expand the list to see every statement.</p>${namedBack.length?relationshipList(namedBack):"<p>No incoming statement from a named term is recorded.</p>"}${supportingBack.length?`<details><summary>Rules and evidence: ${supportingBack.length} incoming statements</summary>${relationshipTable(supportingBack)}</details>`:""}</section>`;
+  // A measure's incoming statements name the data that serves it, so its page shows them first.
+  const measure=isMeasure(n);
   return `${crumb([`<a href="${e(moduleLink(primary))}">${e(moduleLabel(primary))}</a>`,`<a href="${e(pageLink(primary,layer(n)))}">${e(layer(n))}</a>`])}
   <div class="term-head"><div><h1>${e(n.label)}</h1><span class="badge">${e(n.kind)}</span><span class="quiet"> ${e(moduleNames(n).join(", "))}</span></div><a href="${e(pageLink(primary))}">Find another term</a></div>
   <div class="term-definition">${definitions(n).length?valuesHtml(definitions(n)):"<p>No definition is recorded.</p>"}</div>
+  ${measure?pointsHere:""}
   ${vals(n,SKOS+"scopeNote").length?`<div class="note"><h3>Scope notes</h3>${valuesHtml(vals(n,SKOS+"scopeNote"))}</div>`:""}
   <div class="iri-row"><code id="term-iri">${e(id)}</code><button id="copy-iri">Copy identifier</button><span id="copy-status" role="status"></span></div>
   <section class="section"><h2>Where this term fits</h2><p>${kindExplanation(n.kind)}</p>${hierarchy.length?relationshipTable(hierarchy):"<p class=quiet>No parent, domain or range statement is recorded on this term.</p>"}</section>
   <section class="section"><h2>Follow its connections</h2><p>Arrows show outgoing statements exactly as recorded. The tables list its outgoing relationships. Types appear under all recorded facts.</p>${neighbours.length?smallGraph(n,neighbours.slice(0,6)):""}${neighbours.length>6?"<p class=quiet>The diagram shows the first six named connections. Expand the tables for all connections.</p>":""}${outgoing.length?relationshipList(outgoing):"<p>No outgoing relationship other than its types is recorded.</p>"}</section>
-  <section class="section"><h2>What points to this term</h2><p>These incoming statements show how other terms use this term. Expand the list to see every statement.</p>${namedBack.length?relationshipList(namedBack):"<p>No incoming statement from a named term is recorded.</p>"}${supportingBack.length?`<details><summary>Rules and evidence: ${supportingBack.length} incoming statements</summary>${relationshipTable(supportingBack)}</details>`:""}</section>
+  ${measure?"":pointsHere}
   <details id="facts"><summary>All recorded facts, types and sources</summary><p>Literal language and datatype are shown when recorded. Anonymous nodes open their own detail. No inferred statements have been added.</p>${facts(n)}</details>
-  <div class="actions"><a href="${e(viewerHref(id))}">Open this term in the full viewer</a></div>`;
+  <div class="actions"><a href="${e(viewerHref(id))}">Open this term in the full ontology viewer</a></div>`;
 }
 function smallGraph(n,rows) {
   const height=rows.length*76+32, middle=height/2;
@@ -498,9 +505,9 @@ function guide() {
   <section class="section"><h2>Use an identifier</h2><p>Use <strong>Copy identifier</strong> on a term to copy its IRI, the full identifier used in the RDF. The label helps people read it; the IRI identifies the term when querying or mapping data.</p><p>This site is a reference. To run queries or set up a store, use the existing instructions in this release. Reading these pages needs no connection to a store.</p><ul><li><a href="../business_architecture/ontology/epm-ontology-guide.html">Read the ontology guide</a></li><li><a href="../business_architecture/ontology/epm-walkthrough.html">Follow the walkthrough</a></li><li><a href="../viewer/index.html">Explore the full ontology</a></li></ul></section>`;
 }
 function about() {
-  return `${crumb(["Release and coverage"])}<h1>Release and coverage</h1><p>This reference covers every current ontology module of ${e(data.release)}. It retains their recorded facts, supporting nodes and cross-module relationships. Module pages, search and term links stay within this reference.</p><p>The source is the set of release packages of ${e(data.release)}. The build record lists each input file with its checksum. Package versions are shown on each module. This documentation does not update those packages or their versions.</p><p>Historical packages, example datasets and technical-graph records are outside the input set. Blank nodes and evidence remain reachable through term details.</p><p>To read the reference offline, unzip the whole release and open <code>horoi_viewer/index.html</code>. Keep its location within the release so links to the full viewer and guides work.</p><p><a href="build.json">Build record and input hashes</a> · <a href="NOTICE.txt">Credits and license notes</a></p>`;
+  return `${crumb(["Release and coverage"])}<h1>Release and coverage</h1><p>This reference covers every current ontology module of ${e(data.release)}. It retains their recorded facts, supporting nodes and cross-module relationships. Module pages, search and term links stay within this reference.</p><p>The source is the set of release packages of ${e(data.release)}. The build record lists each input file with its checksum. Package versions are shown on each module. This documentation does not update those packages or their versions.</p><p>Historical packages, example datasets and technical-graph records are outside the input set. Blank nodes and evidence remain reachable through term details.</p><p>To read the reference offline, unzip the whole release and open <code>horoi_viewer/index.html</code>. Keep its location within the release so links to the full ontology viewer and guides work.</p><p><a href="build.json">Build record and input hashes</a> · <a href="NOTICE.txt">Credits and license notes</a></p>`;
 }
-function missing(message) {return `<h1>Choose a starting point</h1><p>${e(message)}</p><div class="actions"><a href="#overview">Overview</a><a href="#browse">Find a term</a><a href="../viewer/index.html">Full viewer</a></div>`;}
+function missing(message) {return `<h1>Choose a starting point</h1><p>${e(message)}</p><div class="actions"><a href="#overview">Overview</a><a href="#browse">Find a term</a><a href="../viewer/index.html">Full ontology viewer</a></div>`;}
 "use strict";
 
 // Index existing assertions only. Kept separate from the UI for counterexample tests.
@@ -752,11 +759,13 @@ function processPosition(id) {
     <div><h3>Go deeper</h3>${children.length?`<ul>${children.map(c=>`<li>${hierarchyLink(c,{s:c,p:SKOS+"broader",o:id})}</li>`).join("")}</ul>`:"<p>This is the lowest recorded level on this branch. Its other connections remain below.</p>"}</div></div></section>`;
 }
 
-function measureContext(n) {
+function isMeasure(n) {
   const info=moduleInfo("kpi");
-  if (!info) return "";
-  const ns=info.id+"/";
-  if (!vals(n,RDF+"type").some(v=>!v.literal && v.v===ns+"MeasureDefinition")) return "";
+  return Boolean(info) && vals(n,RDF+"type").some(v=>!v.literal && v.v===info.id+"/MeasureDefinition");
+}
+function measureContext(n) {
+  if (!isMeasure(n)) return "";
+  const ns=moduleInfo("kpi").id+"/";
   const fields=[["Recorded kind",ns+"measureKind"],["Identifier","http://purl.org/dc/terms/identifier"],["Notation",SKOS+"notation"],["Basis",ns+"basis"],["Grain",ns+"grain"],["Compared against",ns+"comparedAgainst"],["KPI candidate",ns+"kpiCandidate"]];
   const value = v => {
     if (v.literal) return e(v.v);
@@ -846,6 +855,7 @@ main.addEventListener("toggle",event=>{
   list.dataset.loaded="true";
 },true);
 
+let searchAfterRender=false;
 function render() {
   const raw=location.hash.slice(1)||"overview";
   const [route,query=""]=raw.split("?",2);
@@ -891,6 +901,8 @@ function render() {
   };
   window.scrollTo(0,0);
   main.focus({preventScroll:true});
+  if(searchAfterRender&&route==="browse") document.getElementById("search").focus();
+  searchAfterRender=false;
   if (isExplorerRoute(route) && new URLSearchParams(query).get("at")) {
     const selected=document.getElementById("selected-title");
     if(selected) {
@@ -907,6 +919,14 @@ applyTheme();
 document.getElementById("theme").onclick=()=>{chosenTheme=themeRoot.dataset.theme==="dark"?"light":"dark";applyTheme();};
 document.querySelector(".skip").onclick=event=>{event.preventDefault();main.focus();main.scrollIntoView();};
 window.addEventListener("hashchange",render);
+// The "/" key opens Find a term with the cursor in its search box. While the reader types, it stays a slash.
+document.addEventListener("keydown",event=>{
+  if(event.key!=="/"||event.ctrlKey||event.metaKey||event.altKey||event.target.closest?.("input,textarea,select,[contenteditable]")) return;
+  event.preventDefault();
+  const search=document.getElementById("search");
+  if(search) search.focus();
+  else {searchAfterRender=true;location.hash="#browse";}
+});
 render();
 </script>
 </body>

@@ -4,7 +4,7 @@ Open `viewer/index.html` in a browser after unzipping the release. The page cont
 
 The viewer opens on Module overview. The top navigation separates Modules, Value streams and Customer views. Use Module overview to find a module by name or description, read its purpose and see its vocabulary and dependencies. The optional module dependency diagram opens the same overviews. Use Browse all terms to enter that module's complete search and hierarchy. The Order to Cash and Commercial Hydrocarbon Lifecycle buttons open each stream's ordered stages directly; expand a stage's processes or open its details to drill down. Breadcrumbs and return buttons take you back while keeping your searches, filters and expanded sections. This browsing state lasts until you close or reload the page.
 
-Use Search ontology from any view. Find modules by name or description, business views by name, and terms by label, definition or IRI. Use Term type to narrow the terms to classes, properties, concepts or another released type. All ontology also provides these filters and the module hierarchy. Select a term to read its definition, source and relationships. Select a connected term to follow a relationship. Expand All properties and evidence to inspect the recorded predicates and values. Include evidence and constraints to find supporting nodes directly.
+Use Search ontology from any view, or press Ctrl+K (Cmd+K on macOS). Find modules by name or description, business views by name, and terms by label, definition or IRI. A prefixed name such as `tg:replaces` also finds its term. Press Enter to open the first result, or choose another result with the Up and Down arrow keys and then press Enter. Use Term type to narrow the terms to classes, properties, concepts or another released type. All ontology also provides these filters and the module hierarchy. Until you select a term, All ontology shows a Choose a term panel that says how to start. Select a term to read its definition, source and relationships. Select a connected term to follow a relationship. Expand All properties and evidence to inspect the recorded predicates and values. Include evidence and constraints to find supporting nodes directly.
 
 Choose the value-stream module to list the value streams. Open a stream to see its stages in sequence, then open a stage to see its processes. Each process links to the core processes it realizes. Use Part of to return to the containing stage or stream.
 
@@ -16,7 +16,7 @@ The header shows the release name on every view. Release details repeats it and 
 
 ## The reference page
 
-`horoi_viewer/index.html` is a second page over the same release. It reads like a reference: an overview, the process tree, the customer lifecycle, the value streams, the measures, each module with its connections, and a term search. It also works offline. Its footer links back to this viewer. `horoi_viewer/build.json` records the release name, the Horoi version, the input files with their checksums and the page's own checksum. `horoi_viewer/NOTICE.txt` gives the credit for the Horoi page styles.
+`horoi_viewer/index.html` is a second page over the same release. It reads like a reference: an overview, the process tree, the customer lifecycle, the value streams, the measures, each module with its connections, and a term search. It also works offline. It gives each module the name this viewer gives it. Press `/` to open Find a term with the cursor in its search box. The search lists an exact label match first, then the labels that start with your text, then the other matches. A measure's page shows What points to this term directly under the definition. Its footer links back to this viewer, which it calls the full ontology viewer. `horoi_viewer/build.json` records the release name, the Horoi version, the input files with their checksums and the page's own checksum. `horoi_viewer/NOTICE.txt` gives the credit for the Horoi page styles.
 
 ## Rebuild the pages after a change
 
@@ -52,29 +52,40 @@ uv run --quiet --no-project --with playwright==1.65.0 python business_architectu
 ```
 
 ```text expect
-viewer     1 load       pass
-viewer     2 release    pass
-viewer     3 modules    pass
-viewer     4 search     pass
-viewer     5 term page  pass
-viewer     6 follow     pass
-viewer     7 way back   pass
-viewer     8 deep link  pass
-viewer     + narrow     pass
-reference  1 load       pass
-reference  2 release    pass
-reference  3 modules    pass
-reference  4 search     pass
-reference  5 term page  pass
-reference  6 follow     pass
-reference  7 way back   pass
-reference  8 deep link  pass
-reference  + narrow     pass
-both pages passed all 18 proofs
+viewer     1 load         pass
+viewer     2 release      pass
+viewer     3 modules      pass
+viewer     4 search       pass
+viewer     5 term page    pass
+viewer     6 follow       pass
+viewer     7 way back     pass
+viewer     8 deep link    pass
+viewer     9 keys         pass
+viewer     10 prefix      pass
+viewer     11 shortcut    pass
+viewer     12 no term     pass
+viewer     13 namespaces  pass
+viewer     + narrow       pass
+reference  1 load         pass
+reference  2 release      pass
+reference  3 modules      pass
+reference  4 search       pass
+reference  5 term page    pass
+reference  6 follow       pass
+reference  7 way back     pass
+reference  8 deep link    pass
+reference  9 ranking      pass
+reference  10 names       pass
+reference  11 measure     pass
+reference  12 language    pass
+reference  13 slash key   pass
+reference  14 wording     pass
+reference  + narrow       pass
+both pages passed all 29 proofs
 ```
 
-The check opens each page from its file and stops any request that would leave the machine. For each page it proves that the page loads with no console error and no network request, shows the release name, lists the 13 modules at their versions, finds `tg:replaces` and the crude prices measure by search, shows the measure's label, definition and relationships, follows a relationship to the other term, returns with the Back button and the breadcrumb, opens a term from a direct link, and has no sideways scroll at 390 px. A failed proof prints `FAIL` with the reason, and the command ends with status 1. Add `--shots <folder>` to save a screenshot of each main view, and `--browser msedge` to use Edge.
+The check opens each page from its file and stops any request that would leave the machine. For each page it proves that the page loads with no console error and no network request, shows the release name, lists the 13 modules at their versions, finds `tg:replaces` and the crude prices measure by search, shows the measure's label, definition and relationships, follows a relationship to the other term, returns with the Back button and the breadcrumb, opens a term from a direct link, and has no sideways scroll at 390 px. It also proves the keys, the prefixed name, the shortcut, the Choose a term panel and a prefix with several namespaces (`role:carrier`) in this viewer, and the result order, the module names, the measure's page, the hidden language tag, the `/` key and the wording of the reference page. A failed proof prints `FAIL` with the reason, and the command ends with status 1. Add `--shots <folder>` to save a screenshot of each main view, and `--browser msedge` to use Edge.
 
 The block above runs in the document check only when `DOC_SNIPPETS_SLOW` is set, because it needs a browser and a download. Run it before a release is cut.
 
-`business_architecture/ontology/viewer/test_browser.mjs` is a longer test of the full viewer's diagrams, value streams and customer views. Its first lines say what it needs.
+`business_architecture/ontology/viewer/test_browser.mjs` is a longer test of the full ontology viewer's diagrams, value streams and customer views. Its first lines say what it needs.

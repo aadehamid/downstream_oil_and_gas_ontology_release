@@ -28,6 +28,8 @@ RELEASE = "KPI Store 1.1"
 LABELS = (SKOS.prefLabel, RDFS.label, DCTERMS.title)
 PARENTS = (RDFS.subClassOf, RDFS.subPropertyOf, SKOS.broader)
 SUPPORTING_KINDS = ("Anonymous node", "Evidence", "Metadata", "Constraint")
+# A prefix line of a Turtle file: "@prefix tg: <https://...> ." or "PREFIX tg: <https://...>".
+PREFIX_LINE = re.compile(r"^\s*(?:@prefix|PREFIX)\s+([A-Za-z][\w.-]*):\s*<([^>]*)>", re.MULTILINE | re.IGNORECASE)
 
 
 @contextmanager
@@ -103,6 +105,11 @@ def clean_packages(root):
         raise ValueError("The release packages have local changes")
 
 
+def declared_prefixes(text):
+    """The (prefix, namespace) pairs a Turtle file declares. The empty prefix is left out: no one can search by it."""
+    return set(PREFIX_LINE.findall(text))
+
+
 def term_id(value):
     return "_:" + str(value) if isinstance(value, BNode) else str(value)
 
@@ -121,6 +128,7 @@ def _build_data(root):
     graph = Graph()
     membership = defaultdict(set)
     inputs = []
+    prefixes = set()
     for path, module, version in release_files(root):
         part = to_canonical_graph(Graph().parse(path, format="turtle"))
         # Canonical blank IDs from different files must remain scoped to their file.
@@ -141,6 +149,7 @@ def _build_data(root):
                 "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
             }
         )
+        prefixes |= declared_prefixes(path.read_text(encoding="utf-8"))
     nodes = []
     subjects = set(graph.subjects())
     for s in sorted(subjects, key=term_id):
@@ -226,6 +235,8 @@ def _build_data(root):
         "counts": counts,
         "triples": len(graph),
         "supportingKinds": SUPPORTING_KINDS,
+        # Search reads a prefixed name such as tg:replaces through these pairs.
+        "prefixes": sorted(prefixes),
         "terms": sum(n["kind"] not in SUPPORTING_KINDS for n in nodes),
     }
 
