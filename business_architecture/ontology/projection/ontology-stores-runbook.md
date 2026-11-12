@@ -904,7 +904,7 @@ The reset is `kpi_store/reset.py`. It has no deletion rule of its own. On Enterp
    reset done: enterprise, neo4j, fuseki and databricks hold nothing of the KPI Store. To load again, run: py -m kpi_store.runner
    ```
 
-6. Load the stores again with the normal run, `py -m kpi_store.runner`, as in "Run it again: nothing changes". Do not add `--replace-enterprise`: the database holds no KPI Store node. This time the lines `notebook`, `fuseki` and `neo4j` say `loaded`, and the line `enterprise` says `copied`.
+6. Load the stores again with the normal run, `py -m kpi_store.runner`, as in "Run it again: nothing changes". Do not add `--replace-enterprise`, because the database holds no KPI Store node. This time the lines `notebook`, `fuseki` and `neo4j` say `loaded`, and the line `enterprise` says `copied`. In the test run, the steps after `check` took 9 minutes.
 
 Between the reset and the load, the sync check reads `unmarked` for Databricks and for the two Neo4j databases. It reads `unreachable` for `jena`, because Fuseki is stopped. The load starts Fuseki again.
 
