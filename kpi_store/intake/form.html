@@ -677,10 +677,13 @@ let state = Object.fromEntries(FORMS.map((f) => [f, emptyForm()]));
 let view = FORMS[0];
 const showAll = {};            // question id -> true when the reader asked for the whole list
 const narrow = matchMedia("(max-width: 999px)");   // the folded frame of a phone, a narrow window or a zoomed page
-// Each name of a term that a module other than the measures holds, as the check compares names, with its module.
-const TERM_MODULE = new Map();
-for (const [module, names] of Object.entries(DATA.term_names || {})) {
-  for (const name of names) if (!TERM_MODULE.has(norm(name))) TERM_MODULE.set(norm(name), module);
+// Each name of a term that a module other than the measures holds, as the check compares names, with its module and
+// whether a term of that name has a definition. Where several terms share a name, one with a definition is kept.
+const TERM = new Map();
+for (const [module, held] of Object.entries(DATA.term_names || {})) {
+  for (const [defined, names] of [[true, held.defined || []], [false, held.undefined || []]]) {
+    for (const name of names) { const key = norm(name); if (!TERM.has(key) || (defined && !TERM.get(key).defined)) TERM.set(key, { module, defined }); }
+  }
 }
 // What each of the two Domain Owner signatures of the KPI form is for.
 const SIGNER_LABELS = { "domain-confirmation": "Domain confirmation", "domain-owner": "Conflicting definitions" };
@@ -827,13 +830,16 @@ function loadDraft() {
   if (!text) return "";
   let held = null;
   try { held = JSON.parse(text); } catch (e) { held = null; }
-  const whole = isObject(held) && isObject(held.state) && FORMS.every((f) => !(f in held.state) || !partsProblem(held.state[f]));
+  // Whole means: every form is there, each with every part that emptyForm() gives, and each part of the right type.
+  const parts = Object.keys(emptyForm());
+  const whole = isObject(held) && isObject(held.state)
+    && FORMS.every((f) => isObject(held.state[f]) && parts.every((part) => part in held.state[f]) && !partsProblem(held.state[f]));
   if (!whole) {
     // The next change writes a new draft over it, so the unread one is kept aside under another key.
     try { localStorage.setItem(DRAFT_KEY + "-unread", text); } catch (e) { /* it is lost with the next change */ }
     return "bad";
   }
-  for (const f of FORMS) if (held.state[f]) state[f] = Object.assign(emptyForm(), held.state[f]);
+  for (const f of FORMS) state[f] = Object.assign(emptyForm(), held.state[f]);
   if (FORMS.includes(held.view)) view = held.view;
   return "ok";
 }
@@ -1181,6 +1187,7 @@ function refresh() {
   const answers = held.answers;
   let formLeft = 0;
   let elsewhere = "";            // the module that already holds the KPI's name as a term, when one does
+  let mayConflict = false;       // true when that term and the KPI both have a definition, so the two may differ
   for (const section of DATA.sections.filter((s) => s.form === view)) {
     const node = document.querySelector(`[data-section="${section.id}"]`);
     if (!node) continue;
@@ -1209,7 +1216,10 @@ function refresh() {
         const name = norm(values(answers, "2.1")[0] || "");
         same = name && DATA.lists.measures.find((m) => [m.label].concat(m.other_names || []).some((n) => norm(n) === name));
         if (same && same.notation === held.example_of) same = null;
-        elsewhere = TERM_MODULE.get(name) || "";
+        const term = TERM.get(name);
+        elsewhere = term ? term.module : "";
+        // The check finds a conflict only when both definitions are there and differ: the term's, and the answer to 2.2.
+        mayConflict = !!term && term.defined && values(answers, "2.2").length > 0;
       }
       for (const hit of hits) if (DATA.outcomes[hit.route.outcome].blocks) routed.push(DATA.forms[hit.route.outcome] ? "Routed: " + DATA.forms[hit.route.outcome].toLowerCase() : DATA.outcomes[hit.route.outcome].title);
       if (same) routed.push("Stopped: the ontology holds this measure");
@@ -1256,16 +1266,17 @@ function refresh() {
   const signers = DATA.sign_off.signer.filter((s) => s.forms.includes(view));
   const isSigned = (s) => { const g = held.sign_offs[s.id] || {}; return !!((g.name || "").trim() && (g.date || "").trim()); };
   // Only the signatures that are needed count. The conflict signature is needed when the check finds that another
-  // module defines the KPI's name differently. The page holds those names and not their definitions, so a name
-  // that another module holds makes that signature count until the check has run. With no such name it is named apart.
+  // module defines the KPI's name differently. The page holds those names and whether each has a definition, and
+  // not the definitions. So when both definitions are there, that signature counts until the check has run, though
+  // the check may then find the two equal. Otherwise it is named apart.
   const conflict = signers.filter((s) => !isNeeded(s, view));
-  const needed = elsewhere ? signers : signers.filter((s) => isNeeded(s, view));
+  const needed = mayConflict ? signers : signers.filter((s) => isNeeded(s, view));
   const signed = needed.filter(isSigned).length;
   for (const s of conflict) {
     const status = document.querySelector(`[data-signer="${s.id}"] .signer-status`);
-    if (status) status.textContent = elsewhere ? `Needed if the check confirms: the name exists in the ${elsewhere} module` : "Only if the check finds a conflicting definition";
+    if (status) status.textContent = mayConflict ? `Needed if the check confirms: the name exists in the ${elsewhere} module` : "Only if the check finds a conflicting definition";
   }
-  const waiting = conflict.map((s) => elsewhere ? (isSigned(s) ? "" : "the conflict signature is needed if the check confirms")
+  const waiting = conflict.map((s) => mayConflict ? (isSigned(s) ? "" : "the conflict signature is needed if the check confirms")
     : (isSigned(s) ? "conflict signature recorded" : "conflict review pending check")).filter(Boolean);
   const line = document.querySelector('[data-part="signoff-progress"]');
   if (line) line.textContent = [`${signed} of ${needed.length} required signatures recorded`].concat(waiting).join(" · ");

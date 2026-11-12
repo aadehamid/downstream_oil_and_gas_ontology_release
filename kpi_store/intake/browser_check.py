@@ -23,8 +23,10 @@ Each proof starts from a fresh load of kpi-intake/kpi-intake-form.html, with emp
  12 bad file     a malformed answers file is refused in words, changes no answer and leaves the form working
  13 other form   a domain activation file loaded from the KPI form opens in its own form and leaves the KPI answers
  14 detail       an optional answer that needs more text counts as a required answer left until the text is there
- 15 conflict     a KPI name that another module holds makes the Domain Owner's second signature count
- 16 bad draft    a browser draft with one malformed form is not restored, in whole, and the form still works
+ 15 conflict     a KPI name that another module holds and defines makes the Domain Owner's second signature count,
+                 once the KPI has a definition of its own; a name whose term has no definition does not
+ 16 bad draft    a browser draft with a malformed form, a missing form or a missing field is not restored, in
+                 whole, and the form still works
 
 Every expected value below is written by hand from the catalogue and the release packages. The script exits 1
 when a proof fails and names it. scripts/check.sh does not run it, because it needs a browser.
@@ -399,6 +401,11 @@ def conflict(s):
     # "Margin Management" is a process of the core module, so the check will ask Enterprise Data Governance, and
     # the Domain Owner must sign if the two definitions differ.
     card(page, "2.1").locator("input").fill("margin management")
+    holds(card(page, "2.1").locator('[data-notice="same-name"]').inner_text(), "Enterprise Data Governance", "the notice before the KPI has a definition")
+    # The check finds a conflict only when both definitions are there and differ. Without an answer to 2.2 it cannot.
+    same(line.locator(".nav-count").inner_text(), "3 of 3 required signed", "the sign-off line before the KPI has a definition")
+    same(status.inner_text(), "Only if the check finds a conflicting definition", "the conflict signature before the KPI has a definition")
+    card(page, "2.2").locator("textarea").fill("How many times the stored volume is replaced in a month.")
     same(status.inner_text(), "Needed if the check confirms: the name exists in the core module", "the conflict signature for a name of another module")
     same(line.locator(".nav-count").inner_text(), "3 of 4 required signed", "the sign-off line for a name of another module")
     same(line.get_attribute("data-state"), "open", "the state of the sign-off line")
@@ -410,19 +417,50 @@ def conflict(s):
         page.locator("#save").click()
     saved = json.loads(Path(download.value.path()).read_text(encoding="utf-8"))
     same(saved["sign_offs"]["domain-owner"], {"name": "A name", "date": "2026-11-12"}, "the conflict signature in the saved file")
+    # "Process Business Renewal Request" is a term with no definition, so the check can find no conflict with it.
+    page.locator('[data-signer="domain-owner"] [data-sign="name"]').fill("")
+    card(page, "2.1").locator("input").fill("Process Business Renewal Request")
+    holds(card(page, "2.1").locator('[data-notice="same-name"]').inner_text(), "Enterprise Data Governance", "the notice for a term with no definition")
+    same(line.locator(".nav-count").inner_text(), "3 of 3 required signed", "the sign-off line for a term with no definition")
+    same(status.inner_text(), "Only if the check finds a conflicting definition", "the conflict signature for a term with no definition")
     s.shot(page, "15-conflict")
 
 
 def bad_draft(s):
     page = s.open()
     good = {"answers": {"2.1": "Tank Turnover"}, "request": {}, "sign_offs": {}, "consulted": {}, "example_of": "", "comment": ""}
-    bad = dict(good, answers={"D1": {"toString": "x"}})
-    seed = json.dumps({"state": {"kpi-intake": good, "domain-activation": bad}, "view": "domain-activation"})
-    page.evaluate("text => localStorage.setItem('kpi-intake-draft-1', text)", seed)
+    empty = dict(good, answers={})
+    forms = ("kpi-intake", "domain-activation", "process-map-request")
+
+    def seeded(**changed):
+        state = {form: empty for form in forms}
+        state["kpi-intake"] = good
+        for form, held in changed.items():
+            if held is None:
+                del state[form.replace("_", "-")]
+            else:
+                state[form.replace("_", "-")] = held
+        return json.dumps({"state": state, "view": "domain-activation"})
+
+    for what, seed in (
+        ("a malformed form", seeded(domain_activation=dict(empty, answers={"D1": {"toString": "x"}}))),
+        ("a missing form", seeded(process_map_request=None)),
+        ("a form with a missing field", seeded(domain_activation={k: v for k, v in empty.items() if k != "comment"})),
+        ("a field of the wrong type", seeded(domain_activation=dict(empty, sign_offs=[]))),
+    ):
+        page.evaluate("text => localStorage.setItem('kpi-intake-draft-1', text)", seed)
+        page.reload()
+        same(page.locator("#status").inner_text(), "The browser draft could not be read and was not restored.", f"the status line for {what}")
+        same(page.locator('[data-view="kpi-intake"]').get_attribute("aria-selected"), "true", f"the view after {what}")
+        same(card(page, "2.1").locator("input").input_value(), "", f"2.1 after {what}")
+    # A whole draft is restored, with its view.
+    page.evaluate("text => localStorage.setItem('kpi-intake-draft-1', text)", seeded())
     page.reload()
-    same(page.locator("#status").inner_text(), "The browser draft could not be read and was not restored.", "the status line")
-    same(page.locator('[data-view="kpi-intake"]').get_attribute("aria-selected"), "true", "the view after the refused draft")
-    same(card(page, "2.1").locator("input").input_value(), "", "2.1 after the refused draft")
+    holds(page.locator("#status").inner_text(), "draft was restored", "the status line for a whole draft")
+    same(page.locator('[data-view="domain-activation"]').get_attribute("aria-selected"), "true", "the view of a whole draft")
+    # After a refused draft the form works, and its own draft is kept.
+    page.evaluate("text => localStorage.setItem('kpi-intake-draft-1', text)", seeded(process_map_request=None))
+    page.reload()
     card(page, "2.1").locator("input").fill("Days of Cover")
     holds(page.locator('[data-section="2"] .section-progress').inner_text(), "1 required answer left", "section 2 after the refused draft")
     page.reload()
