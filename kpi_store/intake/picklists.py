@@ -9,6 +9,7 @@ Every item has an `id` (the term's IRI, or a module's name) and a `label` (what 
 within a list, because a workbook cell holds the label and the reader must find the id again.
 
 A deprecated term stays in its list with "(deprecated)" in its label, so the lists count what the ontology holds.
+The settings may still name it by its label without that mark, so a `hide` written before the deprecation holds.
 
 apply_settings() then marks the lists with what the organization's settings.toml says under [pick_list.<name>]. A
 hidden entry stays in its list with "hidden": true, so the forms do not offer it and the check still knows it. An
@@ -36,6 +37,7 @@ RDFS_LABEL = "http://www.w3.org/2000/01/rdf-schema#label"
 DCTERMS = "http://purl.org/dc/terms/"
 ORG_ROLE = "http://www.w3.org/ns/org#Role"
 OWL_DEPRECATED = "http://www.w3.org/2002/07/owl#deprecated"
+DEPRECATED_MARK = " (deprecated)"
 FILE = "pick-lists.json"
 LABEL_LIMIT = 200   # a workbook's list validation compares at most 255 characters, so a long title is cut
 
@@ -83,6 +85,13 @@ class Release:
         return bool(self.text(module, subject, OWL_DEPRECATED))
 
 
+def _named(items, name):
+    """The entries the settings mean by a name: an id, the last part of an id, or a label. When no entry has the
+    name, it is read as the ontology's own label of a deprecated term, which this build shows with a mark."""
+    hits = [i for i in items if name in (i["id"], i["label"], i["id"].rstrip("/").rsplit("/", 1)[-1])]
+    return hits or [i for i in items if i["label"] == name + DEPRECATED_MARK]
+
+
 def _unique_labels(items):
     """Makes each label unique in its list, by adding the end of the id to a label that occurs twice."""
     counts = Counter(item["label"] for item in items)
@@ -106,7 +115,7 @@ def _simple(release, module, subjects, label=SKOS + "prefLabel"):
     items = []
     for s in subjects:
         name = release.text(module, s, label) or s.rstrip("/").rsplit("/", 1)[-1]
-        items.append({"id": s, "label": name + (" (deprecated)" if release.deprecated(module, s) else "")})
+        items.append({"id": s, "label": name + (DEPRECATED_MARK if release.deprecated(module, s) else "")})
     return _sorted(items)
 
 
@@ -124,7 +133,7 @@ def _processes(release):
         parent = g.value(URIRef(s), broader)
         area = g.value(URIRef(s), area_p)
         entries[s] = {"id": s, "label": (f"{notation} {name}" if notation else name)
-                      + (" (deprecated)" if release.deprecated("core", s) else ""),
+                      + (DEPRECATED_MARK if release.deprecated("core", s) else ""),
                       "level": int(level), "parent": str(parent) if parent is not None else "",
                       "area": str(area) if area is not None else "", "areas": set()}
     for entry in entries.values():
@@ -287,7 +296,7 @@ def apply_settings(built, pick_lists):
 
         def matched(key):
             wanted = list(change.get(key, []))
-            found = {w: [i for i in items if w in (i["id"], i["label"], i["id"].rstrip("/").rsplit("/", 1)[-1])] for w in wanted}
+            found = {w: _named(items, w) for w in wanted}
             for w in wanted:
                 if not found[w]:
                     problems.append(f"{where}: `{key}` names {w!r}, which is no entry of the list. Write the label as the list shows it, or the id.")
@@ -308,7 +317,7 @@ def apply_settings(built, pick_lists):
                 item["hidden"] = True
         renamed = {}
         for wanted, label in (change.get("labels") or {}).items():
-            hits = [i for i in items if wanted in (i["id"], i["label"], i["id"].rstrip("/").rsplit("/", 1)[-1])]
+            hits = _named(items, wanted)
             if not hits:
                 problems.append(f"{where}: `labels` names {wanted!r}, which is no entry of the list. Write the label as the ontology gives it, or the id.")
             for item in hits:

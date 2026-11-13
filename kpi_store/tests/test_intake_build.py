@@ -532,6 +532,28 @@ def test_the_architects_page_names_an_added_entry_the_ontology_has_gained(cat):
     assert "| `systems` | 7.4 | 2 of 2 | 0 | None |" in text and c.ADDED_MARK not in text.split("Keep the lists")[0].split("|---|")[1]
 
 
+def test_the_settings_still_hide_a_role_by_its_plain_label_after_it_is_deprecated():
+    # The ontology's label of the role is "Stock Clerk". The build shows a deprecated term with a mark, and a `hide`
+    # that was written before the deprecation names the label without it.
+    def lists(*roles):
+        data = made_up.data()
+        data["lists"]["roles"] = [{"id": made_up.X + "role/" + tail, "label": label} for tail, label in roles]
+        return data
+
+    def hidden(data):
+        built = picklists.apply_settings(data, {"roles": {"hide": ["Stock Clerk"]}})
+        return {r["label"]: r.get("hidden", False) for r in built["lists"]["roles"]}
+
+    marked = lists(("stock-clerk", "Stock Clerk" + picklists.DEPRECATED_MARK), ("yard-planner", "Yard Planner"))
+    assert hidden(marked) == {"Stock Clerk (deprecated)": True, "Yard Planner": False}
+    # A live entry of that exact label is the one meant, and the deprecated one beside it is left alone.
+    both = lists(("stock-clerk-old", "Stock Clerk" + picklists.DEPRECATED_MARK), ("stock-clerk", "Stock Clerk"))
+    assert hidden(both) == {"Stock Clerk (deprecated)": False, "Stock Clerk": True}
+    # A name that no entry has, with or without the mark, still stops the build.
+    with pytest.raises(catalogue.CatalogueError, match="names 'Stock Clerk'"):
+        hidden(lists(("stock-clark", "Stock Clark" + picklists.DEPRECATED_MARK)))
+
+
 # ---- The build writes only inside the pack folder -----------------------------------------------------------------
 
 def _linked(tmp_path, name, directory=False):

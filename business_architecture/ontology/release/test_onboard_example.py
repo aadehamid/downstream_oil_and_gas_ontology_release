@@ -100,6 +100,81 @@ class Onboard(unittest.TestCase):
             self.assertEqual(files(tmp), before)
 
 
+class Links(unittest.TestCase):
+    """The helper changes only real files inside the copy. These build their own trees and run on every release."""
+
+    def link(self, target, at, directory=False):
+        try:
+            os.symlink(target, at, target_is_directory=directory)
+        except (OSError, NotImplementedError):
+            self.skipTest("this system does not let the test make a link")
+
+    def test_a_file_that_is_a_link_is_not_read_and_not_written(self):
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as outside:
+            target = os.path.join(outside, "check.sh")
+            with open(target, "w", encoding="utf-8") as f:
+                f.write("outside\n")
+            os.makedirs(os.path.join(tmp, "scripts"))
+            self.link(target, os.path.join(tmp, "scripts", "check.sh"))
+            tree = oe.Tree(tmp)
+            with self.assertRaisesRegex(oe.Refused, "scripts/check.sh is a link"):
+                tree.read("scripts/check.sh")
+            tree.texts["scripts/check.sh"] = "changed\n"    # as if the link was put there after the read
+            with self.assertRaisesRegex(oe.Refused, "scripts/check.sh is a link"):
+                tree.save()
+            with open(target, encoding="utf-8") as f:
+                self.assertEqual(f.read(), "outside\n")
+
+    def test_a_file_with_a_second_name_outside_the_copy_is_not_written(self):
+        # A hard link is no symbolic link and resolves inside the copy, yet a write through it changes the other name.
+        with tempfile.TemporaryDirectory() as tmp:
+            root, outside = os.path.join(tmp, "copy"), os.path.join(tmp, "outside.txt")
+            os.makedirs(root)
+            with open(outside, "w", encoding="utf-8") as f:
+                f.write("kept")
+            try:
+                os.link(outside, os.path.join(root, "a.txt"))
+            except OSError:
+                self.skipTest("this file system makes no hard links")
+            tree = oe.Tree(root)
+            with self.assertRaises(oe.Refused) as refused:
+                tree.read("a.txt")
+            self.assertIn("hard link", str(refused.exception))
+            with open(outside, encoding="utf-8") as f:
+                self.assertEqual(f.read(), "kept")
+
+    def test_a_folder_that_is_a_link_is_not_written_through(self):
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as outside:
+            self.link(outside, os.path.join(tmp, "scripts"), directory=True)
+            tree = oe.Tree(tmp)
+            with self.assertRaisesRegex(oe.Refused, "scripts is a link"):
+                tree.new("scripts/new.txt", "text\n")
+            tree.texts["scripts/new.txt"] = "text\n"
+            tree.texts["real.txt"] = "text\n"
+            with self.assertRaisesRegex(oe.Refused, "scripts is a link"):
+                tree.save()
+            self.assertEqual(os.listdir(outside), [])
+            self.assertFalse(os.path.exists(os.path.join(tmp, "real.txt")))   # checked before the first write
+
+    def test_a_path_that_leaves_the_copy_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, "copy"))
+            with open(os.path.join(tmp, "beside.txt"), "w", encoding="utf-8") as f:
+                f.write("beside\n")
+            with self.assertRaisesRegex(oe.Refused, "is not inside the copy"):
+                oe.Tree(os.path.join(tmp, "copy")).read("../beside.txt")
+
+    def test_a_copy_reached_through_a_link_is_used(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, "real"))
+            self.link(os.path.join(tmp, "real"), os.path.join(tmp, "by-link"), directory=True)
+            tree = oe.Tree(os.path.join(tmp, "by-link"))
+            tree.new("a/b.txt", "text\n")
+            tree.save()
+            with open(os.path.join(tmp, "real", "a", "b.txt"), encoding="utf-8") as f:
+                self.assertEqual(f.read(), "text\n")
+
+
 class Command(unittest.TestCase):
     @unittest.skipUnless(HAS_MODULE, "only a copy that holds the module can show the command's refusal")
     def test_the_command_exits_1_on_a_copy_that_holds_the_module(self):
