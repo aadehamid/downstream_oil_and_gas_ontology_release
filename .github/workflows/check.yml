@@ -73,6 +73,10 @@ jobs:
   # on 127.0.0.1 only. One Neo4j Enterprise server (evaluation licence) holds both databases: neo4j, with the n10s and
   # APOC plugins, stands for the local Neo4j, and businessprocessarchitecturegraph stands for the Enterprise target.
   #
+  # The machine is set up as the runbook sets up one without administrator rights: no installer, Java and the
+  # Databricks command line unpacked from their zips and named in the local settings, no Java on PATH, and every
+  # folder under the runner's temporary folder. Git for Windows and Python are the runner's own.
+  #
   # Databricks is a rehearsal workspace, never the client's. The job writes the command line's profile DEFAULT into
   # the runner's own .databrickscfg from the secrets, as `databricks auth login` leaves it for a reader; the SDK reads
   # the same profile. The settings name the two rehearsal catalogs: kpi_reh_idp_sbx plays idp_sbx and
@@ -111,6 +115,10 @@ jobs:
       APOC_SHA256: 4df40cea7444ea193d08f8a679aa998c498196fe149c8c02badb998f1c9580fb
       ROBOT_SHA256: 16a73c074f3df359a7338a84b4e0788785fe06117f931bb9796e9619ea776105
       NEO4J_ZIP_SHA256: 1b1cf3715fbf6a7632d2d221b9eaccdd34037baaa4ddb7242b2ecfecf473b378
+      # Java and the Databricks command line come from their zips, as the runbook's section "Install the programs
+      # without administrator rights" has them: Eclipse Temurin 21.0.13+9 and Databricks CLI 1.26.0.
+      JDK_ZIP_SHA256: a4dbaa05fca4bd89d84584e58c459bd732efebb1722af80ab13c6516832004f9
+      CLI_ZIP_SHA256: 7c7f2bdfc503d0277d60ef36d9ef6d9577769cd992bd3633691ebe47b9f214a2
       # What this part may write to in the rehearsal workspace, and nothing else: two schemas and one folder.
       CI_CATALOG: kpi_reh_idp_sbx
       CI_SCHEMA: kpi_store_ci_${{ github.run_id }}_${{ github.run_attempt }}_${{ matrix.part }}
@@ -120,10 +128,6 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "21"
       - uses: astral-sh/setup-uv@v7
       - name: folders
         run: |
@@ -134,7 +138,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/kpi-local/dl
-          key: store-downloads-${{ env.FUSEKI_SHA256 }}-${{ env.N10S_SHA256 }}-${{ env.APOC_SHA256 }}-${{ env.ROBOT_SHA256 }}-${{ env.NEO4J_ZIP_SHA256 }}
+          key: store-downloads-${{ env.FUSEKI_SHA256 }}-${{ env.N10S_SHA256 }}-${{ env.APOC_SHA256 }}-${{ env.ROBOT_SHA256 }}-${{ env.NEO4J_ZIP_SHA256 }}-${{ env.JDK_ZIP_SHA256 }}-${{ env.CLI_ZIP_SHA256 }}
       - name: downloads, each checked against its pinned SHA-256
         run: |
           cd "$LOCAL/dl"
@@ -147,30 +151,37 @@ jobs:
           fetch apoc-2025.06.2-core.jar "$APOC_SHA256" https://github.com/neo4j/apoc/releases/download/2025.06.2/apoc-2025.06.2-core.jar
           fetch robot.jar "$ROBOT_SHA256" https://github.com/ontodev/robot/releases/download/v1.9.10/robot.jar
           fetch neo4j-enterprise-2025.06.2-windows.zip "$NEO4J_ZIP_SHA256" https://dist.neo4j.org/neo4j-enterprise-2025.06.2-windows.zip
+          fetch temurin-jdk-21.zip "$JDK_ZIP_SHA256" https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.13%2B9/OpenJDK21U-jdk_x64_windows_hotspot_21.0.13_9.zip
+          fetch databricks-cli.zip "$CLI_ZIP_SHA256" https://github.com/databricks/cli/releases/download/v1.26.0/databricks_cli_1.26.0_windows_amd64.zip
       - name: the packages, at the versions the setup check names, for the Python the py launcher starts
         run: |
           py -0p || true
           py -c "import sys; print(sys.executable, sys.version)"
           py -m pip install -q rdflib==7.6.0 pyshacl==0.40.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 openpyxl==3.1.5
-      # The runbook installs the Databricks command line with winget. The list of software on this runner image does
-      # not name winget, so this step may fail, and the job goes on. When winget is not there, the next step installs
-      # the command line with Databricks' own action, which Databricks' page "Install or update the Databricks CLI"
-      # names for GitHub Actions. The two --accept options answer the questions winget asks a person on first use.
-      - name: Databricks command line, with winget as the runbook installs it
-        id: winget
-        continue-on-error: true
+      # No installer and no administrator rights, as the runbook's section "Install the programs without administrator
+      # rights" does it: Java and the Databricks command line are unpacked from their zips into the local folder, and
+      # the local settings name both. Then every Java that the runner image brings is taken off PATH for the rest of
+      # the job, and JAVA_HOME is emptied, so that a command which looked for Java anywhere but in the settings would
+      # fail here.
+      - name: Java and the Databricks command line, unpacked from their zips
+        run: |
+          cd "$LOCAL"
+          unzip -q dl/temurin-jdk-21.zip
+          mv jdk-21* jdk-21
+          mkdir databricks-cli
+          unzip -q dl/databricks-cli.zip -d databricks-cli
+          [ -f databricks-cli/databricks.exe ] || mv "$(find databricks-cli -name databricks.exe | head -n 1)" databricks-cli/databricks.exe
+          jdk-21/bin/java.exe -version
+          databricks-cli/databricks.exe --version
+      - name: take every other Java off PATH
         shell: pwsh
         run: |
-          winget install Databricks.DatabricksCLI --accept-source-agreements --accept-package-agreements --disable-interactivity
-          $links = "$env:LOCALAPPDATA\Microsoft\WinGet\Links"
-          if (-not (Test-Path "$links\databricks.exe")) { "winget did not leave databricks.exe in $links"; exit 1 }
-          $links >> $env:GITHUB_PATH
-          "installed=winget" >> $env:GITHUB_OUTPUT
-      - name: Databricks command line, with Databricks' action when winget did not install it
-        if: steps.winget.outputs.installed != 'winget'
-        uses: databricks/setup-cli@main
-      - name: Databricks command line, its version
-        run: databricks --version
+          $kept = $env:Path -split ';' | Where-Object { $_ -and -not (Test-Path (Join-Path $_ 'java.exe')) }
+          "Path=$($kept -join ';')" >> $env:GITHUB_ENV
+          "JAVA_HOME=" >> $env:GITHUB_ENV
+      - name: no Java is on PATH, and JAVA_HOME names none
+        run: |
+          py -c "import os, shutil, sys; found = shutil.which('java'); sys.exit(f'a Java is still on PATH: {found}' if found else ('JAVA_HOME is still set' if os.environ.get('JAVA_HOME') else 0))"
       # The token goes from the secret into the runner's own .databrickscfg, and from there to the command line and
       # the SDK. No step prints it, and the file is deleted in the last step. The warehouse id goes into the
       # environment's settings file in the runner's temporary folder, which no step prints or uploads.
@@ -215,11 +226,13 @@ jobs:
           profile = "DEFAULT"
           workspace_folder = "$CI_FOLDER"
           timeout_minutes = 40
+          cli = "$LOCAL/databricks-cli/databricks.exe"
 
           [fuseki]
           jar = "$LOCAL/dl/jena-fuseki-server-6.2.0.jar"
           url = "http://127.0.0.1:13030/ds"
           data_folder = "$LOCAL/fuseki-db"
+          java = "$LOCAL/jdk-21/bin/java.exe"
 
           [neo4j.local]
           uri = "bolt://127.0.0.1:17687"
@@ -239,8 +252,12 @@ jobs:
           out = "$LOCAL/lpg-out"
           EOF
           cat "$LOCAL/stores.toml"
+      # The job's Neo4j server stands for Neo4j Desktop, which brings its own Java. So these two steps, and no
+      # other, get JAVA_HOME: the server starts with the unpacked JDK.
       - name: unpack Neo4j, add APOC and n10s, set the password
         shell: pwsh
+        env:
+          JAVA_HOME: ${{ env.LOCAL }}/jdk-21
         run: |
           $neo = "$env:LOCAL/neo4j-enterprise-2025.06.2"
           & "$env:SystemRoot/System32/tar.exe" -xf "$env:LOCAL/dl/neo4j-enterprise-2025.06.2-windows.zip" -C $env:LOCAL
@@ -256,6 +273,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
       # Started with its own hidden console and no tie to this step: a server on the step's console ends with the step.
       - name: start Neo4j and wait for it
+        env:
+          JAVA_HOME: ${{ env.LOCAL }}/jdk-21
         run: |
           py - <<'PY'
           import os, socket, subprocess, sys, time
@@ -442,6 +461,16 @@ jobs:
         if: matrix.part == 'reset'
         run: py -m kpi_store.runner --reset --yes
 
+      # The runbook's first way to install the Databricks command line is winget. The list of software on this runner
+      # image does not name winget, so this step only finds out whether the command runs here. It never fails the job,
+      # and it comes last, so that what it installs serves no step above. The two --accept options answer the
+      # questions that winget asks a person on first use.
+      - name: winget, to learn whether this runner can run the runbook's install command
+        if: matrix.part == 'reset'
+        continue-on-error: true
+        shell: cmd
+        run: winget install Databricks.DatabricksCLI --accept-source-agreements --accept-package-agreements --disable-interactivity
+
       # ---- both parts: leave nothing behind ----
       # Drops exactly the two schemas this part named and made, and deletes its one workspace folder. CASCADE is right
       # here: both schemas are this run's own. Then the sign-in file goes.
@@ -461,7 +490,7 @@ jobs:
               run_sql(f"DROP SCHEMA IF EXISTS {here.write_catalog}.{schema} CASCADE")
               print("dropped", f"{here.write_catalog}.{schema}")
           PY
-          case "$CI_FOLDER" in /Workspace/Shared/kpi_store_ci_*) databricks workspace delete "$CI_FOLDER" --recursive --profile DEFAULT || echo "the folder $CI_FOLDER was not there" ;; esac
+          case "$CI_FOLDER" in /Workspace/Shared/kpi_store_ci_*) "$LOCAL/databricks-cli/databricks.exe" workspace delete "$CI_FOLDER" --recursive --profile DEFAULT || echo "the folder $CI_FOLDER was not there" ;; esac
       - name: remove the sign-in file
         if: always()
         run: py -c "from pathlib import Path; (Path.home() / '.databrickscfg').unlink(missing_ok=True)"

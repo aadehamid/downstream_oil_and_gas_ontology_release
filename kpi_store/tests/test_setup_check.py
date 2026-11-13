@@ -166,6 +166,24 @@ def test_the_databricks_cli_must_run_and_the_profile_must_be_signed_in(tmp_path)
     assert sc.find_databricks(stores_support.local_settings(tmp_path, cli='cli = "gone.exe"'), which) is None
 
 
+def test_the_tools_are_found_where_a_person_without_administrator_rights_puts_them(tmp_path):
+    """No installer: the Databricks CLI unpacked from its zip and named in [databricks] cli, and a Git for Windows
+    that installed for one account, under %LOCALAPPDATA%. Neither is on PATH."""
+    nothing_on_path = lambda name: None   # noqa: E731
+    unpacked = tmp_path / "databricks_cli" / "databricks.exe"
+    unpacked.parent.mkdir()
+    unpacked.write_text("", encoding="utf-8", newline="\n")
+    local = stores_support.local_settings(tmp_path / "s", cli=f'cli = "{unpacked.as_posix()}"')
+    assert sc.find_databricks(local, nothing_on_path) == unpacked
+    from kpi_store import runner
+    ctx = runner.Context(local, support.ROOT, "20260101T000000Z")
+    assert ctx.cli("fs", "ls")[:3] == [str(unpacked), "fs", "ls"]
+    own = tmp_path / "AppData" / "Local"
+    (own / "Programs" / "Git" / "bin").mkdir(parents=True)
+    (own / "Programs" / "Git" / "bin" / "bash.exe").write_text("", encoding="utf-8", newline="\n")
+    assert sc.find_bash(None, {"LOCALAPPDATA": str(own)}, nothing_on_path, windows=True) == own / "Programs" / "Git" / "bin" / "bash.exe"
+
+
 class Versions:
     """A Neo4j session that answers the two version questions."""
 

@@ -79,6 +79,45 @@ Do this section once per machine. The setup check at its end tells you what is s
 8. Open `https://neo4j.com/download/`, download Neo4j Desktop and install it.
 9. Close every terminal window. A new terminal finds the new programs.
 
+Some of these installers ask for administrator rights. If your account has none, use the next section instead of steps 1 to 7.
+
+### Install the programs without administrator rights
+
+No step here asks for administrator rights. Nothing is installed for other accounts, and three programs are only unpacked into the local folder. The settings files then name them, because they are not on `PATH`.
+
+This guide writes `C:\kpi-store-1.1` for the release folder and `C:\kpi-store-local` for the local folder. An account without administrator rights may not be allowed to make a folder at the top of `C:`. Any short path that you may write to works, such as `kpi-store-1.1` and `kpi-store-local` in your own user folder. Then write your two paths wherever this guide writes these two. No command of the release depends on them.
+
+1. Python. Open `https://www.python.org/downloads/windows/` and download the installer of Python 3.12, 64-bit. Start it.
+2. On the installer's first page, tick "Add python.exe to PATH".
+3. On the same page, untick the box at the bottom that installs the launcher `py.exe` for all users. In the 3.12 installer it reads "Use admin privileges when installing py.exe".
+4. Click "Install Now". Python's page "Using Python on Windows" (Python 3.12.16 documentation, `https://docs.python.org/3.12/using/windows.html`) says of "Install Now" that you do not need to be an administrator unless you install the launcher for all users, or Windows needs an update of its C runtime library. Python goes into your user folder.
+5. Git for Windows. Open `https://git-scm.com/downloads/win` and download the edition named `Portable ("thumbdrive edition")`. The page listed it for Git for Windows 2.56.1 when it was read on 2026-11-12.
+6. Start the downloaded file. It asks for a folder and unpacks itself there. Give it `C:\kpi-store-local\PortableGit`. It installs nothing.
+7. Java. Open `https://adoptium.net/temurin/releases/` and choose version 21, Windows, x64, JDK, and the file that ends in `.zip`. Do not take the `.msi` file, which is the installer.
+8. In File Explorer, right-click the zip, choose "Extract All" and give `C:\kpi-store-local` as the folder. A folder such as `jdk-21.0.13+9` appears. Rename it to `jdk-21`. Adoptium's page "Archive Installation" (`https://adoptium.net/installation/archives/`, read 2026-11-12) describes the zip.
+9. The Databricks command line. Open `https://github.com/databricks/cli/releases`, and under "Assets" of the release marked "Latest" download `databricks_cli_` and the version and `_windows_amd64.zip`. Databricks' page "Install or update the Databricks CLI" (last updated 2026-09-11) calls this the source installation.
+10. Extract that zip into `C:\kpi-store-local\databricks-cli`. The folder then holds `databricks.exe`.
+11. Open `https://neo4j.com/download/`, download Neo4j Desktop and install it. If it is already on the machine, as version 2025.06.2 can be, skip this step.
+
+When you write `stores.toml` in "Write the two settings files", set three more lines, so that every command finds the three unpacked programs:
+
+```toml parse
+[databricks]
+cli = "C:/kpi-store-local/databricks-cli/databricks.exe"
+
+[fuseki]
+java = "C:/kpi-store-local/jdk-21/bin/java.exe"
+
+[tools]
+bash = "C:/kpi-store-local/PortableGit/bin/bash.exe"
+```
+
+Each line is already in the example file with an empty value. The `java` line serves Fuseki, ROBOT and the setup check. The `bash` line serves the check script, which the runner starts. The `cli` line serves the setup check and the runner.
+
+The sign-in command of "Sign in to Databricks" is then not on `PATH`. Start it with its full path, `C:\kpi-store-local\databricks-cli\databricks.exe`, in place of the word `databricks`.
+
+The Windows test job runs this guide's chain this way. Its Java and its Databricks command line come from these two zips and are named in the settings. No other Java is on its `PATH`, and its folders lie in a temporary folder. It uses the Git for Windows that its machine already has, so the portable edition and the Python installer are not proven there.
+
 ### Unpack the release
 
 1. In File Explorer, right-click `kpi-store-1.1.zip` and choose "Extract All".
@@ -133,7 +172,7 @@ The Windows test job proved each point below on Windows Server 2025 with Python 
 | Where to run the check script | In Git Bash, or through the runner. In PowerShell or Command Prompt, the plain word `bash` starts the launcher of the Linux subsystem, not Git Bash. The runner finds Git Bash by itself. |
 | Java | Version 21 or later. The setup check fails on an older one. |
 | Long paths | Nothing. The longest path in the release has 95 characters, and the check passed under a folder path of 80 characters. |
-| Rights | No administrator rights for any command of this guide. The installers may ask for them. |
+| Rights | No administrator rights for any command of this guide. `setx` writes your own account's settings and needs none. Some installers ask for them, and "Install the programs without administrator rights" is the way without. The Windows test job proved that the chain runs with Java and the Databricks command line unpacked from their zips, named in the settings and not on `PATH`, and with its folders in a temporary folder. No test ran the Python installer, the portable Git for Windows or Neo4j Desktop. |
 | Fuseki | Nothing. The runner starts Fuseki detached, so it lives on after the command ends. A server that you start yourself in a console window ends when you close the window. |
 | The local folder | Keep `C:\kpi-store-local` private to your account. The Neo4j load writes a login file into the run's folder, and on Windows that file gets the folder's permissions. |
 | A Git copy | Keep the file `.gitattributes`. Without it, Git for Windows checks text files out with other line ends, and the packages' hashes differ. An unpacked zip is not affected. |
@@ -187,7 +226,7 @@ The release has an example of each file. Copy both, then change only the lines t
 
 4. Save the file and close Notepad.
 5. In File Explorer, copy `C:\kpi-store-1.1\kpi_store\stores.example.toml` to `C:\kpi-store-local\stores.toml`.
-6. Open `C:\kpi-store-local\stores.toml` in Notepad and set these lines. Leave every other line as it is.
+6. Open `C:\kpi-store-local\stores.toml` in Notepad and set these lines. Leave every other line as it is. If your local folder is not `C:\kpi-store-local`, also replace `C:/kpi-store-local` in every line that holds it with your folder's path, with `/` in place of each backslash.
 
    | Table | Line | Set it to |
    |---|---|---|
@@ -1187,7 +1226,7 @@ These points are not proven on Windows, or not on the client's own objects. Each
 |---|---|---|
 | Neo4j Desktop in place of a Neo4j server | The Windows job starts a Neo4j Enterprise server from its zip, with no Neo4j Desktop. | The setup check proves the instance, whatever started it. |
 | The sign-in in a browser, and the client's sandbox | The Windows job signs in to a rehearsal workspace with a token, which is a secret in the settings of the repository on GitHub. The release holds no token. No test opens a browser, and no test reaches the sandbox. | Sign in again ("Sign in to Databricks"), and report the line. |
-| Every step of "Install the programs" and "Unpack the release" | No test installs programs. | Report the step. |
+| Every step of "Install the programs" and "Unpack the release" | No test runs an installer. Of "Install the programs without administrator rights", the Windows job does the Java steps and the Databricks command line steps, with `unzip` in place of File Explorer. | Report the step. |
 | The steps of "Set up the local Neo4j" | The Windows job used a Neo4j server, not Neo4j Desktop. The steps follow Neo4j Desktop's documentation ("Instance management"), and menu names may differ in your version. | Reach the same goal by the menu your version has. The setup check proves the result. |
 | A new terminal after `setx KPI_STORE_LOCAL` and `setx PY_PYTHON` | The Windows job runs both commands and reads both values back from the account's settings. It opens no new terminal to read them there. | Add `--stores C:\kpi-store-local\stores.toml` to every command of this guide instead. |
 | Clearing the report in Excel | The test edits the file with Python. The runner reads the CSV as UTF-8, with or without a byte-order mark, and reads only the columns `id`, `decision`, `decided_by` and `note`. | Edit the same three cells in Notepad instead. They are the last three values of each line. |
