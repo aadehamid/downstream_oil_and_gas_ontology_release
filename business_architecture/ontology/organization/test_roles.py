@@ -5,6 +5,7 @@ built roles conform to the organization shapes.
 Run: python3 -m pytest test_roles.py (needs rdflib, pyshacl).
 """
 import csv
+import json
 import os
 import shutil
 import tempfile
@@ -98,6 +99,30 @@ class BrokenRegisterFails(unittest.TestCase):
 
     def test_an_unused_role_fails(self):
         self.run_mutant(roles_edit=lambda d: d + [dict(d[0], slug="spare-role", label="Spare Role")])
+
+    def test_a_deprecated_role_cannot_lose_its_last_name_in_the_process_map(self):
+        # To replace a role in every RACI entry, deprecate it into its successor and leave its name in the process
+        # map (HOW-TO-UPDATE.md, "Deprecate a term"). Rewriting the name in the map is refused both ways: with the
+        # register row kept, the row names a text the map lacks; with the row removed, no row names the role.
+        # RCVO Advisor is a role this release deprecated into its successor.
+        text = next(r["source_text"] for r in rows(br.REGISTER) if r["roles"] == "rcvo-advisor")
+        entries = br.raci_entries(json.load(open(br.SOURCE, encoding="utf-8")), [])
+        self.assertTrue(any(t == text for _, _, t in entries))
+        rewritten = [(p, lvl, "RVCO Advisor" if t == text else t) for p, lvl, t in entries]
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        without = os.path.join(tmp, "role-register.csv")
+        with open(without, "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=list(rows(br.REGISTER)[0].keys()))
+            w.writeheader()
+            w.writerows(r for r in rows(br.REGISTER) if r["source_text"] != text)
+        with mock.patch.object(br, "raci_entries", lambda node, out: out.extend(rewritten) or out):
+            with self.assertRaises(SystemExit) as kept:
+                br.load()
+            with mock.patch.object(br, "REGISTER", without), self.assertRaises(SystemExit) as removed:
+                br.load()
+        self.assertIn(f"register row {text!r} is not in the source", str(kept.exception))
+        self.assertIn("role 'rcvo-advisor' is not used by the register", str(removed.exception))
 
     def test_a_duplicate_role_label_fails(self):
         self.run_mutant(roles_edit=lambda d: [dict(d[0], label=d[1]["label"])] + d[1:])

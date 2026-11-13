@@ -401,7 +401,9 @@ The cut tool leaves four kinds of accepted rows, and lists each as "needs a mino
 
 The next five sections each end with a worked example on made-up data. One helper, `release/update_examples.py`, makes the hand edits of each example. These are the rows, the terms, the shapes and the figures in the tests. The commands after the helper are the ones you run for a real change. Read the helper's functions as the pattern for your own change. It has one function for each file.
 
-**Run an example in a copy of the release, never in the folder you load the stores from.** Use a fresh copy for each example, because two examples may change the same module. No example is your organisation's answer. Your business says which role replaces a role, what kind a system is, what class a catalog entry has, who is responsible for a process and what the domains are.
+**Run an example in a copy of the release, never in the folder you load the stores from.** Use a fresh copy for each example, because two examples may change the same module.
+
+The examples are made for KPI Store 1.1 as shipped. The helper looks for the exact text it changes. In a release that has moved on, a file may no longer hold that text. The helper then stops with a line that starts `refused:`, names the file and changes nothing, with `--plan` and with `--write`. It also refuses a copy that holds the example already, and a file or a folder that is a link. The steps above each example still hold for a release that has moved on. Only the example's own figures and versions are those of the release as shipped. No example is your organisation's answer. Your business says which role replaces a role, what kind a system is, what class a catalog entry has, who is responsible for a process and what the domains are.
 
 Five things hold in all five sections.
 
@@ -413,7 +415,7 @@ Five things hold in all five sections.
 
 ## Deprecate a term
 
-Use this when the business says that a term is no longer used, or that two terms are one. Never delete the term. Mark it deprecated, name the term that replaces it, and keep everything it has. A deprecation is a major release, because an answer that named the term is no longer current. The ontology owner approves it.
+Use this when the business says that a term is no longer used, or that two terms are one. Use it also to replace a role by one other role in every RACI entry that names it. Never delete the term. Mark it deprecated, name the term that replaces it, and keep everything it has. A deprecation is a major release, because an answer that named the term is no longer current. The ontology owner approves it.
 
 The steps are for a role. This release leaves one such case open, whether "Black Oil Manager" is a real role (`KNOWN-OPEN-ITEMS.md`, item 2). The paragraph after the steps says what differs in other modules.
 
@@ -423,7 +425,7 @@ The steps are for a role. This release leaves one such case open, whether "Black
 4. In that row, set `replaced_by` to the `slug` of the successor.
 5. Set `replaced_label_kind` to `alt`. The successor then takes the old name as an alternative label. Write `hidden` only when the old name is a misspelling.
 6. Write in `note` why the role is deprecated and who said so. Start with "Deprecated:", as the three deprecated roles of this release do. Search the file for `rcvo-advisor` to see one.
-7. Leave the role's `slug` and `label`, its row in `role-register.csv` and the process map as they are. The process map still names the role, and the register still maps that name to it.
+7. Leave the role's `slug` and `label`, its row in `role-register.csv` and the process map as they are. **Do not rewrite the role's name in the process map.** The process map keeps the name its source uses, the register still maps that name to the role, and the build gives each of its assignments to the successor. If you rewrite the name, the build stops with `register row ... is not in the source`. If you then remove the register row, it stops with `role ... is not used by the register`.
 8. Change the figures in `organization\test_roles.py`. `test_the_figures_match_the_decision_record` states the count of deprecated and live roles. `test_the_answers_point_the_right_way` lists each deprecated role with its successor.
 9. Rebuild the roles, then the assignments, from the folder `organization`. The commands are `py build_roles.py --write` and `py build_assignments.py --write`.
 10. Release `organization` as a major, with "The release steps" from step 5. Write `major` and the next major version in `start`. The cascade gives `integration` and `ref-mpc` a patch each.
@@ -482,7 +484,7 @@ The commands start in the top folder of the copy.
    Now build: cd ../organization, then build_roles.py --write and build_assignments.py --write. HOW-TO-UPDATE.md has the steps after it.
    ```
 
-4. Rebuild the roles and the assignments. The first line counts 4 deprecated roles, one more than before. The third line ends with 13 moved assignments, which are the 3 of this release and the 10 of Black Oil Manager.
+4. Rebuild the roles and the assignments. The first line counts 4 deprecated roles, one more than before. The count of entries and of role names is the same as before, because the process map has not changed. The third line ends with 13 moved assignments, which are the 3 of this release and the 10 of Black Oil Manager.
 
    ```powershell run=slow
    cd ../organization
@@ -497,7 +499,17 @@ The commands start in the top folder of the copy.
    wrote assignments.ttl and raci-conservation.csv
    ```
 
-5. Set the new version, write the package and release the modules that depend on it.
+5. Read the assignments. Every RACI entry that named Black Oil Manager is still there, with its text and its IRI, and now names Asphalt Manager. This is the whole of replacing a role in every entry that names it.
+
+   ```powershell run=slow
+   py -c "t = open('assignments.ttl', encoding='utf-8').read(); print(t.count('Black oil manager'), 'assignments keep the text Black oil manager;', t.count('--black-oil-manager--'), 'keep their IRI;', t.count('assignedRole role:black-oil-manager '), 'name the deprecated role')"
+   ```
+
+   ```text expect
+   10 assignments keep the text Black oil manager; 10 keep their IRI; 0 name the deprecated role
+   ```
+
+6. Set the new version, write the package and release the modules that depend on it.
 
    ```powershell run=slow
    cd ../release
@@ -518,7 +530,7 @@ The commands start in the top folder of the copy.
    3 modules released. Now rebuild the catalog and the projection manifest, and run the check.
    ```
 
-6. Rebuild the catalog, the projection manifest, the competency questions, the KPI intake pack and the pages.
+7. Rebuild the catalog, the projection manifest, the competency questions, the KPI intake pack and the pages.
 
    ```powershell run=slow
    py build_catalog.py --write
@@ -539,7 +551,7 @@ The commands start in the top folder of the copy.
    ...
    ```
 
-7. Read the role's entry in the form's list. It carries the mark, and the form's settings still hide it.
+8. Read the role's entry in the form's list. It carries the mark, and the form's settings still hide it.
 
    ```powershell run=slow
    py -c "import json; print([(r['label'], r.get('hidden', False)) for r in json.load(open('kpi-intake/pick-lists.json', encoding='utf-8'))['lists']['roles'] if 'Black Oil' in r['label']])"
@@ -549,17 +561,27 @@ The commands start in the top folder of the copy.
    [('Black Oil Manager (deprecated)', True)]
    ```
 
-8. Stage the change and run the full check. On Windows, run it in Git Bash.
+9. Run the helper again. It refuses a copy that holds the example, and changes nothing.
 
-   ```bash run=slow
-   git add -A
-   bash scripts/check.sh
+   ```powershell run=slow exit=1
+   py business_architecture/ontology/release/update_examples.py deprecate-role --write
    ```
 
    ```text expect
-   ...
-   all checks passed
+   refused: this copy holds the example deprecate-role already; nothing was changed
    ```
+
+10. Stage the change and run the full check. On Windows, run it in Git Bash.
+
+    ```bash run=slow
+    git add -A
+    bash scripts/check.sh
+    ```
+
+    ```text expect
+    ...
+    all checks passed
+    ```
 
 ## Change the kind of a term
 
@@ -835,7 +857,16 @@ Use this to add roles, or to add or replace who is responsible, accountable, con
 
 `organization` builds its RACI from the process map. A process there may have a `raci` object with four lists, named `responsible`, `accountable`, `consulted` and `informed`. Each entry of a list is the name of a role, as text. The role register, `organization\role-register.csv`, maps each name to one or more roles of `organization\roles.csv`. The builder writes one assignment for each entry and each role it names. It infers nothing from the hierarchy. A process with no `raci` object gets no assignment, whatever the processes above and below it have.
 
-New roles and new entries are a minor release. An entry that you remove or change takes its assignment out of the module, and that is a major release. A role that no entry names any more cannot stay live. Deprecate it into the role that took its work, with "Deprecate a term".
+Four cases differ in what you do and in the kind of release.
+
+| What changes | What to do | Release |
+|---|---|---|
+| New roles, or new entries. | The steps below. | A minor. |
+| An entry is removed, or a role is replaced in some entries while other entries still name it. | The steps below. Rewrite those entries in the process map. | A major, because the assignments of the old entries leave the module. |
+| One role replaces another in every entry that names it. | "Deprecate a term". Leave the process map and the register as they are. | A major. |
+| A role leaves every entry, and no one role replaces it. | Not possible in this release. "Deprecate a term" says why. | |
+
+The third case is never done in the process map. The build refuses a role that no entry names, and a role is never deleted. So the name stays in the process map, and the deprecation gives each of its assignments to the successor. If the successor is a new role, add it first with the steps below, in the same release.
 
 1. Get the RACI from the business as a document with a date. It has one line for each process, role and level.
 2. Check that each line names a process of the process map. This module holds assignments for those processes only. A RACI for anything else, such as the governance of a data domain, needs that process first ("Change a process"), or a module of its own ("Onboard another module").
