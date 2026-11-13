@@ -256,14 +256,32 @@ SELECT ?area ?process WHERE {{
 # ---- helpers ----------------------------------------------------------------------------------------
 
 class Tree:
-    """The release's files as this run reads and changes them. Nothing is written until save()."""
+    """The release's files as this run reads and changes them. Nothing is written until save().
+
+    Every path is checked before it is read and again before it is written (inside): a file that is a link, or
+    that lies under a folder that is a link, could send a write to a place outside the copy, so the run refuses
+    it. The copy's own top folder may be reached through a link: that is the reader's choice."""
 
     def __init__(self, root):
         self.root, self.texts, self.places = root, {}, []
 
+    def inside(self, path):
+        """The full path of a file of the copy. Raises Refused when the path, or a folder between the top folder
+        and it, is a link, or when the path does not resolve to a place inside the top folder."""
+        at = self.root
+        for part in path.replace("\\", "/").split("/"):
+            at = os.path.join(at, part)
+            if os.path.islink(at) or getattr(os.path, "isjunction", lambda p: False)(at):   # isjunction: Windows, Python 3.12
+                raise Refused(f"{os.path.relpath(at, self.root).replace(os.sep, '/')} is a link. This command changes only "
+                              "files inside the copy, so it does not follow a link. Remove the link and run the command again")
+        top, full = os.path.realpath(self.root), os.path.realpath(os.path.join(self.root, path))
+        if os.path.commonpath([top, full]) != top:
+            raise Refused(f"{path} is not inside the copy")
+        return os.path.join(self.root, path)
+
     def read(self, path):
         if path not in self.texts:
-            full = os.path.join(self.root, path)
+            full = self.inside(path)
             if not os.path.isfile(full):
                 raise Refused(f"{path} is missing")
             with open(full, encoding="utf-8", newline="") as f:
@@ -271,7 +289,7 @@ class Tree:
         return self.texts[path]
 
     def new(self, path, text):
-        if os.path.exists(os.path.join(self.root, path)):
+        if os.path.lexists(self.inside(path)):
             raise Refused(f"{path} exists already")
         self.texts[path] = text
 
@@ -285,8 +303,9 @@ class Tree:
         self.texts[path] = text[:found[0].end()] + added + text[found[0].end():]
 
     def save(self):
+        targets = {path: self.inside(path) for path in self.texts}   # every path is checked before the first write
         for path, text in self.texts.items():
-            full = os.path.join(self.root, path)
+            full = targets[path]
             os.makedirs(os.path.dirname(full), exist_ok=True)
             with open(full, "w", encoding="utf-8", newline="") as f:
                 f.write(text)
