@@ -70,11 +70,11 @@ Do this section once per machine. The setup check at its end tells you what is s
 6. Open `https://adoptium.net/temurin/releases/`, choose version 21 for Windows, and install it with its default choices. Fuseki 6.2.0 and ROBOT run on Java 21.
 7. Open Command Prompt and install the Databricks command line. The command is from Databricks' page "Install or update the Databricks CLI" (last updated 2026-09-11).
 
-   ```cmd skip reason="windows-only: installs a program with winget, which the Windows test job tries and may not have"
+   ```cmd run=windows-account os=windows status-only
    winget install Databricks.DatabricksCLI
    ```
 
-   It downloads and installs the program. The last line says that the install succeeded.
+   It downloads and installs the program. The last line says that the install succeeded. On its first use on a machine, `winget` may ask you to agree to the terms of its sources. Type `Y` and press Enter.
 
 8. Open `https://neo4j.com/download/`, download Neo4j Desktop and install it.
 9. Close every terminal window. A new terminal finds the new programs.
