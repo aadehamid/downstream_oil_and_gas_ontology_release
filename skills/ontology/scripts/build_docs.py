@@ -56,9 +56,13 @@ def build(jar, releases, docs, module, version):
     os.makedirs(os.path.dirname(out), exist_ok=True)
     staging = tempfile.mkdtemp(prefix=f".{version}.building-", dir=os.path.dirname(out))
     try:
-        run = subprocess.run(["java", "-jar", jar, "-ontFile", os.path.join(package, f"{module}.ttl"), "-outFolder",
-                              staging, "-rewriteAll", "-noPlaceHolderText", "-lang", "en"],
-                             capture_output=True, text=True, stdin=subprocess.DEVNULL, encoding="utf-8")
+        try:
+            run = subprocess.run(["java", "-jar", jar, "-ontFile", os.path.join(package, f"{module}.ttl"), "-outFolder",
+                                  staging, "-rewriteAll", "-noPlaceHolderText", "-lang", "en"],
+                                 capture_output=True, text=True, stdin=subprocess.DEVNULL, encoding="utf-8")
+        except OSError as exc:   # no java on PATH, or one that cannot be started
+            print(f"FAIL widoco: {module} {version}: Java could not be started ({exc}); put java on PATH")
+            return False
         if run.returncode != 0 or not os.path.isfile(os.path.join(staging, "index-en.html")):
             print(f"FAIL widoco: {module} {version}: {(run.stdout + run.stderr).strip()[-500:]}")
             return False
