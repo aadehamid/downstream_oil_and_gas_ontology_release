@@ -49,7 +49,7 @@ The tool works in a temporary copy of the release. Besides the ontology's files,
 In a Git copy the tool commits the change and tags it `data-product-<version>`. The cut ends with its commit and its tag, or it changes nothing. It never pushes. Before it changes a file, the tool checks what Git needs and refuses the cut when one of these is missing:
 
 - Git is installed.
-- The copy has no change that is not committed.
+- The copy has no change that is not committed. The tool names the changed files. A `__pycache__` folder that Python left beside the code it ran is not such a change.
 - Git has a `user.name` and a `user.email`. If not, the tool prints the two `git config` commands to run.
 - The tag does not exist yet.
 

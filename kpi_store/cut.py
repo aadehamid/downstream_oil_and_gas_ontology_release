@@ -1064,14 +1064,34 @@ def _paths(files):
     return "\0".join(files) + "\0"
 
 
+def _uncommitted(root):
+    """The paths Git reports as changed or new, sorted. A new file under a name of IGNORED, such as the __pycache__
+    folder Python leaves beside the code it ran, is not a change: the cut never copies, compares or commits it."""
+    # -z: one entry ends with NUL and no path is quoted. --untracked-files=all: each new file by its own path, so a
+    # new folder that holds only a cache is not reported under the folder's name.
+    entries = _git(root, "status", "--porcelain", "-z", "--untracked-files=all").stdout.split("\0")
+    changed, at = [], 0
+    while at < len(entries):
+        entry, at = entries[at], at + 1
+        if not entry:
+            continue
+        status, path = entry[:2], entry[3:]
+        if status[0] in "RC":   # a rename or a copy: the next entry is the old path, not a change of its own
+            at += 1
+        if status == "??" and IGNORED & set(path.split("/")):
+            continue
+        changed.append(path)
+    return sorted(changed)
+
+
 def _git_state(root):
     """"none" for a plain folder, "no git" for a Git copy on a machine without Git, "dirty" when the copy has changes
-    that are not committed, "no author" when Git has no user.name or user.email, else "ready"."""
+    that are not committed (_uncommitted), "no author" when Git has no user.name or user.email, else "ready"."""
     if not (root / ".git").exists():
         return "none"
     if not shutil.which("git"):
         return "no git"
-    if _git(root, "status", "--porcelain").stdout.strip():
+    if _uncommitted(root):
         return "dirty"
     if any(not _git(root, "config", key).stdout.strip() for key in ("user.name", "user.email")):
         return "no author"
@@ -1096,7 +1116,10 @@ def _git_ready(root, plan_):
     if state == "no git":
         raise CutRefused(f"this folder is a Git copy, and Git is not installed, so the cut could not commit. Install Git, then cut. {plain}")
     if state == "dirty":
-        raise CutRefused("this Git copy has changes that are not committed. Commit them or put them aside, then cut.")
+        changed = _uncommitted(root)
+        more = f" and {len(changed) - 5} more" if len(changed) > 5 else ""
+        raise CutRefused(f"this Git copy has changes that are not committed: {', '.join(changed[:5])}{more}. "
+                         "Commit them or put them aside, then cut.")
     if state == "no author":
         raise CutRefused("this Git copy has no user.name or user.email, so the cut could not commit. Run these two commands, "
                          'then cut:\n  git config user.name "<your name or role>"\n  git config user.email "<your e-mail address>"\n' + plain)
