@@ -65,7 +65,12 @@ class NewestSet(unittest.TestCase):
         self.assertEqual(bm.dependencies("technical-graph"), {"data-product": "1.2.0", "kpi": "1.3.0", "system": "1.5.0"})
 
     def test_a_shape_path_names_the_modules_newest_package(self):
-        self.assertEqual(bm.resolve("releases/organization/2.1.0/shapes.ttl"), "releases/organization/2.2.0/shapes.ttl")
+        # The version is read from the module's entry, not written here, so the test still holds after a release of
+        # organization. The folder it names must be a package of this tree.
+        version = bm.MODULES["organization"]["version"]
+        self.assertNotEqual(version, "2.1.0")
+        self.assertEqual(bm.resolve("releases/organization/2.1.0/shapes.ttl"), f"releases/organization/{version}/shapes.ttl")
+        self.assertTrue(os.path.isfile(os.path.join(bm.ONTOLOGY, "releases", "organization", version, "shapes.ttl")))
         self.assertEqual(bm.resolve("ref-mpc/shapes.ttl"), "ref-mpc/shapes.ttl")
 
 
