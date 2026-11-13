@@ -19,9 +19,10 @@ release. Run each example in a copy of its own, because two examples may change 
 proposal and the approval. It builds and releases nothing: the guide's next commands do that. Read each function
 below as the pattern for a change of your own: one function per file.
 
-Every change is worked out before the first file is written, so a file that is not as the example expects it
-stops the command with nothing changed. The command refuses a copy that holds the example already. Exit 0 when
-done, 1 when refused.
+The examples are made for KPI Store 1.1 as shipped: each looks for the exact text it changes. Every change is
+worked out before the first file is written. So on a release that has moved on, where a file no longer holds that
+text, `--plan` and `--write` both stop, name the file and change nothing. The command also refuses a copy that
+holds the example already, a file that is a link, and a path that leaves the copy. Exit 0 when done, 1 when refused.
 """
 import argparse
 import datetime
@@ -41,7 +42,9 @@ def swap(tree, path, old, new):
     """Replaces the one place of a file that holds `old`. No place, or two, stops the run with nothing changed."""
     text = tree.read(path)
     if text.count(old) != 1:
-        raise Refused(f"{path}: expected one place that holds {old!r}, found {text.count(old)}")
+        raise Refused(f"{path} does not hold the text this example changes, or holds it more than once. The example is made "
+                      f"for KPI Store 1.1 as shipped, and this file has changed since. Nothing was changed. The text, which "
+                      f"the file holds {text.count(old)} times, is: {old.strip()[:160]!r}")
     tree.texts[path] = text.replace(old, new)
     return path
 
@@ -69,8 +72,8 @@ def cut_tests(tree, date):
     path = "scripts/pinned-tests.txt"
     line = "kpi_store/tests/test_cut.py::test_the_baseline_is_this_trees_or_data_product_has_moved_on"
     text = tree.read(path)
-    if line in text:
-        raise Refused(f"{path} names {line} already")
+    if line in text:   # an earlier release of another module has added the line: it is said once
+        return path
     tree.texts[path] = text.rstrip("\n") + f"\n# This copy has released a module that data-product does not depend on, so the cut tests' versions are not its own.\n{line}\n"
     return path
 
@@ -359,6 +362,14 @@ def raci_form_guide(tree, date):
 DOMAIN_NS = "https://w3id.org/mpc/ontology/modules/kpi/"
 DOMAIN_QUESTION = "Which data domains does the ontology hold, and what data does each cover?"
 
+
+def next_question(tree):
+    """The number after the last competency question of the copy: 58 on the release as shipped."""
+    rows = [line.split(",", 1)[0] for line in tree.read(f"{ONT}/regression/expected.csv").splitlines()[1:] if line.strip()]
+    if not rows or not all(row.isdigit() for row in rows):
+        raise Refused(f"{ONT}/regression/expected.csv does not start each row with a question's number. Nothing was changed")
+    return max(int(row) for row in rows) + 1
+
 DOMAIN_TABLE = """domain_id,name,definition
 yard-stock,Yard Stock,"The made-up yard stock domain, which stands for one data domain of your organization."
 dock-schedule,Dock Schedule,"The made-up dock schedule domain, which stands for a second data domain of your organization."
@@ -379,7 +390,7 @@ kpi:dataDomain a owl:ObjectProperty ;
     rdfs:label "data domain"@en ;
     rdfs:domain kpi:MeasureDefinition ; rdfs:range skos:Concept ;
     skos:definition "The data domain the measure belongs to, from the list of data domains."@en ;
-    dcterms:bibliographicCitation "{ONT}/kpi/data-domains.csv, a made-up table; competency question 58"@en .
+    dcterms:bibliographicCitation "{ONT}/kpi/data-domains.csv, a made-up table; competency question QUESTION_NUMBER"@en .
 """
 
 DOMAIN_SHAPES = """# A made-up list of data domains (the worked example of HOW-TO-UPDATE.md). A domain is a value of its own list, and a
@@ -551,7 +562,7 @@ if __name__ == "__main__":
     unittest.main()
 '''
 
-DOMAIN_QUERY = f"""# Q58 {DOMAIN_QUESTION}
+DOMAIN_QUERY = f"""# QQUESTION_NUMBER {DOMAIN_QUESTION}
 PREFIX kpi: <{DOMAIN_NS}>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 SELECT ?domain ?name ?covers WHERE {{
@@ -569,7 +580,7 @@ def domain_files(tree, date):
 
 def domain_vocabulary(tree, date):
     """The list's scheme, the class of its values, and the property that points at the list."""
-    return append(tree, f"{ONT}/kpi/vocabulary.ttl", DOMAIN_VOCABULARY)
+    return append(tree, f"{ONT}/kpi/vocabulary.ttl", DOMAIN_VOCABULARY.replace("QUESTION_NUMBER", str(next_question(tree))))
 
 
 def domain_shapes(tree, date):
@@ -606,16 +617,19 @@ def domain_check(tree, date):
 def domain_question(tree, date):
     """The competency question the list answers: its row in expected.csv, its query, the new file in run.py, and
     the question in competency-questions.md, numbered after the last."""
-    tree.new(f"{ONT}/regression/queries/q58-data-domains.rq", DOMAIN_QUERY)
+    number = next_question(tree)
+    tree.new(f"{ONT}/regression/queries/q{number}-data-domains.rq", DOMAIN_QUERY.replace("QUESTION_NUMBER", str(number)))
     expected = tree.read(f"{ONT}/regression/expected.csv")
     end = "\r\n" if expected.endswith("\r\n") else "\n"
-    tree.texts[f"{ONT}/regression/expected.csv"] = expected + f"58,answerable,q58-data-domains.rq,{end}"
+    tree.texts[f"{ONT}/regression/expected.csv"] = expected + f"{number},answerable,q{number}-data-domains.rq,{end}"
     swap(tree, f"{ONT}/regression/run.py", '"kpi", n) for n in ("vocabulary.ttl", "measures.ttl")]',
          '"kpi", n) for n in ("vocabulary.ttl", "measures.ttl", "data-domains.ttl")]')
     path = f"{ONT}/competency-questions.md"
-    tree.texts[path] = tree.read(path).rstrip("\n") + (
-        f"\n\n## XIV. The made-up data domains (added {date})\nThe question of the made-up list of data domains, which "
-        f"`release/update_examples.py` adds to `kpi` as an example.\n58. {DOMAIN_QUESTION}\n")
+    text = tree.read(path)
+    numeral = "XV" if "\n## XIV." in text else "XIV"
+    tree.texts[path] = text.rstrip("\n") + (
+        f"\n\n## {numeral}. The made-up data domains (added {date})\nThe question of the made-up list of data domains, which "
+        f"`release/update_examples.py` adds to `kpi` as an example.\n{number}. {DOMAIN_QUESTION}\n")
     return f"{ONT}/regression/ and {ONT}/competency-questions.md"
 
 
