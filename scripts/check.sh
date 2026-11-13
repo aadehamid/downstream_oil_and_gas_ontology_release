@@ -30,7 +30,7 @@ run_tests() {  # unittest exits 0 on zero tests; a test command must have run at
   echo "--- $*"; local out rc=0; out="$("$@" 2>&1)" || rc=$?; printf '%s\n' "$out"
   [ "$rc" -eq 0 ] && grep -qE '^Ran [1-9][0-9]* tests? ' <<<"$out"
 }
-with_deps() { uv run -q --no-project --with pytest --with pytest-xdist --with rdflib --with pyshacl --with openpyxl --with jsonschema --with "markdown-it-py>=4,<5" --with pyyaml==6.0.3 --with sqlglot==30.31.0 --with pyoxigraph==0.5.13 --with neo4j "$@"; }
+with_deps() { uv run -q --no-project --with pytest==9.2.0 --with pytest-xdist==3.8.0 --with rdflib==7.6.0 --with pyshacl==0.40.2 --with openpyxl==3.1.5 --with jsonschema==4.26.0 --with markdown-it-py==4.3.0 --with pyyaml==6.0.3 --with sqlglot==30.31.0 --with pyoxigraph==0.5.13 --with neo4j==6.4.1 "$@"; }
 
 # Snapshot the tree, so a check that writes a file is caught.
 snapshot() {
@@ -169,11 +169,11 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
 # one table, the same one the cut's skills-tests row runs). A test command that found no test is a failure.
 # Inside uv run the program is python, never python3: the environment uv makes on Windows holds python.exe only, so
 # python3 there would be another Python, without the packages --with names.
-(cd skills/ontology/scripts && run_tests uv run -q --no-project --with rdflib --with pyyaml --with pyshacl python -m unittest discover -q -p 'test_*.py')
-(cd skills/ontology && run uv run -q --no-project --with pyyaml python scripts/check_sssom.py templates/mappings.sssom.tsv)
-(cd skills/ontology-to-lpg/scripts && run_tests uv run -q --no-project --with rdflib --with pyshacl --with mcp-neo4j-data-modeling==0.8.2 python -m unittest -q test_projection test_engine_gate test_modeling test_explore test_run_projection test_release_record)
-(cd skills/rdf-store/scripts && run_tests uv run -q --no-project --with pyoxigraph python -m unittest -q test_rdf_store)
-(cd skills && run_tests uv run -q --no-project --with 'markdown-it-py>=4,<5' python scripts/test_playbook_html.py)
+(cd skills/ontology/scripts && run_tests uv run -q --no-project --with rdflib==7.6.0 --with pyyaml==6.0.3 --with pyshacl==0.40.2 python -m unittest discover -q -p 'test_*.py')
+(cd skills/ontology && run uv run -q --no-project --with pyyaml==6.0.3 python scripts/check_sssom.py templates/mappings.sssom.tsv)
+(cd skills/ontology-to-lpg/scripts && run_tests uv run -q --no-project --with rdflib==7.6.0 --with pyshacl==0.40.2 --with mcp-neo4j-data-modeling==0.8.2 python -m unittest -q test_projection test_engine_gate test_modeling test_explore test_run_projection test_release_record)
+(cd skills/rdf-store/scripts && run_tests uv run -q --no-project --with pyoxigraph==0.5.13 python -m unittest -q test_rdf_store)
+(cd skills && run_tests uv run -q --no-project --with markdown-it-py==4.3.0 python scripts/test_playbook_html.py)
 # The module map and the coverage counts run from the release folders.
 run with_deps python scripts/epm_facts.py counts >/dev/null
 run with_deps python scripts/epm_facts.py modules >/dev/null

@@ -153,6 +153,8 @@ You do not compare the checksums by hand. The setup check does it and fails on a
 
    The last line starts with `Successfully installed` and names the packages.
 
+   The check step of the run needs more packages for its tests, such as `pytest`. It does not install them into Python. On its first run it downloads them through `uv` from `pypi.org`, at the versions `scripts/check.sh` names, into `uv`'s cache folder in your user profile (`%LOCALAPPDATA%\uv\cache`), so the machine must reach `pypi.org` then.
+
 3. If the machine has more than one Python, tell the `py` launcher which one to start. `py` starts the newest Python it finds, and the packages of step 2 must be installed for that one. This command makes `py` start Python 3.12 in every new terminal.
 
    ```cmd run=windows-account os=windows status-only

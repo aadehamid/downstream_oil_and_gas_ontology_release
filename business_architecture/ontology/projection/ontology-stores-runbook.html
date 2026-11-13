@@ -266,7 +266,8 @@ bash = "C:/kpi-store-local/PortableGit/bin/bash.exe"</code></pre>
 <h3 id="install-the-python-packages">Install the Python packages<a class="hl" href="#install-the-python-packages" aria-label="Link to this section">#</a></h3>
 <ol><li>Open PowerShell.</li><li>Install the packages at the versions the release was tested with. The list is <code>PACKAGES</code> in <code>kpi_store/setup_check.py</code>, plus <code>uv</code>, which the check script uses.
 <pre><code class="lang-powershell">py -m pip install rdflib==7.6.0 pyshacl==0.40.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 openpyxl==3.1.5 uv</code></pre>
-<p>The last line starts with <code>Successfully installed</code> and names the packages.</p></li></ol>
+<p>The last line starts with <code>Successfully installed</code> and names the packages.</p>
+<p>The check step of the run needs more packages for its tests, such as <code>pytest</code>. It does not install them into Python. On its first run it downloads them through <code>uv</code> from <code>pypi.org</code>, at the versions <code>scripts/check.sh</code> names, into <code>uv</code>'s cache folder in your user profile (<code>%LOCALAPPDATA%\uv\cache</code>), so the machine must reach <code>pypi.org</code> then.</p></li></ol>
 <ol start="3"><li>If the machine has more than one Python, tell the <code>py</code> launcher which one to start. <code>py</code> starts the newest Python it finds, and the packages of step 2 must be installed for that one. This command makes <code>py</code> start Python 3.12 in every new terminal.
 <pre><code class="lang-cmd">setx PY_PYTHON 3.12</code></pre>
 <p>It answers <code>SUCCESS: Specified value was saved.</code> Then run step 2 again in a new terminal. With one Python installed, skip this step.</p></li></ol>
