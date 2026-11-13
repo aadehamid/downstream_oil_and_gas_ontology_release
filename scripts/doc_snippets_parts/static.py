@@ -2,8 +2,12 @@
 when a chain goes on from one document into another, and the list of the blocks that no test runs."""
 from __future__ import annotations
 
+import ast
 import html
+import os
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 from .extract import FENCE, documents, extract
@@ -14,11 +18,69 @@ SCRIPT = re.compile(r"[\w./\\-]+\.py\b")
 KEY_LENGTH = 60
 
 
+def declared_options(source: str) -> set:
+    """The options a script's argument parser declares: each text that starts with -- among the first arguments
+    of a call to add_argument. Read from the script's syntax tree, so an option that is only named in a comment,
+    a docstring or another string is not one."""
+    found = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Call) and getattr(node.func, "attr", getattr(node.func, "id", "")) == "add_argument":
+            found |= {arg.value for arg in node.args if isinstance(arg, ast.Constant) and isinstance(arg.value, str)
+                      and arg.value.startswith("--")}
+    return found
+
+
+def help_options(script: Path, subcommand=None):
+    """The options the script's own --help names, for the script or for one of its subcommands. None when the
+    script cannot print its help here: a package it imports is missing, or it has no such subcommand."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")} | {"PYTHONDONTWRITEBYTECODE": "1",
+                                                                                 "PYTHONIOENCODING": "utf-8", "COLUMNS": "200"}
+    try:
+        script = script.resolve()
+        done = subprocess.run([sys.executable, "-B", str(script), *([subcommand] if subcommand else []), "--help"],
+                              cwd=script.parent, env=env, stdin=subprocess.DEVNULL, capture_output=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    text = done.stdout.decode("utf-8", errors="replace")
+    if done.returncode != 0 or "usage:" not in text.lower():
+        return None
+    return set(OPTION.findall(text))
+
+
+def handled_options(source: str) -> set:
+    """The options that a script with a parser of its own handles: each text that is exactly --name and stands in
+    the code as a value that is compared, looked up, passed on or listed. A docstring, a comment, a longer string
+    that holds the text, and a name that is only given the text (x = "--name") are not counted. This reads what
+    the code names, not what it does with it, which is the most a check can read from a hand-written parser."""
+    tree = ast.parse(source)
+    plain = {id(node.value) for node in ast.walk(tree)
+             if isinstance(node, (ast.Expr, ast.Assign, ast.AnnAssign)) and isinstance(getattr(node, "value", None), ast.Constant)}
+    return {node.value for node in ast.walk(tree) if isinstance(node, ast.Constant) and isinstance(node.value, str)
+            and OPTION.fullmatch(node.value) and id(node) not in plain}
+
+
+def script_options(script: Path, subcommand=None):
+    """(the options the script takes, how they were read): "help", "declared" or "handled".
+
+    A script that builds an argparse parser is asked for its own --help, and with a subcommand for that
+    subcommand's too. When it cannot run here, because a package it imports is missing, its add_argument calls are
+    read instead. A script with no such call parses its arguments by hand. It is never started, because nothing
+    says what it would do with --help; the options its code handles are read from its text (handled_options)."""
+    source = script.read_text(encoding="utf-8")
+    declared = declared_options(source)
+    if not declared:
+        return handled_options(source), "handled"
+    top = help_options(script)
+    if top is None:
+        return declared, "declared"
+    return top | ((help_options(script, subcommand) or set()) if subcommand else set()), "help"
+
+
 def usage_problem(root: Path, value: str, body: str):
     """Why a `usage=<path>` block is wrong, or None. The block shows how a script is called, with a name in angle
     brackets for each value and square brackets around what is optional, so it cannot run. Each of its lines must
-    name a script that exists and only options that the script's own text holds as "--name". The path is the
-    script, or the folder that holds every script the block names."""
+    name a script that exists and only options that the script's argument parser takes (script_options). The path
+    is the script, or the folder that holds every script the block names."""
     target = (root / value).resolve() if value else None
     if target is None or not target.is_relative_to(root.resolve()) or not target.exists():
         return f"`{value}` must be a script or a folder inside the release"
@@ -40,9 +102,10 @@ def usage_problem(root: Path, value: str, body: str):
             return f"the line names {named.group(0)}, and the tag names {value}"
         if not script.is_file():
             return f"the script {script.relative_to(root.resolve()).as_posix()} does not exist"
-        source = script.read_text(encoding="utf-8")
-        unknown = [option for option in dict.fromkeys(OPTION.findall(line[named.end():]))
-                   if f'"{option}"' not in source and f"'{option}'" not in source]
+        rest = line[named.end():]
+        first = re.match(r"\s+([a-z][a-z0-9-]*)(?=\s|$)", rest)      # a subcommand, such as `build.py manifest`
+        taken, _ = script_options(script, first.group(1) if first else None)
+        unknown = [option for option in dict.fromkeys(OPTION.findall(rest)) if option not in taken]
         if unknown:
             return f"{script.name} has no option {', '.join(unknown)}"
         checked += 1

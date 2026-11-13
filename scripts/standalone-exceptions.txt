@@ -9,6 +9,7 @@ business_architecture/domain/kpi-store-decisions/KPI-DEC-0001.md :: removed-aura
 business_architecture/domain/kpi-store-decisions/KPI-DEC-0001.md :: removed-docker :: Docker :: 2 :: the decision record names what this release removed
 business_architecture/domain/kpi-store-decisions/answers/2026-11-11-kpi-store-1.1.md :: removed-aura :: AuraDB :: 1 :: the decision record names what this release removed
 business_architecture/domain/kpi-store-decisions/answers/2026-11-11-kpi-store-1.1.md :: removed-docker :: Docker :: 1 :: the decision record names what this release removed
+business_architecture/domain/kpi-store-decisions/answers/2026-11-11-kpi-store-1.1.md :: removed-token :: access token :: 1 :: the answers file records the question the owner was asked about the test job's sign-in
 business_architecture/ontology/build/output/step3-taxonomy.ttl :: reference-number :: #31 :: 2 :: ontology content, changed only through a cut; the intake note names an earlier change by its number
 business_architecture/ontology/releases/core/2.4.0/core.jsonld :: reference-number :: #31 :: 2 :: a released package never changes; the intake note names an earlier change by its number
 business_architecture/ontology/releases/core/2.4.0/core.ttl :: reference-number :: #31 :: 2 :: a released package never changes; the intake note names an earlier change by its number

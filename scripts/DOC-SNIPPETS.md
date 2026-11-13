@@ -215,9 +215,25 @@ of the last three, removes it when the check ends, and runs the statements of al
 A `cypher` block prints the rows of each statement: one line of column names, then one line for each row. A
 `sql` block prints `OK:` and the statement, for each statement.
 
+Each store the program makes on the Neo4j server gets a new name for the run, such as `docsnippetsscratch` and
+eight digits and letters. The program stops before it makes anything when the server already holds a database or
+an alias of that name. It records each thing it makes and drops only those, also after a start that failed
+halfway. So it never empties or drops a database that was there before.
+
+A statement may reach only the store of its context, and the program checks every statement of a block before
+it sends the first:
+
+- A `cypher` block for `scratch-database` starts with `MATCH`, `DROP CONSTRAINT` or `SHOW CONSTRAINTS`. One for
+  `enterprise-database` starts with `MATCH`, `RETURN`, `SHOW CONSTRAINTS` or `CALL db.info()`.
+- No Cypher statement may hold `USE`, also not inside a subquery, or a word that names or changes a database, an
+  alias, the server or its accounts. It may call no procedure but `db.info`.
+- A `sql` block holds only `DROP TABLE`, `DROP VOLUME` or `DROP SCHEMA` statements, each with `IF EXISTS` and one
+  plain name.
+
 The documents name the client's objects, such as `idp_sbx.kpi_store.epm_triples`. In `scratch-schemas` the
 program replaces the two schema names of `kpi_store/kpi_store.example.toml`, in the catalog that file names, with
-the two throwaway schemas. It refuses a statement that then still names anything else. It also refuses a
+the two throwaway schemas. That replacement is the only way a name reaches the warehouse: the program refuses a
+statement whose name is not one of those two schemas or an object in them. It also refuses a
 `DROP ... IF EXISTS` that names nothing the context made, because such a statement would pass in silence
 whatever name it held. So a wrong name in the document fails the block.
 
@@ -286,9 +302,20 @@ base = "empty"
 ## A usage pattern: `usage`
 
 A usage pattern shows how to call a script. It has a name in angle brackets for each value, and square brackets
-around what is optional, so it cannot run. Name the script, and the check reads the script's text. Each option
-that the block names after the script, such as `--config`, must be there as `"--config"`. When the block calls several scripts,
-name the folder that holds them all. The block fails when a script is renamed or loses an option.
+around what is optional, so it cannot run. Name the script, and the check compares each option that the block
+names after the script, such as `--config`, with the options the script takes. When the block calls several
+scripts, name the folder that holds them all. The block fails when a script is renamed or loses an option.
+
+How the check reads a script's options depends on the script:
+
+- A script that builds its parser with `argparse` is asked for its own `--help`, and for the help of the
+  subcommand the line names. When a package it imports is missing, the check reads its `add_argument` calls.
+- A script that reads its arguments by hand is never started. The check reads the options its code handles: each
+  text that is exactly `--name` and is compared, looked up, passed on or listed in the code.
+
+A comment, a docstring, a longer string that holds the option's text, and a name that is only given the text do
+not make an option. For a script that reads its arguments by hand, the check proves that the code names the
+option, not what the code does with it.
 
 ````markdown nested
 ```bash usage=scripts/check_standalone.py

@@ -208,6 +208,7 @@ class Runner:
     def __init__(self, root: Path, registry, environ: dict, tmp: Path):
         self.root, self.registry, self.environ, self.tmp = root, registry, environ, tmp
         self._instances: dict = {}
+        self.left_behind: list = []     # one text for each fixture whose clean-up after a failed start failed too
         self._entries = None
         self._token = None
 
@@ -307,7 +308,11 @@ class Runner:
             return None
         status, output = self._fixture(instance, "up")
         if status != 0:
-            self._fixture(instance, "down")     # whatever a failed `up` left behind is removed; its own result is not read
+            # Whatever a failed `up` left behind is removed now. When that fails too, the check says so on a line
+            # of its own: something may be left on a server, and its temporary folder is about to be deleted.
+            down_status, down_output = self._fixture(instance, "down")
+            if down_status != 0:
+                self.left_behind.append(self._not_removed(instance, down_output, "after its start had failed"))
             return output or "(no output)"
         instance.fixture_up = True
         values = instance.fixture / "values.json"
@@ -325,9 +330,17 @@ class Runner:
                 status, output = self._fixture(instance, "down")
                 instance.fixture_up = False
                 if status != 0:
-                    problems.append(f"the fixture of the context `{instance.context.name}` could not be removed\n"
-                                    + "\n".join("    | " + line for line in (output or "").strip().split("\n")[-20:]))
-        return problems
+                    problems.append(self._not_removed(instance, output))
+        return self.left_behind + problems
+
+    @staticmethod
+    def _not_removed(instance, output, when=""):
+        """The failure text for a fixture whose `down` failed: what it made may still be there. The fixture's own
+        output names each thing left and how to remove it by hand."""
+        return (f"the fixture of the context `{instance.context.name}` could not be removed{' ' + when if when else ''}. "
+                f"What it made may still be there; its output below says what is left and how to remove it by hand "
+                f"(the fixture is `{instance.context.fixture}`)\n"
+                + "\n".join("    | " + line for line in (output or "(no output)").strip().split("\n")[-20:]))
 
     def execute(self, block, instance, body, wanted_os, typed=None):
         """Runs the block's text. `typed` is what the reader types at the block's prompts, one answer per line.

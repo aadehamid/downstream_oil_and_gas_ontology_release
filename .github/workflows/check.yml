@@ -4,6 +4,13 @@
 # sign-in: says whether this run has the three secrets of the rehearsal Databricks workspace.
 # stores: the whole chain of the stores runbook on Windows, as a person runs it, against servers the job starts on the
 #   runner and against the rehearsal Databricks workspace. It has two parts, which run side by side.
+#
+# Who can start a run that gets the three Databricks secrets: a pull request from a branch of this repository, and a
+# manual run. Both need the right to write to this repository, and a person with that right could also change this
+# file. Who cannot: a pull request from a fork, to which GitHub gives no secret. The secrets are named only in the
+# two steps that need them, never for a whole job, and neither step runs a program from the checkout: one asks
+# whether the secrets are there, the other writes the sign-in file and the settings with code that stands in this
+# file. No step traces its commands, prints a secret or a settings file, or uploads a file.
 name: check
 on:
   pull_request:
@@ -191,14 +198,22 @@ jobs:
           HOST: ${{ secrets.KPI_CI_DATABRICKS_HOST }}
           WAREHOUSE: ${{ secrets.KPI_CI_DATABRICKS_WAREHOUSE }}
         run: |
-          py -c "import secrets; print(secrets.token_hex(16))" > "$LOCAL/pw"
+          # -I keeps the checkout off Python's path: with the secrets in this step's environment, only Python's own
+          # modules and the code written here may run.
+          py -I -c "import secrets; print(secrets.token_hex(16))" > "$LOCAL/pw"
           pw="$(cat "$LOCAL/pw")"; rm "$LOCAL/pw"
           echo "::add-mask::$pw"
           echo "KPI_CI_NEO4J_PASSWORD=$pw" >> "$GITHUB_ENV"
-          py - <<'PY'
+          py -I - <<'PY'
           import os, re
           from pathlib import Path
+          from urllib.parse import quote, urlsplit
           env = os.environ
+          # GitHub hides a secret's exact text in the log. An error of the command line or of the SDK may print the
+          # workspace's address in another form, so each such form is hidden too.
+          host = urlsplit(env["HOST"]).hostname or env["HOST"]
+          for form in {host, host.split(".")[0], quote(env["HOST"], safe=""), env["HOST"].rstrip("/") + "/"}:
+              print(f"::add-mask::{form}")
           (Path.home() / ".databrickscfg").write_text(f"[DEFAULT]\nhost = {env['HOST']}\ntoken = {env['TOKEN']}\n",
                                                       encoding="utf-8", newline="\n")
           # The environment's settings: the example file, with the rehearsal catalogs and this run's two schemas.
@@ -251,7 +266,6 @@ jobs:
           robot_jar = "$LOCAL/dl/robot.jar"
           out = "$LOCAL/lpg-out"
           EOF
-          cat "$LOCAL/stores.toml"
       # The job's Neo4j server stands for Neo4j Desktop, which brings its own Java. So these two steps, and no
       # other, get JAVA_HOME: the server starts with the unpacked JDK.
       - name: unpack Neo4j, add APOC and n10s, set the password

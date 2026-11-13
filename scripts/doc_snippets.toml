@@ -163,7 +163,7 @@ base = "release-copy"
 needs_env = ["KPI_STORE_TEST_NEO4J_URI", "KPI_STORE_TEST_NEO4J_PASSWORD"]
 pass_env = ["KPI_STORE_TEST_NEO4J_USER"]
 fixture = "py scripts/doc_snippets_fixtures.py scratch-database"
-about = "A throwaway database on the Neo4j test server with 25 nodes and the constraint n10s_unique_uri, which the fixture makes and drops. For a Cypher statement that deletes."
+about = "A throwaway database on the Neo4j test server with 25 nodes and the constraint n10s_unique_uri. The fixture makes it under a new name and drops it. For a Cypher statement that deletes."
 
 [contexts.scratch-database.runs]
 cypher = "py scripts/doc_snippets_fixtures.py cypher scratch"
