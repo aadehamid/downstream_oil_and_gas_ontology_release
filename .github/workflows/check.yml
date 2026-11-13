@@ -10,7 +10,8 @@
 # file. Who cannot: a pull request from a fork, to which GitHub gives no secret. The secrets are named only in the
 # two steps that need them, never for a whole job, and neither step runs a program from the checkout: one asks
 # whether the secrets are there, the other writes the sign-in file and the settings with code that stands in this
-# file. No step traces its commands, prints a secret or a settings file, or uploads a file.
+# file. No step traces its commands, prints a secret or a settings file, or uploads a file. After a failure the last
+# step prints the end of the servers' logs and of the check script's log, which hold neither.
 name: check
 on:
   pull_request:
@@ -398,9 +399,13 @@ jobs:
           assert not problems and len(found) == 1, "the runbook must hold one Python block that clears the report"
           exec(compile(found[0].body, doc, "exec"))
           PY
-      # The cut asks two things. The answers come through standard input, as a person types them.
+      # The cut asks two things. The answers come through standard input, as a person types them. The checkout is a
+      # Git copy, where the cut commits and tags what it wrote, so Git gets an author first, in this checkout only.
+      # The runner has none, and the cut refuses without one, with the two commands a person then runs.
       - name: the second run, with the cut's two typed answers
         run: |
+          git config user.name "KPI Store test job"
+          git config user.email "test-job@example.invalid"
           printf 'Change_Value_Amount\nyes\n' | py -m kpi_store.runner $RUN_OPTIONS | tee "$LOCAL/second-run.log"
           grep -q "^enterprise: copied" "$LOCAL/second-run.log"
           if [ -z "$RUN_OPTIONS" ]; then
@@ -491,20 +496,33 @@ jobs:
       - name: remove this part's two schemas and its folder from the rehearsal workspace
         if: always()
         run: |
-          [ -f "$LOCAL/kpi_store.toml" ] || { echo "no settings were written, so nothing was made"; exit 0; }
+          [ -f "$LOCAL/kpi_store.toml" ] && [ -f "$LOCAL/stores.toml" ] || { echo "no settings were written, so nothing was made"; exit 0; }
           py - <<'PY'
-          import os
+          import os, tomllib
           from pathlib import Path
+          from databricks.sdk.errors import NotFound
           from kpi_store import settings, sync_check
-          here = settings.load(Path(os.environ["LOCAL"], "kpi_store.toml"))
-          run_sql = sync_check.statement_runner(sync_check.workspace_client("DEFAULT"), here.warehouse_id)
+          local = Path(os.environ["LOCAL"])
+          here = settings.load(local / "kpi_store.toml")
+          client = sync_check.workspace_client("DEFAULT")
+          run_sql = sync_check.statement_runner(client, here.warehouse_id)
           for schema in (here.write_schema, here.tech_graph_schema):
               assert here.write_catalog == os.environ["CI_CATALOG"] and schema.startswith(os.environ["CI_SCHEMA"]) \
                   and schema.startswith("kpi_store_ci_"), "not a schema of this run"
               run_sql(f"DROP SCHEMA IF EXISTS {here.write_catalog}.{schema} CASCADE")
               print("dropped", f"{here.write_catalog}.{schema}")
+          # The folder's name comes from the local settings and goes to the SDK. It is not read from this step's
+          # environment or given to a command of this shell: Git Bash rewrites a value that starts with / into a
+          # Windows path before a Windows program gets it, and the delete then names no folder of the workspace.
+          folder = tomllib.loads((local / "stores.toml").read_text(encoding="utf-8"))["databricks"]["workspace_folder"]
+          assert folder == "/Workspace/Shared/" + os.environ["CI_SCHEMA"] and os.environ["CI_SCHEMA"].startswith("kpi_store_ci_"), \
+              "not the folder of this run"
+          try:
+              client.workspace.delete(folder, recursive=True)
+              print("deleted", folder)
+          except NotFound:
+              print("the folder", folder, "was not there")
           PY
-          case "$CI_FOLDER" in /Workspace/Shared/kpi_store_ci_*) "$LOCAL/databricks-cli/databricks.exe" workspace delete "$CI_FOLDER" --recursive --profile DEFAULT || echo "the folder $CI_FOLDER was not there" ;; esac
       - name: remove the sign-in file
         if: always()
         run: py -c "from pathlib import Path; (Path.home() / '.databrickscfg').unlink(missing_ok=True)"
@@ -517,3 +535,14 @@ jobs:
           for f in "$LOCAL"/runs/fuseki/fuseki.log "$LOCAL"/runs/neo4j/neo4j-load.log "$LOCAL"/neo4j-console.log "$LOCAL"/neo4j-enterprise-2025.06.2/logs/neo4j.log; do
             [ -f "$f" ] && { echo "=== $f"; tail -n 150 "$f"; } || true
           done
+          # The check step of a run names its check.log and prints none of it. Each run's log is the check script's
+          # output: first the lines that name a failure, then its end. It holds no settings file.
+          for f in "$LOCAL"/runs/*/check.log; do
+            [ -f "$f" ] || continue
+            echo "=== $f, the lines that name a failure"
+            grep -n -E "^(FAILED|ERROR) |^FAIL|Traceback|^E  |the checks changed the tree" "$f" | head -n 200 || true
+            echo "=== $f, the end"
+            tail -n 400 "$f"
+          done
+          echo "=== what Git reports as changed in the checkout"
+          git status --porcelain --untracked-files=all | head -n 50
