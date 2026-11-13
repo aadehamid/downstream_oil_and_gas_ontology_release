@@ -1356,7 +1356,8 @@ def test_the_contexts_that_run_everywhere_need_no_variable_and_the_others_name_t
         "enterprise-database": ("KPI_STORE_TEST_NEO4J_URI", "KPI_STORE_TEST_NEO4J_PASSWORD"),
         "scratch-database": ("KPI_STORE_TEST_NEO4J_URI", "KPI_STORE_TEST_NEO4J_PASSWORD"),
         "scratch-schemas": ("KPI_STORE_TEST_LOCAL_SETTINGS",),
-        "windows-account": ("DOC_SNIPPETS_WINDOWS_ACCOUNT",)}
+        "windows-account": ("DOC_SNIPPETS_WINDOWS_ACCOUNT",),
+        "shared-drive": ("DOC_SNIPPETS_SHARED_DRIVE",)}
     assert [name for name, c in contexts.items() if c.home == "real"] == ["databricks-free", "first-run", "scratch-schemas",
                                                                           "windows-account"]
     # The runbook's commands read KPI_STORE_LOCAL. Only its own context may give that variable to a block. The
@@ -1750,3 +1751,30 @@ def test_the_links_command_exits_1_on_a_broken_link_and_0_on_none(tmp_path, caps
 
 def test_this_tree_s_documents_hold_no_broken_link():
     assert d.broken_links(d.ROOT) == []
+
+
+def test_the_formulas_quoted_as_text_in_the_crack_spread_definition_hold():
+    """The three formula blocks of the KPI definition are text, so no tool runs them. This reads them from the
+    document and works them out: the two forms of the Ex-RVO formula give the same number, Ex-RVO is Inc-RVO less
+    the RVO of a barrel, and each set of regional weights adds up to 1."""
+    doc = d.ROOT / "business_architecture/reference/internal/crack-spread-kpi-definition.md"
+    blocks = re.findall(r'```text skip reason="illustration: a formula[^"]*"\n(.*?)```', doc.read_text(encoding="utf-8"), re.S)
+    assert len(blocks) == 3
+
+    def worked(block, **values):
+        """Each line of the block that holds a multiplication, worked out with the given values."""
+        results = []
+        for line in block.splitlines():
+            if "×" not in line:
+                continue
+            text = line.split(":")[-1].strip().lstrip("=")
+            results.append(eval(text.replace("×", "*").replace("−", "-"), {"__builtins__": {}}, values))
+        return results
+
+    for prices in ({"CBOB": 2.31, "ULSD": 2.67, "Crude": 78.4, "RVO": 0.13}, {"CBOB": 1.0, "ULSD": 3.5, "Crude": 60.0, "RVO": 0.0},
+                   {"CBOB": 3.02, "ULSD": 2.2, "Crude": 101.25, "RVO": 0.41}):
+        ex_rvo, equivalent = worked(blocks[0], **prices)
+        (inc_rvo,) = worked(blocks[1], **prices)
+        assert ex_rvo == pytest.approx(equivalent)
+        assert ex_rvo == pytest.approx(inc_rvo - prices["RVO"] * 42)
+    assert worked(blocks[2], USGC=1, Chicago=1, LA=1) == [pytest.approx(1.0), pytest.approx(1.0)]

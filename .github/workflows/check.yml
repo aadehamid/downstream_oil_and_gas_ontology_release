@@ -336,8 +336,9 @@ jobs:
       - name: sync check, Jena
         if: matrix.part == 'reset'
         run: time py -m kpi_store.sync_check --store jena --no-tech-graph
-      # The blocks of the runbook and of the two hand-written pages that need this job's Neo4j server or a Windows
-      # account that may be changed: the two setx commands and the cd of the runbook, the Cypher of "How to undo" (on a
+      # The blocks of the runbook and of the three hand-written pages that need this job's Neo4j server or a Windows
+      # account that may be changed: the winget install, the two setx commands and the cd of the runbook, the two
+      # shared-drive commands of the form's guide (on a stand-in drive S:), the Cypher of "How to undo" (on a
       # database of its own, made and dropped here), and the four commands of the cross-graph questions (on a
       # composite database over two made-up graphs, made and dropped here). The packages are those of
       # scripts/check.sh. C:\kpi-store-1.1 is the folder the runbook unpacks the release into.
@@ -347,21 +348,37 @@ jobs:
           KPI_STORE_TEST_NEO4J_URI: bolt://127.0.0.1:17687
           KPI_STORE_TEST_NEO4J_USER: neo4j
           DOC_SNIPPETS_WINDOWS_ACCOUNT: "1"
+          DOC_SNIPPETS_SHARED_DRIVE: "1"
           PYTHONIOENCODING: utf-8
         run: |
           mkdir -p /c/kpi-store-1.1
+          # The stand-in for the client's shared drive that the form's guide names: drive S: over a folder of this
+          # runner, with the release's signed example where the guide's check command looks for it.
+          mkdir -p "$RUNNER_TEMP/shared-drive/Commercial Planning/Shared/KPI-intake/2-ready-for-check"
+          cp kpi-intake/examples/crack-spreads-pricing.json \
+             "$RUNNER_TEMP/shared-drive/Commercial Planning/Shared/KPI-intake/2-ready-for-check/crack-spreads-pricing.kpi-intake.json"
+          MSYS_NO_PATHCONV=1 subst S: "$(cygpath -w "$RUNNER_TEMP/shared-drive")"
+          # winget asks a person to agree to the terms of its sources on first use. This answers that once, so the
+          # runbook's plain install command, which the document test runs below, meets no question. What it installs
+          # serves no later step: the settings file names the program unpacked from the ZIP file.
+          winget list Databricks.DatabricksCLI --accept-source-agreements --disable-interactivity || true
           export KPI_STORE_TEST_NEO4J_PASSWORD="$KPI_CI_NEO4J_PASSWORD"
           uv run -q --no-project --with pytest==9.2.0 --with pytest-xdist==3.8.0 --with rdflib==7.6.0 --with pyshacl==0.40.2 --with openpyxl==3.1.5 --with jsonschema==4.26.0 --with markdown-it-py==4.3.0 --with pyyaml==6.0.3 --with sqlglot==30.31.0 --with pyoxigraph==0.5.13 --with neo4j==6.4.1 \
             python scripts/doc_snippets.py check --verbose \
             business_architecture/ontology/projection/ontology-stores-runbook.md \
             business_architecture/ontology/epm-ontology-guide.html \
-            business_architecture/ontology/epm-walkthrough.html | tee "$LOCAL/doc-test.log"
+            business_architecture/ontology/epm-walkthrough.html \
+            kpi-intake/how-to-use-the-form.html | tee "$LOCAL/doc-test.log"
           # A block whose context is off is counted, not failed. These must have run here.
           for ran in "cmd run=windows-account: ran" "powershell run=windows-account: ran" "cypher run=enterprise-database: ran" \
                      "cypher run=scratch-database: ran" "epm-ontology-guide.html:[0-9]*: powershell run=questions: ran" \
                      "epm-walkthrough.html:[0-9]*: powershell run=questions: ran"; do
             grep -q "$ran" "$LOCAL/doc-test.log" || { echo "no block reads: $ran"; exit 1; }
           done
+          # The runbook has three cmd blocks of the Windows account: winget and the two setx commands. The guide has two
+          # commands on the shared drive. Each must have run, so the count is checked, not only that one ran.
+          [ "$(grep -c "ontology-stores-runbook.md:[0-9]*: cmd run=windows-account: ran" "$LOCAL/doc-test.log")" = 3 ] || { echo "not all three cmd blocks of the runbook ran"; exit 1; }
+          [ "$(grep -c "how-to-use-the-form.html:[0-9]*: powershell run=shared-drive: ran" "$LOCAL/doc-test.log")" = 2 ] || { echo "not both shared-drive blocks of the guide ran"; exit 1; }
       - name: the two variables that the runbook's setx commands set
         if: matrix.part == 'reset'
         shell: pwsh
@@ -480,15 +497,15 @@ jobs:
         if: matrix.part == 'reset'
         run: py -m kpi_store.runner --reset --yes
 
-      # The runbook's first way to install the Databricks command line is winget. The list of software on this runner
-      # image does not name winget, so this step only finds out whether the command runs here. It never fails the job,
-      # and it comes last, so that what it installs serves no step above. The two --accept options answer the
-      # questions that winget asks a person on first use.
-      - name: winget, to learn whether this runner can run the runbook's install command
+      # The runbook's sign-in command, databricks auth login --host ... --profile DEFAULT, needs a person in a
+      # browser, so no job can run it to its end. This checks that the program knows the command and both options.
+      - name: the sign-in command of the runbook and its two options
         if: matrix.part == 'reset'
-        continue-on-error: true
-        shell: cmd
-        run: winget install Databricks.DatabricksCLI --accept-source-agreements --accept-package-agreements --disable-interactivity
+        run: |
+          "$LOCAL/databricks-cli/databricks.exe" auth login --help > "$LOCAL/auth-login-help.txt"
+          grep -q -- "--host " "$LOCAL/auth-login-help.txt" || { echo "databricks auth login has no --host option"; exit 1; }
+          grep -q -- "--profile " "$LOCAL/auth-login-help.txt" || { echo "databricks auth login has no --profile option"; exit 1; }
+          echo "databricks auth login knows --host and --profile"
 
       # ---- both parts: leave nothing behind ----
       # Drops exactly the two schemas this part named and made, and deletes its one workspace folder. CASCADE is right

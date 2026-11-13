@@ -437,6 +437,7 @@ its commands with that in mind.
 | `enterprise-database`, `scratch-database`, `questions` | A copy of the release beside the Neo4j test server. "A statement for a store" describes each. | `KPI_STORE_TEST_NEO4J_URI` and `KPI_STORE_TEST_NEO4J_PASSWORD` are set. |
 | `scratch-schemas` | A copy of the release beside two throwaway schemas of the rehearsal workspace. It keeps the real home folder. | `KPI_STORE_TEST_LOCAL_SETTINGS` is set. |
 | `windows-account` | An empty folder on a Windows account that may be changed. It keeps the real home folder. | `DOC_SNIPPETS_WINDOWS_ACCOUNT` is set. |
+| `shared-drive` | A copy of the release on a Windows machine with a stand-in for the client's shared drive: a drive `S:` that holds `Commercial Planning/Shared`. | `DOC_SNIPPETS_SHARED_DRIVE` is set. |
 
 The `first-run` context is for the runbook, whose commands find the local settings file through the variable
 `KPI_STORE_LOCAL`. The context gives its blocks that variable, with the value of `KPI_STORE_TEST_LOCAL_SETTINGS`.
@@ -452,6 +453,10 @@ counted as skipped, and `--all-contexts` fails them. Name the runbook in the sam
 **Set `DOC_SNIPPETS_WINDOWS_ACCOUNT` only on an account you can throw away.** A block of `windows-account`
 changes a setting of the Windows account that runs the check, as `setx` does. The Windows test job sets the
 variable. On a reader's machine it is not set, so `scripts/check.sh` never runs such a block there.
+
+**Set `DOC_SNIPPETS_SHARED_DRIVE` only where drive `S:` is a stand-in.** A block of `shared-drive` writes the
+folder `KPI-intake` under `S:/Commercial Planning/Shared` and a check report beside a file there. The Windows
+test job makes that drive with `subst`, over a folder of its own, and puts the release's example in it.
 
 A context is one chain. When its variable is not set, the check counts every block of the context as skipped and
 prints the count with the variable to set. So keep the quick, independent commands in a context that always
@@ -621,19 +626,16 @@ prints those four cells for every skipped block. Write the last two cells yourse
 | `business_architecture/ontology/MODULES.md` | One walk across modules | `Gulf Coast 3-2-1 crack spread (market-data)` | `illustration` | It is a sketch. Each link in it is quoted earlier on the page in a Turtle block, and those blocks are parsed. | Nobody. It is a sketch. |
 | `business_architecture/ontology/build/r1/r1-consumer-inventory-checklist.md` | R1 Hierarchy-Consumer Inventory — Team Checklist | `Downstream Operations > Commercial & Marketing > Planning &` | `illustration` | Nothing. The block holds two texts to search for in tools outside this release. | The team that owns each tool, by hand. |
 | `business_architecture/ontology/build/r1/r1-consumer-inventory-checklist.md` | G. Attestation | `Asset class: _______________ Owner: _______________ Date: __` | `illustration` | Nothing. It is a form. | A person fills it in by hand. |
-| `business_architecture/ontology/projection/ontology-stores-runbook.md` | Install the programs | `winget install Databricks.DatabricksCLI` | `windows-only` | The Windows test job tries the command in its last step before the clean-up, "winget, to learn whether this runner can run the runbook's install command". The step may fail, because the runner image's list of software (image 20261101.318.1) does not name winget, and the job does not fail on it. The job itself uses the command line unpacked from its zip, which is the runbook's way without administrator rights. The setup check's `databricks-cli` line proves the result of an install, and that job and the document test both run the check. | The reader, on a Windows 10 or 11 machine. |
-| `business_architecture/ontology/projection/ontology-stores-runbook.md` | Sign in to Databricks | `databricks auth login --host <your workspace URL> --profile` | `needs-browser-sign-in` | Nothing runs it. The setup check's `databricks-auth` line passes only for a profile that is signed in, and the document test runs that check with the rehearsal workspace's profile. The Windows test job has no browser, so it signs in with a token from a secret. | A person, in a browser. |
-| `business_architecture/reference/internal/crack-spread-kpi-definition.md` | 3.2 Core formulas | `3-2-1 Ex-RVO, $/bbl` | `illustration` | Nothing. It is the client's formula, quoted as text. | Nobody. It is a formula. |
-| `business_architecture/reference/internal/crack-spread-kpi-definition.md` | 3.2 Core formulas | `3-2-1 Inc-RVO, $/bbl` | `illustration` | Nothing. It is the client's formula, quoted as text. | Nobody. It is a formula. |
-| `business_architecture/reference/internal/crack-spread-kpi-definition.md` | 4.4 MPC-weighted 3-2-1 | `Before 5 May 2024: (USGC × 0.40) + (Chicago × 0.40) + (LA ×` | `illustration` | Nothing. It is the client's formula, quoted as text. | Nobody. It is a formula. |
+| `business_architecture/ontology/projection/ontology-stores-runbook.md` | Sign in to Databricks | `databricks auth login --host <your workspace URL> --profile` | `needs-browser-sign-in` | The command cannot end without a person in a browser, so nothing runs it. Three things are tested in its place. The Windows test job runs `databricks auth login --help` with the same program and fails when `--host` or `--profile` is not among its options. The setup check's `databricks-auth` line passes only for a profile that is signed in, and the document test runs that check with the rehearsal workspace's profile. The Windows test job has no browser, so it signs in with a token from a secret. | A person, in a browser. |
+| `business_architecture/reference/internal/crack-spread-kpi-definition.md` | 3.2 Core formulas | `3-2-1 Ex-RVO, $/bbl` | `illustration` | It is the client's formula, quoted as text. `scripts/test_doc_snippets.py` reads it from the document and works it out (`test_the_formulas_quoted_as_text_in_the_crack_spread_definition_hold`). | Nobody runs it. The test works it out. |
+| `business_architecture/reference/internal/crack-spread-kpi-definition.md` | 3.2 Core formulas | `3-2-1 Inc-RVO, $/bbl` | `illustration` | It is the client's formula, quoted as text. `scripts/test_doc_snippets.py` reads it from the document and works it out (`test_the_formulas_quoted_as_text_in_the_crack_spread_definition_hold`). | Nobody runs it. The test works it out. |
+| `business_architecture/reference/internal/crack-spread-kpi-definition.md` | 4.4 MPC-weighted 3-2-1 | `Before 5 May 2024: (USGC × 0.40) + (Chicago × 0.40) + (LA ×` | `illustration` | It is the client's formula, quoted as text. `scripts/test_doc_snippets.py` reads it from the document and works it out (`test_the_formulas_quoted_as_text_in_the_crack_spread_definition_hold`). | Nobody runs it. The test works it out. |
 | `scripts/DOC-SNIPPETS.md` | A block the check cannot run: `skip` | `databricks auth login` | `needs-browser-sign-in` | It is this page's example of the `skip` tag, so it must be skipped. `scripts/test_doc_snippets.py` tests the tag. | A person, in a browser. |
 | `scripts/DOC-SNIPPETS.md` | A block the check cannot run: `skip` | `Databricks -> Fuseki -> Neo4j` | `illustration` | It is this page's example of a sketch. `scripts/test_doc_snippets.py` tests the tag. | Nobody. It is a sketch. |
 | `scripts/DOC-SNIPPETS.md` | A page written by hand | `<pre data-snippet="bash run=release-copy"><code>python3 scri` | `illustration` | It shows three made-up blocks of a page. `scripts/test_doc_snippets.py` runs blocks written in this form (`test_a_page_block_runs_as_the_text_its_reader_sees`). | Nobody. The three blocks are made up. |
 | `skills/ontology-to-lpg/references/design-rules.md` | Mental model | `literal object -> node property` | `illustration` | It is a sketch of the rules that the same page states. The skill's `test_projection.py` tests the rules. | Nobody. It is a sketch. |
 | `skills/ontology-to-lpg/references/pipeline.md` | The pipeline: check, reason, serialise, load, verify | `module.ttl ──┐` | `illustration` | It is a drawing of the five steps. The commands of each step are run blocks further down the page. | Nobody. It is a drawing. |
 | `kpi-intake/how-to-use-the-form.html` | The name of an answers file | `crack-spreads-pricing.kpi-intake.json` | `illustration` | It is a file name. `kpi_store/intake/browser_check.py` checks the name that the form proposes for a download. | Nobody. It is a name. |
-| `kpi-intake/how-to-use-the-form.html` | Make the shared folder | `py -m kpi_store.intake folders "S:/Commercial Planning/Share` | `needs-client-server` | The same command runs in the block before it, with `.` as the location. `kpi_store/tests/test_intake_build.py` runs it on a folder of the test. | The reader, on a machine that has the shared drive. |
-| `kpi-intake/how-to-use-the-form.html` | Check a file | `py -m kpi_store.intake check "S:/Commercial Planning/Shared/` | `needs-client-server` | The same command runs in the block before it, on the example that ships with the release. | The reader, on a machine that has the shared drive. |
 
 Some blocks run in a test and still not everywhere:
 
@@ -646,7 +648,9 @@ Some blocks run in a test and still not everywhere:
   run, and it removes them at its end. A pull request from a fork gets no secret, so its run skips that job and
   says so. `.github/workflows/check.yml` describes the job.
 - **A block that says `os=windows` runs on Windows only.** `scripts/check.sh` runs it in the Windows test job. A
-  block of the `windows-account` context runs in the job `stores` of the same workflow.
+  block of the `windows-account` context or the `shared-drive` context runs in the job `stores` of the same
+  workflow. So the runbook's `winget` command and the guide's two shared-drive commands are run there and nowhere
+  else.
 - **The store contexts run only where their variables are set.** `scripts/check.sh` on a reader's machine sets
   none, so it counts those blocks as skipped and names the variable. The cut sets them all and adds
   `--all-contexts`.

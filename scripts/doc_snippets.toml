@@ -191,3 +191,9 @@ needs_env = ["DOC_SNIPPETS_WINDOWS_ACCOUNT"]
 home = "real"
 timeout = 900
 about = "A Windows account that may be changed, such as a test runner's. Its blocks set a variable of the account or install a program, so they never run on a reader's machine. Set DOC_SNIPPETS_WINDOWS_ACCOUNT=1 only on such an account."
+
+[contexts.shared-drive]
+base = "release-copy"
+needs_env = ["DOC_SNIPPETS_SHARED_DRIVE"]
+timeout = 300
+about = "A copy of the release on a Windows machine that has a stand-in for the client's shared drive: a drive S: with the folder \"Commercial Planning/Shared\" and, in it, KPI-intake/2-ready-for-check with the release's example under the name crack-spreads-pricing.kpi-intake.json. The Windows test job makes the drive with subst. Set DOC_SNIPPETS_SHARED_DRIVE=1 only where that drive is a stand-in."
