@@ -304,6 +304,7 @@ class Runner:
             return None
         status, output = self._fixture(instance, "up")
         if status != 0:
+            self._fixture(instance, "down")     # whatever a failed `up` left behind is removed; its own result is not read
             return output or "(no output)"
         instance.fixture_up = True
         values = instance.fixture / "values.json"

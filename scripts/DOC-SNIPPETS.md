@@ -589,8 +589,8 @@ prints those four cells for every skipped block. Write the last two cells yourse
 | `business_architecture/ontology/MODULES.md` | One walk across modules | `Gulf Coast 3-2-1 crack spread (market-data)` | `illustration` | It is a sketch. Each link in it is quoted earlier on the page in a Turtle block, and those blocks are parsed. | Nobody. It is a sketch. |
 | `business_architecture/ontology/build/r1/r1-consumer-inventory-checklist.md` | R1 Hierarchy-Consumer Inventory — Team Checklist | `Downstream Operations > Commercial & Marketing > Planning &` | `illustration` | Nothing. The block holds two texts to search for in tools outside this release. | The team that owns each tool, by hand. |
 | `business_architecture/ontology/build/r1/r1-consumer-inventory-checklist.md` | G. Attestation | `Asset class: _______________ Owner: _______________ Date: __` | `illustration` | Nothing. It is a form. | A person fills it in by hand. |
-| `business_architecture/ontology/projection/ontology-stores-runbook.md` | Install the programs | `winget install Databricks.DatabricksCLI` | `windows-only` | The Windows test job tries the command in its step "winget, to learn whether this runner can run the runbook's install command" and does not fail on it, because the runner image's list of software (image 20261101.318.1) does not name winget. The setup check's `databricks-cli` line proves the result of the install, and the document test runs that check. | The reader, on a Windows 10 or 11 machine. |
-| `business_architecture/ontology/projection/ontology-stores-runbook.md` | Sign in to Databricks | `databricks auth login --host <your workspace URL> --profile` | `needs-browser-sign-in` | Nothing runs it. The setup check's `databricks-auth` line passes only after this sign-in, and the document test runs that check with the rehearsal workspace's profile. | A person, in a browser. |
+| `business_architecture/ontology/projection/ontology-stores-runbook.md` | Install the programs | `winget install Databricks.DatabricksCLI` | `windows-only` | The Windows test job tries the command in its step "Databricks command line, with winget as the runbook installs it". The step may fail, because the runner image's list of software (image 20261101.318.1) does not name winget. The job then installs the command line with Databricks' own action. The setup check's `databricks-cli` line proves the result of an install, and that job and the document test both run the check. | The reader, on a Windows 10 or 11 machine. |
+| `business_architecture/ontology/projection/ontology-stores-runbook.md` | Sign in to Databricks | `databricks auth login --host <your workspace URL> --profile` | `needs-browser-sign-in` | Nothing runs it. The setup check's `databricks-auth` line passes only for a profile that is signed in, and the document test runs that check with the rehearsal workspace's profile. The Windows test job has no browser, so it signs in with a token from a secret. | A person, in a browser. |
 | `business_architecture/reference/internal/crack-spread-kpi-definition.md` | 3.2 Core formulas | `3-2-1 Ex-RVO, $/bbl` | `illustration` | Nothing. It is the client's formula, quoted as text. | Nobody. It is a formula. |
 | `business_architecture/reference/internal/crack-spread-kpi-definition.md` | 3.2 Core formulas | `3-2-1 Inc-RVO, $/bbl` | `illustration` | Nothing. It is the client's formula, quoted as text. | Nobody. It is a formula. |
 | `business_architecture/reference/internal/crack-spread-kpi-definition.md` | 4.4 MPC-weighted 3-2-1 | `Before 5 May 2024: (USGC × 0.40) + (Chicago × 0.40) + (LA ×` | `illustration` | Nothing. It is the client's formula, quoted as text. | Nobody. It is a formula. |
@@ -608,11 +608,13 @@ Some blocks run in a test and still not everywhere:
 - **Nothing runs on the client's sandbox or the client's Enterprise server.** The `first-run` chain loads a
   rehearsal workspace and local test servers. The SQL and the Cypher of the runbook's "How to undo" run on
   throwaway schemas and a throwaway database, not on the objects they name.
-- **No Databricks step runs in the Windows test job.** The repository and its CI hold no token, so the job has
-  no workspace to sign in to. `.github/workflows/check.yml` says which steps of the runner it leaves out. Those
-  steps run in the `first-run` chain on macOS.
+- **The Windows test job signs in to a rehearsal Databricks workspace, never the client's.** The sign-in is a
+  secret kept in the settings of the repository on GitHub. The release itself holds no token, no workspace
+  address and no warehouse id. The job writes to two schemas and one workspace folder that it names after the
+  run, and it removes them at its end. A pull request from a fork gets no secret, so its run skips that job and
+  says so. `.github/workflows/check.yml` describes the job.
 - **A block that says `os=windows` runs on Windows only.** `scripts/check.sh` runs it in the Windows test job. A
-  block of the `windows-account` context runs in that job's `stores` part.
+  block of the `windows-account` context runs in the job `stores` of the same workflow.
 - **The store contexts run only where their variables are set.** `scripts/check.sh` on a reader's machine sets
   none, so it counts those blocks as skipped and names the variable. The cut sets them all and adds
   `--all-contexts`.

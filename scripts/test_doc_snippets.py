@@ -1223,7 +1223,9 @@ def test_a_fixture_that_cannot_be_made_or_removed_fails_the_check(tmp_path):
     assert [f.split("\n")[0] for f in made.failures] == [
         "guide.md:1: the fixture of the context `store` could not be made",
         "guide.md:4: not run: the block at line 1 of the same context failed"]
-    assert "the store did not answer" in made.failures[0] and log.read_text().split() == ["up"]
+    # After a failed `up` the check still runs `down`, so that a store made halfway does not stay.
+    assert "the store did not answer" in made.failures[0] and log.read_text().split() == ["up", "down"]
+    log.unlink()
     removed = check(tmp_path, text, files=FIXTURE_FILES, registry=FIXTURE, environ={"DOC_TEST_LOG": str(log), "DOC_TEST_FAIL": "down"})
     assert removed.ran == 2 and len(removed.failures) == 1
     assert removed.failures[0].startswith("the fixture of the context `store` could not be removed\n")

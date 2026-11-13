@@ -4,6 +4,7 @@
 # line stale, so an exception never covers new text. Use it only for a released package, which never changes
 # after its release, and for a file that must name a word in order to forbid or record it.
 
+.github/workflows/check.yml :: removed-token :: DATABRICKS_TOKEN :: 4 :: the name of the test job's sign-in secret, which is kept in the repository's settings on GitHub; the release holds no token and no token connector
 business_architecture/domain/kpi-store-decisions/KPI-DEC-0001.md :: removed-aura :: AuraDB :: 2 :: the decision record names what this release removed
 business_architecture/domain/kpi-store-decisions/KPI-DEC-0001.md :: removed-docker :: Docker :: 2 :: the decision record names what this release removed
 business_architecture/domain/kpi-store-decisions/answers/2026-11-11-kpi-store-1.1.md :: removed-aura :: AuraDB :: 1 :: the decision record names what this release removed

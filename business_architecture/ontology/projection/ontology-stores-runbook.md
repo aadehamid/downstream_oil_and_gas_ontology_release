@@ -70,7 +70,7 @@ Do this section once per machine. The setup check at its end tells you what is s
 6. Open `https://adoptium.net/temurin/releases/`, choose version 21 for Windows, and install it with its default choices. Fuseki 6.2.0 and ROBOT run on Java 21.
 7. Open Command Prompt and install the Databricks command line. The command is from Databricks' page "Install or update the Databricks CLI" (last updated 2026-09-11).
 
-   ```cmd skip reason="windows-only: installs a program with winget, which the image of the Windows test job does not list"
+   ```cmd skip reason="windows-only: installs a program with winget, which the Windows test job tries and may not have"
    winget install Databricks.DatabricksCLI
    ```
 
@@ -1111,7 +1111,7 @@ This is the design of this release. One person runs the runner on a Windows mach
 
 | Machine | State |
 |---|---|
-| Windows 10 or 11 | The design. The test job runs the check script on Windows. It also runs the runner for the three local stores, the reset of those stores and the sync check. It runs no Databricks step. "What ran where" lists what that leaves open. |
+| Windows 10 or 11 | The design. The test job runs this guide's chain on Windows: the setup check, the first run, the cleared report, the second run with the cut, the sync check, the reset and the load after it. It uses a rehearsal Databricks workspace. "What ran where" lists what that leaves open. |
 | macOS | Every run of this guide's chain so far happened here. Write `python3` where this guide writes `py`. Git Bash and `setx` are not needed. |
 
 ### A pipeline
@@ -1178,16 +1178,15 @@ Three places ran parts of this guide. No place ran all of it, and nothing ran on
 | Place | What ran there |
 |---|---|
 | macOS, with a rehearsal Databricks workspace in the sandbox's shapes, a local Fuseki 6.2.0 and a local Neo4j 2025.06.2 Enterprise with n10s 2025.06.1 and APOC 2025.06.2 | The whole chain of this guide, through the runner: every command that the document test runs. That includes the reset of all four stores and the load after it. |
-| The Windows test job (Windows Server 2025, Python 3.12, Java 21) | The whole check script. The setup check, 13 of its 15 checks. The Fuseki load, a second load that changed nothing, its sync check and `--stop`. Through the runner, without its `check` step and its Databricks steps: the Fuseki load, the Neo4j Enterprise load with n10s and APOC and all its checks (4,242 nodes, 22,331 relationships, 816 of 816 failing cases caught and 0 violations), and the copy into `businessprocessarchitecturegraph` on the same server. The sync check of all three stores. The reset of the three local stores, once with the typed word and once with `--yes`, then a sync check that reads no store as current, then the load again. `--replace-enterprise` on a copy that the job made incomplete. Through the document test: the two `setx` commands and the `cd` of this guide, and the Cypher of "How to undo". |
+| The Windows test job (Windows Server 2025, Python 3.12, Java 21), with a rehearsal Databricks workspace | The whole check script. Then two parts. The first part runs the setup check with all 15 checks, the first run, which stops on the report, the cleared report, the second run with the cut and every load, and the sync check of the four stores. The second part runs the Fuseki load as its own command, twice, and the same chain with `--skip check`. Then it runs the reset of the four stores with the typed word, a sync check that reads no store as current, the load again, `--replace-enterprise` on a copy that the job made incomplete, and the reset with `--yes`. Through the document test it runs the two `setx` commands and the `cd` of this guide, and the Cypher of "How to undo". |
 | The client's sandbox and Enterprise server | Nothing yet. Your first run is the first. |
 
 These points are not proven on Windows, or not on the client's own objects. Each is written from the code and from the vendor's documentation.
 
 | What | Why it is not proven | If it fails |
 |---|---|---|
-| The runner as one command, with every step | The Windows job runs the runner without its `check` step and its Databricks steps. The check script runs in the same job on its own. | Run the steps one at a time with `--only`, and report the step that failed. |
-| Every Databricks step, the reset of Databricks, and the two Databricks checks of the setup check | The Windows job has no workspace to sign in to, because the repository holds no token. They run on macOS, in the document test. | Report the line. |
-| The technical graph in the three stores | It is built by the notebook, so it needs Databricks. It ran on macOS. | Report the line. |
+| Neo4j Desktop in place of a Neo4j server | The Windows job starts a Neo4j Enterprise server from its zip, with no Neo4j Desktop. | The setup check proves the instance, whatever started it. |
+| The sign-in in a browser, and the client's sandbox | The Windows job signs in to a rehearsal workspace with a token, which is a secret in the settings of the repository on GitHub. The release holds no token. No test opens a browser, and no test reaches the sandbox. | Sign in again ("Sign in to Databricks"), and report the line. |
 | Every step of "Install the programs" and "Unpack the release" | No test installs programs. | Report the step. |
 | The steps of "Set up the local Neo4j" | The Windows job used a Neo4j server, not Neo4j Desktop. The steps follow Neo4j Desktop's documentation ("Instance management"), and menu names may differ in your version. | Reach the same goal by the menu your version has. The setup check proves the result. |
 | A new terminal after `setx KPI_STORE_LOCAL` and `setx PY_PYTHON` | The Windows job runs both commands and reads both values back from the account's settings. It opens no new terminal to read them there. | Add `--stores C:\kpi-store-local\stores.toml` to every command of this guide instead. |
