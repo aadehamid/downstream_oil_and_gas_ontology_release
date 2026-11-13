@@ -323,8 +323,8 @@ class Refusals(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             made_up_tree(tmp)
             line = "kpi_store/tests/test_cut.py::test_the_baseline_is_this_trees_or_data_product_has_moved_on\n"
-            with open(os.path.join(tmp, "scripts", "pinned-tests.txt"), "a", encoding="utf-8") as f:
-                f.write(line)
+            with open(os.path.join(tmp, "scripts", "pinned-tests.txt"), "a", encoding="utf-8", newline="\n") as f:
+                f.write(line)   # newline="\n": on Windows a text file would otherwise end this line with \r\n
             ue.apply("deprecate-role", root=tmp, date="2026-11-12", write=True, say=lambda line: None)
             self.assertEqual(files(tmp)["scripts/pinned-tests.txt"].decode("utf-8").count(line), 1)
 
