@@ -528,9 +528,20 @@ def test_a_failure_leaves_the_tree_untouched_and_a_cut_in_local_git_commits_and_
 
     # A change that is not committed stops the cut before it asks anything.
     (root / "note.txt").write_text("not committed\n", encoding="utf-8", newline="\n")
-    with pytest.raises(cut.CutRefused, match="has changes that are not committed"):
+    with pytest.raises(cut.CutRefused, match="has changes that are not committed: note.txt. Commit them"):
         cut.cut(path, root, ask=never, say=quiet)
     (root / "note.txt").unlink()
+    # The caches Python leaves beside the code it ran are not such a change: the runner's first run leaves them, and
+    # the release has no ignore rule for them. A new file of any other name in such a folder's parent still is.
+    for cache in ("kpi_store/__pycache__/runner.cpython-312.pyc", "new folder/__pycache__/x.pyc", ".pytest_cache/README.md"):
+        (root / cache).parent.mkdir(parents=True, exist_ok=True)
+        (root / cache).write_bytes(b"cache")
+    assert git(root, "status", "--porcelain") != "" and cut._uncommitted(root) == [] and cut._git_state(root) == "ready"
+    (root / "new folder" / "note.txt").write_text("not committed\n", encoding="utf-8", newline="\n")
+    assert cut._uncommitted(root) == ["new folder/note.txt"] and cut._git_state(root) == "dirty"
+    shutil.rmtree(root / "new folder")
+    shutil.rmtree(root / ".pytest_cache")
+    shutil.rmtree(root / "kpi_store" / "__pycache__")
 
     # A failure after the packages are written, and a failing step of the release's own scripts.
     steps = []

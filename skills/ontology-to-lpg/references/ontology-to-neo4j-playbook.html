@@ -232,9 +232,11 @@ lib:WorkShape a sh:NodeShape ; sh:targetClass lib:Work ;
 <ol start="3"><li><strong>Apply Rules 1 and 2 to the predicates of every namespace you own whose terms are predicates or classes, and give each its fixed prefix.</strong> List in <code>own_namespaces</code> every namespace you own whose terms the data uses as predicates or classes (a namespace that holds only individuals, such as <code>https://id.example.org/library/work/</code>, may be left out: no rule checks an individual's namespace), and give it the prefix its package uses where it has one (<code>prefixes</code>). Register each qualified-relation class with its ends (<code>qualified_relations</code>, <code>design-rules.md</code>, rule 4). <em>Why:</em> a rule checked on one module lets every later module break it, and a namespace missing from the list is never checked.</li></ol>
 <ol start="4"><li><strong>Register the standard namespaces too.</strong> Every namespace that a predicate or a class in the data uses (RDF, RDFS, OWL, SKOS, DCMI terms, ORG, PROV-O, DCAT, XSD and any other) needs one prefix in <code>prefixes</code>. <em>Why:</em> the loader adds exactly these prefixes, in this order, so n10s never invents one.</li></ol>
 <ol start="5"><li><strong>List each rule gap in a released module as a release exception, with its fix, and fail on an unlisted gap or on a listed gap that no longer occurs.</strong> A gap in a released module (a property with no range, a property with no cardinality shape) can close only in that module's next release, because released packages never change. Only a Rule 1, Rule 2 or Rule 5 failure can be listed. Key each exception by the checker's exact message (a term may be written as a CURIE, as the checker prints it, or as a full IRI, bare or in angle brackets), and say in its fix which release closes it and what that release adds:
-<pre><code class="lang-json">"release_exceptions": {
-  "Rule 1: lib:shelfmark has no single concrete range":
-    "lending 1.0.0 declares no rdfs:range; the next lending release adds rdfs:range xsd:string"
+<pre><code class="lang-json">{
+  "release_exceptions": {
+    "Rule 1: lib:shelfmark has no single concrete range":
+      "lending 1.0.0 declares no rdfs:range; the next lending release adds rdfs:range xsd:string"
+  }
 }</code></pre>
 <p><em>Why:</em> the list lets the projection run without hiding the gap; failing on a stale entry means the list always describes the releases, so it shrinks as releases close the gaps. A blank node, a missing prefix, a broken qualified relation, a refused value or a stale pin is a data error, not a release gap: the checker fails on it even when it is listed.</p></li></ol>
 <ol start="6"><li><strong>When a release closes a gap, remove its exception in the same change that moves the pin.</strong> <em>Why:</em> the check fails until both are done, which is the point.</li></ol></section>

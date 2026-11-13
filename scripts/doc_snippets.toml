@@ -18,7 +18,7 @@ sha256 = "0f2d1d54ee0984eacb3aa6301ecd4d5a8a027f7337369e8feca5e73ae420eb78"
 [reasons]
 needs-client-server = "The command reads or writes a server only the client has."
 needs-browser-sign-in = "The command opens a browser for a person to sign in."
-windows-only = "The command works only on Windows, and no test on Windows can run it either."
+windows-only = "The command works only on Windows, and the Windows test job cannot run it either."
 destructive = "The command deletes or replaces something a test must not touch."
 illustration = "The block shows a shape, a sketch or a pattern. It is not a command to type or a file to copy."
 awaits-the-rewrite = "The document is about to be rewritten, and the block goes or is fixed with it."
@@ -35,6 +35,17 @@ awaits-the-rewrite = "The document is about to be rewritten, and the block goes 
 #   placeholders  the value of each <placeholder> a block of this context uses: text, or env:NAME
 #   set_env       variables a block of this context gets: text, or env:NAME for another variable's value. Such a
 #                 variable reaches no block of another context, whatever the reader's own environment holds
+#   owner         the document whose blocks start this context's chain. The context is then one folder for the
+#                 whole check: a block of another document goes on where the owner's blocks stopped, and the check
+#                 reads the owner first. Without the owner in the same check, such a block is counted as skipped
+#   fixture       a command line. The check runs it with `up` before the context's first block and with `down` when
+#                 the check ends. It makes a small store of the context's own, so that a block which deletes has
+#                 something to delete and harms nothing the other blocks read. A placeholder whose value is
+#                 "fixture" gets its value from the file values.json that `up` leaves in the fixture's folder. The
+#                 same file may give the context's blocks variables. No key of this file may name a password: the
+#                 runner refuses to zip a release whose settings files look as if they held a secret
+#   runs          for a language the check cannot run itself (sql, cypher) or must run in another way (python): the
+#                 command line that runs a block's text. It gets the text as a file, the last argument
 
 [contexts.scratch]
 base = "empty"
@@ -107,7 +118,8 @@ base = "release-copy"
 needs_env = ["KPI_STORE_TEST_LOCAL_SETTINGS", "KPI_STORE_TEST_LPG_OUT"]
 home = "real"
 timeout = 5400
-about = "A copy of the release as a plain folder, as an unpacked zip is, with a prepared local settings file that names test stores and the rehearsal workspace. For the runbook's chain. It keeps the real home folder."
+owner = "business_architecture/ontology/projection/ontology-stores-runbook.md"
+about = "A copy of the release as a plain folder, as an unpacked zip is, with a prepared local settings file that names test stores and the rehearsal workspace. For the runbook's chain, which other documents go on from. It keeps the real home folder."
 
 [contexts.first-run.set_env]
 KPI_STORE_LOCAL = "env:KPI_STORE_TEST_LOCAL_SETTINGS"
@@ -121,3 +133,61 @@ about = "A Git copy of its own for the update guide's cut of the made-up report,
 
 [contexts.first-run.placeholders]
 "your Neo4j load folder" = "env:KPI_STORE_TEST_LPG_OUT"
+
+# The contexts below give a block a small store of its own, made and removed by scripts/doc_snippets_fixtures.py.
+
+[contexts.questions]
+base = "release-copy"
+needs_env = ["KPI_STORE_TEST_NEO4J_URI", "KPI_STORE_TEST_NEO4J_PASSWORD"]
+pass_env = ["KPI_STORE_TEST_NEO4J_USER"]
+timeout = 300
+fixture = "py scripts/doc_snippets_fixtures.py questions"
+about = "A copy of the release beside a composite database over two made-up graphs, which the fixture builds on the Neo4j Enterprise test server and removes. For the cross-graph questions."
+
+[contexts.questions.placeholders]
+"your settings file" = "fixture"
+"your mapping file" = "fixture"
+"a folder" = "fixture"
+
+[contexts.enterprise-database]
+base = "release-copy"
+needs_env = ["KPI_STORE_TEST_NEO4J_URI", "KPI_STORE_TEST_NEO4J_PASSWORD"]
+pass_env = ["KPI_STORE_TEST_NEO4J_USER"]
+about = "The database businessprocessarchitecturegraph of the Neo4j test server, read only: a statement that writes fails. For a Cypher statement that only asks."
+
+[contexts.enterprise-database.runs]
+cypher = "py scripts/doc_snippets_fixtures.py cypher businessprocessarchitecturegraph"
+
+[contexts.scratch-database]
+base = "release-copy"
+needs_env = ["KPI_STORE_TEST_NEO4J_URI", "KPI_STORE_TEST_NEO4J_PASSWORD"]
+pass_env = ["KPI_STORE_TEST_NEO4J_USER"]
+fixture = "py scripts/doc_snippets_fixtures.py scratch-database"
+about = "A throwaway database on the Neo4j test server with 25 nodes and the constraint n10s_unique_uri. The fixture makes it under a new name and drops it. For a Cypher statement that deletes."
+
+[contexts.scratch-database.runs]
+cypher = "py scripts/doc_snippets_fixtures.py cypher scratch"
+
+[contexts.scratch-schemas]
+base = "release-copy"
+needs_env = ["KPI_STORE_TEST_LOCAL_SETTINGS"]
+home = "real"
+timeout = 900
+fixture = "py scripts/doc_snippets_fixtures.py scratch-schemas"
+about = "Two throwaway schemas in the rehearsal catalog of the local settings, with the four tables and the volume a run leaves, which the fixture makes and drops. For SQL that drops, and for Python that needs a notebook's Spark session. It keeps the real home folder."
+
+[contexts.scratch-schemas.runs]
+sql = "py scripts/doc_snippets_fixtures.py sql"
+python = "py scripts/doc_snippets_fixtures.py notebook"
+
+[contexts.scratch-schemas.placeholders]
+catalog = "fixture"
+schema = "fixture"
+table = "fixture"
+
+[contexts.windows-account]
+base = "empty"
+needs_env = ["DOC_SNIPPETS_WINDOWS_ACCOUNT"]
+home = "real"
+timeout = 900
+about = "A Windows account that may be changed, such as a test runner's. Its blocks set a variable of the account or install a program, so they never run on a reader's machine. Set DOC_SNIPPETS_WINDOWS_ACCOUNT=1 only on such an account."

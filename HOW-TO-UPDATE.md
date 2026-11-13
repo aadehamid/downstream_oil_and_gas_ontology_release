@@ -95,11 +95,18 @@ The steps are the runbook's, from "The first run" to "The sync check". Two thing
 3. Run the runner again and answer the cut's prompts, as in the runbook's "The second run".
 4. If the `enterprise` step stops because the database holds KPI Store nodes of the earlier release, run the step again with the replace allowed. **The replace deletes every node in that database that carries the KPI Store's marks, before it copies.** The runbook's "The limits" lists the marks. If the copy still stops and names nodes, the new release dropped a model, class or label that those nodes belong to; the runbook's "Replace what Enterprise holds" says what to do.
 
-   ```powershell skip reason="needs-client-server: replaces the KPI Store's nodes in the client's Enterprise database"
+   ```powershell run=first-run
    py -m kpi_store.runner --from enterprise --replace-enterprise
    ```
 
 5. Read the last line. Expect `the steps that ran passed`, with the steps before `enterprise` named as left out.
+
+   ```text expect
+   run <run ID>: enterprise, sync, summary
+   enterprise: <what the copy did>
+   ...
+   the steps that ran passed; left out: cut, check, zip, volume, upload, notebook, report, fuseki, neo4j (not run, so not checked)
+   ```
 
 The second difference is the version. A second correction to the same module counts up: `1.2.1-correction.2`.
 
@@ -334,8 +341,16 @@ The versions in the commands are those of the release as you received it. Read t
 10. Search your copy for text that the change made stale, and update each document that holds it. No check catches a copy of a sentence.
 11. Load the stores with the runner, and read its last line. The release is done when the sync check reads `current` on every line.
 
-    ```powershell skip reason="needs-client-server: loads the client's Databricks and Enterprise database"
+    ```powershell run=first-run
     py -m kpi_store.runner
+    ```
+
+    ```text expect
+    run <run ID>: cut, check, zip, volume, upload, notebook, report, fuseki, neo4j, enterprise, sync, summary
+    ...
+    sync: all <count> lines read current
+    ...
+    every step passed
     ```
 
     If the `enterprise` step stops because the database holds the earlier release, see step 4 of "A correction through the loop".

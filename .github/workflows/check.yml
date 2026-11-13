@@ -1,7 +1,17 @@
 # Runs on every pull request, and every job must pass.
 # check: the release's check script, scripts/check.sh, on Linux and on Windows under Git Bash. The job sets no
 #   encoding variable, so on Windows Python reads text as cp1252 unless the code names UTF-8, as on most machines.
-# stores: the store loads on Windows, as a person runs them, against servers the job starts on the runner.
+# sign-in: says whether this run has the three secrets of the rehearsal Databricks workspace.
+# stores: the whole chain of the stores runbook on Windows, as a person runs it, against servers the job starts on the
+#   runner and against the rehearsal Databricks workspace. It has two parts, which run side by side.
+#
+# Who can start a run that gets the three Databricks secrets: a pull request from a branch of this repository, and a
+# manual run. Both need the right to write to this repository, and a person with that right could also change this
+# file. Who cannot: a pull request from a fork, to which GitHub gives no secret. The secrets are named only in the
+# two steps that need them, never for a whole job, and neither step runs a program from the checkout: one asks
+# whether the secrets are there, the other writes the sign-in file and the settings with code that stands in this
+# file. No step traces its commands, prints a secret or a settings file, or uploads a file. After a failure the last
+# step prints the end of the servers' logs and of the check script's log, which hold neither.
 name: check
 on:
   pull_request:
@@ -38,13 +48,68 @@ jobs:
         if: matrix.os == 'ubuntu-24.04'
         run: bash scripts/check-pinned.sh
 
-  # The store loads on Windows, with the commands a person runs: the setup check, the Fuseki load, the Neo4j load,
-  # the copy to a second database, and the sync check. The servers run on the runner and listen on 127.0.0.1 only.
-  # One Neo4j Enterprise server (evaluation licence) holds both databases: neo4j, with the n10s and APOC plugins,
-  # stands for the local Neo4j, and businessprocessarchitecturegraph stands for the Enterprise target.
+  # The stores job signs in to a rehearsal Databricks workspace. The sign-in is three secrets of this repository's
+  # settings: KPI_CI_DATABRICKS_TOKEN, KPI_CI_DATABRICKS_HOST and KPI_CI_DATABRICKS_WAREHOUSE. The release itself holds
+  # no token, no workspace address and no warehouse id, and no step prints one. GitHub gives no secret to a pull
+  # request from a fork: such a run skips the stores job and says so. On a branch of this repository the secrets
+  # must be there, and a run without them fails here.
+  sign-in:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      databricks: ${{ steps.secrets.outputs.databricks }}
+    steps:
+      - name: are the three Databricks secrets there
+        id: secrets
+        env:
+          TOKEN: ${{ secrets.KPI_CI_DATABRICKS_TOKEN }}
+          HOST: ${{ secrets.KPI_CI_DATABRICKS_HOST }}
+          WAREHOUSE: ${{ secrets.KPI_CI_DATABRICKS_WAREHOUSE }}
+          FORK: ${{ github.event.pull_request.head.repo.fork }}
+        run: |
+          if [ -n "$TOKEN" ] && [ -n "$HOST" ] && [ -n "$WAREHOUSE" ]; then
+            echo "databricks=on" >> "$GITHUB_OUTPUT"
+          elif [ "$FORK" = "true" ]; then
+            echo "::notice::This pull request comes from a fork, and GitHub gives a fork no secret. The stores job, which signs in to the rehearsal Databricks workspace, is skipped. The job check still runs."
+            echo "databricks=off" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::The stores job cannot sign in to the rehearsal Databricks workspace: KPI_CI_DATABRICKS_TOKEN, KPI_CI_DATABRICKS_HOST or KPI_CI_DATABRICKS_WAREHOUSE is empty. Set all three under Settings, Secrets and variables, Actions."
+            exit 1
+          fi
+
+  # The stores runbook's chain on Windows, with the commands a person runs. The servers run on the runner and listen
+  # on 127.0.0.1 only. One Neo4j Enterprise server (evaluation licence) holds both databases: neo4j, with the n10s and
+  # APOC plugins, stands for the local Neo4j, and businessprocessarchitecturegraph stands for the Enterprise target.
+  #
+  # The machine is set up as the runbook sets up one without administrator rights: no installer, Java and the
+  # Databricks command line unpacked from their zips and named in the local settings, no Java on PATH, and every
+  # folder under the runner's temporary folder. Git for Windows and Python are the runner's own.
+  #
+  # Databricks is a rehearsal workspace, never the client's. The job writes the command line's profile DEFAULT into
+  # the runner's own .databrickscfg from the secrets, as `databricks auth login` leaves it for a reader; the SDK reads
+  # the same profile. The settings name the two rehearsal catalogs: kpi_reh_idp_sbx plays idp_sbx and
+  # kpi_reh_synapse_dev plays synapse_dev. Each part writes to two schemas of its own, named after this run, and to
+  # one workspace folder of its own. The last steps drop exactly those two schemas and that folder, also after a
+  # failure. The job creates, changes and drops nothing else in the workspace.
+  #
+  # The parts:
+  #   run    the setup check with all 15 checks, the first run, which stops on the report, the cleared report, the
+  #          second run with its two typed answers, and the sync check. No step is left out, so the check script runs
+  #          inside each run, about 35 minutes each on this runner.
+  #   reset  the document test for the blocks that need this job's Neo4j server or a Windows account. Then the same
+  #          chain with --skip check, which the runbook gives for a machine where the check step cannot run, and on the
+  #          loaded stores: the reset with the typed word, a sync check that must read unmarked, the load again,
+  #          --replace-enterprise on a copy made incomplete, the sync check, and the reset with --yes.
+  # What this job does not run is in scripts/DOC-SNIPPETS.md, "Blocks the test does not run".
   stores:
+    needs: sign-in
+    if: needs.sign-in.outputs.databricks == 'on'
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [run, reset]
     runs-on: windows-2025
-    timeout-minutes: 60
+    timeout-minutes: 120
     defaults:
       run:
         shell: bash
@@ -58,15 +123,19 @@ jobs:
       APOC_SHA256: 4df40cea7444ea193d08f8a679aa998c498196fe149c8c02badb998f1c9580fb
       ROBOT_SHA256: 16a73c074f3df359a7338a84b4e0788785fe06117f931bb9796e9619ea776105
       NEO4J_ZIP_SHA256: 1b1cf3715fbf6a7632d2d221b9eaccdd34037baaa4ddb7242b2ecfecf473b378
+      # Java and the Databricks command line come from their zips, as the runbook's section "Install the programs
+      # without administrator rights" has them: Eclipse Temurin 21.0.13+9 and Databricks CLI 1.26.0.
+      JDK_ZIP_SHA256: a4dbaa05fca4bd89d84584e58c459bd732efebb1722af80ab13c6516832004f9
+      CLI_ZIP_SHA256: 7c7f2bdfc503d0277d60ef36d9ef6d9577769cd992bd3633691ebe47b9f214a2
+      # What this part may write to in the rehearsal workspace, and nothing else: two schemas and one folder.
+      CI_CATALOG: kpi_reh_idp_sbx
+      CI_SCHEMA: kpi_store_ci_${{ github.run_id }}_${{ github.run_attempt }}_${{ matrix.part }}
+      CI_FOLDER: /Workspace/Shared/kpi_store_ci_${{ github.run_id }}_${{ github.run_attempt }}_${{ matrix.part }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "21"
       - uses: astral-sh/setup-uv@v7
       - name: folders
         run: |
@@ -77,7 +146,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/kpi-local/dl
-          key: store-downloads-${{ env.FUSEKI_SHA256 }}-${{ env.N10S_SHA256 }}-${{ env.APOC_SHA256 }}-${{ env.ROBOT_SHA256 }}-${{ env.NEO4J_ZIP_SHA256 }}
+          key: store-downloads-${{ env.FUSEKI_SHA256 }}-${{ env.N10S_SHA256 }}-${{ env.APOC_SHA256 }}-${{ env.ROBOT_SHA256 }}-${{ env.NEO4J_ZIP_SHA256 }}-${{ env.JDK_ZIP_SHA256 }}-${{ env.CLI_ZIP_SHA256 }}
       - name: downloads, each checked against its pinned SHA-256
         run: |
           cd "$LOCAL/dl"
@@ -90,27 +159,96 @@ jobs:
           fetch apoc-2025.06.2-core.jar "$APOC_SHA256" https://github.com/neo4j/apoc/releases/download/2025.06.2/apoc-2025.06.2-core.jar
           fetch robot.jar "$ROBOT_SHA256" https://github.com/ontodev/robot/releases/download/v1.9.10/robot.jar
           fetch neo4j-enterprise-2025.06.2-windows.zip "$NEO4J_ZIP_SHA256" https://dist.neo4j.org/neo4j-enterprise-2025.06.2-windows.zip
+          fetch temurin-jdk-21.zip "$JDK_ZIP_SHA256" https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.13%2B9/OpenJDK21U-jdk_x64_windows_hotspot_21.0.13_9.zip
+          fetch databricks-cli.zip "$CLI_ZIP_SHA256" https://github.com/databricks/cli/releases/download/v1.26.0/databricks_cli_1.26.0_windows_amd64.zip
       - name: the packages, at the versions the setup check names, for the Python the py launcher starts
         run: |
           py -0p || true
           py -c "import sys; print(sys.executable, sys.version)"
           py -m pip install -q rdflib==7.6.0 pyshacl==0.40.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 openpyxl==3.1.5
-      - name: the local settings file, outside the checkout
+      # No installer and no administrator rights, as the runbook's section "Install the programs without administrator
+      # rights" does it: Java and the Databricks command line are unpacked from their zips into the local folder, and
+      # the local settings name both. Then every Java that the runner image brings is taken off PATH for the rest of
+      # the job, and JAVA_HOME is emptied, so that a command which looked for Java anywhere but in the settings would
+      # fail here.
+      - name: Java and the Databricks command line, unpacked from their zips
         run: |
-          py -c "import secrets; print(secrets.token_hex(16))" > "$LOCAL/pw"
+          cd "$LOCAL"
+          unzip -q dl/temurin-jdk-21.zip
+          mv jdk-21* jdk-21
+          mkdir databricks-cli
+          unzip -q dl/databricks-cli.zip -d databricks-cli
+          [ -f databricks-cli/databricks.exe ] || mv "$(find databricks-cli -name databricks.exe | head -n 1)" databricks-cli/databricks.exe
+          jdk-21/bin/java.exe -version
+          databricks-cli/databricks.exe --version
+      - name: take every other Java off PATH
+        shell: pwsh
+        run: |
+          $kept = $env:Path -split ';' | Where-Object { $_ -and -not (Test-Path (Join-Path $_ 'java.exe')) }
+          "Path=$($kept -join ';')" >> $env:GITHUB_ENV
+          "JAVA_HOME=" >> $env:GITHUB_ENV
+      - name: no Java is on PATH, and JAVA_HOME names none
+        run: |
+          py -c "import os, shutil, sys; found = shutil.which('java'); sys.exit(f'a Java is still on PATH: {found}' if found else ('JAVA_HOME is still set' if os.environ.get('JAVA_HOME') else 0))"
+      # The token goes from the secret into the runner's own .databrickscfg, and from there to the command line and
+      # the SDK. No step prints it, and the file is deleted in the last step. The warehouse id goes into the
+      # environment's settings file in the runner's temporary folder, which no step prints or uploads.
+      - name: sign in, and the two settings files, outside the checkout
+        env:
+          TOKEN: ${{ secrets.KPI_CI_DATABRICKS_TOKEN }}
+          HOST: ${{ secrets.KPI_CI_DATABRICKS_HOST }}
+          WAREHOUSE: ${{ secrets.KPI_CI_DATABRICKS_WAREHOUSE }}
+        run: |
+          # -I keeps the checkout off Python's path: with the secrets in this step's environment, only Python's own
+          # modules and the code written here may run.
+          py -I -c "import secrets; print(secrets.token_hex(16))" > "$LOCAL/pw"
           pw="$(cat "$LOCAL/pw")"; rm "$LOCAL/pw"
           echo "::add-mask::$pw"
           echo "KPI_CI_NEO4J_PASSWORD=$pw" >> "$GITHUB_ENV"
-          sed 's/^warehouse_id = ""/warehouse_id = "0000000000000000"/' kpi_store/kpi_store.example.toml > "$LOCAL/kpi_store.toml"
+          py -I - <<'PY'
+          import os, re
+          from pathlib import Path
+          from urllib.parse import quote, urlsplit
+          env = os.environ
+          # GitHub hides a secret's exact text in the log. An error of the command line or of the SDK may print the
+          # workspace's address in another form, so each such form is hidden too.
+          host = urlsplit(env["HOST"]).hostname or env["HOST"]
+          for form in {host, host.split(".")[0], quote(env["HOST"], safe=""), env["HOST"].rstrip("/") + "/"}:
+              print(f"::add-mask::{form}")
+          (Path.home() / ".databrickscfg").write_text(f"[DEFAULT]\nhost = {env['HOST']}\ntoken = {env['TOKEN']}\n",
+                                                      encoding="utf-8", newline="\n")
+          # The environment's settings: the example file, with the rehearsal catalogs and this run's two schemas.
+          text = Path("kpi_store/kpi_store.example.toml").read_text(encoding="utf-8")
+          for line, new in (
+                  ('write_catalog = "idp_sbx"', f'write_catalog = "{env["CI_CATALOG"]}"'),
+                  ('write_schema = "kpi_store"', f'write_schema = "{env["CI_SCHEMA"]}"'),
+                  ('tech_graph_schema = "tech_graph"', f'tech_graph_schema = "{env["CI_SCHEMA"]}_tech"'),
+                  ('read_catalogs = ["idp_sbx", "synapse_dev"]', 'read_catalogs = ["kpi_reh_idp_sbx", "kpi_reh_synapse_dev"]'),
+                  ('warehouse_id = ""', f'warehouse_id = "{env["WAREHOUSE"]}"'),
+                  ('idp_sbx = "idp_sbx"', 'idp_sbx = "kpi_reh_idp_sbx"'),
+                  ('synapse_dev = "synapse_dev"', 'synapse_dev = "kpi_reh_synapse_dev"'),
+                  ('schemas = ["information_schema", "bronze_replica_*", "kpi_store_poc"]',
+                   'schemas = ["information_schema", "bronze_replica_*", "kpi_store_poc", "epm_ontology", "o2c_unbilled"]')):
+              text, count = re.subn("(?m)^" + re.escape(line), lambda m: new, text)
+              assert count == 1, f"kpi_store.example.toml has no line that starts with: {line}"
+          Path(env["LOCAL"], "kpi_store.toml").write_text(text, encoding="utf-8", newline="\n")
+          PY
           cat > "$LOCAL/stores.toml" <<EOF
           [release]
           settings = "$LOCAL/kpi_store.toml"
           run_folder = "$LOCAL/runs"
 
+          [databricks]
+          profile = "DEFAULT"
+          workspace_folder = "$CI_FOLDER"
+          timeout_minutes = 40
+          cli = "$LOCAL/databricks-cli/databricks.exe"
+
           [fuseki]
           jar = "$LOCAL/dl/jena-fuseki-server-6.2.0.jar"
           url = "http://127.0.0.1:13030/ds"
           data_folder = "$LOCAL/fuseki-db"
+          java = "$LOCAL/jdk-21/bin/java.exe"
 
           [neo4j.local]
           uri = "bolt://127.0.0.1:17687"
@@ -129,19 +267,12 @@ jobs:
           robot_jar = "$LOCAL/dl/robot.jar"
           out = "$LOCAL/lpg-out"
           EOF
-          cat "$LOCAL/stores.toml"
-      - name: setup check, list
-        run: py -m kpi_store.setup_check --list
-      - name: setup check, before any server runs
-        run: py -m kpi_store.setup_check --only python --only packages --only local-settings --only kpi-store-settings --only java --only fuseki-jar --only robot-jar --only bash --only uv --only check-script-tools
-      - name: Fuseki load
-        run: time py -m kpi_store.load_fuseki --json
-      - name: Fuseki load again, which must change nothing
-        run: time py -m kpi_store.load_fuseki --json
-      - name: sync check, Jena
-        run: time py -m kpi_store.sync_check --store jena --no-tech-graph
+      # The job's Neo4j server stands for Neo4j Desktop, which brings its own Java. So these two steps, and no
+      # other, get JAVA_HOME: the server starts with the unpacked JDK.
       - name: unpack Neo4j, add APOC and n10s, set the password
         shell: pwsh
+        env:
+          JAVA_HOME: ${{ env.LOCAL }}/jdk-21
         run: |
           $neo = "$env:LOCAL/neo4j-enterprise-2025.06.2"
           & "$env:SystemRoot/System32/tar.exe" -xf "$env:LOCAL/dl/neo4j-enterprise-2025.06.2-windows.zip" -C $env:LOCAL
@@ -157,6 +288,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
       # Started with its own hidden console and no tie to this step: a server on the step's console ends with the step.
       - name: start Neo4j and wait for it
+        env:
+          JAVA_HOME: ${{ env.LOCAL }}/jdk-21
         run: |
           py - <<'PY'
           import os, socket, subprocess, sys, time
@@ -184,14 +317,215 @@ jobs:
               for row in driver.execute_query("SHOW DATABASES YIELD name, currentStatus", database_="system").records:
                   print(row["name"], row["currentStatus"])
           PY
-      - name: setup check, the Neo4j checks
-        run: py -m kpi_store.setup_check --only neo4j-local --only neo4j-plugins --only neo4j-enterprise
-      - name: Neo4j load
-        run: time py -m kpi_store.load_neo4j --json
-      - name: copy to the second database
-        run: time py -m kpi_store.copy_enterprise --json
-      - name: sync check, Jena and both Neo4j databases
-        run: time py -m kpi_store.sync_check --store jena --store neo4j --store enterprise --no-tech-graph
+      - name: setup check, which must pass all 15 checks
+        run: |
+          py -m kpi_store.setup_check | tee "$LOCAL/setup-check.log"
+          grep -q "^15 of 15 checks passed" "$LOCAL/setup-check.log"
+
+      # ---- part reset, first: the Fuseki load as its own command, and the document test ----
+      # Both come before the first run. After the cut the document test would read the blocks and run none.
+      - name: setup check, list
+        if: matrix.part == 'reset'
+        run: py -m kpi_store.setup_check --list
+      - name: Fuseki load
+        if: matrix.part == 'reset'
+        run: time py -m kpi_store.load_fuseki --json
+      - name: Fuseki load again, which must change nothing
+        if: matrix.part == 'reset'
+        run: time py -m kpi_store.load_fuseki --json
+      - name: sync check, Jena
+        if: matrix.part == 'reset'
+        run: time py -m kpi_store.sync_check --store jena --no-tech-graph
+      # The blocks of the runbook and of the two hand-written pages that need this job's Neo4j server or a Windows
+      # account that may be changed: the two setx commands and the cd of the runbook, the Cypher of "How to undo" (on a
+      # database of its own, made and dropped here), and the four commands of the cross-graph questions (on a
+      # composite database over two made-up graphs, made and dropped here). The packages are those of
+      # scripts/check.sh. C:\kpi-store-1.1 is the folder the runbook unpacks the release into.
+      - name: document test, the blocks that need the Neo4j server or a Windows account
+        if: matrix.part == 'reset'
+        env:
+          KPI_STORE_TEST_NEO4J_URI: bolt://127.0.0.1:17687
+          KPI_STORE_TEST_NEO4J_USER: neo4j
+          DOC_SNIPPETS_WINDOWS_ACCOUNT: "1"
+          PYTHONIOENCODING: utf-8
+        run: |
+          mkdir -p /c/kpi-store-1.1
+          export KPI_STORE_TEST_NEO4J_PASSWORD="$KPI_CI_NEO4J_PASSWORD"
+          uv run -q --no-project --with pytest --with pytest-xdist --with rdflib --with pyshacl --with openpyxl --with jsonschema --with "markdown-it-py>=4,<5" --with pyyaml==6.0.3 --with sqlglot==30.31.0 --with pyoxigraph==0.5.13 --with neo4j \
+            python scripts/doc_snippets.py check --verbose \
+            business_architecture/ontology/projection/ontology-stores-runbook.md \
+            business_architecture/ontology/epm-ontology-guide.html \
+            business_architecture/ontology/epm-walkthrough.html | tee "$LOCAL/doc-test.log"
+          # A block whose context is off is counted, not failed. These must have run here.
+          for ran in "cmd run=windows-account: ran" "powershell run=windows-account: ran" "cypher run=enterprise-database: ran" \
+                     "cypher run=scratch-database: ran" "epm-ontology-guide.html:[0-9]*: powershell run=questions: ran" \
+                     "epm-walkthrough.html:[0-9]*: powershell run=questions: ran"; do
+            grep -q "$ran" "$LOCAL/doc-test.log" || { echo "no block reads: $ran"; exit 1; }
+          done
+      - name: the two variables that the runbook's setx commands set
+        if: matrix.part == 'reset'
+        shell: pwsh
+        run: |
+          $account = Get-ItemProperty -Path HKCU:\Environment
+          "PY_PYTHON = $($account.PY_PYTHON)"
+          "KPI_STORE_LOCAL = $($account.KPI_STORE_LOCAL)"
+          if ($account.PY_PYTHON -ne "3.12" -or $account.KPI_STORE_LOCAL -ne "C:\kpi-store-local\stores.toml") { exit 1 }
+
+      # ---- both parts: the first run, the cleared report, the second run ----
+      # Part run gives no option, as the runbook's "The first run" and "The second run" do. Part reset adds
+      # --skip check, the runbook's own fallback, so that it reaches the reset inside the time limit.
+      - name: which options the runs of this part take
+        run: echo "RUN_OPTIONS=${{ matrix.part == 'reset' && '--skip check' || '' }}" >> "$GITHUB_ENV"
+      - name: the first run, which must stop on the report with exit code 3
+        run: |
+          code=0
+          py -m kpi_store.runner $RUN_OPTIONS | tee "$LOCAL/first-run.log" || code=$?
+          echo "exit code $code"
+          [ "$code" -eq 3 ]
+          grep -q "^report: STOPPED" "$LOCAL/first-run.log"
+          [ -f "$LOCAL/runs/pending/discovery-report.to-clear.csv" ]
+      # The runbook's block "Clear the report" does what a person does in Excel. This step takes that block from the
+      # runbook and runs it, so the job clears the report with the same script as the document test.
+      - name: clear the report, with the runbook's own block
+        run: |
+          py - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, "scripts")
+          import doc_snippets
+          doc = "business_architecture/ontology/projection/ontology-stores-runbook.md"
+          blocks, problems = doc_snippets.extract(doc, Path(doc).read_text(encoding="utf-8"))
+          found = [b for b in blocks if b.lang == "python" and "discovery-report.to-clear.csv" in b.body]
+          assert not problems and len(found) == 1, "the runbook must hold one Python block that clears the report"
+          exec(compile(found[0].body, doc, "exec"))
+          PY
+      # The cut asks two things. The answers come through standard input, as a person types them. The checkout is a
+      # Git copy, where the cut commits and tags what it wrote, so Git gets an author first, in this checkout only.
+      # The runner has none, and the cut refuses without one, with the two commands a person then runs.
+      - name: the second run, with the cut's two typed answers
+        run: |
+          git config user.name "KPI Store test job"
+          git config user.email "test-job@example.invalid"
+          printf 'Change_Value_Amount\nyes\n' | py -m kpi_store.runner $RUN_OPTIONS | tee "$LOCAL/second-run.log"
+          grep -q "^enterprise: copied" "$LOCAL/second-run.log"
+          if [ -z "$RUN_OPTIONS" ]; then
+            grep -q "^check: all checks passed" "$LOCAL/second-run.log"
+            [ "$(tail -n 1 "$LOCAL/second-run.log" | tr -d '\r')" = "every step passed" ]
+          else
+            tail -n 1 "$LOCAL/second-run.log" | grep -q "^the steps that ran passed; left out: check "
+          fi
+      - name: sync check, which must read current on every line
+        run: py -m kpi_store.sync_check
+
+      # ---- part reset: the reset, the load again, the replace ----
+      - name: reset, dry run
+        if: matrix.part == 'reset'
+        run: py -m kpi_store.runner --reset --dry-run
+      # The reset asks for the word reset. The word comes through standard input, as a person types it.
+      - name: reset of the four stores, with the typed word
+        if: matrix.part == 'reset'
+        run: |
+          printf 'reset\n' | py -m kpi_store.runner --reset | tee "$LOCAL/reset.log"
+          tail -n 1 "$LOCAL/reset.log" | grep -q "^reset done: enterprise, neo4j, fuseki and databricks hold nothing of the KPI Store"
+      # After the reset Databricks and the two Neo4j databases read unmarked, and Fuseki, which the reset stopped,
+      # reads unreachable. No line may read current.
+      - name: sync check after the reset, which must read unmarked and unreachable
+        if: matrix.part == 'reset'
+        run: |
+          py -m kpi_store.sync_check --json > "$LOCAL/after-reset.json" || true
+          cat "$LOCAL/after-reset.json"
+          py - "$LOCAL/after-reset.json" <<'PY'
+          import json, sys
+          with open(sys.argv[1], encoding="utf-8") as f:
+              rows = {row["store"]: row["status"] for row in json.load(f)}
+          want = {"databricks": "unmarked", "jena": "unreachable", "neo4j": "unmarked", "enterprise": "unmarked"}
+          wrong = {store: (rows.get(store), status) for store, status in want.items() if rows.get(store) != status}
+          current = [store for store, status in rows.items() if status == "current"]
+          sys.exit(f"after the reset, (found, expected) by store: {wrong}; still current: {current}" if wrong or current else 0)
+          PY
+      - name: runner again, which loads the emptied stores
+        if: matrix.part == 'reset'
+        run: |
+          py -m kpi_store.runner --skip check | tee "$LOCAL/load-again.log"
+          grep -q "^notebook: notebook run [0-9]* loaded" "$LOCAL/load-again.log"
+          grep -q "^enterprise: copied" "$LOCAL/load-again.log"
+      # --replace-enterprise is for a database that holds KPI Store nodes of another release, or a copy that was cut
+      # off halfway. This makes the second case: it deletes 100 of the copied nodes. The copy must then stop and
+      # change nothing, and it must pass with the replace allowed.
+      - name: make the Enterprise copy incomplete, as a copy that was cut off halfway leaves it
+        if: matrix.part == 'reset'
+        run: |
+          py - <<'PY'
+          import os, neo4j
+          with neo4j.GraphDatabase.driver("bolt://127.0.0.1:17687", auth=("neo4j", os.environ["KPI_CI_NEO4J_PASSWORD"])) as driver:
+              done = driver.execute_query("MATCH (n:Resource) WITH n LIMIT 100 DETACH DELETE n", database_="businessprocessarchitecturegraph")
+              print("deleted", done.summary.counters.nodes_deleted, "nodes")
+          PY
+      - name: the enterprise step, which must stop on the incomplete copy
+        if: matrix.part == 'reset'
+        run: |
+          if py -m kpi_store.runner --only enterprise > "$LOCAL/stopped.log" 2>&1; then cat "$LOCAL/stopped.log"; echo "the copy did not stop"; exit 1; fi
+          cat "$LOCAL/stopped.log"
+          grep -q "^enterprise: FAILED" "$LOCAL/stopped.log"
+      - name: the enterprise step again, with the replace allowed
+        if: matrix.part == 'reset'
+        run: |
+          py -m kpi_store.runner --from enterprise --replace-enterprise | tee "$LOCAL/replaced.log"
+          grep -q "^enterprise: copied" "$LOCAL/replaced.log"
+          grep -q "^sync: all [0-9]* lines read current" "$LOCAL/replaced.log"
+      - name: sync check, which must read current again
+        if: matrix.part == 'reset'
+        run: py -m kpi_store.sync_check
+      - name: reset of the four stores, with --yes
+        if: matrix.part == 'reset'
+        run: py -m kpi_store.runner --reset --yes
+
+      # The runbook's first way to install the Databricks command line is winget. The list of software on this runner
+      # image does not name winget, so this step only finds out whether the command runs here. It never fails the job,
+      # and it comes last, so that what it installs serves no step above. The two --accept options answer the
+      # questions that winget asks a person on first use.
+      - name: winget, to learn whether this runner can run the runbook's install command
+        if: matrix.part == 'reset'
+        continue-on-error: true
+        shell: cmd
+        run: winget install Databricks.DatabricksCLI --accept-source-agreements --accept-package-agreements --disable-interactivity
+
+      # ---- both parts: leave nothing behind ----
+      # Drops exactly the two schemas this part named and made, and deletes its one workspace folder. CASCADE is right
+      # here: both schemas are this run's own. Then the sign-in file goes.
+      - name: remove this part's two schemas and its folder from the rehearsal workspace
+        if: always()
+        run: |
+          [ -f "$LOCAL/kpi_store.toml" ] && [ -f "$LOCAL/stores.toml" ] || { echo "no settings were written, so nothing was made"; exit 0; }
+          py - <<'PY'
+          import os, tomllib
+          from pathlib import Path
+          from databricks.sdk.errors import NotFound
+          from kpi_store import settings, sync_check
+          local = Path(os.environ["LOCAL"])
+          here = settings.load(local / "kpi_store.toml")
+          client = sync_check.workspace_client("DEFAULT")
+          run_sql = sync_check.statement_runner(client, here.warehouse_id)
+          for schema in (here.write_schema, here.tech_graph_schema):
+              assert here.write_catalog == os.environ["CI_CATALOG"] and schema.startswith(os.environ["CI_SCHEMA"]) \
+                  and schema.startswith("kpi_store_ci_"), "not a schema of this run"
+              run_sql(f"DROP SCHEMA IF EXISTS {here.write_catalog}.{schema} CASCADE")
+              print("dropped", f"{here.write_catalog}.{schema}")
+          # The folder's name comes from the local settings and goes to the SDK. It is not read from this step's
+          # environment or given to a command of this shell: Git Bash rewrites a value that starts with / into a
+          # Windows path before a Windows program gets it, and the delete then names no folder of the workspace.
+          folder = tomllib.loads((local / "stores.toml").read_text(encoding="utf-8"))["databricks"]["workspace_folder"]
+          assert folder == "/Workspace/Shared/" + os.environ["CI_SCHEMA"] and os.environ["CI_SCHEMA"].startswith("kpi_store_ci_"), \
+              "not the folder of this run"
+          try:
+              client.workspace.delete(folder, recursive=True)
+              print("deleted", folder)
+          except NotFound:
+              print("the folder", folder, "was not there")
+          PY
+      - name: remove the sign-in file
+        if: always()
+        run: py -c "from pathlib import Path; (Path.home() / '.databrickscfg').unlink(missing_ok=True)"
       - name: stop Fuseki
         if: always()
         run: py -m kpi_store.load_fuseki --stop || true
@@ -201,3 +535,14 @@ jobs:
           for f in "$LOCAL"/runs/fuseki/fuseki.log "$LOCAL"/runs/neo4j/neo4j-load.log "$LOCAL"/neo4j-console.log "$LOCAL"/neo4j-enterprise-2025.06.2/logs/neo4j.log; do
             [ -f "$f" ] && { echo "=== $f"; tail -n 150 "$f"; } || true
           done
+          # The check step of a run names its check.log and prints none of it. Each run's log is the check script's
+          # output: first the lines that name a failure, then its end. It holds no settings file.
+          for f in "$LOCAL"/runs/*/check.log; do
+            [ -f "$f" ] || continue
+            echo "=== $f, the lines that name a failure"
+            grep -n -E "^(FAILED|ERROR) |^FAIL|Traceback|^E  |the checks changed the tree" "$f" | head -n 200 || true
+            echo "=== $f, the end"
+            tail -n 400 "$f"
+          done
+          echo "=== what Git reports as changed in the checkout"
+          git status --porcelain --untracked-files=all | head -n 50

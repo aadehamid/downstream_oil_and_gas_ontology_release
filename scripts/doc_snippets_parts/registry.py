@@ -11,9 +11,11 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = ROOT / "scripts" / "doc_snippets.toml"
 
-TAGS = ("run", "expect", "skip", "file", "excerpt", "parse", "nested")
+TAGS = ("run", "expect", "skip", "file", "excerpt", "usage", "parse", "nested")
 RUN_LANGS = ("bash", "sh", "python", "powershell", "cmd")
-PARSE_LANGS = ("json", "toml", "yaml", "turtle", "sparql", "sql", "cypher")
+PARSE_LANGS = ("json", "toml", "yaml", "ini", "turtle", "sparql", "sql", "cypher")
+# A skipped block in one of these languages is still parsed, so a typing error in it fails.
+PARSED_WHEN_SKIPPED = PARSE_LANGS + ("python",)
 # A value the reader must fill in, such as <your workspace>.
 PLACEHOLDER = re.compile(r"<([A-Za-z0-9][A-Za-z0-9 _-]*)>")
 # A placeholder's value goes into a block's text, so it may hold no character a shell reads as syntax.
@@ -49,6 +51,9 @@ class Context:
     placeholders: dict = field(default_factory=dict)
     set_env: dict = field(default_factory=dict)  # variables a block gets: text, or env:NAME for another variable's value
     about: str = ""
+    owner: str = ""                             # the document whose chain this is; other documents continue it
+    fixture: str = ""                           # a command line; `<it> up` before the first block, `<it> down` at the end
+    runs: dict = field(default_factory=dict)    # language -> the command line that runs a block's text, given as a file
 
     def missing(self, environ) -> list:
         return [name for name in self.needs_env if not environ.get(name)]
@@ -87,7 +92,7 @@ def load_registry(path: Path = REGISTRY) -> Registry:
     contexts = {}
     for name, raw in data.get("contexts", {}).items():
         raw = dict(raw)
-        extra = set(raw) - {"base", "git", "needs_env", "pass_env", "home", "timeout", "placeholders", "set_env", "about"}
+        extra = set(raw) - {"base", "git", "needs_env", "pass_env", "home", "timeout", "placeholders", "set_env", "about", "owner", "fixture", "runs"}
         if extra:
             raise RegistryError(f"{path.name}: context {name} has unknown key {sorted(extra)}")
         if raw.get("base") not in ("empty", "release-copy"):
@@ -98,7 +103,13 @@ def load_registry(path: Path = REGISTRY) -> Registry:
                                  needs_env=tuple(raw.get("needs_env", ())), pass_env=tuple(raw.get("pass_env", ())),
                                  home=raw.get("home", "temporary"), timeout=int(raw.get("timeout", 120)),
                                  placeholders=dict(raw.get("placeholders", {})), set_env=dict(raw.get("set_env", {})),
-                                 about=raw.get("about", ""))
+                                 about=raw.get("about", ""), owner=raw.get("owner", ""),
+                                 fixture=raw.get("fixture", ""), runs=dict(raw.get("runs", {})))
+        if contexts[name].owner and _not_inside(contexts[name].owner):
+            raise RegistryError(f"{path.name}: context {name} needs owner as a document's path relative to the release's top folder")
+        if (contexts[name].fixture or contexts[name].runs) and contexts[name].base != "release-copy":
+            raise RegistryError(f"{path.name}: context {name} has a fixture or runs, so it needs base = \"release-copy\": "
+                                "their commands are files of the release")
     describes = dict(data.get("describes", {}))
     if "describes" in data:
         name, digest = describes.get("file"), describes.get("sha256")

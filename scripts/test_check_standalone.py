@@ -294,7 +294,8 @@ def test_two_exceptions_for_one_text_are_refused(tmp_path):
 def test_this_trees_exceptions_are_only_for_fixed_content():
     # Written by hand: an exception is for a released package and its changelog, the two taxonomy files, the
     # decision records, a test that names a word to prove it is gone, two run configurations, and the two viewer
-    # pages, which embed the released core package's text. Nothing else.
+    # pages, which embed the released core package's text, and the workflow, which must name the test job's sign-in
+    # secret in order to read it. Nothing else.
     allowed = ("business_architecture/ontology/releases/", "business_architecture/domain/kpi-store-decisions/",
                "business_architecture/ontology/build/output/step3-taxonomy.ttl",
                "business_architecture/ontology/step4/baseline/step3-taxonomy.ttl", "skills/ontology-to-lpg/scripts/test_",
@@ -304,14 +305,17 @@ def test_this_trees_exceptions_are_only_for_fixed_content():
                "skills/ontology-to-lpg/templates/run-config.json",
                "business_architecture/ontology/projection/skill-run/test_skill_run.py",
                # the two pages built from the release packages; a test keeps each equal to a fresh build
-               "viewer/index.html", "horoi_viewer/index.html")
+               "viewer/index.html", "horoi_viewer/index.html",
+               # the test job signs in to a rehearsal workspace with a secret of the repository's settings; the
+               # release holds no token, and the workflow holds only the secret's name
+               ".github/workflows/check.yml")
     assert [path for path, _, _ in cs.read_exceptions() if not path.startswith(allowed)] == []
 
 
-def test_this_release_has_40_exceptions():
+def test_this_release_has_42_exceptions():
     # A cut moves a package and adds a line for the new one, so this count is the release's as shipped
     # (scripts/pinned-tests.txt).
-    assert len(cs.read_exceptions()) == 40
+    assert len(cs.read_exceptions()) == 42
 
 
 def test_with_git_only_tracked_files_are_read(tmp_path):

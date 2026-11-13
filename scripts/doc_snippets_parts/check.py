@@ -14,9 +14,10 @@ from .extract import Block, documents, extract
 from .match import has_fixed_text, normalise, output_matches
 from .pages import extract_html, html_documents, is_page
 from .parsers import PARSERS
-from .registry import (NESTED, NESTED_FILE, PARSE_LANGS, PLACEHOLDER, REGISTRY, ROOT, RUN_LANGS, SAFE_VALUE, Registry,
-                       load_registry, release_digest)
+from .registry import (NESTED, NESTED_FILE, PARSE_LANGS, PARSED_WHEN_SKIPPED, PLACEHOLDER, REGISTRY, ROOT, RUN_LANGS,
+                       SAFE_VALUE, Registry, load_registry, release_digest)
 from .run import CopyError, NotSimple, Runner, command_lines, family, split_command
+from .static import chain_order, usage_problem
 
 OUTPUT_TAIL = 40
 NESTED_NOTE = "this check was started by a block of another check, so it ran no block"
@@ -36,6 +37,7 @@ class Result:
     status_only: int = 0        # of the blocks that ran, those whose output nothing compares
     checked: int = 0
     skipped: Counter = field(default_factory=Counter)
+    parsed: Counter = field(default_factory=Counter)    # of the checked blocks, the skipped ones that were parsed, by reason
     by_document: dict = field(default_factory=dict)
     failed_blocks: int = 0
     nested: bool = False        # a block of another check started this one, so it ran nothing
@@ -50,6 +52,9 @@ class Result:
                 f"{sum(self.skipped.values())} skipped")
         if self.skipped:
             text += " (" + ", ".join(f"{reason} {n}" for reason, n in sorted(self.skipped.items())) + ")"
+        if self.parsed:
+            text += (f", {sum(self.parsed.values())} of the checked parsed but not run ("
+                     + ", ".join(f"{reason} {n}" for reason, n in sorted(self.parsed.items())) + ")")
         if self.failed_blocks:
             text += f", {self.failed_blocks} failed"
         return text
@@ -79,10 +84,15 @@ class Checker:
         if not self.result.nested:
             self._release_described()
         docs = documents(self.root) + html_documents(self.root) if not docs else list(docs)
+        self.docs = chain_order(self.root, self.registry, docs)
         with tempfile.TemporaryDirectory(prefix="doc-snippets-") as tmp:
             self.runner = Runner(self.root, self.registry, self.environ, Path(tmp).resolve())
-            for doc in docs:
-                self._check_document(doc)
+            try:
+                for doc in self.docs:
+                    self._check_document(doc)
+            finally:
+                for problem in self.runner.close():
+                    self._fail(None, problem)
         return self.result
 
     def _started_by_a_block(self) -> bool:
@@ -148,10 +158,13 @@ class Checker:
         outcome = handler(block, previous)
         state = outcome[0]
         if self.report:
-            name = state if isinstance(state, str) else f"skipped: {state[1]}"
+            name = state if isinstance(state, str) else f"{'checked: parsed, not run' if state[0] == 'parsed' else 'skipped'}: {state[1]}"
             tag = f"{block.tag}={block.value}" if block.value else block.tag
             self.report(f"{block.where}: {block.lang} {tag}: {name} ({time.monotonic() - started:.1f} s)")
-        if state == "ran":
+        if isinstance(state, tuple) and state[0] == "parsed":
+            self.result.checked += 1
+            self.result.parsed[state[1]] += 1
+        elif state == "ran":
             self.result.ran += 1
             self.result.status_only += block.tag == "run" and "status-only" in block.flags
         elif state == "checked":
@@ -183,6 +196,16 @@ class Checker:
         code = block.attrs["reason"].partition(":")[0].strip()
         if self.strict and code in self.registry.temporary:
             return self._fail(block, f"the reason `{code}` is temporary and must be gone at the cut")
+        if block.lang in PARSED_WHEN_SKIPPED:
+            # Nothing runs the block, so at least its text is read: a typing error in it fails.
+            try:
+                PARSERS[block.lang](block.body, {})
+            except ImportError:
+                return ("skipped", code), ""    # a `parse` block names the missing parser; a skipped one stays skipped
+            except Exception as e:
+                return self._fail(block, f"the skipped block is not valid {block.lang}. A skipped block in a language "
+                                         "the check can parse is still parsed", f"{type(e).__name__}: {e}")
+            return ("parsed", code), ""
         return ("skipped", code), ""
 
     def _reason_error(self, block):
@@ -239,10 +262,14 @@ class Checker:
                               f"the block starts: {shown[0]}\nthe closest line: {best}")
         return "checked", ""
 
+    def _tag_usage(self, block, previous):
+        error = self._only(block) or usage_problem(self.root, block.value, block.body)
+        return self._fail(block, error) if error else ("checked", "")
+
     # -- parse
 
     def _tag_parse(self, block, previous):
-        error = self._only(block, attrs=("dialect",) if block.lang == "sql" else ())
+        error = self._only(block, attrs={"sql": ("dialect",), "turtle": ("rdf",), "sparql": ("rdf",)}.get(block.lang, ()))
         if error:
             return self._fail(block, error)
         if block.lang not in PARSE_LANGS:
@@ -252,7 +279,7 @@ class Checker:
             PARSERS[block.lang](block.body, block.attrs)
         except ImportError as e:
             return self._fail(block, f"the parser for {block.lang} is not installed ({e.name}): run the check through "
-                                     "`uv run --no-project --with rdflib --with pyyaml --with sqlglot`")
+                                     "`uv run --no-project --with rdflib --with pyyaml --with sqlglot --with pyoxigraph`")
         except Exception as e:  # each parser raises its own error type; any of them means the block is wrong
             return self._fail(block, f"the block is not valid {block.lang}", f"{type(e).__name__}: {e}")
         return "checked", ""
@@ -271,7 +298,7 @@ class Checker:
         if state == "failed":
             return self._fail(block, "not compared: the block before it failed")
         if state != "ran":
-            return state, ""
+            return (("skipped", state[1]) if isinstance(state, tuple) else state), ""
         if not output_matches(block.body, output):
             got, want = normalise(output), normalise(block.body)
             diff = list(difflib.unified_diff(want, got, "expected", "output", lineterm="", n=2))[:60]
@@ -285,8 +312,6 @@ class Checker:
         error = self._only(block, attrs=("exit", "os", "types"), flags=("define", "status-only"))
         if error:
             return self._fail(block, error)
-        if block.lang not in RUN_LANGS:
-            return self._fail(block, f"a `{block.lang}` block cannot run: `run` takes {', '.join(RUN_LANGS)}")
         if not block.value:
             return self._fail(block, "a run block names its context: `run=<context>` "
                                      f"(one of {', '.join(sorted(self.registry.contexts))})")
@@ -301,6 +326,9 @@ class Checker:
         if context is None:
             return self._fail(block, f"no context named `{block.value}` in {REGISTRY.name}: "
                                      f"use one of {', '.join(sorted(self.registry.contexts))}")
+        if block.lang not in RUN_LANGS and block.lang not in context.runs:
+            return self._fail(block, f"a `{block.lang}` block cannot run in the context `{context.name}`: `run` takes "
+                                     f"{', '.join(RUN_LANGS)}, and a language the context names a program for")
         wanted_os = block.attrs.get("os")
         if wanted_os not in (None, "windows", "posix"):
             return self._fail(block, "os= is `windows` or `posix`")
@@ -332,12 +360,27 @@ class Checker:
             if self.all_contexts:
                 return self._fail(block, f"the context `{context.name}` cannot run: set {', '.join(missing)}")
             return ("skipped", f"context {context.name} is off (set {', '.join(missing)})"), ""
+        if context.owner and block.doc != context.owner and context.owner not in self.docs:
+            # The chain is the owner's: without its blocks there is nothing to go on from.
+            if self.all_contexts:
+                return self._fail(block, f"the context `{context.name}` goes on from {context.owner}: check that "
+                                         "document in the same run")
+            return ("skipped", f"context {context.name} goes on from {context.owner}, which this check did not read"), ""
         try:
             instance = self.runner.instance(block, context)
         except CopyError as e:
             return self._fail(block, str(e))
         if instance.failed_at:
             return self._fail(block, f"not run: the block at line {instance.failed_at} of the same context failed")
+        problem = self.runner.fixture_up(instance)
+        if problem:
+            instance.failed_at = str(block.line)
+            return self._fail(block, f"the fixture of the context `{context.name}` could not be made", problem)
+        for name in [n for n, value in values.items() if value is None]:
+            values[name] = str(instance.values.get(name, ""))
+            if not SAFE_VALUE.fullmatch(values[name]):
+                return self._fail(block, f"the fixture of the context `{context.name}` gave the placeholder <{name}> "
+                                         "no value, or one with a character that is not allowed")
         body = self._fill(block.body, values)
         instance.count += 1
         status, output, problem = self.runner.execute(block, instance, body, wanted_os, "".join(a + "\n" for a in answers) or None)
@@ -377,6 +420,9 @@ class Checker:
             if source is None:
                 return None, (f"the placeholder <{name}> has no value in the context `{context.name}`. Give it one "
                               f"in {REGISTRY.name}, or tag the block `skip`")
+            if source == "fixture":         # the context's fixture gives the value when it is made
+                values[name] = None
+                continue
             if source.startswith("env:"):
                 value = self.environ.get(source[4:], "")
                 if not value and not context.missing(self.environ) and not self.static:

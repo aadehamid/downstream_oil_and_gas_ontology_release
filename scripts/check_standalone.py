@@ -45,7 +45,7 @@ OWN_FILES = {"scripts/check_standalone.py", "scripts/test_check_standalone.py", 
 # The public projects the tree cites on GitHub, in lower case. A link to any other owner is a finding: add an
 # owner here only when the link is a public source or a licence.
 GITHUB_OWNERS = {
-    "apache", "cmader", "databricks", "databrickslabs", "datatreehouse", "dbpedia", "dgarijo", "jbarrasa",
+    "adoptium", "apache", "cmader", "databricks", "databrickslabs", "datatreehouse", "dbpedia", "dgarijo", "jbarrasa",
     "kvistgaard", "mattpocock", "monarch-initiative", "neo4j", "neo4j-contrib", "neo4j-labs", "ontodev", "rdflib",
     "stevehedden",
 }

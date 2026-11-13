@@ -6,6 +6,7 @@ block as the script. PowerShell and cmd blocks are read as plain command lines a
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import secrets
@@ -24,6 +25,8 @@ DRAIN_SECONDS = 5
 # Python's text encoding settings. A block must not get them from the check's own environment: a reader on
 # Windows has neither, so a command that only works with one of them must set it where the reader can see it.
 ENCODING_VARIABLES = ("PYTHONUTF8", "PYTHONIOENCODING")
+# A context's fixture and the programs that run its blocks find the fixture's own folder through this variable.
+FIXTURE_DIR = "DOC_SNIPPETS_FIXTURE_DIR"
 
 
 class CopyError(Exception):
@@ -185,6 +188,10 @@ class Instance:
         self.root = folder / "work"
         self.home = folder / "home"
         self.private = folder / "private"
+        self.fixture = folder / "fixture"       # where the context's fixture keeps what it made, outside the copy
+        self.fixture_up = False
+        self.values: dict = {}                  # the placeholders the fixture gave a value
+        self.fixture_env: dict = {}             # the variables the fixture gives the context's blocks
         self.cwd = self.root
         self.defines: dict = {}
         self.failed_at = ""
@@ -201,16 +208,19 @@ class Runner:
     def __init__(self, root: Path, registry, environ: dict, tmp: Path):
         self.root, self.registry, self.environ, self.tmp = root, registry, environ, tmp
         self._instances: dict = {}
+        self.left_behind: list = []     # one text for each fixture whose clean-up after a failed start failed too
         self._entries = None
         self._token = None
 
     def instance(self, block, context) -> Instance:
         """The context's folder for this block's document, made on first use. Raises CopyError."""
-        key = (block.doc, block.scope, context.name)
+        # A context with an owner is one chain for the whole check: a block of another document goes on in the
+        # folder the owner's blocks left.
+        key = ("", "", context.name) if context.owner else (block.doc, block.scope, context.name)
         if key not in self._instances:
             folder = self.tmp / f"c{len(self._instances)}"
             instance = Instance(context, folder)
-            for sub in (instance.root, instance.home, instance.private):
+            for sub in (instance.root, instance.home, instance.private, instance.fixture):
                 sub.mkdir(parents=True)
             if context.base == "release-copy":
                 self._copy_release(instance.root)
@@ -272,11 +282,65 @@ class Runner:
         env.update(_uv_environment())
         env.update(self._nested_token())
         env["PYTHONDONTWRITEBYTECODE"] = "1"
+        if context.fixture or context.runs:
+            env[FIXTURE_DIR] = str(instance.fixture)
+        env.update(instance.fixture_env)
         if context.home == "temporary":
             env.update({"HOME": str(instance.home), "USERPROFILE": str(instance.home)})
             for name in [k for k in env if k.startswith("XDG_")]:
                 del env[name]
         return env
+
+    def _fixture(self, instance, word):
+        """Runs the context's fixture command with `up` or `down`. Returns (exit status, output)."""
+        env = self.env(instance)
+        try:
+            command = resolve_program(split_command(instance.context.fixture) + [word], env.get("PATH"))
+        except (NotSimple, FileNotFoundError) as e:
+            return 1, f"the fixture command cannot be started ({e})"
+        return run_process(command, instance.root, env, instance.context.timeout)
+
+    def fixture_up(self, instance):
+        """Makes the context's fixture before its first block. Returns None, or why it could not be made. The
+        fixture may leave values.json in its folder: {"placeholders": {name: value}, "env": {name: value}}. The
+        variables are for a value the registry must not hold, such as the test server's password."""
+        if instance.fixture_up or not instance.context.fixture:
+            return None
+        status, output = self._fixture(instance, "up")
+        if status != 0:
+            # Whatever a failed `up` left behind is removed now. When that fails too, the check says so on a line
+            # of its own: something may be left on a server, and its temporary folder is about to be deleted.
+            down_status, down_output = self._fixture(instance, "down")
+            if down_status != 0:
+                self.left_behind.append(self._not_removed(instance, down_output, "after its start had failed"))
+            return output or "(no output)"
+        instance.fixture_up = True
+        values = instance.fixture / "values.json"
+        if values.is_file():
+            given = json.loads(values.read_text(encoding="utf-8"))
+            instance.values = dict(given.get("placeholders", {}))
+            instance.fixture_env = {str(name): str(value) for name, value in given.get("env", {}).items()}
+        return None
+
+    def close(self) -> list:
+        """Removes every fixture that was made. Returns one text for each that could not be removed."""
+        problems = []
+        for instance in self._instances.values():
+            if instance.fixture_up:
+                status, output = self._fixture(instance, "down")
+                instance.fixture_up = False
+                if status != 0:
+                    problems.append(self._not_removed(instance, output))
+        return self.left_behind + problems
+
+    @staticmethod
+    def _not_removed(instance, output, when=""):
+        """The failure text for a fixture whose `down` failed: what it made may still be there. The fixture's own
+        output names each thing left and how to remove it by hand."""
+        return (f"the fixture of the context `{instance.context.name}` could not be removed{' ' + when if when else ''}. "
+                f"What it made may still be there; its output below says what is left and how to remove it by hand "
+                f"(the fixture is `{instance.context.fixture}`)\n"
+                + "\n".join("    | " + line for line in (output or "(no output)").strip().split("\n")[-20:]))
 
     def execute(self, block, instance, body, wanted_os, typed=None):
         """Runs the block's text. `typed` is what the reader types at the block's prompts, one answer per line.
@@ -284,6 +348,17 @@ class Runner:
         env, timeout = self.env(instance), instance.context.timeout
         script = instance.private / f"block-{instance.count}"
         prelude = "\n".join(instance.defines.get(family(block.lang), []))
+        if block.lang in instance.context.runs:
+            # The context names the program that runs this language: a statement for a store, for one. The
+            # program gets the block's text as a file, and its output and exit status are the block's.
+            script = script.with_suffix("." + block.lang)
+            script.write_text(body + "\n", encoding="utf-8", newline="\n")
+            try:
+                command = resolve_program(split_command(instance.context.runs[block.lang]) + [str(script)], env.get("PATH"))
+            except (NotSimple, FileNotFoundError) as e:
+                return None, None, f"the program that runs a `{block.lang}` block in this context cannot be started ({e})"
+            status, output = run_process(command, instance.cwd, env, timeout, typed)
+            return status, output, None
         if family(block.lang) == "bash":
             bash = shutil.which("bash")
             if not bash:

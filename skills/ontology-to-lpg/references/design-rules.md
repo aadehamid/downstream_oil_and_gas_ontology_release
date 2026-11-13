@@ -84,7 +84,7 @@ Each rule can be checked by a script; `scripts/check_projection_rules.py` checks
 
    **4b: RDF 1.2 reifiers.** Use it only when every tool that reads and validates the data reads RDF 1.2 triple terms: Apache Jena 6.1.0 or later, or Eclipse RDF4J 6.0.0 or later. Jena 5.4.0 to 6.0.x was an experimental preview. rdflib and pySHACL do not read RDF 1.2, so a Python pipeline built on them uses 4a. n10s cannot load triple terms, so 4b needs the flatten step in `pipeline.md`. RDF 1.2 Concepts is a W3C Candidate Recommendation (Snapshot, 7 April 2026), not yet a Recommendation.
 
-   ```turtle skip reason="illustration: RDF 1.2 Turtle with a reifier, which the parser here does not read"
+   ```turtle parse rdf=1.2
    <https://id.example.org/library/work/W-0042> lib:createdBy <https://id.example.org/library/person/P-17>
        ~ <https://id.example.org/library/authorship/W-0042-P-17> {| lib:position 2 |} .
    ```

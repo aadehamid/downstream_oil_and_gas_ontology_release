@@ -167,6 +167,26 @@ class Docs(unittest.TestCase):
         self.assertEqual(check_docs.check(self.releases, self.docs), [])
         self.assertEqual(self.leftovers(), [])
 
+    def test_a_machine_with_no_java_on_path_keeps_the_previous_pages(self):
+        # A machine set up without administrator rights has Java unpacked from a zip and not on PATH. The build
+        # must say so and fail as any failed run does, not stop with an error of its own.
+        self.write_old_pages()
+        empty = os.path.join(self.root, "no-java")
+        os.makedirs(empty)
+        saved, out = os.environ["PATH"], io.StringIO()
+        os.environ["PATH"] = empty
+        try:
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+                code = build_docs.main(["--jar", self.jar, "--releases", self.releases, "--docs", self.docs,
+                                        "--package", "lending/1.1.0"])
+        finally:
+            os.environ["PATH"] = saved
+        self.assertEqual(code, 1, out.getvalue())
+        self.assertIn("FAIL widoco: lending 1.1.0: Java could not be started", out.getvalue())
+        with open(os.path.join(self.docs, "lending", "1.1.0", "index-en.html"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "OLD")
+        self.assertEqual(self.leftovers(), [])
+
     @unittest.skipIf(os.name == "nt", NO_STAND_IN)
     def test_a_successful_run_replaces_the_previous_pages(self):
         self.write_old_pages()

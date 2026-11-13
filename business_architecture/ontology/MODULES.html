@@ -357,16 +357,11 @@ tg:standsFor rdfs:domain tg:SourceDatabase ;
 <h3 id="logical-model-logical-data-models">logical-model: logical data models<a class="hl" href="#logical-model-logical-data-models" aria-label="Link to this section">#</a></h3>
 <p><em>2026-11-02:</em> its first model is the customer logical model (the decision of 2026-11-02). The module keeps each logical data model exported from ER Studio Data Architect as two views. The first is ER Studio's export, unchanged, in ER Studio's namespace and its own named graph. The second is an annotation layer in the module's namespace, keyed on ER Studio's identifier for each entity. The layer links each entity to three modules by IRI: <code>lm:sourceSystem</code> to a system of <code>system</code> or a customer system of <code>party</code>, <code>lm:describes</code> to a <code>party</code> concept, class or code list, and <code>lm:implementedBy</code> to a <code>data-product</code> platform table or data product. <code>lm:inModel</code> names the model the entity belongs to. Here the subject is ER Studio's own entity IRI, and nothing is re-minted. The guide's "Adding a logical model" gives the method for any later model.</p>
 <p>This quote is from the layer of the made-up example model, <code>logical-model/example/example-logical-model.layer.ttl</code>, which <code>scripts/check.sh</code> verifies; it is not a release.</p>
-<pre><code class="lang-text">@prefix lm: &lt;https://w3id.org/mpc/ontology/modules/logical-model/&gt; .
-@prefix party: &lt;https://w3id.org/mpc/ontology/modules/party/&gt; .
-@prefix system: &lt;https://w3id.org/mpc/ontology/modules/system/system/&gt; .
-@prefix product: &lt;https://w3id.org/mpc/ontology/modules/data-product/product/&gt; .
-@prefix er: &lt;https://www.erstudio.com/semanticmodel/&gt; .
-
-er:example_core_Example_Account_Dim lm:describes party:CustomerAccount ;
-    lm:implementedBy product:customer-master ;
+<pre><code class="lang-text">&lt;https://www.erstudio.com/semanticmodel/example_core_Example_Account_Dim&gt; lm:describes &lt;https://w3id.org/mpc/ontology/modules/party/CustomerAccount&gt; ;
+    lm:implementedBy &lt;https://w3id.org/mpc/ontology/modules/data-product/product/customer-master&gt; ;
     lm:inModel &lt;https://w3id.org/mpc/ontology/modules/logical-model/model/example-logical-model&gt; ;
-    lm:sourceSystem system:profisee .</code></pre>
+    lm:sourceSystem &lt;https://w3id.org/mpc/ontology/modules/system/system/profisee&gt; .</code></pre>
+<p>The file writes each IRI in full. <code>lm:</code> is the module's namespace, <code>https://w3id.org/mpc/ontology/modules/logical-model/</code>.</p>
 <h3 id="integration-rules-that-apply-across-modules">integration: rules that apply across modules<a class="hl" href="#integration-rules-that-apply-across-modules" aria-label="Link to this section">#</a></h3>
 <p><code>integration</code> adds no new facts. It packages three sets of rules that apply to the other modules' links, sources and bindings:</p>
 <ul><li><strong>placement</strong> says which links prove the work and which only give context. Producing a data product certifies; every other placement is context (the decision of 2026-10-19).</li><li><strong>authority</strong> puts each cited source in one evidence tier, and the best tier wins when two sources disagree (the decision of 2026-10-19).</li><li><strong>consumer</strong> sets how a catalog binds a measure to the data product that publishes it, and what an agent may answer from the graph and must refuse (the decision of 2026-10-19).</li></ul>

@@ -289,18 +289,14 @@ tg:standsFor rdfs:domain tg:SourceDatabase ;
 
 This quote is from the layer of the made-up example model, `logical-model/example/example-logical-model.layer.ttl`, which `scripts/check.sh` verifies; it is not a release.
 
-```text skip reason="illustration: triples with a quoted triple, which the Turtle parser here does not read"
-@prefix lm: <https://w3id.org/mpc/ontology/modules/logical-model/> .
-@prefix party: <https://w3id.org/mpc/ontology/modules/party/> .
-@prefix system: <https://w3id.org/mpc/ontology/modules/system/system/> .
-@prefix product: <https://w3id.org/mpc/ontology/modules/data-product/product/> .
-@prefix er: <https://www.erstudio.com/semanticmodel/> .
-
-er:example_core_Example_Account_Dim lm:describes party:CustomerAccount ;
-    lm:implementedBy product:customer-master ;
+```text excerpt=business_architecture/ontology/logical-model/example/example-logical-model.layer.ttl
+<https://www.erstudio.com/semanticmodel/example_core_Example_Account_Dim> lm:describes <https://w3id.org/mpc/ontology/modules/party/CustomerAccount> ;
+    lm:implementedBy <https://w3id.org/mpc/ontology/modules/data-product/product/customer-master> ;
     lm:inModel <https://w3id.org/mpc/ontology/modules/logical-model/model/example-logical-model> ;
-    lm:sourceSystem system:profisee .
+    lm:sourceSystem <https://w3id.org/mpc/ontology/modules/system/system/profisee> .
 ```
+
+The file writes each IRI in full. `lm:` is the module's namespace, `https://w3id.org/mpc/ontology/modules/logical-model/`.
 
 ### integration: rules that apply across modules
 

@@ -884,9 +884,10 @@ RETURN m.skos_prefLabel AS measure,
 <tr><td><code>q7</code></td><td data-k="What it asks">KPIs that rest on SOX-relevant or confidential systems</td></tr>
 </tbody></table></div>
 <p>The governance graph belongs to its owner, and its labels can change. So no template names a label, a property or a relationship type: it names roles. <code>discover</code> reads both graphs' schemas and proposes which name plays each role. A person corrects the proposal and confirms it once. Every later run checks the confirmed mapping against the live schemas before it asks anything. Every query runs in a read transaction.</p>
-<pre data-snippet="powershell skip reason=&quot;needs-client-server: reads the client's Neo4j composite database&quot;"><code>py -m kpi_store.questions.run discover --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
-py -m kpi_store.questions.run confirm  --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
-py -m kpi_store.questions.run check    --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
+<pre data-snippet="powershell run=questions types=&quot;yes&quot; status-only"><code>py -m kpi_store.questions.run discover --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
+py -m kpi_store.questions.run confirm  --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;</code></pre>
+<p><code>confirm</code> shows the mapping and asks <code>Type yes to confirm this mapping:</code>. Type <code>yes</code> and press Enter. Any other answer leaves the mapping file as it was. Then check the mapping and ask a question:</p>
+<pre data-snippet="powershell run=questions status-only"><code>py -m kpi_store.questions.run check    --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
 py -m kpi_store.questions.run ask q6   --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt; --param kpi=crude-prices --out &lt;a folder&gt;</code></pre>
 <p>The settings file and the mapping file describe one environment, so both stay outside the release. <code>kpi_store/questions/connection.py</code> lists the settings.</p>
 
@@ -907,7 +908,7 @@ py -m kpi_store.questions.run ask q6   --settings &lt;your settings file&gt; --m
 <div class="card story">
 <p class="story-h">In the made-up example</p>
 <p>The example export holds three invented entities. Its links file asserts the links of two and marks the third doubtful. From those, the builder writes the layer. The account entity gets four links:</p>
-<pre data-snippet="turtle skip reason=&quot;illustration: one entity's annotations, with the model's IRI shortened&quot;"><code>er:example_core_Example_Account_Dim
+<pre data-snippet="turtle parse"><code>er:example_core_Example_Account_Dim
     lm:inModel        &lt;…/logical-model/model/example-logical-model&gt; ;
     lm:sourceSystem   system:profisee ;
     lm:describes      party:CustomerAccount ;

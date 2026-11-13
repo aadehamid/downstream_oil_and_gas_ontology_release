@@ -9,6 +9,7 @@ Run: uv run --no-project --with pytest --with rdflib --with pyyaml --with sqlglo
 """
 import hashlib
 import os
+import re
 import sys
 import tempfile
 import uuid
@@ -119,7 +120,7 @@ def test_a_block_with_no_tag_fails_with_its_document_and_line(tmp_path):
 def test_an_unknown_tag_fails(tmp_path):
     result = check(tmp_path, fence("bash runs", "echo hello"))
     assert result.failures == ["guide.md:1: unknown tag `runs`: use one of run, expect, skip, file, excerpt, "
-                               "parse, nested"]
+                               "usage, parse, nested"]
 
 
 def test_a_block_in_a_list_a_tilde_fence_and_an_open_fence_are_all_seen(tmp_path):
@@ -212,7 +213,8 @@ def test_a_run_block_needs_a_known_context_and_a_language_that_runs(tmp_path):
         "guide.md:1: a run block names its context: `run=<context>` (one of copy, gated, other, quick, repo, scratch, settings, signed-in)",
         "guide.md:4: no context named `nowhere` in doc_snippets.toml: use one of copy, gated, other, quick, repo, "
         "scratch, settings, signed-in",
-        "guide.md:7: a `json` block cannot run: `run` takes bash, sh, python, powershell, cmd"]
+        "guide.md:7: a `json` block cannot run in the context `scratch`: `run` takes bash, sh, python, powershell, cmd, "
+        "and a language the context names a program for"]
 
 
 def test_a_block_that_runs_too_long_is_stopped(tmp_path):
@@ -788,6 +790,8 @@ def test_an_excerpt_block_must_be_lines_of_the_file_next_to_each_other(tmp_path)
     ("sql", "SELECT a FROM b.c.d WHERE e = 1", "SELECT FROM WHERE (("),
     ("cypher", "MATCH (n:Resource {uri: $uri}) RETURN n.`a b` AS x // (", "MATCH (n:Resource RETURN n"),
     ("cypher", "RETURN 'it''s' AS x", "RETURN 'never closed"),
+    ("ini", "[profile]\nhost = <your workspace URL>", "[profile]\nno value or sign"),
+    ("ini", "dbms.security.procedures.unrestricted=apoc.*,n10s.*", "one = 1\none = 2"),   # a section's lines may stand alone
 ])
 def test_a_parse_block_must_be_valid(tmp_path, lang, good, bad):
     assert check(tmp_path, fence(f"{lang} parse", good)).failures == []
@@ -817,8 +821,99 @@ def test_the_cypher_check_reads_this_trees_tokenizer_when_another_copy_is_loaded
 
 def test_a_command_cannot_be_parsed_instead_of_run(tmp_path):
     result = check(tmp_path, fence("bash parse", "echo hello"))
-    assert result.failures == ["guide.md:1: `bash` cannot be parsed: `parse` reads json, toml, yaml, turtle, sparql, "
+    assert result.failures == ["guide.md:1: `bash` cannot be parsed: `parse` reads json, toml, yaml, ini, turtle, sparql, "
                                "sql, cypher. A command is tagged `run` or `skip`"]
+
+
+def test_rdf_1_2_syntax_is_parsed_when_the_block_says_so(tmp_path):
+    reifier = "<urn:w> lib:createdBy <urn:p> ~ <urn:a> {| lib:position 2 |} ."
+    query = "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o FILTER(!isTRIPLE(?o)) }"
+    assert check(tmp_path, fence("turtle parse rdf=1.2", reifier) + fence("sparql parse rdf=1.2", query)).failures == []
+    old = check(tmp_path, fence("turtle parse", reifier) + fence("sparql parse", query)).failures
+    assert [f.split("\n")[0] for f in old] == ["guide.md:1: the block is not valid turtle", "guide.md:4: the block is not valid sparql"]
+    bad = check(tmp_path, fence("turtle parse rdf=1.2", "<urn:w> lib:createdBy .") + fence("sparql parse rdf=1.2", "SELECT * WHERE { ?s ?p }")
+                + fence("turtle parse rdf=2", reifier) + fence("json parse rdf=1.2", "{}")).failures
+    assert [f.split("\n")[0] for f in bad] == [
+        "guide.md:1: the block is not valid turtle", "guide.md:4: the block is not valid sparql",
+        "guide.md:7: the block is not valid turtle", "guide.md:10: `rdf` is not something a `parse` block takes"]
+
+
+def test_a_skipped_block_in_a_language_the_check_parses_is_still_parsed(tmp_path):
+    reason = 'skip reason="needs-client-server: runs on the client\'s server"'
+    text = (fence(f"sql {reason}", "DROP TABLE IF EXISTS a.b.c;") + fence(f"python {reason}", "store = rs.SparkStore(spark, '<table>')")
+            + fence(f"bash {reason}", "databricks auth login ((") + fence("text expect", "signed in"))
+    result = check(tmp_path, text)
+    assert result.failures == []
+    assert result.summary() == ("4 blocks: 0 run (0 status-only), 2 checked, 2 skipped (needs-client-server 2), "
+                                "2 of the checked parsed but not run (needs-client-server 2)")
+    broken = check(tmp_path, fence(f"sql {reason}", "DROP TABLE IF EXISTS ((") + fence(f"python {reason}", "store = ("))
+    assert [f.split("\n")[0] for f in broken.failures] == [
+        "guide.md:1: the skipped block is not valid sql. A skipped block in a language the check can parse is still parsed",
+        "guide.md:4: the skipped block is not valid python. A skipped block in a language the check can parse is still parsed"]
+
+
+PARSER = ("import argparse\nap = argparse.ArgumentParser()\nap.add_argument('--config')\n"
+          "ap.add_argument(\"--plan\", action='store_true')\nap.add_argument('data', nargs='*')\nap.parse_args()\n")
+SUBCOMMANDS = ("import argparse\nap = argparse.ArgumentParser()\nsub = ap.add_subparsers(dest='command', required=True)\n"
+               "one = sub.add_parser('records')\none.add_argument('--report')\ntwo = sub.add_parser('write')\n"
+               "two.add_argument('--uri')\nap.parse_args()\n")
+
+
+def test_a_usage_block_names_scripts_that_exist_and_options_their_parsers_take(tmp_path):
+    files = {"tools/load.py": PARSER, "tools/record.py": SUBCOMMANDS}
+    good = (fence("bash usage=tools/load.py", "uv run --no-project --with rdflib python load.py --config <file> \\", "  [--plan]")
+            + fence("text usage=tools", "load.py --config <config> <data>...", "# then", "scripts/record.py records --report r.json",
+                    "record.py write --uri bolt://127.0.0.1:<port>"))
+    result = check(tmp_path, good, files=files)
+    assert result.failures == [] and result.checked == 2
+    bad = (fence("bash usage=tools/load.py", "python load.py --config x --replace --batch 5") + fence("bash usage=tools", "gone.py --a")
+           + fence("bash usage=tools/load.py", "python record.py --report r") + fence("bash usage=tools", "echo no script here")
+           + fence("bash usage=../outside.py", "python outside.py") + fence("bash usage=tools", "# only a comment")
+           + fence("bash usage=tools", "record.py write --report r.json"))
+    assert check(tmp_path, bad, files=files).failures == [
+        "guide.md:1: load.py has no option --replace, --batch",
+        "guide.md:4: the script tools/gone.py does not exist",
+        "guide.md:7: the line names record.py, and the tag names tools/load.py",
+        "guide.md:10: the line `echo no script here` names no script",
+        "guide.md:13: `../outside.py` must be a script or a folder inside the release",
+        "guide.md:16: the block names no script",
+        "guide.md:19: record.py has no option --report"]     # --report belongs to the other subcommand
+
+
+def test_an_option_that_a_script_only_mentions_is_not_one_it_takes(tmp_path):
+    """The option must be the parser's. A comment, a docstring or any other string that holds its text is not
+    enough, whether the script can print its help here or not."""
+    mentions = '"""Takes --report."""\n# --report\nx = "--report"\n' + PARSER
+    cannot_run = "import a_package_that_is_not_installed\n" + mentions
+    for source in (mentions, cannot_run):
+        result = check(tmp_path, fence("bash usage=tools/check.py", "python check.py --config c --report r.json"),
+                       files={"tools/check.py": source})
+        assert result.failures == ["guide.md:1: check.py has no option --report"]
+    # Read from the text when the script cannot run: the declared options still pass.
+    assert check(tmp_path, fence("bash usage=tools/check.py", "python check.py --config c [--plan]"),
+                 files={"tools/check.py": cannot_run}).failures == []
+    assert d.declared_options(cannot_run) == {"--config", "--plan"}
+    # A script that parses its arguments by hand is not started. The options its code compares, looks up or lists
+    # count; a docstring, a comment, a longer string and a name that is only given the text do not.
+    by_hand = ('"""Takes --doc."""\nimport sys\n# --comment\nx = "--plain"\nknown = {"--uri", "--env"}\nopts = dict.fromkeys(sys.argv)\n'
+               'if "--report" in opts:\n    print(opts.get("--output"), "give --longer or nothing")\nraise SystemExit("this script was started")\n')
+    assert d.handled_options(by_hand) == {"--uri", "--env", "--report", "--output"}
+    # A text counts only where the code reads its arguments. An argument of another call, such as an error's text,
+    # and a list, which is a command for another program, do not make an option.
+    elsewhere = ('import subprocess, sys\nraise SystemExit("--fake")\nprint("--printed")\nsubprocess.run(["tool", "--passed-on"])\n'
+                 'def f(): return "--returned"\n')
+    assert d.handled_options(elsewhere) == set()
+    reads = ('import sys\nargv = sys.argv[1:]\nif argv[0] == "--equal": pass\nif "--member" in argv: pass\nat = argv.index("--index")\n'
+             'opts = {"--key": 1}\nvalue = opts["--subscript"]\nfor flag in ("--tuple",): pass\nif argv[0].startswith("--prefix"): pass\n'
+             'match argv[0]:\n    case "--case" | "--other-case": pass\n')
+    assert d.handled_options(reads) == {"--equal", "--member", "--index", "--key", "--subscript", "--tuple", "--prefix",
+                                        "--case", "--other-case"}
+    assert check(tmp_path, fence("bash usage=tools", "elsewhere.py --fake"), files={"tools/elsewhere.py": elsewhere}).failures == [
+        "guide.md:1: elsewhere.py has no option --fake"]
+    files = {"tools/by_hand.py": by_hand}
+    assert check(tmp_path, fence("bash usage=tools", "by_hand.py --uri <uri> [--env <file>] --report r --output o"), files=files).failures == []
+    assert check(tmp_path, fence("bash usage=tools", "by_hand.py --doc --comment --plain --longer"), files=files).failures == [
+        "guide.md:1: by_hand.py has no option --doc, --comment, --plain, --longer"]
 
 
 # -- placeholders
@@ -1005,7 +1100,7 @@ def test_an_unknown_tag_a_nested_block_and_an_open_block_fail_in_a_page(tmp_path
     result = check_page(tmp_path, '<pre data-snippet="bash test">x</pre>',
                         '<pre data-snippet="markdown nested">x</pre>', '<pre data-snippet="json parse">{}')
     assert result.failures == [
-        "guide.html:4: unknown tag `test`: use one of run, expect, skip, file, excerpt, parse, nested",
+        "guide.html:4: unknown tag `test`: use one of run, expect, skip, file, excerpt, usage, parse, nested",
         "guide.html:5: a nested block is for a Markdown document, not for a page",
         "guide.html:6: the <pre> code block is never closed"]
 
@@ -1086,6 +1181,139 @@ def test_the_html_command_counts_only_pages_with_no_markdown_source(tmp_path, ca
     assert d.html_pages(tmp_path) == [("hand.html", 2, 2)]
 
 
+CHAIN = REGISTRY + """
+[contexts.chain]
+base = "empty"
+owner = "m-owner.md"
+"""
+
+
+def check_tree(tmp_path, files, docs, registry=REGISTRY, environ=None, **options):
+    """Check several documents of a temporary tree, in the order given."""
+    root = tmp_path / "tree"
+    for name, content in files.items():
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        (root / name).write_text(content, encoding="utf-8", newline="\n")
+    (tmp_path / "registry.toml").write_text(registry, encoding="utf-8", newline="\n")
+    env = {k: v for k, v in os.environ.items() if k not in (d.NESTED, d.NESTED_FILE)}
+    env.update(environ or {})
+    return d.Checker(root, d.load_registry(tmp_path / "registry.toml"), environ=env, **options).check(docs)
+
+
+def test_a_context_with_an_owner_is_one_chain_that_other_documents_go_on_from(tmp_path):
+    files = {"a-early.md": fence("bash run=chain", "cat made.txt") + fence("text expect", "by the owner"),
+             "m-owner.md": fence("bash run=chain status-only", "echo by the owner > made.txt"),
+             "z-late.md": fence("bash run=chain status-only", "test -f made.txt") + fence("bash run=scratch status-only", "test ! -f made.txt")}
+    result = check_tree(tmp_path, files, ["a-early.md", "m-owner.md", "z-late.md"], registry=CHAIN)
+    assert result.failures == [] and result.ran == 4
+    assert list(result.by_document) == ["m-owner.md", "a-early.md", "z-late.md"]     # the owner is read first
+
+
+def test_without_its_owner_a_chain_s_block_is_counted_and_all_contexts_makes_it_a_failure(tmp_path):
+    files = {"a-early.md": fence("bash run=chain status-only", "test -f made.txt"), "m-owner.md": "# Owner\n"}
+    alone = check_tree(tmp_path, files, ["a-early.md"], registry=CHAIN)
+    assert alone.failures == [] and alone.skipped == {"context chain goes on from m-owner.md, which this check did not read": 1}
+    strict = check_tree(tmp_path, files, ["a-early.md"], registry=CHAIN, all_contexts=True)
+    assert strict.failures == ["a-early.md:1: the context `chain` goes on from m-owner.md: check that document in the same run"]
+
+
+def test_the_owner_of_a_chain_is_read_before_the_documents_that_use_it(tmp_path):
+    for name, text in (("a.md", "```bash run=other,chain define status-only\n```\n"), ("b.md", "run=chains\n"),
+                       ("c.md", "```bash run=chain\n```\n"), ("m-owner.md", ""), ("z.md", "```bash run=chain\n```\n")):
+        (tmp_path / name).write_text(text, encoding="utf-8", newline="\n")
+    (tmp_path / "registry.toml").write_text(CHAIN, encoding="utf-8", newline="\n")
+    registry = d.load_registry(tmp_path / "registry.toml")
+    assert d.chain_order(tmp_path, registry, ["a.md", "b.md", "c.md", "m-owner.md", "z.md"]) == ["b.md", "m-owner.md", "a.md", "c.md", "z.md"]
+    assert d.chain_order(tmp_path, registry, ["a.md", "z.md"]) == ["a.md", "z.md"]
+
+
+FIXTURE = REGISTRY + """
+[contexts.store]
+base = "release-copy"
+pass_env = ["DOC_TEST_LOG", "DOC_TEST_FAIL"]
+fixture = "py tools/fixture.py"
+[contexts.store.runs]
+sql = "py tools/run_sql.py"
+[contexts.store.placeholders]
+"the table" = "fixture"
+"no value" = "fixture"
+"""
+FIXTURE_FILES = {
+    "tools/fixture.py": "import json, os, sys\nfrom pathlib import Path\n"
+                        "folder = Path(os.environ['DOC_SNIPPETS_FIXTURE_DIR'])\n"
+                        "with open(os.environ['DOC_TEST_LOG'], 'a') as log:\n    log.write(sys.argv[1] + '\\n')\n"
+                        "if sys.argv[1] in os.environ.get('DOC_TEST_FAIL', '').split():\n"
+                        "    sys.exit('the store did not answer' if sys.argv[1] == 'up' else 'left behind: the made-up store')\n"
+                        "if sys.argv[1] == 'up':\n"
+                        "    (folder / 'values.json').write_text(json.dumps({'placeholders': {'the table': 'made_up.rows'},\n"
+                        "                                                    'env': {'DOC_TEST_GIVEN': 'by the fixture'}}))\n",
+    "tools/run_sql.py": "import os, sys\nfrom pathlib import Path\n"
+                        "assert (Path(os.environ['DOC_SNIPPETS_FIXTURE_DIR']) / 'values.json').is_file()\n"
+                        "assert os.environ['DOC_TEST_GIVEN'] == 'by the fixture'\n"
+                        "print('ran:', Path(sys.argv[1]).read_text().strip())\n",
+}
+
+
+def test_a_context_s_fixture_is_made_once_gives_values_and_is_removed_at_the_end(tmp_path):
+    log = tmp_path / "log.txt"
+    text = (fence("sql run=store", "DROP TABLE <the table>;") + fence("text expect", "ran: DROP TABLE made_up.rows;")
+            + fence("sql run=store status-only", "SELECT 1"))
+    result = check(tmp_path, text, files=FIXTURE_FILES, registry=FIXTURE, environ={"DOC_TEST_LOG": str(log)})
+    assert result.failures == [] and (result.ran, result.checked) == (2, 1)
+    assert log.read_text().split() == ["up", "down"]
+    # The static check makes no fixture and still knows the placeholder.
+    static = check(tmp_path, text, files=FIXTURE_FILES, registry=FIXTURE, environ={"DOC_TEST_LOG": str(log)}, static=True)
+    assert static.failures == [] and log.read_text().split() == ["up", "down"]
+
+
+def test_a_fixture_that_cannot_be_made_or_removed_fails_the_check(tmp_path):
+    log = tmp_path / "log.txt"
+    text = fence("sql run=store status-only", "SELECT 1") + fence("sql run=store status-only", "SELECT 2")
+    made = check(tmp_path, text, files=FIXTURE_FILES, registry=FIXTURE, environ={"DOC_TEST_LOG": str(log), "DOC_TEST_FAIL": "up"})
+    assert [f.split("\n")[0] for f in made.failures] == [
+        "guide.md:1: the fixture of the context `store` could not be made",
+        "guide.md:4: not run: the block at line 1 of the same context failed"]
+    # After a failed `up` the check still runs `down`, so that a store made halfway does not stay.
+    assert "the store did not answer" in made.failures[0] and log.read_text().split() == ["up", "down"]
+    log.unlink()
+    # When that `down` fails too, the check says so on a line of its own: something may be left on a server.
+    both = check(tmp_path, text, files=FIXTURE_FILES, registry=FIXTURE, environ={"DOC_TEST_LOG": str(log), "DOC_TEST_FAIL": "up down"})
+    assert log.read_text().split() == ["up", "down"] and len(both.failures) == 3
+    assert both.failures[2].startswith("the fixture of the context `store` could not be removed after its start had failed. "
+                                       "What it made may still be there; its output below says what is left and how to "
+                                       "remove it by hand (the fixture is `py tools/fixture.py`)\n")
+    assert "left behind: the made-up store" in both.failures[2]
+    log.unlink()
+    removed = check(tmp_path, text, files=FIXTURE_FILES, registry=FIXTURE, environ={"DOC_TEST_LOG": str(log), "DOC_TEST_FAIL": "down"})
+    assert removed.ran == 2 and len(removed.failures) == 1
+    assert removed.failures[0].startswith("the fixture of the context `store` could not be removed. What it made may still be there")
+    missing = check(tmp_path, fence("sql run=store status-only", "SELECT <no value>"), files=FIXTURE_FILES, registry=FIXTURE,
+                    environ={"DOC_TEST_LOG": str(log)})
+    assert missing.failures == ["guide.md:1: the fixture of the context `store` gave the placeholder <no value> no value, "
+                                "or one with a character that is not allowed"]
+
+
+def test_the_registry_holds_nothing_the_runner_reads_as_a_secret():
+    """The runner refuses to zip a release in which a settings file has a key that names a password or a token.
+    The registry is such a file, so a context gets a password from its fixture, never from a key here."""
+    sys.path.insert(0, str(d.ROOT))
+    try:
+        from kpi_store import runner
+    finally:
+        sys.path.remove(str(d.ROOT))
+    assert runner.secret_keys(d.REGISTRY) == []
+
+
+def test_a_fixture_or_a_runs_table_needs_a_copy_of_the_release_and_an_owner_a_path_inside_it(tmp_path):
+    path = tmp_path / "r.toml"
+    path.write_text('[contexts.a]\nbase = "empty"\nfixture = "py tools/fixture.py"\n', encoding="utf-8", newline="\n")
+    with pytest.raises(d.RegistryError, match="context a has a fixture or runs, so it needs base"):
+        d.load_registry(path)
+    path.write_text('[contexts.a]\nbase = "empty"\nowner = "../guide.md"\n', encoding="utf-8", newline="\n")
+    with pytest.raises(d.RegistryError, match="context a needs owner as a document's path"):
+        d.load_registry(path)
+
+
 def test_a_registry_with_an_unknown_key_or_base_is_refused(tmp_path):
     path = tmp_path / "r.toml"
     path.write_text('[contexts.a]\nbase = "empty"\nshell = true\n', encoding="utf-8", newline="\n")
@@ -1123,11 +1351,24 @@ def test_the_contexts_that_run_everywhere_need_no_variable_and_the_others_name_t
         "databricks-free": ("KPI_STORE_TEST_DATABRICKS_PROFILE",),
         "reasoner": ("KPI_STORE_TEST_ROBOT_JAR",),
         "empty-fuseki": ("KPI_STORE_TEST_EMPTY_FUSEKI_URL",),
-        "first-run": ("KPI_STORE_TEST_LOCAL_SETTINGS", "KPI_STORE_TEST_LPG_OUT")}
-    assert [name for name, c in contexts.items() if c.home == "real"] == ["databricks-free", "first-run"]
-    # The runbook's commands read KPI_STORE_LOCAL. Only its own context may give that variable to a block.
-    assert {name: c.set_env for name, c in contexts.items() if c.set_env} == {
-        "first-run": {"KPI_STORE_LOCAL": "env:KPI_STORE_TEST_LOCAL_SETTINGS"}}
+        "first-run": ("KPI_STORE_TEST_LOCAL_SETTINGS", "KPI_STORE_TEST_LPG_OUT"),
+        "questions": ("KPI_STORE_TEST_NEO4J_URI", "KPI_STORE_TEST_NEO4J_PASSWORD"),
+        "enterprise-database": ("KPI_STORE_TEST_NEO4J_URI", "KPI_STORE_TEST_NEO4J_PASSWORD"),
+        "scratch-database": ("KPI_STORE_TEST_NEO4J_URI", "KPI_STORE_TEST_NEO4J_PASSWORD"),
+        "scratch-schemas": ("KPI_STORE_TEST_LOCAL_SETTINGS",),
+        "windows-account": ("DOC_SNIPPETS_WINDOWS_ACCOUNT",)}
+    assert [name for name, c in contexts.items() if c.home == "real"] == ["databricks-free", "first-run", "scratch-schemas",
+                                                                          "windows-account"]
+    # The runbook's commands read KPI_STORE_LOCAL. Only its own context may give that variable to a block. The
+    # questions' commands read KPI_STORE_NEO4J_*; their fixture gives those, so the registry names no password.
+    assert {name: sorted(c.set_env) for name, c in contexts.items() if c.set_env} == {"first-run": ["KPI_STORE_LOCAL"]}
+    assert contexts["first-run"].set_env == {"KPI_STORE_LOCAL": "env:KPI_STORE_TEST_LOCAL_SETTINGS"}
+    # One chain goes on from one document into others: the runbook's. A fixture is always the tree's own file.
+    assert {name: c.owner for name, c in contexts.items() if c.owner} == {
+        "first-run": "business_architecture/ontology/projection/ontology-stores-runbook.md"}
+    for c in contexts.values():
+        for command in [c.fixture, *c.runs.values()]:
+            assert not command or command.startswith("py scripts/doc_snippets_fixtures.py "), c.name
 
 
 def test_every_markdown_document_of_the_tree_is_in_scope():
@@ -1172,7 +1413,7 @@ def test_a_markdown_file_git_ignores_is_outside_the_scan(tmp_path):
 def test_no_part_of_the_tool_is_a_long_file():
     parts = sorted((d.ROOT / "scripts" / "doc_snippets_parts").glob("*.py")) + [d.ROOT / "scripts" / "doc_snippets.py"]
     assert [p.name for p in parts] == ["__init__.py", "check.py", "extract.py", "links.py", "match.py", "pages.py", "parsers.py",
-                                       "registry.py", "report.py", "run.py", "doc_snippets.py"]
+                                       "registry.py", "report.py", "run.py", "static.py", "doc_snippets.py"]
     for part in parts:
         assert len(part.read_text(encoding="utf-8").split("\n")) < 500, part.name
 
@@ -1183,6 +1424,259 @@ def test_every_block_of_the_tree_has_a_valid_tag():
     result = d.Checker(static=True).check()
     assert result.failures == []
     assert result.total > 80
+
+
+# ---- the blocks that no test runs ----
+
+NOT_RUN_HEADING = "## Blocks the test does not run"
+
+
+def test_the_blocks_that_are_not_run_are_named_by_document_heading_and_first_line(tmp_path):
+    (tmp_path / "guide.md").write_text("\n".join([
+        "# Guide", "", "## Sign in", "",
+        '```powershell skip reason="needs-browser-sign-in: opens the sign-in page"', "", "  databricks   auth login --host <url>", "```",
+        "", "````markdown nested", "# not a heading of the guide", '```text skip reason="illustration: a sketch of the loads"',
+        "a | b", "```", "````", "", "```bash run=scratch status-only", "true", "```", ""]), encoding="utf-8", newline="\n")
+    (tmp_path / "page.html").write_text(page(
+        "<h2 id='x'>Make the <em>shared</em> folders</h2>",
+        "<pre data-snippet='text skip reason=\"illustration: the name of one file\"'>crack-spreads.json</pre>"),
+        encoding="utf-8", newline="\n")
+    assert d.not_run(tmp_path) == [
+        ("guide.md", "Sign in", "databricks auth login --host <url>", "needs-browser-sign-in"),
+        ("guide.md", "Sign in", "a | b", "illustration"),
+        ("page.html", "Make the shared folders", "crack-spreads.json", "illustration")]
+    assert d.block_key("\n" + "x" * 80 + "\nsecond") == "x" * 60
+
+
+def test_the_rows_of_a_table_under_a_heading_are_read_with_their_code_spans_and_bars():
+    text = "\n".join(["## Other", "| a |", "|---|", "| no |", "", NOT_RUN_HEADING, "", "Some words.", "",
+                      "| Document | Block |", "|---|---|", "| `guide.md` | `a \\| b` |", "| `page.html` | `` a `b` `` |", "",
+                      "| later | table |", "|---|---|", "| not | read |"])
+    assert d.table_rows(text, NOT_RUN_HEADING) == [["guide.md", "a | b"], ["page.html", "a `b`"]]
+    assert d.table_rows(text, "## Absent") == []
+
+
+def test_every_block_that_no_test_runs_is_in_the_table_and_the_table_names_no_other():
+    """Nobody adds a skipped block in silence: scripts/DOC-SNIPPETS.md lists each one, with what was done instead
+    and who can run it. `py scripts/doc_snippets.py not-run` prints the first four cells of every row."""
+    text = (d.ROOT / "scripts" / "DOC-SNIPPETS.md").read_text(encoding="utf-8")
+    rows = d.table_rows(text, NOT_RUN_HEADING)
+    assert rows, f"scripts/DOC-SNIPPETS.md has no table under {NOT_RUN_HEADING}"
+    assert all(len(row) == 6 and all(row) for row in rows), "each row has six cells, and none is empty"
+    listed = [tuple(row[:4]) for row in rows]
+    blocks = d.not_run(d.ROOT)
+    assert len(set(blocks)) == len(blocks), "two skipped blocks of one document start with the same line under one heading"
+    missing = [block for block in blocks if block not in listed]
+    gone = [row for row in listed if row not in blocks]
+    assert not missing, f"skipped blocks that the table does not list: {missing}"
+    assert not gone, f"rows of the table that name no skipped block: {gone}"
+    assert len(listed) == len(set(listed))
+
+
+# ---- the stand-in stores of scripts/doc_snippets_fixtures.py ----
+
+def fixtures_module():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("doc_snippets_fixtures", d.ROOT / "scripts" / "doc_snippets_fixtures.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_a_block_s_statements_are_split_at_the_semicolons_that_end_a_line():
+    f = fixtures_module()
+    assert f.statements("// a comment\nMATCH (n) CALL (n) { DETACH DELETE n } IN TRANSACTIONS OF 10000 ROWS;\n"
+                        "DROP CONSTRAINT n10s_unique_uri IF EXISTS;\n") == [
+        "MATCH (n) CALL (n) { DETACH DELETE n } IN TRANSACTIONS OF 10000 ROWS", "DROP CONSTRAINT n10s_unique_uri IF EXISTS"]
+    assert f.statements("-- a comment\nSELECT ';' AS x;  \nSELECT 2") == ["SELECT ';' AS x", "SELECT 2"]
+    assert f.table_text(["name", "n"], [{"name": "a", "n": 1}, {"name": None, "n": 2}]) == "name, n\na, 1\nnull, 2"
+
+
+def test_a_statement_reaches_only_the_throwaway_schemas():
+    f = fixtures_module()
+    names = {"idp_sbx.kpi_store": "rehearsal.doc_snippets_1", "idp_sbx.tech_graph": "rehearsal.doc_snippets_1_tech"}
+    assert f.to_scratch("DROP TABLE IF EXISTS idp_sbx.kpi_store.epm_triples", names) == ("TABLE", "rehearsal.doc_snippets_1.epm_triples")
+    assert f.to_scratch("drop volume if exists IDP_SBX.kpi_store.releases", names) == ("VOLUME", "rehearsal.doc_snippets_1.releases")
+    assert f.to_scratch("DROP SCHEMA IF EXISTS IDP_SBX.tech_graph", names) == ("SCHEMA", "rehearsal.doc_snippets_1_tech")
+    for statement in ("DROP TABLE IF EXISTS idp_sbx.kpi_store_other.epm_triples", "DROP SCHEMA IF EXISTS idp_sbx.gold_commercial_core",
+                      "DROP TABLE IF EXISTS workspace.default.b", "DROP SCHEMA IF EXISTS idp_sbx.kpi_store.epm_triples",
+                      "DROP TABLE IF EXISTS idp_sbx.kpi_store", "DROP TABLE IF EXISTS rehearsal.doc_snippets_1.epm_triples"):
+        with pytest.raises(f.Refused, match="only the throwaway schemas may be changed"):
+            f.to_scratch(statement, names)
+    # Any other statement, a second name, a quoted name, CASCADE or a name with no schema is never sent.
+    for statement in ("DROP TABLE idp_sbx.kpi_store.a", "DROP TABLE IF EXISTS idp_sbx.kpi_store.a, workspace.default.b",
+                      "DROP TABLE IF EXISTS epm_triples", "DROP CATALOG idp_sbx", "DROP SCHEMA IF EXISTS idp_sbx.kpi_store CASCADE",
+                      "DROP TABLE IF EXISTS `workspace`.`default`.`b`", "USE CATALOG workspace", "DELETE FROM idp_sbx.kpi_store.a",
+                      "DROP TABLE IF EXISTS idp_sbx.kpi_store.a; DROP TABLE x"):
+        with pytest.raises(f.Refused, match="only one DROP TABLE, DROP VOLUME or DROP SCHEMA"):
+            f.to_scratch(statement, names)
+    schema = "rehearsal.doc_snippets_1"
+    assert f.only_inside(f"INSERT INTO {schema}.t__staging_1 (a) SELECT decode(unbase64(c0), 'x.y') FROM VALUES ('a.b') AS v(c0)", schema)
+    for statement in (f"CREATE TABLE {schema}.t AS SELECT * FROM workspace.default.b", "SELECT 1", f"SELECT * FROM `{schema}`.t",
+                      "CREATE TABLE rehearsal.doc_snippets_10.t (a STRING)"):
+        with pytest.raises(f.Refused, match="only tables of rehearsal.doc_snippets_1 may be used"):
+            f.only_inside(statement, schema)
+
+
+def test_a_cypher_statement_cannot_name_another_database():
+    f = fixtures_module()
+    for statement in ("MATCH (n) CALL (n) { DETACH DELETE n } IN TRANSACTIONS OF 10000 ROWS", "DROP CONSTRAINT n10s_unique_uri IF EXISTS",
+                      "MATCH (n) RETURN count(n) AS nodes_left", "SHOW CONSTRAINTS YIELD name RETURN count(name) AS constraints_left",
+                      "MATCH (n {note: 'USE the DATABASE'}) RETURN n"):
+        assert f.check_cypher(statement, "scratch") == statement
+    assert f.check_cypher("CALL db.info() YIELD name RETURN name", "read")
+    refused = {
+        "USE businessprocessarchitecturegraph MATCH (n) DETACH DELETE n": "starts with MATCH",
+        "MATCH (n) CALL { USE businessprocessarchitecturegraph MATCH (m) DETACH DELETE m } RETURN n": "holds USE",
+        "MATCH (n) CALL (n) { use graph.byName('neo4j') MATCH (m) DETACH DELETE m } RETURN n": "holds USE",
+        "DROP DATABASE businessprocessarchitecturegraph": "starts with MATCH",
+        "CREATE DATABASE other": "starts with MATCH", "DROP ALIAS a FOR DATABASE": "starts with MATCH",
+        "STOP DATABASE neo4j": "starts with MATCH", "ALTER DATABASE neo4j SET ACCESS READ ONLY": "starts with MATCH",
+        "SHOW DATABASES": "starts with MATCH", "CREATE (n:Written)": "starts with MATCH",
+        "MATCH (n) CALL apoc.cypher.runWrite('MATCH (m) DETACH DELETE m', {}) YIELD value RETURN n": "calls the procedure apoc.cypher.runWrite",
+        "MATCH (n) CALL dbms.listConfig() YIELD name RETURN name": "calls the procedure dbms.listConfig",
+        "CALL db.info() YIELD name RETURN name": "starts with MATCH",        # the throwaway database only empties and counts
+    }
+    for statement, why in refused.items():
+        with pytest.raises(f.Refused, match=why):
+            f.check_cypher(statement, "scratch")
+    # A comment between CALL and the name, or backticks around the name, hide no procedure: the server reads the
+    # statement without its comments, and a name in backticks as the name.
+    hidden = {
+        "MATCH (n) CALL /* x */ apoc.bolt.execute('bolt://other', 'CREATE (m)', {}) YIELD value RETURN value": "calls the procedure apoc.bolt.execute",
+        "MATCH (n) CALL/**/apoc.bolt.execute('bolt://other', 'CREATE (m)', {}) YIELD value RETURN value": "calls the procedure apoc.bolt.execute",
+        "MATCH (n) CALL // x\n apoc.bolt.execute('bolt://other', 'CREATE (m)', {}) YIELD value RETURN value": "calls the procedure apoc.bolt.execute",
+        "MATCH (n) CALL `apoc`.`bolt`.`execute`('bolt://other', 'CREATE (m)', {}) YIELD value RETURN value": "calls the procedure apoc.bolt.execute",
+        "MATCH (n) CALL apoc . bolt . execute('bolt://other', 'CREATE (m)', {}) YIELD value RETURN value": "calls the procedure apoc.bolt.execute",
+        "MATCH (n) CALL db.`info`.`x y`() YIELD name RETURN name": "a CALL whose procedure name cannot be read",
+        "MATCH (n) CALL `a``b`() YIELD name RETURN name": "a CALL whose procedure name cannot be read",
+        "MATCH (n) CALL $name() YIELD name RETURN name": "a CALL whose procedure name cannot be read",
+        "MATCH (n) /* a note */ CALL { U/* x */SE neo4j MATCH (m) RETURN m } RETURN n": "",   # checked below: not USE
+        "MATCH (n) CALL { /* ' */ USE neo4j MATCH (m) RETURN m /* ' */ } RETURN n": "holds USE",
+    }
+    for statement, why in hidden.items():
+        if not why:
+            assert f.check_cypher(statement, "scratch") == statement      # U SE is no keyword; the server refuses it
+            continue
+        with pytest.raises(f.Refused, match=why):
+            f.check_cypher(statement, "scratch")
+    # A comment mark inside a string is text, a quote inside a comment is comment, and a subquery after a comment stays.
+    for statement in ("MATCH (n {note: '// CALL apoc.x() /* '}) RETURN n", "MATCH (n) // it's a note\nRETURN n",
+                      "MATCH (n) CALL /* each node */ (n) { DETACH DELETE n } IN TRANSACTIONS OF 10000 ROWS",
+                      "MATCH (n:`CALL apoc.x`) RETURN n"):
+        assert f.check_cypher(statement, "scratch") == statement
+    assert f.check_cypher("CALL /* which */ db.info() YIELD name RETURN name", "read")
+    for statement in ("MATCH (n) DETACH DELETE n", "MATCH (n) RETURN n"):       # a read session refuses a write itself
+        assert f.check_cypher(statement, "read")
+    with pytest.raises(f.Refused, match="holds USE"):
+        f.check_cypher("MATCH (n) CALL { USE neo4j MATCH (m) RETURN m } RETURN n", "read")
+    with pytest.raises(f.Refused, match="starts with MATCH"):
+        f.check_cypher("DROP CONSTRAINT n10s_unique_uri IF EXISTS", "read")
+
+
+class FakeNeo4j:
+    """A stand-in for the driver: it records every statement with its database, and holds the names a server has."""
+
+    def __init__(self, databases=(), aliases=(), fail_on=None):
+        self.databases, self.aliases, self.fail_on, self.sent = list(databases), list(aliases), fail_on, []
+
+    def session(self, database=None, **options):
+        return self._Session(self, database)
+
+    class _Session:
+        def __init__(self, server, database):
+            self.server, self.database = server, database
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *error):
+            return False
+
+        def run(self, statement):
+            server = self.server
+            if server.fail_on and server.fail_on in statement:
+                raise RuntimeError("the server refused")
+            server.sent.append((self.database, statement))
+            names = server.databases if statement.startswith("SHOW DATABASES") else server.aliases if statement.startswith("SHOW ALIASES") else []
+            created = re.match(r"CREATE (?:COMPOSITE )?DATABASE (\w+)", statement)
+            if created:
+                server.databases.append(created.group(1))
+
+            class Result:
+                def value(self):
+                    return list(names)
+
+                def consume(self):
+                    return None
+            return Result()
+
+
+def test_a_neo4j_fixture_makes_its_own_databases_and_removes_only_those(tmp_path):
+    f = fixtures_module()
+    assert f.new_name("scratch") != f.new_name("scratch") and re.fullmatch(r"docsnippetsscratch[0-9a-f]{8}", f.new_name("scratch"))
+    server = FakeNeo4j(databases=["neo4j", "system", "businessprocessarchitecturegraph"])
+    name = f.scratch_up(server, tmp_path, "docsnippetsscratch00000001")
+    assert f.created(tmp_path) == [["database", name]]
+    assert ("system", f"CREATE DATABASE {name} WAIT") in server.sent
+    assert all(database in ("system", name) for database, _ in server.sent)        # nothing is sent to another database
+    assert not any(statement.startswith("DROP") or "DELETE" in statement for _, statement in server.sent)
+    server.sent.clear()
+    assert f.remove_created(server, tmp_path) == 0
+    assert server.sent == [("system", f"DROP DATABASE {name} IF EXISTS WAIT")] and f.created(tmp_path) == []
+    # The questions' fixture: two databases, the composite, two aliases. Removed newest first, and nothing else.
+    names = {"composite": "docsnippetscomposite1", "governance": "docsnippetsgovernance1", "bpa": "docsnippetsbpa1"}
+    server.sent.clear()
+    f.questions_up(server, tmp_path, names)
+    assert f.created(tmp_path) == [["database", "docsnippetsgovernance1"], ["database", "docsnippetsbpa1"], ["composite", "docsnippetscomposite1"],
+                                   ["alias", "docsnippetscomposite1.governance"], ["alias", "docsnippetscomposite1.bpa"]]
+    loaded = {database for database, statement in server.sent if database != "system"}
+    assert loaded == {"docsnippetsgovernance1", "docsnippetsbpa1"}
+    assert not any("DELETE" in statement or statement.startswith("DROP") or "IF NOT EXISTS" in statement for _, statement in server.sent)
+    server.sent.clear()
+    assert f.remove_created(server, tmp_path) == 0
+    assert [statement for _, statement in server.sent] == [
+        "DROP ALIAS docsnippetscomposite1.bpa IF EXISTS FOR DATABASE", "DROP ALIAS docsnippetscomposite1.governance IF EXISTS FOR DATABASE",
+        "DROP COMPOSITE DATABASE docsnippetscomposite1 IF EXISTS WAIT", "DROP DATABASE docsnippetsbpa1 IF EXISTS WAIT",
+        "DROP DATABASE docsnippetsgovernance1 IF EXISTS WAIT"]
+
+
+def test_a_neo4j_fixture_never_empties_or_drops_a_database_that_was_there(tmp_path, capsys):
+    f = fixtures_module()
+    # A name the fixture wants is taken: it stops before it makes, empties or drops anything, and so does its `down`.
+    for held in ({"databases": ["docsnippetsbpa1"]}, {"aliases": ["docsnippetscomposite1"]}, {"databases": ["DocSnippetsGovernance1"]}):
+        server, folder = FakeNeo4j(**held), tmp_path / str(len(list(tmp_path.iterdir())))
+        folder.mkdir()
+        with pytest.raises(f.Refused, match="the server already holds"):
+            f.questions_up(server, folder, {"composite": "docsnippetscomposite1", "governance": "docsnippetsgovernance1", "bpa": "docsnippetsbpa1"})
+        assert all(statement.startswith("SHOW ") for _, statement in server.sent) and f.created(folder) == []
+        assert f.remove_created(server, folder) == 0
+        assert all(statement.startswith("SHOW ") for _, statement in server.sent)
+    server, folder = FakeNeo4j(databases=["docsnippetsscratch1"]), tmp_path / "scratch"
+    folder.mkdir()
+    with pytest.raises(f.Refused, match="the server already holds docsnippetsscratch1"):
+        f.scratch_up(server, folder, "docsnippetsscratch1")
+    assert f.remove_created(server, folder) == 0 and all(statement.startswith("SHOW ") for _, statement in server.sent)
+    # A set-up that stops halfway removes what it had made, and only that.
+    server, folder = FakeNeo4j(databases=["neo4j"], fail_on="CREATE COMPOSITE"), tmp_path / "half"
+    folder.mkdir()
+    with pytest.raises(RuntimeError):
+        f.questions_up(server, folder, {"composite": "docsnippetscomposite2", "governance": "docsnippetsgovernance2", "bpa": "docsnippetsbpa2"})
+    assert f.created(folder) == [["database", "docsnippetsgovernance2"], ["database", "docsnippetsbpa2"]]
+    server.sent.clear()
+    assert f.remove_created(server, folder) == 0
+    assert [statement for _, statement in server.sent] == ["DROP DATABASE docsnippetsbpa2 IF EXISTS WAIT",
+                                                           "DROP DATABASE docsnippetsgovernance2 IF EXISTS WAIT"]
+    # A drop that fails is named with the statement that removes the thing by hand, and stays on record.
+    server, folder = FakeNeo4j(fail_on="DROP DATABASE docsnippetsscratch3"), tmp_path / "left"
+    folder.mkdir()
+    f.record(folder, "database", "docsnippetsscratch3")
+    assert f.remove_created(server, folder) == 1 and f.created(folder) == [["database", "docsnippetsscratch3"]]
+    assert "left behind: the database docsnippetsscratch3 (RuntimeError). Remove it by hand, in the system database: " \
+           "DROP DATABASE docsnippetsscratch3 IF EXISTS WAIT" in capsys.readouterr().out
+    f.record(folder, "database", "neo4j")
+    with pytest.raises(f.Refused, match="neo4j is not a name this fixture makes"):
+        f.remove_created(FakeNeo4j(), folder)
 
 
 # ---- the links of the documents ----
