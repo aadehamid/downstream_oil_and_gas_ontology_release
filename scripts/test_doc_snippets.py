@@ -1197,9 +1197,11 @@ FIXTURE_FILES = {
                         "with open(os.environ['DOC_TEST_LOG'], 'a') as log:\n    log.write(sys.argv[1] + '\\n')\n"
                         "if os.environ.get('DOC_TEST_FAIL') == sys.argv[1]:\n    sys.exit('the store did not answer')\n"
                         "if sys.argv[1] == 'up':\n"
-                        "    (folder / 'values.json').write_text(json.dumps({'placeholders': {'the table': 'made_up.rows'}}))\n",
+                        "    (folder / 'values.json').write_text(json.dumps({'placeholders': {'the table': 'made_up.rows'},\n"
+                        "                                                    'env': {'DOC_TEST_GIVEN': 'by the fixture'}}))\n",
     "tools/run_sql.py": "import os, sys\nfrom pathlib import Path\n"
                         "assert (Path(os.environ['DOC_SNIPPETS_FIXTURE_DIR']) / 'values.json').is_file()\n"
+                        "assert os.environ['DOC_TEST_GIVEN'] == 'by the fixture'\n"
                         "print('ran:', Path(sys.argv[1]).read_text().strip())\n",
 }
 
@@ -1233,6 +1235,17 @@ def test_a_fixture_that_cannot_be_made_or_removed_fails_the_check(tmp_path):
                     environ={"DOC_TEST_LOG": str(log)})
     assert missing.failures == ["guide.md:1: the fixture of the context `store` gave the placeholder <no value> no value, "
                                 "or one with a character that is not allowed"]
+
+
+def test_the_registry_holds_nothing_the_runner_reads_as_a_secret():
+    """The runner refuses to zip a release in which a settings file has a key that names a password or a token.
+    The registry is such a file, so a context gets a password from its fixture, never from a key here."""
+    sys.path.insert(0, str(d.ROOT))
+    try:
+        from kpi_store import runner
+    finally:
+        sys.path.remove(str(d.ROOT))
+    assert runner.secret_keys(d.REGISTRY) == []
 
 
 def test_a_fixture_or_a_runs_table_needs_a_copy_of_the_release_and_an_owner_a_path_inside_it(tmp_path):
@@ -1291,11 +1304,8 @@ def test_the_contexts_that_run_everywhere_need_no_variable_and_the_others_name_t
     assert [name for name, c in contexts.items() if c.home == "real"] == ["databricks-free", "first-run", "scratch-schemas",
                                                                           "windows-account"]
     # The runbook's commands read KPI_STORE_LOCAL. Only its own context may give that variable to a block. The
-    # questions' commands read KPI_STORE_NEO4J_*, and only their context gives those.
-    assert {name: sorted(c.set_env) for name, c in contexts.items() if c.set_env} == {
-        "first-run": ["KPI_STORE_LOCAL"],
-        "questions": ["KPI_STORE_NEO4J_BPA_ALIAS", "KPI_STORE_NEO4J_COMPOSITE", "KPI_STORE_NEO4J_GOVERNANCE_ALIAS",
-                      "KPI_STORE_NEO4J_PASSWORD", "KPI_STORE_NEO4J_URI", "KPI_STORE_NEO4J_USER"]}
+    # questions' commands read KPI_STORE_NEO4J_*; their fixture gives those, so the registry names no password.
+    assert {name: sorted(c.set_env) for name, c in contexts.items() if c.set_env} == {"first-run": ["KPI_STORE_LOCAL"]}
     assert contexts["first-run"].set_env == {"KPI_STORE_LOCAL": "env:KPI_STORE_TEST_LOCAL_SETTINGS"}
     # One chain goes on from one document into others: the runbook's. A fixture is always the tree's own file.
     assert {name: c.owner for name, c in contexts.items() if c.owner} == {

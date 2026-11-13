@@ -17,7 +17,7 @@ DOC_SNIPPETS_FIXTURE_DIR naming a folder outside that copy where a fixture keeps
 The Neo4j test server is the one KPI_STORE_TEST_NEO4J_URI, KPI_STORE_TEST_NEO4J_USER and
 KPI_STORE_TEST_NEO4J_PASSWORD name. The Databricks workspace is the one of the local settings file that
 KPI_STORE_TEST_LOCAL_SETTINGS names; that file must name a rehearsal catalog, never the client's. No password and
-no token is written to a file or printed. scripts/DOC-SNIPPETS.md describes the contexts for writers.
+no token is written to a file of the release or printed. scripts/DOC-SNIPPETS.md describes the contexts for writers.
 """
 from __future__ import annotations
 
@@ -94,14 +94,21 @@ def questions(word):
         if word == "up":
             build.build(driver)
             folder = fixture_dir()
-            # The password is not written: the context hands it to the command in KPI_STORE_NEO4J_PASSWORD.
             (folder / "questions.toml").write_text(
                 f'[neo4j]\nuri = "{os.environ["KPI_STORE_TEST_NEO4J_URI"]}"\n'
                 f'user = "{os.environ.get("KPI_STORE_TEST_NEO4J_USER") or "neo4j"}"\n'
                 f'composite = "{build.COMPOSITE}"\ngovernance_alias = "governance"\nbpa_alias = "bpa"\n',
                 encoding="utf-8", newline="\n")
+            # The settings file holds no password. The commands read each value from the environment first, so
+            # the six variables below decide, whatever the terminal that started the check holds. values.json is
+            # in the check's temporary folder, which the check deletes.
+            user = os.environ.get("KPI_STORE_TEST_NEO4J_USER") or "neo4j"
             write_values(folder, {"your settings file": "../fixture/questions.toml",
-                                  "your mapping file": "../fixture/mapping.json", "a folder": "../fixture/answers"})
+                                  "your mapping file": "../fixture/mapping.json", "a folder": "../fixture/answers"},
+                         {"KPI_STORE_NEO4J_URI": os.environ["KPI_STORE_TEST_NEO4J_URI"], "KPI_STORE_NEO4J_USER": user,
+                          "KPI_STORE_NEO4J_PASSWORD": os.environ["KPI_STORE_TEST_NEO4J_PASSWORD"],
+                          "KPI_STORE_NEO4J_COMPOSITE": build.COMPOSITE, "KPI_STORE_NEO4J_GOVERNANCE_ALIAS": "governance",
+                          "KPI_STORE_NEO4J_BPA_ALIAS": "bpa"})
             print(f"made the composite database {build.COMPOSITE} over two made-up graphs")
             return
         with driver.session(database="system") as session:
@@ -167,9 +174,9 @@ def databricks():
     return here, example, sync_check.statement_runner(client, here.warehouse_id)
 
 
-def write_values(folder, placeholders):
-    (folder / "values.json").write_text(json.dumps({"placeholders": placeholders}, indent=2) + "\n", encoding="utf-8",
-                                        newline="\n")
+def write_values(folder, placeholders, env=None):
+    (folder / "values.json").write_text(json.dumps({"placeholders": placeholders, "env": env or {}}, indent=2) + "\n",
+                                        encoding="utf-8", newline="\n")
 
 
 def scratch_names(example, catalog, schema):

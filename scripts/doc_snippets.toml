@@ -41,7 +41,9 @@ awaits-the-rewrite = "The document is about to be rewritten, and the block goes 
 #   fixture       a command line. The check runs it with `up` before the context's first block and with `down` when
 #                 the check ends. It makes a small store of the context's own, so that a block which deletes has
 #                 something to delete and harms nothing the other blocks read. A placeholder whose value is
-#                 "fixture" gets its value from the file values.json that `up` leaves in the fixture's folder
+#                 "fixture" gets its value from the file values.json that `up` leaves in the fixture's folder. The
+#                 same file may give the context's blocks variables. No key of this file may name a password: the
+#                 runner refuses to zip a release whose settings files look as if they held a secret
 #   runs          for a language the check cannot run itself (sql, cypher) or must run in another way (python): the
 #                 command line that runs a block's text. It gets the text as a file, the last argument
 
@@ -141,14 +143,6 @@ pass_env = ["KPI_STORE_TEST_NEO4J_USER"]
 timeout = 300
 fixture = "py scripts/doc_snippets_fixtures.py questions"
 about = "A copy of the release beside a composite database over two made-up graphs, which the fixture builds on the Neo4j Enterprise test server and removes. For the cross-graph questions."
-
-[contexts.questions.set_env]
-KPI_STORE_NEO4J_URI = "env:KPI_STORE_TEST_NEO4J_URI"
-KPI_STORE_NEO4J_USER = "env:KPI_STORE_TEST_NEO4J_USER"
-KPI_STORE_NEO4J_PASSWORD = "env:KPI_STORE_TEST_NEO4J_PASSWORD"
-KPI_STORE_NEO4J_COMPOSITE = "docsnippetsquestions"
-KPI_STORE_NEO4J_GOVERNANCE_ALIAS = "governance"
-KPI_STORE_NEO4J_BPA_ALIAS = "bpa"
 
 [contexts.questions.placeholders]
 "your settings file" = "fixture"

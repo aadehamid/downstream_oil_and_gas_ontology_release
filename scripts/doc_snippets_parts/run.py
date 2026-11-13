@@ -191,6 +191,7 @@ class Instance:
         self.fixture = folder / "fixture"       # where the context's fixture keeps what it made, outside the copy
         self.fixture_up = False
         self.values: dict = {}                  # the placeholders the fixture gave a value
+        self.fixture_env: dict = {}             # the variables the fixture gives the context's blocks
         self.cwd = self.root
         self.defines: dict = {}
         self.failed_at = ""
@@ -282,6 +283,7 @@ class Runner:
         env["PYTHONDONTWRITEBYTECODE"] = "1"
         if context.fixture or context.runs:
             env[FIXTURE_DIR] = str(instance.fixture)
+        env.update(instance.fixture_env)
         if context.home == "temporary":
             env.update({"HOME": str(instance.home), "USERPROFILE": str(instance.home)})
             for name in [k for k in env if k.startswith("XDG_")]:
@@ -299,7 +301,8 @@ class Runner:
 
     def fixture_up(self, instance):
         """Makes the context's fixture before its first block. Returns None, or why it could not be made. The
-        fixture may leave values.json in its folder: {"placeholders": {name: value}}."""
+        fixture may leave values.json in its folder: {"placeholders": {name: value}, "env": {name: value}}. The
+        variables are for a value the registry must not hold, such as the test server's password."""
         if instance.fixture_up or not instance.context.fixture:
             return None
         status, output = self._fixture(instance, "up")
@@ -309,7 +312,9 @@ class Runner:
         instance.fixture_up = True
         values = instance.fixture / "values.json"
         if values.is_file():
-            instance.values = dict(json.loads(values.read_text(encoding="utf-8")).get("placeholders", {}))
+            given = json.loads(values.read_text(encoding="utf-8"))
+            instance.values = dict(given.get("placeholders", {}))
+            instance.fixture_env = {str(name): str(value) for name, value in given.get("env", {}).items()}
         return None
 
     def close(self) -> list:
