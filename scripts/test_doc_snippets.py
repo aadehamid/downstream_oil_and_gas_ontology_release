@@ -898,6 +898,18 @@ def test_an_option_that_a_script_only_mentions_is_not_one_it_takes(tmp_path):
     by_hand = ('"""Takes --doc."""\nimport sys\n# --comment\nx = "--plain"\nknown = {"--uri", "--env"}\nopts = dict.fromkeys(sys.argv)\n'
                'if "--report" in opts:\n    print(opts.get("--output"), "give --longer or nothing")\nraise SystemExit("this script was started")\n')
     assert d.handled_options(by_hand) == {"--uri", "--env", "--report", "--output"}
+    # A text counts only where the code reads its arguments. An argument of another call, such as an error's text,
+    # and a list, which is a command for another program, do not make an option.
+    elsewhere = ('import subprocess, sys\nraise SystemExit("--fake")\nprint("--printed")\nsubprocess.run(["tool", "--passed-on"])\n'
+                 'def f(): return "--returned"\n')
+    assert d.handled_options(elsewhere) == set()
+    reads = ('import sys\nargv = sys.argv[1:]\nif argv[0] == "--equal": pass\nif "--member" in argv: pass\nat = argv.index("--index")\n'
+             'opts = {"--key": 1}\nvalue = opts["--subscript"]\nfor flag in ("--tuple",): pass\nif argv[0].startswith("--prefix"): pass\n'
+             'match argv[0]:\n    case "--case" | "--other-case": pass\n')
+    assert d.handled_options(reads) == {"--equal", "--member", "--index", "--key", "--subscript", "--tuple", "--prefix",
+                                        "--case", "--other-case"}
+    assert check(tmp_path, fence("bash usage=tools", "elsewhere.py --fake"), files={"tools/elsewhere.py": elsewhere}).failures == [
+        "guide.md:1: elsewhere.py has no option --fake"]
     files = {"tools/by_hand.py": by_hand}
     assert check(tmp_path, fence("bash usage=tools", "by_hand.py --uri <uri> [--env <file>] --report r --output o"), files=files).failures == []
     assert check(tmp_path, fence("bash usage=tools", "by_hand.py --doc --comment --plain --longer"), files=files).failures == [
@@ -1528,6 +1540,32 @@ def test_a_cypher_statement_cannot_name_another_database():
     for statement, why in refused.items():
         with pytest.raises(f.Refused, match=why):
             f.check_cypher(statement, "scratch")
+    # A comment between CALL and the name, or backticks around the name, hide no procedure: the server reads the
+    # statement without its comments, and a name in backticks as the name.
+    hidden = {
+        "MATCH (n) CALL /* x */ apoc.bolt.execute('bolt://other', 'CREATE (m)', {}) YIELD value RETURN value": "calls the procedure apoc.bolt.execute",
+        "MATCH (n) CALL/**/apoc.bolt.execute('bolt://other', 'CREATE (m)', {}) YIELD value RETURN value": "calls the procedure apoc.bolt.execute",
+        "MATCH (n) CALL // x\n apoc.bolt.execute('bolt://other', 'CREATE (m)', {}) YIELD value RETURN value": "calls the procedure apoc.bolt.execute",
+        "MATCH (n) CALL `apoc`.`bolt`.`execute`('bolt://other', 'CREATE (m)', {}) YIELD value RETURN value": "calls the procedure apoc.bolt.execute",
+        "MATCH (n) CALL apoc . bolt . execute('bolt://other', 'CREATE (m)', {}) YIELD value RETURN value": "calls the procedure apoc.bolt.execute",
+        "MATCH (n) CALL db.`info`.`x y`() YIELD name RETURN name": "a CALL whose procedure name cannot be read",
+        "MATCH (n) CALL `a``b`() YIELD name RETURN name": "a CALL whose procedure name cannot be read",
+        "MATCH (n) CALL $name() YIELD name RETURN name": "a CALL whose procedure name cannot be read",
+        "MATCH (n) /* a note */ CALL { U/* x */SE neo4j MATCH (m) RETURN m } RETURN n": "",   # checked below: not USE
+        "MATCH (n) CALL { /* ' */ USE neo4j MATCH (m) RETURN m /* ' */ } RETURN n": "holds USE",
+    }
+    for statement, why in hidden.items():
+        if not why:
+            assert f.check_cypher(statement, "scratch") == statement      # U SE is no keyword; the server refuses it
+            continue
+        with pytest.raises(f.Refused, match=why):
+            f.check_cypher(statement, "scratch")
+    # A comment mark inside a string is text, a quote inside a comment is comment, and a subquery after a comment stays.
+    for statement in ("MATCH (n {note: '// CALL apoc.x() /* '}) RETURN n", "MATCH (n) // it's a note\nRETURN n",
+                      "MATCH (n) CALL /* each node */ (n) { DETACH DELETE n } IN TRANSACTIONS OF 10000 ROWS",
+                      "MATCH (n:`CALL apoc.x`) RETURN n"):
+        assert f.check_cypher(statement, "scratch") == statement
+    assert f.check_cypher("CALL /* which */ db.info() YIELD name RETURN name", "read")
     for statement in ("MATCH (n) DETACH DELETE n", "MATCH (n) RETURN n"):       # a read session refuses a write itself
         assert f.check_cypher(statement, "read")
     with pytest.raises(f.Refused, match="holds USE"):

@@ -226,7 +226,9 @@ it sends the first:
 - A `cypher` block for `scratch-database` starts with `MATCH`, `DROP CONSTRAINT` or `SHOW CONSTRAINTS`. One for
   `enterprise-database` starts with `MATCH`, `RETURN`, `SHOW CONSTRAINTS` or `CALL db.info()`.
 - No Cypher statement may hold `USE`, also not inside a subquery, or a word that names or changes a database, an
-  alias, the server or its accounts. It may call no procedure but `db.info`.
+  alias, the server or its accounts. It may call no procedure but `db.info`. The program reads the statement
+  without its comments, and a procedure's name without its backticks, so neither hides a name. It refuses a `CALL`
+  whose procedure name it cannot read.
 - A `sql` block holds only `DROP TABLE`, `DROP VOLUME` or `DROP SCHEMA` statements, each with `IF EXISTS` and one
   plain name.
 
@@ -311,11 +313,14 @@ How the check reads a script's options depends on the script:
 - A script that builds its parser with `argparse` is asked for its own `--help`, and for the help of the
   subcommand the line names. When a package it imports is missing, the check reads its `add_argument` calls.
 - A script that reads its arguments by hand is never started. The check reads the options its code handles: each
-  text that is exactly `--name` and is compared, looked up, passed on or listed in the code.
+  text that is exactly `--name` and stands where the code reads its arguments. Such a place is a comparison, a
+  membership test, a `case` of a match statement, a lookup such as `opts["--name"]` or `opts.get("--name")`, and a
+  set, a tuple or a dict of options.
 
 A comment, a docstring, a longer string that holds the option's text, and a name that is only given the text do
-not make an option. For a script that reads its arguments by hand, the check proves that the code names the
-option, not what the code does with it.
+not make an option. Neither does a text in a list, which is how a command for another program is written, or a
+text given to any other call, such as the message of an error. For a script that reads its arguments by hand, the
+check proves that the code names the option where it reads its arguments, not what the code does with it.
 
 ````markdown nested
 ```bash usage=scripts/check_standalone.py

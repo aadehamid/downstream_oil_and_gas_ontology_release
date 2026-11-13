@@ -224,20 +224,49 @@ CYPHER_STARTS = {"scratch": (r"MATCH\b", r"DROP\s+CONSTRAINT\b", r"SHOW\s+CONSTR
 # inside a subquery: USE would send the statement to another database than the one the session was opened on.
 CYPHER_REFUSED = re.compile(r"\b(USE|DATABASES?|ALIAS(?:ES)?|COMPOSITE|GRAPH|SERVERS?|USERS?|ROLES?|PRIVILEGES?|GRANT|DENY|"
                             r"REVOKE|LOAD|START|STOP|ALTER|TERMINATE)\b", re.I)
-# A procedure call: CALL and a name. `CALL (n) { ... }` and `CALL { ... }` are subqueries, which stay.
-CYPHER_PROCEDURE = re.compile(r"\bCALL\s+([A-Za-z_][\w.]*)", re.I)
+# One piece of a statement that is not plain code: a string, a name in backticks (a doubled backtick stands for one
+# inside the name), or a comment. Read in this order from the left, so a comment mark inside a string is text and a
+# quote inside a comment is comment.
+CYPHER_PIECE = re.compile(r"""'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`]|``)*`|/\*.*?\*/|//[^\n]*""", re.S)
+# CALL and what follows it. `CALL (n) { ... }` and `CALL { ... }` are subqueries, which stay. Anything else is a
+# procedure call, and its name is one or more plain names with dots between them.
+CYPHER_CALL = re.compile(r"\bCALL\b\s*(?![\s({])", re.I)
+CYPHER_PROCEDURE = re.compile(r"[A-Za-z_]\w*(?:\s*\.\s*[A-Za-z_]\w*)*")
+UNREADABLE = "\x00"   # stands for a name in backticks that is not a plain name; no check reads past it
+
+
+def cypher_views(statement: str):
+    """(the statement for the keyword checks, the statement for the procedure check). Both have no comment, because
+    the server reads none, and '' for each string. In the first, a name in backticks is '' too, so a word in a name
+    is not read as a keyword. In the second, such a name is the name itself when it is a plain name, as the server
+    reads it, so CALL `apoc`.x() is read as a call of apoc.x."""
+    def piece(found, names):
+        text = found.group(0)
+        if text.startswith("/"):
+            return " "
+        if not text.startswith("`") or not names:
+            return "''"
+        name = text[1:-1].replace("``", "`")
+        return name if re.fullmatch(r"[A-Za-z_]\w*", name) else UNREADABLE
+    return (CYPHER_PIECE.sub(lambda found: piece(found, False), statement),
+            CYPHER_PIECE.sub(lambda found: piece(found, True), statement))
 
 
 def check_cypher(statement: str, kind: str) -> str:
-    """The statement, or Refused: it may reach only the database its session was opened on. Text inside quotes and
-    backticks is set aside first, so a word in a string is not read as a keyword, and a keyword cannot hide in one."""
-    bare = re.sub(r"'(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"|`[^`]*`", "''", statement)
+    """The statement, or Refused: it may reach only the database its session was opened on. Comments are taken out
+    and text inside quotes and backticks is set aside first (cypher_views), so a word in a string is not read as a
+    keyword, a keyword cannot hide in one, and a comment or a pair of backticks cannot hide a procedure's name."""
+    bare, named = cypher_views(statement)
     if not any(re.match(start, bare.lstrip(), re.I) for start in CYPHER_STARTS[kind]):
         raise Refused(f"a statement here starts with MATCH, {'DROP CONSTRAINT or SHOW CONSTRAINTS' if kind == 'scratch' else 'RETURN, SHOW CONSTRAINTS or CALL db.info()'}: {statement[:60]}")
     word = CYPHER_REFUSED.search(bare)
     if word:
         raise Refused(f"the statement holds {word.group(1).upper()}, which names or changes a database or the server: {statement[:60]}")
-    for procedure in CYPHER_PROCEDURE.findall(bare):
+    for call in CYPHER_CALL.finditer(named):
+        name = CYPHER_PROCEDURE.match(named, call.end())
+        if not name or named[name.end():name.end() + 1] in (UNREADABLE, ".", "`"):
+            raise Refused(f"the statement holds a CALL whose procedure name cannot be read: {statement[:60]}")
+        procedure = re.sub(r"\s", "", name.group(0))
         if procedure.lower() != "db.info":
             raise Refused(f"the statement calls the procedure {procedure}: {statement[:60]}")
     return statement

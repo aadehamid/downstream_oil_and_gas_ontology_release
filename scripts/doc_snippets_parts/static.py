@@ -47,16 +47,38 @@ def help_options(script: Path, subcommand=None):
     return set(OPTION.findall(text))
 
 
+# Methods that look a text up in the arguments or compare it with one: opts.get("--name"), argv.index("--name"),
+# arg.startswith("--name").
+LOOKUPS = {"get", "pop", "setdefault", "index", "count", "remove", "discard", "startswith", "__contains__"}
+
+
 def handled_options(source: str) -> set:
-    """The options that a script with a parser of its own handles: each text that is exactly --name and stands in
-    the code as a value that is compared, looked up, passed on or listed. A docstring, a comment, a longer string
-    that holds the text, and a name that is only given the text (x = "--name") are not counted. This reads what
-    the code names, not what it does with it, which is the most a check can read from a hand-written parser."""
-    tree = ast.parse(source)
-    plain = {id(node.value) for node in ast.walk(tree)
-             if isinstance(node, (ast.Expr, ast.Assign, ast.AnnAssign)) and isinstance(getattr(node, "value", None), ast.Constant)}
-    return {node.value for node in ast.walk(tree) if isinstance(node, ast.Constant) and isinstance(node.value, str)
-            and OPTION.fullmatch(node.value) and id(node) not in plain}
+    """The options that a script with a parser of its own handles: each text that is exactly --name and stands where
+    the code reads its arguments. Such a place is a comparison or a membership test ("--name" in opts, arg ==
+    "--name"), a `case` of a match statement, a lookup (opts["--name"], opts.get("--name"), argv.index("--name")),
+    and a set, a tuple or a dict of options. A docstring, a comment, a longer string that holds the text, a name
+    that is only given the text (x = "--name"), a list, which is how a command for another program is written, and
+    an argument of any other call, such as SystemExit("--name"), are not counted. This reads where the code names
+    the option, not what it does with it, which is the most a check can read from a hand-written parser."""
+    found = set()
+    for parent in ast.walk(ast.parse(source)):
+        if isinstance(parent, ast.Compare):
+            near = [parent.left, *parent.comparators]
+        elif isinstance(parent, (ast.Set, ast.Tuple)):
+            near = parent.elts
+        elif isinstance(parent, ast.Dict):
+            near = [*parent.keys, *parent.values]
+        elif isinstance(parent, ast.Subscript):
+            near = [parent.slice]
+        elif isinstance(parent, ast.MatchValue):
+            near = [parent.value]
+        elif isinstance(parent, ast.Call) and isinstance(parent.func, ast.Attribute) and parent.func.attr in LOOKUPS:
+            near = parent.args
+        else:
+            continue
+        found |= {node.value for node in near if isinstance(node, ast.Constant) and isinstance(node.value, str)
+                  and OPTION.fullmatch(node.value)}
+    return found
 
 
 def script_options(script: Path, subcommand=None):
