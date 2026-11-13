@@ -260,7 +260,8 @@ class Tree:
 
     Every path is checked before it is read and again before it is written (inside): a file that is a link, or
     that lies under a folder that is a link, could send a write to a place outside the copy, so the run refuses
-    it. The copy's own top folder may be reached through a link: that is the reader's choice."""
+    it. The copy's own top folder may be reached through a link: that is the reader's choice. The checks read the
+    disk as it is at that moment. They do not lock the copy: do not let another program change it during a run."""
 
     def __init__(self, root):
         self.root, self.texts, self.places = root, {}, []
@@ -277,6 +278,10 @@ class Tree:
         top, full = os.path.realpath(self.root), os.path.realpath(os.path.join(self.root, path))
         if os.path.commonpath([top, full]) != top:
             raise Refused(f"{path} is not inside the copy")
+        # A hard link is a second name of one file: a write through the name in the copy would change the other too.
+        if os.path.isfile(full) and os.stat(full).st_nlink > 1:
+            raise Refused(f"{path} has a second name on this disk (a hard link). This command changes only files inside "
+                          "the copy. Replace it with a copy of its own and run the command again")
         return os.path.join(self.root, path)
 
     def read(self, path):
@@ -303,10 +308,11 @@ class Tree:
         self.texts[path] = text[:found[0].end()] + added + text[found[0].end():]
 
     def save(self):
-        targets = {path: self.inside(path) for path in self.texts}   # every path is checked before the first write
+        for path in self.texts:   # every path is checked before the first write
+            self.inside(path)
         for path, text in self.texts.items():
-            full = targets[path]
-            os.makedirs(os.path.dirname(full), exist_ok=True)
+            os.makedirs(os.path.dirname(os.path.join(self.root, path)), exist_ok=True)
+            full = self.inside(path)   # and again right before its own write, after its folders exist
             with open(full, "w", encoding="utf-8", newline="") as f:
                 f.write(text)
 

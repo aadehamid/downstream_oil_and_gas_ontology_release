@@ -125,6 +125,24 @@ class Links(unittest.TestCase):
             with open(target, encoding="utf-8") as f:
                 self.assertEqual(f.read(), "outside\n")
 
+    def test_a_file_with_a_second_name_outside_the_copy_is_not_written(self):
+        # A hard link is no symbolic link and resolves inside the copy, yet a write through it changes the other name.
+        with tempfile.TemporaryDirectory() as tmp:
+            root, outside = os.path.join(tmp, "copy"), os.path.join(tmp, "outside.txt")
+            os.makedirs(root)
+            with open(outside, "w", encoding="utf-8") as f:
+                f.write("kept")
+            try:
+                os.link(outside, os.path.join(root, "a.txt"))
+            except OSError:
+                self.skipTest("this file system makes no hard links")
+            tree = oe.Tree(root)
+            with self.assertRaises(oe.Refused) as refused:
+                tree.read("a.txt")
+            self.assertIn("hard link", str(refused.exception))
+            with open(outside, encoding="utf-8") as f:
+                self.assertEqual(f.read(), "kept")
+
     def test_a_folder_that_is_a_link_is_not_written_through(self):
         with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as outside:
             self.link(outside, os.path.join(tmp, "scripts"), directory=True)
