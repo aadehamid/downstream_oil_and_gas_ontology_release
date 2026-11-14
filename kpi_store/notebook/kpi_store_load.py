@@ -48,19 +48,22 @@
 # MAGIC
 # MAGIC The cells, in order:
 # MAGIC
-# MAGIC 1. Install five packages, each at the version the release was tested with, so every run installs the same
-# MAGIC    versions of these five.
+# MAGIC 1. Install six packages, each at the version the release was tested with, so every run installs the same
+# MAGIC    versions of these six. The sixth, `tomli`, reads the settings file on Python 3.10, which has no reader
+# MAGIC    of its own.
 # MAGIC 2. Restart Python, so the cells after it use the packages that were just installed.
-# MAGIC 3. Define the two functions that do the work: `bootstrap` checks the zip and unpacks it, and `main` runs
+# MAGIC 3. Print the version of Python that the compute runs, and stop on one below 3.10. The notebook was tested
+# MAGIC    on Python 3.10 and on Python 3.12.
+# MAGIC 4. Define the two functions that do the work: `bootstrap` checks the zip and unpacks it, and `main` runs
 # MAGIC    the comparison and the load. This cell only defines them.
-# MAGIC 4. Run `main` and hand its summary to the caller. The runner on the Windows machine reads this summary.
+# MAGIC 5. Run `main` and hand its summary to the caller. The runner on the Windows machine reads this summary.
 # MAGIC
 # MAGIC The notebook holds little code of its own. The comparison and the load live in the release zip, in the
 # MAGIC `kpi_store` package, so the code that runs comes from the zip that the checksum in the settings accepts.
 
 # COMMAND ----------
 
-# MAGIC %pip install databricks-sdk==0.164.0 pyoxigraph==0.5.13 rdflib==7.6.0 sqlglot==30.31.0 pyyaml==6.0.3
+# MAGIC %pip install databricks-sdk==0.164.0 pyoxigraph==0.5.13 rdflib==7.6.0 sqlglot==30.31.0 pyyaml==6.0.3 tomli==2.2.1
 
 # COMMAND ----------
 
@@ -68,6 +71,20 @@
 # Outside Databricks there is no dbutils, and this cell does nothing: the tests load this file as a module.
 if "dbutils" in globals():
     dbutils.library.restartPython()  # noqa: F821  the notebook supplies dbutils
+
+# COMMAND ----------
+
+# The Python of this compute. Serverless compute of environment version 1 runs Python 3.10.12 (Databricks' release
+# notes "Environment version 1", last updated 2026-11-05). The release's code needs 3.10 or later. This cell is written so that an older Python can still read
+# it and say so in one sentence, before a later cell fails on something harder to read.
+import sys
+
+PYTHON_MINIMUM = (3, 10)
+print("Python " + ".".join(str(part) for part in sys.version_info[:3]))
+if sys.version_info[:2] < PYTHON_MINIMUM:
+    raise RuntimeError("The KPI Store notebook needs Python 3.10 or later, and this compute runs Python "
+                       + ".".join(str(part) for part in sys.version_info[:3])
+                       + ". Run it on a compute with Python 3.10 or later.")
 
 # COMMAND ----------
 
@@ -79,7 +96,6 @@ import io
 import json
 import sys
 import tempfile
-import tomllib
 import zipfile
 from pathlib import Path
 
@@ -88,20 +104,36 @@ class Stop(Exception):
     """The run stopped before any read or write of the workspace."""
 
 
+def toml_reader():
+    """The module that reads TOML here: tomllib from Python 3.11 on, else the package tomli, which the first cell
+    installs, else the copy of tomli that pip carries. The three are one code base. The release's own
+    kpi_store/toml_reader.py does the same for the code in the zip; bootstrap runs before the zip is unpacked, so
+    it cannot use that module."""
+    import importlib
+    for name in ("tomllib", "tomli", "pip._vendor.tomli"):
+        try:
+            return importlib.import_module(name)
+        except ImportError:
+            continue
+    raise Stop("Python " + ".".join(str(part) for part in sys.version_info[:3]) + " has no TOML reader, so the "
+               "settings file cannot be read. Run the first cell, which installs the package tomli, and run again")
+
+
 def bootstrap(settings_path, work_dir=None):
     """(release root, settings). Checks the zip's SHA-256 against the settings, unzips the release to a local
     folder, puts it on the import path, and validates the settings in full with the release's own code.
 
     This function uses the standard library only, because the release's code is inside the zip it checks."""
     path = Path(settings_path)
+    toml = toml_reader()
     # Read only the two values needed to find and check the zip. The full validation comes after the unzip, with
     # the release's own settings code.
     try:
-        doc = tomllib.loads(path.read_bytes().decode("utf-8"))
+        doc = toml.loads(path.read_bytes().decode("utf-8"))
         zip_name, want = doc["release"]["zip"], doc["release"]["sha256"]
     except OSError as err:
         raise Stop(f"cannot read the settings file {path}: {type(err).__name__}") from None
-    except (UnicodeDecodeError, tomllib.TOMLDecodeError, KeyError, TypeError) as err:
+    except (UnicodeDecodeError, toml.TOMLDecodeError, KeyError, TypeError) as err:
         raise Stop(f"the settings file {path} is wrong: {type(err).__name__}: {err}") from None
     # A bare file name only: a name with a folder in it could point at a zip outside the settings file's folder.
     if not isinstance(zip_name, str) or Path(zip_name).name != zip_name or not zip_name.endswith(".zip"):

@@ -59,6 +59,11 @@ jobs:
         env:
           PYTEST_ADDOPTS: -rs   # name each skipped test and why, so a skip on one system is seen
         run: bash scripts/check.sh
+      # The notebook and the modules it reaches run in Databricks, on the Python of the compute. Serverless compute of
+      # environment version 1 has Python 3.10, older than any Python the check script itself accepts, and the first
+      # real run failed there. So their tests run again here on Python 3.10, which uv fetches.
+      - name: the notebook's side on Python 3.10
+        run: bash scripts/check-notebook-side.sh 3.10
       # check.sh leaves out the tests that ask whether the tree still equals the release as shipped. This branch is
       # the release as shipped, so they must pass here. One system is enough: they compare files, not behaviour.
       - name: check-pinned.sh

@@ -20,9 +20,10 @@ file paths from these names.
 import fnmatch
 import hashlib
 import re
-import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+
+from . import toml_reader   # tomllib, or its stand-in on Python 3.10: this module runs in the notebook too
 
 # The forms a value may take. Each leaves out quotes, spaces and slashes, so a value can go into a SQL statement
 # or a path and stay one name. All but ZIP_NAME leave out dots too; a zip's name may hold them, as a file name does.
@@ -139,8 +140,8 @@ def _strings(where, value, pattern, what, allow_empty=True):
 def parse(data, folder=Path(".")):
     """Settings from the file's bytes. Raises SettingsError with the first problem found."""
     try:
-        doc = tomllib.loads(data.decode("utf-8"))
-    except (UnicodeDecodeError, tomllib.TOMLDecodeError) as err:
+        doc = toml_reader.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, toml_reader.TOMLDecodeError) as err:
         raise SettingsError(f"the settings file is not valid TOML: {err}") from None
     for table in doc:
         if table not in LAYOUT:

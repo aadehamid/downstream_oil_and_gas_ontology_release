@@ -214,9 +214,14 @@ def test_a_wrong_settings_file_stops_before_any_read_or_write(tmp_path, old, new
 def test_the_notebook_pins_its_packages_and_restarts_python_before_any_code():
     text = NOTEBOOK.read_text(encoding="utf-8")
     cells = text.split("# COMMAND ----------")
-    assert text.startswith("# Databricks notebook source\n") and len(cells) == 5
-    assert cells[1].strip() == "# MAGIC %pip install databricks-sdk==0.164.0 pyoxigraph==0.5.13 rdflib==7.6.0 sqlglot==30.31.0 pyyaml==6.0.3"
+    assert text.startswith("# Databricks notebook source\n") and len(cells) == 6
+    assert cells[1].strip() == ("# MAGIC %pip install databricks-sdk==0.164.0 pyoxigraph==0.5.13 rdflib==7.6.0 sqlglot==30.31.0 "
+                                "pyyaml==6.0.3 tomli==2.2.1")
     assert "dbutils.library.restartPython()" in cells[2] and "import" not in cells[2]
+    # The third cell says which Python runs, before the cell that needs it. It must be readable by a Python older
+    # than the lowest one supported, or that Python could not say the sentence.
+    assert "PYTHON_MINIMUM = (3, 10)" in cells[3] and "print(" in cells[3] and "needs Python 3.10 or later" in cells[3]
+    assert "f\"" not in cells[3] and "match " not in cells[3] and ":=" not in cells[3]
     assert "token" not in text.lower().replace("no token", "").replace("it needs no token", "")
 
 
@@ -255,3 +260,73 @@ def test_the_unpacked_files_are_the_bytes_that_were_hashed(tmp_path, monkeypatch
         nb.bootstrap(folder / "kpi_store.toml", work_dir=tmp_path / "work")   # the release's own second check sees the swap
     assert not (tmp_path / "work" / "swapped.txt").exists()
     assert (tmp_path / "work" / "release.json").is_file()   # the hashed zip's own file
+
+
+# ---------- Python 3.10: the notebook's side runs there too ----------
+
+def test_the_notebook_side_reads_toml_without_tomllib(tmp_path, monkeypatch):
+    """The first real run was on serverless compute with Python 3.10, which has no tomllib. The notebook's own
+    bootstrap and the release's settings module each take the first reader that is there."""
+    from kpi_store import toml_reader
+    assert toml_reader.READERS == ("tomllib", "tomli", "pip._vendor.tomli")
+    made_up = type(sys)("made_up_reader")
+    seen = []
+
+    def load(name):
+        seen.append(name)
+        if name != "pip._vendor.tomli":
+            raise ImportError(name)
+        return made_up
+    assert toml_reader.reader(load=load) is made_up and seen == list(toml_reader.READERS)
+    with pytest.raises(ImportError, match=r"^Python \d+\.\d+\.\d+ has no TOML reader\. Python 3\.11 and later bring one "
+                                          r"\(tomllib\); on an older Python install the package tomli$"):
+        toml_reader.reader(names=("no_such_reader_a", "no_such_reader_b"))
+    assert toml_reader.loads('a = "b"') == {"a": "b"}
+    with pytest.raises(toml_reader.TOMLDecodeError):
+        toml_reader.loads("a = ")
+    # The notebook's own copy of the same choice, for the code that runs before the zip is unpacked.
+    nb = notebook()
+    assert nb.toml_reader().loads('a = "b"') == {"a": "b"}
+    import importlib
+    real = importlib.import_module
+    monkeypatch.setattr(importlib, "import_module", lambda name, *a: (_ for _ in ()).throw(ImportError(name))
+                        if name in toml_reader.READERS else real(name, *a))
+    with pytest.raises(nb.Stop, match=r"has no TOML reader, so the settings file cannot be read\. Run the first cell"):
+        nb.toml_reader()
+
+
+def test_the_modules_the_notebook_reaches_import_no_tomllib_of_their_own():
+    """A module that runs in the notebook must read TOML through kpi_store/toml_reader.py. This walks the imports from
+    the modules that the notebook names and fails on a direct import of tomllib, which Python 3.10 does not have."""
+    import ast
+    package = support.ROOT / "kpi_store"
+    seen, todo = {}, ["settings", "load_databricks", "tech_graph"]
+    while todo:
+        name = todo.pop()
+        if name in seen or not (package / f"{name}.py").is_file():
+            continue
+        tree = ast.parse((package / f"{name}.py").read_text(encoding="utf-8"))
+        seen[name] = sorted({alias.name.split(".")[0] for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names}
+                            | {node.module.split(".")[0] for node in ast.walk(tree)
+                               if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module})
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.level == 1:
+                todo += [node.module] if node.module else [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and (node.module or "").startswith("kpi_store"):
+                todo += [alias.name for alias in node.names] + node.module.split(".")[1:]
+    assert sorted(seen) == ["compare", "discovery", "load_databricks", "metric_view", "ontology_view", "report", "settings",
+                            "tech_graph", "toml_reader"]
+    assert [name for name, imports in seen.items() if "tomllib" in imports] == []
+    assert "import tomllib" not in NOTEBOOK.read_text(encoding="utf-8")
+
+
+def test_every_file_that_runs_in_the_notebook_is_python_3_10_syntax():
+    """The notebook, the modules it reaches, and the four files of the release that those load by their path."""
+    import ast
+    files = ["kpi_store/notebook/kpi_store_load.py", "kpi_store/__init__.py", "kpi_store/toml_reader.py", "kpi_store/settings.py",
+             "kpi_store/load_databricks.py", "kpi_store/discovery.py", "kpi_store/compare.py", "kpi_store/report.py",
+             "kpi_store/tech_graph.py", "kpi_store/metric_view.py", "kpi_store/ontology_view.py",
+             "business_architecture/ontology/projection/sync_stores.py", "business_architecture/ontology/projection/subgraph.py",
+             "business_architecture/ontology/release/newest.py", "skills/rdf-store/scripts/rdfstore.py"]
+    for name in files:
+        ast.parse((support.ROOT / name).read_text(encoding="utf-8"), name, feature_version=(3, 10))

@@ -724,15 +724,16 @@ the steps that ran passed; left out: <the other steps> (not run, so not checked)
 
 It imports `kpi_store/notebook/kpi_store_load.py` into the workspace folder as the notebook `kpi_store_load`. It submits the notebook as a one-time job run on serverless compute, waits for it, and reads its result.
 
-The notebook has five cells.
+The notebook has six cells.
 
 | Cell | What it does |
 |---|---|
 | 1 | Text. It says what the notebook does and lists its three parameters: `settings_path`, `mode` and `stale_after_days`. |
-| 2 | Installs five Python packages at pinned versions for this run: `databricks-sdk`, `pyoxigraph`, `rdflib`, `sqlglot` and `pyyaml`. |
+| 2 | Installs six Python packages at pinned versions for this run: `databricks-sdk`, `pyoxigraph`, `rdflib`, `sqlglot`, `pyyaml` and `tomli`. The last reads the settings file on Python 3.10, which has no reader of its own. |
 | 3 | Restarts Python, so that the run uses the packages of cell 2. |
-| 4 | Defines the work. `bootstrap` reads `kpi_store.toml` from the volume, checks the zip's SHA-256 against it, unpacks the zip and validates the settings. `main` then runs the release's own code from the zip. |
-| 5 | Runs `main` and ends the run with a summary in JSON, which the runner reads. |
+| 4 | Prints the version of Python that the compute runs, and stops on one below 3.10. |
+| 5 | Defines the work. `bootstrap` reads `kpi_store.toml` from the volume, checks the zip's SHA-256 against it, unpacks the zip and validates the settings. `main` then runs the release's own code from the zip. |
+| 6 | Runs `main` and ends the run with a summary in JSON, which the runner reads. |
 
 `main` calls `kpi_store/load_databricks.py`. That code reads the workspace (`kpi_store/discovery.py`): the objects and columns, the metric view definitions, the lineage, the jobs that build the tables and the Genie spaces. It compares them with the ontology (`kpi_store/compare.py`) and writes the report. If a row blocks, it stops there. Otherwise it writes the release's triples to a staging table, reads them back, and compares their hash with the release files' hash. Only an equal staging table replaces `epm_triples`. Then it writes the marker row. Last, it builds the technical graph from what it read (`kpi_store/tech_graph.py`) and loads it the same way.
 
@@ -879,6 +880,7 @@ The steps, in order, are `cut`, `check`, `zip`, `volume`, `upload`, `notebook`, 
 | `zip` | A file in the release folder sets a password. | Move that file out of the release folder. Run `python -m kpi_store.runner --from zip`. |
 | `volume`, `upload` | The sign-in expired, or you may not create the schema. | Sign in again. If the line prints two SQL statements, run them in a Databricks SQL editor. Then run `python -m kpi_store.runner --from volume`. |
 | `notebook` | The notebook run failed, or it still runs after 60 minutes. | Read the reason in the line. Run `python -m kpi_store.runner --from notebook`. A run that still runs is waited for again, not started twice. |
+| `notebook`, with `ModuleNotFoundError: No module named 'tomllib'` | The compute runs Python 3.10, and your zip is the first cut of KPI Store 1.1, whose notebook needed Python 3.11. Serverless compute of environment version 1 has Python 3.10.12 (Databricks' release notes "Environment version 1", last updated 2026-11-05). | Take the corrected zip, whose notebook runs on Python 3.10, unpack it in place of the release folder, and run the runner again. |
 | `fuseki` | Java or the jar is missing, or the port is in use. | Run the setup check. Then run `python -m kpi_store.runner --from fuseki`. |
 | `neo4j` | The local instance is stopped, or a plugin is missing. | Start the instance. Run the setup check. Then run `python -m kpi_store.runner --from neo4j`. |
 | `enterprise` | The server did not answer, or the database holds nodes. | Read the line. For KPI Store nodes of another release, see "Replace what Enterprise holds". For any other node, stop and ask whose it is. |
@@ -1229,6 +1231,8 @@ Three places ran parts of this guide. No place ran all of it, and nothing ran on
 | macOS, with a rehearsal Databricks workspace in the sandbox's shapes, a local Fuseki 6.2.0 and a local Neo4j 2025.06.2 Enterprise with n10s 2025.06.1 and APOC 2025.06.2 | The whole chain of this guide, through the runner: every command that the document test runs. That includes the reset of all four stores and the load after it. |
 | The Windows test job (Windows Server 2025, Python 3.12, Java 21), with a rehearsal Databricks workspace | The whole check script. Then two parts. The first part runs the setup check with all 15 checks, the first run, which stops on the report, the cleared report, the second run with the cut and every load, and the sync check of the four stores. The second part runs the Fuseki load as its own command, twice, and the same chain with `--skip check`. Then it runs the reset of the four stores with the typed word, a sync check that reads no store as current, the load again, `--replace-enterprise` on a copy that the job made incomplete, and the reset with `--yes`. Through the document test it runs the `setx` command and the `cd` of this guide, and the Cypher of "How to undo". |
 | The client's sandbox and Enterprise server | Nothing yet. Your first run is the first. |
+
+The notebook runs on the Python of the Databricks compute, not on yours. Its code and its tests ran on Python 3.10 and on Python 3.12: `scripts/check-notebook-side.sh` runs the notebook's tests on Python 3.10, in the test job on Linux and on Windows, and `scripts/check.sh` runs them on the machine's own Python. Those tests run the notebook's `main` against a made-up workspace, not on Databricks compute. On real compute the notebook ran only on the rehearsal workspace's serverless Python, which is 3.11 or later: the first cut's notebook imported `tomllib` there. So Python 3.10 on Databricks compute itself is not proven by a test. The commands on your machine need Python 3.11 or later, which the setup check enforces.
 
 These points are not proven on Windows, or not on the client's own objects. Each is written from the code and from the vendor's documentation.
 
