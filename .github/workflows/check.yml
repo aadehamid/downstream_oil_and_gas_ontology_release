@@ -64,6 +64,11 @@ jobs:
       # real run failed there. So their tests run again here on Python 3.10, which uv fetches.
       - name: the notebook's side on Python 3.10
         run: bash scripts/check-notebook-side.sh 3.10
+      # The runbook has the reader unpack the zip and commit the folder to Git before any change. The runner zips every
+      # file of a plain folder and the tracked files of a Git folder, and both must be one zip, also where Git for
+      # Windows could change line ends.
+      - name: one zip from the plain folder and from the Git folder
+        run: bash scripts/check-git-copy.sh
       # check.sh leaves out the tests that ask whether the tree still equals the release as shipped. This branch is
       # the release as shipped, so they must pass here. One system is enough: they compare files, not behaviour.
       - name: check-pinned.sh
@@ -455,7 +460,7 @@ jobs:
       # shared-drive commands of the form's guide (on a stand-in drive S:), the Cypher of "How to undo" (on a
       # database of its own, made and dropped here), and the four commands of the cross-graph questions (on a
       # composite database over two made-up graphs, made and dropped here). The packages are those of
-      # scripts/check.sh. C:\kpi-store-1.1 is the folder the runbook unpacks the release into.
+      # scripts/check.sh. kpi-store-1.1 in the user folder is where the runbook unpacks the release.
       - name: document test, the blocks that need the Neo4j server or a Windows account
         if: matrix.part == 'reset'
         env:
@@ -465,7 +470,7 @@ jobs:
           DOC_SNIPPETS_SHARED_DRIVE: "1"
           PYTHONIOENCODING: utf-8
         run: |
-          mkdir -p /c/kpi-store-1.1
+          mkdir -p "$USERPROFILE/kpi-store-1.1"
           # The stand-in for the client's shared drive that the form's guide names: drive S: over a folder of this
           # runner, with the release's signed example where the guide's check command looks for it.
           mkdir -p "$RUNNER_TEMP/shared-drive/Commercial Planning/Shared/KPI-intake/2-ready-for-check"
@@ -489,9 +494,11 @@ jobs:
                      "epm-walkthrough.html:[0-9]*: powershell run=questions: ran"; do
             grep -q "$ran" "$LOCAL/doc-test.log" || { echo "no block reads: $ran"; exit 1; }
           done
-          # The runbook has two cmd blocks of the Windows account: winget and the setx command. The guide has two
-          # commands on the shared drive. Each must have run, so the count is checked, not only that one ran.
-          [ "$(grep -c "ontology-stores-runbook.md:[0-9]*: cmd run=windows-account: ran" "$LOCAL/doc-test.log")" = 2 ] || { echo "not both cmd blocks of the runbook ran"; exit 1; }
+          # The runbook has three blocks of the Windows account: winget in cmd, and the setx command and the cd in
+          # PowerShell. The guide has two commands on the shared drive. Each must have run, so the counts are checked,
+          # not only that one ran.
+          [ "$(grep -c "ontology-stores-runbook.md:[0-9]*: cmd run=windows-account: ran" "$LOCAL/doc-test.log")" = 1 ] || { echo "the cmd block of the runbook did not run"; exit 1; }
+          [ "$(grep -c "ontology-stores-runbook.md:[0-9]*: powershell run=windows-account: ran" "$LOCAL/doc-test.log")" = 2 ] || { echo "not both PowerShell blocks of the runbook's Windows account ran"; exit 1; }
           [ "$(grep -c "how-to-use-the-form.html:[0-9]*: powershell run=shared-drive: ran" "$LOCAL/doc-test.log")" = 2 ] || { echo "not both shared-drive blocks of the guide ran"; exit 1; }
       - name: the variable that the runbook's setx command set
         if: matrix.part == 'reset'
@@ -499,7 +506,18 @@ jobs:
         run: |
           $account = Get-ItemProperty -Path HKCU:\Environment
           "KPI_STORE_LOCAL = $($account.KPI_STORE_LOCAL)"
-          if ($account.KPI_STORE_LOCAL -ne "C:\kpi-store-local\stores.toml") { exit 1 }
+          if ($account.KPI_STORE_LOCAL -ne "$env:USERPROFILE\kpi-store-local\stores.toml") { exit 1 }
+          # The runbook's two commands with the user folder in them, for a user name that holds a space. $HOME cannot
+          # be set, so another variable stands for it; the quoting and the expansion are the same.
+          $folder = Join-Path $env:RUNNER_TEMP "Jo Smith"
+          New-Item -ItemType Directory -Force "$folder\kpi-store-1.1" | Out-Null
+          setx KPI_STORE_QUOTING_TEST "$folder\kpi-store-local\stores.toml" | Out-Null
+          $saved = (Get-ItemProperty -Path HKCU:\Environment).KPI_STORE_QUOTING_TEST
+          Remove-ItemProperty -Path HKCU:\Environment -Name KPI_STORE_QUOTING_TEST
+          "with a space: $saved"
+          if ($saved -ne "$folder\kpi-store-local\stores.toml") { exit 1 }
+          cd $folder\kpi-store-1.1
+          if ((Get-Location).Path -ne "$folder\kpi-store-1.1") { exit 1 }
 
       # ---- both parts: the first run, the cleared report, the second run ----
       # Part run gives no option, as the runbook's "The first run" and "The second run" do. Part reset adds

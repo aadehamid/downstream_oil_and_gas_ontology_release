@@ -134,6 +134,31 @@ def test_the_file_is_named_by_the_argument_or_the_environment(tmp_path):
         ls.load(tmp_path / "missing.toml", {}, support.ROOT)
 
 
+def test_the_example_s_paths_start_at_the_file_s_folder_and_a_tilde_is_the_user_folder(tmp_path, monkeypatch):
+    """The example file names no drive and no user, so it holds wherever a person keeps the local folder. The
+    release is unpacked into the user folder, whose path differs for every user."""
+    assert ":/" not in stores_support.STORES_TEXT.replace("://", "") and "kpi-store-local" not in stores_support.STORES_TEXT
+    local = stores_support.local_settings(tmp_path / "any folder")
+    here = tmp_path / "any folder"
+    assert (local.settings, local.run_folder) == (here / "kpi_store.toml", here / "runs")
+    assert (local.fuseki.jar, local.fuseki.data_folder) == (here / "jena-fuseki-server-6.2.0.jar", here / "fuseki-db")
+    assert (local.robot_jar, local.projection_out) == (here / "robot.jar", here / "lpg-out")
+    # The three programs of a machine without administrator rights, as the runbook writes them.
+    local = stores_support.local_settings(here, cli='cli = "databricks-cli/databricks.exe"', java='java = "jdk-21/bin/java.exe"',
+                                          bash='bash = "PortableGit/bin/bash.exe"')
+    assert (local.databricks.cli, local.fuseki.java, local.bash) == (
+        here / "databricks-cli" / "databricks.exe", here / "jdk-21" / "bin" / "java.exe", here / "PortableGit" / "bin" / "bash.exe")
+    # ~ is the user folder on every system; a full path stays as written.
+    home = tmp_path / "home of Jo Smith"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    full = (tmp_path / "elsewhere" / "robot.jar").as_posix()
+    tilde = "~"   # apart from the slash, so that the stand-alone check does not read this line as a path of this machine
+    local = stores_support.local_settings(here, run_folder=f'run_folder = "{tilde}/kpi-store-runs"', robot_jar=f'robot_jar = "{full}"')
+    assert local.run_folder == home / "kpi-store-runs" and local.robot_jar == Path(full)
+
+
 def test_the_environment_version_is_2_when_not_set_and_may_be_left_to_the_workspace(tmp_path):
     """Version 2 has Python 3.11, which the rehearsal runs got. A settings file written before the setting
     existed gets it too. An empty value sends no environment, and the workspace chooses."""

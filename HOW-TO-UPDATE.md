@@ -47,7 +47,7 @@ The check proves your copy is valid. Every package equals a fresh build of its s
 
 Do not edit files while the check runs. It compares the folder at its start and its end, and a change fails the run.
 
-A Git copy keeps your history, and the cut tool then commits and tags each correction. Keep the file `.gitattributes` in a Git copy: without it, Git for Windows checks text files out with other line ends, and the packages' hashes differ. A plain folder works too. In a Git copy, run `git add -A` before the check, because one test reads which pages Git tracks.
+Keep the release folder in Git. The runbook's section "Keep the release folder in Git" has the commands and the rules: commit the release as it was unpacked, before any change, and commit only the release's files and your changes to them. Git then keeps your history, the cut tool commits and tags each correction, and the runner zips exactly the files that Git tracks. Keep the file `.gitattributes`: without it, Git for Windows checks text files out with other line ends, and the packages' hashes differ. A plain folder, one with no `.git` folder, works too; there the cut makes no commit and the runner zips every file except caches. In a Git folder, run `git add -A` before the check, because one test reads which pages Git tracks, and commit before a run that cuts.
 
 ## Choose the way a change goes
 
@@ -1182,12 +1182,12 @@ In a Git copy you may name the two copies of the map by the first 12 characters 
 
 The same ontology loads into another workspace with new settings files. The ontology does not change. The ontology names its catalogs `idp_sbx` and `synapse_dev`. The `[names]` table says what each is called in the new environment.
 
-1. Copy `C:\kpi-store-local\kpi_store.toml` to a new file beside it, such as `kpi_store.prod.toml`.
+1. Copy `%USERPROFILE%\kpi-store-local\kpi_store.toml` to a new file beside it, such as `kpi_store.prod.toml`.
 2. In the new file, set `write_catalog` and `read_catalogs` to the new environment's catalogs.
 3. In `[names]`, set each of the ontology's two catalog names to the catalog that holds those objects in the new environment.
 4. Set `warehouse_id` to a SQL warehouse of the new workspace.
-5. Copy `C:\kpi-store-local\stores.toml` to a new file, such as `stores.prod.toml`.
-6. In the new file, set `settings` to the new `kpi_store` file, and `run_folder` to a new folder, such as `C:/kpi-store-local/runs-prod`.
+5. Copy `%USERPROFILE%\kpi-store-local\stores.toml` to a new file, such as `stores.prod.toml`.
+6. In the new file, set `settings` to the new `kpi_store` file, and `run_folder` to a new folder, such as `runs-prod`. A path without a drive starts at the folder of the settings file.
 7. In `[databricks]`, set `profile` to a profile that you signed in to the new workspace with.
 8. Set `[neo4j.enterprise]` to the new environment's server and database.
 9. Run every command for that environment with `--stores` and the new file.

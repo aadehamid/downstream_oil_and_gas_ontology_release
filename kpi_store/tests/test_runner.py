@@ -168,8 +168,38 @@ def test_the_example_settings_file_and_a_commented_password_line_may_travel(setu
 
 def git(root, *args):
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-    runner.subprocess.run(["git", "-C", str(root), "-c", "user.name=sample", "-c", "user.email=sample@example.org", *args],
-                          check=True, capture_output=True, stdin=runner.subprocess.DEVNULL, env=env)
+    return runner.subprocess.run(["git", "-C", str(root), "-c", "user.name=sample", "-c", "user.email=sample@example.org", *args],
+                                 check=True, capture_output=True, stdin=runner.subprocess.DEVNULL, env=env)
+
+
+def test_the_unpacked_release_gives_one_zip_as_a_plain_folder_and_in_git(setup):
+    """The runbook has the reader unpack the zip and commit the folder to Git before any change. The zip of that
+    folder must be the zip of the plain folder: the same files and the same bytes."""
+    (setup.root / ".gitattributes").write_text("* text=auto eol=lf\n", encoding="utf-8", newline="\n")
+    (setup.root / ".gitignore").write_text("__pycache__/\n*.pyc\n", encoding="utf-8", newline="\n")
+    (setup.root / "kpi_store" / "__pycache__").mkdir(exist_ok=True)
+    (setup.root / "kpi_store" / "__pycache__" / "x.cpython-312.pyc").write_bytes(b"\x00cache")
+    (setup.root / "data" / "windows.csv").write_bytes(b"a,b\r\n1,2\r\n")       # a text file as a Windows tool saves it
+    (setup.root / "data" / "picture.bin").write_bytes(bytes(range(256)) + b"\r\n")
+    plain, plain_count = runner.build_zip(setup.root, setup.tmp / "plain.zip")
+    unpacked = setup.tmp / "unpacked"
+    with zipfile.ZipFile(setup.tmp / "plain.zip") as z:
+        names = z.namelist()
+        z.extractall(unpacked)
+    assert ".gitattributes" in names and ".gitignore" in names and not any("__pycache__" in name for name in names)
+    assert runner.build_zip(unpacked, setup.tmp / "unpacked.zip") == (plain, plain_count)
+    git(unpacked, "init", "-q")
+    git(unpacked, "add", "-A")
+    git(unpacked, "commit", "-q", "-m", "as shipped")
+    assert git(unpacked, "status", "--porcelain").stdout == b""
+    assert runner.build_zip(unpacked, setup.tmp / "git.zip") == (plain, plain_count)
+    with zipfile.ZipFile(setup.tmp / "git.zip") as z:
+        assert z.namelist() == names
+    # A tool's project files that are committed there travel in the zip, which is why the runbook says not to.
+    (unpacked / "pyproject.toml").write_text('[project]\nname = "x"\n', encoding="utf-8", newline="\n")
+    assert runner.build_zip(unpacked, setup.tmp / "left.zip") == (plain, plain_count)      # left in the folder, not added
+    git(unpacked, "add", "pyproject.toml")
+    assert runner.build_zip(unpacked, setup.tmp / "added.zip")[1] == plain_count + 1
 
 
 def test_in_a_git_checkout_the_zip_holds_only_the_files_git_tracks(setup):

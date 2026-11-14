@@ -65,7 +65,7 @@ To understand the ontology, open `business_architecture/ontology/epm-ontology-gu
 
 ## Before you run anything
 
-The loads run on a Windows machine. Set these up once. The runbook gives the steps, and the setup check tests each item and prints the fix for any that fails.
+The loads run on a Windows machine. Set these up once. The runbook gives the steps, and the setup check tests each item and prints the fix for any that fails. Unpack the zip to `kpi-store-1.1` in your user folder and put that folder into Git before you change anything: the runbook's sections "Unpack the release" and "Keep the release folder in Git" say how, and "Replace the release with a newer zip" says how a later zip takes its place. Keep your settings, the jars and any Python virtual environment outside the release folder, because the runner zips the release folder and uploads it.
 
 | What you need | Why |
 |---|---|
@@ -111,7 +111,7 @@ bash scripts/check.sh
 all checks passed
 ```
 
-The check passes in a Git copy and in a plain folder, such as the unpacked zip. `bash scripts/check-pinned.sh` is separate and optional. It asks whether your copy still equals this release as shipped. After your first change some of its tests fail. That says only that your copy differs from the release as shipped.
+The check passes in a Git copy, which the runbook recommends, and in a plain folder, such as the unpacked zip. `bash scripts/check-pinned.sh` is separate and optional. It asks whether your copy still equals this release as shipped. After your first change some of its tests fail. That says only that your copy differs from the release as shipped.
 
 Two quick commands show what the release holds. Both need the rdflib package (`python -m pip install rdflib`). The first lists the released modules, each with its version, the modules it requires and its number of triples. In a plain folder the first line says that the commit is unknown.
 
