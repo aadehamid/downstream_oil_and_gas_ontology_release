@@ -113,8 +113,10 @@ def resolve_program(args: list, path: str | None) -> list:
 
 
 # The word `py` where a shell reads a command: at the start of a line, or after `;`, `&`, `|`, `(` or `{`, also
-# behind cmd's `call` or `start`, or an `@` that hides the line. Windows reads the name in any case.
-_LAUNCHER = re.compile(r"(?:^|[;&|({])[ \t]*@?(?:(?:call|start)[ \t]+)?py(?:\.exe)?(?=[ \t]|$)", re.MULTILINE | re.IGNORECASE)
+# behind cmd's `call` or `start` (with its window title and its switches), or an `@` that hides the line. Windows
+# reads the name in any case.
+_LAUNCHER = re.compile(r"(?:^|[;&|({])[ \t]*@?(?:call[ \t]+|start(?:[ \t]+(?:\"[^\"\n]*\"|/\S+))*[ \t]+)?py(?:\.exe)?(?=[ \t]|$)",
+                       re.MULTILINE | re.IGNORECASE)
 
 
 def starts_launcher(body: str) -> bool:

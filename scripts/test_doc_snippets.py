@@ -1006,11 +1006,13 @@ def test_a_block_that_starts_python_with_py_fails_on_every_machine(tmp_path):
     for body in (f"{launcher} -m pip install rdflib", f"$env:A = 1; {launcher} -c \"print(1)\"", f"set B=also&& {launcher} -c \"print(1)\"",
                  f"cd C:\\kpi-store-1.1\n{launcher}.exe -m kpi_store.setup_check", f"if ($true) {{ {launcher} -V }}",
                  f"{launcher.capitalize()} -V", f"{launcher.upper()}.EXE -V", f"call {launcher} -V", f"@{launcher} -V", f"& {launcher} -V",
-                 f"echo on && CALL {launcher} -V", f"start {launcher} tool.{launcher}"):
+                 f"echo on && CALL {launcher} -V", f"start {launcher} tool.{launcher}",
+                 f'start "" {launcher} -V', f"start /wait {launcher} -V", f'START "KPI Store" /wait /b {launcher}.exe -V'):
         assert d.starts_launcher(body), body
     # The word inside another word, a path or an argument is not the launcher.
     for body in ("python -m pip install rdflib", "setx PY_PYTHON 3.12", "uv run tool.py", f"echo {launcher}", f"C:\\tools\\{launcher} -V",
-                 "copy.exe a b", "happy -V", f"call tool.{launcher}", "set PY=3", f"python -m {launcher}_compile x"):
+                 "copy.exe a b", "happy -V", f"call tool.{launcher}", "set PY=3", f"python -m {launcher}_compile x",
+                 f'start "{launcher}" python -V', "start /wait python -V", f"start notepad {launcher}"):
         assert not d.starts_launcher(body), body
     said = ("the block starts Python with `py`. Write `python`: a Python from a virtual environment has no `py` "
             "launcher, so the command would not start there")
