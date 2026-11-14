@@ -87,6 +87,7 @@ from . import settings as settings_module
 from . import setup_check
 
 # The steps in the order they run. A step's place here is also its number in <run>/steps/NN-<name>.json.
+ENVIRONMENT_KEY = "kpi_store"   # the name of the notebook run's one serverless environment inside its request
 STEPS = ("cut", "check", "zip", "volume", "upload", "notebook", "report", "fuseki", "neo4j", "enterprise", "sync", "summary")
 NOTEBOOK = Path("kpi_store") / "notebook" / "kpi_store_load.py"   # inside the release folder
 NOTEBOOK_NAME = "kpi_store_load"   # the notebook's name in the workspace folder, and the run's task key
@@ -546,13 +547,21 @@ def step_upload(ctx):
 
 
 def submit_request(ctx):
-    """The one-time run: one notebook task and no cluster, which Databricks runs on serverless compute."""
-    folder = ctx.local.need("databricks").workspace_folder
-    return {"run_name": f"KPI Store load {ctx.run_id}",
-            "tasks": [{"task_key": NOTEBOOK_NAME,
-                       "notebook_task": {"notebook_path": f"{folder}/{NOTEBOOK_NAME}", "source": "WORKSPACE",
-                                         "base_parameters": {"settings_path": f"{ctx.volume_path}/{SETTINGS_NAME}",
-                                                             "mode": ctx.mode}}}]}
+    """The one-time run: one notebook task and no cluster, which Databricks runs on serverless compute.
+
+    The run names its serverless environment version, [databricks] environment_version, so that the notebook gets
+    the Python it was tested on and not whatever the workspace gives a run that names none. Databricks' page
+    "Configure the serverless environment" (dated 2026-10-22) says a notebook task uses the notebook's own
+    environment unless a job-level environment overrides it; this is that override. An empty setting leaves it out."""
+    bricks = ctx.local.need("databricks")
+    task = {"task_key": NOTEBOOK_NAME,
+            "notebook_task": {"notebook_path": f"{bricks.workspace_folder}/{NOTEBOOK_NAME}", "source": "WORKSPACE",
+                              "base_parameters": {"settings_path": f"{ctx.volume_path}/{SETTINGS_NAME}", "mode": ctx.mode}}}
+    request = {"run_name": f"KPI Store load {ctx.run_id}", "tasks": [task]}
+    if bricks.environment_version:
+        task["environment_key"] = ENVIRONMENT_KEY
+        request["environments"] = [{"environment_key": ENVIRONMENT_KEY, "spec": {"environment_version": bricks.environment_version}}]
+    return request
 
 
 def _json(text, what):

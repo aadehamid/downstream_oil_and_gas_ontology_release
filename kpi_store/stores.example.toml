@@ -11,6 +11,7 @@ run_folder = "C:/kpi-store-local/runs"            # the runner writes each run's
 profile = "DEFAULT"                               # the Databricks CLI profile you signed in with (databricks auth login)
 workspace_folder = "/Workspace/Shared/kpi_store"  # the notebook is imported here as kpi_store_load
 timeout_minutes = 60                              # how long the runner waits for the notebook run
+environment_version = "2"                         # the serverless environment of the notebook run: "2" has Python 3.11; "" leaves the choice to the workspace
 cli = ""                                          # the databricks executable; empty means the one on PATH
 
 [fuseki]

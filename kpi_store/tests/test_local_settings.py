@@ -12,6 +12,7 @@ def test_the_example_file_gives_every_setting(tmp_path):
     assert local.settings == tmp_path / "kpi_store.toml" and local.run_folder == tmp_path / "runs"
     assert (local.databricks.profile, local.databricks.workspace_folder) == ("DEFAULT", "/Workspace/Shared/kpi_store")
     assert local.databricks.timeout_minutes == 60 and local.databricks.cli is None
+    assert local.databricks.environment_version == "2"
     f = local.fuseki
     assert (f.url, f.port, f.dataset, f.is_local) == ("http://127.0.0.1:3030/ds", 3030, "/ds", True)
     assert (f.query_url, f.data_url, f.update_url) == ("http://127.0.0.1:3030/ds/query", "http://127.0.0.1:3030/ds/data",
@@ -90,6 +91,8 @@ def test_a_folder_the_runner_writes_to_may_not_be_inside_the_release(tmp_path, k
     ({"workspace_folder": 'workspace_folder = "Shared/kpi_store"'}, "must start with /"),
     ({"timeout_minutes": "timeout_minutes = 0"}, "must be 1 or more"),
     ({"timeout_minutes": 'timeout_minutes = "60"'}, "must be a whole number"),
+    ({"environment_version": "environment_version = 2"}, "must be text"),
+    ({"environment_version": 'environment_version = "latest"'}, 'must be a number in quotes, such as "2"'),
     ({"profile": 'profile = " "'}, "must name a Databricks CLI profile"),
     ({"password": 'password = ""'}, "exactly one of password and password_env"),
     ({"password": 'password = "a"\npassword_env = "B"'}, "exactly one of password and password_env"),
@@ -129,3 +132,16 @@ def test_the_file_is_named_by_the_argument_or_the_environment(tmp_path):
         ls.locate(None, {})
     with pytest.raises(ls.LocalSettingsError, match="cannot read the local settings file"):
         ls.load(tmp_path / "missing.toml", {}, support.ROOT)
+
+
+def test_the_environment_version_is_2_when_not_set_and_may_be_left_to_the_workspace(tmp_path):
+    """Version 2 has Python 3.11, which the rehearsal runs got. A settings file written before the setting
+    existed gets it too. An empty value sends no environment, and the workspace chooses."""
+    assert ls.ENVIRONMENT_VERSION == "2"
+    text = (tmp_path / "stores.toml")
+    stores_support.local_settings(tmp_path)
+    lines = [line for line in text.read_text(encoding="utf-8").split("\n") if not line.startswith("environment_version")]
+    text.write_text("\n".join(lines), encoding="utf-8", newline="\n")
+    assert ls.load(text, {}, support.ROOT).databricks.environment_version == "2"
+    assert stores_support.local_settings(tmp_path, environment_version='environment_version = ""').databricks.environment_version == ""
+    assert stores_support.local_settings(tmp_path, environment_version='environment_version = " 4 "').databricks.environment_version == "4"

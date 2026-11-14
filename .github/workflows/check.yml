@@ -78,8 +78,9 @@ jobs:
   #          makes os.symlink fail in every Python that inherits PYTHONPATH and KPI_CHECK_NO_LINKS. A Python that a
   #          test starts with a clean environment is not reached, so this proves less than a real plain account.
   #   py     Every py launcher on PATH is renamed, and the job fails unless bash, PowerShell and cmd all find none.
-  # The last step reads the log: tests were skipped for the link, and the document test counted blocks for the
-  # launcher. Without those lines the job would pass on a runner that was never made plain. It gets no secret.
+  # The last step reads the log: tests were skipped for the link. Without those lines the job would pass on a runner
+  # that was never made plain. Nothing is skipped for the launcher: no command of the release starts py, and the
+  # document test fails a block that does, so a passing check here means that nothing needed it. It gets no secret.
   check-plain-account:
     name: check (no links, no py)
     runs-on: windows-2025
@@ -97,7 +98,7 @@ jobs:
         shell: pwsh
         run: |
           for ($i = 0; $i -lt 20; $i++) {
-            $found = Get-Command python -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+            $found = Get-Command py -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
             if (-not $found) { break }
             Write-Output "renaming $($found.Source)"
             Rename-Item -LiteralPath $found.Source -NewName ((Split-Path -Leaf $found.Source) + ".off")
@@ -141,7 +142,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}/scripts/no-links
           PYTEST_ADDOPTS: -rs   # name each skipped test and why: the next step reads those lines
         run: bash scripts/check.sh 2>&1 | tee "$RUNNER_TEMP/check.log"
-      - name: the log shows both conditions at work
+      - name: the log shows that tests were skipped for the link
         run: |
           links="$(grep -c 'does not let the test make a link\|cannot make a symbolic link\|cannot make a link' "$RUNNER_TEMP/check.log" || true)"
           echo "skips for a link: $links"

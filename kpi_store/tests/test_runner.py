@@ -326,10 +326,12 @@ def test_the_notebook_is_imported_submitted_serverless_and_its_result_read(setup
         [CLI, "jobs", "get-run-output", "7002", "--output", "json", *PROFILE]]
     assert json.loads(request_file.read_text(encoding="utf-8")) == {
         "run_name": f"KPI Store load {RUN}",
-        "tasks": [{"task_key": "kpi_store_load",
+        "tasks": [{"task_key": "kpi_store_load", "environment_key": "kpi_store",
                    "notebook_task": {"notebook_path": "/Workspace/Shared/kpi_store/kpi_store_load", "source": "WORKSPACE",
                                      "base_parameters": {"settings_path": "/Volumes/idp_sbx/kpi_store/releases/kpi_store.toml",
-                                                         "mode": "load"}}}]}   # no cluster: the run is serverless
+                                                         "mode": "load"}}}],   # no cluster: the run is serverless
+        # The run names its serverless environment, so it gets the Python the notebook was tested on.
+        "environments": [{"environment_key": "kpi_store", "spec": {"environment_version": "2"}}]}
     assert (result["status"], result["databricks_run_id"]) == ("loaded", 7001)
     assert result["line"] == "notebook run 7001 loaded: 58250 triples in idp_sbx.kpi_store.epm_triples, hash ab12"
     assert all("shell" not in o and o["stdin"] == runner.subprocess.DEVNULL for o in run.options)
