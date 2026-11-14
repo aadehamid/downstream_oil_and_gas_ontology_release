@@ -427,7 +427,7 @@ function refreshResults() {
   const s=browseState;
   const found=data.nodes.filter(n=>isLocal(n) && (s.layer==="Rules and evidence" ? layer(n)===s.layer : referenceTerms.has(n.id))
     && (!s.module||moduleNames(n).includes(s.module)) && (!s.layer||layer(n)===s.layer)
-    && (n.label+" "+n.id+" "+definition(n)).toLowerCase().includes(s.q.toLowerCase()));
+    && (n.label+" "+(n.releasedLabel||"")+" "+n.id+" "+definition(n)).toLowerCase().includes(s.q.toLowerCase()));
   // An exact label match comes first, then the labels that start with the search text, then the rest.
   const q=s.q.trim().toLowerCase();
   const rank=n=>{const label=n.label.toLowerCase();return label===q?0:label.startsWith(q)?1:2;};

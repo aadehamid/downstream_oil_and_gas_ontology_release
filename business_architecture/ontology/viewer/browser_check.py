@@ -28,7 +28,8 @@ For viewer/index.html it also proves:
 For horoi_viewer/index.html it also proves:
 
   9 ranking       search lists an exact label match first, then the labels that start with the search text
-  10 names        each module has the name the full ontology viewer gives it
+  10 names        each module has its title without the leading "MPC ", and so has every other name;
+                  a search for a name as its package states it still finds the term
   11 measure      a measure's page shows "What points to this term" directly under its definition
   12 language     a definition shows no "en" language tag
   13 slash key    the "/" key opens Find a term with the cursor in its search box, except while the reader types
@@ -101,21 +102,32 @@ CUSTOMER_ACCOUNT = "https://w3id.org/mpc/ontology/modules/party/CustomerAccount"
 # The labels of 32 terms start with "terminal" in either case: 4 in data-product, 13 in party, 1 in system,
 # 2 in value-stream, 3 in core and 9 in logical-model. One of the 32 is "Terminal" itself.
 TERMINAL_LABELS = 32
-# Each module's dcterms:title, the name the full ontology viewer shows on Module overview.
+# Each module's dcterms:title without its leading "MPC ": the reference page leaves that word off every name it
+# shows, because the whole reference is MPC's. The full ontology viewer shows the title as the package states it.
 MODULE_NAMES = {
-    "core": "MPC Core Process Ontology",
-    "data-product": "MPC Data Product Module",
-    "integration": "MPC Integration Vocabularies",
-    "kpi": "MPC KPI Module",
-    "lane": "MPC Lane Module",
-    "logical-model": "MPC Logical Model Module",
-    "market-data": "MPC Market Data Module",
-    "organization": "MPC Organization Module",
-    "party": "MPC Party Module",
-    "ref-mpc": "MPC Reference Instances: Marathon Petroleum Corporation",
-    "system": "MPC System Module",
-    "technical-graph": "MPC Technical Graph Module",
-    "value-stream": "MPC Value Stream Module",
+    "core": "Core Process Ontology",
+    "data-product": "Data Product Module",
+    "integration": "Integration Vocabularies",
+    "kpi": "KPI Module",
+    "lane": "Lane Module",
+    "logical-model": "Logical Model Module",
+    "market-data": "Market Data Module",
+    "organization": "Organization Module",
+    "party": "Party Module",
+    "ref-mpc": "Reference Instances: Marathon Petroleum Corporation",
+    "system": "System Module",
+    "technical-graph": "Technical Graph Module",
+    "value-stream": "Value Stream Module",
+}
+
+
+# Terms whose released name starts with "MPC ", and the name the reference page shows for each.
+SHOWN_WITHOUT_MPC = {
+    "https://w3id.org/mpc/ontology/modules/core": "Core Process Ontology",
+    "https://w3id.org/mpc/ontology/modules/market-data/series/crack-mpr-42023": "Internal Blended 3-2-1 Crack, ex-RIN",
+    "https://w3id.org/mpc/ontology/modules/party/attribute/salesforce/enrich/mpc-diesel-volume": "Diesel Volume",
+    "https://w3id.org/mpc/ontology/modules/party/attribute/salesforce/enrich/mpc-gas-volume": "Gas Volume",
+    "https://w3id.org/mpc/ontology/modules/party/mpcClassification": "classification",
 }
 
 
@@ -415,7 +427,7 @@ def reference_modules(s):
     same(found, MODULES, "the modules and their versions")
     s.shot(page.locator(".module-directory"), "2-module-list")
     page.locator(".module-directory a.tile.technical-graph").click()
-    reference_heading(page, "MPC Technical Graph Module", "the module page")
+    reference_heading(page, "Technical Graph Module", "the module page")
     same(page.locator("#content .eyebrow").first.text_content(), "technical-graph · 1.1.0", "its version line")
     page.wait_for_function("scrollY < 5")  # the page scrolls back to its top smoothly; wait for that to end
     s.shot(page, "2-module-overview")
@@ -469,13 +481,13 @@ def reference_back(s):
     reference_heading(page, PROCESS_LABEL, "the term the relationship link opened")
     page.go_back()
     reference_heading(page, MEASURE_LABEL, "the term after Back")
-    same(page.locator(".crumb").inner_text(), "Overview / MPC KPI Module / Business concepts", "the breadcrumb")
+    same(page.locator(".crumb").inner_text(), "Overview / KPI Module / Business concepts", "the breadcrumb")
     page.go_back()
     same(page.locator("#search").input_value(), MEASURE_LABEL, "the search text after a second Back")
     page.go_forward()
     reference_heading(page, MEASURE_LABEL, "the term after Forward")
-    page.locator(".crumb a", has_text="MPC KPI Module").click()
-    reference_heading(page, "MPC KPI Module", "the module page its breadcrumb opens")
+    page.locator(".crumb a", has_text="KPI Module").click()
+    reference_heading(page, "KPI Module", "the module page its breadcrumb opens")
     same(page.locator("#content .eyebrow").first.text_content(), "kpi · 1.3.0", "its version line")
     page.locator(".crumb a", has_text="Overview").click()
     page.locator(".module-directory").wait_for()
@@ -487,7 +499,7 @@ def reference_deep_link(s):
     reference_heading(page, MEASURE_LABEL, "the term a direct link opens")
     same(page.locator("#term-iri").inner_text(), MEASURE, "its identifier")
     page = s.open("#module=technical-graph")
-    reference_heading(page, "MPC Technical Graph Module", "the module a direct link opens")
+    reference_heading(page, "Technical Graph Module", "the module a direct link opens")
 
 
 def reference_narrow(s):
@@ -524,6 +536,15 @@ def reference_names(s):
     page = s.open("#browse")
     options = page.locator("#module-filter option").all_inner_texts()
     same(options, ["All modules", *MODULE_NAMES.values()], "the module names in the search filter")
+    # No name on the page starts with the word: the term's heading, its tile in the results and the release catalog.
+    for iri, shown in SHOWN_WITHOUT_MPC.items():
+        page = s.open(term_link(iri))
+        reference_heading(page, shown, f"the heading of {iri}")
+    # The name as the package states it still finds the term, and the result shows the name without the word.
+    page = s.open("#browse")
+    page.locator("#search").fill("MPC Diesel Volume")
+    page.wait_for_function("document.querySelector('#results li a')?.innerText === 'Diesel Volume'")
+    same(page.locator("#results li a").first.inner_text(), "Diesel Volume", "the first result for the released name")
 
 
 def section_headings(page):
