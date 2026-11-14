@@ -1012,7 +1012,8 @@ def test_a_block_that_starts_python_with_py_fails_on_every_machine(tmp_path):
     # The word inside another word, a path or an argument is not the launcher.
     for body in ("python -m pip install rdflib", "setx PY_PYTHON 3.12", "uv run tool.py", f"echo {launcher}", f"C:\\tools\\{launcher} -V",
                  "copy.exe a b", "happy -V", f"call tool.{launcher}", "set PY=3", f"python -m {launcher}_compile x",
-                 f'start "{launcher}" python -V', "start /wait python -V", f"start notepad {launcher}"):
+                 f'start "{launcher}" python -V', "start /wait python -V", f"start notepad {launcher}",
+                 f'start "" "python" {launcher} -V'):   # after the title, the quoted word is the program and the launcher's name its argument
         assert not d.starts_launcher(body), body
     said = ("the block starts Python with `py`. Write `python`: a Python from a virtual environment has no `py` "
             "launcher, so the command would not start there")
