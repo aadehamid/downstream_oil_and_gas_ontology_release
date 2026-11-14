@@ -506,9 +506,9 @@ jobs:
         run: |
           $account = Get-ItemProperty -Path HKCU:\Environment
           "KPI_STORE_LOCAL = $($account.KPI_STORE_LOCAL)"
-          if ($account.KPI_STORE_LOCAL -ne "$env:USERPROFILE\kpi-store-local\stores.toml") { exit 1 }
-          # The runbook's two commands with the user folder in them, for a user name that holds a space. $HOME cannot
-          # be set, so another variable stands for it; the quoting and the expansion are the same.
+          if ($account.KPI_STORE_LOCAL -ne "$HOME\kpi-store-local\stores.toml") { exit 1 }
+          # The runbook's two commands with the user folder in them, for a user name that holds a space. PowerShell lets no
+          # script set its user folder variable, so another variable stands for it; the quoting and the expansion are the same.
           $folder = Join-Path $env:RUNNER_TEMP "Jo Smith"
           New-Item -ItemType Directory -Force "$folder\kpi-store-1.1" | Out-Null
           setx KPI_STORE_QUOTING_TEST "$folder\kpi-store-local\stores.toml" | Out-Null
