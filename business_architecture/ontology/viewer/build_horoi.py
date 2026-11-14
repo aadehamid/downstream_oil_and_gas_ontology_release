@@ -34,10 +34,9 @@ _spec.loader.exec_module(viewer)
 HOROI_VERSION = "0.2.0"
 HOROI_COMMIT = "e0660af0f795ebfeb6f1354a69b3b0c47ebafba6"
 DCTERMS = "http://purl.org/dc/terms/"
-# The word the page leaves off the front of a name, and the kinds of node that keep it. An Evidence node is a
-# source, and its name is the source's citation, which is quoted as it stands.
+# The word the page leaves off the front of every name it shows, a source's name included: the owner asked that no
+# shown name start with it.
 IMPLIED_PREFIX = "MPC "
-KEEPS_ITS_NAME = ("Evidence",)
 
 
 def shown_name(label):
@@ -52,8 +51,6 @@ def shown_names(data):
     as releasedLabel, so that a search for the old name still finds it. The node's statements are not touched: they
     are what the packages state."""
     for node in data["nodes"]:
-        if node["kind"] in KEEPS_ITS_NAME:
-            continue
         shown = shown_name(node["label"])
         if shown != node["label"]:
             node["releasedLabel"], node["label"] = node["label"], shown

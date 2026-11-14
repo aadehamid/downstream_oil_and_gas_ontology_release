@@ -15,4 +15,8 @@ the below should also remove MPC - Terms whose own name starts with MPC, such as
 
 Page title can stay. The older viwer is already complaint
 
-What it allows (the agent's text, not the owner's words): the reference page shows every name without a leading "MPC ". Decided (delegated under KPI-DEC-0001): the change is in what the page shows and nowhere else. The released packages keep their names, because a released package never changes, and a term's page still lists the name as its package states it, among its statements. A source keeps its citation as its name. The page's title and heading, the definitions and other running text, the identifiers and the full ontology viewer stay as they are. A search for a name as its package states it still finds the term.
+The owner then set the goal for the seventh zip on 2026-11-14. The next paragraph is one sentence of it, unchanged.
+
+No name shown in the Horoi viewer starts with "MPC", except the page title.
+
+What it allows (the agent's text, not the owner's words): the reference page shows every name without a leading "MPC ". Decided (delegated under KPI-DEC-0001): the change is in what the page shows and nowhere else. The released packages keep their names, because a released package never changes, and a term's page still lists the name as its package states it, among its statements. A source's name loses the word too: the owner's goal for the seventh zip says that no name shown there starts with "MPC", except the page title. A column's name such as `MPC_Cost_Center_Id` is an identifier in the client's tables and stays as the table has it. The page's title and heading, the definitions and other running text, the identifiers and the full ontology viewer stay as they are. A search for a name as its package states it still finds the term.

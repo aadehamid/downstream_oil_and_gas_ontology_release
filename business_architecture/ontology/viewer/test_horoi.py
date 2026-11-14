@@ -222,18 +222,22 @@ def test_the_build_shows_names_without_the_word_and_keeps_the_statements(tmp_pat
 def test_no_name_the_committed_page_shows_starts_with_mpc_and_its_title_still_does():
     page = (ROOT / "horoi_viewer" / "index.html").read_text(encoding="utf-8")
     data = embedded(page)
-    # A source keeps its citation as its name. Every other name is shown without the word.
-    with_word = [(n["kind"], n["label"].split(",")[0]) for n in data["nodes"] if n["label"].startswith("MPC ")]
-    assert with_word == [("Evidence", "MPC core 2.3.0"), ("Evidence", "MPC Economics"), ("Evidence", "MPC performance measures")]
+    # Every name is shown without the word, a source's name included. A column's name such as
+    # MPC_Cost_Center_Id is an identifier in the client's tables, not the word, and stays as the table has it.
+    assert [n["label"] for n in data["nodes"] if n["label"].startswith("MPC ")] == []
+    assert all(n["label"].startswith("MPC_") for n in data["nodes"] if n["label"].startswith("MPC"))
     assert [m["label"] for m in data["moduleInfo"] if m["label"].startswith("MPC")] == []
     changed = {n["releasedLabel"]: n["label"] for n in data["nodes"] if "releasedLabel" in n}
-    assert len(changed) == 31 and all(old == "MPC " + new for old, new in changed.items())
+    assert len(changed) == 34 and all(old == "MPC " + new for old, new in changed.items())
     for old, new in (("MPC Diesel Volume", "Diesel Volume"), ("MPC Gas Volume", "Gas Volume"),
                      ("MPC Internal Blended 3-2-1 Crack, ex-RIN", "Internal Blended 3-2-1 Crack, ex-RIN"),
                      ("MPC classification", "classification"), ("MPC Core Process Ontology", "Core Process Ontology"),
                      ("MPC KPI Module 1.3.0", "KPI Module 1.3.0"), ("MPC Ontology Release Catalog", "Ontology Release Catalog"),
                      ("MPC Reference Instances: Marathon Petroleum Corporation", "Reference Instances: Marathon Petroleum Corporation")):
         assert changed[old] == new
+    # The three sources lose the word as well.
+    assert sorted(new.split(",")[0] for old, new in changed.items() if old.split(",")[0] in (
+        "MPC core 2.3.0", "MPC Economics", "MPC performance measures")) == ["Economics", "core 2.3.0", "performance measures"]
     # No two terms of one kind share a shown name because of the change.
     names = [(n["kind"], n["label"].lower()) for n in data["nodes"]]
     assert [(kind, new) for new in changed.values() for kind in {k for k, name in names if name == new.lower()}
