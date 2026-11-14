@@ -26,6 +26,7 @@ Exit 0 when every check passed, 1 when one failed, 2 on bad arguments.
 """
 import argparse
 import importlib.metadata
+import importlib.util
 import os
 import shutil
 import subprocess
@@ -64,11 +65,15 @@ class Context:
     run, which and connect."""
 
     def __init__(self, stores=None, environ=None, run=subprocess.run, which=shutil.which, connect=None,
-                 release_root=ls.ROOT, version=None, installed=importlib.metadata.version):
+                 release_root=ls.ROOT, version=None, installed=importlib.metadata.version, executable=None, has_pip=None):
         self.environ = os.environ if environ is None else environ
         self.run, self.which, self.release_root = run, which, Path(release_root)
         self.version = version or sys.version_info[:3]
         self.installed = installed
+        # The Python that runs this command, and whether it holds pip: the packages' fix line names both. An
+        # environment that uv made holds no pip.
+        self.executable = executable or sys.executable
+        self.has_pip = importlib.util.find_spec("pip") is not None if has_pip is None else has_pip
         self.connect = connect
         # Settings that cannot be read do not stop the command: the checks that need none still run, and each
         # check that needs them fails with the settings' own fix (needs_settings).
@@ -159,8 +164,10 @@ def python(ctx):
 
 
 def packages(ctx):
-    """Every package in PACKAGES is installed at exactly its pinned version. The fix is one pip command that
-    names only the packages that are missing or differ."""
+    """Every package in PACKAGES is installed at exactly its pinned version. The fix is one install command that
+    names only the packages that are missing or differ. It names the Python that ran this check, by its path, so
+    the packages go where this check looks: the word `py` may start another Python, and in a virtual environment
+    it is often not there at all. A Python without pip gets the same install through uv."""
     wrong = []
     for name, version in PACKAGES.items():
         try:
@@ -171,7 +178,8 @@ def packages(ctx):
             wrong.append((name, version, have))
     if wrong:
         said = ", ".join(f"{n} {have or 'missing'} (need {v})" for n, v, have in wrong)
-        return failed(said, "py -m pip install " + " ".join(f"{n}=={v}" for n, v, _ in wrong))
+        install = f'"{ctx.executable}" -m pip install' if ctx.has_pip else f'uv pip install --python "{ctx.executable}"'
+        return failed(said, install + " " + " ".join(f"{n}=={v}" for n, v, _ in wrong))
     return passed(", ".join(f"{n} {v}" for n, v in PACKAGES.items()))
 
 

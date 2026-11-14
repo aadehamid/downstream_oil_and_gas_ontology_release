@@ -1,6 +1,8 @@
 """The setup check: each check passes on a machine that is set up, and fails with one fix line on one that is not."""
 import hashlib
 import importlib.metadata
+import importlib.util
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -12,12 +14,13 @@ from kpi_store.tests import stores_support, support
 TARGET = "businessprocessarchitecturegraph"
 
 
-def context(tmp_path, run=None, which=None, connect=None, version=(3, 12, 4), installed=None, write=True, **replace):
+def context(tmp_path, run=None, which=None, connect=None, version=(3, 12, 4), installed=None, write=True,
+            executable="C:/sample folder/python.exe", has_pip=True, **replace):
     if write:
         stores_support.local_settings(tmp_path, **replace)
     return sc.Context(str(tmp_path / "stores.toml"), environ={}, run=run or (lambda cmd, **k: SimpleNamespace(returncode=0, stdout="", stderr="")),
                       which=which or (lambda name: None), connect=connect, version=version,
-                      installed=installed or (lambda name: sc.PACKAGES[name]))
+                      installed=installed or (lambda name: sc.PACKAGES[name]), executable=executable, has_pip=has_pip)
 
 
 def test_the_checks_have_these_names_in_this_order():
@@ -42,7 +45,15 @@ def test_a_missing_or_other_package_version_gets_the_exact_install_line(tmp_path
         return "0.163.0" if name == "databricks-sdk" else sc.PACKAGES[name]
     ok, detail, fix = sc.packages(context(tmp_path, installed=installed))
     assert ok is False and detail == "neo4j missing (need 6.4.1), databricks-sdk 0.163.0 (need 0.164.0)"
-    assert fix == "py -m pip install neo4j==6.4.1 databricks-sdk==0.164.0"
+    # The line names the Python that ran the check, in quotes, never the word `py`: on the machine of the first real
+    # run `py` was not there, and the Python was a virtual environment's.
+    assert fix == '"C:/sample folder/python.exe" -m pip install neo4j==6.4.1 databricks-sdk==0.164.0'
+    # A Python without pip, as in an environment that uv made, gets the same packages through uv.
+    assert sc.packages(context(tmp_path, installed=installed, has_pip=False))[2] == (
+        'uv pip install --python "C:/sample folder/python.exe" neo4j==6.4.1 databricks-sdk==0.164.0')
+    # By default the context reads both from the Python that runs it.
+    plain = sc.Context(str(tmp_path / "stores.toml"), environ={})
+    assert plain.executable == sys.executable and plain.has_pip is (importlib.util.find_spec("pip") is not None)
 
 
 def test_the_local_settings_must_exist_outside_the_release(tmp_path):
