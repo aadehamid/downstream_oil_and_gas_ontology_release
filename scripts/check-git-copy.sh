@@ -11,6 +11,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 while IFS= read -r var; do unset "$var"; done < <(compgen -e | grep '^GIT_' || true)
 export PYTHONDONTWRITEBYTECODE=1 PYTHONIOENCODING=utf-8
+# uv starts a Python of its own choice for "uv run", and it prefers one it installed itself, whatever its version.
+# The release's code on this machine needs Python 3.11 or later, so uv is told so here. A --python option on a
+# command line still wins, as in scripts/check-notebook-side.sh.
+export UV_PYTHON="${UV_PYTHON:->=3.11}"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 build() {  # <release folder> <zip to write>: prints "<sha256> <files>"

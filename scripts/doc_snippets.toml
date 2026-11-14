@@ -47,15 +47,20 @@ awaits-the-rewrite = "The document is about to be rewritten, and the block goes 
 #   runs          for a language the check cannot run itself (sql, cypher) or must run in another way (python): the
 #                 command line that runs a block's text. It gets the text as a file, the last argument
 
+# The three quick contexts give a block ten minutes. A block that takes 40 seconds on a fast machine ran past
+# two minutes on a slow test machine, and the reader's laptop may be slower still.
 [contexts.scratch]
+timeout = 600
 base = "empty"
 about = "An empty folder. For a command that needs nothing from the release."
 
 [contexts.release-copy]
+timeout = 600
 base = "release-copy"
 about = "A copy of the release, as a plain folder. For a quick command that reads or changes the release."
 
 [contexts.release-git]
+timeout = 600
 base = "release-copy"
 git = true
 about = "A copy of the release in a new Git repository with one commit. For a quick command that uses Git."

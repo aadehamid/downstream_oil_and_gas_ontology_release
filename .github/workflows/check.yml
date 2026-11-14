@@ -112,6 +112,9 @@ jobs:
           cmd /d /c "where py >nul 2>nul"
           if ($LASTEXITCODE -eq 0) { Write-Output "::error::cmd still finds py"; exit 1 }
           Write-Output "PowerShell and cmd find no py"
+          # "where" ended with 1 because it found nothing, which is the wanted result. Without this line the
+          # step would end with that exit code and fail.
+          exit 0
       - name: bash finds no py
         run: |
           if command -v py >/dev/null 2>&1; then echo "::error::bash still finds py at $(command -v py)"; exit 1; fi

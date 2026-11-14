@@ -14,6 +14,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 while IFS= read -r var; do unset "$var"; done < <(compgen -e | grep '^GIT_' || true)
 export PYTHONDONTWRITEBYTECODE=1
+# uv starts a Python of its own choice for "uv run", and it prefers one it installed itself, whatever its version.
+# The release's code on this machine needs Python 3.11 or later, so uv is told so here. A --python option on a
+# command line still wins, as in scripts/check-notebook-side.sh.
+export UV_PYTHON="${UV_PYTHON:->=3.11}"
 # A check's output is UTF-8 on every system. On Windows a Python whose output goes to a pipe would otherwise write
 # cp1252 and fail on a character cp1252 lacks.
 export PYTHONIOENCODING=utf-8

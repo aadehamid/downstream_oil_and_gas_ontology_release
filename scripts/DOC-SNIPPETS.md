@@ -468,8 +468,8 @@ A context is one chain. When its variable is not set, the check counts every blo
 prints the count with the variable to set. So keep the quick, independent commands in a context that always
 runs, and give a guide whose steps take minutes one context for all its steps.
 
-A block must be quick in a context that always runs: `scripts/check.sh` runs them all, and the whole document
-check has two minutes.
+A block must be quick in a context that always runs: `scripts/check.sh` runs them all. Keep such a block to
+seconds on a fast machine. Its limit is ten minutes, because a slow machine takes several times as long.
 
 A check that a block starts, such as `bash scripts/check.sh` in a copy of the release, runs no block itself, and
 its last line says so. The running check proves to it that a block started it. The variable
