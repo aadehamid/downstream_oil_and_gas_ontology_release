@@ -326,7 +326,11 @@ def test_names_check_finds_the_owner_in_any_case_path_and_office_file(tmp_path):
     (tmp_path / "prose.md").write_text(f"line one\n{first.upper()} approved it.\n", encoding="utf-8", newline="\n")
     (tmp_path / "link.md").write_text(f"https://github.com/{user}/repo\n", encoding="utf-8", newline="\n")
     (tmp_path / f"{first.lower()}-notes.txt").write_text("no name inside\n", encoding="utf-8", newline="\n")
-    os.symlink("clean.md", tmp_path / f"{first}-link.md")
+    try:   # Windows lets an account make a link only with administrator rights or Developer Mode
+        os.symlink("clean.md", tmp_path / f"{first}-link.md")
+        linked = [f"{first}-link.md: the path names the decision owner"]
+    except (OSError, NotImplementedError):
+        linked = []   # without the link, every other row is still checked
     with zipfile.ZipFile(tmp_path / "book.xlsx", "w") as z:
         z.writestr("xl/worksheets/sheet1.xml", f"<t>{first}'s verdict</t>")
     # Office shows these cells as the name: a character reference, and two rich-text runs.
@@ -347,7 +351,7 @@ def test_names_check_finds_the_owner_in_any_case_path_and_office_file(tmp_path):
         "PROBE.XLSX!docProps/core.xml (decoded values):1: names the decision owner",
         "book.xlsx!xl/worksheets/sheet1.xml:1: names the decision owner",
         "book.xlsx!xl/worksheets/sheet1.xml (decoded values):1: names the decision owner",
-        f"{first}-link.md: the path names the decision owner",
+        *linked,
         f"{first.lower()}-notes.txt: the path names the decision owner",
         "link.md:1: names the decision owner",
         "link.md (displayed text):1: names the decision owner",
