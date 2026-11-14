@@ -1,7 +1,7 @@
 """Loads the release into a local Jena Fuseki and proves by a hash that the store holds exactly the release.
 
-    py -m kpi_store.load_fuseki --stores <local settings file>            # start or reuse Fuseki, load, check
-    py -m kpi_store.load_fuseki --stores <local settings file> --stop     # stop the Fuseki this command started
+    python -m kpi_store.load_fuseki --stores <local settings file>            # start or reuse Fuseki, load, check
+    python -m kpi_store.load_fuseki --stores <local settings file> --stop     # stop the Fuseki this command started
 
 Where it sits in the run: this is the runner's fuseki step (kpi_store.runner). It runs after the Databricks
 notebook loaded the release, and before the local Neo4j load. The sync check reads the same dataset afterwards.

@@ -1,10 +1,10 @@
 """Empties the stores the KPI Store loaded, so that the next run loads them again from nothing.
 
-    py -m kpi_store.runner --reset                        # all four stores
-    py -m kpi_store.runner --reset --only fuseki,neo4j    # only these stores
-    py -m kpi_store.runner --reset --skip databricks      # all but these stores
-    py -m kpi_store.runner --reset --dry-run              # say what would be deleted, and delete nothing
-    py -m kpi_store.runner --reset --yes                  # do not ask first; for a script
+    python -m kpi_store.runner --reset                        # all four stores
+    python -m kpi_store.runner --reset --only fuseki,neo4j    # only these stores
+    python -m kpi_store.runner --reset --skip databricks      # all but these stores
+    python -m kpi_store.runner --reset --dry-run              # say what would be deleted, and delete nothing
+    python -m kpi_store.runner --reset --yes                  # do not ask first; for a script
 
 This module has no command of its own. The runner calls run() here when it is given --reset.
 
@@ -527,5 +527,5 @@ def run(ctx, stores=STORES, yes=False, dry_run=False, ask=input, connect=local_l
                 + f"Not emptied: {store_list(left_alone)}; {'its line above says' if len(left_alone) == 1 else 'their lines above say'} why. " + (f"{holds}. " if empty else "")
                 + f"Run the same command again, or {skip_hint}")
         return 1
-    ctx.out(f"reset done: {holds}. To load again, run: py -m kpi_store.runner")
+    ctx.out(f"reset done: {holds}. To load again, run: python -m kpi_store.runner")
     return 0

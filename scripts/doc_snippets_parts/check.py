@@ -16,12 +16,12 @@ from .pages import extract_html, html_documents, is_page
 from .parsers import PARSERS
 from .registry import (NESTED, NESTED_FILE, PARSE_LANGS, PARSED_WHEN_SKIPPED, PLACEHOLDER, REGISTRY, ROOT, RUN_LANGS,
                        SAFE_VALUE, Registry, load_registry, release_digest)
-from .run import CopyError, NotSimple, Runner, command_lines, family, split_command
+from .run import CopyError, NotSimple, Runner, command_lines, family, split_command, starts_launcher
 from .static import chain_order, usage_problem
 
 OUTPUT_TAIL = 40
 NESTED_NOTE = "this check was started by a block of another check, so it ran no block"
-REFRESH = "py scripts/doc_snippets.py describe-release --write"
+REFRESH = "python scripts/doc_snippets.py describe-release --write"
 RELEASE_CHANGED = "not run: the release changed since the documents were written"
 RELEASE_NOTE = ("note: the release changed since the documents were written, so this check ran no block. An example may show "
                 "a version or a count of the release as it was then. scripts/DOC-SNIPPETS.md says how to bring the examples "
@@ -329,6 +329,9 @@ class Checker:
         if block.lang not in RUN_LANGS and block.lang not in context.runs:
             return self._fail(block, f"a `{block.lang}` block cannot run in the context `{context.name}`: `run` takes "
                                      f"{', '.join(RUN_LANGS)}, and a language the context names a program for")
+        if block.lang != "python" and starts_launcher(block.body):
+            return self._fail(block, "the block starts Python with `py`. Write `python`: a Python from a virtual "
+                                     "environment has no `py` launcher, so the command would not start there")
         wanted_os = block.attrs.get("os")
         if wanted_os not in (None, "windows", "posix"):
             return self._fail(block, "os= is `windows` or `posix`")

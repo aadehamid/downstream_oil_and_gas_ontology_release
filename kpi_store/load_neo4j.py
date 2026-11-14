@@ -1,6 +1,6 @@
 """Loads the release into the local Neo4j, which has the n10s and APOC plugins, and runs every check there.
 
-    py -m kpi_store.load_neo4j --stores <local settings file> [--force]
+    python -m kpi_store.load_neo4j --stores <local settings file> [--force]
 
 Where it sits in the run: this is the runner's neo4j step (kpi_store.runner). It runs after the Fuseki load and
 before the copy to Neo4j Enterprise (kpi_store.copy_enterprise), which takes only the graph this load verified.

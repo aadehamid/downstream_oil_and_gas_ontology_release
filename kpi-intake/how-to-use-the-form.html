@@ -406,7 +406,7 @@ dl.buttons dd { margin-top: 2px; }
   <div class="body">
     <h3>Make the shared folder</h3>
     <p>This command makes <span class="file">KPI-intake</span> inside the location you name, with its four folders, and copies the two forms and this guide into <span class="file">the-form</span>. The dot means the current folder.</p>
-    <pre data-snippet="powershell run=release-copy">py -m kpi_store.intake folders .</pre>
+    <pre data-snippet="powershell run=release-copy">python -m kpi_store.intake folders .</pre>
     <pre class="out" data-snippet="text expect">made KPI-intake/the-form
 made KPI-intake/1-in-progress
 made KPI-intake/2-ready-for-check
@@ -417,25 +417,25 @@ copied KPI-intake/the-form/how-to-use-the-form.html
 wrote KPI-intake/READ-ME.txt
 KPI-intake is ready</pre>
     <p>For a shared drive, name its location in place of the dot. Put it in quotes when it has a space:</p>
-    <pre data-snippet="powershell run=shared-drive os=windows status-only">py -m kpi_store.intake folders "S:/Commercial Planning/Shared"</pre>
+    <pre data-snippet="powershell run=shared-drive os=windows status-only">python -m kpi_store.intake folders "S:/Commercial Planning/Shared"</pre>
     <p>Run the command again when the form changes. It replaces the three files in <span class="file">the-form</span> and changes nothing in the numbered folders. You can also make the folders by hand.</p>
 
     <h3>Check a file</h3>
     <p>This is the check of the example that ships with the release. <code>--report</code> also writes the report beside the file, under the same name with <span class="file">.check.txt</span> in place of <span class="file">.json</span>. For a workbook the name ends with <span class="file">.kpi-intake.workbook.check.txt</span>.</p>
-    <pre data-snippet="powershell run=release-copy">py -m kpi_store.intake check kpi-intake/examples/crack-spreads-pricing.json --report</pre>
+    <pre data-snippet="powershell run=release-copy">python -m kpi_store.intake check kpi-intake/examples/crack-spreads-pricing.json --report</pre>
     <pre class="out" data-snippet="text expect">KPI intake check: Crack Spreads Pricing
 ...
 Result: the intake is complete and signed.
 This check changes nothing in the ontology. The Architect applies a complete intake by hand, with HOW-TO-UPDATE.md.
 The report is also in crack-spreads-pricing.check.txt, beside the file.</pre>
     <p>For a file in the shared folder, name it where it is:</p>
-    <pre data-snippet="powershell run=shared-drive os=windows status-only">py -m kpi_store.intake check "S:/Commercial Planning/Shared/KPI-intake/2-ready-for-check/crack-spreads-pricing.kpi-intake.json" --report</pre>
+    <pre data-snippet="powershell run=shared-drive os=windows status-only">python -m kpi_store.intake check "S:/Commercial Planning/Shared/KPI-intake/2-ready-for-check/crack-spreads-pricing.kpi-intake.json" --report</pre>
     <p>The check changes nothing in the ontology. Add a complete KPI by hand, with the steps of <span class="file">HOW-TO-UPDATE.md</span> in the release.</p>
 
     <h3>When the check says the pick lists are older than the release</h3>
     <p>A module of the ontology was released after the form was built. Rebuild the form and copy it to the shared folder again:</p>
-    <pre data-snippet="powershell run=release-copy">py -m kpi_store.intake build
-py -m kpi_store.intake folders .</pre>
+    <pre data-snippet="powershell run=release-copy">python -m kpi_store.intake build
+python -m kpi_store.intake folders .</pre>
     <pre class="out" data-snippet="text expect">the intake pack is current; nothing was written
 KPI-intake is current; nothing was changed</pre>
     <p>Here both commands found nothing to do. After a release, each prints the files it wrote.</p>

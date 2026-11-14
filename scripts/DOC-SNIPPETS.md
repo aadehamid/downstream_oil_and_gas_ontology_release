@@ -129,14 +129,16 @@ typed Change_Value_Amount and yes
 
 ## Commands for Windows
 
-Write a command for Windows in a `powershell` or `cmd` block, with the `py` launcher. The check reads each line
-as a program and its arguments and runs it without a shell, on every platform. `py` and `python` are the Python
-that runs the check. `cd` moves the lines after it. Write paths with forward slashes, which Python on Windows
+Write a command for Windows in a `powershell` or `cmd` block, and start Python with `python`. The check reads each
+line as a program and its arguments and runs it without a shell, on every platform. `python` is the Python that
+runs the check. A run block that starts Python with the `py` launcher fails the check: a Python from a virtual
+environment, or one that `uv` installed, has no launcher, and the first real run of the release was on such a
+machine. `cd` moves the lines after it. Write paths with forward slashes, which Python on Windows
 accepts.
 
 ````markdown nested
 ```powershell run=scratch
-py -c "print('KPI Store')"
+python -c "print('KPI Store')"
 ```
 
 ```text expect
@@ -151,13 +153,17 @@ PowerShell or cmd on Windows, and every other platform counts it as skipped unde
 ````markdown nested
 ```powershell run=scratch os=windows
 $env:PYTHONUTF8 = "1"
-py -c "print('KPI Store')"
+python -c "print('KPI Store')"
 ```
 
 ```text expect
 KPI Store
 ```
 ````
+
+A real shell finds `python` on `PATH`. Under `scripts/check.sh` that is the temporary environment which `uv`
+makes for the check, with the check's packages and `pip`. So a line such as `python -m pip install <package>`
+installs into that environment, which is deleted when the check ends, and changes no Python of the reader.
 
 The check does not set `PYTHONUTF8` or `PYTHONIOENCODING` for a block, and removes them when its own environment
 has them. A reader on Windows has neither. So when a command needs one of them, the block must set it, as the
@@ -490,7 +496,7 @@ timeout = 600
 Run it from the release's top folder. For one document:
 
 ```powershell run=release-copy
-py scripts/doc_snippets.py check scripts/DOC-SNIPPETS.md --verbose
+python scripts/doc_snippets.py check scripts/DOC-SNIPPETS.md --verbose
 ```
 
 ```text expect
@@ -564,7 +570,7 @@ When you prepare a new zip from a changed release, bring the examples up to date
 2. Record the release that the examples now describe:
 
    ```powershell run=release-copy
-   py scripts/doc_snippets.py describe-release --write
+   python scripts/doc_snippets.py describe-release --write
    ```
 
    ```text expect
@@ -578,7 +584,7 @@ With no option, the command writes nothing and says whether the recorded value i
 exit 1 when it is not:
 
 ```powershell run=release-copy
-py scripts/doc_snippets.py describe-release
+python scripts/doc_snippets.py describe-release
 ```
 
 ```text expect
@@ -596,7 +602,7 @@ last line counts the blocks. "checked" counts the blocks that were compared or p
 blocks that ran with no `expect` block. This is the count for a document with four parsed blocks and one sketch:
 
 ```powershell run=release-copy
-py scripts/doc_snippets.py check skills/ontology-to-lpg/references/design-rules.md
+python scripts/doc_snippets.py check skills/ontology-to-lpg/references/design-rules.md
 ```
 
 ```text expect
@@ -607,7 +613,7 @@ this check was started by a block of another check, so it ran no block
 When a skipped block was parsed, the line ends with their number and reasons, such as
 `1 of the checked parsed but not run (needs-client-server 1)`.
 
-`py scripts/doc_snippets.py html` lists the HTML pages written by hand, with the number of `<pre>` blocks in each.
+`python scripts/doc_snippets.py html` lists the HTML pages written by hand, with the number of `<pre>` blocks in each.
 
 ## Blocks the test does not run
 
@@ -617,7 +623,7 @@ block.
 
 A test in `scripts/test_doc_snippets.py` compares this table with the documents. It fails when a skipped block
 has no row here, and when a row names a block that is gone. The first four cells must be the block's document,
-the heading it stands under, the start of its first line and its reason. `py scripts/doc_snippets.py not-run`
+the heading it stands under, the start of its first line and its reason. `python scripts/doc_snippets.py not-run`
 prints those four cells for every skipped block. Write the last two cells yourself.
 
 | Document | Heading | The block starts with | Reason | What is done instead | Who can run it |
@@ -661,7 +667,7 @@ A second command reads every Markdown document and every HTML page of the tree, 
 checks that each relative link points at a file or a folder of the tree:
 
 ```powershell run=release-copy
-py scripts/doc_snippets.py links
+python scripts/doc_snippets.py links
 ```
 
 ```text expect

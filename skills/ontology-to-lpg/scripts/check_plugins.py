@@ -2,7 +2,7 @@
 """Check that a Neo4j plugins folder holds the two plugin jars this skill was tested with.
 
 Run: python3 check_plugins.py <plugins folder>
-     On Windows: py check_plugins.py <plugins folder>
+     On Windows: python check_plugins.py <plugins folder>
 
 The local Neo4j that builds the projection needs n10s (neosemantics) and APOC Core. Neo4j Desktop
 shows the folder under the DBMS's "Open folder" menu, as "Plugins". The check reads every .jar in the

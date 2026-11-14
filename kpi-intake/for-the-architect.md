@@ -194,7 +194,7 @@ The form asks for some of these and keeps the answers in its own file. `KNOWN-OP
 
 Four of the forms' lists come from the ontology. `settings.toml` says, under `[pick_list.<name>]`, what your organization hides from each and adds to each. The ontology is not changed. This table is rebuilt with the pack and shows each list as it stands.
 
-The Architect, or whoever maintains the form, edits `settings.toml`. The business users never do. Edit it when a role title or a definition changes, when the domain list changes, or when an entry of a list is to be hidden or added. Then run `py -m kpi_store.intake build`.
+The Architect, or whoever maintains the form, edits `settings.toml`. The business users never do. Edit it when a role title or a definition changes, when the domain list changes, or when an entry of a list is to be hidden or added. Then run `python -m kpi_store.intake build`.
 
 | List | Questions | Offered | Hidden | Added |
 |---|---|---|---|---|

@@ -1,11 +1,11 @@
 """One command that runs the whole KPI Store chain, from a cleared report to the sync check.
 
-    py -m kpi_store.runner --stores <local settings file>                 # the whole chain
-    py -m kpi_store.runner --stores <file> --dry-run                      # print each step's commands; run nothing
-    py -m kpi_store.runner --stores <file> --from fuseki                  # go on from one step, in the newest run
-    py -m kpi_store.runner --stores <file> --only sync                    # one step
-    py -m kpi_store.runner --stores <file> --skip check,enterprise        # leave steps out
-    py -m kpi_store.runner --stores <file> --reset                        # empty the stores, to load them again
+    python -m kpi_store.runner --stores <local settings file>                 # the whole chain
+    python -m kpi_store.runner --stores <file> --dry-run                      # print each step's commands; run nothing
+    python -m kpi_store.runner --stores <file> --from fuseki                  # go on from one step, in the newest run
+    python -m kpi_store.runner --stores <file> --only sync                    # one step
+    python -m kpi_store.runner --stores <file> --skip check,enterprise        # leave steps out
+    python -m kpi_store.runner --stores <file> --reset                        # empty the stores, to load them again
 
 The steps, in order:
   cut         when a cleared report waits in <run folder>/pending, turn it into a correction version (the cut tool)
@@ -335,7 +335,7 @@ def step_check(ctx):
     reason did not run every check."""
     if ctx.bash is None and not ctx.dry_run:
         raise StepFailed("bash was not found, and scripts/check.sh is a bash script. Install Git for Windows, or name "
-                         "bash.exe in [tools] bash; py -m kpi_store.setup_check --only bash says more")
+                         "bash.exe in [tools] bash; python -m kpi_store.setup_check --only bash says more")
     cmd = [str(ctx.bash or "bash"), "scripts/check.sh"]
     code, out, err = ctx.call(cmd, cwd=str(ctx.release_root))
     if ctx.dry_run:

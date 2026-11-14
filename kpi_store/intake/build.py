@@ -1,7 +1,7 @@
 """Writes every generated file of the intake pack, or with --check says which of them is stale.
 
-    py -m kpi_store.intake build            write them
-    py -m kpi_store.intake build --check    write nothing; exit 1 when a committed file differs from a fresh build
+    python -m kpi_store.intake build            write them
+    python -m kpi_store.intake build --check    write nothing; exit 1 when a committed file differs from a fresh build
 
 Run it from the release's top folder, after you change kpi-intake/catalogue.toml, kpi-intake/settings.toml or
 kpi-intake/examples/examples.toml, and after every release of a module, because the pick lists come from the
@@ -119,7 +119,7 @@ def lists_text(cat, lists):
     today. It is rebuilt with the pack, so an entry the ontology gains and the settings hide shows here."""
     out = ["## The lists your settings change", "",
            "Four of the forms' lists come from the ontology. `settings.toml` says, under `[pick_list.<name>]`, what your organization hides from each and adds to each. The ontology is not changed. This table is rebuilt with the pack and shows each list as it stands.", "",
-           "The Architect, or whoever maintains the form, edits `settings.toml`. The business users never do. Edit it when a role title or a definition changes, when the domain list changes, or when an entry of a list is to be hidden or added. Then run `py -m kpi_store.intake build`.", "",
+           "The Architect, or whoever maintains the form, edits `settings.toml`. The business users never do. Edit it when a role title or a definition changes, when the domain list changes, or when an entry of a list is to be hidden or added. Then run `python -m kpi_store.intake build`.", "",
            "| List | Questions | Offered | Hidden | Added |", "|---|---|---|---|---|"]
     detail = []
     for name, module in catalogue.SETTINGS_LISTS.items():

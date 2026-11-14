@@ -1,5 +1,5 @@
-"""The command line of the intake pack: `py -m kpi_store.intake build`, `py -m kpi_store.intake check <file>` and
-`py -m kpi_store.intake folders <place>`."""
+"""The command line of the intake pack: `python -m kpi_store.intake build`, `python -m kpi_store.intake check <file>` and
+`python -m kpi_store.intake folders <place>`."""
 import argparse
 import sys
 from pathlib import Path
@@ -30,7 +30,7 @@ def report_path(file, form=None):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(prog="py -m kpi_store.intake", description="The KPI intake pack: build its forms, check a filled form, or set up the shared folder.")
+    parser = argparse.ArgumentParser(prog="python -m kpi_store.intake", description="The KPI intake pack: build its forms, check a filled form, or set up the shared folder.")
     sub = parser.add_subparsers(dest="command", required=True)
     build = sub.add_parser("build", help="write the forms, the pick lists, the generated pages and the examples")
     build.add_argument("--check", action="store_true", help="write nothing; exit 1 when a committed file differs from a fresh build")

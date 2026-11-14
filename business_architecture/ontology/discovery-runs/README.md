@@ -20,7 +20,7 @@ The order is 1.2.0, 1.2.1-correction.1, 1.2.1-correction.2, 1.2.2. One function 
 Run the tool from the release's top folder. It needs Python 3.11 or later with `rdflib`, `pyshacl` and `openpyxl`. It needs no Java, no bash and no Git.
 
 ```powershell run=release-copy
-py -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --decisions kpi_store/tests/fixtures/cut/cleared-decisions.csv --approver "the ontology owner" --plan
+python -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --decisions kpi_store/tests/fixtures/cut/cleared-decisions.csv --approver "the ontology owner" --plan
 ```
 
 ```text expect

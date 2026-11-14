@@ -1,8 +1,8 @@
 """Checks the one-time setup of the machine that runs the KPI Store loads, and prints the one fix for each failure.
 
-    py -m kpi_store.setup_check --stores <local settings file>              # every check
-    py -m kpi_store.setup_check --stores <local settings file> --only java  # one check
-    py -m kpi_store.setup_check --list                                      # the checks' names
+    python -m kpi_store.setup_check --stores <local settings file>              # every check
+    python -m kpi_store.setup_check --stores <local settings file> --only java  # one check
+    python -m kpi_store.setup_check --list                                      # the checks' names
 
 The checks, in order: python, packages, local-settings, kpi-store-settings, java, fuseki-jar, robot-jar, bash, uv,
 check-script-tools, databricks-cli, databricks-auth, neo4j-local, neo4j-plugins, neo4j-enterprise.
@@ -159,7 +159,7 @@ def python(ctx):
     found = ".".join(str(p) for p in ctx.version)
     if tuple(ctx.version[:2]) < PYTHON_MINIMUM:
         return failed(f"Python {found}", "Install Python 3.11 or later from https://www.python.org/downloads/ and run "
-                                        "the commands with the py launcher")
+                                        "the commands with python")
     return passed(f"Python {found}")
 
 
@@ -255,7 +255,7 @@ def uv(ctx):
     """scripts/check.sh runs every check through uv, which fetches the test dependencies."""
     found = ctx.which("uv")
     if not found:
-        return failed("uv was not found; scripts/check.sh runs its checks through uv", "py -m pip install uv")
+        return failed("uv was not found; scripts/check.sh runs its checks through uv", "python -m pip install uv")
     return passed(str(found))
 
 
@@ -270,7 +270,7 @@ def check_script_tools(ctx):
     words = out.split()
     if code != 0 or len(words) < 5:
         return failed("inside bash, Python 3.11 or later (python3, python or py) or uv was not found; scripts/check.sh calls both",
-                      "Run py -m pip install uv, then add the folder of python.exe and the folder of uv.exe to PATH and open a new terminal")
+                      "Run python -m pip install uv, then add the folder of python.exe and the folder of uv.exe to PATH and open a new terminal")
     return passed(f"inside bash: {words[0]} {words[1]}.{words[2]} and {words[3]} {words[4]}")
 
 

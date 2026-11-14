@@ -1,6 +1,6 @@
 """Sets up the shared folder a team keeps its intake files in, for a team that works offline.
 
-    py -m kpi_store.intake folders <place>
+    python -m kpi_store.intake folders <place>
 
 It makes one folder named KPI-intake in the place you name, with four folders in it, and copies the two forms and
 the guide into the first:
@@ -76,7 +76,7 @@ def create(place, pack):
         raise FoldersError(f"{place} is not a folder. Name a folder that exists, such as your team's shared drive.")
     missing = [name for name in COPIED if not (pack / name).is_file()]
     if missing:
-        raise FoldersError(f"the pack folder {pack} has no {', '.join(missing)}. Build the pack first: py -m kpi_store.intake build")
+        raise FoldersError(f"the pack folder {pack} has no {', '.join(missing)}. Build the pack first: python -m kpi_store.intake build")
     refuse_links(place)        # before anything is read or written
     top = place / TOP
     done = []

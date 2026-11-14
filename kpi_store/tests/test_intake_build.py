@@ -97,7 +97,7 @@ def test_the_term_index_leaves_the_measures_out(committed):
 def test_the_committed_pack_equals_a_fresh_build():
     # The pick lists, the HTML form, the Excel form, the two generated pages and both examples in both formats.
     stale = [path.relative_to(ROOT).as_posix() for path in build.stale(ROOT, PACK)]
-    assert stale == [], "rebuild with: py -m kpi_store.intake build"
+    assert stale == [], "rebuild with: python -m kpi_store.intake build"
 
 
 def test_the_build_writes_these_nine_files():

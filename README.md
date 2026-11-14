@@ -18,7 +18,7 @@ KPI Store loads the released ontology packages of this folder into three stores.
 
 Before the Databricks load, the notebook compares the ontology with the workspace. It reads the tables, columns, metric views, lineage and Genie spaces that the workspace reports. When an object, a column or a table edge that the ontology names is missing or renamed in Databricks, the load stops. The notebook then writes a report, `discovery-report.json`, with the same rows in `discovery-report.csv`. A person clears the report by writing a decision on each row that blocks. The cut tool turns the cleared report into a correction version of the ontology, such as `1.2.1-correction.1`.
 
-The notebook loads the zip in the volume, so a correction reaches Databricks only in a new zip. After you clear the report, run the same runner command again. Its `cut` step runs the cut tool. Its `zip` step builds a new zip from the corrected folder and writes the zip's checksum into a copy of the settings. Its `upload` step copies both to the volume, and its `notebook` step loads that zip. A cut that you run by hand with `py -m kpi_store.cut` changes this folder only. Run the runner's `zip` and `upload` steps afterwards, or the notebook still reads the earlier zip.
+The notebook loads the zip in the volume, so a correction reaches Databricks only in a new zip. After you clear the report, run the same runner command again. Its `cut` step runs the cut tool. Its `zip` step builds a new zip from the corrected folder and writes the zip's checksum into a copy of the settings. Its `upload` step copies both to the volume, and its `notebook` step loads that zip. A cut that you run by hand with `python -m kpi_store.cut` changes this folder only. Run the runner's `zip` and `upload` steps afterwards, or the notebook still reads the earlier zip.
 
 Each load proves that the store holds the release. Databricks and Fuseki compare a hash of what the store holds with a hash of the release files. Neo4j runs the validation shapes in the graph and reads the graph back as triples, which must equal the triples that went in.
 
@@ -69,7 +69,7 @@ The loads run on a Windows machine. Set these up once. The runbook gives the ste
 
 | What you need | Why |
 |---|---|
-| Python 3.11 or later, with the `py` launcher | The KPI Store commands are Python modules, and the documents start them with `py`. The check is a bash script, and the sign-in is the Databricks command line; both have their own rows below |
+| Python 3.11 or later, on `PATH` as `python` | The KPI Store commands are Python modules, and the documents start them with `python`. In a virtual environment that is the environment's Python. The check is a bash script, and the sign-in is the Databricks command line; both have their own rows below |
 | Java 21 | Fuseki 6.2.0 and ROBOT, the reasoner, run on Java. This release was tested with Java 21 |
 | Git for Windows, for Git Bash, and [uv](https://docs.astral.sh/uv/) | The full check, `scripts/check.sh`, is a bash script. It runs each check through uv, which fetches the test packages. The script takes the first of `python3`, `python` and `py` that is Python 3.11 or later. Run it from Git Bash or through the runner: in PowerShell, the plain word `bash` starts the launcher of the Linux subsystem |
 | The Databricks command line, signed in with OAuth (`databricks auth login`) | The commands on Windows upload the release and start the notebook with this sign-in |
@@ -86,16 +86,16 @@ The runbook says when to run each command and what it prints. This table says on
 
 | Command | What it does |
 |---|---|
-| `py -m kpi_store.setup_check` | Checks the one-time setup of the machine and prints the fix for each failure |
-| `py -m kpi_store.runner` | Runs the whole chain, from a cleared report to the sync check |
-| `py -m kpi_store.runner --reset` | Empties the four stores after it shows what it will delete and you type `reset`, so the next run loads them again from nothing |
-| `py -m kpi_store.cut` | Turns a cleared report into a correction version of the ontology |
-| `py -m kpi_store.load_fuseki` | Loads the release into the local Fuseki and proves by a hash that the store holds exactly the release |
-| `py -m kpi_store.load_neo4j` | Empties the local Neo4j database, loads the release into it and runs every check there |
-| `py -m kpi_store.copy_enterprise` | Copies the checked graph from the local Neo4j to the one named database on Neo4j Enterprise, and checks the copy |
-| `py -m kpi_store.sync_check` | Says whether each store holds the release in this folder: current, or behind |
-| `py -m kpi_store.questions.run ask <question> --settings <file> --mapping <file> --out <folder>` | Asks one of the four cross-graph questions (`q1`, `q4`, `q6`, `q7`) and writes its rows. The other subcommands are `discover`, `confirm` and `check`, which make and check the mapping file that `ask` needs. `py -m kpi_store.questions.run --help` lists them |
-| `py -m kpi_store.intake check <file>` | Says what a filled KPI intake form still lacks. `py -m kpi_store.intake build` rebuilds the forms from the catalogue and the release packages. `py -m kpi_store.intake folders <place>` makes the shared folder a team keeps its answers files in |
+| `python -m kpi_store.setup_check` | Checks the one-time setup of the machine and prints the fix for each failure |
+| `python -m kpi_store.runner` | Runs the whole chain, from a cleared report to the sync check |
+| `python -m kpi_store.runner --reset` | Empties the four stores after it shows what it will delete and you type `reset`, so the next run loads them again from nothing |
+| `python -m kpi_store.cut` | Turns a cleared report into a correction version of the ontology |
+| `python -m kpi_store.load_fuseki` | Loads the release into the local Fuseki and proves by a hash that the store holds exactly the release |
+| `python -m kpi_store.load_neo4j` | Empties the local Neo4j database, loads the release into it and runs every check there |
+| `python -m kpi_store.copy_enterprise` | Copies the checked graph from the local Neo4j to the one named database on Neo4j Enterprise, and checks the copy |
+| `python -m kpi_store.sync_check` | Says whether each store holds the release in this folder: current, or behind |
+| `python -m kpi_store.questions.run ask <question> --settings <file> --mapping <file> --out <folder>` | Asks one of the four cross-graph questions (`q1`, `q4`, `q6`, `q7`) and writes its rows. The other subcommands are `discover`, `confirm` and `check`, which make and check the mapping file that `ask` needs. `python -m kpi_store.questions.run --help` lists them |
+| `python -m kpi_store.intake check <file>` | Says what a filled KPI intake form still lacks. `python -m kpi_store.intake build` rebuilds the forms from the catalogue and the release packages. `python -m kpi_store.intake folders <place>` makes the shared folder a team keeps its answers files in |
 | `bash scripts/check.sh` | Proves that this copy of the release is valid |
 
 ## Run the checks
@@ -113,10 +113,10 @@ all checks passed
 
 The check passes in a Git copy and in a plain folder, such as the unpacked zip. `bash scripts/check-pinned.sh` is separate and optional. It asks whether your copy still equals this release as shipped. After your first change some of its tests fail. That says only that your copy differs from the release as shipped.
 
-Two quick commands show what the release holds. Both need the rdflib package (`py -m pip install rdflib`). The first lists the released modules, each with its version, the modules it requires and its number of triples. In a plain folder the first line says that the commit is unknown.
+Two quick commands show what the release holds. Both need the rdflib package (`python -m pip install rdflib`). The first lists the released modules, each with its version, the modules it requires and its number of triples. In a plain folder the first line says that the commit is unknown.
 
 ```powershell run=release-copy
-py scripts/epm_facts.py modules
+python scripts/epm_facts.py modules
 ```
 
 ```text expect
@@ -124,11 +124,11 @@ commit <the commit>: 13 released modules
 ...
 ```
 
-The second asks the ontology one competency question. `py ask.py` with no name lists the questions, and `business_architecture/ontology/competency-questions.md` explains them.
+The second asks the ontology one competency question. `python ask.py` with no name lists the questions, and `business_architecture/ontology/competency-questions.md` explains them.
 
 ```powershell run=release-copy
 cd business_architecture/ontology/regression
-py ask.py q36-the-crack
+python ask.py q36-the-crack
 ```
 
 ```text expect

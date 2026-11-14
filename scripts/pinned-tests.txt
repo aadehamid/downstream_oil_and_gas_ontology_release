@@ -42,7 +42,7 @@ kpi_store/tests/test_load_databricks.py::test_the_graph_set_is_the_one_sync_stor
 business_architecture/ontology/viewer/test_viewer.py::test_the_committed_page_equals_a_fresh_build
 business_architecture/ontology/viewer/test_horoi.py::test_the_committed_page_and_record_equal_a_fresh_build
 # The KPI intake pack's forms, pick lists and examples are built from the packages of the release as shipped too.
-# A cut rebuilds them itself. After a new version rebuild them with: py -m kpi_store.intake build
+# A cut rebuilds them itself. After a new version rebuild them with: python -m kpi_store.intake build
 kpi_store/tests/test_intake_build.py::test_the_committed_pack_equals_a_fresh_build
 kpi_store/tests/test_intake_build.py::test_the_pick_lists_hold_the_counts_of_this_release
 kpi_store/tests/test_intake_build.py::test_the_process_list_follows_the_business_area_and_the_chosen_process
@@ -54,5 +54,5 @@ kpi_store/tests/test_intake_build.py::test_the_architects_page_says_what_the_set
 kpi_store/tests/test_intake_build.py::test_the_forms_offer_what_the_settings_leave_and_add
 # The documents' examples show the versions and counts of the release as shipped, and scripts/doc_snippets.toml
 # records which release that is. On any other release scripts/check.sh runs no block of the documents. After you
-# bring the examples up to date: py scripts/doc_snippets.py describe-release --write
+# bring the examples up to date: python scripts/doc_snippets.py describe-release --write
 scripts/test_doc_snippets.py::test_the_registry_describes_the_release_as_shipped

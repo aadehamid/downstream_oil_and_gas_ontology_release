@@ -1,7 +1,7 @@
 """The cut tool: turns a cleared discovery report into a correction version of the ontology.
 
-    py -m kpi_store.cut --report discovery-report.json [--decisions discovery-report.csv] [--release .] [--approver "<role>"]
-    py -m kpi_store.cut --report discovery-report.json --plan      # show what a cut would do, and change nothing
+    python -m kpi_store.cut --report discovery-report.json [--decisions discovery-report.csv] [--release .] [--approver "<role>"]
+    python -m kpi_store.cut --report discovery-report.json --plan      # show what a cut would do, and change nothing
 
 Where it sits in the run: the Databricks notebook compares the ontology with the workspace and stops on a report
 when a row blocks the load. A person clears the report. The runner's `cut` step (kpi_store/runner.py) then calls
@@ -717,7 +717,7 @@ def _requirements(root):
     missing = [name for name in needed if not _importable(name)]
     if missing:
         raise CutRefused(f"the cut needs the Python package{'s' if len(missing) > 1 else ''} {' and '.join(missing)}: "
-                         f"py -m pip install {' '.join(missing)}")
+                         f"python -m pip install {' '.join(missing)}")
 
 
 def _importable(name):
@@ -779,7 +779,7 @@ def _build(plan_, staging, approver, now, step):
     step("carry the stand-alone exceptions to the moved packages", lambda: _carry_exceptions(staging, plan_.versions))
     step("rebuild the catalog", lambda: _run("rebuild the catalog", ["build_catalog.py", "--write"], release))
     step("rebuild the projection manifest", lambda: _run("rebuild the projection manifest", ["pipeline.py", "build"], ontology / "projection"))
-    # The pack's pick lists name each module's version, and `py -m kpi_store.intake check` refuses lists that are
+    # The pack's pick lists name each module's version, and `python -m kpi_store.intake check` refuses lists that are
     # older than the packages. The module is the staging copy's own: -m finds kpi_store in the folder the command
     # runs in before any installed copy.
     intake = [*INTAKE, "--root", str(staging)]
@@ -1222,7 +1222,7 @@ def _write(path, text):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="py -m kpi_store.cut", description="Cut a cleared KPI Store discovery report into a correction version.")
+    ap = argparse.ArgumentParser(prog="python -m kpi_store.cut", description="Cut a cleared KPI Store discovery report into a correction version.")
     ap.add_argument("--report", required=True, help="discovery-report.json, or the cleared discovery-report.csv beside it")
     ap.add_argument("--decisions", help="a cleared CSV whose decisions replace those in the JSON file")
     ap.add_argument("--release", default=".", help="the release's top folder (default: this folder)")

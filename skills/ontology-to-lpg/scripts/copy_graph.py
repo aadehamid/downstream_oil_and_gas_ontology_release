@@ -10,7 +10,7 @@ Run: uv run --no-project --with rdflib --with neo4j python copy_graph.py \
          (--source-env <file> | --source bolt://<host>:<port>) [--source-database <name>] \
          --target-env <file> [--target-database <name>] --report <projection-report.json> \
          [--batch 1000] [--replace] [--query-timeout <seconds>]
-     On Windows, after `py -m pip install rdflib neo4j`: py copy_graph.py ...
+     On Windows, after `python -m pip install rdflib neo4j`: python copy_graph.py ...
 
 --source-env and --target-env each name a file of KEY=VALUE lines, kept outside the repository:
 NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD and optionally NEO4J_DATABASE. With --source, the source's

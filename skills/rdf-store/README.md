@@ -9,13 +9,13 @@ This README is for people. Agents read `SKILL.md` and the files it points to.
 ## How to use it
 
 1. Start Fuseki. Download `jena-fuseki-server-6.2.0.jar`, check its SHA-256 (`references/stores.md` gives the value and the command), and run `java -jar jena-fuseki-server-6.2.0.jar --mem --update --localhost --port 3030 /ds`.
-2. Round-trip your releases. The command below sends the library example of the `ontology-to-lpg` skill, so you can run it as written, from this release's top folder. `<your Fuseki address>` is the dataset's address, `http://127.0.0.1:3030/ds` for the server of step 1. For your releases, name every release file at the end instead. The tool needs the pyoxigraph package (`py -m pip install pyoxigraph`). On macOS or Linux, write `python3` for `py`.
+2. Round-trip your releases. The command below sends the library example of the `ontology-to-lpg` skill, so you can run it as written, from this release's top folder. `<your Fuseki address>` is the dataset's address, `http://127.0.0.1:3030/ds` for the server of step 1. For your releases, name every release file at the end instead. The tool needs the pyoxigraph package (`python -m pip install pyoxigraph`). On macOS or Linux, write `python3` for `python` when that is your Python's name.
 
    The dataset must hold nothing but what this command loads. The comparison reads everything the store holds, so a graph from another load fails it.
 
    ```powershell run=empty-fuseki
    cd skills/rdf-store
-   py scripts/rdfstore.py roundtrip --store fuseki --gsp <your Fuseki address>/data --query <your Fuseki address>/query --update <your Fuseki address>/update --report report.json ../ontology-to-lpg/templates/library-module.ttl
+   python scripts/rdfstore.py roundtrip --store fuseki --gsp <your Fuseki address>/data --query <your Fuseki address>/query --update <your Fuseki address>/update --report report.json ../ontology-to-lpg/templates/library-module.ttl
    ```
 
    ```text expect
@@ -33,7 +33,7 @@ This README is for people. Agents read `SKILL.md` and the files it points to.
 4. To get Fuseki's copy back as files, export it. `copy.nq` must not exist yet, and the `ttl` folder must be empty or absent.
 
    ```powershell run=empty-fuseki
-   py scripts/rdfstore.py export --store fuseki --gsp <your Fuseki address>/data --query <your Fuseki address>/query --out copy.nq --ttl-dir ttl
+   python scripts/rdfstore.py export --store fuseki --gsp <your Fuseki address>/data --query <your Fuseki address>/query --out copy.nq --ttl-dir ttl
    ```
 
    ```text expect

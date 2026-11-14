@@ -31,7 +31,7 @@ On the client platform you do not write that copy by hand. The runner's `neo4j` 
 
 ```powershell run=release-copy status-only
 cd business_architecture/ontology/projection/skill-run
-py inputs.py releases
+python inputs.py releases
 ```
 
 `--plan` lists the steps and why any is skipped, and runs nothing. The run needs uv, Java 11 or later and ROBOT 1.9.10 at the path `robot_jar` names. It starts and stops no server: the Neo4j servers and the Fuseki datasets the copy names must already run. The skill's `references/running.md`, rule 5, says how to prepare the local Neo4j, and the `rdf-store` skill's `references/stores.md` says how to start Fuseki from the Apache jar. The driver reads no password: it passes each env file to the skill's scripts by path (`load_verify.py --env`, `copy_graph.py --source-env` and `--target-env`).

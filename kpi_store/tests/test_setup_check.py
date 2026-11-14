@@ -132,7 +132,7 @@ def test_bash_on_windows_is_git_bash_and_never_the_linux_subsystems(tmp_path):
 
 def test_uv_must_be_on_the_path(tmp_path):
     assert sc.uv(context(tmp_path, which=lambda name: "/sample/uv" if name == "uv" else None)) == (True, "/sample/uv", "")
-    assert sc.uv(context(tmp_path)) == (False, "uv was not found; scripts/check.sh runs its checks through uv", "py -m pip install uv")
+    assert sc.uv(context(tmp_path)) == (False, "uv was not found; scripts/check.sh runs its checks through uv", "python -m pip install uv")
 
 
 def test_the_check_script_needs_a_python_and_uv_inside_bash(tmp_path):
@@ -153,7 +153,7 @@ def test_the_check_script_needs_a_python_and_uv_inside_bash(tmp_path):
     assert sc.check_script_tools(ctx)[0] is False     # a Python and no uv
     ctx.run = lambda cmd, **k: SimpleNamespace(returncode=127, stdout="", stderr="uv: command not found")
     ok, detail, fix = sc.check_script_tools(ctx)
-    assert not ok and "(python3, python or py) or uv was not found" in detail and fix.startswith("Run py -m pip install uv")
+    assert not ok and "(python3, python or py) or uv was not found" in detail and fix.startswith("Run python -m pip install uv")
 
 
 def test_the_databricks_cli_must_run_and_the_profile_must_be_signed_in(tmp_path):

@@ -174,18 +174,18 @@ figure.pic figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
 <h2 id="settings">Settings<a class="hl" href="#settings" aria-label="Link to this section">#</a></h2>
 <p><code>sync_stores.py</code>, <code>empty_stores.py</code> and <code>logical_models.py</code> read one set of settings: <code>NEO4J_URI</code>, <code>NEO4J_USERNAME</code>, <code>NEO4J_PASSWORD</code>, <code>NEO4J_DATABASE</code> and <code>EPM_JENA_QUERY</code>. Copy <code>skill-run/environment.example</code> to a file outside the repository, fill it in, and name that file in <code>EPM_STORES_ENV</code>. A value set in the process environment wins over the file. No command prints a password.</p>
 <h2 id="run-the-projection">Run the projection<a class="hl" href="#run-the-projection" aria-label="Link to this section">#</a></h2>
-<p>On the client platform one command runs the projection and every load: the runner, <code>py -m kpi_store.runner</code>. Its <code>neo4j</code> step calls <code>kpi_store/load_neo4j.py</code>, which runs the driver on this folder's inputs against the local Neo4j, and its <code>enterprise</code> step copies the checked graph to the named database. <code>ontology-stores-runbook.md</code> in this folder gives every step, from the setup of the machine to the sync check, and says what each step of the runner does.</p>
+<p>On the client platform one command runs the projection and every load: the runner, <code>python -m kpi_store.runner</code>. Its <code>neo4j</code> step calls <code>kpi_store/load_neo4j.py</code>, which runs the driver on this folder's inputs against the local Neo4j, and its <code>enterprise</code> step copies the checked graph to the named database. <code>ontology-stores-runbook.md</code> in this folder gives every step, from the setup of the machine to the sync check, and says what each step of the runner does.</p>
 <p>Two commands of this folder need no database. Run them from this folder after any input or shape changes.</p>
-<ol><li>Check the rules, validate, and compare the manifest with a fresh build. It fails unless the manifest is current. To write a new manifest, run <code>py pipeline.py build</code>.
+<ol><li>Check the rules, validate, and compare the manifest with a fresh build. It fails unless the manifest is current. To write a new manifest, run <code>python pipeline.py build</code>.
 <pre><code class="lang-powershell">cd business_architecture/ontology/projection
-py pipeline.py build --verify</code></pre>
+python pipeline.py build --verify</code></pre>
 <pre><code class="lang-text">Step 1 passed; loadable.nt &lt;count&gt; triples, inferred.nt 2
 projection-manifest.json is current</code></pre></li></ol>
-<ol start="2"><li>After a Neo4j load, take the load's result into this folder: <code>inferred.nt</code>, a summary of its report, and the manifest. The runbook's section "Record the load's report in the release folder" runs the command, <code>py pipeline.py record</code>, on a real load. It refuses a load that read other inputs than this tree's, or whose report did not pass.</li></ol>
+<ol start="2"><li>After a Neo4j load, take the load's result into this folder: <code>inferred.nt</code>, a summary of its report, and the manifest. The runbook's section "Record the load's report in the release folder" runs the command, <code>python pipeline.py record</code>, on a real load. It refuses a load that read other inputs than this tree's, or whose report did not pass.</li></ol>
 <p>The Databricks table is not loaded from here. The runner's <code>notebook</code> step loads <code>epm_triples</code> with the <code>rdf-store</code> skill's <code>rdfstore.py</code> and writes the table's marker row in <code>epm_store_markers</code>.</p>
 <h2 id="check-the-stores">Check the stores<a class="hl" href="#check-the-stores" aria-label="Link to this section">#</a></h2>
-<p><code>py -m kpi_store.sync_check</code> reads the four stores of the client platform and says whether each is current. The runbook's section "The sync check" shows it and how to read each line. It takes what a current store holds from <code>sync_stores.py</code> in this folder:</p>
-<pre><code class="lang-powershell">py sync_stores.py expected</code></pre>
+<p><code>python -m kpi_store.sync_check</code> reads the four stores of the client platform and says whether each is current. The runbook's section "The sync check" shows it and how to read each line. It takes what a current store holds from <code>sync_stores.py</code> in this folder:</p>
+<pre><code class="lang-powershell">python sync_stores.py expected</code></pre>
 <pre><code class="lang-text">{
   "catalog_datasets": 13,
 ...

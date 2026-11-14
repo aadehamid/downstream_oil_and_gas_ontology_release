@@ -666,12 +666,12 @@ details.fm:not([open])>:not(summary){display:none}
     <thead><tr><th>Store</th><th>What it is</th><th>What you need</th><th>Loaded by</th></tr></thead>
     <tbody>
       <tr><td>Databricks</td><td>The Delta table <code>epm_triples</code>, with <code>epm_store_markers</code> beside it, in the schema <code>kpi_store.toml</code> names</td><td>A workspace with Unity Catalog, and the Databricks command line signed in through the browser. No token</td><td>The notebook <code>kpi_store/notebook/kpi_store_load.py</code></td></tr>
-      <tr><td>Jena Fuseki</td><td>One dataset, served by the plain Apache jar <code>jena-fuseki-server-6.2.0.jar</code></td><td>Java, and the jar (<code>skills/rdf-store/references/stores.md</code>)</td><td><code>py -m kpi_store.load_fuseki</code></td></tr>
-      <tr><td>Neo4j, local</td><td>One database on a Neo4j 2025.06.2 that has the n10s and APOC jars in its <code>plugins</code> folder</td><td>Neo4j, the two jars, Java, and ROBOT 1.9.10 for the reasoning step (<code>skills/ontology-to-lpg/references/running.md</code>)</td><td><code>py -m kpi_store.load_neo4j</code></td></tr>
-      <tr><td>Neo4j Enterprise</td><td>A named database on a server that needs no plugin</td><td>The server's address and a login</td><td><code>py -m kpi_store.copy_enterprise</code></td></tr>
+      <tr><td>Jena Fuseki</td><td>One dataset, served by the plain Apache jar <code>jena-fuseki-server-6.2.0.jar</code></td><td>Java, and the jar (<code>skills/rdf-store/references/stores.md</code>)</td><td><code>python -m kpi_store.load_fuseki</code></td></tr>
+      <tr><td>Neo4j, local</td><td>One database on a Neo4j 2025.06.2 that has the n10s and APOC jars in its <code>plugins</code> folder</td><td>Neo4j, the two jars, Java, and ROBOT 1.9.10 for the reasoning step (<code>skills/ontology-to-lpg/references/running.md</code>)</td><td><code>python -m kpi_store.load_neo4j</code></td></tr>
+      <tr><td>Neo4j Enterprise</td><td>A named database on a server that needs no plugin</td><td>The server's address and a login</td><td><code>python -m kpi_store.copy_enterprise</code></td></tr>
     </tbody>
   </table></div>
-  <p class="rise"><code>py -m kpi_store.setup_check</code> looks for each program on a Windows machine and prints the one fix for any it does not find. <code>py -m kpi_store.runner</code> then runs the whole chain, and <code>py -m kpi_store.sync_check</code> says whether each store is current. The runbook, <code>business_architecture/ontology/projection/ontology-stores-runbook.html</code>, gives every step in order; open it beside this page when you load a store. <a href="#load">Load the three stores</a> below explains what the steps do.</p>
+  <p class="rise"><code>python -m kpi_store.setup_check</code> looks for each program on a Windows machine and prints the one fix for any it does not find. <code>python -m kpi_store.runner</code> then runs the whole chain, and <code>python -m kpi_store.sync_check</code> says whether each store is current. The runbook, <code>business_architecture/ontology/projection/ontology-stores-runbook.html</code>, gives every step in order; open it beside this page when you load a store. <a href="#load">Load the three stores</a> below explains what the steps do.</p>
   <p class="rise">No command takes a password as an argument, and no file in the release holds one. The store tools in <code>business_architecture/ontology/projection/</code> read their settings from a file you keep outside the release: copy <code>skill-run/environment.example</code>, fill it in, and name the copy in <code>EPM_STORES_ENV</code>.</p>
 </section>
 
@@ -908,7 +908,7 @@ MATCH (:Resource)-[r]-&gt;(:Resource) RETURN count(r) AS relationships;</code></
     "https://w3id.org/mpc/ontology/modules/value-stream/1.2.0"
   ]
 }</code></pre>
-  <p class="rise"><code>sync_stores.py check</code> reads the Neo4j database and the Jena dataset your settings name and says whether each is current. <code>py -m kpi_store.sync_check</code> reports all three stores, Databricks included. <a href="#sync">Keeping every store in step</a> says what each reads.</p>
+  <p class="rise"><code>sync_stores.py check</code> reads the Neo4j database and the Jena dataset your settings name and says whether each is current. <code>python -m kpi_store.sync_check</code> reports all three stores, Databricks included. <a href="#sync">Keeping every store in step</a> says what each reads.</p>
   <p class="xref rise"><strong>Built in Part 2:</strong> steps <a href="#s-24">24</a>, <a href="#s-25">25</a>.</p>
 </section>
 
@@ -951,15 +951,15 @@ MATCH (:Resource)-[r]-&gt;(:Resource) RETURN count(r) AS relationships;</code></
   <p class="section-lede rise">The release loads into Databricks first, then Jena Fuseki, then Neo4j. Before the Databricks load it compares the ontology with the workspace, and a difference in structure stops the load. This section explains each part. The runbook, <code>business_architecture/ontology/projection/ontology-stores-runbook.html</code>, has the steps to type.</p>
 
   <h3 class="rise" data-ss-id="load-commands">The commands, by purpose</h3>
-  <p class="rise">Each command runs on the Windows machine that holds the release, with the <code>py</code> launcher. The runbook gives each one's arguments and what it prints.</p>
+  <p class="rise">Each command runs on the Windows machine that holds the release, started with <code>python</code>. The runbook gives each one's arguments and what it prints.</p>
   <div class="tbl rise"><table class="gapt"><thead><tr><th>Command</th><th>What it is for</th></tr></thead><tbody>
-<tr><td><code>py -m kpi_store.setup_check</code></td><td data-k="What it is for">Once per machine: checks that each program a load needs is installed, and prints the one fix for any that is not</td></tr>
-<tr><td><code>py -m kpi_store.runner</code></td><td data-k="What it is for">One command for the whole chain: the release's check, the Databricks load, the Fuseki load, the Neo4j load and its copy, then the sync check, with one summary at the end</td></tr>
-<tr><td><code>py -m kpi_store.cut</code></td><td data-k="What it is for">Turns a cleared report into a correction version of the ontology</td></tr>
-<tr><td><code>py -m kpi_store.load_fuseki</code></td><td data-k="What it is for">Loads the release into the Fuseki dataset and proves the copy by its hash</td></tr>
-<tr><td><code>py -m kpi_store.load_neo4j</code></td><td data-k="What it is for">Loads the local Neo4j, which has n10s and APOC, and runs the checks in the graph</td></tr>
-<tr><td><code>py -m kpi_store.copy_enterprise</code></td><td data-k="What it is for">Copies the checked local graph to a named database on Neo4j Enterprise, which needs no plugin</td></tr>
-<tr><td><code>py -m kpi_store.sync_check</code></td><td data-k="What it is for">Reads all three stores and reports each as current or behind</td></tr>
+<tr><td><code>python -m kpi_store.setup_check</code></td><td data-k="What it is for">Once per machine: checks that each program a load needs is installed, and prints the one fix for any that is not</td></tr>
+<tr><td><code>python -m kpi_store.runner</code></td><td data-k="What it is for">One command for the whole chain: the release's check, the Databricks load, the Fuseki load, the Neo4j load and its copy, then the sync check, with one summary at the end</td></tr>
+<tr><td><code>python -m kpi_store.cut</code></td><td data-k="What it is for">Turns a cleared report into a correction version of the ontology</td></tr>
+<tr><td><code>python -m kpi_store.load_fuseki</code></td><td data-k="What it is for">Loads the release into the Fuseki dataset and proves the copy by its hash</td></tr>
+<tr><td><code>python -m kpi_store.load_neo4j</code></td><td data-k="What it is for">Loads the local Neo4j, which has n10s and APOC, and runs the checks in the graph</td></tr>
+<tr><td><code>python -m kpi_store.copy_enterprise</code></td><td data-k="What it is for">Copies the checked local graph to a named database on Neo4j Enterprise, which needs no plugin</td></tr>
+<tr><td><code>python -m kpi_store.sync_check</code></td><td data-k="What it is for">Reads all three stores and reports each as current or behind</td></tr>
 </tbody></table></div>
 
   <h3 class="rise" data-ss-id="load-settings">The settings file</h3>
@@ -1041,7 +1041,7 @@ spaces = []                        # space IDs to read; empty means every space 
   <h3 class="rise" data-ss-id="load-loop">Correct, cut, reload</h3>
   <p class="rise">The ontology changes to follow the platform only through this loop. The load stops and writes a report. A person clears it. The cut tool, <code>kpi_store/cut.py</code>, turns the cleared report into a correction version. The next run loads that version, and its comparison passes. Nobody edits a released package by hand.</p>
   <p class="rise"><code>--plan</code> shows what a cut would do and changes nothing. The release holds a made-up report in the client platform's shapes, which the tool's tests use. No row of it has a decision yet, so the tool refuses it:</p>
-<pre data-snippet="powershell run=release-copy exit=1"><code>py -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --plan</code></pre>
+<pre data-snippet="powershell run=release-copy exit=1"><code>python -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --plan</code></pre>
 <pre data-snippet="text expect"><code>CutRefused: the report is not cleared. Rows that block the load and have no decision: R002</code></pre>
   <p class="rise">This script clears the one row that blocks, as a person would, and saves the cleared copy in a folder beside the release:</p>
 <pre data-snippet="python run=release-copy status-only"><code>import json
@@ -1054,7 +1054,7 @@ for row in report["rows"]:
 Path("../cleared").mkdir(exist_ok=True)
 Path("../cleared/discovery-report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8", newline="\n")</code></pre>
   <p class="rise">The plan now names the change, the rows it leaves, and the versions it would write:</p>
-<pre data-snippet="powershell run=release-copy"><code>py -m kpi_store.cut --report ../cleared/discovery-report.json --plan</code></pre>
+<pre data-snippet="powershell run=release-copy"><code>python -m kpi_store.cut --report ../cleared/discovery-report.json --plan</code></pre>
 <pre data-snippet="text expect"><code>Discovery run &lt;run id&gt; of KPI Store 1.1: 28 rows.
 The cut applies (1):
   R002 column-renamed: column ChangeValue of idp_sbx.gold_commercial_core.mips_mpr_executive_summary_fact becomes Change_Value_Amount  BREAKING
@@ -1213,7 +1213,7 @@ ORDER BY metric_view, measure;</code></pre>
 <tr><td>The logical models in Neo4j</td><td data-k="How it says">A <code>LogicalModelMarker</code> node, a digest of the model graph files</td><td data-k="What the check compares">The marker and a fingerprint of the <code>LogicalModel</code> subgraph with the package's graphs, on an <code>lm:neo4j</code> line</td></tr>
 <tr><td>The technical graph, in each store</td><td data-k="How it says">Its own marker in Databricks and in Neo4j. None in Jena</td><td data-k="What the check compares">A hash of the store's copy with the graph files of the last build</td></tr>
 </tbody></table></div>
-  <p class="rise"><code>sync_stores.py</code>, in <code>business_architecture/ontology/projection/</code>, judges the Neo4j database and the Jena dataset. It does not connect to Databricks: the load that writes the triple table also writes its marker. <code>py -m kpi_store.sync_check</code> reads all three stores and reports each as current or behind.</p>
+  <p class="rise"><code>sync_stores.py</code>, in <code>business_architecture/ontology/projection/</code>, judges the Neo4j database and the Jena dataset. It does not connect to Databricks: the load that writes the triple table also writes its marker. <code>python -m kpi_store.sync_check</code> reads all three stores and reports each as current or behind.</p>
   <h3 class="rise" data-ss-id="map-h-7">What to do, and when</h3>
   <div class="tbl rise" data-ss-id="map-t-8"><table class="gapt"><thead><tr><th>When</th><th>Do this</th></tr></thead><tbody>
 <tr><td>You loaded a store</td><td data-k="Do this">Run the sync check. The load is done only when every store reads current</td></tr>
@@ -1339,11 +1339,11 @@ WHERE { GRAPH ?g { ?s ?p ?o } FILTER(STRSTARTS(STR(?g), "https://w3id.org/mpc/on
 <tr><td><code>q7</code></td><td data-k="What it asks">KPIs that rest on SOX-relevant or confidential systems</td></tr>
 </tbody></table></div>
 <p class="rise">The governance graph belongs to its owner, and its labels can change. So no template names a label, a property or a relationship type: it names roles. <code>discover</code> reads both graphs' schemas and proposes which name plays each role. A person corrects the proposal and confirms it once. Every later run checks the confirmed mapping against the live schemas before it asks anything. Every query runs in a read transaction.</p>
-<pre data-snippet="powershell run=questions types=&quot;yes&quot; status-only"><code>py -m kpi_store.questions.run discover --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
-py -m kpi_store.questions.run confirm  --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;</code></pre>
+<pre data-snippet="powershell run=questions types=&quot;yes&quot; status-only"><code>python -m kpi_store.questions.run discover --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
+python -m kpi_store.questions.run confirm  --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;</code></pre>
 <p class="rise"><code>confirm</code> shows the mapping and asks <code>Type yes to confirm this mapping:</code>. Type <code>yes</code> and press Enter. Any other answer leaves the mapping file as it was. Then check the mapping and ask a question:</p>
-<pre data-snippet="powershell run=questions status-only"><code>py -m kpi_store.questions.run check    --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
-py -m kpi_store.questions.run ask q6   --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt; --param kpi=crude-prices --out &lt;a folder&gt;</code></pre>
+<pre data-snippet="powershell run=questions status-only"><code>python -m kpi_store.questions.run check    --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
+python -m kpi_store.questions.run ask q6   --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt; --param kpi=crude-prices --out &lt;a folder&gt;</code></pre>
 <p class="rise">The settings file and the mapping file describe one environment, so both stay outside the release. <code>kpi_store/questions/connection.py</code> lists the settings.</p></section>
 
 <section id="change" data-ss-id="section-change" data-ss-section>
@@ -1363,7 +1363,7 @@ py -m kpi_store.questions.run ask q6   --settings &lt;your settings file&gt; --m
 <tr><td>Change a process</td><td data-k="Start in"><code>downstream_process_map.json</code>, then a new core builder</td><td data-k="Section">Change a process</td></tr>
 <tr><td>Add a module</td><td data-k="Start in">A copy of <code>lane/</code>, then every place the table lists</td><td data-k="Section">Add a module</td></tr>
 <tr><td>Add a logical model</td><td data-k="Start in">ER Studio's export and a links file in <code>logical-model/models/</code>, then <code>build_logical_model.py</code></td><td data-k="Section">Add a logical model</td></tr>
-<tr><td>Correct a name the platform has changed</td><td data-k="Start in">The cleared discovery report, then <code>py -m kpi_store.cut</code> ("Correct, cut, reload" above)</td><td data-k="Section">The runbook has the steps</td></tr>
+<tr><td>Correct a name the platform has changed</td><td data-k="Start in">The cleared discovery report, then <code>python -m kpi_store.cut</code> ("Correct, cut, reload" above)</td><td data-k="Section">The runbook has the steps</td></tr>
 <tr><td>Re-release what depends on a change</td><td data-k="Start in"><code>release/dependents.py</code></td><td data-k="Section">The cascade</td></tr>
 </tbody></table></div>
 </section>
@@ -1915,7 +1915,7 @@ load: skipped, 'no neo4j_env in the run configuration'
 rebuild: skipped, 'no rebuild in the run configuration'</code></pre></dd>
 <dt>What you should see</dt><dd><code>--plan</code> lists the steps and runs nothing. With the configuration as shipped, which names no store, only the steps that need none would run. A run with your own copy of the configuration ends with <code>every step passed</code>.</dd>
 <dt>How to check it worked</dt><dd>The driver's own checks per step; <code>skill-run/test_skill_run.py</code>.</dd>
-<dt>What it enables next</dt><dd>A checked local graph, which <code>py -m kpi_store.copy_enterprise</code> copies to the Enterprise database.</dd>
+<dt>What it enables next</dt><dd>A checked local graph, which <code>python -m kpi_store.copy_enterprise</code> copies to the Enterprise database.</dd>
 <dt>Explained in</dt><dd><a href="#projections">Projections and stores</a></dd>
 <dt>Files in the File map</dt><dd><a href="#fm-projection">Projections and stores</a></dd>
 </dl>
@@ -1943,11 +1943,11 @@ rebuild: skipped, 'no rebuild in the run configuration'</code></pre></dd>
 <dl class="parts">
 <dt>Prerequisites</dt><dd>The release, checked (build step 23); a Windows machine with Python, Java, the Fuseki jar, a local Neo4j with n10s and APOC, and the Databricks command line; a Databricks workspace; a Neo4j Enterprise database.</dd>
 <dt>Files to open, in this order</dt><dd><ol class="files"><li><code>business_architecture/ontology/projection/ontology-stores-runbook.html</code>: the steps, in order</li><li><code>kpi_store/kpi_store.example.toml</code>: the settings of one environment</li><li><code>kpi_store/notebook/kpi_store_load.py</code>: the Databricks load</li><li><code>kpi_store/discovery.py, compare.py, report.py</code>: the reading of the workspace, the comparison and the report</li><li><code>kpi_store/load_databricks.py</code>: the load of <code>epm_triples</code> and its proof by a hash</li><li><code>kpi_store/cut.py</code> and <code>business_architecture/ontology/discovery-runs/README.md</code>: the cut tool and the record it writes</li><li><code>kpi_store/tech_graph.py</code>: the technical graph, built from the same reading</li><li><code>kpi_store/tests/</code>: the tests, on made-up fixtures with the real shapes</li></ol></dd>
-<dt>Commands</dt><dd><pre data-snippet="powershell run=first-run status-only"><code>py -m kpi_store.setup_check
-py -m kpi_store.runner
-py -m kpi_store.sync_check</code></pre></dd>
+<dt>Commands</dt><dd><pre data-snippet="powershell run=first-run status-only"><code>python -m kpi_store.setup_check
+python -m kpi_store.runner
+python -m kpi_store.sync_check</code></pre></dd>
 <dt>What you should see</dt><dd>The first run either loads all three stores or stops with a discovery report. After a person clears the report and the cut tool writes a correction version, the next run passes and loads. The sync check then reads every store as current. A rehearsal on a made-up workspace did exactly this: one blocking row, one cut, a second run that loaded, and a third that changed nothing.</dd>
-<dt>How to check it worked</dt><dd><code>py -m kpi_store.sync_check</code>, and the notebook's summary, whose <code>status</code> says <code>loaded</code> or <code>current</code>.</dd>
+<dt>How to check it worked</dt><dd><code>python -m kpi_store.sync_check</code>, and the notebook's summary, whose <code>status</code> says <code>loaded</code> or <code>current</code>.</dd>
 <dt>What it enables next</dt><dd>Stores that hold this release, and a technical graph of the real objects beside it.</dd>
 <dt>Explained in</dt><dd><a href="#load">Load the three stores</a>; <a href="#tech-build">The technical graph</a>; <a href="#sync">Keeping every store in step</a></dd>
 <dt>Files in the File map</dt><dd><a href="#fm-platform">The client's platform</a></dd>

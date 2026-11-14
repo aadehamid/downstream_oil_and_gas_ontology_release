@@ -21,12 +21,12 @@ The ontology owner approves every major release and every module's first release
 
 ## Before you change anything
 
-You need the machine that the runbook set up. The commands start in the release folder unless a step moves you. They start Python with `py`, as on Windows.
+You need the machine that the runbook set up. The commands start in the release folder unless a step moves you. They start Python with `python`, as the runbook does.
 
 1. Install the one more package that this guide's page builder needs.
 
    ```powershell run=scratch os=windows status-only
-   py -m pip install "markdown-it-py>=4,<5"
+   python -m pip install "markdown-it-py>=4,<5"
    ```
 
 2. Open Git Bash in the release folder. In File Explorer, right-click the folder and choose "Open Git Bash here".
@@ -96,7 +96,7 @@ The steps are the runbook's, from "The first run" to "The sync check". Two thing
 4. If the `enterprise` step stops because the database holds KPI Store nodes of the earlier release, run the step again with the replace allowed. **The replace deletes every node in that database that carries the KPI Store's marks, before it copies.** The runbook's "The limits" lists the marks. If the copy still stops and names nodes, the new release dropped a model, class or label that those nodes belong to; the runbook's "Replace what Enterprise holds" says what to do.
 
    ```powershell run=first-run
-   py -m kpi_store.runner --from enterprise --replace-enterprise
+   python -m kpi_store.runner --from enterprise --replace-enterprise
    ```
 
 5. Read the last line. Expect `the steps that ran passed`, with the steps before `enterprise` named as left out.
@@ -117,7 +117,7 @@ The runner calls the cut tool for you. To see what a cut does, run the tool on t
 1. Ask for the plan of the report as the notebook wrote it, with no decision. The tool refuses it, because the row that blocks has no decision.
 
    ```powershell run=correction exit=1
-   py -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --plan
+   python -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --plan
    ```
 
    ```text expect
@@ -127,7 +127,7 @@ The runner calls the cut tool for you. To see what a cut does, run the tool on t
 2. Ask for the plan with the cleared decisions. `cleared-decisions.csv` accepts the renamed column, the two case-only spellings and the second source. `--plan` changes nothing.
 
    ```powershell run=correction
-   py -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --decisions kpi_store/tests/fixtures/cut/cleared-decisions.csv --plan
+   python -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --decisions kpi_store/tests/fixtures/cut/cleared-decisions.csv --plan
    ```
 
    ```text expect
@@ -157,7 +157,7 @@ The runner calls the cut tool for you. To see what a cut does, run the tool on t
 3. Cut. At the first prompt type `Change_Value_Amount`, which confirms the breaking change. At the second prompt type `yes`.
 
    ```powershell run=correction types="Change_Value_Amount,yes"
-   py -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --decisions kpi_store/tests/fixtures/cut/cleared-decisions.csv --approver "the ontology owner"
+   python -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --decisions kpi_store/tests/fixtures/cut/cleared-decisions.csv --approver "the ontology owner"
    ```
 
    ```text expect
@@ -195,13 +195,13 @@ The runner calls the cut tool for you. To see what a cut does, run the tool on t
 
 A patch, a minor and a major all end with these steps. The worked example adds the alias "unit capacity utilization" to the measure Unit Utilization in `kpi`. An alias is new content that changes no meaning, so it is a minor: `kpi` 1.3.0 becomes 1.4.0.
 
-The versions in the commands are those of the release as you received it. Read the version you hold with `py next_version.py current kpi`, from the folder `business_architecture/ontology/release`.
+The versions in the commands are those of the release as you received it. Read the version you hold with `python next_version.py current kpi`, from the folder `business_architecture/ontology/release`.
 
 1. List the modules to release, in order. The first line is the module you change. Each module after it depends on it and gets a patch.
 
    ```powershell run=release-git
    cd business_architecture/ontology/release
-   py dependents.py kpi
+   python dependents.py kpi
    cd ../../..
    ```
 
@@ -244,7 +244,7 @@ The versions in the commands are those of the release as you received it. Read t
 
    ```powershell run=slow
    cd business_architecture/ontology/kpi
-   py build_measures.py --write
+   python build_measures.py --write
    ```
 
    ```text expect
@@ -256,8 +256,8 @@ The versions in the commands are those of the release as you received it. Read t
 
    ```powershell run=slow
    cd ../release
-   py next_version.py start kpi 1.4.0 minor --why "Adds the alias unit capacity utilization to Unit Utilization." --approver "The kpi module owner" --where "approvals/2026-11-12-kpi.md" --words "Approved as a minor."
-   py build_module.py kpi --write
+   python next_version.py start kpi 1.4.0 minor --why "Adds the alias unit capacity utilization to Unit Utilization." --approver "The kpi module owner" --where "approvals/2026-11-12-kpi.md" --words "Approved as a minor."
+   python build_module.py kpi --write
    ```
 
    ```text expect
@@ -271,7 +271,7 @@ The versions in the commands are those of the release as you received it. Read t
 6. Release every module that depends on it, and finish all of them. `cascade` gives each module of step 1's list the next patch, writes its package, and moves each old package to `releases\previous`. It also changes each version in the projection's two lists, `projection/pipeline.py` and `projection/skill-run/epm-config.json`.
 
    ```powershell run=slow
-   py next_version.py cascade kpi --approver "The kpi module owner" --where "approvals/2026-11-12-kpi.md" --words "Approved as a minor."
+   python next_version.py cascade kpi --approver "The kpi module owner" --where "approvals/2026-11-12-kpi.md" --words "Approved as a minor."
    ```
 
    ```text expect
@@ -296,11 +296,11 @@ The versions in the commands are those of the release as you received it. Read t
 7. Rebuild the catalog, then the projection manifest, then run the competency questions.
 
    ```powershell run=slow
-   py build_catalog.py --write
+   python build_catalog.py --write
    cd ../projection
-   py pipeline.py build
+   python pipeline.py build
    cd ../regression
-   py run.py
+   python run.py
    cd ../../..
    ```
 
@@ -313,10 +313,10 @@ The versions in the commands are those of the release as you received it. Read t
    competency coverage on <the core package>: 57 questions; answerable 56, partial 0, waiting 0, parked 1
    ```
 
-8. Rebuild the KPI intake pack, so that its lists offer what the release changed. The command needs the `openpyxl` package beside `rdflib` (`py -m pip install openpyxl`). `kpi-intake/README.md` explains the pack.
+8. Rebuild the KPI intake pack, so that its lists offer what the release changed. The command needs the `openpyxl` package beside `rdflib` (`python -m pip install openpyxl`). `kpi-intake/README.md` explains the pack.
 
    ```powershell run=slow
-   py -m kpi_store.intake build
+   python -m kpi_store.intake build
    ```
 
    ```text expect
@@ -336,13 +336,13 @@ The versions in the commands are those of the release as you received it. Read t
    all checks passed
    ```
 
-   After a change, the check prints a note: `projection-report.json describes an earlier build`. That file is the summary of the last Neo4j load, and it now describes the release before your change. The note does not fail the check, and it does not mean the ontology is wrong. It goes away when you have loaded the stores and recorded the new load's report with `py pipeline.py record`. The runbook's section "Record the load's report in the release folder" runs that command.
+   After a change, the check prints a note: `projection-report.json describes an earlier build`. That file is the summary of the last Neo4j load, and it now describes the release before your change. The note does not fail the check, and it does not mean the ontology is wrong. It goes away when you have loaded the stores and recorded the new load's report with `python pipeline.py record`. The runbook's section "Record the load's report in the release folder" runs that command.
 
 10. Search your copy for text that the change made stale, and update each document that holds it. No check catches a copy of a sentence.
 11. Load the stores with the runner, and read its last line. The release is done when the sync check reads `current` on every line.
 
     ```powershell run=first-run
-    py -m kpi_store.runner
+    python -m kpi_store.runner
     ```
 
     ```text expect
@@ -388,7 +388,7 @@ A role is in two tables of `business_architecture\ontology\organization`.
 1. Add the role's row to `roles.csv`: its `slug`, its `label`, its `kind` (`position` or `team`), its `definition` and a `note` that names its source.
 2. Add the role's name to `role-register.csv`, as the process map spells it, with the role's `slug`.
 3. Check that a RACI list of the process map names the role. The build refuses a role that no process names. For a role that no process names yet, start with "Change the RACI", which has every step and a worked example.
-4. Change the figures in `test_roles.py`, then run `py build_roles.py --write` and `py build_assignments.py --write`.
+4. Change the figures in `test_roles.py`, then run `python build_roles.py --write` and `python build_assignments.py --write`.
 5. Change the count of roles in `kpi-intake\README.md`, as step 12 of "Change the RACI" says.
 
 A system is in the tables of `business_architecture\ontology\system`.
@@ -397,7 +397,7 @@ A system is in the tables of `business_architecture\ontology\system`.
 2. For a system that another source names, such as SharePoint, add its row to `other-systems.csv`, with the key of that source in `named_by`.
 3. Add the system's definition to `definitions.csv`, with the keys of its sources. A system that the process map does not name must have a definition.
 4. A source that is new to the module is a row in `sources.csv`: its key, its title and its tier. Give the source the same tier in `authority\source-tiers.csv`. That table is part of `integration`, so the new row means a minor version of `integration` after `system`.
-5. Change the figures in `test_systems.py`: `test_figures` and `test_definitions`. Then run `py build_systems.py --write`.
+5. Change the figures in `test_systems.py`: `test_figures` and `test_definitions`. Then run `python build_systems.py --write`.
 
 Then follow "The release steps" from step 3.
 
@@ -442,7 +442,7 @@ The steps are for a role. This release leaves one such case open, whether "Black
 6. Write in `note` why the role is deprecated and who said so. Start with "Deprecated:", as the three deprecated roles of this release do. Search the file for `rcvo-advisor` to see one.
 7. Leave the role's `slug` and `label`, its row in `role-register.csv` and the process map as they are. **Do not rewrite the role's name in the process map.** The process map keeps the name its source uses, the register still maps that name to the role, and the build gives each of its assignments to the successor. If you rewrite the name, the build stops with `register row ... is not in the source`. If you then remove the register row, it stops with `role ... is not used by the register`.
 8. Change the figures in `organization\test_roles.py`. `test_the_figures_match_the_decision_record` states the count of deprecated and live roles. `test_the_answers_point_the_right_way` lists each deprecated role with its successor.
-9. Rebuild the roles, then the assignments, from the folder `organization`. The commands are `py build_roles.py --write` and `py build_assignments.py --write`.
+9. Rebuild the roles, then the assignments, from the folder `organization`. The commands are `python build_roles.py --write` and `python build_assignments.py --write`.
 10. Release `organization` as a major, with "The release steps" from step 5. Write `major` and the next major version in `start`. The cascade gives `integration` and `ref-mpc` a patch each.
 11. Add the line to `scripts/pinned-tests.txt` that "The worked examples of the next five sections" names.
 12. Follow "The release steps" from step 7 to the end.
@@ -477,7 +477,7 @@ The commands start in the top folder of the copy.
 
    ```powershell run=slow
    cd business_architecture/ontology/release
-   py update_examples.py deprecate-role --plan
+   python update_examples.py deprecate-role --plan
    ```
 
    ```text expect
@@ -490,7 +490,7 @@ The commands start in the top folder of the copy.
 3. Make the hand edits of steps 2 to 8 and of step 11 above.
 
    ```powershell run=slow
-   py update_examples.py deprecate-role --write
+   python update_examples.py deprecate-role --write
    ```
 
    ```text expect
@@ -503,8 +503,8 @@ The commands start in the top folder of the copy.
 
    ```powershell run=slow
    cd ../organization
-   py build_roles.py --write
-   py build_assignments.py --write
+   python build_roles.py --write
+   python build_assignments.py --write
    ```
 
    ```text expect
@@ -517,7 +517,7 @@ The commands start in the top folder of the copy.
 5. Read the assignments. Every RACI entry that named Black Oil Manager is still there, with its text and its IRI, and now names Asphalt Manager. This is the whole of replacing a role in every entry that names it.
 
    ```powershell run=slow
-   py -c "t = open('assignments.ttl', encoding='utf-8').read(); print(t.count('Black oil manager'), 'assignments keep the text Black oil manager;', t.count('--black-oil-manager--'), 'keep their IRI;', t.count('assignedRole role:black-oil-manager '), 'name the deprecated role')"
+   python -c "t = open('assignments.ttl', encoding='utf-8').read(); print(t.count('Black oil manager'), 'assignments keep the text Black oil manager;', t.count('--black-oil-manager--'), 'keep their IRI;', t.count('assignedRole role:black-oil-manager '), 'name the deprecated role')"
    ```
 
    ```text expect
@@ -528,9 +528,9 @@ The commands start in the top folder of the copy.
 
    ```powershell run=slow
    cd ../release
-   py next_version.py start organization 3.0.0 major --why "Deprecates the role Black Oil Manager into Asphalt Manager." --approver "The ontology owner" --where "approvals/example-deprecate-role.md" --words "Approved as a major: Black Oil Manager is deprecated into Asphalt Manager."
-   py build_module.py organization --write
-   py next_version.py cascade organization --approver "The ontology owner" --where "approvals/example-deprecate-role.md" --words "Approved as a major: Black Oil Manager is deprecated into Asphalt Manager."
+   python next_version.py start organization 3.0.0 major --why "Deprecates the role Black Oil Manager into Asphalt Manager." --approver "The ontology owner" --where "approvals/example-deprecate-role.md" --words "Approved as a major: Black Oil Manager is deprecated into Asphalt Manager."
+   python build_module.py organization --write
+   python next_version.py cascade organization --approver "The ontology owner" --where "approvals/example-deprecate-role.md" --words "Approved as a major: Black Oil Manager is deprecated into Asphalt Manager."
    ```
 
    ```text expect
@@ -548,14 +548,14 @@ The commands start in the top folder of the copy.
 7. Rebuild the catalog, the projection manifest, the competency questions, the KPI intake pack and the pages.
 
    ```powershell run=slow
-   py build_catalog.py --write
+   python build_catalog.py --write
    cd ../projection
-   py pipeline.py build
+   python pipeline.py build
    cd ../regression
-   py run.py
+   python run.py
    cd ../../..
-   py -m kpi_store.intake build
-   py scripts/build_docs_html.py
+   python -m kpi_store.intake build
+   python scripts/build_docs_html.py
    ```
 
    ```text expect
@@ -569,7 +569,7 @@ The commands start in the top folder of the copy.
 8. Read the role's entry in the form's list. It carries the mark, and the form's settings still hide it.
 
    ```powershell run=slow
-   py -c "import json; print([(r['label'], r.get('hidden', False)) for r in json.load(open('kpi-intake/pick-lists.json', encoding='utf-8'))['lists']['roles'] if 'Black Oil' in r['label']])"
+   python -c "import json; print([(r['label'], r.get('hidden', False)) for r in json.load(open('kpi-intake/pick-lists.json', encoding='utf-8'))['lists']['roles'] if 'Black Oil' in r['label']])"
    ```
 
    ```text expect
@@ -579,7 +579,7 @@ The commands start in the top folder of the copy.
 9. Run the helper again. It refuses a copy that holds the example, and changes nothing.
 
    ```powershell run=slow exit=1
-   py business_architecture/ontology/release/update_examples.py deprecate-role --write
+   python business_architecture/ontology/release/update_examples.py deprecate-role --write
    ```
 
    ```text expect
@@ -617,7 +617,7 @@ A changed kind is a major release when an answer given under the old kind is no 
 6. In `system\build_systems.py`, add the value's notation to `KINDS`.
 7. Change the system's row. A system that the process map names is in `system\systems.csv`. Any other system, such as Databricks, is in `system\other-systems.csv`. Set its `kind` to the value's notation.
 8. Change the count of each kind in `test_figures`, in `system\test_systems.py`. Add a line to `test_kinds` that names the system and its kind.
-9. Rebuild with `py build_systems.py --write`, from the folder `system`.
+9. Rebuild with `python build_systems.py --write`, from the folder `system`.
 10. Release `system` as a major, with "The release steps" from step 3. The cascade gives seven modules a patch each. They are `data-product`, `party`, `logical-model`, `ref-mpc`, `technical-graph`, `value-stream` and `integration`.
 
 Nothing outside `system` reads a system's kind in this release. The links from a platform table to a system, `dp:copiesSystem` and `dp:dependsOnSystem`, point at the system whatever its kind is. No competency question asks for the kind.
@@ -641,7 +641,7 @@ The commands start in the top folder of the copy.
 
    ```powershell run=slow
    cd business_architecture/ontology/release
-   py update_examples.py system-kind --plan
+   python update_examples.py system-kind --plan
    ```
 
    ```text expect
@@ -656,7 +656,7 @@ The commands start in the top folder of the copy.
 3. Make the hand edits of steps 2 to 8 above, and write the approval.
 
    ```powershell run=slow
-   py update_examples.py system-kind --write
+   python update_examples.py system-kind --write
    ```
 
    ```text expect
@@ -669,7 +669,7 @@ The commands start in the top folder of the copy.
 
    ```powershell run=slow
    cd ../system
-   py build_systems.py --write
+   python build_systems.py --write
    ```
 
    ```text expect
@@ -681,9 +681,9 @@ The commands start in the top folder of the copy.
 
    ```powershell run=slow
    cd ../release
-   py next_version.py start system 2.0.0 major --why "Adds the system kind data platform and gives it to Databricks." --approver "The ontology owner" --where "approvals/example-system-kind.md" --words "Approved as a major: the system kind data platform, and Databricks as a data platform."
-   py build_module.py system --write
-   py next_version.py cascade system --approver "The ontology owner" --where "approvals/example-system-kind.md" --words "Approved as a major: the system kind data platform, and Databricks as a data platform."
+   python next_version.py start system 2.0.0 major --why "Adds the system kind data platform and gives it to Databricks." --approver "The ontology owner" --where "approvals/example-system-kind.md" --words "Approved as a major: the system kind data platform, and Databricks as a data platform."
+   python build_module.py system --write
+   python next_version.py cascade system --approver "The ontology owner" --where "approvals/example-system-kind.md" --words "Approved as a major: the system kind data platform, and Databricks as a data platform."
    ```
 
    ```text expect
@@ -705,14 +705,14 @@ The commands start in the top folder of the copy.
 6. Rebuild the catalog, the projection manifest, the competency questions, the KPI intake pack and the pages.
 
    ```powershell run=slow
-   py build_catalog.py --write
+   python build_catalog.py --write
    cd ../projection
-   py pipeline.py build
+   python pipeline.py build
    cd ../regression
-   py run.py
+   python run.py
    cd ../../..
-   py -m kpi_store.intake build
-   py scripts/build_docs_html.py
+   python -m kpi_store.intake build
+   python scripts/build_docs_html.py
    ```
 
    ```text expect
@@ -751,7 +751,7 @@ An entry that moves keeps its IRI, its name and its place in its line. It is the
 6. Change `data-product\shapes.ttl` in three places. Add the class to the targets of `shp:PortfolioItem` and of `shp:ActiveIsDefined`. Add a shape of its own, which says that the entry sits in one line, has one status and is not also a data product.
 7. Change `data-product\build_data_products.py` in four places. It must refuse a kind it does not know, give an entry the class of its kind, write a history note that says what the entry was before, and count the two classes apart. The helper's function `entry_builder` shows each place.
 8. Change the count of terms, the figures and the count of data products in `data-product\test_data_products.py`. Add a test that the new shape rejects an entry of both classes.
-9. Rebuild with `py build_data_products.py --write`, from the folder `data-product`.
+9. Rebuild with `python build_data_products.py --write`, from the folder `data-product`.
 10. Release `data-product` as a major, with "The release steps" from step 3. The cascade gives `logical-model`, `technical-graph`, `value-stream` and `integration` a patch each.
 
 The intake form offers the data products in question 6.6. Its list holds every `dp:DataProduct`, so an entry that moved leaves it. `[pick_list.data-products]` in `kpi-intake/settings.toml` names the 13 data products under `keep_only`. The build of the pack stops on a name there that is no longer in the list. So if you move an entry that `keep_only` names, remove its name there. When all 36 have moved, the list holds only the data products. Delete the table `[pick_list.data-products]` then, so that the form offers a data product the ontology gains later.
@@ -773,7 +773,7 @@ The commands start in the top folder of the copy.
 
    ```powershell run=slow
    cd business_architecture/ontology/release
-   py update_examples.py move-entry --plan
+   python update_examples.py move-entry --plan
    ```
 
    ```text expect
@@ -790,7 +790,7 @@ The commands start in the top folder of the copy.
 3. Make the hand edits of steps 3 to 8 above, and write the approval.
 
    ```powershell run=slow
-   py update_examples.py move-entry --write
+   python update_examples.py move-entry --write
    ```
 
    ```text expect
@@ -803,7 +803,7 @@ The commands start in the top folder of the copy.
 
    ```powershell run=slow
    cd ../data-product
-   py build_data_products.py --write
+   python build_data_products.py --write
    ```
 
    ```text expect
@@ -815,9 +815,9 @@ The commands start in the top folder of the copy.
 
    ```powershell run=slow
    cd ../release
-   py next_version.py start data-product 2.0.0 major --why "Moves the catalog entry HR to the new class data portfolio." --approver "The ontology owner" --where "approvals/example-move-entry.md" --words "Approved as a major: the catalog entry HR is a data portfolio."
-   py build_module.py data-product --write
-   py next_version.py cascade data-product --approver "The ontology owner" --where "approvals/example-move-entry.md" --words "Approved as a major: the catalog entry HR is a data portfolio."
+   python next_version.py start data-product 2.0.0 major --why "Moves the catalog entry HR to the new class data portfolio." --approver "The ontology owner" --where "approvals/example-move-entry.md" --words "Approved as a major: the catalog entry HR is a data portfolio."
+   python build_module.py data-product --write
+   python next_version.py cascade data-product --approver "The ontology owner" --where "approvals/example-move-entry.md" --words "Approved as a major: the catalog entry HR is a data portfolio."
    ```
 
    ```text expect
@@ -836,14 +836,14 @@ The commands start in the top folder of the copy.
 6. Rebuild the catalog, the projection manifest, the competency questions, the KPI intake pack and the pages. The pages now include the proposal's page.
 
    ```powershell run=slow
-   py build_catalog.py --write
+   python build_catalog.py --write
    cd ../projection
-   py pipeline.py build
+   python pipeline.py build
    cd ../regression
-   py run.py
+   python run.py
    cd ../../..
-   py -m kpi_store.intake build
-   py scripts/build_docs_html.py
+   python -m kpi_store.intake build
+   python scripts/build_docs_html.py
    ```
 
    ```text expect
@@ -891,7 +891,7 @@ The third case is never done in the process map. The build refuses a role that n
 6. For each new role, add a row to `roles.csv`. It holds the role's `slug`, its `label` as the source spells it, its `kind` (`position` or `team`), its `definition`, and a `note` that names the source and its date. Give the row every column, also the empty ones.
 7. To give an existing role your organisation's title, set its `preferred_label`. The role keeps its `slug`, and the name in the process map becomes an alternative label.
 8. Change the figures in `organization\test_roles.py`. `test_the_figures_match_the_decision_record` states the counts of processes, entries, role names and roles.
-9. Rebuild the roles, then the assignments, from the folder `organization`. The commands are `py build_roles.py --write` and `py build_assignments.py --write`. The second prints the ledger. In it, the entries plus the extra roles of entries that name two roles equal the assignments.
+9. Rebuild the roles, then the assignments, from the folder `organization`. The commands are `python build_roles.py --write` and `python build_assignments.py --write`. The second prints the ledger. In it, the entries plus the extra roles of entries that name two roles equal the assignments.
 10. Release `organization`, with "The release steps" from step 3. The cascade gives `integration` and `ref-mpc` a patch each.
 11. Add the line to `scripts/pinned-tests.txt` that "The worked examples of the next five sections" names.
 12. Change the count of roles in `kpi-intake\README.md`, under "Hide or add an entry of one of the ontology's lists". The page quotes the roles line of `kpi-intake\for-the-architect.md`, which the build of the pack writes, and the full check compares the two. Each new role raises both figures of the line by one.
@@ -924,7 +924,7 @@ The commands start in the top folder of the copy.
 
    ```powershell run=slow
    cd business_architecture/ontology/release
-   py update_examples.py raci --plan
+   python update_examples.py raci --plan
    ```
 
    ```text expect
@@ -941,7 +941,7 @@ The commands start in the top folder of the copy.
 3. Make the hand edits of steps 3 to 8 and of steps 11 and 12 above, and write the approval.
 
    ```powershell run=slow
-   py update_examples.py raci --write
+   python update_examples.py raci --write
    ```
 
    ```text expect
@@ -954,8 +954,8 @@ The commands start in the top folder of the copy.
 
    ```powershell run=slow
    cd ../organization
-   py build_roles.py --write
-   py build_assignments.py --write
+   python build_roles.py --write
+   python build_assignments.py --write
    ```
 
    ```text expect
@@ -969,9 +969,9 @@ The commands start in the top folder of the copy.
 
    ```powershell run=slow
    cd ../release
-   py next_version.py start organization 2.3.0 minor --why "Adds two roles and the RACI of CM 1.1.2." --approver "The organization module owner" --where "approvals/example-raci.md" --words "Approved as a minor: two roles and the RACI of CM 1.1.2."
-   py build_module.py organization --write
-   py next_version.py cascade organization --approver "The organization module owner" --where "approvals/example-raci.md" --words "Approved as a minor: two roles and the RACI of CM 1.1.2."
+   python next_version.py start organization 2.3.0 minor --why "Adds two roles and the RACI of CM 1.1.2." --approver "The organization module owner" --where "approvals/example-raci.md" --words "Approved as a minor: two roles and the RACI of CM 1.1.2."
+   python build_module.py organization --write
+   python next_version.py cascade organization --approver "The organization module owner" --where "approvals/example-raci.md" --words "Approved as a minor: two roles and the RACI of CM 1.1.2."
    ```
 
    ```text expect
@@ -988,14 +988,14 @@ The commands start in the top folder of the copy.
 6. Rebuild the catalog, the projection manifest, the competency questions, the KPI intake pack and the pages. The pages now include the proposal's page.
 
    ```powershell run=slow
-   py build_catalog.py --write
+   python build_catalog.py --write
    cd ../projection
-   py pipeline.py build
+   python pipeline.py build
    cd ../regression
-   py run.py
+   python run.py
    cd ../../..
-   py -m kpi_store.intake build
-   py scripts/build_docs_html.py
+   python -m kpi_store.intake build
+   python scripts/build_docs_html.py
    ```
 
    ```text expect
@@ -1027,7 +1027,7 @@ A controlled list is a SKOS concept scheme. Each value is a `skos:Concept` in th
 First decide where the list lives.
 
 - Put the list in the module whose property points at it. `system` holds its kinds this way, `organization` its RACI levels, and `data-product` its statuses and its layers.
-- A module can point only at a module it depends on. `py dependents.py <module>`, from the folder `release`, prints the modules that depend on one.
+- A module can point only at a module it depends on. `python dependents.py <module>`, from the folder `release`, prints the modules that depend on one.
 - Give the list a module of its own when its values carry facts of their own that a competency question asks for, or when two modules that do not depend on each other must point at it. Then follow "Onboard another module".
 
 For the domains, the first property is a KPI's domain, so the list goes in `kpi`. `data-product` depends on `kpi` and can point at the list later. The domains with their owners are more than a list. An owner is a role of `organization`, and `organization` does not depend on `kpi`. That part needs a module of its own.
@@ -1064,7 +1064,7 @@ The commands start in the top folder of the copy.
 
    ```powershell run=slow
    cd business_architecture/ontology/release
-   py update_examples.py domain-list --plan
+   python update_examples.py domain-list --plan
    ```
 
    ```text expect
@@ -1081,7 +1081,7 @@ The commands start in the top folder of the copy.
 3. Make the hand edits of steps 2 to 10 above, and write the approval.
 
    ```powershell run=slow
-   py update_examples.py domain-list --write
+   python update_examples.py domain-list --write
    ```
 
    ```text expect
@@ -1094,7 +1094,7 @@ The commands start in the top folder of the copy.
 
    ```powershell run=slow
    cd ../kpi
-   py build_data_domains.py --write
+   python build_data_domains.py --write
    ```
 
    ```text expect
@@ -1106,9 +1106,9 @@ The commands start in the top folder of the copy.
 
    ```powershell run=slow
    cd ../release
-   py next_version.py start kpi 1.4.0 minor --why "Adds a list of data domains and the property that points at it." --approver "The kpi module owner" --where "approvals/example-domain-list.md" --words "Approved as a minor: a list of data domains and the property that points at it."
-   py build_module.py kpi --write
-   py next_version.py cascade kpi --approver "The kpi module owner" --where "approvals/example-domain-list.md" --words "Approved as a minor: a list of data domains and the property that points at it."
+   python next_version.py start kpi 1.4.0 minor --why "Adds a list of data domains and the property that points at it." --approver "The kpi module owner" --where "approvals/example-domain-list.md" --words "Approved as a minor: a list of data domains and the property that points at it."
+   python build_module.py kpi --write
+   python next_version.py cascade kpi --approver "The kpi module owner" --where "approvals/example-domain-list.md" --words "Approved as a minor: a list of data domains and the property that points at it."
    ```
 
    ```text expect
@@ -1124,14 +1124,14 @@ The commands start in the top folder of the copy.
 6. Rebuild the catalog, the projection manifest, the competency questions, the KPI intake pack and the pages. The count of questions is one higher than before, because the list's question is number 58.
 
    ```powershell run=slow
-   py build_catalog.py --write
+   python build_catalog.py --write
    cd ../projection
-   py pipeline.py build
+   python pipeline.py build
    cd ../regression
-   py run.py
+   python run.py
    cd ../../..
-   py -m kpi_store.intake build
-   py scripts/build_docs_html.py
+   python -m kpi_store.intake build
+   python scripts/build_docs_html.py
    ```
 
    ```text expect
@@ -1169,10 +1169,10 @@ The document test does not run this section's commands. Each needs your own edit
 7. Fill in the block that the new builder marks: the two labels, the new version and the approval. To change an existing node's ID or description, read `build_core_2_2.py`, which applies those changes.
 8. Write the changelog `business_architecture\ontology\releases\core\CHANGELOG-2.5.0.md`, in the form of `CHANGELOG-2.4.0.md` beside it.
 9. Add a short test, `test_build_core_2_5.py`, beside the builder. It says what the release adds and that it removes no IRI. Add it to the test list in `scripts/check.sh`.
-10. From the folder `release`, write the package with `py build_core_2_5.py --write`.
+10. From the folder `release`, write the package with `python build_core_2_5.py --write`.
 11. Move the folder `releases\core\2.4.0` into `releases\previous\core`. Make that folder first if it is missing.
 12. Rebuild every module's source file, since each reads `core`. `scripts/check.sh` lists the builders after the comment on each module's source Turtle. Run each from its folder with `--write`.
-13. From the folder `release`, release every module with `py next_version.py cascade core`, with `--approver`, `--where` and `--words` as in "The release steps".
+13. From the folder `release`, release every module with `python next_version.py cascade core`, with `--approver`, `--where` and `--words` as in "The release steps".
 14. Change the version of `core` by hand in `PACKAGES` in `projection/pipeline.py` and under `packages` in `projection/skill-run/epm-config.json`.
 15. Follow "The release steps" from step 7.
 
@@ -1222,7 +1222,7 @@ spaces = []
 Each catalog in `[names]` must also be in `read_catalogs`. Two ontology catalogs may not share one catalog of the environment. The settings reader refuses both mistakes before any read or write. To check a settings file before you use it, load it. The example loads the file that ships with the release:
 
 ```powershell run=release-copy
-py -c "from kpi_store import settings; s = settings.load('kpi_store/kpi_store.example.toml'); print(s.write_schemas, s.read_catalogs, s.names)"
+python -c "from kpi_store import settings; s = settings.load('kpi_store/kpi_store.example.toml'); print(s.write_schemas, s.read_catalogs, s.names)"
 ```
 
 ```text expect
@@ -1290,21 +1290,21 @@ The comparison before each Databricks load reads the platform tables of the `dat
 1. Add a row for each table and view of the area to `business_architecture/ontology/data-product/pricing/tables.csv`. Use the names the workspace uses.
 2. Add a row for each hop of the area's lineage to `lineage.csv`, in the same folder.
 3. Add a row for each value column to `columns.csv`, in the same folder.
-4. Run the builder from `business_architecture/ontology/data-product`: `py build_pricing.py --write`. It fails on a name that does not resolve.
+4. Run the builder from `business_architecture/ontology/data-product`: `python build_pricing.py --write`. It fails on a name that does not resolve.
 5. Release `data-product` as a minor version, with its cascade ("The release steps").
-6. Run `py -m kpi_store.runner`. The run now compares the new tables with the workspace.
+6. Run `python -m kpi_store.runner`. The run now compares the new tables with the workspace.
 
 The cut tool applies corrections to the tables in `data-product/pricing/` only. A difference in any other module's content goes through the release steps of this guide, not through the cut.
 
 ### Release the module at 1.0.0
 
 1. Run the module's builder with `--write`, from the module's folder.
-2. Write the package: `py build_module.py <module> --write`, from `business_architecture/ontology/release`.
-3. Rebuild the catalog: `py build_catalog.py --write`, from the same folder.
-4. Rebuild the projection manifest: `py pipeline.py build`, from `business_architecture/ontology/projection`.
-5. Run the competency questions: `py run.py`, from `business_architecture/ontology/regression`.
-6. Rebuild the KPI intake pack: `py -m kpi_store.intake build`, from the top folder. Its lists name the release's modules.
-7. Rebuild the pages: `py scripts/build_docs_html.py`, from the top folder.
+2. Write the package: `python build_module.py <module> --write`, from `business_architecture/ontology/release`.
+3. Rebuild the catalog: `python build_catalog.py --write`, from the same folder.
+4. Rebuild the projection manifest: `python pipeline.py build`, from `business_architecture/ontology/projection`.
+5. Run the competency questions: `python run.py`, from `business_architecture/ontology/regression`.
+6. Rebuild the KPI intake pack: `python -m kpi_store.intake build`, from the top folder. Its lists name the release's modules.
+7. Rebuild the pages: `python scripts/build_docs_html.py`, from the top folder.
 8. Run the full check. Do not share the module until it prints `all checks passed`.
 
 A first release needs no cascade. No released module requires the new one yet. A module that should link to it does so in its own next release.
@@ -1313,9 +1313,9 @@ A first release needs no cascade. No released module requires the new one yet. A
 
 The projection takes every module in `PACKAGES`, so the new module goes into Neo4j with the others. No store needs a setting of its own for it.
 
-1. Run `py -m kpi_store.runner --replace-enterprise`. The Enterprise database holds the earlier release, so the copy needs the replace.
+1. Run `python -m kpi_store.runner --replace-enterprise`. The Enterprise database holds the earlier release, so the copy needs the replace.
 2. Read the last line. Expect `every step passed`.
-3. Run `py -m kpi_store.sync_check`. Every line must read `current`.
+3. Run `python -m kpi_store.sync_check`. Every line must read `current`.
 
 The runbook, `business_architecture/ontology/projection/ontology-stores-runbook.md`, explains each line of both commands.
 
@@ -1331,7 +1331,7 @@ The commands start in the top folder of the copy.
 
    ```powershell run=new-module
    cd business_architecture/ontology/release
-   py onboard_example.py --plan
+   python onboard_example.py --plan
    ```
 
    ```text expect
@@ -1352,7 +1352,7 @@ The commands start in the top folder of the copy.
 2. Write the module's folder and register the module.
 
    ```powershell run=new-module
-   py onboard_example.py --write
+   python onboard_example.py --write
    ```
 
    ```text expect
@@ -1366,7 +1366,7 @@ The commands start in the top folder of the copy.
 
    ```powershell run=new-module
    cd ../sample-area
-   py build_sample_areas.py --write
+   python build_sample_areas.py --write
    ```
 
    ```text expect
@@ -1378,8 +1378,8 @@ The commands start in the top folder of the copy.
 
    ```powershell run=new-module
    cd ../release
-   py build_module.py sample-area --write
-   py build_catalog.py --write
+   python build_module.py sample-area --write
+   python build_catalog.py --write
    ```
 
    ```text expect
@@ -1393,7 +1393,7 @@ The commands start in the top folder of the copy.
 
    ```powershell run=new-module
    cd ../projection
-   py pipeline.py build
+   python pipeline.py build
    ```
 
    ```text expect
@@ -1405,7 +1405,7 @@ The commands start in the top folder of the copy.
 
    ```powershell run=new-module
    cd ../regression
-   py run.py
+   python run.py
    ```
 
    ```text expect
@@ -1416,13 +1416,13 @@ The commands start in the top folder of the copy.
 
    ```powershell run=new-module status-only
    cd ../../..
-   py -m kpi_store.intake build
+   python -m kpi_store.intake build
    ```
 
 8. Rebuild the pages, and tell Git about the new files. One test reads which pages Git tracks.
 
    ```powershell run=new-module status-only
-   py scripts/build_docs_html.py
+   python scripts/build_docs_html.py
    git add -A
    ```
 
@@ -1441,7 +1441,7 @@ The commands start in the top folder of the copy.
 
     ```powershell run=new-module exit=1
     cd business_architecture/ontology/release
-    py onboard_example.py --write
+    python onboard_example.py --write
     ```
 
     ```text expect
@@ -1461,7 +1461,7 @@ Each model is two files in `business_architecture\ontology\logical-model\models`
 
    ```powershell run=release-copy status-only
    cd business_architecture/ontology/logical-model
-   py build_logical_model.py --export models/customer-logical-model.erstudio.ttl --links models/customer-logical-model.links.csv --model customer-logical-model --title "Customer logical model" --out models --verify
+   python build_logical_model.py --export models/customer-logical-model.erstudio.ttl --links models/customer-logical-model.links.csv --model customer-logical-model --title "Customer logical model" --out models --verify
    ```
 
 3. In `release/build_module.py`, add the model's two graph files to the `graphs` list of the `logical-model` entry: the `.erstudio.ttl` file and the `.layer.ttl` file that the builder wrote.
@@ -1476,9 +1476,9 @@ A build can also read a model's files from a folder outside your copy. Point `--
 
 | Part | Command, from its folder | When |
 |---|---|---|
-| The catalog, `releases/catalog.ttl` | `py build_catalog.py --write`, in `release` | After any package is written. |
-| The regression | `py run.py`, in `regression` | After any change. A new question goes in `regression/expected.csv`, with its query in `regression/queries`. |
-| The projection manifest | `py pipeline.py build`, in `projection` | After any package is written. The check fails until you run it. |
+| The catalog, `releases/catalog.ttl` | `python build_catalog.py --write`, in `release` | After any package is written. |
+| The regression | `python run.py`, in `regression` | After any change. A new question goes in `regression/expected.csv`, with its query in `regression/queries`. |
+| The projection manifest | `python pipeline.py build`, in `projection` | After any package is written. The check fails until you run it. |
 
 Step 7 of "The release steps" runs all three.
 

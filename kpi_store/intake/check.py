@@ -1,6 +1,6 @@
 """The completeness check of a filled intake form.
 
-    py -m kpi_store.intake check <answers.json or filled.xlsx> [--form domain-activation] [--pack <folder>]
+    python -m kpi_store.intake check <answers.json or filled.xlsx> [--form domain-activation] [--pack <folder>]
 
 It reads the form, in either format, and says in plain words, section by section, what is missing, which
 questions the rules rightly skipped, where an answer routes the request, and what the derived checks found. It
@@ -311,7 +311,7 @@ def check(cat, data, intake, stale=None):
         report.say(f"Note: the form was filled with catalogue {intake.catalogue_version}. This check uses {cat.version}.")
     if stale:
         changed = ", ".join(f"{m} ({old} then, {new} now)" for m, (old, new) in stale.items())
-        report.say(f"The pick lists are older than the release packages: {changed}. Rebuild them first: py -m kpi_store.intake build")
+        report.say(f"The pick lists are older than the release packages: {changed}. Rebuild them first: python -m kpi_store.intake build")
         report.block("the pick lists are older than the release packages")
     for key in intake.unknown_keys:
         report.say(f"Note: the workbook holds an answer under {key}, which is no question of this form. It was not read.")

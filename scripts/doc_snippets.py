@@ -7,7 +7,7 @@
     python3 scripts/doc_snippets.py html               the HTML pages with no Markdown source, and their blocks
     python3 scripts/doc_snippets.py not-run            the blocks no test runs, as rows of the table that lists them
     python3 scripts/doc_snippets.py links [DOC ...]    check that every relative link points at a file of the tree
-    py scripts/doc_snippets.py describe-release [--write]   say whether the examples describe this release, or record it
+    python scripts/doc_snippets.py describe-release [--write]   say whether the examples describe this release, or record it
 
 A document that shows a command which no longer works misleads its reader. So every fenced code block carries a
 tag after its language, and a <pre> block of a hand-written page carries the same tag in a data-snippet
@@ -37,7 +37,7 @@ from doc_snippets_parts.registry import (NESTED, NESTED_FILE, REGISTRY, ROOT, Re
                                          release_digest, write_release_digest)
 from doc_snippets_parts.report import describe_release, html_pages, main, tally  # noqa: E402,F401
 from doc_snippets_parts.static import block_key, chain_order, declared_options, handled_options, not_run, table_rows, usage_problem  # noqa: E402,F401
-from doc_snippets_parts.run import NotSimple, command_lines, resolve_program, run_process, split_command  # noqa: E402,F401
+from doc_snippets_parts.run import NotSimple, command_lines, resolve_program, run_process, split_command, starts_launcher  # noqa: E402,F401
 
 if __name__ == "__main__":
     sys.exit(main())

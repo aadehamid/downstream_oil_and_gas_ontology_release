@@ -4,7 +4,7 @@
 # The Architect, or whoever maintains the form, edits this file. The business users never do.
 # After you change this file, rebuild the forms:
 #
-#     py -m kpi_store.intake build
+#     python -m kpi_store.intake build
 #
 # A list is a table of items under [[list.<name>]]. A question offers it with source = "settings:<name>".
 # Each item has an id, which the answers file keeps, and a label, which the forms show. An item may say

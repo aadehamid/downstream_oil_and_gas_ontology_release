@@ -204,9 +204,9 @@ figure.pic figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
 <div class="tblwrap"><table><thead><tr><th>Word</th><th>Meaning</th></tr></thead><tbody><tr><td>Module</td><td>One part of the ontology with its own version, such as <code>kpi</code>.</td></tr><tr><td>Package</td><td>One released version of a module: the folder <code>business_architecture/ontology/releases/</code>, then the module, then the version. A package never changes after its release. A change makes a new package.</td></tr><tr><td>Release folder</td><td>The top folder of your copy, which holds <code>README.md</code> and <code>kpi_store</code>.</td></tr><tr><td>Ontology owner</td><td>The person your organisation names to decide what the ontology means.</td></tr><tr><td>Module owner</td><td>The person the ontology owner names for one module. Until a module has an owner, the ontology owner decides for it.</td></tr><tr><td>Correction version</td><td>A version that the cut tool wrote from a cleared report. Its name carries a marker: <code>1.2.1-correction.1</code>.</td></tr></tbody></table></div>
 <p>The ontology owner approves every major release and every module's first release. The module owner approves minor and patch releases. The person who runs the cut approves a correction, at the cut's prompt.</p>
 <h2 id="before-you-change-anything">Before you change anything<a class="hl" href="#before-you-change-anything" aria-label="Link to this section">#</a></h2>
-<p>You need the machine that the runbook set up. The commands start in the release folder unless a step moves you. They start Python with <code>py</code>, as on Windows.</p>
+<p>You need the machine that the runbook set up. The commands start in the release folder unless a step moves you. They start Python with <code>python</code>, as the runbook does.</p>
 <ol><li>Install the one more package that this guide's page builder needs.
-<pre><code class="lang-powershell">py -m pip install "markdown-it-py&gt;=4,&lt;5"</code></pre></li></ol>
+<pre><code class="lang-powershell">python -m pip install "markdown-it-py&gt;=4,&lt;5"</code></pre></li></ol>
 <ol start="2"><li>Open Git Bash in the release folder. In File Explorer, right-click the folder and choose "Open Git Bash here".</li><li>Run the full check. It must end with <code>all checks passed</code>. It took about 10 minutes on a Mac and 21 minutes on a Windows machine with 4 cores. Run it in Git Bash: in PowerShell, the plain word <code>bash</code> starts the launcher of the Linux subsystem.
 <pre><code class="lang-bash">bash scripts/check.sh</code></pre>
 <pre><code class="lang-text">...
@@ -227,7 +227,7 @@ all checks passed</code></pre></li></ol>
 <p>This is the normal way to follow a change in Databricks. The runner compares the ontology with the workspace on every run. If a name that the ontology holds is missing or renamed, the run stops on a report. You clear the report. The next run cuts a correction version and loads every store.</p>
 <p>The steps are the runbook's, from "The first run" to "The sync check". Two things differ after the first run.</p>
 <ol><li>Run the runner, as in the runbook's "The first run". If it ends with <code>every step passed</code>, nothing differs and you are done.</li><li>If it stops on a report, clear the report, as in the runbook's "Clear the report".</li><li>Run the runner again and answer the cut's prompts, as in the runbook's "The second run".</li><li>If the <code>enterprise</code> step stops because the database holds KPI Store nodes of the earlier release, run the step again with the replace allowed. <strong>The replace deletes every node in that database that carries the KPI Store's marks, before it copies.</strong> The runbook's "The limits" lists the marks. If the copy still stops and names nodes, the new release dropped a model, class or label that those nodes belong to; the runbook's "Replace what Enterprise holds" says what to do.
-<pre><code class="lang-powershell">py -m kpi_store.runner --from enterprise --replace-enterprise</code></pre></li></ol>
+<pre><code class="lang-powershell">python -m kpi_store.runner --from enterprise --replace-enterprise</code></pre></li></ol>
 <ol start="5"><li>Read the last line. Expect <code>the steps that ran passed</code>, with the steps before <code>enterprise</code> named as left out.
 <pre><code class="lang-text">run &lt;run ID&gt;: enterprise, sync, summary
 enterprise: &lt;what the copy did&gt;
@@ -237,10 +237,10 @@ the steps that ran passed; left out: cut, check, zip, volume, upload, notebook, 
 <h3 id="see-the-cut-by-itself">See the cut by itself<a class="hl" href="#see-the-cut-by-itself" aria-label="Link to this section">#</a></h3>
 <p>The runner calls the cut tool for you. To see what a cut does, run the tool on the made-up report that ships with the tests. It is the report of a made-up workspace in the sandbox's shapes. Do this in a copy of the release folder, never in the folder you load from.</p>
 <ol><li>Ask for the plan of the report as the notebook wrote it, with no decision. The tool refuses it, because the row that blocks has no decision.
-<pre><code class="lang-powershell">py -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --plan</code></pre>
+<pre><code class="lang-powershell">python -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --plan</code></pre>
 <pre><code class="lang-text">CutRefused: the report is not cleared. Rows that block the load and have no decision: R002</code></pre></li></ol>
 <ol start="2"><li>Ask for the plan with the cleared decisions. <code>cleared-decisions.csv</code> accepts the renamed column, the two case-only spellings and the second source. <code>--plan</code> changes nothing.
-<pre><code class="lang-powershell">py -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --decisions kpi_store/tests/fixtures/cut/cleared-decisions.csv --plan</code></pre>
+<pre><code class="lang-powershell">python -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --decisions kpi_store/tests/fixtures/cut/cleared-decisions.csv --plan</code></pre>
 <pre><code class="lang-text">Discovery run 20261111T120000Z-0a1b2c3d of KPI Store 1.1: 28 rows.
 The cut applies (4):
   R001 column-case: column assessment_amount of idp_sbx.gold_commercial_core.mips_mpr_executive_summary_fact becomes Assessment_Amount (case only)
@@ -263,7 +263,7 @@ Versions the cut writes:
   integration 2.5.0 -&gt; 2.5.1-correction.1
 The cut also rebuilds the KPI intake pack (kpi-intake/), whose pick lists come from these packages.</code></pre></li></ol>
 <ol start="3"><li>Cut. At the first prompt type <code>Change_Value_Amount</code>, which confirms the breaking change. At the second prompt type <code>yes</code>.
-<pre><code class="lang-powershell">py -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --decisions kpi_store/tests/fixtures/cut/cleared-decisions.csv --approver "the ontology owner"</code></pre>
+<pre><code class="lang-powershell">python -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.json --decisions kpi_store/tests/fixtures/cut/cleared-decisions.csv --approver "the ontology owner"</code></pre>
 <pre><code class="lang-text">...
 Done. The record is business_architecture/ontology/discovery-runs/20261111T120000Z-0a1b2c3d.md; the cut changed &lt;count&gt; files.
 Run the full check before you load: bash scripts/check.sh (on Windows, in Git Bash; the runner does it).</code></pre></li></ol>
@@ -279,10 +279,10 @@ all checks passed</code></pre></li></ol>
 <p><code>business_architecture/ontology/discovery-runs/README.md</code> says what each decision does, what the record holds and how a standing decision works.</p>
 <h2 id="the-release-steps">The release steps<a class="hl" href="#the-release-steps" aria-label="Link to this section">#</a></h2>
 <p>A patch, a minor and a major all end with these steps. The worked example adds the alias "unit capacity utilization" to the measure Unit Utilization in <code>kpi</code>. An alias is new content that changes no meaning, so it is a minor: <code>kpi</code> 1.3.0 becomes 1.4.0.</p>
-<p>The versions in the commands are those of the release as you received it. Read the version you hold with <code>py next_version.py current kpi</code>, from the folder <code>business_architecture/ontology/release</code>.</p>
+<p>The versions in the commands are those of the release as you received it. Read the version you hold with <code>python next_version.py current kpi</code>, from the folder <code>business_architecture/ontology/release</code>.</p>
 <ol><li>List the modules to release, in order. The first line is the module you change. Each module after it depends on it and gets a patch.
 <pre><code class="lang-powershell">cd business_architecture/ontology/release
-py dependents.py kpi
+python dependents.py kpi
 cd ../../..</code></pre>
 <pre><code class="lang-text">kpi
 data-product
@@ -309,19 +309,19 @@ print("changed", table.name, "and wrote", approval.name)</code></pre>
 <pre><code class="lang-text">changed measure-details.csv and wrote 2026-11-12-kpi.md</code></pre></li></ol>
 <ol start="4"><li>Rebuild the module's source file. Each module has its own builder in its folder. <code>scripts/check.sh</code> lists them.
 <pre><code class="lang-powershell">cd business_architecture/ontology/kpi
-py build_measures.py --write</code></pre>
+python build_measures.py --write</code></pre>
 <pre><code class="lang-text">measures 41; &lt;the counts by source and kind&gt;
 wrote &lt;the path of the measures file&gt;</code></pre></li></ol>
 <ol start="5"><li>Set the module's new version and write its package. <code>start</code> sets the version, the date, the approver and the approval in the module's entry in <code>build_module.py</code>. It also adds a section to the top of the module's <code>CHANGELOG.md</code>.
 <pre><code class="lang-powershell">cd ../release
-py next_version.py start kpi 1.4.0 minor --why "Adds the alias unit capacity utilization to Unit Utilization." --approver "The kpi module owner" --where "approvals/2026-11-12-kpi.md" --words "Approved as a minor."
-py build_module.py kpi --write</code></pre>
+python next_version.py start kpi 1.4.0 minor --why "Adds the alias unit capacity utilization to Unit Utilization." --approver "The kpi module owner" --where "approvals/2026-11-12-kpi.md" --words "Approved as a minor."
+python build_module.py kpi --write</code></pre>
 <pre><code class="lang-text">kpi is set to 1.4.0. Now run: python3 build_module.py kpi --write
 kpi 1.4.0: &lt;count&gt; triples; shapes conform
 wrote &lt;the path of the new package&gt;</code></pre>
 <p>The write stops if the version is already released and the content differs. Raise the version first, because a released package never changes.</p></li></ol>
 <ol start="6"><li>Release every module that depends on it, and finish all of them. <code>cascade</code> gives each module of step 1's list the next patch, writes its package, and moves each old package to <code>releases\previous</code>. It also changes each version in the projection's two lists, <code>projection/pipeline.py</code> and <code>projection/skill-run/epm-config.json</code>.
-<pre><code class="lang-powershell">py next_version.py cascade kpi --approver "The kpi module owner" --where "approvals/2026-11-12-kpi.md" --words "Approved as a minor."</code></pre>
+<pre><code class="lang-powershell">python next_version.py cascade kpi --approver "The kpi module owner" --where "approvals/2026-11-12-kpi.md" --words "Approved as a minor."</code></pre>
 <pre><code class="lang-text">data-product is set to 1.2.1. Now run: python3 build_module.py data-product --write
 market-data is set to 1.1.1. Now run: python3 build_module.py market-data --write
 logical-model is set to 1.0.1. Now run: python3 build_module.py logical-model --write
@@ -338,11 +338,11 @@ integration 2.5.0 moved to releases/previous/; the projection's lists name 2.5.1
 7 modules released. Now rebuild the catalog and the projection manifest, and run the check.</code></pre>
 <p>The lines that say "Now run" are <code>start</code>'s own. <code>cascade</code> has already run that command for each module. <code>cascade</code> verifies each package against a fresh build before it finishes the module. If it stops halfway, fix what it names and run it again. It keeps its plan in <code>release\cascade-in-progress.json</code> until it ends, so the next run leaves a finished module alone and builds what is missing. If it names a folder that is not a whole package, delete that folder first. A build that failed midway leaves such a folder.</p></li></ol>
 <ol start="7"><li>Rebuild the catalog, then the projection manifest, then run the competency questions.
-<pre><code class="lang-powershell">py build_catalog.py --write
+<pre><code class="lang-powershell">python build_catalog.py --write
 cd ../projection
-py pipeline.py build
+python pipeline.py build
 cd ../regression
-py run.py
+python run.py
 cd ../../..</code></pre>
 <pre><code class="lang-text">catalog: 13 releases from 13 packages
 wrote &lt;the path of the catalog file&gt;
@@ -350,8 +350,8 @@ Step 1 passed; loadable.nt &lt;count&gt; triples, inferred.nt 2
 wrote projection-manifest.json
 ...
 competency coverage on &lt;the core package&gt;: 57 questions; answerable 56, partial 0, waiting 0, parked 1</code></pre></li></ol>
-<ol start="8"><li>Rebuild the KPI intake pack, so that its lists offer what the release changed. The command needs the <code>openpyxl</code> package beside <code>rdflib</code> (<code>py -m pip install openpyxl</code>). <code>kpi-intake/README.md</code> explains the pack.
-<pre><code class="lang-powershell">py -m kpi_store.intake build</code></pre>
+<ol start="8"><li>Rebuild the KPI intake pack, so that its lists offer what the release changed. The command needs the <code>openpyxl</code> package beside <code>rdflib</code> (<code>python -m pip install openpyxl</code>). <code>kpi-intake/README.md</code> explains the pack.
+<pre><code class="lang-powershell">python -m kpi_store.intake build</code></pre>
 <pre><code class="lang-text">wrote kpi-intake/pick-lists.json
 ...</code></pre></li></ol>
 <ol start="9"><li>In a Git copy, stage the change. Then run the full check. After a release of a module the check reads the documents' examples and runs none, as after a cut. Before you send the release on as a new zip, bring the examples up to date and record the release they describe (<code>scripts/DOC-SNIPPETS.md</code>, "The release the examples describe").
@@ -359,9 +359,9 @@ competency coverage on &lt;the core package&gt;: 57 questions; answerable 56, pa
 bash scripts/check.sh</code></pre>
 <pre><code class="lang-text">...
 all checks passed</code></pre>
-<p>After a change, the check prints a note: <code>projection-report.json describes an earlier build</code>. That file is the summary of the last Neo4j load, and it now describes the release before your change. The note does not fail the check, and it does not mean the ontology is wrong. It goes away when you have loaded the stores and recorded the new load's report with <code>py pipeline.py record</code>. The runbook's section "Record the load's report in the release folder" runs that command.</p></li></ol>
+<p>After a change, the check prints a note: <code>projection-report.json describes an earlier build</code>. That file is the summary of the last Neo4j load, and it now describes the release before your change. The note does not fail the check, and it does not mean the ontology is wrong. It goes away when you have loaded the stores and recorded the new load's report with <code>python pipeline.py record</code>. The runbook's section "Record the load's report in the release folder" runs that command.</p></li></ol>
 <ol start="10"><li>Search your copy for text that the change made stale, and update each document that holds it. No check catches a copy of a sentence.</li><li>Load the stores with the runner, and read its last line. The release is done when the sync check reads <code>current</code> on every line.
-<pre><code class="lang-powershell">py -m kpi_store.runner</code></pre>
+<pre><code class="lang-powershell">python -m kpi_store.runner</code></pre>
 <pre><code class="lang-text">run &lt;run ID&gt;: cut, check, zip, volume, upload, notebook, report, fuseki, neo4j, enterprise, sync, summary
 ...
 sync: all &lt;count&gt; lines read current
@@ -379,9 +379,9 @@ every step passed</code></pre>
 <h3 id="a-new-role-or-a-new-system">A new role or a new system<a class="hl" href="#a-new-role-or-a-new-system" aria-label="Link to this section">#</a></h3>
 <p>A role and a system are rows in tables. Neither needs a change to <code>vocabulary.ttl</code> or <code>shapes.ttl</code>, so steps 1 to 3 above do not apply. Both are a minor.</p>
 <p>A role is in two tables of <code>business_architecture\ontology\organization</code>.</p>
-<ol><li>Add the role's row to <code>roles.csv</code>: its <code>slug</code>, its <code>label</code>, its <code>kind</code> (<code>position</code> or <code>team</code>), its <code>definition</code> and a <code>note</code> that names its source.</li><li>Add the role's name to <code>role-register.csv</code>, as the process map spells it, with the role's <code>slug</code>.</li><li>Check that a RACI list of the process map names the role. The build refuses a role that no process names. For a role that no process names yet, start with "Change the RACI", which has every step and a worked example.</li><li>Change the figures in <code>test_roles.py</code>, then run <code>py build_roles.py --write</code> and <code>py build_assignments.py --write</code>.</li><li>Change the count of roles in <code>kpi-intake\README.md</code>, as step 12 of "Change the RACI" says.</li></ol>
+<ol><li>Add the role's row to <code>roles.csv</code>: its <code>slug</code>, its <code>label</code>, its <code>kind</code> (<code>position</code> or <code>team</code>), its <code>definition</code> and a <code>note</code> that names its source.</li><li>Add the role's name to <code>role-register.csv</code>, as the process map spells it, with the role's <code>slug</code>.</li><li>Check that a RACI list of the process map names the role. The build refuses a role that no process names. For a role that no process names yet, start with "Change the RACI", which has every step and a worked example.</li><li>Change the figures in <code>test_roles.py</code>, then run <code>python build_roles.py --write</code> and <code>python build_assignments.py --write</code>.</li><li>Change the count of roles in <code>kpi-intake\README.md</code>, as step 12 of "Change the RACI" says.</li></ol>
 <p>A system is in the tables of <code>business_architecture\ontology\system</code>.</p>
-<ol><li>For a system that the process map names in a <code>systems</code> field, add its row to <code>systems.csv</code> and its name to <code>register.csv</code>.</li><li>For a system that another source names, such as SharePoint, add its row to <code>other-systems.csv</code>, with the key of that source in <code>named_by</code>.</li><li>Add the system's definition to <code>definitions.csv</code>, with the keys of its sources. A system that the process map does not name must have a definition.</li><li>A source that is new to the module is a row in <code>sources.csv</code>: its key, its title and its tier. Give the source the same tier in <code>authority\source-tiers.csv</code>. That table is part of <code>integration</code>, so the new row means a minor version of <code>integration</code> after <code>system</code>.</li><li>Change the figures in <code>test_systems.py</code>: <code>test_figures</code> and <code>test_definitions</code>. Then run <code>py build_systems.py --write</code>.</li></ol>
+<ol><li>For a system that the process map names in a <code>systems</code> field, add its row to <code>systems.csv</code> and its name to <code>register.csv</code>.</li><li>For a system that another source names, such as SharePoint, add its row to <code>other-systems.csv</code>, with the key of that source in <code>named_by</code>.</li><li>Add the system's definition to <code>definitions.csv</code>, with the keys of its sources. A system that the process map does not name must have a definition.</li><li>A source that is new to the module is a row in <code>sources.csv</code>: its key, its title and its tier. Give the source the same tier in <code>authority\source-tiers.csv</code>. That table is part of <code>integration</code>, so the new row means a minor version of <code>integration</code> after <code>system</code>.</li><li>Change the figures in <code>test_systems.py</code>: <code>test_figures</code> and <code>test_definitions</code>. Then run <code>python build_systems.py --write</code>.</li></ol>
 <p>Then follow "The release steps" from step 3.</p>
 <h3 id="a-report-row-that-needs-a-minor-version">A report row that needs a minor version<a class="hl" href="#a-report-row-that-needs-a-minor-version" aria-label="Link to this section">#</a></h3>
 <p>The cut tool leaves four kinds of accepted rows, and lists each as "needs a minor version". Each goes in by the steps above.</p>
@@ -395,7 +395,7 @@ every step passed</code></pre>
 <h2 id="deprecate-a-term">Deprecate a term<a class="hl" href="#deprecate-a-term" aria-label="Link to this section">#</a></h2>
 <p>Use this when the business says that a term is no longer used, or that two terms are one. Use it also to replace a role by one other role in every RACI entry that names it. Never delete the term. Mark it deprecated, name the term that replaces it, and keep everything it has. A deprecation is a major release, because an answer that named the term is no longer current. The ontology owner approves it.</p>
 <p>The steps are for a role. This release leaves one such case open, whether "Black Oil Manager" is a real role (<code>KNOWN-OPEN-ITEMS.md</code>, item 2). The paragraph after the steps says what differs in other modules.</p>
-<ol><li>Ask the business two questions. Is the role real? If it is not, which role does its work? The second answer names the successor.</li><li>Save the answer as the approval, as step 3 of "The release steps" says.</li><li>Open <code>business_architecture\ontology\organization\roles.csv</code> and find the role's row. The row of Black Oil Manager starts <code>black-oil-manager</code>.</li><li>In that row, set <code>replaced_by</code> to the <code>slug</code> of the successor.</li><li>Set <code>replaced_label_kind</code> to <code>alt</code>. The successor then takes the old name as an alternative label. Write <code>hidden</code> only when the old name is a misspelling.</li><li>Write in <code>note</code> why the role is deprecated and who said so. Start with "Deprecated:", as the three deprecated roles of this release do. Search the file for <code>rcvo-advisor</code> to see one.</li><li>Leave the role's <code>slug</code> and <code>label</code>, its row in <code>role-register.csv</code> and the process map as they are. <strong>Do not rewrite the role's name in the process map.</strong> The process map keeps the name its source uses, the register still maps that name to the role, and the build gives each of its assignments to the successor. If you rewrite the name, the build stops with <code>register row ... is not in the source</code>. If you then remove the register row, it stops with <code>role ... is not used by the register</code>.</li><li>Change the figures in <code>organization\test_roles.py</code>. <code>test_the_figures_match_the_decision_record</code> states the count of deprecated and live roles. <code>test_the_answers_point_the_right_way</code> lists each deprecated role with its successor.</li><li>Rebuild the roles, then the assignments, from the folder <code>organization</code>. The commands are <code>py build_roles.py --write</code> and <code>py build_assignments.py --write</code>.</li><li>Release <code>organization</code> as a major, with "The release steps" from step 5. Write <code>major</code> and the next major version in <code>start</code>. The cascade gives <code>integration</code> and <code>ref-mpc</code> a patch each.</li><li>Add the line to <code>scripts/pinned-tests.txt</code> that "The worked examples of the next five sections" names.</li><li>Follow "The release steps" from step 7 to the end.</li></ol>
+<ol><li>Ask the business two questions. Is the role real? If it is not, which role does its work? The second answer names the successor.</li><li>Save the answer as the approval, as step 3 of "The release steps" says.</li><li>Open <code>business_architecture\ontology\organization\roles.csv</code> and find the role's row. The row of Black Oil Manager starts <code>black-oil-manager</code>.</li><li>In that row, set <code>replaced_by</code> to the <code>slug</code> of the successor.</li><li>Set <code>replaced_label_kind</code> to <code>alt</code>. The successor then takes the old name as an alternative label. Write <code>hidden</code> only when the old name is a misspelling.</li><li>Write in <code>note</code> why the role is deprecated and who said so. Start with "Deprecated:", as the three deprecated roles of this release do. Search the file for <code>rcvo-advisor</code> to see one.</li><li>Leave the role's <code>slug</code> and <code>label</code>, its row in <code>role-register.csv</code> and the process map as they are. <strong>Do not rewrite the role's name in the process map.</strong> The process map keeps the name its source uses, the register still maps that name to the role, and the build gives each of its assignments to the successor. If you rewrite the name, the build stops with <code>register row ... is not in the source</code>. If you then remove the register row, it stops with <code>role ... is not used by the register</code>.</li><li>Change the figures in <code>organization\test_roles.py</code>. <code>test_the_figures_match_the_decision_record</code> states the count of deprecated and live roles. <code>test_the_answers_point_the_right_way</code> lists each deprecated role with its successor.</li><li>Rebuild the roles, then the assignments, from the folder <code>organization</code>. The commands are <code>python build_roles.py --write</code> and <code>python build_assignments.py --write</code>.</li><li>Release <code>organization</code> as a major, with "The release steps" from step 5. Write <code>major</code> and the next major version in <code>start</code>. The cascade gives <code>integration</code> and <code>ref-mpc</code> a patch each.</li><li>Add the line to <code>scripts/pinned-tests.txt</code> that "The worked examples of the next five sections" names.</li><li>Follow "The release steps" from step 7 to the end.</li></ol>
 <p>The builders do the rest.</p>
 <ul><li>The role keeps its IRI and every triple it had. It gains <code>owl:deprecated true</code> and <code>dcterms:isReplacedBy</code> with its successor. The successor gains the old name as a label.</li><li>Each assignment of the role keeps its IRI and its source text, and now names the successor. The shapes reject an assignment that names a deprecated role. The ledger <code>raci-conservation.csv</code> counts the moved assignments in its last line.</li><li>The role register still reconciles with the process map. The build fails if the process map names a role text that the register lacks, or the register holds a role that no text names.</li><li>The competency questions answer as before. Question 5 now gives the successor wherever the deprecated role was named.</li></ul>
 <p>The intake form keeps a deprecated role in its list of roles, with "(deprecated)" after the name, and still offers it. To stop offering it, name the role under <code>hide</code> in <code>[pick_list.roles]</code> of <code>kpi-intake/settings.toml</code>. This release hides Black Oil Manager already, and that line still holds after the deprecation, because <code>hide</code> takes the role's name with or without the mark. The check of a filled form that names a deprecated role says so, and asks for the term that replaced it.</p>
@@ -409,32 +409,32 @@ every step passed</code></pre>
 git clean -q -fd</code></pre></li></ol>
 <ol start="2"><li>List the files the example changes. This changes nothing.
 <pre><code class="lang-powershell">cd business_architecture/ontology/release
-py update_examples.py deprecate-role --plan</code></pre>
+python update_examples.py deprecate-role --plan</code></pre>
 <pre><code class="lang-text">would change business_architecture/ontology/organization/roles.csv
 would change business_architecture/ontology/organization/test_roles.py
 would change scripts/pinned-tests.txt
 would change business_architecture/ontology/approvals/example-deprecate-role.md</code></pre></li></ol>
 <ol start="3"><li>Make the hand edits of steps 2 to 8 and of step 11 above.
-<pre><code class="lang-powershell">py update_examples.py deprecate-role --write</code></pre>
+<pre><code class="lang-powershell">python update_examples.py deprecate-role --write</code></pre>
 <pre><code class="lang-text">changed business_architecture/ontology/organization/roles.csv
 ...
 Now build: cd ../organization, then build_roles.py --write and build_assignments.py --write. HOW-TO-UPDATE.md has the steps after it.</code></pre></li></ol>
 <ol start="4"><li>Rebuild the roles and the assignments. The first line counts 4 deprecated roles, one more than before. The count of entries and of role names is the same as before, because the process map has not changed. The third line ends with 13 moved assignments, which are the 3 of this release and the 10 of Black Oil Manager.
 <pre><code class="lang-powershell">cd ../organization
-py build_roles.py --write
-py build_assignments.py --write</code></pre>
+python build_roles.py --write
+python build_assignments.py --write</code></pre>
 <pre><code class="lang-text">processes with RACI 153; RACI entries 913; distinct source strings 91; roles 60; positions 54; teams 6; deprecated roles 4; live roles 56; compound strings 11; role references after splitting 940
 wrote &lt;the path of the roles file&gt;
 processes with RACI in the source 153; RACI entries in the source 913; &lt;the counts by level&gt;; assignments moved to a successor role 13; SHACL conforms
 wrote assignments.ttl and raci-conservation.csv</code></pre></li></ol>
 <ol start="5"><li>Read the assignments. Every RACI entry that named Black Oil Manager is still there, with its text and its IRI, and now names Asphalt Manager. This is the whole of replacing a role in every entry that names it.
-<pre><code class="lang-powershell">py -c "t = open('assignments.ttl', encoding='utf-8').read(); print(t.count('Black oil manager'), 'assignments keep the text Black oil manager;', t.count('--black-oil-manager--'), 'keep their IRI;', t.count('assignedRole role:black-oil-manager '), 'name the deprecated role')"</code></pre>
+<pre><code class="lang-powershell">python -c "t = open('assignments.ttl', encoding='utf-8').read(); print(t.count('Black oil manager'), 'assignments keep the text Black oil manager;', t.count('--black-oil-manager--'), 'keep their IRI;', t.count('assignedRole role:black-oil-manager '), 'name the deprecated role')"</code></pre>
 <pre><code class="lang-text">10 assignments keep the text Black oil manager; 10 keep their IRI; 0 name the deprecated role</code></pre></li></ol>
 <ol start="6"><li>Set the new version, write the package and release the modules that depend on it.
 <pre><code class="lang-powershell">cd ../release
-py next_version.py start organization 3.0.0 major --why "Deprecates the role Black Oil Manager into Asphalt Manager." --approver "The ontology owner" --where "approvals/example-deprecate-role.md" --words "Approved as a major: Black Oil Manager is deprecated into Asphalt Manager."
-py build_module.py organization --write
-py next_version.py cascade organization --approver "The ontology owner" --where "approvals/example-deprecate-role.md" --words "Approved as a major: Black Oil Manager is deprecated into Asphalt Manager."</code></pre>
+python next_version.py start organization 3.0.0 major --why "Deprecates the role Black Oil Manager into Asphalt Manager." --approver "The ontology owner" --where "approvals/example-deprecate-role.md" --words "Approved as a major: Black Oil Manager is deprecated into Asphalt Manager."
+python build_module.py organization --write
+python next_version.py cascade organization --approver "The ontology owner" --where "approvals/example-deprecate-role.md" --words "Approved as a major: Black Oil Manager is deprecated into Asphalt Manager."</code></pre>
 <pre><code class="lang-text">organization is set to 3.0.0. Now run: python3 build_module.py organization --write
 organization 3.0.0: &lt;count&gt; triples; shapes conform
 wrote &lt;the path of the new package&gt;
@@ -445,24 +445,24 @@ integration 2.5.0 moved to releases/previous/; the projection's lists name 2.5.1
 ref-mpc 1.3.0 moved to releases/previous/; the projection's lists name 1.3.1
 3 modules released. Now rebuild the catalog and the projection manifest, and run the check.</code></pre></li></ol>
 <ol start="7"><li>Rebuild the catalog, the projection manifest, the competency questions, the KPI intake pack and the pages.
-<pre><code class="lang-powershell">py build_catalog.py --write
+<pre><code class="lang-powershell">python build_catalog.py --write
 cd ../projection
-py pipeline.py build
+python pipeline.py build
 cd ../regression
-py run.py
+python run.py
 cd ../../..
-py -m kpi_store.intake build
-py scripts/build_docs_html.py</code></pre>
+python -m kpi_store.intake build
+python scripts/build_docs_html.py</code></pre>
 <pre><code class="lang-text">catalog: 13 releases from 13 packages
 ...
 competency coverage on &lt;the core package&gt;: 57 questions; answerable 56, partial 0, waiting 0, parked 1
 wrote kpi-intake/pick-lists.json
 ...</code></pre></li></ol>
 <ol start="8"><li>Read the role's entry in the form's list. It carries the mark, and the form's settings still hide it.
-<pre><code class="lang-powershell">py -c "import json; print([(r['label'], r.get('hidden', False)) for r in json.load(open('kpi-intake/pick-lists.json', encoding='utf-8'))['lists']['roles'] if 'Black Oil' in r['label']])"</code></pre>
+<pre><code class="lang-powershell">python -c "import json; print([(r['label'], r.get('hidden', False)) for r in json.load(open('kpi-intake/pick-lists.json', encoding='utf-8'))['lists']['roles'] if 'Black Oil' in r['label']])"</code></pre>
 <pre><code class="lang-text">[('Black Oil Manager (deprecated)', True)]</code></pre></li></ol>
 <ol start="9"><li>Run the helper again. It refuses a copy that holds the example, and changes nothing.
-<pre><code class="lang-powershell">py business_architecture/ontology/release/update_examples.py deprecate-role --write</code></pre>
+<pre><code class="lang-powershell">python business_architecture/ontology/release/update_examples.py deprecate-role --write</code></pre>
 <pre><code class="lang-text">refused: this copy holds the example deprecate-role already; nothing was changed</code></pre></li></ol>
 <ol start="10"><li>Stage the change and run the full check. On Windows, run it in Git Bash.
 <pre><code class="lang-bash">git add -A
@@ -474,7 +474,7 @@ all checks passed</code></pre></li></ol>
 <p>"Kind" has two meanings here, and the steps differ.</p>
 <ul><li>The first is the kind a module gives its terms. In <code>system</code>, the kind is a value of the code list <code>sys:SystemKind</code>, and the property <code>sys:systemKind</code> holds it. The list has three values, which are application, office tool and working document. The shape allows a system exactly one. So you replace the value. You never add a second one. The term keeps its IRI and its class, <code>sys:System</code>. The steps below are for this meaning.</li><li>The second is the kind of thing a term is in the ontology. It is a concept, a class, a property, a value of a code list or a named real thing. One IRI has one of these, for good. If a term has the wrong one, add a new term of the right kind and deprecate the old one into it, with "Deprecate a term".</li></ul>
 <p>A changed kind is a major release when an answer given under the old kind is no longer right. After the Databricks change, the answer "Databricks is an application" is wrong, and the definitions that name the three kinds change too. So it is a major, and the ontology owner approves it.</p>
-<ol><li>Agree the kind with the ontology owner. If the list lacks it, agree the new value's name and its definition, with the source of the definition.</li><li>For a new value, open <code>business_architecture\ontology\system\vocabulary.ttl</code>. Add the value after <code>kind:document</code>, as a copy of those two lines with its own name, notation and definition.</li><li>In the same file, add the value to <code>skos:hasTopConcept</code> of <code>sys:SystemKind</code>.</li><li>In the same file, change each definition that names the kinds one by one. <code>sys:SystemKind</code> and <code>sys:systemKind</code> have such a definition.</li><li>In <code>system\shapes.ttl</code>, add the value to the <code>sh:in</code> list of <code>sys:systemKind</code>. The shape checks every system's kind against this list, so a value that is not in it fails the build.</li><li>In <code>system\build_systems.py</code>, add the value's notation to <code>KINDS</code>.</li><li>Change the system's row. A system that the process map names is in <code>system\systems.csv</code>. Any other system, such as Databricks, is in <code>system\other-systems.csv</code>. Set its <code>kind</code> to the value's notation.</li><li>Change the count of each kind in <code>test_figures</code>, in <code>system\test_systems.py</code>. Add a line to <code>test_kinds</code> that names the system and its kind.</li><li>Rebuild with <code>py build_systems.py --write</code>, from the folder <code>system</code>.</li><li>Release <code>system</code> as a major, with "The release steps" from step 3. The cascade gives seven modules a patch each. They are <code>data-product</code>, <code>party</code>, <code>logical-model</code>, <code>ref-mpc</code>, <code>technical-graph</code>, <code>value-stream</code> and <code>integration</code>.</li></ol>
+<ol><li>Agree the kind with the ontology owner. If the list lacks it, agree the new value's name and its definition, with the source of the definition.</li><li>For a new value, open <code>business_architecture\ontology\system\vocabulary.ttl</code>. Add the value after <code>kind:document</code>, as a copy of those two lines with its own name, notation and definition.</li><li>In the same file, add the value to <code>skos:hasTopConcept</code> of <code>sys:SystemKind</code>.</li><li>In the same file, change each definition that names the kinds one by one. <code>sys:SystemKind</code> and <code>sys:systemKind</code> have such a definition.</li><li>In <code>system\shapes.ttl</code>, add the value to the <code>sh:in</code> list of <code>sys:systemKind</code>. The shape checks every system's kind against this list, so a value that is not in it fails the build.</li><li>In <code>system\build_systems.py</code>, add the value's notation to <code>KINDS</code>.</li><li>Change the system's row. A system that the process map names is in <code>system\systems.csv</code>. Any other system, such as Databricks, is in <code>system\other-systems.csv</code>. Set its <code>kind</code> to the value's notation.</li><li>Change the count of each kind in <code>test_figures</code>, in <code>system\test_systems.py</code>. Add a line to <code>test_kinds</code> that names the system and its kind.</li><li>Rebuild with <code>python build_systems.py --write</code>, from the folder <code>system</code>.</li><li>Release <code>system</code> as a major, with "The release steps" from step 3. The cascade gives seven modules a patch each. They are <code>data-product</code>, <code>party</code>, <code>logical-model</code>, <code>ref-mpc</code>, <code>technical-graph</code>, <code>value-stream</code> and <code>integration</code>.</li></ol>
 <p>Nothing outside <code>system</code> reads a system's kind in this release. The links from a platform table to a system, <code>dp:copiesSystem</code> and <code>dp:dependsOnSystem</code>, point at the system whatever its kind is. No competency question asks for the kind.</p>
 <p>The intake form does not read the kind either. Question 7.4 offers every system of the module. So Databricks is still offered as a source system after this change, unless the form hides it. Keep it under <code>hide</code> in <code>[pick_list.systems]</code> of <code>kpi-intake/settings.toml</code>, where this release has it.</p>
 <h3 id="a-worked-example-databricks-becomes-a-data-platform">A worked example: Databricks becomes a data platform<a class="hl" href="#a-worked-example-databricks-becomes-a-data-platform" aria-label="Link to this section">#</a></h3>
@@ -485,7 +485,7 @@ all checks passed</code></pre></li></ol>
 git clean -q -fd</code></pre></li></ol>
 <ol start="2"><li>List the files the example changes. This changes nothing.
 <pre><code class="lang-powershell">cd business_architecture/ontology/release
-py update_examples.py system-kind --plan</code></pre>
+python update_examples.py system-kind --plan</code></pre>
 <pre><code class="lang-text">would change business_architecture/ontology/system/vocabulary.ttl
 would change business_architecture/ontology/system/shapes.ttl
 would change business_architecture/ontology/system/build_systems.py
@@ -493,20 +493,20 @@ would change business_architecture/ontology/system/other-systems.csv
 would change business_architecture/ontology/system/test_systems.py
 would change business_architecture/ontology/approvals/example-system-kind.md</code></pre></li></ol>
 <ol start="3"><li>Make the hand edits of steps 2 to 8 above, and write the approval.
-<pre><code class="lang-powershell">py update_examples.py system-kind --write</code></pre>
+<pre><code class="lang-powershell">python update_examples.py system-kind --write</code></pre>
 <pre><code class="lang-text">changed business_architecture/ontology/system/vocabulary.ttl
 ...
 Now build: cd ../system, then build_systems.py --write. HOW-TO-UPDATE.md has the steps after it.</code></pre></li></ol>
 <ol start="4"><li>Rebuild the systems. The line counts 39 applications, one fewer than before, and 1 data platform.
 <pre><code class="lang-powershell">cd ../system
-py build_systems.py --write</code></pre>
+python build_systems.py --write</code></pre>
 <pre><code class="lang-text">map strings 45; systems 49; defined 47; application 39; office-tool 4; document 5; data-platform 1; no-system strings 4; processes with a systems field 165; processes with a link 162; links 306; links waiting for a core release 0
 wrote &lt;the path of the systems file&gt;</code></pre></li></ol>
 <ol start="5"><li>Set the new version, write the package and release the modules that depend on it.
 <pre><code class="lang-powershell">cd ../release
-py next_version.py start system 2.0.0 major --why "Adds the system kind data platform and gives it to Databricks." --approver "The ontology owner" --where "approvals/example-system-kind.md" --words "Approved as a major: the system kind data platform, and Databricks as a data platform."
-py build_module.py system --write
-py next_version.py cascade system --approver "The ontology owner" --where "approvals/example-system-kind.md" --words "Approved as a major: the system kind data platform, and Databricks as a data platform."</code></pre>
+python next_version.py start system 2.0.0 major --why "Adds the system kind data platform and gives it to Databricks." --approver "The ontology owner" --where "approvals/example-system-kind.md" --words "Approved as a major: the system kind data platform, and Databricks as a data platform."
+python build_module.py system --write
+python next_version.py cascade system --approver "The ontology owner" --where "approvals/example-system-kind.md" --words "Approved as a major: the system kind data platform, and Databricks as a data platform."</code></pre>
 <pre><code class="lang-text">system is set to 2.0.0. Now run: python3 build_module.py system --write
 system 2.0.0: &lt;count&gt; triples; shapes conform
 wrote &lt;the path of the new package&gt;
@@ -521,14 +521,14 @@ value-stream 1.2.0 moved to releases/previous/; the projection's lists name 1.2.
 integration 2.5.0 moved to releases/previous/; the projection's lists name 2.5.1
 8 modules released. Now rebuild the catalog and the projection manifest, and run the check.</code></pre></li></ol>
 <ol start="6"><li>Rebuild the catalog, the projection manifest, the competency questions, the KPI intake pack and the pages.
-<pre><code class="lang-powershell">py build_catalog.py --write
+<pre><code class="lang-powershell">python build_catalog.py --write
 cd ../projection
-py pipeline.py build
+python pipeline.py build
 cd ../regression
-py run.py
+python run.py
 cd ../../..
-py -m kpi_store.intake build
-py scripts/build_docs_html.py</code></pre>
+python -m kpi_store.intake build
+python scripts/build_docs_html.py</code></pre>
 <pre><code class="lang-text">catalog: 13 releases from 13 packages
 ...
 competency coverage on &lt;the core package&gt;: 57 questions; answerable 56, partial 0, waiting 0, parked 1
@@ -543,7 +543,7 @@ all checks passed</code></pre></li></ol>
 <p>Use this when entries of the data-product catalog are not data products. This release leaves that open for 36 of the 49 entries, which are functional areas or portfolios (<code>KNOWN-OPEN-ITEMS.md</code>, item 5).</p>
 <p>The catalog is built from the portfolio file, <code>business_architecture\business_process\data_product_portfolio.json</code>. The file has 3 segments, 19 product lines and 49 entries in the lists it names <code>portfolios</code>. The builder gives each segment the class <code>dp:PortfolioSegment</code>, each line <code>dp:DataProductLine</code> and each entry <code>dp:DataProduct</code>. The module has no class for a portfolio or a functional area, and the builder cannot tell one entry from another. So this change has four parts. They are a proposal to the portfolio file, a class to move to, a change to the builder, and a release.</p>
 <p>An entry that moves keeps its IRI, its name and its place in its line. It is the same thing under its right class, so it is not deprecated. A list of the data products no longer holds it, so the release is a major. The ontology owner approves it.</p>
-<ol><li>List the entries to move, and agree the class of each with the ontology owner.</li><li>Search your copy for the <code>id</code> of each entry, such as <code>dp-hr</code>. A value stream, a row of <code>data-product\links.csv</code> or a platform table may name it. A link that needs a data product stops the build once the entry has moved, so settle each one first.</li><li>Write the proposal, as "The worked examples of the next five sections" says. It names each entry and its new kind.</li><li>When the proposal is accepted, give each entry a field for its kind in the portfolio file. The example writes <code>"kind": "portfolio"</code>. Allow the field in the file's schema too, <code>business_architecture\schema\data_product_portfolio.schema.json</code>. A test compares the file with its schema.</li><li>Add the class to <code>business_architecture\ontology\data-product\vocabulary.ttl</code>, with <code>rdfs:label</code>, <code>skos:definition</code> and its source in <code>dcterms:bibliographicCitation</code>.</li><li>Change <code>data-product\shapes.ttl</code> in three places. Add the class to the targets of <code>shp:PortfolioItem</code> and of <code>shp:ActiveIsDefined</code>. Add a shape of its own, which says that the entry sits in one line, has one status and is not also a data product.</li><li>Change <code>data-product\build_data_products.py</code> in four places. It must refuse a kind it does not know, give an entry the class of its kind, write a history note that says what the entry was before, and count the two classes apart. The helper's function <code>entry_builder</code> shows each place.</li><li>Change the count of terms, the figures and the count of data products in <code>data-product\test_data_products.py</code>. Add a test that the new shape rejects an entry of both classes.</li><li>Rebuild with <code>py build_data_products.py --write</code>, from the folder <code>data-product</code>.</li><li>Release <code>data-product</code> as a major, with "The release steps" from step 3. The cascade gives <code>logical-model</code>, <code>technical-graph</code>, <code>value-stream</code> and <code>integration</code> a patch each.</li></ol>
+<ol><li>List the entries to move, and agree the class of each with the ontology owner.</li><li>Search your copy for the <code>id</code> of each entry, such as <code>dp-hr</code>. A value stream, a row of <code>data-product\links.csv</code> or a platform table may name it. A link that needs a data product stops the build once the entry has moved, so settle each one first.</li><li>Write the proposal, as "The worked examples of the next five sections" says. It names each entry and its new kind.</li><li>When the proposal is accepted, give each entry a field for its kind in the portfolio file. The example writes <code>"kind": "portfolio"</code>. Allow the field in the file's schema too, <code>business_architecture\schema\data_product_portfolio.schema.json</code>. A test compares the file with its schema.</li><li>Add the class to <code>business_architecture\ontology\data-product\vocabulary.ttl</code>, with <code>rdfs:label</code>, <code>skos:definition</code> and its source in <code>dcterms:bibliographicCitation</code>.</li><li>Change <code>data-product\shapes.ttl</code> in three places. Add the class to the targets of <code>shp:PortfolioItem</code> and of <code>shp:ActiveIsDefined</code>. Add a shape of its own, which says that the entry sits in one line, has one status and is not also a data product.</li><li>Change <code>data-product\build_data_products.py</code> in four places. It must refuse a kind it does not know, give an entry the class of its kind, write a history note that says what the entry was before, and count the two classes apart. The helper's function <code>entry_builder</code> shows each place.</li><li>Change the count of terms, the figures and the count of data products in <code>data-product\test_data_products.py</code>. Add a test that the new shape rejects an entry of both classes.</li><li>Rebuild with <code>python build_data_products.py --write</code>, from the folder <code>data-product</code>.</li><li>Release <code>data-product</code> as a major, with "The release steps" from step 3. The cascade gives <code>logical-model</code>, <code>technical-graph</code>, <code>value-stream</code> and <code>integration</code> a patch each.</li></ol>
 <p>The intake form offers the data products in question 6.6. Its list holds every <code>dp:DataProduct</code>, so an entry that moved leaves it. <code>[pick_list.data-products]</code> in <code>kpi-intake/settings.toml</code> names the 13 data products under <code>keep_only</code>. The build of the pack stops on a name there that is no longer in the list. So if you move an entry that <code>keep_only</code> names, remove its name there. When all 36 have moved, the list holds only the data products. Delete the table <code>[pick_list.data-products]</code> then, so that the form offers a data product the ontology gains later.</p>
 <h3 id="a-worked-example-the-entry-hr-becomes-a-data-portfolio">A worked example: the entry HR becomes a data portfolio<a class="hl" href="#a-worked-example-the-entry-hr-becomes-a-data-portfolio" aria-label="Link to this section">#</a></h3>
 <p>The example moves one entry, HR, to a new class, <code>dp:DataPortfolio</code>. <strong>The class, its definition and the proposal are made up.</strong> <code>data-product</code> 1.2.0 becomes 2.0.0.</p>
@@ -553,7 +553,7 @@ all checks passed</code></pre></li></ol>
 git clean -q -fd</code></pre></li></ol>
 <ol start="2"><li>List the files the example changes. This changes nothing.
 <pre><code class="lang-powershell">cd business_architecture/ontology/release
-py update_examples.py move-entry --plan</code></pre>
+python update_examples.py move-entry --plan</code></pre>
 <pre><code class="lang-text">would change business_architecture/business_process/proposals/EXAMPLE-P02-portfolio-entry.md
 would change business_architecture/business_process/data_product_portfolio.json
 would change business_architecture/schema/data_product_portfolio.schema.json
@@ -563,20 +563,20 @@ would change business_architecture/ontology/data-product/build_data_products.py
 would change business_architecture/ontology/data-product/test_data_products.py
 would change business_architecture/ontology/approvals/example-move-entry.md</code></pre></li></ol>
 <ol start="3"><li>Make the hand edits of steps 3 to 8 above, and write the approval.
-<pre><code class="lang-powershell">py update_examples.py move-entry --write</code></pre>
+<pre><code class="lang-powershell">python update_examples.py move-entry --write</code></pre>
 <pre><code class="lang-text">changed business_architecture/business_process/proposals/EXAMPLE-P02-portfolio-entry.md
 ...
 Now build: cd ../data-product, then build_data_products.py --write. HOW-TO-UPDATE.md has the steps after it.</code></pre></li></ol>
 <ol start="4"><li>Rebuild the catalog's entries. The line counts 48 data products, one fewer than before, and 1 data portfolio.
 <pre><code class="lang-powershell">cd ../data-product
-py build_data_products.py --write</code></pre>
+python build_data_products.py --write</code></pre>
 <pre><code class="lang-text">segments 3; lines 19; data products 48; data portfolios 1; active products 16; defined_only products 32; open_decision products 0; parked without a description 32; process links 2; links waiting for a core release 0
 wrote &lt;the path of the data products file&gt;</code></pre></li></ol>
 <ol start="5"><li>Set the new version, write the package and release the modules that depend on it.
 <pre><code class="lang-powershell">cd ../release
-py next_version.py start data-product 2.0.0 major --why "Moves the catalog entry HR to the new class data portfolio." --approver "The ontology owner" --where "approvals/example-move-entry.md" --words "Approved as a major: the catalog entry HR is a data portfolio."
-py build_module.py data-product --write
-py next_version.py cascade data-product --approver "The ontology owner" --where "approvals/example-move-entry.md" --words "Approved as a major: the catalog entry HR is a data portfolio."</code></pre>
+python next_version.py start data-product 2.0.0 major --why "Moves the catalog entry HR to the new class data portfolio." --approver "The ontology owner" --where "approvals/example-move-entry.md" --words "Approved as a major: the catalog entry HR is a data portfolio."
+python build_module.py data-product --write
+python next_version.py cascade data-product --approver "The ontology owner" --where "approvals/example-move-entry.md" --words "Approved as a major: the catalog entry HR is a data portfolio."</code></pre>
 <pre><code class="lang-text">data-product is set to 2.0.0. Now run: python3 build_module.py data-product --write
 data-product 2.0.0: &lt;count&gt; triples; shapes conform
 wrote &lt;the path of the new package&gt;
@@ -588,14 +588,14 @@ value-stream 1.2.0 moved to releases/previous/; the projection's lists name 1.2.
 integration 2.5.0 moved to releases/previous/; the projection's lists name 2.5.1
 5 modules released. Now rebuild the catalog and the projection manifest, and run the check.</code></pre></li></ol>
 <ol start="6"><li>Rebuild the catalog, the projection manifest, the competency questions, the KPI intake pack and the pages. The pages now include the proposal's page.
-<pre><code class="lang-powershell">py build_catalog.py --write
+<pre><code class="lang-powershell">python build_catalog.py --write
 cd ../projection
-py pipeline.py build
+python pipeline.py build
 cd ../regression
-py run.py
+python run.py
 cd ../../..
-py -m kpi_store.intake build
-py scripts/build_docs_html.py</code></pre>
+python -m kpi_store.intake build
+python scripts/build_docs_html.py</code></pre>
 <pre><code class="lang-text">catalog: 13 releases from 13 packages
 ...
 competency coverage on &lt;the core package&gt;: 57 questions; answerable 56, partial 0, waiting 0, parked 1
@@ -612,7 +612,7 @@ all checks passed</code></pre></li></ol>
 <p>Four cases differ in what you do and in the kind of release.</p>
 <div class="tblwrap"><table><thead><tr><th>What changes</th><th>What to do</th><th>Release</th></tr></thead><tbody><tr><td>New roles, or new entries.</td><td>The steps below.</td><td>A minor.</td></tr><tr><td>An entry is removed, or a role is replaced in some entries while other entries still name it.</td><td>The steps below. Rewrite those entries in the process map.</td><td>A major, because the assignments of the old entries leave the module.</td></tr><tr><td>One role replaces another in every entry that names it.</td><td>"Deprecate a term". Leave the process map and the register as they are.</td><td>A major.</td></tr><tr><td>A role leaves every entry, and no one role replaces it.</td><td>Not possible in this release. "Deprecate a term" says why.</td><td></td></tr></tbody></table></div>
 <p>The third case is never done in the process map. The build refuses a role that no entry names, and a role is never deleted. So the name stays in the process map, and the deprecation gives each of its assignments to the successor. If the successor is a new role, add it first with the steps below, in the same release.</p>
-<ol><li>Get the RACI from the business as a document with a date. It has one line for each process, role and level.</li><li>Check that each line names a process of the process map. This module holds assignments for those processes only. A RACI for anything else, such as the governance of a data domain, needs that process first ("Change a process"), or a module of its own ("Onboard another module").</li><li>Write the proposal, as "The worked examples of the next five sections" says. It names each process and its four lists, and the date of the RACI.</li><li>When the proposal is accepted, write the four lists into the process map, in the <code>raci</code> object of each process. Give a process that has none a <code>raci</code> object after its <code>name</code>.</li><li>For each role name that is new to the process map, add a row to <code>role-register.csv</code>. <code>source_text</code> is the name exactly as the process map spells it. <code>roles</code> is the <code>slug</code> of the role. <code>rule</code> is <code>exact</code> when the name is spelt as the role's <code>label</code>. <code>build_roles.py</code> checks each of the other rules.</li><li>For each new role, add a row to <code>roles.csv</code>. It holds the role's <code>slug</code>, its <code>label</code> as the source spells it, its <code>kind</code> (<code>position</code> or <code>team</code>), its <code>definition</code>, and a <code>note</code> that names the source and its date. Give the row every column, also the empty ones.</li><li>To give an existing role your organisation's title, set its <code>preferred_label</code>. The role keeps its <code>slug</code>, and the name in the process map becomes an alternative label.</li><li>Change the figures in <code>organization\test_roles.py</code>. <code>test_the_figures_match_the_decision_record</code> states the counts of processes, entries, role names and roles.</li><li>Rebuild the roles, then the assignments, from the folder <code>organization</code>. The commands are <code>py build_roles.py --write</code> and <code>py build_assignments.py --write</code>. The second prints the ledger. In it, the entries plus the extra roles of entries that name two roles equal the assignments.</li><li>Release <code>organization</code>, with "The release steps" from step 3. The cascade gives <code>integration</code> and <code>ref-mpc</code> a patch each.</li><li>Add the line to <code>scripts/pinned-tests.txt</code> that "The worked examples of the next five sections" names.</li><li>Change the count of roles in <code>kpi-intake\README.md</code>, under "Hide or add an entry of one of the ontology's lists". The page quotes the roles line of <code>kpi-intake\for-the-architect.md</code>, which the build of the pack writes, and the full check compares the two. Each new role raises both figures of the line by one.</li></ol>
+<ol><li>Get the RACI from the business as a document with a date. It has one line for each process, role and level.</li><li>Check that each line names a process of the process map. This module holds assignments for those processes only. A RACI for anything else, such as the governance of a data domain, needs that process first ("Change a process"), or a module of its own ("Onboard another module").</li><li>Write the proposal, as "The worked examples of the next five sections" says. It names each process and its four lists, and the date of the RACI.</li><li>When the proposal is accepted, write the four lists into the process map, in the <code>raci</code> object of each process. Give a process that has none a <code>raci</code> object after its <code>name</code>.</li><li>For each role name that is new to the process map, add a row to <code>role-register.csv</code>. <code>source_text</code> is the name exactly as the process map spells it. <code>roles</code> is the <code>slug</code> of the role. <code>rule</code> is <code>exact</code> when the name is spelt as the role's <code>label</code>. <code>build_roles.py</code> checks each of the other rules.</li><li>For each new role, add a row to <code>roles.csv</code>. It holds the role's <code>slug</code>, its <code>label</code> as the source spells it, its <code>kind</code> (<code>position</code> or <code>team</code>), its <code>definition</code>, and a <code>note</code> that names the source and its date. Give the row every column, also the empty ones.</li><li>To give an existing role your organisation's title, set its <code>preferred_label</code>. The role keeps its <code>slug</code>, and the name in the process map becomes an alternative label.</li><li>Change the figures in <code>organization\test_roles.py</code>. <code>test_the_figures_match_the_decision_record</code> states the counts of processes, entries, role names and roles.</li><li>Rebuild the roles, then the assignments, from the folder <code>organization</code>. The commands are <code>python build_roles.py --write</code> and <code>python build_assignments.py --write</code>. The second prints the ledger. In it, the entries plus the extra roles of entries that name two roles equal the assignments.</li><li>Release <code>organization</code>, with "The release steps" from step 3. The cascade gives <code>integration</code> and <code>ref-mpc</code> a patch each.</li><li>Add the line to <code>scripts/pinned-tests.txt</code> that "The worked examples of the next five sections" names.</li><li>Change the count of roles in <code>kpi-intake\README.md</code>, under "Hide or add an entry of one of the ontology's lists". The page quotes the roles line of <code>kpi-intake\for-the-architect.md</code>, which the build of the pack writes, and the full check compares the two. Each new role raises both figures of the line by one.</li></ol>
 <p>The shapes and the tests then hold you to these rules.</p>
 <ul><li>An assignment has one process, one role, one of the four levels, the text of its entry and a source.</li><li>An assignment names a live role, never a deprecated one.</li><li>A role has one English name and cites its source.</li><li>The register holds each role name of the process map once, and every role is named by a row of the register.</li></ul>
 <p><strong>An assignment carries no date in this release.</strong> Each one cites the process map as its source. Write the date of your RACI in the proposal and in the <code>note</code> of each new role.</p>
@@ -625,7 +625,7 @@ all checks passed</code></pre></li></ol>
 git clean -q -fd</code></pre></li></ol>
 <ol start="2"><li>List the files the example changes. This changes nothing.
 <pre><code class="lang-powershell">cd business_architecture/ontology/release
-py update_examples.py raci --plan</code></pre>
+python update_examples.py raci --plan</code></pre>
 <pre><code class="lang-text">would change business_architecture/business_process/proposals/EXAMPLE-P01-sample-raci.md
 would change business_architecture/business_process/downstream_process_map.json
 would change business_architecture/ontology/organization/role-register.csv
@@ -635,23 +635,23 @@ would change scripts/pinned-tests.txt
 would change kpi-intake/README.md
 would change business_architecture/ontology/approvals/example-raci.md</code></pre></li></ol>
 <ol start="3"><li>Make the hand edits of steps 3 to 8 and of steps 11 and 12 above, and write the approval.
-<pre><code class="lang-powershell">py update_examples.py raci --write</code></pre>
+<pre><code class="lang-powershell">python update_examples.py raci --write</code></pre>
 <pre><code class="lang-text">changed business_architecture/business_process/proposals/EXAMPLE-P01-sample-raci.md
 ...
 Now build: cd ../organization, then build_roles.py --write and build_assignments.py --write. HOW-TO-UPDATE.md has the steps after it.</code></pre></li></ol>
 <ol start="4"><li>Rebuild the roles and the assignments. The lines count one more process with a RACI, four more entries, two more roles and four more assignments than before.
 <pre><code class="lang-powershell">cd ../organization
-py build_roles.py --write
-py build_assignments.py --write</code></pre>
+python build_roles.py --write
+python build_assignments.py --write</code></pre>
 <pre><code class="lang-text">processes with RACI 154; RACI entries 917; distinct source strings 93; roles 62; positions 56; teams 6; deprecated roles 3; live roles 59; compound strings 11; role references after splitting 944
 wrote &lt;the path of the roles file&gt;
 processes with RACI in the source 154; RACI entries in the source 917; extra roles from compound strings 27; assignments emitted 944; &lt;the counts by level&gt;; SHACL conforms
 wrote assignments.ttl and raci-conservation.csv</code></pre></li></ol>
 <ol start="5"><li>Set the new version, write the package and release the modules that depend on it.
 <pre><code class="lang-powershell">cd ../release
-py next_version.py start organization 2.3.0 minor --why "Adds two roles and the RACI of CM 1.1.2." --approver "The organization module owner" --where "approvals/example-raci.md" --words "Approved as a minor: two roles and the RACI of CM 1.1.2."
-py build_module.py organization --write
-py next_version.py cascade organization --approver "The organization module owner" --where "approvals/example-raci.md" --words "Approved as a minor: two roles and the RACI of CM 1.1.2."</code></pre>
+python next_version.py start organization 2.3.0 minor --why "Adds two roles and the RACI of CM 1.1.2." --approver "The organization module owner" --where "approvals/example-raci.md" --words "Approved as a minor: two roles and the RACI of CM 1.1.2."
+python build_module.py organization --write
+python next_version.py cascade organization --approver "The organization module owner" --where "approvals/example-raci.md" --words "Approved as a minor: two roles and the RACI of CM 1.1.2."</code></pre>
 <pre><code class="lang-text">organization is set to 2.3.0. Now run: python3 build_module.py organization --write
 organization 2.3.0: &lt;count&gt; triples; shapes conform
 wrote &lt;the path of the new package&gt;
@@ -661,14 +661,14 @@ integration 2.5.0 moved to releases/previous/; the projection's lists name 2.5.1
 ref-mpc 1.3.0 moved to releases/previous/; the projection's lists name 1.3.1
 3 modules released. Now rebuild the catalog and the projection manifest, and run the check.</code></pre></li></ol>
 <ol start="6"><li>Rebuild the catalog, the projection manifest, the competency questions, the KPI intake pack and the pages. The pages now include the proposal's page.
-<pre><code class="lang-powershell">py build_catalog.py --write
+<pre><code class="lang-powershell">python build_catalog.py --write
 cd ../projection
-py pipeline.py build
+python pipeline.py build
 cd ../regression
-py run.py
+python run.py
 cd ../../..
-py -m kpi_store.intake build
-py scripts/build_docs_html.py</code></pre>
+python -m kpi_store.intake build
+python scripts/build_docs_html.py</code></pre>
 <pre><code class="lang-text">catalog: 13 releases from 13 packages
 ...
 competency coverage on &lt;the core package&gt;: 57 questions; answerable 56, partial 0, waiting 0, parked 1
@@ -683,7 +683,7 @@ all checks passed</code></pre></li></ol>
 <p>Use this when a property must take its value from a fixed list that the ontology does not hold yet. This release leaves the data domains open. The intake form asks for a KPI's domain, and the ontology holds no list of domains (<code>KNOWN-OPEN-ITEMS.md</code>, item 7). A new list removes nothing, so the release is a minor.</p>
 <p>A controlled list is a SKOS concept scheme. Each value is a <code>skos:Concept</code> in the list's own scheme, and the shape of the property that points at the list checks that scheme.</p>
 <p>First decide where the list lives.</p>
-<ul><li>Put the list in the module whose property points at it. <code>system</code> holds its kinds this way, <code>organization</code> its RACI levels, and <code>data-product</code> its statuses and its layers.</li><li>A module can point only at a module it depends on. <code>py dependents.py &lt;module&gt;</code>, from the folder <code>release</code>, prints the modules that depend on one.</li><li>Give the list a module of its own when its values carry facts of their own that a competency question asks for, or when two modules that do not depend on each other must point at it. Then follow "Onboard another module".</li></ul>
+<ul><li>Put the list in the module whose property points at it. <code>system</code> holds its kinds this way, <code>organization</code> its RACI levels, and <code>data-product</code> its statuses and its layers.</li><li>A module can point only at a module it depends on. <code>python dependents.py &lt;module&gt;</code>, from the folder <code>release</code>, prints the modules that depend on one.</li><li>Give the list a module of its own when its values carry facts of their own that a competency question asks for, or when two modules that do not depend on each other must point at it. Then follow "Onboard another module".</li></ul>
 <p>For the domains, the first property is a KPI's domain, so the list goes in <code>kpi</code>. <code>data-product</code> depends on <code>kpi</code> and can point at the list later. The domains with their owners are more than a list. An owner is a role of <code>organization</code>, and <code>organization</code> does not depend on <code>kpi</code>. That part needs a module of its own.</p>
 <ol><li>Write the competency question that the list answers.</li><li>Write the list as a table in the module's folder. Each value is one row with an id, a name and a definition. The example's table is <code>kpi\data-domains.csv</code>.</li><li>Write a builder that writes the table as Turtle, with <code>--write</code> and <code>--verify</code>. It gives each value its types, <code>skos:inScheme</code> and <code>skos:topConceptOf</code> with the list's scheme, a label, a notation, a definition and its source. The example's builder is <code>kpi\build_data_domains.py</code>.</li><li>Add three terms to the module's <code>vocabulary.ttl</code>. They are the scheme, the class of its values, and the property that points at the list. Give the property one <code>rdfs:domain</code>, and <code>skos:Concept</code> as its <code>rdfs:range</code>.</li><li>Change the module's <code>shapes.ttl</code> in four places. Add the property's cardinality to the shape of the class that carries it. In <code>kpi</code>, add the property to the <code>sh:ignoredProperties</code> list of the closed shape too. Add a shape for a value of the list. Add a shape with <code>sh:targetObjectsOf</code> the property, which requires <code>skos:inScheme</code> to be the list's scheme. Without that last shape, a value from another list passes.</li><li>Add the builder's Turtle file to the module's <code>parts</code> in <code>release\build_module.py</code>, and to the module's files in <code>regression\run.py</code>. For <code>kpi</code>, add it also to <code>test_kpi_holds_the_measures_and_the_populations</code> in <code>release\test_build_module.py</code>, which names the module's files by hand.</li><li>Add two lines to <code>scripts/check.sh</code>. One runs the builder with <code>--verify</code>. The other names the list's test file in the test list.</li><li>Add the file to the module's row in <code>business_architecture\ontology\MODULES.md</code>.</li><li>Add the question's text to <code>competency-questions.md</code>, its row to <code>regression\expected.csv</code> and its query to <code>regression\queries</code>.</li><li>Write the test file. It states the values by hand, and proves that the shapes reject a value from another list.</li><li>To give a term its value, add a column to the term's table and a line to its builder, as step 4 of "Add a concept or a property" says.</li><li>Build the list, then release the module as a minor, with "The release steps" from step 3.</li></ol>
 <p><strong>The intake form cannot take a new list from the ontology in this release.</strong> The lists that the form reads from the ontology are fixed in <code>kpi_store/intake/picklists.py</code>. Question 1.5 reads the domains from <code>[[list.domains]]</code> in <code>kpi-intake/settings.toml</code>. That list also says which domain is active, which the ontology's list does not. So keep the list in <code>settings.toml</code>, and give each domain there the <code>id</code> it has in the ontology's table. Then an answer in a form names the same domain as the ontology.</p>
@@ -695,7 +695,7 @@ all checks passed</code></pre></li></ol>
 git clean -q -fd</code></pre></li></ol>
 <ol start="2"><li>List the files the example changes. This changes nothing.
 <pre><code class="lang-powershell">cd business_architecture/ontology/release
-py update_examples.py domain-list --plan</code></pre>
+python update_examples.py domain-list --plan</code></pre>
 <pre><code class="lang-text">would change business_architecture/ontology/kpi/data-domains.csv, build_data_domains.py and test_data_domains.py
 would change business_architecture/ontology/kpi/vocabulary.ttl
 would change business_architecture/ontology/kpi/shapes.ttl
@@ -705,20 +705,20 @@ would change business_architecture/ontology/regression/ and business_architectur
 would change business_architecture/ontology/MODULES.md
 would change business_architecture/ontology/approvals/example-domain-list.md</code></pre></li></ol>
 <ol start="3"><li>Make the hand edits of steps 2 to 10 above, and write the approval.
-<pre><code class="lang-powershell">py update_examples.py domain-list --write</code></pre>
+<pre><code class="lang-powershell">python update_examples.py domain-list --write</code></pre>
 <pre><code class="lang-text">changed business_architecture/ontology/kpi/data-domains.csv, build_data_domains.py and test_data_domains.py
 ...
 Now build: cd ../kpi, then build_data_domains.py --write. HOW-TO-UPDATE.md has the steps after it.</code></pre></li></ol>
 <ol start="4"><li>Build the list from its table.
 <pre><code class="lang-powershell">cd ../kpi
-py build_data_domains.py --write</code></pre>
+python build_data_domains.py --write</code></pre>
 <pre><code class="lang-text">data domains 2
 wrote data-domains.ttl</code></pre></li></ol>
 <ol start="5"><li>Set the new version, write the package and release the modules that depend on it.
 <pre><code class="lang-powershell">cd ../release
-py next_version.py start kpi 1.4.0 minor --why "Adds a list of data domains and the property that points at it." --approver "The kpi module owner" --where "approvals/example-domain-list.md" --words "Approved as a minor: a list of data domains and the property that points at it."
-py build_module.py kpi --write
-py next_version.py cascade kpi --approver "The kpi module owner" --where "approvals/example-domain-list.md" --words "Approved as a minor: a list of data domains and the property that points at it."</code></pre>
+python next_version.py start kpi 1.4.0 minor --why "Adds a list of data domains and the property that points at it." --approver "The kpi module owner" --where "approvals/example-domain-list.md" --words "Approved as a minor: a list of data domains and the property that points at it."
+python build_module.py kpi --write
+python next_version.py cascade kpi --approver "The kpi module owner" --where "approvals/example-domain-list.md" --words "Approved as a minor: a list of data domains and the property that points at it."</code></pre>
 <pre><code class="lang-text">kpi is set to 1.4.0. Now run: python3 build_module.py kpi --write
 kpi 1.4.0: &lt;count&gt; triples; shapes conform
 wrote &lt;the path of the new package&gt;
@@ -727,14 +727,14 @@ kpi 1.3.0 moved to releases/previous/; the projection's lists name 1.4.0
 ...
 7 modules released. Now rebuild the catalog and the projection manifest, and run the check.</code></pre></li></ol>
 <ol start="6"><li>Rebuild the catalog, the projection manifest, the competency questions, the KPI intake pack and the pages. The count of questions is one higher than before, because the list's question is number 58.
-<pre><code class="lang-powershell">py build_catalog.py --write
+<pre><code class="lang-powershell">python build_catalog.py --write
 cd ../projection
-py pipeline.py build
+python pipeline.py build
 cd ../regression
-py run.py
+python run.py
 cd ../../..
-py -m kpi_store.intake build
-py scripts/build_docs_html.py</code></pre>
+python -m kpi_store.intake build
+python scripts/build_docs_html.py</code></pre>
 <pre><code class="lang-text">catalog: 13 releases from 13 packages
 ...
 competency coverage on &lt;the core package&gt;: 58 questions; answerable 57, partial 0, waiting 0, parked 1
@@ -748,7 +748,7 @@ all checks passed</code></pre></li></ol>
 <h2 id="change-a-process">Change a process<a class="hl" href="#change-a-process" aria-label="Link to this section">#</a></h2>
 <p>The process map is the source of the taxonomy in <code>core</code>. Every module depends on <code>core</code>, so this is the widest change. A change to an existing process's meaning is a major. A new process is a minor.</p>
 <p>The document test does not run this section's commands. Each needs your own edits to a new builder first. The steps it ends with, the cascade and the check, are tested in "The release steps".</p>
-<ol><li>Copy <code>business_architecture\business_process\downstream_process_map.json</code> into <code>business_architecture\ontology\release\frozen</code>. Name the copy with a label of 12 letters or digits, a hyphen, and the file's name, such as <code>before202611-downstream_process_map.json</code>.</li><li>Add the node to <code>downstream_process_map.json</code>, with its <code>id</code>, <code>level</code>, <code>name</code> and <code>description</code>. The builder makes the description's first sentence the definition and the rest the scope note. So put the whole definition in the first sentence.</li><li>Add its row to <code>business_architecture\ontology\build\output\step2-identity-map.json</code>, beside its siblings, with the same fields. Copy <code>minted</code> and <code>deprecated</code> from a sibling: <code>false</code> for an ordinary new process.</li><li>Copy the changed map into <code>frozen</code> too, under a second label, such as <code>after2026110-downstream_process_map.json</code>.</li><li>Save the approval, as step 3 of "The release steps" says.</li><li>In <code>business_architecture\ontology\release</code>, copy <code>build_core_template.py</code> to <code>build_core_2_5.py</code>. The name is for the first change to this release. A later change raises it.</li><li>Fill in the block that the new builder marks: the two labels, the new version and the approval. To change an existing node's ID or description, read <code>build_core_2_2.py</code>, which applies those changes.</li><li>Write the changelog <code>business_architecture\ontology\releases\core\CHANGELOG-2.5.0.md</code>, in the form of <code>CHANGELOG-2.4.0.md</code> beside it.</li><li>Add a short test, <code>test_build_core_2_5.py</code>, beside the builder. It says what the release adds and that it removes no IRI. Add it to the test list in <code>scripts/check.sh</code>.</li><li>From the folder <code>release</code>, write the package with <code>py build_core_2_5.py --write</code>.</li><li>Move the folder <code>releases\core\2.4.0</code> into <code>releases\previous\core</code>. Make that folder first if it is missing.</li><li>Rebuild every module's source file, since each reads <code>core</code>. <code>scripts/check.sh</code> lists the builders after the comment on each module's source Turtle. Run each from its folder with <code>--write</code>.</li><li>From the folder <code>release</code>, release every module with <code>py next_version.py cascade core</code>, with <code>--approver</code>, <code>--where</code> and <code>--words</code> as in "The release steps".</li><li>Change the version of <code>core</code> by hand in <code>PACKAGES</code> in <code>projection/pipeline.py</code> and under <code>packages</code> in <code>projection/skill-run/epm-config.json</code>.</li><li>Follow "The release steps" from step 7.</li></ol>
+<ol><li>Copy <code>business_architecture\business_process\downstream_process_map.json</code> into <code>business_architecture\ontology\release\frozen</code>. Name the copy with a label of 12 letters or digits, a hyphen, and the file's name, such as <code>before202611-downstream_process_map.json</code>.</li><li>Add the node to <code>downstream_process_map.json</code>, with its <code>id</code>, <code>level</code>, <code>name</code> and <code>description</code>. The builder makes the description's first sentence the definition and the rest the scope note. So put the whole definition in the first sentence.</li><li>Add its row to <code>business_architecture\ontology\build\output\step2-identity-map.json</code>, beside its siblings, with the same fields. Copy <code>minted</code> and <code>deprecated</code> from a sibling: <code>false</code> for an ordinary new process.</li><li>Copy the changed map into <code>frozen</code> too, under a second label, such as <code>after2026110-downstream_process_map.json</code>.</li><li>Save the approval, as step 3 of "The release steps" says.</li><li>In <code>business_architecture\ontology\release</code>, copy <code>build_core_template.py</code> to <code>build_core_2_5.py</code>. The name is for the first change to this release. A later change raises it.</li><li>Fill in the block that the new builder marks: the two labels, the new version and the approval. To change an existing node's ID or description, read <code>build_core_2_2.py</code>, which applies those changes.</li><li>Write the changelog <code>business_architecture\ontology\releases\core\CHANGELOG-2.5.0.md</code>, in the form of <code>CHANGELOG-2.4.0.md</code> beside it.</li><li>Add a short test, <code>test_build_core_2_5.py</code>, beside the builder. It says what the release adds and that it removes no IRI. Add it to the test list in <code>scripts/check.sh</code>.</li><li>From the folder <code>release</code>, write the package with <code>python build_core_2_5.py --write</code>.</li><li>Move the folder <code>releases\core\2.4.0</code> into <code>releases\previous\core</code>. Make that folder first if it is missing.</li><li>Rebuild every module's source file, since each reads <code>core</code>. <code>scripts/check.sh</code> lists the builders after the comment on each module's source Turtle. Run each from its folder with <code>--write</code>.</li><li>From the folder <code>release</code>, release every module with <code>python next_version.py cascade core</code>, with <code>--approver</code>, <code>--where</code> and <code>--words</code> as in "The release steps".</li><li>Change the version of <code>core</code> by hand in <code>PACKAGES</code> in <code>projection/pipeline.py</code> and under <code>packages</code> in <code>projection/skill-run/epm-config.json</code>.</li><li>Follow "The release steps" from step 7.</li></ol>
 <p>In a Git copy you may name the two copies of the map by the first 12 characters of their commits instead.</p>
 <h2 id="a-new-environment">A new environment<a class="hl" href="#a-new-environment" aria-label="Link to this section">#</a></h2>
 <p>The same ontology loads into another workspace with new settings files. The ontology does not change. The ontology names its catalogs <code>idp_sbx</code> and <code>synapse_dev</code>. The <code>[names]</code> table says what each is called in the new environment.</p>
@@ -777,7 +777,7 @@ tables = ["*__ct", "attrep_*"]
 [genie]
 spaces = []</code></pre>
 <p>Each catalog in <code>[names]</code> must also be in <code>read_catalogs</code>. Two ontology catalogs may not share one catalog of the environment. The settings reader refuses both mistakes before any read or write. To check a settings file before you use it, load it. The example loads the file that ships with the release:</p>
-<pre><code class="lang-powershell">py -c "from kpi_store import settings; s = settings.load('kpi_store/kpi_store.example.toml'); print(s.write_schemas, s.read_catalogs, s.names)"</code></pre>
+<pre><code class="lang-powershell">python -c "from kpi_store import settings; s = settings.load('kpi_store/kpi_store.example.toml'); print(s.write_schemas, s.read_catalogs, s.names)"</code></pre>
 <pre><code class="lang-text">('idp_sbx.kpi_store', 'idp_sbx.tech_graph') ('idp_sbx', 'synapse_dev') {'idp_sbx': 'idp_sbx', 'synapse_dev': 'synapse_dev'}</code></pre>
 <p>The first run in a new environment is a first run. Follow the runbook from "Run the setup check", with <code>--stores</code> and the new file on every command. A name that differs in the new environment is an <code>environment setting</code> row or a correction, as the report says.</p>
 <p><strong>A correction changes the ontology for every environment.</strong> Accept a rename only when the name changed everywhere. When it differs in one environment only, decide the row as <code>environment setting</code>.</p>
@@ -797,14 +797,14 @@ spaces = []</code></pre>
 <h3 id="give-the-area-s-tables-their-place-in-the-discovery-comparison">Give the area's tables their place in the discovery comparison<a class="hl" href="#give-the-area-s-tables-their-place-in-the-discovery-comparison" aria-label="Link to this section">#</a></h3>
 <p>The comparison before each Databricks load reads the platform tables of the <code>data-product</code> module. A table that is not there is not compared. So a new data area joins the comparison through <code>data-product</code>, whether or not it also gets a module of its own.</p>
 <p><strong>An object, a column or a table edge that the ontology names and the workspace lacks stops the load.</strong> Add a table only when it exists in the workspace under that name.</p>
-<ol><li>Add a row for each table and view of the area to <code>business_architecture/ontology/data-product/pricing/tables.csv</code>. Use the names the workspace uses.</li><li>Add a row for each hop of the area's lineage to <code>lineage.csv</code>, in the same folder.</li><li>Add a row for each value column to <code>columns.csv</code>, in the same folder.</li><li>Run the builder from <code>business_architecture/ontology/data-product</code>: <code>py build_pricing.py --write</code>. It fails on a name that does not resolve.</li><li>Release <code>data-product</code> as a minor version, with its cascade ("The release steps").</li><li>Run <code>py -m kpi_store.runner</code>. The run now compares the new tables with the workspace.</li></ol>
+<ol><li>Add a row for each table and view of the area to <code>business_architecture/ontology/data-product/pricing/tables.csv</code>. Use the names the workspace uses.</li><li>Add a row for each hop of the area's lineage to <code>lineage.csv</code>, in the same folder.</li><li>Add a row for each value column to <code>columns.csv</code>, in the same folder.</li><li>Run the builder from <code>business_architecture/ontology/data-product</code>: <code>python build_pricing.py --write</code>. It fails on a name that does not resolve.</li><li>Release <code>data-product</code> as a minor version, with its cascade ("The release steps").</li><li>Run <code>python -m kpi_store.runner</code>. The run now compares the new tables with the workspace.</li></ol>
 <p>The cut tool applies corrections to the tables in <code>data-product/pricing/</code> only. A difference in any other module's content goes through the release steps of this guide, not through the cut.</p>
 <h3 id="release-the-module-at-1-0-0">Release the module at 1.0.0<a class="hl" href="#release-the-module-at-1-0-0" aria-label="Link to this section">#</a></h3>
-<ol><li>Run the module's builder with <code>--write</code>, from the module's folder.</li><li>Write the package: <code>py build_module.py &lt;module&gt; --write</code>, from <code>business_architecture/ontology/release</code>.</li><li>Rebuild the catalog: <code>py build_catalog.py --write</code>, from the same folder.</li><li>Rebuild the projection manifest: <code>py pipeline.py build</code>, from <code>business_architecture/ontology/projection</code>.</li><li>Run the competency questions: <code>py run.py</code>, from <code>business_architecture/ontology/regression</code>.</li><li>Rebuild the KPI intake pack: <code>py -m kpi_store.intake build</code>, from the top folder. Its lists name the release's modules.</li><li>Rebuild the pages: <code>py scripts/build_docs_html.py</code>, from the top folder.</li><li>Run the full check. Do not share the module until it prints <code>all checks passed</code>.</li></ol>
+<ol><li>Run the module's builder with <code>--write</code>, from the module's folder.</li><li>Write the package: <code>python build_module.py &lt;module&gt; --write</code>, from <code>business_architecture/ontology/release</code>.</li><li>Rebuild the catalog: <code>python build_catalog.py --write</code>, from the same folder.</li><li>Rebuild the projection manifest: <code>python pipeline.py build</code>, from <code>business_architecture/ontology/projection</code>.</li><li>Run the competency questions: <code>python run.py</code>, from <code>business_architecture/ontology/regression</code>.</li><li>Rebuild the KPI intake pack: <code>python -m kpi_store.intake build</code>, from the top folder. Its lists name the release's modules.</li><li>Rebuild the pages: <code>python scripts/build_docs_html.py</code>, from the top folder.</li><li>Run the full check. Do not share the module until it prints <code>all checks passed</code>.</li></ol>
 <p>A first release needs no cascade. No released module requires the new one yet. A module that should link to it does so in its own next release.</p>
 <h3 id="reload-the-stores">Reload the stores<a class="hl" href="#reload-the-stores" aria-label="Link to this section">#</a></h3>
 <p>The projection takes every module in <code>PACKAGES</code>, so the new module goes into Neo4j with the others. No store needs a setting of its own for it.</p>
-<ol><li>Run <code>py -m kpi_store.runner --replace-enterprise</code>. The Enterprise database holds the earlier release, so the copy needs the replace.</li><li>Read the last line. Expect <code>every step passed</code>.</li><li>Run <code>py -m kpi_store.sync_check</code>. Every line must read <code>current</code>.</li></ol>
+<ol><li>Run <code>python -m kpi_store.runner --replace-enterprise</code>. The Enterprise database holds the earlier release, so the copy needs the replace.</li><li>Read the last line. Expect <code>every step passed</code>.</li><li>Run <code>python -m kpi_store.sync_check</code>. Every line must read <code>current</code>.</li></ol>
 <p>The runbook, <code>business_architecture/ontology/projection/ontology-stores-runbook.md</code>, explains each line of both commands.</p>
 <h3 id="a-worked-example-the-made-up-module-sample-area">A worked example: the made-up module <code>sample-area</code><a class="hl" href="#a-worked-example-the-made-up-module-sample-area" aria-label="Link to this section">#</a></h3>
 <p>The release holds a helper, <code>release/onboard_example.py</code>, that onboards one made-up module. It writes the six files of the folder and registers the module in each place of the table above. Read its functions as the pattern for your own module: it has one function per place.</p>
@@ -812,7 +812,7 @@ spaces = []</code></pre>
 <p>The commands start in the top folder of the copy.</p>
 <ol><li>List the places. This changes nothing.
 <pre><code class="lang-powershell">cd business_architecture/ontology/release
-py onboard_example.py --plan</code></pre>
+python onboard_example.py --plan</code></pre>
 <pre><code class="lang-text">would register in business_architecture/ontology/sample-area/
 would register in business_architecture/ontology/approvals/sample-area-1.0.0.md
 would register in business_architecture/ontology/release/build_module.py
@@ -826,38 +826,38 @@ would register in business_architecture/ontology/competency-questions.md
 would register in business_architecture/ontology/MODULES.md
 would register in scripts/build_docs_html.py</code></pre></li></ol>
 <ol start="2"><li>Write the module's folder and register the module.
-<pre><code class="lang-powershell">py onboard_example.py --write</code></pre>
+<pre><code class="lang-powershell">python onboard_example.py --write</code></pre>
 <pre><code class="lang-text">registered in business_architecture/ontology/sample-area/
 ...
 registered in scripts/build_docs_html.py
 Now build: cd ../sample-area, then build_sample_areas.py --write. HOW-TO-UPDATE.md has the steps after it.</code></pre></li></ol>
 <ol start="3"><li>Build the module's instances from its table.
 <pre><code class="lang-powershell">cd ../sample-area
-py build_sample_areas.py --write</code></pre>
+python build_sample_areas.py --write</code></pre>
 <pre><code class="lang-text">areas 3; covered processes 3
 wrote sample-areas.ttl</code></pre></li></ol>
 <ol start="4"><li>Write the package at 1.0.0, then rebuild the catalog.
 <pre><code class="lang-powershell">cd ../release
-py build_module.py sample-area --write
-py build_catalog.py --write</code></pre>
+python build_module.py sample-area --write
+python build_catalog.py --write</code></pre>
 <pre><code class="lang-text">sample-area 1.0.0: 52 triples; shapes conform
 wrote &lt;the package folder&gt;
 catalog: 14 releases from 14 packages
 wrote &lt;the catalog file&gt;</code></pre></li></ol>
 <ol start="5"><li>Rebuild the projection manifest. The projection now takes the module.
 <pre><code class="lang-powershell">cd ../projection
-py pipeline.py build</code></pre>
+python pipeline.py build</code></pre>
 <pre><code class="lang-text">...
 wrote projection-manifest.json</code></pre></li></ol>
 <ol start="6"><li>Run the competency questions. The count is one higher than before: the module's question is number 58.
 <pre><code class="lang-powershell">cd ../regression
-py run.py</code></pre>
+python run.py</code></pre>
 <pre><code class="lang-text">competency coverage on &lt;the core release&gt;: 58 questions; answerable 57, partial 0, waiting 0, parked 1</code></pre></li></ol>
 <ol start="7"><li>Rebuild the KPI intake pack. Its lists name the release's modules, so a new module makes them older than the packages, and the full check then stops on the pack.
 <pre><code class="lang-powershell">cd ../../..
-py -m kpi_store.intake build</code></pre></li></ol>
+python -m kpi_store.intake build</code></pre></li></ol>
 <ol start="8"><li>Rebuild the pages, and tell Git about the new files. One test reads which pages Git tracks.
-<pre><code class="lang-powershell">py scripts/build_docs_html.py
+<pre><code class="lang-powershell">python scripts/build_docs_html.py
 git add -A</code></pre></li></ol>
 <ol start="9"><li>Run the full check. It takes about 10 minutes. On Windows, run it in Git Bash.
 <pre><code class="lang-bash">bash scripts/check.sh</code></pre>
@@ -865,7 +865,7 @@ git add -A</code></pre></li></ol>
 all checks passed</code></pre></li></ol>
 <ol start="10"><li>Run the helper again. It refuses a copy that holds the module, and changes nothing.
 <pre><code class="lang-powershell">cd business_architecture/ontology/release
-py onboard_example.py --write</code></pre>
+python onboard_example.py --write</code></pre>
 <pre><code class="lang-text">refused: this release holds the module sample-area already; nothing was changed</code></pre></li></ol>
 <p>The copy now holds the made-up module. Delete the copy when you have read what the helper changed.</p>
 <h2 id="add-a-logical-model">Add a logical model<a class="hl" href="#add-a-logical-model" aria-label="Link to this section">#</a></h2>
@@ -873,12 +873,12 @@ py onboard_example.py --write</code></pre>
 <p>Each model is two files in <code>business_architecture\ontology\logical-model\models</code>: ER Studio's Turtle export, saved as the model's name and <code>.erstudio.ttl</code>, and a links file, the model's name and <code>.links.csv</code>. Name the model in lower-case words joined by hyphens. <code>logical-model/README.md</code> describes the links file's columns. Only rows marked <code>asserted</code> become triples. Every link target must be in the newest package of its module.</p>
 <ol><li>Save the two files in <code>models</code>.</li><li>Build the model's graphs with <code>--write</code>. The command below is the one for the made-up model that ships with the release, with <code>--verify</code>, which changes nothing. For your model, change the four names and write <code>--write</code> in place of <code>--verify</code>.
 <pre><code class="lang-powershell">cd business_architecture/ontology/logical-model
-py build_logical_model.py --export models/customer-logical-model.erstudio.ttl --links models/customer-logical-model.links.csv --model customer-logical-model --title "Customer logical model" --out models --verify</code></pre></li></ol>
+python build_logical_model.py --export models/customer-logical-model.erstudio.ttl --links models/customer-logical-model.links.csv --model customer-logical-model --title "Customer logical model" --out models --verify</code></pre></li></ol>
 <ol start="3"><li>In <code>release/build_module.py</code>, add the model's two graph files to the <code>graphs</code> list of the <code>logical-model</code> entry: the <code>.erstudio.ttl</code> file and the <code>.layer.ttl</code> file that the builder wrote.</li><li>In <code>scripts/check.sh</code>, add the new model's four options to the line that runs <code>build_logical_model.py</code>, so that the check rebuilds every model.</li><li>Release <code>logical-model</code> as a minor, with "The release steps" from step 3.</li></ol>
 <p>The stores load each model: Fuseki and Databricks its two graphs as named graphs, the two Neo4j databases the model as its own subgraph. The sync check prints an <code>lm:</code> line for each Neo4j database.</p>
 <p>A build can also read a model's files from a folder outside your copy. Point <code>--export</code> and <code>--links</code> at them, and keep <code>--out</code> at <code>models</code>. List each file with its SHA-256 in the <code>augment</code> list of the <code>logical-model</code> entry, and compare the files with those hashes before you build from them again.</p>
 <h2 id="keep-the-catalog-the-regression-and-the-projection-current">Keep the catalog, the regression and the projection current<a class="hl" href="#keep-the-catalog-the-regression-and-the-projection-current" aria-label="Link to this section">#</a></h2>
-<div class="tblwrap"><table><thead><tr><th>Part</th><th>Command, from its folder</th><th>When</th></tr></thead><tbody><tr><td>The catalog, <code>releases/catalog.ttl</code></td><td><code>py build_catalog.py --write</code>, in <code>release</code></td><td>After any package is written.</td></tr><tr><td>The regression</td><td><code>py run.py</code>, in <code>regression</code></td><td>After any change. A new question goes in <code>regression/expected.csv</code>, with its query in <code>regression/queries</code>.</td></tr><tr><td>The projection manifest</td><td><code>py pipeline.py build</code>, in <code>projection</code></td><td>After any package is written. The check fails until you run it.</td></tr></tbody></table></div>
+<div class="tblwrap"><table><thead><tr><th>Part</th><th>Command, from its folder</th><th>When</th></tr></thead><tbody><tr><td>The catalog, <code>releases/catalog.ttl</code></td><td><code>python build_catalog.py --write</code>, in <code>release</code></td><td>After any package is written.</td></tr><tr><td>The regression</td><td><code>python run.py</code>, in <code>regression</code></td><td>After any change. A new question goes in <code>regression/expected.csv</code>, with its query in <code>regression/queries</code>.</td></tr><tr><td>The projection manifest</td><td><code>python pipeline.py build</code>, in <code>projection</code></td><td>After any package is written. The check fails until you run it.</td></tr></tbody></table></div>
 <p>Step 7 of "The release steps" runs all three.</p>
 <h2 id="keep-every-store-in-step">Keep every store in step<a class="hl" href="#keep-every-store-in-step" aria-label="Link to this section">#</a></h2>
 <p>Your packages are the master copy. Each store is a copy that falls behind when you release.</p>

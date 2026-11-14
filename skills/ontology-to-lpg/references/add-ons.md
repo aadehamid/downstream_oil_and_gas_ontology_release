@@ -58,7 +58,7 @@ uv run --no-project --with rdflib --with neo4j python copy_graph.py \
   --report projection-report.json [--replace] [--batch 1000] [--query-timeout 120]
 ```
 
-On Windows, after `py -m pip install rdflib neo4j`, the same line starts `py copy_graph.py`.
+On Windows, after `python -m pip install rdflib neo4j`, the same line starts `python copy_graph.py`.
 
 Run it after `check-report` passed and before anything else writes to the local graph (`running.md`, rule 5, step 3). Each env file holds `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD` and optionally `NEO4J_DATABASE`; keep both outside the repository. `--source <URI>` with `NEO4J_PASSWORD` and `NEO4J_USERNAME` in the environment replaces `--source-env`. `--source-database` and `--target-database` name the database on each side and override the file's `NEO4J_DATABASE`; without either the server's default database is used. The script never prints a password.
 

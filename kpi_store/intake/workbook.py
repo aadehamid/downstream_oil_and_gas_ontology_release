@@ -173,7 +173,7 @@ def build(cat, lists, examples=None, intake=None, others=None):
         "Where a cell has a dropdown, choose from it. If the right answer is not in the list, choose \"Not in the list\".",
         "A question with several answers has several rows. Use one row for each answer and leave the others empty.",
         "Leave a question empty when its rule in the \"Asked of\" column says it does not apply.",
-        "Check the filled workbook with: py -m kpi_store.intake check <this file>",
+        "Check the filled workbook with: python -m kpi_store.intake check <this file>",
     ]
     for row, note in enumerate(notes, 2):
         put(ws, row, 1, note)

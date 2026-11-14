@@ -1,9 +1,9 @@
 """The KPI intake pack: the forms a business analyst fills in to ask for a new KPI, and the check of a filled form.
 
-    py -m kpi_store.intake build            write the forms, the pick lists, the two generated pages and the examples
-    py -m kpi_store.intake build --check    write nothing; exit 1 when a committed file differs from a fresh build
-    py -m kpi_store.intake check <file>     say what a filled form (answers JSON or workbook) still lacks
-    py -m kpi_store.intake folders <place>  make the shared KPI-intake folder a team keeps its answers files in
+    python -m kpi_store.intake build            write the forms, the pick lists, the two generated pages and the examples
+    python -m kpi_store.intake build --check    write nothing; exit 1 when a committed file differs from a fresh build
+    python -m kpi_store.intake check <file>     say what a filled form (answers JSON or workbook) still lacks
+    python -m kpi_store.intake folders <place>  make the shared KPI-intake folder a team keeps its answers files in
 
 The questions live in kpi-intake/catalogue.toml and the organization's own lists in kpi-intake/settings.toml.
 Everything else in kpi-intake/ except README.md, the guide how-to-use-the-form.html, the JSON Schema and

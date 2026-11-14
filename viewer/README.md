@@ -22,11 +22,11 @@ The header shows the release name on every view. Release details repeats it and 
 
 Each page carries a copy of the ontology data. Editing a package does not refresh that copy, so rebuild both pages after you cut a new module version. Follow `HOW-TO-UPDATE.md` at the release root for the change to the ontology itself.
 
-The two commands need Python 3.11 or later with the `rdflib` package. Run them from the release root. On macOS or Linux, write `python3` in place of `py`.
+The two commands need Python 3.11 or later with the `rdflib` package. Run them from the release root. On macOS or Linux, write `python3` in place of `python` when that is your Python's name.
 
 ```powershell run=release-copy status-only
-py business_architecture/ontology/viewer/build.py --source . --out viewer/index.html
-py business_architecture/ontology/viewer/build_horoi.py --source . --out horoi_viewer
+python business_architecture/ontology/viewer/build.py --source . --out viewer/index.html
+python business_architecture/ontology/viewer/build_horoi.py --source . --out horoi_viewer
 ```
 
 Each command reads the newest version of every module under `business_architecture/ontology/releases/` and checks each file against its package's manifest. It stops when a file differs from its manifest. Two runs on the same packages write the same bytes.
@@ -34,8 +34,8 @@ Each command reads the newest version of every module under `business_architectu
 Add `--check` to compare a page with a fresh build without writing anything. `scripts/check.sh` makes the same comparison, so it fails while a page is older than the packages.
 
 ```powershell run=release-copy
-py business_architecture/ontology/viewer/build.py --source . --out viewer/index.html --check
-py business_architecture/ontology/viewer/build_horoi.py --source . --out horoi_viewer --check
+python business_architecture/ontology/viewer/build.py --source . --out viewer/index.html --check
+python business_architecture/ontology/viewer/build_horoi.py --source . --out horoi_viewer --check
 ```
 
 ```text expect
