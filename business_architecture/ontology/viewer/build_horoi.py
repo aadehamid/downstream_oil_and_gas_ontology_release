@@ -8,6 +8,12 @@ plus what the reference page needs to list the modules: each module's name, titl
 versions it requires, read from the module's own ontology statement. The build record (build.json) names the
 release, the Horoi version, the input files with their checksums, the counts and the page's checksum.
 
+The page shows each name without a leading "MPC ": the whole reference is MPC's, so the word says nothing there.
+This is a choice of what the page shows and of nothing else. The released packages keep their names, and a term's
+page still lists the name as its package states it, among its statements (shown_names).
+Decided (delegated under KPI-DEC-0001); the owner's words are in
+business_architecture/domain/kpi-store-decisions/answers/2026-11-14-reference-page-names.md.
+
 --check writes nothing. It fails when the page or the record differs from a fresh build.
 """
 
@@ -28,6 +34,30 @@ _spec.loader.exec_module(viewer)
 HOROI_VERSION = "0.2.0"
 HOROI_COMMIT = "e0660af0f795ebfeb6f1354a69b3b0c47ebafba6"
 DCTERMS = "http://purl.org/dc/terms/"
+# The word the page leaves off the front of a name, and the kinds of node that keep it. An Evidence node is a
+# source, and its name is the source's citation, which is quoted as it stands.
+IMPLIED_PREFIX = "MPC "
+KEEPS_ITS_NAME = ("Evidence",)
+
+
+def shown_name(label):
+    """The name as the page shows it: without the leading "MPC ". "MPC" inside a name stays, and so does a name
+    that would be empty without the word."""
+    rest = label[len(IMPLIED_PREFIX):] if label.startswith(IMPLIED_PREFIX) else label
+    return rest if rest.strip() else label
+
+
+def shown_names(data):
+    """Gives every node the name the page shows, in place. A node whose name changes keeps the name of its package
+    as releasedLabel, so that a search for the old name still finds it. The node's statements are not touched: they
+    are what the packages state."""
+    for node in data["nodes"]:
+        if node["kind"] in KEEPS_ITS_NAME:
+            continue
+        shown = shown_name(node["label"])
+        if shown != node["label"]:
+            node["releasedLabel"], node["label"] = node["label"], shown
+    return data
 
 
 def module_info(root, data):
@@ -52,7 +82,7 @@ def module_info(root, data):
                 "name": module,
                 "version": version,
                 "id": iri,
-                "label": titles[0],
+                "label": shown_name(titles[0]),
                 "description": descriptions[0],
                 "requires": stated("requires"),
             }
@@ -64,6 +94,7 @@ def build_data(root):
     root = Path(root).resolve()
     data = viewer.build_data(root)
     info = module_info(root, data)
+    shown_names(data)
     supporting = set(data["supportingKinds"])
     data["horoiVersion"] = HOROI_VERSION
     data["horoiCommit"] = HOROI_COMMIT

@@ -191,3 +191,65 @@ def test_the_page_shows_the_release_name_and_links_only_inside_the_release():
         assert f'href="{link}"' in template
         assert (ROOT / "horoi_viewer" / link).resolve().is_file()
     assert 'src="http' not in template and "@import" not in template
+
+
+# ---------- the names the page shows ----------
+
+def test_a_shown_name_loses_only_the_leading_word():
+    assert horoi.shown_name("MPC Diesel Volume") == "Diesel Volume"
+    assert horoi.shown_name("MPC Reference Instances: Marathon Petroleum Corporation") == "Reference Instances: Marathon Petroleum Corporation"
+    assert horoi.shown_name("MPC KPI Module 1.3.0") == "KPI Module 1.3.0"
+    # The word inside a name, a name written without the space, and a name that is the word alone all stay.
+    for kept in ("Sales to MPC Retail", "MPC_Diesel_Volume_Gallons_Quantity", "MPCX terminals", "mpc classification", "MPC ", "MPC"):
+        assert horoi.shown_name(kept) == kept
+
+
+def test_the_build_shows_names_without_the_word_and_keeps_the_statements(tmp_path):
+    ttl = TTL.replace('dcterms:title "The MODULE module"@en', 'dcterms:title "MPC MODULE Module"@en').replace(
+        'rdfs:label "A MODULE term"@en', 'rdfs:label "MPC MODULE Volume"@en')
+    package(tmp_path, "alpha", ttl=ttl)
+    data = horoi.build_data(tmp_path)
+    assert [m["label"] for m in data["moduleInfo"]] == ["alpha Module"]
+    by_id = {n["id"]: n for n in data["nodes"]}
+    term, module = by_id["https://example.test/alpha-Thing"], by_id["https://example.test/modules/alpha"]
+    assert (term["label"], term["releasedLabel"]) == ("alpha Volume", "MPC alpha Volume")
+    assert (module["label"], module["releasedLabel"]) == ("alpha Module", "MPC alpha Module")
+    # What the package states is still among the node's statements, word for word.
+    assert "MPC alpha Volume" in [v["v"] for v in term["values"]] and "MPC alpha Module" in [v["v"] for v in module["values"]]
+    assert not any("releasedLabel" in n for n in data["nodes"] if n["id"] not in (term["id"], module["id"]))
+
+
+def test_no_name_the_committed_page_shows_starts_with_mpc_and_its_title_still_does():
+    page = (ROOT / "horoi_viewer" / "index.html").read_text(encoding="utf-8")
+    data = embedded(page)
+    # A source keeps its citation as its name. Every other name is shown without the word.
+    with_word = [(n["kind"], n["label"].split(",")[0]) for n in data["nodes"] if n["label"].startswith("MPC ")]
+    assert with_word == [("Evidence", "MPC core 2.3.0"), ("Evidence", "MPC Economics"), ("Evidence", "MPC performance measures")]
+    assert [m["label"] for m in data["moduleInfo"] if m["label"].startswith("MPC")] == []
+    changed = {n["releasedLabel"]: n["label"] for n in data["nodes"] if "releasedLabel" in n}
+    assert len(changed) == 31 and all(old == "MPC " + new for old, new in changed.items())
+    for old, new in (("MPC Diesel Volume", "Diesel Volume"), ("MPC Gas Volume", "Gas Volume"),
+                     ("MPC Internal Blended 3-2-1 Crack, ex-RIN", "Internal Blended 3-2-1 Crack, ex-RIN"),
+                     ("MPC classification", "classification"), ("MPC Core Process Ontology", "Core Process Ontology"),
+                     ("MPC KPI Module 1.3.0", "KPI Module 1.3.0"), ("MPC Ontology Release Catalog", "Ontology Release Catalog"),
+                     ("MPC Reference Instances: Marathon Petroleum Corporation", "Reference Instances: Marathon Petroleum Corporation")):
+        assert changed[old] == new
+    # No two terms of one kind share a shown name because of the change.
+    names = [(n["kind"], n["label"].lower()) for n in data["nodes"]]
+    assert [(kind, new) for new in changed.values() for kind in {k for k, name in names if name == new.lower()}
+            if names.count((kind, new.lower())) > 1] == []
+    # The search reads the released name too, so a search for the old name still finds the term.
+    assert 'n.label+" "+(n.releasedLabel||"")+" "+n.id' in page
+    # The page's own title and heading keep the word.
+    assert "<title>MPC ontology reference</title>" in page and "MPC Business Process and Architecture Ontology" in page
+
+
+def test_the_released_packages_are_the_bytes_their_manifests_name():
+    """The names change on the page only. Every file of every released package still has the checksum that its
+    manifest recorded at the release."""
+    releases = ROOT / "business_architecture" / "ontology" / "releases"
+    manifests = sorted(releases.glob("*/*/manifest.json")) + sorted(releases.glob("previous/*/*/manifest.json"))
+    assert len(manifests) >= 13
+    for manifest in manifests:
+        for name, digest in json.loads(manifest.read_text(encoding="utf-8"))["files"].items():
+            assert hashlib.sha256((manifest.parent / name).read_bytes()).hexdigest() == digest, f"{manifest.parent / name}"
