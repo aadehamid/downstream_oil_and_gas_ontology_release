@@ -1,0 +1,6 @@
+# What Python and its tools leave in the release folder. None of it is part of the release: the runner's zip and the
+# checks leave these out by themselves, and with this file Git does too.
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
