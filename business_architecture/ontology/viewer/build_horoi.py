@@ -34,16 +34,20 @@ _spec.loader.exec_module(viewer)
 HOROI_VERSION = "0.2.0"
 HOROI_COMMIT = "e0660af0f795ebfeb6f1354a69b3b0c47ebafba6"
 DCTERMS = "http://purl.org/dc/terms/"
-# The word the page leaves off the front of every name it shows, a source's name included: the owner asked that no
-# shown name start with it.
-IMPLIED_PREFIX = "MPC "
+# The word the page leaves off the front of every name it shows, a source's name and a column's name included: the
+# owner's goal for the release says that no shown name starts with it. A column's name joins the word with an
+# underscore, as in MPC_Cost_Center_Id, so both forms go.
+IMPLIED_PREFIXES = ("MPC ", "MPC_")
 
 
 def shown_name(label):
-    """The name as the page shows it: without the leading "MPC ". "MPC" inside a name stays, and so does a name
-    that would be empty without the word."""
-    rest = label[len(IMPLIED_PREFIX):] if label.startswith(IMPLIED_PREFIX) else label
-    return rest if rest.strip() else label
+    """The name as the page shows it: without the leading "MPC " or "MPC_". "MPC" inside a name stays, and so does
+    a name that would be empty without the word."""
+    for prefix in IMPLIED_PREFIXES:
+        if label.startswith(prefix):
+            rest = label[len(prefix):]
+            return rest if rest.strip() else label
+    return label
 
 
 def shown_names(data):

@@ -200,7 +200,9 @@ def test_a_shown_name_loses_only_the_leading_word():
     assert horoi.shown_name("MPC Reference Instances: Marathon Petroleum Corporation") == "Reference Instances: Marathon Petroleum Corporation"
     assert horoi.shown_name("MPC KPI Module 1.3.0") == "KPI Module 1.3.0"
     # The word inside a name, a name written without the space, and a name that is the word alone all stay.
-    for kept in ("Sales to MPC Retail", "MPC_Diesel_Volume_Gallons_Quantity", "MPCX terminals", "mpc classification", "MPC ", "MPC"):
+    # A column's name joins the word with an underscore, and loses it too.
+    assert horoi.shown_name("MPC_Diesel_Volume_Gallons_Quantity") == "Diesel_Volume_Gallons_Quantity"
+    for kept in ("Sales to MPC Retail", "Total_MPC_Volume", "MPCX terminals", "mpc classification", "MPC ", "MPC_", "MPC"):
         assert horoi.shown_name(kept) == kept
 
 
@@ -222,13 +224,14 @@ def test_the_build_shows_names_without_the_word_and_keeps_the_statements(tmp_pat
 def test_no_name_the_committed_page_shows_starts_with_mpc_and_its_title_still_does():
     page = (ROOT / "horoi_viewer" / "index.html").read_text(encoding="utf-8")
     data = embedded(page)
-    # Every name is shown without the word, a source's name included. A column's name such as
-    # MPC_Cost_Center_Id is an identifier in the client's tables, not the word, and stays as the table has it.
-    assert [n["label"] for n in data["nodes"] if n["label"].startswith("MPC ")] == []
-    assert all(n["label"].startswith("MPC_") for n in data["nodes"] if n["label"].startswith("MPC"))
+    # Every name is shown without the word: a source's name and a column's name included.
+    # MPC_Cost_Center_Id is shown as Cost_Center_Id. No shown name starts with the three letters at all.
+    assert [n["label"] for n in data["nodes"] if n["label"].startswith("MPC")] == []
     assert [m["label"] for m in data["moduleInfo"] if m["label"].startswith("MPC")] == []
     changed = {n["releasedLabel"]: n["label"] for n in data["nodes"] if "releasedLabel" in n}
-    assert len(changed) == 34 and all(old == "MPC " + new for old, new in changed.items())
+    assert len(changed) == 38 and all(old in ("MPC " + new, "MPC_" + new) for old, new in changed.items())
+    assert sorted(new for old, new in changed.items() if old.startswith("MPC_")) == [
+        "Collection_Specialist_Number", "Cost_Center_Id", "Diesel_Volume_Gallons_Quantity", "GAS_Volume_Gallons_Quantity"]
     for old, new in (("MPC Diesel Volume", "Diesel Volume"), ("MPC Gas Volume", "Gas Volume"),
                      ("MPC Internal Blended 3-2-1 Crack, ex-RIN", "Internal Blended 3-2-1 Crack, ex-RIN"),
                      ("MPC classification", "classification"), ("MPC Core Process Ontology", "Core Process Ontology"),
