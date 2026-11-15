@@ -1,6 +1,8 @@
 # Runs on every pull request, and every job must pass.
 # check: the release's check script, scripts/check.sh, on Linux and on Windows under Git Bash. The job sets no
 #   encoding variable, so on Windows Python reads text as cp1252 unless the code names UTF-8, as on most machines.
+# check-plain-account: the same check script on Windows as an account without administrator rights meets it: no
+#   symbolic link can be made, and no py launcher is on PATH. It gets no secret.
 # sign-in: says whether this run has the three secrets of the rehearsal Databricks workspace.
 # stores: the whole chain of the stores runbook on Windows, as a person runs it, against servers the job starts on the
 #   runner and against the rehearsal Databricks workspace. It has two parts, which run side by side.
@@ -38,15 +40,122 @@ jobs:
         with:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@v7
+      # The documents and the steps below start Python with the word python. It must be the 3.12 that this job set
+      # up, in each of the three shells a reader may type a command in.
+      - name: python is the Python this job set up, in Git Bash, PowerShell and cmd
+        if: runner.os == 'Windows'
+        run: |
+          cat > "$RUNNER_TEMP/which_python.py" <<'PY'
+          import os, sys
+          here, want = os.path.normcase(sys.executable), os.path.normcase(os.environ["pythonLocation"])
+          print(here)
+          sys.exit(0 if here.startswith(want) and sys.version_info[:2] == (3, 12) else 1)
+          PY
+          script="$(cygpath -w "$RUNNER_TEMP/which_python.py")"
+          echo "Git Bash:"; python "$script"
+          echo "PowerShell:"; pwsh -NoProfile -NonInteractive -Command "python '$script'; exit \$LASTEXITCODE"
+          echo "cmd:"; MSYS_NO_PATHCONV=1 cmd /d /c "python $script"
       - name: check.sh
         env:
           PYTEST_ADDOPTS: -rs   # name each skipped test and why, so a skip on one system is seen
         run: bash scripts/check.sh
+      # The notebook and the modules it reaches run in Databricks, on the Python of the compute. Serverless compute of
+      # environment version 1 has Python 3.10, older than any Python the check script itself accepts, and the first
+      # real run failed there. So their tests run again here on Python 3.10, which uv fetches.
+      - name: the notebook's side on Python 3.10
+        run: bash scripts/check-notebook-side.sh 3.10
+      # The runbook has the reader unpack the zip and commit the folder to Git before any change. The runner zips every
+      # file of a plain folder and the tracked files of a Git folder, and both must be one zip, also where Git for
+      # Windows could change line ends.
+      - name: one zip from the plain folder and from the Git folder
+        run: bash scripts/check-git-copy.sh
       # check.sh leaves out the tests that ask whether the tree still equals the release as shipped. This branch is
       # the release as shipped, so they must pass here. One system is enough: they compare files, not behaviour.
       - name: check-pinned.sh
         if: matrix.os == 'ubuntu-24.04'
         run: bash scripts/check-pinned.sh
+
+  # The first real run of the release was on a Windows laptop without administrator rights, with a Python from a
+  # virtual environment. Two things differ there from the runner of the job above, and the check script failed on
+  # both: the account cannot make a symbolic link (WinError 1314), and `py` is not on PATH. This job makes the runner
+  # the same in both ways and runs the check script again.
+  #   links  The runner is an administrator, so Windows would let it make a link. scripts/no-links/sitecustomize.py
+  #          makes os.symlink fail in every Python that inherits PYTHONPATH and KPI_CHECK_NO_LINKS. A Python that a
+  #          test starts with a clean environment is not reached, so this proves less than a real plain account.
+  #   py     Every py launcher on PATH is renamed, and the job fails unless bash, PowerShell and cmd all find none.
+  # The last step reads the log: tests were skipped for the link. Without those lines the job would pass on a runner
+  # that was never made plain. Nothing is skipped for the launcher: no command of the release starts py, and the
+  # document test fails a block that does, so a passing check here means that nothing needed it. It gets no secret.
+  check-plain-account:
+    name: check (no links, no py)
+    runs-on: windows-2025
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v7
+      - name: take every py launcher off PATH
+        shell: pwsh
+        run: |
+          for ($i = 0; $i -lt 20; $i++) {
+            $found = Get-Command py -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+            if (-not $found) { break }
+            Write-Output "renaming $($found.Source)"
+            Rename-Item -LiteralPath $found.Source -NewName ((Split-Path -Leaf $found.Source) + ".off")
+          }
+          if (Get-Command py -ErrorAction SilentlyContinue) { Write-Output "::error::PowerShell still finds py"; exit 1 }
+          cmd /d /c "where py >nul 2>nul"
+          if ($LASTEXITCODE -eq 0) { Write-Output "::error::cmd still finds py"; exit 1 }
+          Write-Output "PowerShell and cmd find no py"
+          # "where" ended with 1 because it found nothing, which is the wanted result. Without this line the
+          # step would end with that exit code and fail.
+          exit 0
+      - name: bash finds no py
+        run: |
+          if command -v py >/dev/null 2>&1; then echo "::error::bash still finds py at $(command -v py)"; exit 1; fi
+      # The documents and the steps below start Python with the word python. It must be the 3.12 that this job set
+      # up, in each of the three shells a reader may type a command in.
+      - name: python is the Python this job set up, in Git Bash, PowerShell and cmd
+        run: |
+          cat > "$RUNNER_TEMP/which_python.py" <<'PY'
+          import os, sys
+          here, want = os.path.normcase(sys.executable), os.path.normcase(os.environ["pythonLocation"])
+          print(here)
+          sys.exit(0 if here.startswith(want) and sys.version_info[:2] == (3, 12) else 1)
+          PY
+          script="$(cygpath -w "$RUNNER_TEMP/which_python.py")"
+          echo "Git Bash:"; python "$script"
+          echo "PowerShell:"; pwsh -NoProfile -NonInteractive -Command "python '$script'; exit \$LASTEXITCODE"
+          echo "cmd:"; MSYS_NO_PATHCONV=1 cmd /d /c "python $script"
+      - name: no Python can make a link
+        env:
+          KPI_CHECK_NO_LINKS: "1"
+          PYTHONPATH: ${{ github.workspace }}/scripts/no-links
+        run: |
+          if python -c 'import os, tempfile; os.symlink("a", os.path.join(tempfile.mkdtemp(), "b"))' 2>/dev/null; then
+            echo "::error::python made a link, so the simulation is not on"; exit 1
+          fi
+          if uv run -q --no-project python -c 'import os, tempfile; os.symlink("a", os.path.join(tempfile.mkdtemp(), "b"))' 2>/dev/null; then
+            echo "::error::the Python of uv run made a link, so the simulation is not on"; exit 1
+          fi
+          echo "no Python of this job makes a link"
+      - name: check.sh
+        env:
+          KPI_CHECK_NO_LINKS: "1"
+          PYTHONPATH: ${{ github.workspace }}/scripts/no-links
+          PYTEST_ADDOPTS: -rs   # name each skipped test and why: the next step reads those lines
+        run: bash scripts/check.sh 2>&1 | tee "$RUNNER_TEMP/check.log"
+      - name: the log shows that tests were skipped for the link
+        run: |
+          links="$(grep -c 'does not let the test make a link\|cannot make a symbolic link\|cannot make a link' "$RUNNER_TEMP/check.log" || true)"
+          echo "skips for a link: $links"
+          [ "$links" -ge 3 ] || { echo "::error::fewer than 3 skip lines name a link"; exit 1; }
+          grep -q '^all checks passed$' "$RUNNER_TEMP/check.log" || { echo "::error::no line 'all checks passed'"; exit 1; }
 
   # The stores job signs in to a rehearsal Databricks workspace. The sign-in is three secrets of this repository's
   # settings: KPI_CI_DATABRICKS_TOKEN, KPI_CI_DATABRICKS_HOST and KPI_CI_DATABRICKS_WAREHOUSE. The release itself holds
@@ -114,9 +223,9 @@ jobs:
       run:
         shell: bash
     env:
-      # The py launcher starts the newest Python, and from 3.15 Python reads text as UTF-8 by default. 3.12 still reads
-      # cp1252 on Windows, as most machines do, so the commands run on 3.12.
-      PY_PYTHON: "3.12"
+      # The commands start Python with the word python, as the documents do. That is the 3.12 which the set-up step
+      # below puts first on PATH; a step checks it in Git Bash, PowerShell and cmd. From 3.15 Python reads text as
+      # UTF-8 by default. 3.12 still reads cp1252 on Windows, as most machines do, so the commands run on 3.12.
       NEO4J_ACCEPT_LICENSE_AGREEMENT: eval
       FUSEKI_SHA256: 2c92c598e65ab69d99820052e05f4277ed1d77980a8845f87545ad35b71a76ee
       N10S_SHA256: 4c461087e08405c7cb472ecfefc043e9e8ed93628ed74988e4fda1f1bac54b3e
@@ -137,6 +246,20 @@ jobs:
         with:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@v7
+      # The documents and the steps below start Python with the word python. It must be the 3.12 that this job set
+      # up, in each of the three shells a reader may type a command in.
+      - name: python is the Python this job set up, in Git Bash, PowerShell and cmd
+        run: |
+          cat > "$RUNNER_TEMP/which_python.py" <<'PY'
+          import os, sys
+          here, want = os.path.normcase(sys.executable), os.path.normcase(os.environ["pythonLocation"])
+          print(here)
+          sys.exit(0 if here.startswith(want) and sys.version_info[:2] == (3, 12) else 1)
+          PY
+          script="$(cygpath -w "$RUNNER_TEMP/which_python.py")"
+          echo "Git Bash:"; python "$script"
+          echo "PowerShell:"; pwsh -NoProfile -NonInteractive -Command "python '$script'; exit \$LASTEXITCODE"
+          echo "cmd:"; MSYS_NO_PATHCONV=1 cmd /d /c "python $script"
       - name: folders
         run: |
           local="$(cygpath -m "$RUNNER_TEMP")/kpi-local"
@@ -161,11 +284,10 @@ jobs:
           fetch neo4j-enterprise-2025.06.2-windows.zip "$NEO4J_ZIP_SHA256" https://dist.neo4j.org/neo4j-enterprise-2025.06.2-windows.zip
           fetch temurin-jdk-21.zip "$JDK_ZIP_SHA256" https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.13%2B9/OpenJDK21U-jdk_x64_windows_hotspot_21.0.13_9.zip
           fetch databricks-cli.zip "$CLI_ZIP_SHA256" https://github.com/databricks/cli/releases/download/v1.26.0/databricks_cli_1.26.0_windows_amd64.zip
-      - name: the packages, at the versions the setup check names, for the Python the py launcher starts
+      - name: the packages, at the versions the setup check names, for the Python that the word python starts
         run: |
-          py -0p || true
-          py -c "import sys; print(sys.executable, sys.version)"
-          py -m pip install -q rdflib==7.6.0 pyshacl==0.40.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 openpyxl==3.1.5
+          python -c "import sys; print(sys.executable, sys.version)"
+          python -m pip install -q rdflib==7.6.0 pyshacl==0.40.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 openpyxl==3.1.5
       # No installer and no administrator rights, as the runbook's section "Install the programs without administrator
       # rights" does it: Java and the Databricks command line are unpacked from their zips into the local folder, and
       # the local settings name both. Then every Java that the runner image brings is taken off PATH for the rest of
@@ -189,7 +311,7 @@ jobs:
           "JAVA_HOME=" >> $env:GITHUB_ENV
       - name: no Java is on PATH, and JAVA_HOME names none
         run: |
-          py -c "import os, shutil, sys; found = shutil.which('java'); sys.exit(f'a Java is still on PATH: {found}' if found else ('JAVA_HOME is still set' if os.environ.get('JAVA_HOME') else 0))"
+          python -c "import os, shutil, sys; found = shutil.which('java'); sys.exit(f'a Java is still on PATH: {found}' if found else ('JAVA_HOME is still set' if os.environ.get('JAVA_HOME') else 0))"
       # The token goes from the secret into the runner's own .databrickscfg, and from there to the command line and
       # the SDK. No step prints it, and the file is deleted in the last step. The warehouse id goes into the
       # environment's settings file in the runner's temporary folder, which no step prints or uploads.
@@ -201,11 +323,11 @@ jobs:
         run: |
           # -I keeps the checkout off Python's path: with the secrets in this step's environment, only Python's own
           # modules and the code written here may run.
-          py -I -c "import secrets; print(secrets.token_hex(16))" > "$LOCAL/pw"
+          python -I -c "import secrets; print(secrets.token_hex(16))" > "$LOCAL/pw"
           pw="$(cat "$LOCAL/pw")"; rm "$LOCAL/pw"
           echo "::add-mask::$pw"
           echo "KPI_CI_NEO4J_PASSWORD=$pw" >> "$GITHUB_ENV"
-          py -I - <<'PY'
+          python -I - <<'PY'
           import os, re
           from pathlib import Path
           from urllib.parse import quote, urlsplit
@@ -291,7 +413,7 @@ jobs:
         env:
           JAVA_HOME: ${{ env.LOCAL }}/jdk-21
         run: |
-          py - <<'PY'
+          python - <<'PY'
           import os, socket, subprocess, sys, time
           local = os.environ["LOCAL"]
           log = open(local + "/neo4j-console.log", "ab")
@@ -310,7 +432,7 @@ jobs:
           PY
       - name: the second database, which stands for the Enterprise target
         run: |
-          py - <<'PY'
+          python - <<'PY'
           import os, neo4j
           with neo4j.GraphDatabase.driver("bolt://127.0.0.1:17687", auth=("neo4j", os.environ["KPI_CI_NEO4J_PASSWORD"])) as driver:
               driver.execute_query("CREATE DATABASE businessprocessarchitecturegraph IF NOT EXISTS WAIT", database_="system")
@@ -319,29 +441,29 @@ jobs:
           PY
       - name: setup check, which must pass all 15 checks
         run: |
-          py -m kpi_store.setup_check | tee "$LOCAL/setup-check.log"
+          python -m kpi_store.setup_check | tee "$LOCAL/setup-check.log"
           grep -q "^15 of 15 checks passed" "$LOCAL/setup-check.log"
 
       # ---- part reset, first: the Fuseki load as its own command, and the document test ----
       # Both come before the first run. After the cut the document test would read the blocks and run none.
       - name: setup check, list
         if: matrix.part == 'reset'
-        run: py -m kpi_store.setup_check --list
+        run: python -m kpi_store.setup_check --list
       - name: Fuseki load
         if: matrix.part == 'reset'
-        run: time py -m kpi_store.load_fuseki --json
+        run: time python -m kpi_store.load_fuseki --json
       - name: Fuseki load again, which must change nothing
         if: matrix.part == 'reset'
-        run: time py -m kpi_store.load_fuseki --json
+        run: time python -m kpi_store.load_fuseki --json
       - name: sync check, Jena
         if: matrix.part == 'reset'
-        run: time py -m kpi_store.sync_check --store jena --no-tech-graph
+        run: time python -m kpi_store.sync_check --store jena --no-tech-graph
       # The blocks of the runbook and of the three hand-written pages that need this job's Neo4j server or a Windows
-      # account that may be changed: the winget install, the two setx commands and the cd of the runbook, the two
+      # account that may be changed: the winget install, the setx command and the cd of the runbook, the two
       # shared-drive commands of the form's guide (on a stand-in drive S:), the Cypher of "How to undo" (on a
       # database of its own, made and dropped here), and the four commands of the cross-graph questions (on a
       # composite database over two made-up graphs, made and dropped here). The packages are those of
-      # scripts/check.sh. C:\kpi-store-1.1 is the folder the runbook unpacks the release into.
+      # scripts/check.sh. kpi-store-1.1 in the user folder is where the runbook unpacks the release.
       - name: document test, the blocks that need the Neo4j server or a Windows account
         if: matrix.part == 'reset'
         env:
@@ -351,7 +473,7 @@ jobs:
           DOC_SNIPPETS_SHARED_DRIVE: "1"
           PYTHONIOENCODING: utf-8
         run: |
-          mkdir -p /c/kpi-store-1.1
+          mkdir -p "$USERPROFILE/kpi-store-1.1"
           # The stand-in for the client's shared drive that the form's guide names: drive S: over a folder of this
           # runner, with the release's signed example where the guide's check command looks for it.
           mkdir -p "$RUNNER_TEMP/shared-drive/Commercial Planning/Shared/KPI-intake/2-ready-for-check"
@@ -363,7 +485,7 @@ jobs:
           # serves no later step: the settings file names the program unpacked from the ZIP file.
           winget list Databricks.DatabricksCLI --accept-source-agreements --disable-interactivity || true
           export KPI_STORE_TEST_NEO4J_PASSWORD="$KPI_CI_NEO4J_PASSWORD"
-          uv run -q --no-project --with pytest==9.2.0 --with pytest-xdist==3.8.0 --with rdflib==7.6.0 --with pyshacl==0.40.2 --with openpyxl==3.1.5 --with jsonschema==4.26.0 --with markdown-it-py==4.3.0 --with pyyaml==6.0.3 --with sqlglot==30.31.0 --with pyoxigraph==0.5.13 --with neo4j==6.4.1 \
+          uv run -q --no-project --with pytest==9.2.0 --with pytest-xdist==3.8.0 --with rdflib==7.6.0 --with pyshacl==0.40.2 --with openpyxl==3.1.5 --with jsonschema==4.26.0 --with markdown-it-py==4.3.0 --with pyyaml==6.0.3 --with sqlglot==30.31.0 --with pyoxigraph==0.5.13 --with neo4j==6.4.1 --with pip==26.3 \
             python scripts/doc_snippets.py check --verbose \
             business_architecture/ontology/projection/ontology-stores-runbook.md \
             business_architecture/ontology/epm-ontology-guide.html \
@@ -375,18 +497,30 @@ jobs:
                      "epm-walkthrough.html:[0-9]*: powershell run=questions: ran"; do
             grep -q "$ran" "$LOCAL/doc-test.log" || { echo "no block reads: $ran"; exit 1; }
           done
-          # The runbook has three cmd blocks of the Windows account: winget and the two setx commands. The guide has two
-          # commands on the shared drive. Each must have run, so the count is checked, not only that one ran.
-          [ "$(grep -c "ontology-stores-runbook.md:[0-9]*: cmd run=windows-account: ran" "$LOCAL/doc-test.log")" = 3 ] || { echo "not all three cmd blocks of the runbook ran"; exit 1; }
+          # The runbook has three blocks of the Windows account: winget in cmd, and the setx command and the cd in
+          # PowerShell. The guide has two commands on the shared drive. Each must have run, so the counts are checked,
+          # not only that one ran.
+          [ "$(grep -c "ontology-stores-runbook.md:[0-9]*: cmd run=windows-account: ran" "$LOCAL/doc-test.log")" = 1 ] || { echo "the cmd block of the runbook did not run"; exit 1; }
+          [ "$(grep -c "ontology-stores-runbook.md:[0-9]*: powershell run=windows-account: ran" "$LOCAL/doc-test.log")" = 2 ] || { echo "not both PowerShell blocks of the runbook's Windows account ran"; exit 1; }
           [ "$(grep -c "how-to-use-the-form.html:[0-9]*: powershell run=shared-drive: ran" "$LOCAL/doc-test.log")" = 2 ] || { echo "not both shared-drive blocks of the guide ran"; exit 1; }
-      - name: the two variables that the runbook's setx commands set
+      - name: the variable that the runbook's setx command set
         if: matrix.part == 'reset'
         shell: pwsh
         run: |
           $account = Get-ItemProperty -Path HKCU:\Environment
-          "PY_PYTHON = $($account.PY_PYTHON)"
           "KPI_STORE_LOCAL = $($account.KPI_STORE_LOCAL)"
-          if ($account.PY_PYTHON -ne "3.12" -or $account.KPI_STORE_LOCAL -ne "C:\kpi-store-local\stores.toml") { exit 1 }
+          if ($account.KPI_STORE_LOCAL -ne "$HOME\kpi-store-local\stores.toml") { exit 1 }
+          # The runbook's two commands with the user folder in them, for a user name that holds a space. PowerShell lets no
+          # script set its user folder variable, so another variable stands for it; the quoting and the expansion are the same.
+          $folder = Join-Path $env:RUNNER_TEMP "Jo Smith"
+          New-Item -ItemType Directory -Force "$folder\kpi-store-1.1" | Out-Null
+          setx KPI_STORE_QUOTING_TEST "$folder\kpi-store-local\stores.toml" | Out-Null
+          $saved = (Get-ItemProperty -Path HKCU:\Environment).KPI_STORE_QUOTING_TEST
+          Remove-ItemProperty -Path HKCU:\Environment -Name KPI_STORE_QUOTING_TEST
+          "with a space: $saved"
+          if ($saved -ne "$folder\kpi-store-local\stores.toml") { exit 1 }
+          cd $folder\kpi-store-1.1
+          if ((Get-Location).Path -ne "$folder\kpi-store-1.1") { exit 1 }
 
       # ---- both parts: the first run, the cleared report, the second run ----
       # Part run gives no option, as the runbook's "The first run" and "The second run" do. Part reset adds
@@ -396,7 +530,7 @@ jobs:
       - name: the first run, which must stop on the report with exit code 3
         run: |
           code=0
-          py -m kpi_store.runner $RUN_OPTIONS | tee "$LOCAL/first-run.log" || code=$?
+          python -m kpi_store.runner $RUN_OPTIONS | tee "$LOCAL/first-run.log" || code=$?
           echo "exit code $code"
           [ "$code" -eq 3 ]
           grep -q "^report: STOPPED" "$LOCAL/first-run.log"
@@ -405,7 +539,7 @@ jobs:
       # runbook and runs it, so the job clears the report with the same script as the document test.
       - name: clear the report, with the runbook's own block
         run: |
-          py - <<'PY'
+          python - <<'PY'
           import sys
           from pathlib import Path
           sys.path.insert(0, "scripts")
@@ -423,7 +557,7 @@ jobs:
         run: |
           git config user.name "KPI Store test job"
           git config user.email "test-job@example.invalid"
-          printf 'Change_Value_Amount\nyes\n' | py -m kpi_store.runner $RUN_OPTIONS | tee "$LOCAL/second-run.log"
+          printf 'Change_Value_Amount\nyes\n' | python -m kpi_store.runner $RUN_OPTIONS | tee "$LOCAL/second-run.log"
           grep -q "^enterprise: copied" "$LOCAL/second-run.log"
           if [ -z "$RUN_OPTIONS" ]; then
             grep -q "^check: all checks passed" "$LOCAL/second-run.log"
@@ -432,26 +566,26 @@ jobs:
             tail -n 1 "$LOCAL/second-run.log" | grep -q "^the steps that ran passed; left out: check "
           fi
       - name: sync check, which must read current on every line
-        run: py -m kpi_store.sync_check
+        run: python -m kpi_store.sync_check
 
       # ---- part reset: the reset, the load again, the replace ----
       - name: reset, dry run
         if: matrix.part == 'reset'
-        run: py -m kpi_store.runner --reset --dry-run
+        run: python -m kpi_store.runner --reset --dry-run
       # The reset asks for the word reset. The word comes through standard input, as a person types it.
       - name: reset of the four stores, with the typed word
         if: matrix.part == 'reset'
         run: |
-          printf 'reset\n' | py -m kpi_store.runner --reset | tee "$LOCAL/reset.log"
+          printf 'reset\n' | python -m kpi_store.runner --reset | tee "$LOCAL/reset.log"
           tail -n 1 "$LOCAL/reset.log" | grep -q "^reset done: enterprise, neo4j, fuseki and databricks hold nothing of the KPI Store"
       # After the reset Databricks and the two Neo4j databases read unmarked, and Fuseki, which the reset stopped,
       # reads unreachable. No line may read current.
       - name: sync check after the reset, which must read unmarked and unreachable
         if: matrix.part == 'reset'
         run: |
-          py -m kpi_store.sync_check --json > "$LOCAL/after-reset.json" || true
+          python -m kpi_store.sync_check --json > "$LOCAL/after-reset.json" || true
           cat "$LOCAL/after-reset.json"
-          py - "$LOCAL/after-reset.json" <<'PY'
+          python - "$LOCAL/after-reset.json" <<'PY'
           import json, sys
           with open(sys.argv[1], encoding="utf-8") as f:
               rows = {row["store"]: row["status"] for row in json.load(f)}
@@ -463,7 +597,7 @@ jobs:
       - name: runner again, which loads the emptied stores
         if: matrix.part == 'reset'
         run: |
-          py -m kpi_store.runner --skip check | tee "$LOCAL/load-again.log"
+          python -m kpi_store.runner --skip check | tee "$LOCAL/load-again.log"
           grep -q "^notebook: notebook run [0-9]* loaded" "$LOCAL/load-again.log"
           grep -q "^enterprise: copied" "$LOCAL/load-again.log"
       # --replace-enterprise is for a database that holds KPI Store nodes of another release, or a copy that was cut
@@ -472,7 +606,7 @@ jobs:
       - name: make the Enterprise copy incomplete, as a copy that was cut off halfway leaves it
         if: matrix.part == 'reset'
         run: |
-          py - <<'PY'
+          python - <<'PY'
           import os, neo4j
           with neo4j.GraphDatabase.driver("bolt://127.0.0.1:17687", auth=("neo4j", os.environ["KPI_CI_NEO4J_PASSWORD"])) as driver:
               done = driver.execute_query("MATCH (n:Resource) WITH n LIMIT 100 DETACH DELETE n", database_="businessprocessarchitecturegraph")
@@ -481,21 +615,21 @@ jobs:
       - name: the enterprise step, which must stop on the incomplete copy
         if: matrix.part == 'reset'
         run: |
-          if py -m kpi_store.runner --only enterprise > "$LOCAL/stopped.log" 2>&1; then cat "$LOCAL/stopped.log"; echo "the copy did not stop"; exit 1; fi
+          if python -m kpi_store.runner --only enterprise > "$LOCAL/stopped.log" 2>&1; then cat "$LOCAL/stopped.log"; echo "the copy did not stop"; exit 1; fi
           cat "$LOCAL/stopped.log"
           grep -q "^enterprise: FAILED" "$LOCAL/stopped.log"
       - name: the enterprise step again, with the replace allowed
         if: matrix.part == 'reset'
         run: |
-          py -m kpi_store.runner --from enterprise --replace-enterprise | tee "$LOCAL/replaced.log"
+          python -m kpi_store.runner --from enterprise --replace-enterprise | tee "$LOCAL/replaced.log"
           grep -q "^enterprise: copied" "$LOCAL/replaced.log"
           grep -q "^sync: all [0-9]* lines read current" "$LOCAL/replaced.log"
       - name: sync check, which must read current again
         if: matrix.part == 'reset'
-        run: py -m kpi_store.sync_check
+        run: python -m kpi_store.sync_check
       - name: reset of the four stores, with --yes
         if: matrix.part == 'reset'
-        run: py -m kpi_store.runner --reset --yes
+        run: python -m kpi_store.runner --reset --yes
 
       # The runbook's sign-in command, databricks auth login --host ... --profile DEFAULT, needs a person in a
       # browser, so no job can run it to its end. This checks that the program knows the command and both options.
@@ -514,7 +648,7 @@ jobs:
         if: always()
         run: |
           [ -f "$LOCAL/kpi_store.toml" ] && [ -f "$LOCAL/stores.toml" ] || { echo "no settings were written, so nothing was made"; exit 0; }
-          py - <<'PY'
+          python - <<'PY'
           import os, tomllib
           from pathlib import Path
           from databricks.sdk.errors import NotFound
@@ -542,10 +676,10 @@ jobs:
           PY
       - name: remove the sign-in file
         if: always()
-        run: py -c "from pathlib import Path; (Path.home() / '.databrickscfg').unlink(missing_ok=True)"
+        run: python -c "from pathlib import Path; (Path.home() / '.databrickscfg').unlink(missing_ok=True)"
       - name: stop Fuseki
         if: always()
-        run: py -m kpi_store.load_fuseki --stop || true
+        run: python -m kpi_store.load_fuseki --stop || true
       - name: logs, when a step failed
         if: failure()
         run: |

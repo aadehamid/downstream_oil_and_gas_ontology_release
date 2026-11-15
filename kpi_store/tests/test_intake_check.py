@@ -217,7 +217,7 @@ def test_the_two_smaller_forms_have_their_own_questions_and_signers(report_of):
 def test_pick_lists_older_than_the_packages_stop_the_check(cat):
     report = check.check(cat, made_up.data(), made_up.intake(), stale={"kpi": ("1.0.0", "1.1.0")})
     assert report.blocking == ["the pick lists are older than the release packages"]
-    assert "kpi (1.0.0 then, 1.1.0 now). Rebuild them first: py -m kpi_store.intake build" in report.text()
+    assert "kpi (1.0.0 then, 1.1.0 now). Rebuild them first: python -m kpi_store.intake build" in report.text()
 
 
 def test_a_workbook_cell_holds_the_label_and_a_label_it_does_not_know_stays_as_typed(tmp_path, cat):

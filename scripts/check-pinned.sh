@@ -7,6 +7,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 while IFS= read -r var; do unset "$var"; done < <(compgen -e | grep '^GIT_' || true)
 export PYTHONDONTWRITEBYTECODE=1 EPM_PINNED_ONLY=1
+# uv prefers a Python it installed itself, whatever its version; the release needs 3.11 or later here.
+export UV_PYTHON="${UV_PYTHON:->=3.11}"
 files="$(grep -v '^#' scripts/pinned-tests.txt | cut -d: -f1 | sort -u)"
 # shellcheck disable=SC2086
 uv run -q --no-project --with pytest==9.2.0 --with rdflib==7.6.0 --with pyshacl==0.40.2 --with openpyxl==3.1.5 --with jsonschema==4.26.0 --with pyoxigraph==0.5.13 --with markdown-it-py==4.3.0 \

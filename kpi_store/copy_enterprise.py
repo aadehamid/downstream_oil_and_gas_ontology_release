@@ -1,6 +1,6 @@
 """Copies the verified graph from the local Neo4j to one named database on Neo4j Enterprise, and checks the copy.
 
-    py -m kpi_store.copy_enterprise --stores <local settings file> [--replace]
+    python -m kpi_store.copy_enterprise --stores <local settings file> [--replace]
 
 The Enterprise server has no plugin, so the copy is plain Cypher over the driver (the ontology-to-lpg skill's
 copy_graph.py). Run the local load first (kpi_store.load_neo4j): the copy takes only the graph whose hash equals

@@ -1143,7 +1143,10 @@ class CheckScriptWithoutGit(CheckScriptSkeleton):
         for tool in ("bash", "dirname", "grep", "python3", "uv", "find", "mkdir", "chmod"):
             found = shutil.which(tool)
             if found:
-                os.symlink(found, os.path.join(bin_dir, tool))
+                try:
+                    os.symlink(found, os.path.join(bin_dir, tool))
+                except (OSError, NotImplementedError):
+                    self.skipTest("this system does not let the test make a link")
         return dict(self.env, PATH=bin_dir)
 
     @unittest.skipIf(os.name == "nt", NO_PLAIN_BASH)

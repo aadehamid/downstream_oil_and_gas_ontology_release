@@ -1,6 +1,6 @@
 # The filled examples. Each one is a measure the ontology already holds, filled in as if it were new.
 # The build command reads every answer it can from the ontology, word for word, and takes the rest from here.
-# After you change this file, rebuild: py -m kpi_store.intake build
+# After you change this file, rebuild: python -m kpi_store.intake build
 #
 # `illustration` holds the answers the ontology does not hold. They are made up to show what an answer looks like.
 # The signer names are placeholders, because no file of this release names a person.

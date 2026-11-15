@@ -14,7 +14,7 @@ STORES_TEXT = (support.ROOT / "kpi_store" / "stores.example.toml").read_text(enc
 def local_settings(folder, release_root=None, environ=None, **replace):
     """LocalSettings from the example file, written into folder, with whole lines replaced by key:
     local_settings(tmp, database='database = "other"'). A key that occurs twice is replaced everywhere."""
-    text = STORES_TEXT.replace("C:/kpi-store-local", Path(folder).as_posix())
+    text = STORES_TEXT   # its paths have no drive, so they start at the folder the file is written into
     for key, line in replace.items():
         text, n = re.subn(rf"(?m)^{key} = .*$", line, text)
         assert n >= 1, key

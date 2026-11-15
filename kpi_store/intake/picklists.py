@@ -371,7 +371,7 @@ def load(folder):
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as e:
-        raise ontology_view.ReleaseError(f"{path} cannot be read ({e}); build it with: py -m kpi_store.intake build") from None
+        raise ontology_view.ReleaseError(f"{path} cannot be read ({e}); build it with: python -m kpi_store.intake build") from None
 
 
 def stale_modules(data, root):

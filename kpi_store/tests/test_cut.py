@@ -468,7 +468,7 @@ def test_a_cut_rebuilds_the_kpi_intake_pack_so_its_check_reads_current_pick_list
     pack = with_intake_pack(root)
     example = pack / "examples" / "crack-spreads-pricing.json"
     assert intake_build.stale(root, pack) == [], ("the KPI intake pack is older than this tree's packages, so this test cannot start. "
-                                                  "Rebuild it: py -m kpi_store.intake build")
+                                                  "Rebuild it: python -m kpi_store.intake build")
     assert intake_check.run(example, pack, root=root).complete
     path = cleared(tmp_path, {"R002": "accept", **{r: "reject" for r in EXTRAS}})
     said = []
@@ -494,7 +494,7 @@ def test_a_release_with_the_intake_pack_needs_openpyxl_and_one_without_it_does_n
     for needed in cut.INTAKE_NEEDS:
         (tmp_path / needed).parent.mkdir(parents=True)
         (tmp_path / needed).write_text("", encoding="utf-8")
-    with pytest.raises(cut.CutRefused, match=r"the cut needs the Python package openpyxl: py -m pip install openpyxl$"):
+    with pytest.raises(cut.CutRefused, match=r"the cut needs the Python package openpyxl: python -m pip install openpyxl$"):
         cut._requirements(tmp_path)
 
 

@@ -884,11 +884,11 @@ RETURN m.skos_prefLabel AS measure,
 <tr><td><code>q7</code></td><td data-k="What it asks">KPIs that rest on SOX-relevant or confidential systems</td></tr>
 </tbody></table></div>
 <p>The governance graph belongs to its owner, and its labels can change. So no template names a label, a property or a relationship type: it names roles. <code>discover</code> reads both graphs' schemas and proposes which name plays each role. A person corrects the proposal and confirms it once. Every later run checks the confirmed mapping against the live schemas before it asks anything. Every query runs in a read transaction.</p>
-<pre data-snippet="powershell run=questions types=&quot;yes&quot; status-only"><code>py -m kpi_store.questions.run discover --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
-py -m kpi_store.questions.run confirm  --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;</code></pre>
+<pre data-snippet="powershell run=questions types=&quot;yes&quot; status-only"><code>python -m kpi_store.questions.run discover --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
+python -m kpi_store.questions.run confirm  --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;</code></pre>
 <p><code>confirm</code> shows the mapping and asks <code>Type yes to confirm this mapping:</code>. Type <code>yes</code> and press Enter. Any other answer leaves the mapping file as it was. Then check the mapping and ask a question:</p>
-<pre data-snippet="powershell run=questions status-only"><code>py -m kpi_store.questions.run check    --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
-py -m kpi_store.questions.run ask q6   --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt; --param kpi=crude-prices --out &lt;a folder&gt;</code></pre>
+<pre data-snippet="powershell run=questions status-only"><code>python -m kpi_store.questions.run check    --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt;
+python -m kpi_store.questions.run ask q6   --settings &lt;your settings file&gt; --mapping &lt;your mapping file&gt; --param kpi=crude-prices --out &lt;a folder&gt;</code></pre>
 <p>The settings file and the mapping file describe one environment, so both stay outside the release. <code>kpi_store/questions/connection.py</code> lists the settings.</p>
 
 <h2 id="logical-model">Adding a logical model</h2>
@@ -958,8 +958,8 @@ py -m kpi_store.questions.run ask q6   --settings &lt;your settings file&gt; --m
 <div class="two">
 <div>
 <p>The releases are the master copy, as Turtle: thirteen modules. The release loads them into three stores, in this order. A notebook loads the Databricks table <code>epm_triples</code>, with no token, and proves by a hash that the table holds every triple. The plain Apache jar serves a Jena Fuseki dataset that holds the same graphs. The <code>ontology-to-lpg</code> skill's driver builds a property graph in a local Neo4j that has n10s and APOC, and the checked graph is then copied to a named database on Neo4j Enterprise, which needs no plugin. <code>pipeline.py build --verify</code> checks the same inputs with no database.</p>
-<p>Before the Databricks load, the notebook compares the ontology with the workspace. If an object, a column or a table edge that the ontology names is missing or renamed, the load stops and writes a report. A person clears the report, <code>py -m kpi_store.cut</code> turns it into a correction version, and the next run loads that version.</p>
-<p>A technical graph, built from the workspace's real objects, is loaded into all three stores beside the ontology. <code>py -m kpi_store.sync_check</code> then says whether each store is current or behind.</p>
+<p>Before the Databricks load, the notebook compares the ontology with the workspace. If an object, a column or a table edge that the ontology names is missing or renamed, the load stops and writes a report. A person clears the report, <code>python -m kpi_store.cut</code> turns it into a correction version, and the next run loads that version.</p>
+<p>A technical graph, built from the workspace's real objects, is loaded into all three stores beside the ontology. <code>python -m kpi_store.sync_check</code> then says whether each store is current or behind.</p>
 </div>
 <div class="card">
 <h3>Where to read more</h3>
@@ -1039,7 +1039,7 @@ py -m kpi_store.questions.run ask q6   --settings &lt;your settings file&gt; --m
 <tr><td>The logical models in Neo4j</td><td data-k="How it says">A <code>LogicalModelMarker</code> node, a digest of the model graph files</td><td data-k="What the check compares">The marker and a fingerprint of the <code>LogicalModel</code> subgraph with the package's graphs, on an <code>lm:neo4j</code> line</td></tr>
 <tr><td>The technical graph, in each store</td><td data-k="How it says">Its own marker in Databricks and in Neo4j. None in Jena</td><td data-k="What the check compares">A hash of the store's copy with the graph files of the last build</td></tr>
 </tbody></table></div>
-  <p><code>sync_stores.py</code>, in <code>business_architecture/ontology/projection/</code>, judges the Neo4j database and the Jena dataset. It does not connect to Databricks: the load that writes the triple table also writes its marker. <code>py -m kpi_store.sync_check</code> reads all three stores and reports each as current or behind.</p>
+  <p><code>sync_stores.py</code>, in <code>business_architecture/ontology/projection/</code>, judges the Neo4j database and the Jena dataset. It does not connect to Databricks: the load that writes the triple table also writes its marker. <code>python -m kpi_store.sync_check</code> reads all three stores and reports each as current or behind.</p>
   <h3>What to do, and when</h3>
   <div class="tblwrap"><table class="stack"><thead><tr><th>When</th><th>Do this</th></tr></thead><tbody>
 <tr><td>You loaded a store</td><td data-k="Do this">Run the sync check. The load is done only when every store reads current</td></tr>

@@ -13,12 +13,12 @@ This README is for people. Agents read `SKILL.md` and the files it points to.
 1. Install the skill where your agent finds skills, and ask the agent to project your ontology into Neo4j, or to check whether it is ready for a projection.
 2. The agent starts at the design rules and asks you to record the Rule 4 option and its reason in your projection policy. If the ontology is not released yet, it stops there and applies the rules before the first release.
 3. After a release, it fills a copy of `templates/projection-config.json` with you: the Rule 4 option and reason, your namespaces and prefixes, your released packages, your qualified-relation classes. It lists each rule gap in a released module as a release exception, with the release that will close it.
-4. Run the checks the agent runs. The two commands below check the skill's own library example, so you can run them as written, from this release's top folder. For your ontology, name your copy of the configuration, your shapes file and your module's Turtle file instead, and add `--releases <your release folder>` to the first command so that it also checks the packages the configuration pins. The checks need the rdflib and pySHACL packages (`py -m pip install rdflib pyshacl`). On macOS or Linux, write `python3` for `py`.
+4. Run the checks the agent runs. The two commands below check the skill's own library example, so you can run them as written, from this release's top folder. For your ontology, name your copy of the configuration, your shapes file and your module's Turtle file instead, and add `--releases <your release folder>` to the first command so that it also checks the packages the configuration pins. The checks need the rdflib and pySHACL packages (`python -m pip install rdflib pyshacl`). On macOS or Linux, write `python3` for `python` when that is your Python's name.
 
    ```powershell run=release-copy
    cd skills/ontology-to-lpg
-   py scripts/check_projection_rules.py --config templates/projection-config.json --shapes templates/library-shapes.ttl templates/library-module.ttl
-   py scripts/validate_data.py --config templates/projection-config.json --shapes templates/library-shapes.ttl templates/library-module.ttl
+   python scripts/check_projection_rules.py --config templates/projection-config.json --shapes templates/library-shapes.ttl templates/library-module.ttl
+   python scripts/validate_data.py --config templates/projection-config.json --shapes templates/library-shapes.ttl templates/library-module.ttl
    ```
 
    ```text expect

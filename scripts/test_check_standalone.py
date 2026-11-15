@@ -92,7 +92,8 @@ CASES = [
     ("home-path", "Read ~/private-repository/README.md first.", "~/private-repository/README.md", "https://www.api.org/~/media/files/x.pdf"),
     ("home-path", "The output goes to ~/lpg-out/epm.", "~/lpg-out/epm", "Write it to <your output folder>, about ~40 MB."),
     ("home-path", "export OUT=$HOME/lpg-out", "$HOME/lpg-out", "The variable HOME names the home folder; $HOMEPAGE does not."),
-    ("home-path", "cd %USERPROFILE%\\kpi-store", "%USERPROFILE%", "Usage is 40% of the USERPROFILE quota."),
+    # The reader's own user folder on Windows, as the runbook names it, is let stand; the same folder in another form is not.
+    ("home-path", "cd $HOME/kpi-store-1.1", "$HOME/kpi-store-1.1", "cd $HOME\\kpi-store-1.1, then open %USERPROFILE%\\kpi-store-local. Usage is 40% of the USERPROFILE quota."),
     ("github-link", "curl https://raw.githubusercontent.com/someone/x/y.txt", "raw.githubusercontent.com/someone",
      "See https://docs.github.com/en/actions and https://github.com/neo4j-labs/neosemantics."),
 ]

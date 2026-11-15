@@ -14,6 +14,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 while IFS= read -r var; do unset "$var"; done < <(compgen -e | grep '^GIT_' || true)
 export PYTHONDONTWRITEBYTECODE=1
+# uv starts a Python of its own choice for "uv run", and it prefers one it installed itself, whatever its version.
+# The release's code on this machine needs Python 3.11 or later, so uv is told so here. A --python option on a
+# command line still wins, as in scripts/check-notebook-side.sh.
+export UV_PYTHON="${UV_PYTHON:->=3.11}"
 # A check's output is UTF-8 on every system. On Windows a Python whose output goes to a pipe would otherwise write
 # cp1252 and fail on a character cp1252 lacks.
 export PYTHONIOENCODING=utf-8
@@ -30,7 +34,9 @@ run_tests() {  # unittest exits 0 on zero tests; a test command must have run at
   echo "--- $*"; local out rc=0; out="$("$@" 2>&1)" || rc=$?; printf '%s\n' "$out"
   [ "$rc" -eq 0 ] && grep -qE '^Ran [1-9][0-9]* tests? ' <<<"$out"
 }
-with_deps() { uv run -q --no-project --with pytest==9.2.0 --with pytest-xdist==3.8.0 --with rdflib==7.6.0 --with pyshacl==0.40.2 --with openpyxl==3.1.5 --with jsonschema==4.26.0 --with markdown-it-py==4.3.0 --with pyyaml==6.0.3 --with sqlglot==30.31.0 --with pyoxigraph==0.5.13 --with neo4j==6.4.1 "$@"; }
+# pip is in the list for the documents' own `python -m pip install` lines. The document test runs them in the
+# temporary environment that uv makes for this script, which is deleted afterwards, so they change no Python of yours.
+with_deps() { uv run -q --no-project --with pytest==9.2.0 --with pytest-xdist==3.8.0 --with rdflib==7.6.0 --with pyshacl==0.40.2 --with openpyxl==3.1.5 --with jsonschema==4.26.0 --with markdown-it-py==4.3.0 --with pyyaml==6.0.3 --with sqlglot==30.31.0 --with pyoxigraph==0.5.13 --with neo4j==6.4.1 --with pip==26.3 "$@"; }
 
 # Snapshot the tree, so a check that writes a file is caught.
 snapshot() {

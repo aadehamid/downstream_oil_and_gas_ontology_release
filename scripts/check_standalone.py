@@ -65,8 +65,12 @@ _GITHUB = re.compile(r"(?<![\w.-])((?:[a-z0-9-]+\.)*github(?:usercontent)?\.com)
 # person; a home path leads outside the tree. A placeholder such as /Users/<name>/ is not a path.
 _USER_PATH = re.compile(r"(?<![\w.~:-])(?<!:/)/(?:users|home)/[a-z0-9._-]+|\b[a-z]:[\\/]{1,2}users[\\/]{1,2}[a-z0-9._-]+", re.I)
 _REST = r"""(?:[^\s"'`<>)\],;]*[^\s"'`<>)\],;.:])?"""
-_HOME_PATH = re.compile(r"(?<![\w/.-])~(?:[A-Za-z][A-Za-z0-9._-]*)?/" + _REST + r"|\$HOME\b" + _REST + r"|\$\{HOME\}" + _REST
-                        + r"|\$env:(?:USERPROFILE|HOME|HOMEPATH)\b" + _REST + r"|%(?:USERPROFILE|HOMEPATH|HOMEDRIVE)%", re.I)
+# Two forms are let stand, because the runbook tells the reader to keep the release folder and the local folder in the
+# user folder of the Windows machine, and names that folder for every reader alike: %USERPROFILE% in prose and in
+# File Explorer, and $HOME\ with a backslash in a PowerShell command. Neither can name a folder of the machine that
+# built the release. The other forms, such as ~/ and $HOME/, are still findings.
+_HOME_PATH = re.compile(r"(?<![\w/.-])~(?:[A-Za-z][A-Za-z0-9._-]*)?/" + _REST + r"|\$HOME\b(?!\\)" + _REST + r"|\$\{HOME\}" + _REST
+                        + r"|\$env:(?:USERPROFILE|HOME|HOMEPATH)\b" + _REST + r"|%(?:HOMEPATH|HOMEDRIVE)%", re.I)
 
 
 def _number_sign(line):
@@ -121,7 +125,7 @@ RULES = [
     ("decision-record", "a decision record kept elsewhere", _regex(r"EPM-DEC-")),
     ("session", "a session or a handoff folder", _regex(r"~/\.claude|(?<![\w-])\.claude/|\bhandoffs?/|\bhandoff folder", re.I)),
     ("user-path", "a path under one person's account: /Users/<name>, /home/<name>, C:\\Users\\<name>", lambda line: list(_USER_PATH.finditer(line))),
-    ("home-path", "a path under the home folder (~/, $HOME, %USERPROFILE%), which leads outside the tree", lambda line: list(_HOME_PATH.finditer(line))),
+    ("home-path", "a path under the home folder (~/, $HOME/, %HOMEPATH%), which leads outside the tree", lambda line: list(_HOME_PATH.finditer(line))),
     ("removed-demo", "the removed demo", _regex(r"(?<![\w-])demos/|(?<![A-Za-z])pricing[ _-]?demos?(?![A-Za-z])", re.I)),
     ("removed-aura", "the removed AuraDB copy", _regex(r"\baura(?:db)?\b", re.I)),
     ("removed-docker", "the removed Docker stores", _regex(r"docker", re.I)),

@@ -14,8 +14,7 @@ in such a transaction, should one get past the renderer's write guard.
 
 Run it after the stores are loaded and the KPI Store graph is copied to Neo4j Enterprise (the runner's
 `enterprise` step). The runner does not call it. Do `discover` and `confirm` once per environment, and again
-when `check` says the governance graph's schema changed. On Windows, write `py` where the lines above say
-`python`.
+when `check` says the governance graph's schema changed.
 
 It reads the connection settings, the mapping file and both graphs. It writes the mapping file (`discover`,
 `confirm`) and, for `ask`, <question>.json and <question>.csv in the --out folder. All of these must be outside

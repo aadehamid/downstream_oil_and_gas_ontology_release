@@ -112,6 +112,20 @@ def resolve_program(args: list, path: str | None) -> list:
     return [found] + args[1:]
 
 
+# The word `py` where a shell reads a command: at the start of a line, or after `;`, `&`, `|`, `(` or `{`, also
+# behind cmd's `call` or `start` (with one window title in quotes, then its switches), or an `@` that hides the line.
+# Windows reads the name in any case.
+_LAUNCHER = re.compile(r"(?:^|[;&|({])[ \t]*@?(?:call[ \t]+|start(?:[ \t]+\"[^\"\n]*\")?(?:[ \t]+/\S+)*[ \t]+)?py(?:\.exe)?(?=[ \t]|$)",
+                       re.MULTILINE | re.IGNORECASE)
+
+
+def starts_launcher(body: str) -> bool:
+    """True when a line of the block starts the `py` launcher. The documents start Python with `python`: a Python
+    from a virtual environment, or one that uv installed, comes without the launcher, and the first real run of
+    the release was on such a machine."""
+    return _LAUNCHER.search(body) is not None
+
+
 # ---------------------------------------------------------------------------------------------------------------
 # Running
 

@@ -1,6 +1,6 @@
 """Says whether each store holds the release in this folder: current, or behind.
 
-    py -m kpi_store.sync_check --stores <local settings file> [--store jena] [--ref worktree] [--json]
+    python -m kpi_store.sync_check --stores <local settings file> [--store jena] [--ref worktree] [--json]
 
 The stores, and how each is read:
   databricks  the marker row in epm_store_markers and the rows per graph of epm_triples, through the Databricks

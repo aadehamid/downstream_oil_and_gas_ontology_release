@@ -35,11 +35,11 @@ The checks of these rules, numbered V1 to V12 in the order they run, are mapped 
 
 4. **Reason once, upstream, with ELK through ROBOT, over the merged released data:**
 
-   The commands below reason over the skill's library template, so they run as written from the skill's folder. For a project, name every released data file in place of the template. `<your ROBOT jar>` is the path of `robot.jar`. Keep the quotes around it, so that a path with a space stays one argument. On Windows `py` starts Python; on macOS or Linux write `python3`.
+   The commands below reason over the skill's library template, so they run as written from the skill's folder. For a project, name every released data file in place of the template. `<your ROBOT jar>` is the path of `robot.jar`. Keep the quotes around it, so that a path with a space stays one argument. `python` starts Python; on macOS or Linux write `python3` when that is your Python's name.
 
    ```powershell run=reasoner
    cd skills/ontology-to-lpg
-   py scripts/build.py merge --output merged.ttl templates/library-module.ttl
+   python scripts/build.py merge --output merged.ttl templates/library-module.ttl
    ```
 
    ```text expect
@@ -61,8 +61,8 @@ The checks of these rules, numbered V1 to V12 in the order they run, are mapped 
 6. **Build `inferred.nt` from the reasoner's input and output, compared as triples:** `uv run --no-project --with rdflib python build.py inferred --input merged.ttl --reasoned reasoned.ttl --output inferred.nt`. It keeps the triples of `reasoned.ttl` that are not in `merged.ttl`, then only `rdf:type` and `rdfs:subClassOf` triples whose subject and object are both IRIs, then drops those whose object is in the OWL or RDFS namespace. If you build it with other tools, put both files through the same serialiser before comparing lines, or compare triples: two serialisers write the same triple differently. `build.py check-serialised` (rule 5) checks the result. *Why:* ROBOT writes through the OWL API, which declares every individual `owl:NamedIndividual` and adds `owl:Class`, `owl:Thing`, `owl:AnnotationProperty` and `rdfs:Datatype` declarations; they are new in the output but are not inferences about the domain. OWL axioms use blank nodes whose labels change from run to run, so a triple with a blank node never counts. On a SKOS-first ontology with few class axioms the file can rightly be empty; on the library template it holds one triple (`W-0043 rdf:type lib:Work`):
 
    ```powershell run=reasoner
-   py scripts/build.py inferred --input merged.ttl --reasoned reasoned.ttl --output inferred.nt
-   py -c "print(open('inferred.nt', encoding='utf-8').read().strip())"
+   python scripts/build.py inferred --input merged.ttl --reasoned reasoned.ttl --output inferred.nt
+   python -c "print(open('inferred.nt', encoding='utf-8').read().strip())"
    ```
 
    ```text expect

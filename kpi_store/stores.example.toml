@@ -1,22 +1,24 @@
 # KPI Store local settings: the stores and tools on the machine that runs the loads.
 # Copy this file to a folder OUTSIDE the release folder, fill it in, and name it with --stores <file> or in the
 # environment variable KPI_STORE_LOCAL. It holds passwords, so it never goes into the release folder or the zip:
-# every command refuses a file it finds there. Paths may use / on Windows. A relative path starts at this file's folder.
+# every command refuses a file it finds there. Paths may use / on Windows. A path without a drive starts at this file's
+# folder, so the paths below hold wherever you keep this file. A full path works too, and ~ stands for your user folder.
 
 [release]
-settings = "C:/kpi-store-local/kpi_store.toml"    # this environment's kpi_store.toml; the runner uploads a copy with the zip's checksum
-run_folder = "C:/kpi-store-local/runs"            # the runner writes each run's files here
+settings = "kpi_store.toml"                       # this environment's kpi_store.toml; the runner uploads a copy with the zip's checksum
+run_folder = "runs"                               # the runner writes each run's files here
 
 [databricks]
 profile = "DEFAULT"                               # the Databricks CLI profile you signed in with (databricks auth login)
 workspace_folder = "/Workspace/Shared/kpi_store"  # the notebook is imported here as kpi_store_load
 timeout_minutes = 60                              # how long the runner waits for the notebook run
+environment_version = "2"                         # the serverless environment of the notebook run: "2" has Python 3.11; "" leaves the choice to the workspace
 cli = ""                                          # the databricks executable; empty means the one on PATH
 
 [fuseki]
-jar = "C:/kpi-store-local/jena-fuseki-server-6.2.0.jar"
+jar = "jena-fuseki-server-6.2.0.jar"
 url = "http://127.0.0.1:3030/ds"                  # the dataset's URL; the load starts Fuseki here when nothing answers
-data_folder = "C:/kpi-store-local/fuseki-db"      # the dataset is kept here across restarts; empty keeps it in memory
+data_folder = "fuseki-db"                         # the dataset is kept here across restarts; empty keeps it in memory
 java = ""                                         # the java executable, for Fuseki and for ROBOT; empty means JAVA_HOME, then PATH
 
 [neo4j.local]                                     # Neo4j Desktop, with the n10s and APOC plugins. The load EMPTIES this database.
@@ -33,8 +35,8 @@ password = "<the Enterprise password>"            # or leave out and set passwor
 database = "businessprocessarchitecturegraph"
 
 [projection]
-robot_jar = "C:/kpi-store-local/robot.jar"        # ROBOT 1.9.10, which runs the reasoner before the Neo4j load
-out = "C:/kpi-store-local/lpg-out"                # the Neo4j load's working files and its report
+robot_jar = "robot.jar"                           # ROBOT 1.9.10, which runs the reasoner before the Neo4j load
+out = "lpg-out"                                   # the Neo4j load's working files and its report
 
 [tools]
 bash = ""                                         # bash.exe of Git for Windows; empty means the usual install folders, then PATH

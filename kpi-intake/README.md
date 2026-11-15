@@ -93,7 +93,7 @@ Section 7 takes Digital IT 20 to 30 minutes with no business person present.
 A team that works offline keeps its answers files in one shared folder with a fixed layout. [`how-to-use-the-form.html`](how-to-use-the-form.html) explains it to the people who use it. This command makes the folder `KPI-intake` in the place you name, here the release's top folder, and copies the two forms and the guide into it:
 
 ```powershell run=release-copy
-py -m kpi_store.intake folders .
+python -m kpi_store.intake folders .
 ```
 
 ```text expect
@@ -122,13 +122,13 @@ An answers file keeps the name the form gives it, such as `crack-spreads-pricing
 The check reads an answers file or a filled workbook. It needs Python 3.11 or later. Reading a workbook also needs the `openpyxl` package.
 
 ```powershell run=scratch os=windows status-only
-py -m pip install openpyxl rdflib
+python -m pip install openpyxl rdflib
 ```
 
 Run the check from the release's top folder. This is the check of the first shipped example:
 
 ```powershell run=release-copy
-py -m kpi_store.intake check kpi-intake/examples/crack-spreads-pricing.json
+python -m kpi_store.intake check kpi-intake/examples/crack-spreads-pricing.json
 ```
 
 ```text expect
@@ -156,7 +156,7 @@ This check changes nothing in the ontology. The Architect applies a complete int
 A workbook is checked the same way:
 
 ```powershell run=release-copy
-py -m kpi_store.intake check kpi-intake/examples/rm-margin-per-barrel.xlsx
+python -m kpi_store.intake check kpi-intake/examples/rm-margin-per-barrel.xlsx
 ```
 
 ```text expect
@@ -204,7 +204,7 @@ The two smaller forms are tabs of the HTML form and sheets of the workbook. Each
 Check a workbook's sheet by naming the form:
 
 ```powershell run=release-copy exit=1
-py -m kpi_store.intake check kpi-intake/kpi-intake-form.xlsx --form domain-activation
+python -m kpi_store.intake check kpi-intake/kpi-intake-form.xlsx --form domain-activation
 ```
 
 ```text expect
@@ -236,7 +236,7 @@ Three files are yours to edit. After any change, rebuild.
 - `catalogue.toml` holds the questions. Its first lines explain the file. You can change any text, a rule, a time estimate or the sign-off block. A new question needs an `id` that no other question has.
 - `examples/examples.toml` names the measures that the two examples copy.
 
-The Architect, or whoever maintains the form, edits `settings.toml`. The business users never do. Edit it when a role title or a definition changes, when the domain list changes, or when an entry of a list is to be hidden or added. Then run `py -m kpi_store.intake build`, and copy the new form to the shared folder with `py -m kpi_store.intake folders <place>`, as "The shared folder" above shows.
+The Architect, or whoever maintains the form, edits `settings.toml`. The business users never do. Edit it when a role title or a definition changes, when the domain list changes, or when an entry of a list is to be hidden or added. Then run `python -m kpi_store.intake build`, and copy the new form to the shared folder with `python -m kpi_store.intake folders <place>`, as "The shared folder" above shows.
 
 A question takes its list from one of three places, which its `source` names:
 
@@ -305,7 +305,7 @@ The two examples use the domains `market-price` and `financial-performance`. Whe
 Rebuild from the release's top folder. The build needs the `rdflib` and `openpyxl` packages. On the release as received it has nothing to write:
 
 ```powershell run=release-copy
-py -m kpi_store.intake build
+python -m kpi_store.intake build
 ```
 
 ```text expect
@@ -316,10 +316,10 @@ After a change it prints one line for each file it wrote. It stops with the reas
 
 The build writes only inside the pack folder it is given, which is `kpi-intake` unless you name another with `--pack`. It does not follow a link there. If a generated file or the `examples` folder is a link, the build stops and names it, and `--check` does the same.
 
-Rebuild after every release of a module too, because the lists come from the newest packages. The cut tool (`py -m kpi_store.cut`) runs this build itself, so after a correction the pack is already current. To see whether the pack is current without writing anything, add `--check`:
+Rebuild after every release of a module too, because the lists come from the newest packages. The cut tool (`python -m kpi_store.cut`) runs this build itself, so after a correction the pack is already current. To see whether the pack is current without writing anything, add `--check`:
 
 ```powershell run=release-copy
-py -m kpi_store.intake build --check
+python -m kpi_store.intake build --check
 ```
 
 ```text expect

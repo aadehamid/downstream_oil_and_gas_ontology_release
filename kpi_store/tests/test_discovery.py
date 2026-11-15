@@ -1,4 +1,8 @@
 """Discovery against a made-up workspace with the sandbox's shapes: what is kept and what the rules drop."""
+import datetime as dt
+
+import pytest
+
 from kpi_store import discovery
 from kpi_store.tests import support
 
@@ -201,3 +205,23 @@ def test_a_missing_package_stops_the_discovery_instead_of_reading_as_an_unreadab
     monkeypatch.setitem(sys.modules, "yaml", None)   # makes "import yaml" raise ImportError
     with pytest.raises(ImportError):
         discovery.discover(support.make_settings(), workspace.run_sql, genie, {"idp_sbx.semantic_sem_commercial"})
+
+
+@pytest.mark.parametrize("text, want", [
+    ("2026-11-02T06:00:00Z", (2026, 11, 2, 6, 0, 0, 0)),
+    ("2026-11-02 06:00:00z", (2026, 11, 2, 6, 0, 0, 0)),
+    ("2026-11-02T06:00:00.5Z", (2026, 11, 2, 6, 0, 0, 500000)),
+    ("2026-11-02T06:00:00.123456789+00:00", (2026, 11, 2, 6, 0, 0, 123456)),
+    ("2026-11-02T08:00:00+0200", (2026, 11, 2, 6, 0, 0, 0)),
+    ("2026-11-02T01:00:00.25-05", (2026, 11, 2, 6, 0, 0, 250000)),
+    ("2026-11-02T06:00", (2026, 11, 2, 6, 0, 0, 0)),
+    ("2026-11-02T06:00:00.000001", (2026, 11, 2, 6, 0, 0, 1)),
+])
+def test_a_platform_time_reads_the_same_on_every_python_the_notebook_runs_on(text, want):
+    """Python 3.10 reads fewer ISO forms than 3.11, and the notebook runs on both. The first real run was on 3.10."""
+    assert discovery.instant(text) == dt.datetime(*want, tzinfo=dt.timezone.utc)
+
+
+def test_text_that_is_no_time_is_still_no_time():
+    for text in ("", "soon", "2026-13-40T06:00:00Z", "06:00:00Z"):
+        assert discovery.instant(text) is None, text

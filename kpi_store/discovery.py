@@ -23,6 +23,7 @@ are read only for the schemas that hold the ontology's objects or a Genie space'
 """
 import datetime as dt
 import json
+import re
 from dataclasses import asdict, dataclass, field
 
 from . import metric_view as mv
@@ -125,6 +126,23 @@ def _text(value):
     return "" if value is None else str(value)
 
 
+_ISO = re.compile(r"(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}(?::\d{2})?)(?:[.,](\d+))?\s*(?:([Zz])|([+-]\d{2}):?(\d{2})?)?")
+
+
+def _plain_iso(text):
+    """An ISO time in the form that datetime.fromisoformat reads on every Python from 3.10 on: a part of a second
+    with six digits (more are cut, as Python 3.11 cuts them), Z as +00:00, and an offset with its colon. Text of
+    another shape comes back as it is."""
+    m = _ISO.fullmatch(text)
+    if not m:
+        return text
+    date, time, part, z, hours, minutes = m.groups()
+    if part is not None:
+        time = (time if time.count(":") == 2 else time + ":00") + "." + part[:6].ljust(6, "0")
+    zone = "+00:00" if z else f"{hours}:{minutes or '00'}" if hours else ""
+    return f"{date}T{time}{zone}"
+
+
 def instant(value):
     """A platform time as a timezone-aware UTC datetime, or None when the value is empty or is no time.
 
@@ -135,10 +153,17 @@ def instant(value):
     elif isinstance(value, dt.date):
         when = dt.datetime(value.year, value.month, value.day)
     else:
+        text = str(value or "").strip()
         try:
-            when = dt.datetime.fromisoformat(str(value or "").strip())
+            when = dt.datetime.fromisoformat(text)
         except ValueError:
-            return None
+            # Python 3.10 reads fewer forms than 3.11: no trailing Z, no offset without a colon, and a part of a
+            # second only with three or six digits. The notebook runs on 3.10 too, so those forms are rewritten
+            # into the one that every Python reads.
+            try:
+                when = dt.datetime.fromisoformat(_plain_iso(text))
+            except ValueError:
+                return None
     return (when.replace(tzinfo=dt.timezone.utc) if when.tzinfo is None else when).astimezone(dt.timezone.utc)
 
 

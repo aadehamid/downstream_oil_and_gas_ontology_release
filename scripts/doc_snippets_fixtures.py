@@ -7,12 +7,12 @@ that store before the context's first block (`up`), runs the block's statement o
 check ends (`down`). The check starts every command here from a copy of the release, with the variable
 DOC_SNIPPETS_FIXTURE_DIR naming a folder outside that copy where a fixture keeps what it made.
 
-    py scripts/doc_snippets_fixtures.py questions up|down             a composite database over two made-up graphs
-    py scripts/doc_snippets_fixtures.py scratch-database up|down      one throwaway database on the test server
-    py scripts/doc_snippets_fixtures.py scratch-schemas up|down       two throwaway schemas in the rehearsal catalog
-    py scripts/doc_snippets_fixtures.py cypher <database|scratch> <file>     run the file's Cypher statements
-    py scripts/doc_snippets_fixtures.py sql <file>                    run the file's SQL on the throwaway schemas
-    py scripts/doc_snippets_fixtures.py notebook <file>               run the file's Python as a notebook cell would
+    python scripts/doc_snippets_fixtures.py questions up|down             a composite database over two made-up graphs
+    python scripts/doc_snippets_fixtures.py scratch-database up|down      one throwaway database on the test server
+    python scripts/doc_snippets_fixtures.py scratch-schemas up|down       two throwaway schemas in the rehearsal catalog
+    python scripts/doc_snippets_fixtures.py cypher <database|scratch> <file>     run the file's Cypher statements
+    python scripts/doc_snippets_fixtures.py sql <file>                    run the file's SQL on the throwaway schemas
+    python scripts/doc_snippets_fixtures.py notebook <file>               run the file's Python as a notebook cell would
 
 The Neo4j test server is the one KPI_STORE_TEST_NEO4J_URI, KPI_STORE_TEST_NEO4J_USER and
 KPI_STORE_TEST_NEO4J_PASSWORD name. The Databricks workspace is the one of the local settings file that

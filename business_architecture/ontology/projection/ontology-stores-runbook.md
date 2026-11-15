@@ -2,7 +2,7 @@
 
 This guide takes you from the release zip to three loaded and checked stores: Databricks, Jena Fuseki on your Windows machine, and Neo4j Enterprise. Follow it from top to bottom, one step at a time. Every command in it is run by the document test, except the ones the section "What ran where" lists.
 
-One command does the work: `py -m kpi_store.runner`. You run it three times. The first run compares the ontology with the sandbox and stops on a report. You clear the report. The second run cuts a correction version and loads every store. The third run proves that nothing is left to change.
+One command does the work: `python -m kpi_store.runner`. You run it three times. The first run compares the ontology with the sandbox and stops on a report. You clear the report. The second run cuts a correction version and loads every store. The third run proves that nothing is left to change.
 
 For every later change, use `HOW-TO-UPDATE.md` in the release's top folder.
 
@@ -49,7 +49,7 @@ A node that another writer made with all the marks of one row counts as the KPI 
 | Databricks, schema `idp_sbx.kpi_store` | The schema and the volume `releases`, when they are missing. In the volume: the zip, a copy of `kpi_store.toml`, and one `reports` folder per run. The tables `epm_triples` and `epm_store_markers`. |
 | Databricks, schema `idp_sbx.tech_graph` | The schema, when it is missing. The tables `tech_graph_triples` and `tech_graph_markers`. |
 | Databricks, the workspace | One notebook, `kpi_store_load`, in the folder that your local settings name. One job run per runner run, named `KPI Store load` and the run's ID. |
-| Your Windows machine | The folder `C:\kpi-store-local`: each run's files, the Fuseki dataset and the Neo4j load's working files. |
+| Your Windows machine | The folder `%USERPROFILE%\kpi-store-local`: each run's files, the Fuseki dataset and the Neo4j load's working files. |
 | The local Neo4j | The database that your local settings name. **The load empties it first.** |
 | Neo4j Enterprise | Nodes and relationships in `businessprocessarchitecturegraph`, and one constraint there, `n10s_unique_uri`. |
 | The release folder | Nothing, except in the cut. The cut writes the correction version and its record, and rebuilds the KPI intake pack in `kpi-intake`. |
@@ -64,7 +64,7 @@ Do this section once per machine. The setup check at its end tells you what is s
 
 1. Open `https://www.python.org/downloads/windows/` and download the installer of Python 3.12, 64-bit.
 2. Start the installer.
-3. Tick "Add python.exe to PATH". The check script cannot find Python without it.
+3. Tick "Add python.exe to PATH". Every command in this guide starts Python with the word `python`, and neither a terminal nor the check script finds it without the tick.
 4. Click "Install Now".
 5. Open `https://git-scm.com/download/win`, download Git for Windows and install it with its default choices. It brings `bash.exe`, which the check script needs.
 6. Open `https://adoptium.net/temurin/releases/`, choose version 21 for Windows, and install it with its default choices. Fuseki 6.2.0 and ROBOT run on Java 21.
@@ -85,53 +85,98 @@ Some of these installers ask for administrator rights. If your account has none,
 
 No step here asks for administrator rights. Nothing is installed for other accounts, and three programs are only unpacked into the local folder. The settings files then name them, because they are not on `PATH`.
 
-This guide writes `C:\kpi-store-1.1` for the release folder and `C:\kpi-store-local` for the local folder. An account without administrator rights may not be allowed to make a folder at the top of `C:`. Any short path that you may write to works, such as `kpi-store-1.1` and `kpi-store-local` in your own user folder. Then write your two paths wherever this guide writes these two. No command of the release depends on them.
-
 1. Python. Open `https://www.python.org/downloads/windows/` and download the installer of Python 3.12, 64-bit. Start it.
 2. On the installer's first page, tick "Add python.exe to PATH".
-3. On the same page, untick the box at the bottom that installs the launcher `py.exe` for all users. In the 3.12 installer it reads "Use admin privileges when installing py.exe".
+3. On the same page, untick the box at the bottom that installs the launcher `py.exe` for all users. In the 3.12 installer it reads "Use admin privileges when installing py.exe". The release does not use the launcher. The box is unticked because, ticked, the installer asks for administrator rights.
 4. Click "Install Now". Python's page "Using Python on Windows" (Python 3.12.16 documentation, `https://docs.python.org/3.12/using/windows.html`) says of "Install Now" that you do not need to be an administrator unless you install the launcher for all users, or Windows needs an update of its C runtime library. Python goes into your user folder.
 5. Git for Windows. Open `https://git-scm.com/downloads/win` and download the edition named `Portable ("thumbdrive edition")`. The page listed it for Git for Windows 2.56.1 when it was read on 2026-11-12.
-6. Start the downloaded file. It asks for a folder and unpacks itself there. Give it `C:\kpi-store-local\PortableGit`. It installs nothing.
+6. Start the downloaded file. It asks for a folder and unpacks itself there. Give it `%USERPROFILE%\kpi-store-local\PortableGit`. It installs nothing.
 7. Java. Open `https://adoptium.net/temurin/releases/` and choose version 21, Windows, x64, JDK, and the file that ends in `.zip`. Do not take the `.msi` file, which is the installer.
-8. In File Explorer, right-click the zip, choose "Extract All" and give `C:\kpi-store-local` as the folder. A folder such as `jdk-21.0.13+9` appears. Rename it to `jdk-21`. Adoptium's page "Archive Installation" (`https://adoptium.net/installation/archives/`, read 2026-11-12) describes the zip.
+8. In File Explorer, right-click the zip, choose "Extract All" and give `%USERPROFILE%\kpi-store-local` as the folder. A folder such as `jdk-21.0.13+9` appears. Rename it to `jdk-21`. Adoptium's page "Archive Installation" (`https://adoptium.net/installation/archives/`, read 2026-11-12) describes the zip.
 9. The Databricks command line. Open `https://github.com/databricks/cli/releases`, and under "Assets" of the release marked "Latest" download `databricks_cli_` and the version and `_windows_amd64.zip`. Databricks' page "Install or update the Databricks CLI" (last updated 2026-09-11) calls this the source installation.
-10. Extract that zip into `C:\kpi-store-local\databricks-cli`. The folder then holds `databricks.exe`.
+10. Extract that zip into `%USERPROFILE%\kpi-store-local\databricks-cli`. The folder then holds `databricks.exe`.
 11. Open `https://neo4j.com/download/`, download Neo4j Desktop and install it. If it is already on the machine, as version 2025.06.2 can be, skip this step.
 
 When you write `stores.toml` in "Write the two settings files", set three more lines, so that every command finds the three unpacked programs:
 
 ```toml parse
 [databricks]
-cli = "C:/kpi-store-local/databricks-cli/databricks.exe"
+cli = "databricks-cli/databricks.exe"
 
 [fuseki]
-java = "C:/kpi-store-local/jdk-21/bin/java.exe"
+java = "jdk-21/bin/java.exe"
 
 [tools]
-bash = "C:/kpi-store-local/PortableGit/bin/bash.exe"
+bash = "PortableGit/bin/bash.exe"
 ```
 
-Each line is already in the example file with an empty value. The `java` line serves Fuseki, ROBOT and the setup check. The `bash` line serves the check script, which the runner starts. The `cli` line serves the setup check and the runner.
+Each line is already in the example file with an empty value. A path without a drive starts at the folder of `stores.toml`, which is the local folder. The `java` line serves Fuseki, ROBOT and the setup check. The `bash` line serves the check script, which the runner starts. The `cli` line serves the setup check and the runner.
 
-The sign-in command of "Sign in to Databricks" is then not on `PATH`. Start it with its full path, `C:\kpi-store-local\databricks-cli\databricks.exe`, in place of the word `databricks`.
+The sign-in command of "Sign in to Databricks" is then not on `PATH`. Start it with its path, `$HOME\kpi-store-local\databricks-cli\databricks.exe`, in place of the word `databricks`.
 
 The Windows test job runs this guide's chain this way. Its Java and its Databricks command line come from these two zips and are named in the settings. No other Java is on its `PATH`, and its folders lie in a temporary folder. It uses the Git for Windows that its machine already has, so the portable edition and the Python installer are not proven there.
+
+### Where the folders are
+
+Everything of this guide lies in your user folder, `C:\Users\` and your user name. An account without administrator rights may write there, and often not at the top of `C:`. This guide writes `%USERPROFILE%` for that folder. Type `%USERPROFILE%` into the address bar of File Explorer to open it. A PowerShell command writes the same folder as `$HOME\`, as in `cd $HOME\kpi-store-1.1`.
+
+| Folder | What it holds |
+|---|---|
+| `%USERPROFILE%\kpi-store-1.1` | The release folder: the unpacked zip, kept in Git. |
+| `%USERPROFILE%\kpi-store-local` | The local folder: your two settings files, the downloaded jars, and everything the runs write. |
+| `%USERPROFILE%\kpi-store-venv` | A Python virtual environment, if you use one. |
+
+Do not put these folders into a folder that OneDrive or another sync program copies, such as `Documents` or `Desktop`. Any other short path that you may write to works as well. Then write your paths wherever this guide writes these.
 
 ### Unpack the release
 
 1. In File Explorer, right-click `kpi-store-1.1.zip` and choose "Extract All".
-2. Type `C:\kpi-store-1.1` as the folder and click "Extract".
-3. Check that `C:\kpi-store-1.1\README.md` exists. If the files lie one folder deeper, use that folder instead.
+2. As the folder, type the path of your user folder and `\kpi-store-1.1`, such as `C:\Users\<your user name>\kpi-store-1.1`. Click "Extract".
+3. Check that `%USERPROFILE%\kpi-store-1.1\README.md` exists. If the files lie one folder deeper, move them up, so that `README.md` lies in `kpi-store-1.1` itself.
 
-This guide calls that folder the release folder. Keep its path short. Do not put it in a folder that a sync program watches.
+This guide calls that folder the release folder.
+
+### Keep the release folder in Git
+
+Put the release folder into Git before you change anything in it. Every later change then shows against the release as shipped, and the cut tool commits and tags each correction.
+
+1. Open PowerShell and go to the release folder.
+2. Make the repository and commit the release as it was unpacked. The two `git config` lines give the commits of this folder a name. Write your own name and address in them. Leave them out if Git on this machine already knows you.
+
+   ```powershell run=release-copy status-only
+   git init
+   git config user.name "KPI Store operator"
+   git config user.email "kpi-store-operator@example.invalid"
+   git add -A
+   git commit -m "KPI Store 1.1 as shipped"
+   ```
+
+   The last lines name the commit and count the files.
+
+Three rules keep the folder and the zip right:
+
+- **The runner zips what Git tracks.** In a Git folder the zip holds exactly the files that Git tracks. In a plain folder, one with no `.git` folder, it holds every file except caches. `scripts/check-git-copy.sh` proves on the release that both give the same zip, and the test job runs it on Linux and on Windows.
+- **Commit only the release's files and your changes to them.** Keep a Python virtual environment outside the release folder. Do not run `uv init` there, and do not commit the project files of a tool, such as `pyproject.toml`, `uv.lock` or `.python-version`: they would travel in the zip. On the first real run such files were committed in the release folder, and the zip held 928 files where the release had 926.
+- **Commit your changes before a run that cuts.** The cut refuses a Git folder that holds a change which is not committed, and names the files.
+
+The release brings two files for Git. `.gitattributes` keeps the line ends of text files the same on every system, so keep it. `.gitignore` leaves out what Python leaves behind, such as `__pycache__` folders.
+
+### Replace the release with a newer zip
+
+A newer zip of the release replaces the release folder. Your settings, your jars and your virtual environment stay.
+
+1. Rename the old release folder, for example to `kpi-store-1.1-old`. Its `.git` folder goes with it, and so does its history.
+2. Unpack the new zip to `%USERPROFILE%\kpi-store-1.1`, as in "Unpack the release".
+3. Run the Git commands of "Keep the release folder in Git" in the new folder.
+4. Leave the local folder, the virtual environment and `KPI_STORE_LOCAL` as they are. If the old folder held a correction that the new zip does not hold, read "The release folder" under "How to undo" first: the stores then read `behind` until you load them again.
+5. Run the setup check, then the run.
 
 ### Make the local folder and fetch three files
 
 The local folder holds your settings, with a password, and everything the runs write. It must stay outside the release folder. Every command refuses a settings file inside the release folder.
 
-1. In File Explorer, make the folder `C:\kpi-store-local`.
-2. Download each file below with your browser and save it in `C:\kpi-store-local` under the name shown.
+1. In File Explorer, make the folder `%USERPROFILE%\kpi-store-local`.
+2. Download each file below with your browser and save it in `%USERPROFILE%\kpi-store-local` under the name shown.
 
 | Save as | Download from | SHA-256 |
 |---|---|---|
@@ -148,20 +193,24 @@ You do not compare the checksums by hand. The setup check does it and fails on a
 2. Install the packages at the versions the release was tested with. The list is `PACKAGES` in `kpi_store/setup_check.py`, plus `uv`, which the check script uses.
 
    ```powershell run=scratch os=windows status-only
-   py -m pip install rdflib==7.6.0 pyshacl==0.40.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 openpyxl==3.1.5 uv
+   python -m pip install rdflib==7.6.0 pyshacl==0.40.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 openpyxl==3.1.5 uv
    ```
 
    The last line starts with `Successfully installed` and names the packages.
 
    The check step of the run needs more packages for its tests, such as `pytest`. It does not install them into Python. On its first run it downloads them through `uv` from `pypi.org`, at the versions `scripts/check.sh` names, into `uv`'s cache folder in your user profile (`%LOCALAPPDATA%\uv\cache`), so the machine must reach `pypi.org` then.
 
-3. If the machine has more than one Python, tell the `py` launcher which one to start. `py` starts the newest Python it finds, and the packages of step 2 must be installed for that one. This command makes `py` start Python 3.12 in every new terminal.
+3. Check which Python the word `python` starts. Every command in this guide starts Python with `python`.
 
-   ```cmd run=windows-account os=windows status-only
-   setx PY_PYTHON 3.12
+   ```powershell run=scratch status-only
+   python -c "import sys; print(sys.executable)"
    ```
 
-   It answers `SUCCESS: Specified value was saved.` Then run step 2 again in a new terminal. With one Python installed, skip this step.
+   It prints the path of `python.exe`. Three cases need a fix:
+
+   - **The Microsoft Store opens, or `python` is not found.** The tick "Add python.exe to PATH" was missed. Start the Python installer again, choose "Modify", and tick "Add Python to environment variables". Then open a new terminal.
+   - **The machine has more than one Python, and the path is not the one that holds the packages.** Make a virtual environment of the Python you want, outside the release folder, such as `kpi-store-venv` in your user folder, and activate it. Then `python` is that environment's Python. Install the packages of step 2 into it.
+   - **You work in a virtual environment.** Activate it in every new terminal, before the first command. An environment that `uv` made has no `pip`: install the packages with `uv pip install` and the list of step 2.
 
 ### What Windows itself needs
 
@@ -175,9 +224,11 @@ The Windows test job proved each point below on Windows Server 2025 with Python 
 | Java | Version 21 or later. The setup check fails on an older one. |
 | Long paths | Nothing. The longest path in the release has 95 characters, and the check passed under a folder path of 80 characters. |
 | Rights | No administrator rights for any command of this guide. `setx` writes your own account's settings and needs none. Some installers ask for them, and "Install the programs without administrator rights" is the way without. The Windows test job proved that the chain runs with Java and the Databricks command line unpacked from their zips, named in the settings and not on `PATH`, and with its folders in a temporary folder. No test ran the Python installer, the portable Git for Windows or Neo4j Desktop. |
+| Symbolic links | Nothing. An account without administrator rights cannot make one unless Windows has Developer Mode on. The check script's tests that need a link are then counted as skipped. The test job `check (no links, no py)` imitates this: its account is an administrator, so the job makes Python's link call fail the way Windows refuses it. A real account without the right has not run the check script since that fix. |
+| The `py` launcher | Nothing. No command of this guide or of the other documents starts it, and no line that the code prints names it. Every command starts Python with `python`, so a Python from a virtual environment or from `uv`, which has no launcher, runs them all. The check script still tries `py` last, after `python3` and `python`, for a machine where only the launcher is on `PATH`. The same test job runs the check script with every `py` taken off `PATH`. |
 | Fuseki | Nothing. The runner starts Fuseki detached, so it lives on after the command ends. A server that you start yourself in a console window ends when you close the window. |
-| The local folder | Keep `C:\kpi-store-local` private to your account. The Neo4j load writes a login file into the run's folder, and on Windows that file gets the folder's permissions. |
-| A Git copy | Keep the file `.gitattributes`. Without it, Git for Windows checks text files out with other line ends, and the packages' hashes differ. An unpacked zip is not affected. |
+| The local folder | Keep `%USERPROFILE%\kpi-store-local` private to your account. The Neo4j load writes a login file into the run's folder, and on Windows that file gets the folder's permissions. |
+| Git | Keep the release folder in Git, as "Keep the release folder in Git" says, and keep the file `.gitattributes`. Without it, Git for Windows checks text files out with other line ends, and the packages' hashes differ. |
 
 ### Set up the local Neo4j
 
@@ -188,7 +239,7 @@ The local Neo4j checks the graph before anything goes to Enterprise. It needs tw
 1. Open Neo4j Desktop.
 2. Create a local instance. Choose version `2025.06.2`, and choose a password. Note the password.
 3. On the instance's menu, choose "Open folder", then open the folder `plugins`. Note its path.
-4. Copy `neosemantics-2025.06.1.jar` and `apoc-2025.06.2-core.jar` from `C:\kpi-store-local` into that `plugins` folder.
+4. Copy `neosemantics-2025.06.1.jar` and `apoc-2025.06.2-core.jar` from `%USERPROFILE%\kpi-store-local` into that `plugins` folder.
 5. On the instance's menu, open `neo4j.conf`.
 6. Add this line at the end of the file and save it.
 
@@ -202,8 +253,8 @@ The local Neo4j checks the graph before anything goes to Enterprise. It needs tw
 
 The release has an example of each file. Copy both, then change only the lines the steps name.
 
-1. In File Explorer, copy `C:\kpi-store-1.1\kpi_store\kpi_store.example.toml` to `C:\kpi-store-local\kpi_store.toml`.
-2. Open `C:\kpi-store-local\kpi_store.toml` in Notepad.
+1. In File Explorer, copy `%USERPROFILE%\kpi-store-1.1\kpi_store\kpi_store.example.toml` to `%USERPROFILE%\kpi-store-local\kpi_store.toml`.
+2. Open `%USERPROFILE%\kpi-store-local\kpi_store.toml` in Notepad.
 3. Set `warehouse_id` to the ID of your SQL warehouse. Change nothing else. The file already holds the sandbox's values:
 
    ```toml excerpt=kpi_store/kpi_store.example.toml
@@ -227,8 +278,8 @@ The release has an example of each file. Copy both, then change only the lines t
    Leave the `sha256` line of zeros as it is. The runner writes the zip's real checksum into the copy it uploads.
 
 4. Save the file and close Notepad.
-5. In File Explorer, copy `C:\kpi-store-1.1\kpi_store\stores.example.toml` to `C:\kpi-store-local\stores.toml`.
-6. Open `C:\kpi-store-local\stores.toml` in Notepad and set these lines. Leave every other line as it is. If your local folder is not `C:\kpi-store-local`, also replace `C:/kpi-store-local` in every line that holds it with your folder's path, with `/` in place of each backslash.
+5. In File Explorer, copy `%USERPROFILE%\kpi-store-1.1\kpi_store\stores.example.toml` to `%USERPROFILE%\kpi-store-local\stores.toml`.
+6. Open `%USERPROFILE%\kpi-store-local\stores.toml` in Notepad and set these lines. Leave every other line as it is. The file's other paths, such as `runs` and `robot.jar`, have no drive: such a path starts at the folder of `stores.toml`, so they hold wherever your local folder is. A path that you write yourself may be a full one, with `/` in place of each backslash, and `~` at its start stands for your user folder.
 
    | Table | Line | Set it to |
    |---|---|---|
@@ -242,12 +293,16 @@ The release has an example of each file. Copy both, then change only the lines t
 
    The notebook is imported into `/Workspace/Shared/kpi_store`. If you may not write there, set `workspace_folder` to a folder of your own, such as `/Workspace/Users/` and your sign-in name and `/kpi_store`.
 
+   Leave `environment_version = "2"` as it is. The notebook run then asks for serverless environment version 2, which has Python 3.11. It is the version that the rehearsal workspace gave the test runs, which named none (measured on 2026-11-14). A settings file without the line gets the same. `""` leaves the choice to the workspace, and the notebook also runs on the Python 3.10 of environment version 1.
+
 7. Save the file and close Notepad.
 8. Tell every command where the file is. Then close PowerShell and open it again, because the setting reaches new windows only.
 
-   ```cmd run=windows-account os=windows status-only
-   setx KPI_STORE_LOCAL C:\kpi-store-local\stores.toml
+   ```powershell run=windows-account os=windows status-only
+   setx KPI_STORE_LOCAL "$HOME\kpi-store-local\stores.toml"
    ```
+
+   Type it in PowerShell, which puts the path of your user folder into the value. Keep the quotes: a user name may hold a space.
 
    It answers `SUCCESS: Specified value was saved.` From then on no command of this guide needs the file's path.
 
@@ -270,13 +325,13 @@ When the sign-in expires later, a run fails at its first Databricks step. Run th
 1. In PowerShell, go to the release folder. Every later command in this guide starts there.
 
    ```powershell run=windows-account os=windows status-only
-   cd C:\kpi-store-1.1
+   cd $HOME\kpi-store-1.1
    ```
 
 2. Run the setup check. It only reads. It changes nothing on your machine or on any server.
 
    ```powershell run=first-run
-   py -m kpi_store.setup_check
+   python -m kpi_store.setup_check
    ```
 
    ```text expect
@@ -304,15 +359,15 @@ When the sign-in expires later, a run fails at its first Databricks step. Run th
 
 | Check | When it fails |
 |---|---|
-| `python` | Install Python 3.11 or later and start the commands with `py`. |
-| `packages` | Run the `py -m pip install` line that the check prints. It names the packages that differ. |
+| `python` | Install Python 3.11 or later, or activate a virtual environment of one, so that `python` starts it. |
+| `packages` | Run the install line that the check prints. It names the Python that ran the check, by its path, and the packages that differ. |
 | `local-settings` | Open a new PowerShell window, so that `KPI_STORE_LOCAL` is set. The file must lie outside the release folder. |
-| `kpi-store-settings` | Correct the line that the check names in `C:\kpi-store-local\kpi_store.toml`. An empty `warehouse_id` fails this check. |
+| `kpi-store-settings` | Correct the line that the check names in `%USERPROFILE%\kpi-store-local\kpi_store.toml`. An empty `warehouse_id` fails this check. |
 | `java` | Install Java 21 and open a new terminal. If Java is still not found, name `java.exe` in `[fuseki]` `java`. |
 | `fuseki-jar`, `robot-jar` | Download the file again and save it under the name the check prints. |
 | `bash` | Install Git for Windows, or name `bash.exe` in `[tools]` `bash`. |
-| `uv` | Run `py -m pip install uv`. |
-| `check-script-tools` | Inside Git Bash, no Python 3.11 or later was found, or `uv` was not found. Run `py -m pip install uv`. Python's folder and its `Scripts` folder must be on `PATH`, which the tick in the installer did. Open a new terminal. |
+| `uv` | Run `python -m pip install uv`. |
+| `check-script-tools` | Inside Git Bash, no Python 3.11 or later was found, or `uv` was not found. Run `python -m pip install uv`. Python's folder and its `Scripts` folder must be on `PATH`, which the tick in the installer did. Open a new terminal. |
 | `databricks-cli` | Install the Databricks command line and open a new terminal. If it is still not found, name `databricks.exe` in `[databricks]` `cli`. |
 | `databricks-auth` | Sign in again ("Sign in to Databricks"). |
 | `neo4j-local` | Start the instance in Neo4j Desktop. Check the password, and that the two jars and the line in `neo4j.conf` are there. Restart the instance. |
@@ -326,7 +381,7 @@ The first run changes nothing in the ontology and loads nothing. It checks the r
 1. See what the run will do. This prints each step's commands and runs nothing.
 
    ```powershell run=first-run
-   py -m kpi_store.runner --dry-run
+   python -m kpi_store.runner --dry-run
    ```
 
    ```text expect
@@ -337,10 +392,10 @@ The first run changes nothing in the ontology and loads nothing. It checks the r
    summary: would print the run's summary
    ```
 
-2. Start the first run. The step `check` prints nothing until it ends. It took about 10 minutes on the Mac of the test runs, and 21 minutes on a Windows machine with 4 cores. The other steps took about 3 minutes.
+2. Start the first run. The step `check` prints nothing until it ends. It took about 10 minutes on the Mac of the test runs, 21 minutes on a Windows test machine with 4 cores, and about 40 minutes on the Windows laptop of the first real run. The other steps took about 3 minutes.
 
    ```powershell run=first-run exit=3
-   py -m kpi_store.runner
+   python -m kpi_store.runner
    ```
 
    ```text expect
@@ -364,7 +419,7 @@ If the run ends on another line, go to "When a step fails".
 
 ## The first report
 
-The run left three files in `C:\kpi-store-local\runs\pending`:
+The run left three files in `%USERPROFILE%\kpi-store-local\runs\pending`:
 
 | File | What it is |
 |---|---|
@@ -416,7 +471,7 @@ Do not clear a row that you do not understand.
 
 **Do not delete a row, and do not change any column but `decision`, `decided_by` and `note`.** A file with a missing row stops the next run.
 
-1. In File Explorer, open `C:\kpi-store-local\runs\pending`.
+1. In File Explorer, open `%USERPROFILE%\kpi-store-local\runs\pending`.
 2. Open `discovery-report.to-clear.csv` in Excel.
 3. Find each row that the table above tells you to accept.
 4. Check that the row's `decision` reads `accept`.
@@ -464,7 +519,7 @@ The second run is the same command. It finds the cleared report and hands it to 
 1. Run the same command again. It takes about 40 minutes.
 
    ```powershell run=first-run types="Change_Value_Amount,yes"
-   py -m kpi_store.runner
+   python -m kpi_store.runner
    ```
 
 2. Read the plan that the cut tool prints. Check that "The cut applies" lists only the rows you accepted.
@@ -532,7 +587,7 @@ One case needs a person. The marks are those of the release you copy. When that 
 If the `enterprise` step stops for that reason, run the step again with the replace allowed:
 
 ```powershell run=first-run
-py -m kpi_store.runner --from enterprise --replace-enterprise
+python -m kpi_store.runner --from enterprise --replace-enterprise
 ```
 
 ```text expect
@@ -553,7 +608,7 @@ Do not add `--replace-enterprise` to a first run. An empty database needs no rep
 The sync check reads the four stores and writes nothing. The runner ran it as its `sync` step. Run it alone whenever you want to know whether a store is behind.
 
 ```powershell run=first-run
-py -m kpi_store.sync_check
+python -m kpi_store.sync_check
 ```
 
 ```text expect
@@ -587,7 +642,7 @@ Each line names a store, then its status, then the reason.
 | `unmarked` | The store holds data and no marker. | Run the runner again. |
 | `empty` | The store holds nothing. Fuseki reads `empty` when its data folder was deleted. | Run the runner again. |
 | `unreachable` | The store did not answer, or a setting is missing. The reason says which. | Start the store, or correct the setting. |
-| `not checked` | No technical graph file was fetched yet. | Run `py -m kpi_store.runner --from notebook`. |
+| `not checked` | No technical graph file was fetched yet. | Run `python -m kpi_store.runner --from notebook`. |
 
 The command ends with exit code 0 only when every line reads `current`.
 
@@ -598,7 +653,7 @@ A second run on the same release must change nothing. It proves that the loads a
 1. Run the same command a third time. It takes about 20 minutes.
 
    ```powershell run=first-run
-   py -m kpi_store.runner
+   python -m kpi_store.runner
    ```
 
    ```text expect
@@ -624,7 +679,7 @@ A second run on the same release must change nothing. It proves that the loads a
 
 The end of each line names the technical graph, and that part may say `loaded`. The notebook builds the technical graph again from the workspace on every run. When the workspace's objects, lineage or jobs changed since the last run, the graph differs and each store loads it again. The runs of this guide are themselves jobs in the workspace, so this happened in the test.
 
-The loads are done. Keep `C:\kpi-store-local` and the release folder. The release folder now holds the correction, and every later change starts from it.
+The loads are done. Keep `%USERPROFILE%\kpi-store-local` and the release folder. The release folder now holds the correction, and every later change starts from it.
 
 ## What the runner does, step by step
 
@@ -639,7 +694,7 @@ It calls the cut tool, `kpi_store/cut.py`, when a cleared report waits in `runs\
 It reads `runs\pending\discovery-report.json` and `discovery-report.to-clear.csv`. It writes new packages under `business_architecture\ontology\releases`, the record of the cut under `business_architecture\ontology\discovery-runs`, and the rebuilt KPI intake pack under `kpi-intake`. With no report waiting, it does nothing.
 
 ```powershell run=first-run
-py -m kpi_store.runner --only cut
+python -m kpi_store.runner --only cut
 ```
 
 ```text expect
@@ -655,7 +710,7 @@ It runs `scripts/check.sh` with bash. The script rebuilds every package and comp
 It reads the release folder. It writes only `check.log` in the run's folder. It took about 10 minutes on a Mac and 21 minutes on a Windows machine with 4 cores.
 
 ```powershell run=first-run
-py -m kpi_store.runner --only check
+python -m kpi_store.runner --only check
 ```
 
 ```text expect
@@ -668,10 +723,10 @@ the steps that ran passed; left out: <the other steps> (not run, so not checked)
 
 It packs the release folder into one zip, in `runner.py` itself. The same files always give the same zip: the entries are sorted, each has one fixed date, and text files get the same line ends. It then copies your `kpi_store.toml` and writes the zip's SHA-256 into the copy.
 
-It reads the release folder and `C:\kpi-store-local\kpi_store.toml`. It writes the zip and the settings copy to the run's folder, under `upload`. It stops when a settings file in the release folder holds a password.
+It reads the release folder and `%USERPROFILE%\kpi-store-local\kpi_store.toml`. It writes the zip and the settings copy to the run's folder, under `upload`. It stops when a settings file in the release folder holds a password.
 
 ```powershell run=first-run
-py -m kpi_store.runner --only zip
+python -m kpi_store.runner --only zip
 ```
 
 ```text expect
@@ -687,7 +742,7 @@ It asks Databricks, through the Databricks command line, whether the schema and 
 It reads `write_catalog`, `write_schema` and `volume` from `kpi_store.toml`. It writes nothing when both exist.
 
 ```powershell run=first-run
-py -m kpi_store.runner --only volume
+python -m kpi_store.runner --only volume
 ```
 
 ```text expect
@@ -703,7 +758,7 @@ It copies the zip, then the settings copy, into the volume with the Databricks c
 It reads the two files of the `zip` step. It writes them to the volume and replaces the ones of the run before.
 
 ```powershell run=first-run
-py -m kpi_store.runner --only upload
+python -m kpi_store.runner --only upload
 ```
 
 ```text expect
@@ -716,22 +771,23 @@ the steps that ran passed; left out: <the other steps> (not run, so not checked)
 
 It imports `kpi_store/notebook/kpi_store_load.py` into the workspace folder as the notebook `kpi_store_load`. It submits the notebook as a one-time job run on serverless compute, waits for it, and reads its result.
 
-The notebook has five cells.
+The notebook has six cells.
 
 | Cell | What it does |
 |---|---|
 | 1 | Text. It says what the notebook does and lists its three parameters: `settings_path`, `mode` and `stale_after_days`. |
-| 2 | Installs five Python packages at pinned versions for this run: `databricks-sdk`, `pyoxigraph`, `rdflib`, `sqlglot` and `pyyaml`. |
+| 2 | Installs six Python packages at pinned versions for this run: `databricks-sdk`, `pyoxigraph`, `rdflib`, `sqlglot`, `pyyaml` and `tomli`. The last reads the settings file on Python 3.10, which has no reader of its own. |
 | 3 | Restarts Python, so that the run uses the packages of cell 2. |
-| 4 | Defines the work. `bootstrap` reads `kpi_store.toml` from the volume, checks the zip's SHA-256 against it, unpacks the zip and validates the settings. `main` then runs the release's own code from the zip. |
-| 5 | Runs `main` and ends the run with a summary in JSON, which the runner reads. |
+| 4 | Prints the version of Python that the compute runs, and stops on one below 3.10. |
+| 5 | Defines the work. `bootstrap` reads `kpi_store.toml` from the volume, checks the zip's SHA-256 against it, unpacks the zip and validates the settings. `main` then runs the release's own code from the zip. |
+| 6 | Runs `main` and ends the run with a summary in JSON, which the runner reads. |
 
 `main` calls `kpi_store/load_databricks.py`. That code reads the workspace (`kpi_store/discovery.py`): the objects and columns, the metric view definitions, the lineage, the jobs that build the tables and the Genie spaces. It compares them with the ontology (`kpi_store/compare.py`) and writes the report. If a row blocks, it stops there. Otherwise it writes the release's triples to a staging table, reads them back, and compares their hash with the release files' hash. Only an equal staging table replaces `epm_triples`. Then it writes the marker row. Last, it builds the technical graph from what it read (`kpi_store/tech_graph.py`) and loads it the same way.
 
 The notebook reads the catalogs that `kpi_store.toml` names and three system schemas. It writes to the two schemas of the limits, and to the volume: the report files and `tech-graph.nq`, in one `reports` folder per run.
 
 ```powershell run=first-run
-py -m kpi_store.runner --only notebook
+python -m kpi_store.runner --only notebook
 ```
 
 ```text expect
@@ -745,7 +801,7 @@ the steps that ran passed; left out: <the other steps> (not run, so not checked)
 When the notebook stopped on a report, this step fetches the report from the volume into `runs\pending`. It prints the rows that block, writes the copy for you to clear, and stops the run. When the notebook loaded, it fetches `tech-graph.nq` into `runs\tech-graph` instead, and checks that the file is the one the notebook loaded.
 
 ```powershell run=first-run
-py -m kpi_store.runner --only report
+python -m kpi_store.runner --only report
 ```
 
 ```text expect
@@ -758,10 +814,10 @@ the steps that ran passed; left out: <the other steps> (not run, so not checked)
 
 It calls `kpi_store/load_fuseki.py`. That code checks Java and the jar's checksum. It uses the Fuseki that answers at the address of your local settings, or starts one from the jar. It builds the dataset that a current store holds and compares its RDFC-1.0 hash with the store's. When the hashes are equal it writes nothing. Otherwise it drops the graphs of earlier versions, replaces every graph, reads all of it back and compares again. Then it loads the technical graph.
 
-It reads the release folder and `runs\tech-graph\tech-graph.nq`. It writes to the Fuseki dataset, which is kept in `C:\kpi-store-local\fuseki-db`.
+It reads the release folder and `runs\tech-graph\tech-graph.nq`. It writes to the Fuseki dataset, which is kept in `%USERPROFILE%\kpi-store-local\fuseki-db`.
 
 ```powershell run=first-run
-py -m kpi_store.runner --only fuseki
+python -m kpi_store.runner --only fuseki
 ```
 
 ```text expect
@@ -774,10 +830,10 @@ the steps that ran passed; left out: <the other steps> (not run, so not checked)
 
 It calls `kpi_store/load_neo4j.py`, which runs the `ontology-to-lpg` skill's steps. It checks the projection's rules, validates the release with SHACL, and runs the reasoner with ROBOT. **It empties the local database.** It sends the triples in the request, validates the graph with SHACL in the database, and proves each compiled constraint with a failing case. It exports the graph again and compares it with what it loaded. It loads twice and compares the two graph hashes. Last, it loads the logical models and the technical graph, and writes the marker.
 
-It reads the release folder and `robot.jar`. It writes to the local database, and its working files and report to `C:\kpi-store-local\lpg-out`. When the database already holds this release, it writes nothing.
+It reads the release folder and `robot.jar`. It writes to the local database, and its working files and report to `%USERPROFILE%\kpi-store-local\lpg-out`. When the database already holds this release, it writes nothing.
 
 ```powershell run=first-run
-py -m kpi_store.runner --only neo4j
+python -m kpi_store.runner --only neo4j
 ```
 
 ```text expect
@@ -793,7 +849,7 @@ It calls `kpi_store/copy_enterprise.py`. That code checks that the local graph i
 It reads the local database and the load's report. It writes only to the one Enterprise database. When that database already holds this release, it writes nothing. It tells its own nodes from others by the marks that "The limits" lists, not by who wrote a node. So the database must be one that no other writer fills with ontology nodes of this release's shape.
 
 ```powershell run=first-run
-py -m kpi_store.runner --only enterprise
+python -m kpi_store.runner --only enterprise
 ```
 
 ```text expect
@@ -807,7 +863,7 @@ the steps that ran passed; left out: <the other steps> (not run, so not checked)
 It calls `kpi_store/sync_check.py`, which "The sync check" above describes. It reads the four stores and writes nothing to them.
 
 ```powershell run=first-run
-py -m kpi_store.runner --only sync
+python -m kpi_store.runner --only sync
 ```
 
 ```text expect
@@ -822,7 +878,7 @@ the steps that ran passed; left out: <the other steps> (not run, so not checked)
 It prints each step's result in this run, and writes `summary.json` in the run's folder.
 
 ```powershell run=first-run
-py -m kpi_store.runner --only summary
+python -m kpi_store.runner --only summary
 ```
 
 ```text expect
@@ -847,7 +903,7 @@ Each run ends with one of four exit codes. The last line of the run says which c
 To go on from the step that failed, name it after `--from`. The run then continues the newest run and repeats nothing before that step. Its last line names the steps before it as left out. For example, when the Fuseki load failed:
 
 ```powershell run=first-run
-py -m kpi_store.runner --from fuseki
+python -m kpi_store.runner --from fuseki
 ```
 
 ```text expect
@@ -862,23 +918,25 @@ summary of run <run ID>:
 the steps that ran passed; left out: <the other steps> (not run, so not checked)
 ```
 
-The steps, in order, are `cut`, `check`, `zip`, `volume`, `upload`, `notebook`, `report`, `fuseki`, `neo4j`, `enterprise`, `sync` and `summary`. Each step's result is a file in `C:\kpi-store-local\runs`, in the run's folder, under `steps`.
+The steps, in order, are `cut`, `check`, `zip`, `volume`, `upload`, `notebook`, `report`, `fuseki`, `neo4j`, `enterprise`, `sync` and `summary`. Each step's result is a file in `%USERPROFILE%\kpi-store-local\runs`, in the run's folder, under `steps`.
 
 | Step that failed | Likely cause | What to do |
 |---|---|---|
 | `cut` | You typed another answer, or a row's `decided_by` is not a role. | Correct the file if the line says so. Run the same command again. |
 | `check` | A check of the release failed. The line names `check.log` in the run's folder. | Read the end of `check.log`. See "What ran where" for the one case in which you may leave the step out. |
-| `zip` | A file in the release folder sets a password. | Move that file out of the release folder. Run `py -m kpi_store.runner --from zip`. |
-| `volume`, `upload` | The sign-in expired, or you may not create the schema. | Sign in again. If the line prints two SQL statements, run them in a Databricks SQL editor. Then run `py -m kpi_store.runner --from volume`. |
-| `notebook` | The notebook run failed, or it still runs after 60 minutes. | Read the reason in the line. Run `py -m kpi_store.runner --from notebook`. A run that still runs is waited for again, not started twice. |
-| `fuseki` | Java or the jar is missing, or the port is in use. | Run the setup check. Then run `py -m kpi_store.runner --from fuseki`. |
-| `neo4j` | The local instance is stopped, or a plugin is missing. | Start the instance. Run the setup check. Then run `py -m kpi_store.runner --from neo4j`. |
+| `zip` | A file in the release folder sets a password. | Move that file out of the release folder. Run `python -m kpi_store.runner --from zip`. |
+| `volume`, `upload` | The sign-in expired, or you may not create the schema. | Sign in again. If the line prints two SQL statements, run them in a Databricks SQL editor. Then run `python -m kpi_store.runner --from volume`. |
+| `notebook` | The notebook run failed, or it still runs after 60 minutes. | Read the reason in the line. Run `python -m kpi_store.runner --from notebook`. A run that still runs is waited for again, not started twice. |
+| `notebook`, with `Cannot launch the cluster` and `Invalid platform channel` | The workspace does not offer the serverless environment version that `[databricks]` `environment_version` names. The rehearsal workspace answered this way for version 1. | Set `environment_version` to a version the workspace offers, or to `""` for the workspace's own choice. Then run `python -m kpi_store.runner --from notebook`. |
+| `notebook`, with `ModuleNotFoundError: No module named 'tomllib'` | The compute runs Python 3.10, and your zip is the first cut of KPI Store 1.1, whose notebook needed Python 3.11. Serverless compute of environment version 1 has Python 3.10.12 (Databricks' release notes "Environment version 1", last updated 2026-11-05). | Take the corrected zip, unpack it in place of the release folder, and run the runner again. Its notebook runs on Python 3.10, and its run asks for environment version 2. |
+| `fuseki` | Java or the jar is missing, or the port is in use. | Run the setup check. Then run `python -m kpi_store.runner --from fuseki`. |
+| `neo4j` | The local instance is stopped, or a plugin is missing. | Start the instance. Run the setup check. Then run `python -m kpi_store.runner --from neo4j`. |
 | `enterprise` | The server did not answer, or the database holds nodes. | Read the line. For KPI Store nodes of another release, see "Replace what Enterprise holds". For any other node, stop and ask whose it is. |
 | `sync` | A store is not current. The lines above name it. | Run the runner from the step that loads that store. |
 
 A store load never runs after a notebook run that did not load. The run then stops with exit code 3 and says why.
 
-To run one store's load by itself, use `--only` and the step's name, as "What the runner does, step by step" shows. The runner hands each load the technical graph's file. A load module started alone, such as `py -m kpi_store.load_fuseki`, does not know that file. The Fuseki load then stops, because it finds the technical graph's named graph and cannot tell whose it is.
+To run one store's load by itself, use `--only` and the step's name, as "What the runner does, step by step" shows. The runner hands each load the technical graph's file. A load module started alone, such as `python -m kpi_store.load_fuseki`, does not know that file. The Fuseki load then stops, because it finds the technical graph's named graph and cannot tell whose it is.
 
 ## Record the load's report in the release folder
 
@@ -889,7 +947,7 @@ The release folder holds a summary of the last Neo4j load, `business_architectur
 
    ```powershell run=first-run
    cd business_architecture/ontology/projection
-   py pipeline.py record --run <your Neo4j load folder>
+   python pipeline.py record --run <your Neo4j load folder>
    cd ../../..
    ```
 
@@ -902,7 +960,7 @@ The release folder holds a summary of the last Neo4j load, `business_architectur
 3. Run the sync check again. Every line must still read `current`, because the record changes no package.
 
    ```powershell run=first-run status-only
-   py -m kpi_store.sync_check
+   python -m kpi_store.sync_check
    ```
 
 The command refuses a load that read other files than this release folder's, and a load whose report did not pass.
@@ -917,10 +975,10 @@ Use this section to show the load again from nothing, for example in a demonstra
 |---|---|---|
 | Neo4j Enterprise | In `businessprocessarchitecturegraph`: every node that carries the KPI Store's marks, with its relationships. "The limits" lists the marks. | Every node without the marks, and the constraint `n10s_unique_uri`. |
 | The local Neo4j | The nodes that the load wrote, with their relationships. Then the constraint `n10s_unique_uri`, which is the only constraint that the load makes. | A node that the load did not write, and every other constraint. The output lists both. |
-| Fuseki | It stops the Fuseki that the load started. Then it deletes the folder `C:\kpi-store-local\fuseki-db`. | A Fuseki that you started yourself. The command does not stop it, and it then leaves the folder. |
+| Fuseki | It stops the Fuseki that the load started. Then it deletes the folder `%USERPROFILE%\kpi-store-local\fuseki-db`. | A Fuseki that you started yourself. The command does not stop it, and it then leaves the folder. |
 | Databricks | The tables `epm_triples` and `epm_store_markers` in `idp_sbx.kpi_store`. The tables `tech_graph_triples` and `tech_graph_markers` in `idp_sbx.tech_graph`. | The two schemas, the volume `releases` with the zip and every report, and the notebook. |
 
-The command never changes the release folder, `C:\kpi-store-local\runs` or `C:\kpi-store-local\lpg-out`.
+The command never changes the release folder, `%USERPROFILE%\kpi-store-local\runs` or `%USERPROFILE%\kpi-store-local\lpg-out`.
 
 The reset is `kpi_store/reset.py`. It has no deletion rule of its own. In both Neo4j databases it deletes by the marks that the copy uses, and on Enterprise it passes the copy's guard. In Databricks every statement passes `Gate`, as in "The limits".
 
@@ -940,7 +998,7 @@ The exit code is 0 only when every store that the command names holds nothing of
 1. See what the command will delete. This reads the four stores and deletes nothing.
 
    ```powershell run=first-run
-   py -m kpi_store.runner --reset --dry-run
+   python -m kpi_store.runner --reset --dry-run
    ```
 
    ```text expect
@@ -958,7 +1016,7 @@ The exit code is 0 only when every store that the command names holds nothing of
 3. Run the reset. **This step deletes.** It prints the same lines again and then asks.
 
    ```powershell run=first-run types="reset"
-   py -m kpi_store.runner --reset
+   python -m kpi_store.runner --reset
    ```
 
 4. At the prompt `Type reset to delete this, or press Enter to stop:`, type `reset` and press Enter. Any other answer deletes nothing.
@@ -966,13 +1024,13 @@ The exit code is 0 only when every store that the command names holds nothing of
 
    ```text expect
    ...
-   reset done: enterprise, neo4j, fuseki and databricks hold nothing of the KPI Store. To load again, run: py -m kpi_store.runner
+   reset done: enterprise, neo4j, fuseki and databricks hold nothing of the KPI Store. To load again, run: python -m kpi_store.runner
    ```
 
 6. Run the sync check. It reads `unmarked` for Databricks and for the two Neo4j databases. It reads `unreachable` for `jena`, because Fuseki is stopped. The command ends with exit code 1, because no store holds the release now.
 
    ```powershell run=first-run exit=1
-   py -m kpi_store.sync_check
+   python -m kpi_store.sync_check
    ```
 
    ```text expect
@@ -991,7 +1049,7 @@ The exit code is 0 only when every store that the command names holds nothing of
 7. Load the stores again with the normal run, as in "Run it again: nothing changes". Do not add `--replace-enterprise`, because the database holds no KPI Store node. The load starts Fuseki again. This time the lines `notebook`, `fuseki` and `neo4j` say `loaded`, and the line `enterprise` says `copied`. In the test run, the steps after `check` took 9 minutes.
 
    ```powershell run=first-run
-   py -m kpi_store.runner
+   python -m kpi_store.runner
    ```
 
    ```text expect
@@ -1034,14 +1092,14 @@ The reset empties the stores one after another, and it cannot undo a deletion.
 
 Each store is a copy of the release folder. You can empty a store and load it again at any time. This section returns each store to its state before your first run, by hand, and removes what the reset keeps: the release folder's correction, the volume, the schemas, the notebook, the Enterprise constraint and the runs' files.
 
-To empty the stores and keep the rest, use `py -m kpi_store.runner --reset` instead, as "Empty every store and load again" shows.
+To empty the stores and keep the rest, use `python -m kpi_store.runner --reset` instead, as "Empty every store and load again" shows.
 
 ### The release folder
 
 The cut is the only step that changed the release folder.
 
-1. Rename `C:\kpi-store-1.1`, for example to `C:\kpi-store-1.1-with-correction`.
-2. Unpack `kpi-store-1.1.zip` again, as in "Unpack the release".
+1. Rename `%USERPROFILE%\kpi-store-1.1`, for example to `kpi-store-1.1-with-correction`.
+2. Unpack `kpi-store-1.1.zip` again, as in "Unpack the release", and run the Git commands of "Keep the release folder in Git" there.
 
 The stores then read `behind` until you load them again from that folder.
 
@@ -1083,14 +1141,14 @@ The document test runs the statements of steps 2 to 4 on two throwaway schemas o
 1. Stop the Fuseki that the load started. The command stops only that process.
 
    ```powershell run=first-run
-   py -m kpi_store.load_fuseki --stop
+   python -m kpi_store.load_fuseki --stop
    ```
 
    ```text expect
    fuseki: stopped process <number>
    ```
 
-2. In File Explorer, delete the folder `C:\kpi-store-local\fuseki-db`. The dataset is gone with it.
+2. In File Explorer, delete the folder `%USERPROFILE%\kpi-store-local\fuseki-db`. The dataset is gone with it.
 
 ### The local Neo4j
 
@@ -1142,7 +1200,7 @@ The document test runs step 3 on the test server's `businessprocessarchitectureg
 
 ### The runs' files
 
-1. Delete the folder `C:\kpi-store-local\runs` to remove every run's files and reports from your machine.
+1. Delete the folder `%USERPROFILE%\kpi-store-local\runs` to remove every run's files and reports from your machine.
 
 ## Where you can run it from
 
@@ -1153,13 +1211,13 @@ This is the design of this release. One person runs the runner on a Windows mach
 | Machine | State |
 |---|---|
 | Windows 10 or 11 | The design. The test job runs this guide's chain on Windows: the setup check, the first run, the cleared report, the second run with the cut, the sync check, the reset and the load after it. It uses a rehearsal Databricks workspace. "What ran where" lists what that leaves open. |
-| macOS | Every run of this guide's chain so far happened here. Write `python3` where this guide writes `py`. Git Bash and `setx` are not needed. |
+| macOS | Every run of this guide's chain so far happened here. Write `python3` where this guide writes `python`, when that is your Python's name. Git Bash and `setx` are not needed. |
 
 ### A pipeline
 
 This is not part of this release's tested path. The paragraphs below say what the code does today.
 
-A run that finds no report to cut asks nothing. The document test runs the third run of this guide with no keyboard attached, and it passes. So a scheduler can start the same command, `py -m kpi_store.runner`, and read its exit code.
+A run that finds no report to cut asks nothing. The document test runs the third run of this guide with no keyboard attached, and it passes. So a scheduler can start the same command, `python -m kpi_store.runner`, and read its exit code.
 
 Two things need a person today.
 
@@ -1219,8 +1277,10 @@ Three places ran parts of this guide. No place ran all of it, and nothing ran on
 | Place | What ran there |
 |---|---|
 | macOS, with a rehearsal Databricks workspace in the sandbox's shapes, a local Fuseki 6.2.0 and a local Neo4j 2025.06.2 Enterprise with n10s 2025.06.1 and APOC 2025.06.2 | The whole chain of this guide, through the runner: every command that the document test runs. That includes the reset of all four stores and the load after it. |
-| The Windows test job (Windows Server 2025, Python 3.12, Java 21), with a rehearsal Databricks workspace | The whole check script. Then two parts. The first part runs the setup check with all 15 checks, the first run, which stops on the report, the cleared report, the second run with the cut and every load, and the sync check of the four stores. The second part runs the Fuseki load as its own command, twice, and the same chain with `--skip check`. Then it runs the reset of the four stores with the typed word, a sync check that reads no store as current, the load again, `--replace-enterprise` on a copy that the job made incomplete, and the reset with `--yes`. Through the document test it runs the two `setx` commands and the `cd` of this guide, and the Cypher of "How to undo". |
+| The Windows test job (Windows Server 2025, Python 3.12, Java 21), with a rehearsal Databricks workspace | The whole check script. Then two parts. The first part runs the setup check with all 15 checks, the first run, which stops on the report, the cleared report, the second run with the cut and every load, and the sync check of the four stores. The second part runs the Fuseki load as its own command, twice, and the same chain with `--skip check`. Then it runs the reset of the four stores with the typed word, a sync check that reads no store as current, the load again, `--replace-enterprise` on a copy that the job made incomplete, and the reset with `--yes`. Through the document test it runs the `setx` command and the `cd` of this guide, and the Cypher of "How to undo". |
 | The client's sandbox and Enterprise server | Nothing yet. Your first run is the first. |
+
+The notebook runs on the Python of the Databricks compute, not on yours. Its code and its tests ran on Python 3.10 and on Python 3.12: `scripts/check-notebook-side.sh` runs the notebook's tests on Python 3.10, in the test job on Linux and on Windows, and `scripts/check.sh` runs them on the machine's own Python. Those tests run the notebook's `main` against a made-up workspace, not on Databricks compute. On real compute the notebook ran only on the rehearsal workspace, on serverless environment version 2 with Python 3.11.10. A trial there on 2026-11-14 ran a one-cell notebook as a one-time run with a job-level environment: version 2 reported Python 3.11.10 and version 4 reported Python 3.12.3, so the run's own environment decides the Python of a notebook task. Databricks' page "Configure the serverless environment" (dated 2026-10-22) describes that override. The same workspace refused version 1, so Python 3.10 on Databricks compute itself is not proven by a test. The commands on your machine need Python 3.11 or later, which the setup check enforces.
 
 These points are not proven on Windows, or not on the client's own objects. Each is written from the code and from the vendor's documentation.
 
@@ -1230,7 +1290,7 @@ These points are not proven on Windows, or not on the client's own objects. Each
 | The sign-in in a browser, and the client's sandbox | The Windows job signs in to a rehearsal workspace with a token, which is a secret in the settings of the repository on GitHub. The release holds no token. No test opens a browser, and no test reaches the sandbox. | Sign in again ("Sign in to Databricks"), and report the line. |
 | Every step of "Install the programs" and "Unpack the release" | No test runs an installer. Of "Install the programs without administrator rights", the Windows job does the Java steps and the Databricks command line steps, with `unzip` in place of File Explorer. | Report the step. |
 | The steps of "Set up the local Neo4j" | The Windows job used a Neo4j server, not Neo4j Desktop. The steps follow Neo4j Desktop's documentation ("Instance management"), and menu names may differ in your version. | Reach the same goal by the menu your version has. The setup check proves the result. |
-| A new terminal after `setx KPI_STORE_LOCAL` and `setx PY_PYTHON` | The Windows job runs both commands and reads both values back from the account's settings. It opens no new terminal to read them there. | Add `--stores C:\kpi-store-local\stores.toml` to every command of this guide instead. |
+| A new terminal after `setx KPI_STORE_LOCAL` | The Windows job runs the command and reads the value back from the account's settings. It opens no new terminal to read it there. | Add `--stores "$HOME\kpi-store-local\stores.toml"` to every command of this guide instead. |
 | Clearing the report in Excel | The test edits the file with Python. The runner reads the CSV as UTF-8, with or without a byte-order mark, and reads only the columns `id`, `decision`, `decided_by` and `note`. | Edit the same three cells in Notepad instead. They are the last three values of each line. |
 | The SQL and the Cypher of "How to undo", on the objects they name | The document test runs the SQL on two throwaway schemas of the rehearsal workspace, and the delete on a throwaway database of the test server. No run used them on the sandbox or on `businessprocessarchitecturegraph`. | Do not improvise. Report it. |
 | `--replace-enterprise` on a database that holds an earlier release | The document test runs the command on a database that already holds this release, so nothing is replaced. The Windows job runs it on a copy that the job made incomplete by deleting 100 nodes. The copy stops there, and it passes with the replace allowed. A hand run on macOS did the same against the test server. No run replaced the nodes of an earlier release. | Report the line. |
@@ -1239,7 +1299,7 @@ These points are not proven on Windows, or not on the client's own objects. Each
 The check script passes on Windows in the test job. Your machine is another machine, with its own antivirus and its own folders, so one fallback stays. If the step `check` fails, read the end of `check.log`. If the failing test is about the release's content, stop and report it. If it is about the machine, such as a file that another program holds open, report it and leave the step out of the run:
 
 ```powershell run=first-run
-py -m kpi_store.runner --skip check
+python -m kpi_store.runner --skip check
 ```
 
 ```text expect

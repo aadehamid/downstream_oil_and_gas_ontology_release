@@ -193,7 +193,7 @@ def test_a_run_block_may_say_what_the_reader_types_at_its_prompts(tmp_path):
            "print('typed', name, 'and', answer)"]
     shown = fence("text expect", "Type the new name to confirm: Type yes to cut:", "typed Change_Value_Amount and yes")
     text = (fence('python run=scratch types="Change_Value_Amount,yes"', *ask) + shown
-            + fence('powershell run=copy types="Change_Value_Amount,yes"', "py -c \"print('first line')\"", "py ask.py")
+            + fence('powershell run=copy types="Change_Value_Amount,yes"', "python -c \"print('first line')\"", "python ask.py")
             + fence("text expect", "first line", "Type the new name to confirm: Type yes to cut:",
                     "typed Change_Value_Amount and yes"))
     result = check(tmp_path, text, files={"ask.py": "\n".join(ask) + "\n"})
@@ -388,7 +388,7 @@ def test_on_a_changed_release_the_strict_check_fails_and_still_runs_the_blocks(t
     result = check(tmp_path, WOULD_FAIL, files={CATALOG: "a correction version\n"}, registry=describing("one release\n"), strict=True)
     assert result.failures[0] == (f"the documents' examples describe another release than this one: the registry holds {then} and "
                                   f"{CATALOG} gives {now}. Bring the examples up to date with this release, then run: "
-                                  "py scripts/doc_snippets.py describe-release --write")
+                                  "python scripts/doc_snippets.py describe-release --write")
     assert len(result.failures) == 3 and not result.release_changed   # the builder also sees each example to change
 
 
@@ -454,7 +454,7 @@ def test_the_registry_describes_the_release_as_shipped():
     assert registry.describes == "business_architecture/ontology/releases/catalog.ttl"
     assert d.release_digest(d.ROOT, registry) == registry.sha256, (
         "the documents' examples describe another release. Bring them up to date, then run: "
-        "py scripts/doc_snippets.py describe-release --write")
+        "python scripts/doc_snippets.py describe-release --write")
 
 
 def test_the_static_check_runs_nothing_but_still_reads_the_tags(tmp_path):
@@ -942,17 +942,17 @@ def test_a_placeholder_with_no_value_or_an_unsafe_value_fails(tmp_path):
 
 
 @pytest.mark.parametrize("line,args", [
-    ("py -m kpi_store.runner --settings kpi_store.toml", ["py", "-m", "kpi_store.runner", "--settings", "kpi_store.toml"]),
-    ('py tool.py --why "Two words" --empty ""', ["py", "tool.py", "--why", "Two words", "--empty", ""]),
-    (r"py -m tool C:\kpi-store\report.json 'single quoted'", ["py", "-m", "tool", r"C:\kpi-store\report.json", "single quoted"]),
+    ("python -m kpi_store.runner --settings kpi_store.toml", ["python", "-m", "kpi_store.runner", "--settings", "kpi_store.toml"]),
+    ('python tool.py --why "Two words" --empty ""', ["python", "tool.py", "--why", "Two words", "--empty", ""]),
+    (r"python -m tool C:\kpi-store\report.json 'single quoted'", ["python", "-m", "tool", r"C:\kpi-store\report.json", "single quoted"]),
     ("  java   -jar  fuseki.jar ", ["java", "-jar", "fuseki.jar"]),
 ])
 def test_a_plain_command_line_splits_into_its_arguments(line, args):
     assert d.split_command(line) == args
 
 
-@pytest.mark.parametrize("line", ["py a.py | more", "py a.py > out.txt", "$env:X = 1", "py a.py; py b.py",
-                                  'py a.py "$NAME"', "py a.py %NAME%", "py a.py && py b.py", 'py "open'])
+@pytest.mark.parametrize("line", ["python a.py | more", "python a.py > out.txt", "$env:X = 1", "python a.py; python b.py",
+                                  'python a.py "$NAME"', "python a.py %NAME%", "python a.py && python b.py", 'py "open'])
 def test_a_line_that_needs_a_shell_is_not_a_plain_command_line(line):
     with pytest.raises(d.NotSimple):
         d.split_command(line)
@@ -967,15 +967,15 @@ def test_py_and_python_are_this_interpreter():
 
 
 def test_a_powershell_block_of_plain_lines_runs_without_a_shell(tmp_path):
-    text = (fence("powershell run=copy", "# A comment line.", "cd tools", 'py show.py "two words" `', "    last")
+    text = (fence("powershell run=copy", "# A comment line.", "cd tools", 'python show.py "two words" `', "    last")
             + fence("text expect", "['two words', 'last']")
-            + fence("cmd run=copy status-only", "REM back in the top folder", "cd ..", "py tools/show.py one"))
+            + fence("cmd run=copy status-only", "REM back in the top folder", "cd ..", "python tools/show.py one"))
     result = check(tmp_path, text, files={"tools/show.py": "import sys\nprint(sys.argv[1:])\n"})
     assert result.failures == [] and result.summary() == "3 blocks: 2 run (1 status-only), 1 checked, 0 skipped"
 
 
 def test_a_powershell_block_with_shell_syntax_fails_unless_it_says_windows(tmp_path):
-    result = check(tmp_path, "# Guide\n\n" + fence("powershell run=scratch status-only", "py -c \"print(1)\"", "$env:A = 1"),
+    result = check(tmp_path, "# Guide\n\n" + fence("powershell run=scratch status-only", "python -c \"print(1)\"", "$env:A = 1"),
                    static=True)
     assert result.failures == ["guide.md:3: line 5 is not a plain command line (`$`). Write it without shell syntax, "
                                "or add os=windows so that it runs in a real shell on Windows only"]
@@ -983,18 +983,46 @@ def test_a_powershell_block_with_shell_syntax_fails_unless_it_says_windows(tmp_p
 
 @pytest.mark.skipif(os.name == "nt", reason="on Windows the block runs")
 def test_a_block_for_windows_only_is_counted_elsewhere(tmp_path):
-    result = check(tmp_path, fence("powershell run=scratch os=windows status-only", "$env:A = 1; py -c \"print($env:A)\""))
+    result = check(tmp_path, fence("powershell run=scratch os=windows status-only", "$env:A = 1; python -c \"print($env:A)\""))
     assert result.failures == [] and result.summary() == "1 blocks: 0 run (0 status-only), 0 checked, 1 skipped (windows-only 1)"
 
 
 @pytest.mark.skipif(os.name != "nt", reason="elsewhere the block is counted and not run")
 def test_a_block_for_windows_only_runs_in_a_real_shell_on_windows(tmp_path):
-    text = (fence("powershell run=scratch os=windows", "$env:A = 'seen'; py -c \"import os; print(os.environ['A'])\"")
+    # `python`, not `py`: the test runs wherever the check script runs, and a Python from a virtual environment or
+    # from uv has no launcher. The Python that runs this test is on PATH under the name python.
+    text = (fence("powershell run=scratch os=windows", "$env:A = 'seen'; python -c \"import os; print(os.environ['A'])\"")
             + fence("text expect", "seen")
-            + fence("cmd run=scratch os=windows", "set B=also&& py -c \"import os; print(os.environ['B'])\"")
+            + fence("cmd run=scratch os=windows", "set B=also&& python -c \"import os; print(os.environ['B'])\"")
             + fence("text expect", "also"))
     result = check(tmp_path, text)
     assert result.failures == [] and result.summary() == "4 blocks: 2 run (0 status-only), 2 checked, 0 skipped"
+
+
+def test_a_block_that_starts_python_with_py_fails_on_every_machine(tmp_path):
+    """The first real run was on a Python from a virtual environment, where `py` is not there. The documents start
+    Python with `python`, and the check holds every run block to that."""
+    launcher = "p" + "y"   # spelled in two parts, so that a search of the tree for the launcher's commands finds none here
+    for body in (f"{launcher} -m pip install rdflib", f"$env:A = 1; {launcher} -c \"print(1)\"", f"set B=also&& {launcher} -c \"print(1)\"",
+                 f"cd C:\\kpi-store-1.1\n{launcher}.exe -m kpi_store.setup_check", f"if ($true) {{ {launcher} -V }}",
+                 f"{launcher.capitalize()} -V", f"{launcher.upper()}.EXE -V", f"call {launcher} -V", f"@{launcher} -V", f"& {launcher} -V",
+                 f"echo on && CALL {launcher} -V", f"start {launcher} tool.{launcher}",
+                 f'start "" {launcher} -V', f"start /wait {launcher} -V", f'START "KPI Store" /wait /b {launcher}.exe -V'):
+        assert d.starts_launcher(body), body
+    # The word inside another word, a path or an argument is not the launcher.
+    for body in ("python -m pip install rdflib", "setx PY_PYTHON 3.12", "uv run tool.py", f"echo {launcher}", f"C:\\tools\\{launcher} -V",
+                 "copy.exe a b", "happy -V", f"call tool.{launcher}", "set PY=3", f"python -m {launcher}_compile x",
+                 f'start "{launcher}" python -V', "start /wait python -V", f"start notepad {launcher}",
+                 f'start "" "python" {launcher} -V'):   # after the title, the quoted word is the program and the launcher's name its argument
+        assert not d.starts_launcher(body), body
+    said = ("the block starts Python with `py`. Write `python`: a Python from a virtual environment has no `py` "
+            "launcher, so the command would not start there")
+    for tag, body in (("powershell run=scratch status-only", f"{launcher} -c \"print(1)\""),
+                      ("powershell run=scratch os=windows status-only", f"$env:A = 1; {launcher} -c \"print(1)\""),
+                      ("cmd run=scratch os=windows status-only", f"set B=also&& {launcher} -c \"print(1)\""),
+                      ("bash run=scratch status-only", f"{launcher} -c 'print(1)'")):
+        assert check(tmp_path, fence(tag, body)).failures == [f"guide.md:1: {said}"], tag
+    assert check(tmp_path, fence("powershell run=scratch status-only", "python -c \"print(1)\"")).failures == []
 
 
 def test_a_missing_program_fails_the_line(tmp_path):
@@ -1231,9 +1259,9 @@ FIXTURE = REGISTRY + """
 [contexts.store]
 base = "release-copy"
 pass_env = ["DOC_TEST_LOG", "DOC_TEST_FAIL"]
-fixture = "py tools/fixture.py"
+fixture = "python tools/fixture.py"
 [contexts.store.runs]
-sql = "py tools/run_sql.py"
+sql = "python tools/run_sql.py"
 [contexts.store.placeholders]
 "the table" = "fixture"
 "no value" = "fixture"
@@ -1281,7 +1309,7 @@ def test_a_fixture_that_cannot_be_made_or_removed_fails_the_check(tmp_path):
     assert log.read_text().split() == ["up", "down"] and len(both.failures) == 3
     assert both.failures[2].startswith("the fixture of the context `store` could not be removed after its start had failed. "
                                        "What it made may still be there; its output below says what is left and how to "
-                                       "remove it by hand (the fixture is `py tools/fixture.py`)\n")
+                                       "remove it by hand (the fixture is `python tools/fixture.py`)\n")
     assert "left behind: the made-up store" in both.failures[2]
     log.unlink()
     removed = check(tmp_path, text, files=FIXTURE_FILES, registry=FIXTURE, environ={"DOC_TEST_LOG": str(log), "DOC_TEST_FAIL": "down"})
@@ -1306,7 +1334,7 @@ def test_the_registry_holds_nothing_the_runner_reads_as_a_secret():
 
 def test_a_fixture_or_a_runs_table_needs_a_copy_of_the_release_and_an_owner_a_path_inside_it(tmp_path):
     path = tmp_path / "r.toml"
-    path.write_text('[contexts.a]\nbase = "empty"\nfixture = "py tools/fixture.py"\n', encoding="utf-8", newline="\n")
+    path.write_text('[contexts.a]\nbase = "empty"\nfixture = "python tools/fixture.py"\n', encoding="utf-8", newline="\n")
     with pytest.raises(d.RegistryError, match="context a has a fixture or runs, so it needs base"):
         d.load_registry(path)
     path.write_text('[contexts.a]\nbase = "empty"\nowner = "../guide.md"\n', encoding="utf-8", newline="\n")
@@ -1369,7 +1397,7 @@ def test_the_contexts_that_run_everywhere_need_no_variable_and_the_others_name_t
         "first-run": "business_architecture/ontology/projection/ontology-stores-runbook.md"}
     for c in contexts.values():
         for command in [c.fixture, *c.runs.values()]:
-            assert not command or command.startswith("py scripts/doc_snippets_fixtures.py "), c.name
+            assert not command or command.startswith("python scripts/doc_snippets_fixtures.py "), c.name
 
 
 def test_every_markdown_document_of_the_tree_is_in_scope():
@@ -1459,7 +1487,7 @@ def test_the_rows_of_a_table_under_a_heading_are_read_with_their_code_spans_and_
 
 def test_every_block_that_no_test_runs_is_in_the_table_and_the_table_names_no_other():
     """Nobody adds a skipped block in silence: scripts/DOC-SNIPPETS.md lists each one, with what was done instead
-    and who can run it. `py scripts/doc_snippets.py not-run` prints the first four cells of every row."""
+    and who can run it. `python scripts/doc_snippets.py not-run` prints the first four cells of every row."""
     text = (d.ROOT / "scripts" / "DOC-SNIPPETS.md").read_text(encoding="utf-8")
     rows = d.table_rows(text, NOT_RUN_HEADING)
     assert rows, f"scripts/DOC-SNIPPETS.md has no table under {NOT_RUN_HEADING}"

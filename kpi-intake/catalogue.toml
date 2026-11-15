@@ -4,7 +4,7 @@
 # The two forms (kpi-intake-form.html and kpi-intake-form.xlsx), the explainer, the Architect's page and the
 # completeness check are all built from this file. After you change it, rebuild them:
 #
-#     py -m kpi_store.intake build
+#     python -m kpi_store.intake build
 #
 # What you can change here without touching code: any text, the rules, the routing outcomes, the sign-off block
 # and the time estimates. The role titles and the lists your organization sets for itself are in settings.toml. A new question

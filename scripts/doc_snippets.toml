@@ -7,7 +7,7 @@ temporary_reasons = ["awaits-the-rewrite"]
 # The release the documents' examples describe: the SHA-256 of `file`, the catalog of every release package, which
 # changes with every package version. On a release with another digest the check runs no block, because an example
 # may rightly show another version or count there, and `check --strict` fails. After you bring the examples up to
-# date with a new release, write its digest here with: py scripts/doc_snippets.py describe-release --write
+# date with a new release, write its digest here with: python scripts/doc_snippets.py describe-release --write
 [describes]
 file = "business_architecture/ontology/releases/catalog.ttl"
 sha256 = "0f2d1d54ee0984eacb3aa6301ecd4d5a8a027f7337369e8feca5e73ae420eb78"
@@ -47,18 +47,23 @@ awaits-the-rewrite = "The document is about to be rewritten, and the block goes 
 #   runs          for a language the check cannot run itself (sql, cypher) or must run in another way (python): the
 #                 command line that runs a block's text. It gets the text as a file, the last argument
 
+# The three quick contexts give a block ten minutes. A block that takes 40 seconds on a fast machine ran past
+# two minutes on a slow test machine, and the reader's laptop may be slower still.
 [contexts.scratch]
 base = "empty"
 about = "An empty folder. For a command that needs nothing from the release."
+timeout = 600
 
 [contexts.release-copy]
 base = "release-copy"
 about = "A copy of the release, as a plain folder. For a quick command that reads or changes the release."
+timeout = 600
 
 [contexts.release-git]
 base = "release-copy"
 git = true
 about = "A copy of the release in a new Git repository with one commit. For a quick command that uses Git."
+timeout = 600
 
 [contexts.slow]
 base = "release-copy"
@@ -141,7 +146,7 @@ base = "release-copy"
 needs_env = ["KPI_STORE_TEST_NEO4J_URI", "KPI_STORE_TEST_NEO4J_PASSWORD"]
 pass_env = ["KPI_STORE_TEST_NEO4J_USER"]
 timeout = 300
-fixture = "py scripts/doc_snippets_fixtures.py questions"
+fixture = "python scripts/doc_snippets_fixtures.py questions"
 about = "A copy of the release beside a composite database over two made-up graphs, which the fixture builds on the Neo4j Enterprise test server and removes. For the cross-graph questions."
 
 [contexts.questions.placeholders]
@@ -156,29 +161,29 @@ pass_env = ["KPI_STORE_TEST_NEO4J_USER"]
 about = "The database businessprocessarchitecturegraph of the Neo4j test server, read only: a statement that writes fails. For a Cypher statement that only asks."
 
 [contexts.enterprise-database.runs]
-cypher = "py scripts/doc_snippets_fixtures.py cypher businessprocessarchitecturegraph"
+cypher = "python scripts/doc_snippets_fixtures.py cypher businessprocessarchitecturegraph"
 
 [contexts.scratch-database]
 base = "release-copy"
 needs_env = ["KPI_STORE_TEST_NEO4J_URI", "KPI_STORE_TEST_NEO4J_PASSWORD"]
 pass_env = ["KPI_STORE_TEST_NEO4J_USER"]
-fixture = "py scripts/doc_snippets_fixtures.py scratch-database"
+fixture = "python scripts/doc_snippets_fixtures.py scratch-database"
 about = "A throwaway database on the Neo4j test server with 25 nodes and the constraint n10s_unique_uri. The fixture makes it under a new name and drops it. For a Cypher statement that deletes."
 
 [contexts.scratch-database.runs]
-cypher = "py scripts/doc_snippets_fixtures.py cypher scratch"
+cypher = "python scripts/doc_snippets_fixtures.py cypher scratch"
 
 [contexts.scratch-schemas]
 base = "release-copy"
 needs_env = ["KPI_STORE_TEST_LOCAL_SETTINGS"]
 home = "real"
 timeout = 900
-fixture = "py scripts/doc_snippets_fixtures.py scratch-schemas"
+fixture = "python scripts/doc_snippets_fixtures.py scratch-schemas"
 about = "Two throwaway schemas in the rehearsal catalog of the local settings, with the four tables and the volume a run leaves, which the fixture makes and drops. For SQL that drops, and for Python that needs a notebook's Spark session. It keeps the real home folder."
 
 [contexts.scratch-schemas.runs]
-sql = "py scripts/doc_snippets_fixtures.py sql"
-python = "py scripts/doc_snippets_fixtures.py notebook"
+sql = "python scripts/doc_snippets_fixtures.py sql"
+python = "python scripts/doc_snippets_fixtures.py notebook"
 
 [contexts.scratch-schemas.placeholders]
 catalog = "fixture"

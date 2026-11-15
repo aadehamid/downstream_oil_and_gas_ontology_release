@@ -803,7 +803,10 @@ class CommandLine(unittest.TestCase):
         folder = tempfile.mkdtemp()
         path = write(folder, "d.nq", '<http://s> <http://p> "v" <http://g> .\n')
         link = os.path.join(folder, "alias")
-        os.symlink(path, link)
+        try:
+            os.symlink(path, link)
+        except (OSError, NotImplementedError):
+            self.skipTest("this system does not let the test make a link")
         out = os.path.join(folder, "o.nq")
         r = self.run_cli("pack", "--out", out, "--graph", f"{link}=https://example.org/x", path)
         self.assertEqual(r.returncode, 2)

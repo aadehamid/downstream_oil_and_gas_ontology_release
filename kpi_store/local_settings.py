@@ -18,6 +18,7 @@ Each table of the file is optional, so a machine that runs only one command need
 command asks for a part with LocalSettings.need, which stops with the name of the missing table.
 """
 import os
+import re
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,7 +32,7 @@ SYSTEM_DATABASE = "system"   # Neo4j's own database of databases and users; neve
 # read as a key left out. Each table is optional; a step that needs a missing table stops and names it.
 LAYOUT = {
     "release": {"settings": str, "run_folder": str},
-    "databricks": {"profile": str, "workspace_folder": str, "cli": str, "timeout_minutes": int},
+    "databricks": {"profile": str, "workspace_folder": str, "cli": str, "timeout_minutes": int, "environment_version": str},
     "fuseki": {"jar": str, "url": str, "data_folder": str, "java": str},
     "neo4j": {"local": {"uri": str, "username": str, "password": str, "password_env": str, "database": str,
                         "plugins_folder": str},
@@ -40,7 +41,11 @@ LAYOUT = {
     "tools": {"bash": str},
 }
 # The keys a table may leave out. Every other key of a table that is present is required.
-OPTIONAL = {("databricks", "cli"), ("databricks", "timeout_minutes"), ("fuseki", "data_folder"), ("fuseki", "java"),
+# The serverless environment version the notebook run asks for when the settings name none. Version 2 has Python
+# 3.11, and the rehearsal workspace gave it to the test runs, which named none (measured on 2026-11-14). A workspace's own default can be older: the first real run
+# got Python 3.10 that way, and the first cut's notebook failed there.
+ENVIRONMENT_VERSION = "2"
+OPTIONAL = {("databricks", "cli"), ("databricks", "timeout_minutes"), ("databricks", "environment_version"), ("fuseki", "data_folder"), ("fuseki", "java"),
             ("neo4j.local", "password"), ("neo4j.local", "password_env"), ("neo4j.local", "plugins_folder"),
             ("neo4j.enterprise", "password"), ("neo4j.enterprise", "password_env"), ("tools", "bash")}
 
@@ -121,6 +126,7 @@ class Databricks:
     workspace_folder: str     # the workspace folder the notebook is imported into
     cli: Path | None          # the CLI's path when it is not on PATH
     timeout_minutes: int      # how long the runner waits for the notebook run; 60 when not set
+    environment_version: str  # the serverless environment version of the notebook run; "" leaves it to the workspace
 
 
 @dataclass(frozen=True)
@@ -245,6 +251,9 @@ def parse(data, path, environ=None, release_root=ROOT):
             raise LocalSettingsError("[databricks] profile must name a Databricks CLI profile")
         if bricks.get("timeout_minutes", 60) < 1:
             raise LocalSettingsError("[databricks] timeout_minutes must be 1 or more")
+        if not re.fullmatch(r"[1-9][0-9]?|", bricks.get("environment_version", ENVIRONMENT_VERSION).strip()):
+            raise LocalSettingsError('[databricks] environment_version must be a number in quotes, such as "2", or "" '
+                                     "to leave the choice to the workspace")
     if fuseki is not None:
         _required(fuseki, "fuseki", LAYOUT["fuseki"])
         # The URL must be a server and exactly one dataset name, with nothing after it: the query, data and update
@@ -262,7 +271,8 @@ def parse(data, path, environ=None, release_root=ROOT):
         run_folder=_path(release["run_folder"], base) if release else None,
         databricks=Databricks(bricks["profile"].strip(), bricks["workspace_folder"],
                               _path(bricks["cli"], base) if bricks.get("cli") else None,
-                              bricks.get("timeout_minutes", 60)) if bricks else None,
+                              bricks.get("timeout_minutes", 60),
+                              bricks.get("environment_version", ENVIRONMENT_VERSION).strip()) if bricks else None,
         fuseki=Fuseki(_path(fuseki["jar"], base), fuseki["url"].rstrip("/"),
                       _path(fuseki["data_folder"], base) if fuseki.get("data_folder") else None,
                       _path(fuseki["java"], base) if fuseki.get("java") else None) if fuseki else None,

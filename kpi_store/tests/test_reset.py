@@ -163,7 +163,7 @@ def test_the_word_empties_the_stores_in_order_and_a_node_without_the_marks_survi
         f"fuseki: emptied. process 4242 stopped; {world.data} deleted",
         "databricks: emptied. 3 table(s) dropped: idp_sbx.kpi_store.epm_triples, idp_sbx.kpi_store.epm_store_markers, "
         "idp_sbx.tech_graph.tech_graph_triples",
-        "reset done: enterprise, neo4j, fuseki and databricks hold nothing of the KPI Store. To load again, run: py -m kpi_store.runner"]
+        "reset done: enterprise, neo4j, fuseki and databricks hold nothing of the KPI Store. To load again, run: python -m kpi_store.runner"]
     # Enterprise: the two Invoice nodes are all that is left, and no statement dropped anything there.
     assert world.enterprise.nodes == [(["Invoice"], {"number": "made up"})] * 2
     assert not any("DROP" in s for s in world.enterprise.statements)
@@ -224,7 +224,7 @@ def test_a_local_database_with_no_constraint_does_not_speak_of_constraints(world
     assert world.lines[1:3] == [
         "neo4j: the local database neo4j holds no node that the load wrote and no constraint that it made; nothing to delete",
         "  1 node(s) that the load did not write stay (1 Note)"]
-    assert world.lines[-1] == "reset done: neo4j holds nothing of the KPI Store. To load again, run: py -m kpi_store.runner"
+    assert world.lines[-1] == "reset done: neo4j holds nothing of the KPI Store. To load again, run: python -m kpi_store.runner"
     assert world.neo4j.nodes == [(["Note"], {"text": "made up"})] and world.asked == []
 
 
@@ -448,12 +448,16 @@ def test_a_folder_that_is_not_the_configured_one_is_refused(world, tmp_path):
     assert (other / "Data-0001").is_dir() and (world.data / "Data-0001" / "nodes.dat").is_file()
 
 
-def test_a_data_folder_reached_through_a_link_is_refused_and_the_folder_checked_is_the_folder_deleted(world, tmp_path, monkeypatch):
+def test_a_data_folder_reached_through_a_link_is_refused(world, tmp_path):
     real = tmp_path / "elsewhere"
     (real / "fuseki-db" / "Data-0001").mkdir(parents=True)
     (real / "fuseki-db" / "Data-0001" / "nodes.dat").write_bytes(b"someone else's")
     link = tmp_path / "linked"
-    link.symlink_to(real, target_is_directory=True)
+    try:
+        link.symlink_to(real, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        # Windows lets an account make a link only with administrator rights or Developer Mode.
+        pytest.skip("this system does not let the test make a link")
     through = stores_support.local_settings(world.folder, release_root=world.root,
                                             data_folder=f'data_folder = "{(link / "fuseki-db").as_posix()}"')
     with pytest.raises(reset.ResetFailed, match=r"linked is a link, so \[fuseki\] data_folder does not say which folder would "
@@ -468,6 +472,9 @@ def test_a_data_folder_reached_through_a_link_is_refused_and_the_folder_checked_
     direct = stores_support.local_settings(world.folder, release_root=world.root, data_folder=f'data_folder = "{last.as_posix()}"')
     with pytest.raises(reset.ResetFailed, match="db-link is a link"):
         reset.check_dataset_folder(last, direct, world.root)
+
+
+def test_the_folder_checked_is_the_folder_deleted(world, monkeypatch):
     # With no link, the path that was checked is the one that is deleted, in its resolved form.
     roundabout = world.folder / "runs" / ".." / "fuseki-db"   # the same folder, written another way in the settings
     world.ctx.local = stores_support.local_settings(world.folder, release_root=world.root,
