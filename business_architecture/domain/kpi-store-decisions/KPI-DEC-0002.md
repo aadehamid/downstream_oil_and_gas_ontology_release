@@ -1,4 +1,4 @@
-# KPI-DEC-0002: KPI Store 1.2 automates every ontology change through forms and commands, with one end-to-end handout
+# KPI-DEC-0002: KPI Store 1.2 makes ontology changes through change forms and commands, with optional AI drafting and one end-to-end handout
 
 | Field | Value |
 |---|---|
@@ -18,9 +18,9 @@ The agent wrote this section. It is not the owner's words.
 
 KPI Store 1.1 closed on 2026-11-17. Its command handout leaves the ontology change itself to a person: the
 Architect reads a signed intake form and edits the source tables by hand (handout H6 and H7). The people who will
-receive the ontology have never built one. This record fixes what 1.2 builds so that every ontology change goes
-through a form and a command, and so that one handout covers the whole path from setup to a changed, loaded and
-checked ontology.
+receive the ontology have never built one. This record fixes what 1.2 builds: every change the six change forms
+cover goes through a form and a command; a change outside them needs a specialist, or an AI draft under the extra
+gates of Q19; and one handout covers the whole path from setup to a changed, loaded and checked ontology.
 
 Facts the questions rested on, read on 2026-11-18 at `kpi-store/1.1` 6586f63:
 
@@ -33,45 +33,63 @@ Facts the questions rested on, read on 2026-11-18 at `kpi-store/1.1` 6586f63:
   needs a code change today.
 - Approvals are free Markdown; no file format is checked.
 
-How the agent reads two answers, for the owner to correct:
+How the agent reads the answers, for the owner to correct:
 
-- Q1 and Q8 together set the independent-review order for this release's pull requests: Antigravity on
+- Q1, Q8 and Q9 together set the independent-review order for this release's pull requests: Antigravity on
   `gemini-4-neon-xhigh`, then Pi, then Codex on `gpt-6.2-sol` at xhigh reasoning with the Fast tier, then Kimi on
-  K3.1 Pro. The agent reads Q1's list as replacing the order for every pull request, not only the high-risk ones.
-  The same order for the main repository needs its own amendment to EPM-DEC-001-0028 there (Q15).
-- The owner's reply on AI amends Q3: propose stays rule-based by default, and AI becomes an option (Q16 to Q20).
+  K3.1 Pro. Q9 made Antigravity depend on one trial review without a person present. The trial ran on 2026-11-18
+  on this record's first commit and returned a full review when the change was given in the prompt; Antigravity's
+  headless mode refused tool commands. The agent reads Q1's list as replacing the order for every pull request,
+  not only the high-risk ones; the owner has not confirmed that reading.
+- The owner's reply on AI amends the accepted Q3: propose stays rule-based by default, and AI becomes an option
+  (Q16 to Q20).
+- This record changes three things that KPI-DEC-0001 set for this release: what the next version builds; how a
+  change enters the ontology, now through the change forms (Q10) or an AI draft under Q16 to Q19, alongside the
+  correction loop that KPI-DEC-0001 set and that stays in force; and the independent-review order (Q1, Q8, Q9).
+  The rest of KPI-DEC-0001 stays in force.
+
+Open items, not decided by the owner:
+
+- Q11 leaves a third module pattern (a new class with new properties) for later. With Q17, AI-drafted new
+  modelling is allowed under the Q19 gates; whether that also becomes a supported form pattern is not decided.
+- Q18 and Q22: the exact Genie call for AI drafting waits on the Genie investigation.
+- Q26: installing the skills as Genie skills in Unity Catalog waits on the same investigation.
+- Q25: the person who rehearses the handout is the owner's choice.
+- Whether Q1's reviewer order covers every pull request or only the high-risk ones, as above.
 
 ## Decision
 
-The owner's words, quoted from the answers file. Where the owner accepted a recommendation, the recommendation is
-quoted as it was asked, with Markdown removed.
+The owner's words, quoted from the answers file. Where the owner chose an option or accepted a recommendation,
+that option or recommendation is quoted as it was asked, with Markdown removed; those quotes are the agent's text,
+as asked, not the owner's words.
 
 **The instruction:** "By the way I want that single ahndlout that works end to end , including updating the
 ontology with commands created. Remember the people I plan to hand the ontology to have never built one so it will
 have to be mostly automated and of course rigorosuly validated"
 
-**Order in 1.2:** "Handout + commands first (Recommended)", the option "Build propose and apply, and the single
-handout that uses them, before the Genie items. The Genie doors build on these commands anyway."
+**Order in 1.2:** "Handout + commands first (Recommended)". The option it chose (the agent's text, as asked): "Build
+propose and apply, and the single handout that uses them, before the Genie items. The Genie doors build on these
+commands anyway."
 
 **Scope:** "Everything as much as possible also from taking the output of the KPI Intake and using the portion of
 the intake data that requires an update to the ontology to be made. also including creating a new module"
 
-**Change format:** "Yes, KGCL (Recommended)", the option "A standard, readable change record that a machine can
-apply. It doubles as the release notes and the list of terms the glossary agent tests."
+**Change format:** "Yes, KGCL (Recommended)". The option it chose (the agent's text, as asked): "A standard,
+readable change record that a machine can apply. It doubles as the release notes and the list of terms the glossary
+agent tests."
 
-**Handout home:** "Release repo, copied out (Recommended)", the option "The master lives in the release with its
-commands, and the release's checks test that every command in it exists and runs. The training-materials folder
-gets a generated copy."
+**Handout home:** "Release repo, copied out (Recommended)". The option it chose (the agent's text, as asked): "The
+master lives in the release with its commands, and the release's checks test that every command in it exists and
+runs. The training-materials folder gets a generated copy."
 
 **Q1, the reviewers:** "use in orde Gemini 4 Neon, Pi, Codex 6.2 Astra Sol ultrafast, Kimi 3.1 Pro"
 
-**Q2 to Q7:** "Yes to other questions." The recommendations accepted:
+**Q2 to Q7:** "Yes to other questions." The recommendations accepted (the agent's text, as asked):
 
 - Q2: "(a). The client owns content after handover, and 1.2 includes an upgrade command that brings new tooling
   into their copy without touching their ontology changes."
 - Q3: "(a). Propose works by rule only: the same signed form always gives the same proposal, and it can be tested.
-  An LLM could still help write the form, in Genie's door 2 later, but not inside propose." Amended the same day
-  by the owner's words on AI below.
+  An LLM could still help write the form, in Genie's door 2 later, but not inside propose."
 - Q4: "Yes. The client names one person in Digital IT as the Architect. Apply refuses without the signatures that
   the change type needs, and a major change or a new module also needs the Ontology Owner. The commands record each
   signature in the approval file automatically."
@@ -89,11 +107,14 @@ validated that it works like we did before."
 writing of ontology. If this is not possible let me know"
 
 **AI as an option:** "We should not eliminate AI completely. it should be an option. As we may need it in cases
-like below", followed by the agent's statement that new modelling (new classes, rules, property meanings or
-constraint shapes) is not safely possible by forms alone.
+like below". The text the owner's message quoted (the agent's text, not the owner's words): "Not safely possible: a
+new module that needs new modelling, such as new classes with their own rules, new property meanings or new
+constraint shapes. Someone has to design those. With no ontologist and no AI in propose, a form can only offer
+choices from patterns we define in advance. Anything outside the patterns stops and says it needs a specialist. I'd
+rather the commands refuse than produce a model that passes the checks but means the wrong thing."
 
 **Q8 to Q20:** "Yes to all with comments below:" and "Q18: they should also be able to use Genie for thsi." The
-recommendations accepted:
+recommendations accepted (the agent's text, as asked):
 
 - Q8: "gpt-6.2-sol at xhigh reasoning with the Fast tier. ultra hands work off to other agents automatically,
   which doesn't suit a single review."
@@ -107,12 +128,11 @@ recommendations accepted:
 - Q15: "Yes to both. I'll write them once the grilling is finished."
 - Q16: "Yes. AI drafts, people sign, and the commands check."
 - Q17: "Yes to both. Nothing an AI suggests reaches a proposal unless a person accepted it."
-- Q18: "(c), defaulting to (a). The client's IT approves the choice once, and it's recorded in settings." With the
-  owner's comment: "they should also be able to use Genie for thsi."
+- Q18: "(c), defaulting to (a). The client's IT approves the choice once, and it's recorded in settings."
 - Q19: "Yes, all five."
 - Q20: "Yes."
 
-**Q21 to Q25:** "Yes to all." The recommendations accepted:
+**Q21 to Q25:** "Yes to all." The recommendations accepted (the agent's text, as asked):
 
 - Q21: "Yes. It's an idea to borrow and test after the core commands work."
 - Q22: "Yes. The Genie investigation moves earlier and runs alongside, scoped to that one question."
@@ -120,30 +140,37 @@ recommendations accepted:
 - Q24: "Yes. It replaces the 1.1 handout in the training folder through the generated copy."
 - Q25: "Yes. You choose the person, and their run is the last gate before handover."
 
-**Q26 to Q28:** "yes to all" The recommendations accepted:
+**Q26 to Q28:** "yes to all" The recommendations accepted (the agent's text, as asked):
 
 - Q26: "Yes. The skills are versioned with the release, so the AI always follows the rules of the release it
   changes."
 - Q27: "Yes. Apply runs every check that applies to the change type, and the full check still runs all of them."
 - Q28: "Yes. The readers have never built an ontology, so the skills are machinery, not reading."
 
-## Not decided
-
-- Q11 leaves a third module pattern (a new class with new properties) for later. With Q17, AI-drafted new
-  modelling is allowed under the Q19 gates; whether that also becomes a supported form pattern is not decided.
-- Q18 and Q22: the exact Genie call for AI drafting waits on the Genie investigation.
-- Q26: installing the skills as Genie skills in Unity Catalog waits on the same investigation.
-- Q25: the person who rehearses the handout is the owner's choice.
-
 ## Alternatives considered
 
-The options and recommendations not taken are saved with each question in the answers file.
+- **Keep the agreed 1.2 order, with the Genie investigation and door 1 first.** Not chosen: "Handout + commands first
+  (Recommended)".
+- **Limit 1.2 to KPI changes.** Not chosen: "Everything as much as possible ... also including creating a new module".
+- **A KPI Store-specific JSON change file.** Not chosen: "Yes, KGCL (Recommended)".
+- **Keep editing the handout in the training folder only.** Not chosen: "Release repo, copied out (Recommended)".
+- **Propose by rule only, with no AI anywhere.** Not chosen: "We should not eliminate AI completely. it should be an
+  option."
+- **Take SelfGraph into 1.2 as a dependency.** Not chosen: Q21's recommendation, accepted with "Yes to all."
+
+The other options and recommendations not taken are saved with each question in the answers file.
+
+## The owner's recorded words
+
+Saved in `answers/2026-11-18-kpi-store-1.2.md`: every quote in the Decision section above, word for word. Square
+brackets in that file replace references to things outside this release, so the release stands alone (KPI-DEC-0001);
+the agent decided that under the delegation in KPI-DEC-0003, and the unchanged text is kept outside the release.
+
+The agent's text, not the owner's words: the owner can reverse any reading in the Context section.
 
 ## Evidence
 
-- The owner's words: `answers/2026-11-18-kpi-store-1.2.md`.
-- The 1.1 handout: "Running and Changing Your Ontology - Command Handout" (KPI Store 1.1 training materials),
+- The owner's instruction and answers of 2026-11-18 (the answers file). Tier: the owner's recorded decision.
+- The 1.1 handout, "Running and Changing Your Ontology - Command Handout" (KPI Store 1.1 training materials),
   sections H6 and H7.
-- A review of related links (KGCL, Apache Ossie, the Neo4j Ontology Graph Specification, Relate), read 2026-11-18.
-
-This record amends KPI-DEC-0001 only in what 1.2 builds; KPI-DEC-0001's rules for the release stay in force.
+- `scripts/check.sh` in this release: the check every change passes before it is pushed.
