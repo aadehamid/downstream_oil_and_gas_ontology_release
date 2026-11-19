@@ -389,7 +389,7 @@ def test_settings_that_name_the_enterprise_database_are_refused_when_enterprise_
     assert not ln.same_address(one("bolt://localhost:abc"), one("bolt://127.0.0.1:xyz"))
     # A load report from an earlier run makes no difference: the settings are refused before anything connects.
     (tmp_path / "same" / "lpg-out").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "same" / "lpg-out" / ln.REPORT).write_text("{}", encoding="utf-8")
+    (tmp_path / "same" / "lpg-out" / ln.REPORT).write_text(json.dumps(REPORT), encoding="utf-8")   # a passing report
     with pytest.raises(ln.LoadError, match=r"^\[neo4j.local\] names the Enterprise database"):
         ln.load(same, support.ROOT, tmp_path / "run", code=stub_code(calls), connect=unreachable)
 
