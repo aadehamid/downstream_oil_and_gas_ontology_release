@@ -7,6 +7,7 @@ shipped. Every line the code writes is checked against the official KGCL parser,
 these tests need.
 """
 import csv
+import importlib.util
 import json
 import shutil
 from pathlib import Path
@@ -328,8 +329,12 @@ def test_a_change_file_applied_to_a_scratch_copy_comes_back_from_the_compare(scr
     assert 'a "made-up" synonym' in kpi_tables._split(details[a]["aliases"])
     assert details[b]["definition"] == "A made-up definition, written for the round trip."
     # The edge is written as the process's notation from the core, not as the id's slug.
-    notation = str(Graph().parse(next((scratch / "business_architecture" / "ontology" / "releases" / "core").glob("*/core.ttl")))
-                   .value(URIRef(kpi_tables.PREFIXES["proc"] + process.split(":", 1)[1]), SKOS.notation))
+    spec = importlib.util.spec_from_file_location("newest_for_test", scratch / "business_architecture" / "ontology" /
+                                                  "release" / "newest.py")   # the newest core, as apply reads it
+    newest = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(newest)
+    core = Graph().parse(newest.core_file(ontology=str(scratch / "business_architecture" / "ontology")))
+    notation = str(core.value(URIRef(kpi_tables.PREFIXES["proc"] + process.split(":", 1)[1]), SKOS.notation))
     assert notation != process.split(":", 1)[1]
     assert notation in kpi_tables._split(details[b]["informs_process"])
     assert notation not in kpi_tables._split(details[a]["informs_process"])
@@ -480,7 +485,7 @@ def test_write_record_refuses_an_extra_signature_field_and_signatures_that_are_n
     with pytest.raises(ChangeRefused, match="no signatures"):
         approval.write_record(tmp_path, "c1", "minor", None)
     with pytest.raises(ChangeRefused, match="control character"):
-        approval.write_record(tmp_path, "c1", "minor", [dict(DATA_OWNER, name="A. Sample"), ARCHITECT])
+        approval.write_record(tmp_path, "c1", "minor", [dict(DATA_OWNER, name="A.\u2028Sample"), ARCHITECT])
     assert not (tmp_path / approval.APPROVALS).exists()
 
 
