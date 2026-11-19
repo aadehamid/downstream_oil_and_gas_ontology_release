@@ -82,7 +82,7 @@ def check(record):
             raise ChangeRefused(f"signature {n} holds fields it should not: {', '.join(extra)}")
         if sig["role"] not in ROLES:
             raise ChangeRefused(f"signature {n}: {sig['role']!r} is not a role that signs ({', '.join(ROLES)})")
-        if any(unicodedata.category(c) == "Cc" for c in sig["name"]):
+        if any(unicodedata.category(c) in ("Cc", "Zl", "Zp") for c in sig["name"]):
             raise ChangeRefused(f"signature {n}: the name holds a line break or another control character")
         if not DATE.fullmatch(sig["date"]) or not _is_date(sig["date"]):
             raise ChangeRefused(f"signature {n}: the date {sig['date']!r} is not a date written as YYYY-MM-DD")
@@ -107,8 +107,8 @@ def write_record(release_root, change_id, route, signatures, new_module=False):
     """Checks and writes the approval record of one change, and returns its path. Refuses an incomplete record,
     and a record for a change that has one already."""
     record = check({"change": change_id, "route": route, "new_module": new_module,
-                    "signatures": [{f: sig.get(f) for f in SIGNATURE_FIELDS} if isinstance(sig, dict) else sig
-                                   for sig in signatures]})
+                    "signatures": list(signatures) if isinstance(signatures, tuple) else signatures})
+    record["signatures"] = [{f: sig[f] for f in SIGNATURE_FIELDS} for sig in record["signatures"]]
     path = record_path(release_root, change_id)
     if path.exists():
         raise ChangeRefused(f"the change {change_id} has an approval record already: {path}")

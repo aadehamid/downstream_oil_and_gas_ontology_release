@@ -40,25 +40,36 @@ PREDICATES = {SKOS.prefLabel: "name", SKOS.definition: "definition", SKOS.altLab
               URIRef(PREFIXES["kpi"] + "informsProcess"): "edge"}
 
 
+LANGUAGE = "en"
+ORDER = {"remove synonym": 0, "rename": 1, "create synonym": 2}
+
+
 def _split(text):
     """A list cell's values, as build_measures.split reads them."""
     return [t.strip() for t in text.split(";") if t.strip()]
 
 
 def _curie(iri):
+    """prefix:name for an IRI of one of PREFIXES' namespaces with a name after it, else None."""
+    if not isinstance(iri, URIRef):
+        return None
     for prefix, ns in PREFIXES.items():
-        if str(iri).startswith(ns):
+        if str(iri).startswith(ns) and len(str(iri)) > len(ns):
             return f"{prefix}:{str(iri)[len(ns):]}"
     return None
 
 
 def _process_index(root):
     """{notation or slug: process IRI} from the newest core package of the release, as build_measures.py reads it."""
-    spec = importlib.util.spec_from_file_location("kpi_change_newest", root / "business_architecture" / "ontology" /
-                                                  "release" / "newest.py")
-    newest = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(newest)
-    g = Graph().parse(newest.core_file(ontology=str(root / "business_architecture" / "ontology")))
+    try:
+        spec = importlib.util.spec_from_file_location("kpi_change_newest", root / "business_architecture" /
+                                                      "ontology" / "release" / "newest.py")
+        newest = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(newest)
+        g = Graph().parse(newest.core_file(ontology=str(root / "business_architecture" / "ontology")))
+    except (OSError, ValueError) as err:
+        raise ChangeRefused(f"{root} has no readable newest core package, which an edge needs to find its process "
+                            f"({type(err).__name__}: {err})") from None
     proc = PREFIXES["proc"]
     index = {str(n): str(s) for s, n in g.subject_objects(SKOS.notation) if str(s).startswith(proc)}
     index.update({str(s)[len(proc):]: str(s) for s in g.subjects(RDF.type, SKOS.Concept) if str(s).startswith(proc)})
@@ -72,6 +83,7 @@ def apply_changes(changes, release_root):
     nothing, when any change does not fit the tables. When the builder refuses the changed tables, they stay
     written in the scratch copy, and ChangeRefused carries the builder's message."""
     root = Path(release_root).resolve()
+    changes = list(changes)
     if not changes:
         raise ChangeRefused("there are no changes to apply")
     try:
@@ -147,7 +159,8 @@ def apply_changes(changes, release_root):
 
 
 def compare(before, after):
-    """The KGCL lines that take the built kpi graph `before` to `after` (files or rdflib Graphs), sorted. Raises
+    """The KGCL lines that take the built kpi graph `before` to `after` (files or rdflib Graphs), in an order
+    apply_changes can replay: removed synonyms, renames, new synonyms, then the rest, each by its text. Raises
     ChangeRefused when the graphs differ in a way no supported line states, naming those differences."""
     before, after = (g if isinstance(g, Graph) else Graph().parse(str(g), format="turtle") for g in (before, after))
     removed, added = set(before) - set(after), set(after) - set(before)
@@ -164,8 +177,8 @@ def compare(before, after):
                 else:
                     changes.append(Change("create edge" if sign == "+" else "delete edge", subject,
                                           predicate=INFORMS, target=target))
-            elif not isinstance(o, Literal):
-                unsupported.append(f"{sign} {s} {p} {o}")
+            elif not isinstance(o, Literal) or o.language != LANGUAGE or o.datatype is not None:
+                unsupported.append(f"{sign} {s} {p} {o!r}")   # the builder writes every name and text @en
             elif kind == "synonym":
                 changes.append(Change("create synonym" if sign == "+" else "remove synonym", subject, text=str(o)))
             else:
@@ -181,4 +194,6 @@ def compare(before, after):
         shown = sorted(unsupported)[:10]
         raise ChangeRefused(f"the graphs differ in {len(unsupported)} ways that no supported KGCL line states: "
                             + "; ".join(shown))
-    return sorted(write_line(c) for c in changes)
+    # In an order apply_changes can replay: a synonym goes before a rename that takes it as the name, and a rename
+    # before a synonym that keeps the old name.
+    return [line for _, line in sorted((ORDER.get(c.kind, len(ORDER)), write_line(c)) for c in changes)]

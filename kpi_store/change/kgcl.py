@@ -12,8 +12,8 @@ src/kgcl_schema/grammar/kgcl.lark), with one space between words:
 
 Any other line is refused with "not a change this release applies".
 
-An <id> is a CURIE: a prefix of letters, digits and underscores, a colon, then no space and no quote
-(measure:crude-utilization). The grammar's other spellings of an id, <IRI> and a quoted label, are not read.
+An <id> is a CURIE: a prefix of letters, digits and underscores, a colon, then a name of letters, digits,
+underscores, dots and hyphens (measure:crude-utilization). The grammar's other spellings of an id, <IRI> and a quoted label, are not read.
 
 Quotes. The grammar's single-quoted text is "'" INNER "'", where INNER is /((?!\').)*/: it has no escape, so a
 straight single quote (') cannot appear inside the text at all. Tested on kgcl-schema 0.7.0: 'MPC''s' and 'MPC\'s'
@@ -39,7 +39,7 @@ KINDS = ("create synonym", "remove synonym", "change definition", "rename", "cre
 NOT_APPLIED = "not a change this release applies"
 TYPOGRAPHIC = "\u2019"   # how a KGCL line writes a straight apostrophe of a text
 
-_ID = r"[A-Za-z0-9_]+:[^\s']+"
+_ID = r"[A-Za-z0-9_]+:[A-Za-z0-9_.-]+"
 _TEXT = r"'([^']*)'"
 _FORMS = {
     "create synonym": re.compile(rf"create exact synonym {_TEXT} for ({_ID})"),
@@ -75,7 +75,7 @@ def text_problem(text):
                 "apostrophe; write it as a straight apostrophe (')")
     if "\\" in text:
         return "the text holds a backslash, which the official KGCL tools would write twice"
-    if any(unicodedata.category(c) == "Cc" for c in text):
+    if any(unicodedata.category(c) in ("Cc", "Zl", "Zp") for c in text):
         return "the text holds a line break or another control character, and a KGCL line is one line"
     return None
 

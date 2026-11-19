@@ -129,7 +129,8 @@ def test_the_official_renderer_writes_a_backslash_twice_so_the_text_is_refused()
 
 
 @pytest.mark.parametrize("text,reason", [("", "empty"), (" padded", "starts or ends with a space"),
-                                         ("two\nlines", "line break"), ("tab\there", "control character")])
+                                         ("two\nlines", "line break"), ("tab\there", "control character"),
+                                         ("first\u2028second", "line break"), ("first\u2029second", "line break")])
 def test_text_that_a_line_cannot_carry_is_refused(text, reason):
     with pytest.raises(ChangeRefused, match=reason):
         kgcl.write_line(Change("create synonym", "measure:x", text=text))
@@ -317,7 +318,7 @@ def test_a_change_file_applied_to_a_scratch_copy_comes_back_from_the_compare(scr
     after = kpi_tables.apply_changes(changes, scratch)
     assert after == scratch / kpi_tables.MEASURES
     back = kpi_tables.compare(before, after)
-    assert back == sorted(lines)
+    assert sorted(back) == sorted(lines)
     for line in back:
         official(line)
     # The tables hold the changes, and nothing else changed in them.
@@ -326,6 +327,12 @@ def test_a_change_file_applied_to_a_scratch_copy_comes_back_from_the_compare(scr
     assert alias not in kpi_tables._split(details[a]["aliases"])
     assert 'a "made-up" synonym' in kpi_tables._split(details[a]["aliases"])
     assert details[b]["definition"] == "A made-up definition, written for the round trip."
+    # The edge is written as the process's notation from the core, not as the id's slug.
+    notation = str(Graph().parse(next((scratch / "business_architecture" / "ontology" / "releases" / "core").glob("*/core.ttl")))
+                   .value(URIRef(kpi_tables.PREFIXES["proc"] + process.split(":", 1)[1]), SKOS.notation))
+    assert notation != process.split(":", 1)[1]
+    assert notation in kpi_tables._split(details[b]["informs_process"])
+    assert notation not in kpi_tables._split(details[a]["informs_process"])
     for table, changed in ((kpi_tables.CLASSIFICATION, {a}), (kpi_tables.DETAILS, {a, b})):
         real_rows = {r["measure_id"]: r for r in csv.DictReader((real[f"{table}.csv"]).decode("utf-8").splitlines())}
         assert {m for m, r in _rows(scratch, table).items() if r != real_rows[m]} == changed
@@ -354,6 +361,8 @@ def test_a_difference_no_line_states_is_refused():
     ("rename persona:prompt-planner from 'A' to 'B'", "changes only measures"),
     ("rename measure:{a} from 'Not The Name' to 'B'", "the measure's name is"),
     ("rename measure:{a} from '{name}' to '{name}'", "the new name is the current name"),
+    ("rename measure:{a} from '{name}' to '{alias}'", "the new name is one of the measure's synonyms"),
+    ("change definition of measure:{a} to '{definition}'", "the new definition is the current definition"),
     ("create exact synonym '{alias}' for measure:{a}", "has this synonym already"),
     ("create exact synonym '{name}' for measure:{a}", "may not repeat the measure's name"),
     ("create exact synonym 'one;two' for measure:{a}", "semicolon"),
@@ -368,7 +377,10 @@ def test_a_change_that_does_not_fit_the_tables_is_refused_and_nothing_is_written
     a, b, process, name, alias = _pick(scratch)
     before = {p.name: p.read_bytes() for p in (scratch / kpi_tables.KPI_FOLDER).iterdir()}
     with pytest.raises(ChangeRefused, match=message):
-        kpi_tables.apply_changes([kgcl.read_line(line.format(a=a, b=b, process=process, name=name, alias=alias))], scratch)
+        definition = _rows(scratch, kpi_tables.DETAILS)[a]["definition"]
+        change = kgcl.read_line(line.format(a=a, b=b, process=process, name=name, alias=alias,
+                                            definition=definition.replace("'", "\u2019")))
+        kpi_tables.apply_changes([change], scratch)
     assert {p.name: p.read_bytes() for p in (scratch / kpi_tables.KPI_FOLDER).iterdir()} == before
 
 
@@ -385,6 +397,8 @@ def test_a_later_change_that_conflicts_stops_the_earlier_ones_too(scratch):
 def test_an_empty_change_list_and_a_folder_without_kpi_tables_are_refused(tmp_path):
     with pytest.raises(ChangeRefused, match="no changes"):
         kpi_tables.apply_changes([], tmp_path)
+    with pytest.raises(ChangeRefused, match="no changes"):
+        kpi_tables.apply_changes((c for c in []), tmp_path)
     with pytest.raises(ChangeRefused, match="not a KPI Store release"):
         kpi_tables.apply_changes([FORMS[0][1]], tmp_path)
 
@@ -405,3 +419,82 @@ def test_apply_refuses_a_value_that_holds_a_real_typographic_apostrophe(scratch)
     a, b, process, name, alias = _pick(scratch)
     with pytest.raises(ChangeRefused, match="typographic apostrophe"):
         kpi_tables.apply_changes([Change("change definition", f"measure:{b}", text="MPC’s margin")], scratch)
+
+
+def test_compare_gives_lines_in_an_order_that_apply_can_replay(scratch, tmp_path):
+    # A rename that keeps the old name as a synonym: the rename must come back before the synonym.
+    a, b, process, name, alias = _pick(scratch)
+    clean = tmp_path / "clean"
+    shutil.copytree(scratch, clean)
+    before = Graph().parse(scratch / kpi_tables.MEASURES)
+    lines = [f"rename measure:{a} from '{name}' to '{name} (renamed)'",
+             f"create exact synonym '{name}' for measure:{a}",
+             f"remove synonym '{alias}' for measure:{a}"]
+    back = kpi_tables.compare(before, kpi_tables.apply_changes(kgcl.read_lines("\n".join(lines)), scratch))
+    assert back == [lines[2], lines[0], lines[1]]
+    replayed = kpi_tables.apply_changes(kgcl.read_lines("\n".join(back)), clean)
+    assert replayed.read_bytes() == (scratch / kpi_tables.MEASURES).read_bytes()
+
+
+def _measure(g):
+    """The first measure of a graph, by IRI."""
+    return min(s for s in g.subjects(SKOS.definition, None) if str(s).startswith(kpi_tables.PREFIXES["measure"]))
+
+
+def _changed(change):
+    """A copy of the real measures graph, with change(graph) applied."""
+    g = Graph().parse(KPI / "measures.ttl")
+    change(g)
+    return g
+
+
+@pytest.mark.parametrize("change", [
+    lambda g: [(g.remove((s, SKOS.prefLabel, o)), g.add((s, SKOS.prefLabel, Literal(str(o), lang="fr"))))
+               for s, o in [(_measure(g), g.value(_measure(g), SKOS.prefLabel))]],
+    lambda g: [(g.remove((s, SKOS.prefLabel, o)), g.add((s, SKOS.prefLabel, Literal(str(o)))))
+               for s, o in [(_measure(g), g.value(_measure(g), SKOS.prefLabel))]],
+    lambda g: g.add((_measure(g), SKOS.altLabel, Literal("unit rates", lang="fr"))),
+    lambda g: g.add((_measure(g), SKOS.altLabel, Literal(42))),
+    lambda g: g.add((_measure(g), INFORMS,
+                     Literal(kpi_tables.PREFIXES["proc"] + "CM-1-1-4-4"))),
+    lambda g: g.add((_measure(g), INFORMS, URIRef(kpi_tables.PREFIXES["proc"]))),
+    lambda g: [g.remove((s, SKOS.definition, o)) for s, o in [(_measure(g), g.value(_measure(g), SKOS.definition))]],
+], ids=["name language changed", "name language dropped", "synonym in French", "typed synonym",
+        "edge to a literal", "edge to the bare namespace", "definition removed"])
+def test_compare_refuses_a_difference_that_is_not_a_supported_line(change):
+    with pytest.raises(ChangeRefused, match="no supported KGCL line states"):
+        kpi_tables.compare(KPI / "measures.ttl", _changed(change))
+
+
+@pytest.mark.parametrize("subject", ['measure:a"b', "measure:a\x00b", "measure:a\\b"])
+def test_an_id_with_a_character_the_grammar_does_not_take_is_refused(subject):
+    with pytest.raises(ChangeRefused, match="prefix:name"):
+        kgcl.write_line(Change("create synonym", subject, text="unit rates"))
+    with pytest.raises(ChangeRefused):
+        kgcl.read_line(f"create exact synonym 'unit rates' for {subject}")
+
+
+def test_write_record_refuses_an_extra_signature_field_and_signatures_that_are_not_a_list(tmp_path):
+    with pytest.raises(ChangeRefused, match="fields it should not: email"):
+        approval.write_record(tmp_path, "c1", "minor", [dict(DATA_OWNER, email="a@example.com"), ARCHITECT])
+    with pytest.raises(ChangeRefused, match="no signatures"):
+        approval.write_record(tmp_path, "c1", "minor", None)
+    with pytest.raises(ChangeRefused, match="control character"):
+        approval.write_record(tmp_path, "c1", "minor", [dict(DATA_OWNER, name="A. Sample"), ARCHITECT])
+    assert not (tmp_path / approval.APPROVALS).exists()
+
+
+def test_a_copy_without_the_newest_core_refuses_an_edge(scratch):
+    a, b, process, name, alias = _pick(scratch)
+    (scratch / "business_architecture" / "ontology" / "release" / "newest.py").unlink()
+    with pytest.raises(ChangeRefused, match="no readable newest core package"):
+        kpi_tables.apply_changes([Change("create edge", f"measure:{b}", predicate="kpi:informsProcess", target=process)],
+                                 scratch)
+
+
+def test_a_builder_that_fails_becomes_a_refusal(scratch):
+    a, b, process, name, alias = _pick(scratch)
+    (scratch / kpi_tables.KPI_FOLDER / kpi_tables.BUILDER).write_text('import sys\nsys.exit("made-up failure")\n',
+                                                                      encoding="utf-8")
+    with pytest.raises(ChangeRefused, match="(?s)the kpi builder refused the changed tables.*made-up failure"):
+        kpi_tables.apply_changes([Change("create synonym", f"measure:{a}", text="a made-up synonym")], scratch)
