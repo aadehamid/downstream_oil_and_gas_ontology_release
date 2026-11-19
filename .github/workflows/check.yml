@@ -485,7 +485,7 @@ jobs:
           # serves no later step: the settings file names the program unpacked from the ZIP file.
           winget list Databricks.DatabricksCLI --accept-source-agreements --disable-interactivity || true
           export KPI_STORE_TEST_NEO4J_PASSWORD="$KPI_CI_NEO4J_PASSWORD"
-          uv run -q --no-project --with pytest==9.2.0 --with pytest-xdist==3.8.0 --with rdflib==7.6.0 --with pyshacl==0.40.2 --with openpyxl==3.1.5 --with jsonschema==4.26.0 --with markdown-it-py==4.3.0 --with pyyaml==6.0.3 --with sqlglot==30.31.0 --with pyoxigraph==0.5.13 --with neo4j==6.4.1 --with pip==26.3 \
+          uv run -q --no-project --with pytest==9.2.0 --with pytest-xdist==3.8.0 --with rdflib==7.6.0 --with pyshacl==0.40.2 --with openpyxl==3.1.5 --with jsonschema==4.26.0 --with markdown-it-py==4.3.0 --with pyyaml==6.0.3 --with sqlglot==30.31.0 --with pyoxigraph==0.5.13 --with neo4j==6.4.1 --with kgcl-schema==0.7.0 --with pip==26.3 \
             python scripts/doc_snippets.py check --verbose \
             business_architecture/ontology/projection/ontology-stores-runbook.md \
             business_architecture/ontology/epm-ontology-guide.html \

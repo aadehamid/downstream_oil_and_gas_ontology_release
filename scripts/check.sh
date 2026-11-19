@@ -36,7 +36,9 @@ run_tests() {  # unittest exits 0 on zero tests; a test command must have run at
 }
 # pip is in the list for the documents' own `python -m pip install` lines. The document test runs them in the
 # temporary environment that uv makes for this script, which is deleted afterwards, so they change no Python of yours.
-with_deps() { uv run -q --no-project --with pytest==9.2.0 --with pytest-xdist==3.8.0 --with rdflib==7.6.0 --with pyshacl==0.40.2 --with openpyxl==3.1.5 --with jsonschema==4.26.0 --with markdown-it-py==4.3.0 --with pyyaml==6.0.3 --with sqlglot==30.31.0 --with pyoxigraph==0.5.13 --with neo4j==6.4.1 --with pip==26.3 "$@"; }
+# kgcl-schema is the official KGCL parser. Only kpi_store/tests/test_change.py uses it, to check each line that
+# kpi_store/change writes; the release reads and writes KGCL without it.
+with_deps() { uv run -q --no-project --with pytest==9.2.0 --with pytest-xdist==3.8.0 --with rdflib==7.6.0 --with pyshacl==0.40.2 --with openpyxl==3.1.5 --with jsonschema==4.26.0 --with markdown-it-py==4.3.0 --with pyyaml==6.0.3 --with sqlglot==30.31.0 --with pyoxigraph==0.5.13 --with neo4j==6.4.1 --with kgcl-schema==0.7.0 --with pip==26.3 "$@"; }
 
 # Snapshot the tree, so a check that writes a file is caught.
 snapshot() {
@@ -142,6 +144,7 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   business_architecture/ontology/viewer/test_viewer.py \
   kpi_store/tests/test_compare.py \
   kpi_store/tests/test_cut.py \
+  kpi_store/tests/test_change.py \
   kpi_store/tests/test_discovery.py \
   kpi_store/tests/test_load_databricks.py \
   kpi_store/tests/test_metric_view.py \
