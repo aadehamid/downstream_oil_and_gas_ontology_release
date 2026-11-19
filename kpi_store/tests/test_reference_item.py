@@ -216,9 +216,10 @@ def test_propose_writes_the_kgcl_lines_of_a_new_item_as_a_minor(tmp_path, answer
 
 
 def test_the_summary_of_a_system_says_what_it_adds_in_plain_words(tmp_path):
-    [folder] = propose_cmd.propose([item_form(tmp_path, SYSTEM_ANSWERS, number="RI-2026-001")], tmp_path / "out", ROOT,
+    # A number of its own: the guide's example applies RI-2026-001, and a release that holds its record counts up.
+    [folder] = propose_cmd.propose([item_form(tmp_path, SYSTEM_ANSWERS, number="RI-TEST-001")], tmp_path / "out", ROOT,
                                    now=NOW, say=quiet)
-    assert folder.name == "RI-2026-001"
+    assert folder.name == "RI-TEST-001"
     summary = (folder / "summary.txt").read_text(encoding="utf-8")
     for line in ('The new item: a system, "Acme Scheduler" (system:acme-scheduler), in the system module',
                  '  - A system named "Acme Scheduler".',
