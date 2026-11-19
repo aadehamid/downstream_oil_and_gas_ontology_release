@@ -8,7 +8,7 @@ pricing/tables.csv names each table and view of the subject matter expert's pric
 replica copies, and for a data product its kind, the criterion that decided it and why; lineage.csv says which
 table each is derived from, at every hop; columns.csv the value columns' lineage only; agents.csv the Genie
 agents and the metric views they use; view-systems.csv the systems each view's lineage reaches; sources.csv the
-title of each source the module cites. The names are the
+title of each source the module cites, which each table and agent names in its source column. The names are the
 idp_sbx sandbox's, marked sandbox. The build fails unless every name resolves, a replica copies a known system and
 is no data product, every other table is a data product with a kind, a foundational one is derived only from
 replicas, a derived one from at least one data product, and every view's systems are the ones its lineage reaches.
@@ -43,8 +43,8 @@ WHOLE = PRODUCT["master-pricing"]  # all pricing sits under Master Pricing (the 
 LAYERS = ("replica", "silver", "gold", "metric-view")
 KINDS = ("foundational", "derived")
 TESTS = ("inputs", "logic")
-ASSETS = "decision-owner-pricing-assets-2026-10-25"  # the source every table and agent cites
-# pricing/sources.csv gives each source its key (the end of its IRI) and its title: the pricing assets, and the data
+# pricing/sources.csv gives each source its key (the end of its IRI) and its title: the pricing assets, which each
+# table and agent names in its source column, and the data
 # product kinds' sources, all generic frameworks (tier 5), since no MPC, peer or downstream source defines the kinds
 # (the decision of 2026-10-25, item 14; data-product-kinds research of 2026-10-25). A new source is a new row there.
 
@@ -52,6 +52,19 @@ ASSETS = "decision-owner-pricing-assets-2026-10-25"  # the source every table an
 def read(name):
     with open(os.path.join(TABLES, name), newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
+
+
+def source_problems(rows, table, has_slug=True):
+    """What is wrong with a sources table: a key or slug that is empty, holds a space or is used twice, or an empty
+    title. The same check is in kpi/build_measures.py and market-data/build_market_data.py."""
+    problems = []
+    for column in ("key", "slug") if has_slug else ("key",):
+        values = [r[column] for r in rows]
+        problems += [f"{table}: the {column} {v!r} must not be empty or hold a space" for v in values
+                     if not v.strip() or any(c.isspace() for c in v)]
+        problems += [f"{table} lists the {column} {v!r} {values.count(v)} times" for v in sorted(set(values)) if values.count(v) > 1]
+    problems += [f"{table}: {r['key']!r} has no title" for r in rows if not r["title"].strip()]
+    return problems
 
 
 def split(text):
@@ -69,10 +82,10 @@ def load():
     measures = {str(n) for n in Graph().parse(MEASURES).objects(None, SKOS.notation)}
     by = {t["slug"]: t for t in tables}
     problems = [f"tables.csv lists {s} {n} times" for s, n in Counter(t["slug"] for t in tables).items() if n > 1]
-    problems += [f"sources.csv lists {k} {n} times" for k, n in Counter(r["key"] for r in source_rows).items() if n > 1]
-    problems += [f"sources.csv: {r['key']!r} has no title" for r in source_rows if not r["title"]]
-    if ASSETS not in {r["key"] for r in source_rows}:
-        problems.append(f"sources.csv has no {ASSETS!r} source, which every table and agent cites")
+    problems += source_problems(source_rows, "sources.csv", has_slug=False)
+    keys = {r["key"] for r in source_rows}
+    problems += [f"{name} {r['slug']}: unknown source {r['source']!r}, which is not in sources.csv"
+                 for name, rows in (("table", tables), ("agent", agents)) for r in rows if r["source"] not in keys]
     for t in tables:
         s = t["slug"]
         if t["layer"] not in LAYERS:
@@ -146,7 +159,7 @@ def build(tables, lineage, columns, agents, view_systems, sources):
         g.add((iri, DP.fullName, Literal(t["name"], datatype=XSD.string)))
         g.add((iri, DP.sandbox, Literal(t["name"].startswith("idp_sbx.") or t["name"].startswith("synapse_dev."))))
         g.add((iri, DP.layer, LAYER[t["layer"]]))
-        g.add((iri, DCTERMS.source, SRC[ASSETS]))
+        g.add((iri, DCTERMS.source, SRC[t["source"]]))
         if t["layer"] == "replica":
             g.add((iri, DP.copiesSystem, SYSTEM[t["copies_system"]]))
         else:
@@ -174,7 +187,7 @@ def build(tables, lineage, columns, agents, view_systems, sources):
         iri = AGENT[a["slug"]]
         g.add((iri, RDF.type, PROV.SoftwareAgent))
         g.add((iri, RDFS.label, Literal(a["label"], lang="en")))
-        g.add((iri, DCTERMS.source, SRC[ASSETS]))
+        g.add((iri, DCTERMS.source, SRC[a["source"]]))
         for v in split(a["uses"]):
             g.add((iri, PROV.used, TABLE[v]))
     return g

@@ -6,9 +6,9 @@ The `kpi` module defines the measures that the decision owner's planning team us
 |---|---|
 | `measure-classification.csv` | One row per distinct measure: its class, whether it is a KPI candidate, the personas who use it, what it is compared against, MPC's counterpart, the reason and the evidence (the decision of 2026-10-18) |
 | `measure-details.csv` | Each measure's definition, grain, basis, aliases, the measures it is not to be confused with and how, and the core processes it informs (the decision of 2026-10-18) |
-| `personas.csv` | The four planning personas, with plan type and horizon |
+| `personas.csv` | The four planning personas, with plan type, horizon and the key of the source each comes from (`measure-sources.csv`) |
 | `measure-identifiers.csv` | Each measure's identifier: KPI-0001 to KPI-0003 and OPM-0001 to OPM-0030, none for trackers, reports and non-measures (kpi 1.3.0, the decision of 2026-10-28) |
-| `measure-sources.csv` | The three sources a measure comes from: each one's key (the classification table's `source` column), the end of its IRI, its title and its short name. A new source document is a new row here, with no code change (KPI-DEC-0002, Q12) |
+| `measure-sources.csv` | The three sources a measure or persona comes from: each one's key (the classification table's `source` column), the end of its IRI, its title and its short name. A new source document is a new row here, with no code change (KPI-DEC-0002, Q12) |
 | `identifier-notes.csv`, `change-notes.csv` | The notes kept on a measure: a note on its identifier (`skos:note`) and what changed since an earlier release (`skos:changeNote`), one row per note. A new note is a new row, with no code change. The build fails if a row names a measure the classification table lacks |
 | `vocabulary.ttl`, `shapes.ttl` | The module's terms and SHACL shapes, with a stated cardinality on every property (the decision of 2026-10-18) |
 | `build_measures.py`, `measures.ttl` | The build: seven tables in (four until KPI Store 1.2 moved the sources and notes out of the code into tables; three until kpi 1.3.0 added `measure-identifiers.csv`), 41 measure definitions and 4 personas out. `python3 build_measures.py` prints the figures; `--verify` fails unless `measures.ttl` equals a fresh build. `scripts/check.sh` runs it |

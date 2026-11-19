@@ -178,10 +178,47 @@ class Tables(unittest.TestCase):
             self.build_with(edit)
         self.assertIn("benchmark test-crude: unknown source 'ARGUS', which is not in sources.csv", str(caught.exception))
 
-    def test_a_source_listed_twice_fails(self):
-        with self.assertRaises(SystemExit) as caught:
-            self.build_with(lambda d: self.append(d, "sources.csv", {"key": "MPC-S01", "slug": "x", "title": "x"}))
-        self.assertIn("sources.csv lists 'MPC-S01' 2 times", str(caught.exception))
+    def test_a_new_region_and_enumeration_cite_the_source_their_rows_name(self):
+        def edit(d):
+            self.append(d, "sources.csv", {"key": "ARGUS", "slug": "argus-crack-spreads-2026", "title": "Argus, a test title"})
+            self.append(d, "regions.csv", {"slug": "test-region", "label": "Test region", "definition": "A test region.",
+                                           "scheme": "market", "source": "ARGUS"})
+            self.append(d, "enumerations.csv", {"slug": "test-enum", "measure": "crack-spreads", "view": "v", "id_column": "i",
+                                                "name_column": "n", "group_column": "", "filter": "", "count": "",
+                                                "source": "ARGUS"})
+        g = self.build_with(edit)
+        src = URIRef("https://w3id.org/mpc/ontology/source/argus-crack-spreads-2026")
+        dcterms = URIRef("http://purl.org/dc/terms/source")
+        self.assertEqual(g.value(REGION["test-region"], dcterms), src)
+        self.assertEqual(g.value(URIRef(str(bm.ENUM) + "test-enum"), dcterms), src)
+
+    def test_a_series_note_is_its_note_cell(self):
+        def edit(d):
+            path = os.path.join(d, "series.csv")
+            with open(path, newline="", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                fields, rows = reader.fieldnames, list(reader)
+            for r in rows:
+                if r["slug"] == "crack-blended-3-2-1":
+                    r["note"] = "From the third quarter of 2026, a test weighting."
+            with open(path, "w", newline="", encoding="utf-8") as f:
+                w = csv.DictWriter(f, fieldnames=fields, lineterminator="\n")
+                w.writeheader()
+                w.writerows(rows)
+        g = self.build_with(edit)
+        self.assertEqual(set(g.objects(SERIES["crack-blended-3-2-1"], SKOS.scopeNote)),
+                         {Literal("From the third quarter of 2026, a test weighting.", lang="en")})
+
+    def test_a_bad_sources_row_fails(self):
+        cases = (({"key": "MPC-S01", "slug": "x", "title": "x"}, "sources.csv lists the key 'MPC-S01' 2 times"),
+                 ({"key": "A RGUS", "slug": "x", "title": "x"}, "sources.csv: the key 'A RGUS' must not be empty or hold a space"),
+                 ({"key": "ARGUS", "slug": "mpc-performance-measures-evidence", "title": "x"},
+                  "sources.csv lists the slug 'mpc-performance-measures-evidence' 2 times"),
+                 ({"key": "ARGUS", "slug": "x", "title": " "}, "sources.csv: 'ARGUS' has no title"))
+        for row, message in cases:
+            with self.assertRaises(SystemExit) as caught:
+                self.build_with(lambda d: self.append(d, "sources.csv", row))
+            self.assertIn(message, str(caught.exception))
 
 
 class Shapes(unittest.TestCase):

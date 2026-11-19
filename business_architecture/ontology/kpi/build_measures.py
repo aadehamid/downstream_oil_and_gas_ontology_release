@@ -48,10 +48,9 @@ KINDS = ("kpi", "operational-metric", "plan-variance-diagnostic", "market-indica
 # Where a measure comes from: measure-sources.csv gives each source its key (the classification table's source
 # column), the end of its IRI, its title and, if it has one, its short name.
 SOURCE_TABLE = os.path.join(HERE, "measure-sources.csv")
-# Every measure also cites the classification evidence, which holds the rule it was sorted by; the personas cite
-# the planner list.
+# Every measure also cites the classification evidence, which holds the rule it was sorted by. This is a rule, not
+# content: it holds for every measure. Each persona names its source in personas.csv.
 CLASSIFIED_BY = "industry"
-PERSONA_SOURCE = "planner list"
 # identifier-notes.csv gives the note on an identifier the decision owner's assets give a measure (the decision of
 # 2026-10-25, item 3); every other measure's identifier follows the rule in the decision of 2026-10-28 and carries no
 # note. change-notes.csv gives what changed in a measure since an earlier release, kept on the measure (kpi 1.2.0).
@@ -67,6 +66,19 @@ PREFIX_EXCEPTIONS = {"crack-spreads": "KPI-0001"}
 def read_csv(path):
     with open(path, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
+
+
+def source_problems(rows, table, has_slug=True):
+    """What is wrong with a sources table: a key or slug that is empty, holds a space or is used twice, or an empty
+    title. The same check is in market-data/build_market_data.py and data-product/build_pricing.py."""
+    problems = []
+    for column in ("key", "slug") if has_slug else ("key",):
+        values = [r[column] for r in rows]
+        problems += [f"{table}: the {column} {v!r} must not be empty or hold a space" for v in values
+                     if not v.strip() or any(c.isspace() for c in v)]
+        problems += [f"{table} lists the {column} {v!r} {values.count(v)} times" for v in sorted(set(values)) if values.count(v) > 1]
+    problems += [f"{table}: {r['key']!r} has no title" for r in rows if not r["title"].strip()]
+    return problems
 
 
 def process_index():
@@ -91,18 +103,19 @@ def load():
     procs = process_index()
     identifiers = {i["measure_id"]: i["identifier"] for i in read_csv(IDENTIFIER_TABLE)}
     sources = read_csv(SOURCE_TABLE)
-    problems += [f"measure-sources.csv lists {k!r} {n} times" for k, n in Counter(s["key"] for s in sources).items() if n > 1]
-    problems += [f"measure-sources.csv: {s['key']!r} has no slug or no title" for s in sources if not s["slug"] or not s["title"]]
+    problems += source_problems(sources, "measure-sources.csv")
     sources = {s["key"]: s for s in sources}
-    problems += [f"measure-sources.csv has no {k!r} source, which the build cites" for k in (CLASSIFIED_BY, PERSONA_SOURCE)
-                 if k not in sources]
+    if CLASSIFIED_BY not in sources:
+        problems.append(f"measure-sources.csv has no {CLASSIFIED_BY!r} source, which every measure cites")
+    problems += [f"persona {p['slug']}: unknown source {p['source']!r}, which is not in measure-sources.csv"
+                 for p in personas if p["source"] not in sources]
     notes = {}
     for path, prop in ((IDENTIFIER_NOTE_TABLE, SKOS.note), (CHANGE_NOTE_TABLE, SKOS.changeNote)):
         for n in read_csv(path):
             name = os.path.basename(path)
             if n["measure_id"] not in ids:
                 problems.append(f"{name}: {n['measure_id']!r} is not a measure of the classification table")
-            elif not n["note"]:
+            elif not n["note"].strip():
                 problems.append(f"{name}: {n['measure_id']!r} has an empty note")
             else:
                 notes.setdefault(n["measure_id"], []).append((prop, n["note"]))
@@ -182,7 +195,7 @@ def build(rows, details, personas, labels, procs, sources):
         g.add((iri, SKOS.definition, Literal(p["definition"], lang="en")))
         g.add((iri, KPI.planType, Literal(p["plan_type"], datatype=XSD.string)))
         g.add((iri, KPI.planHorizon, Literal(p["horizon"], datatype=XSD.string)))
-        g.add((iri, DCTERMS.source, SRC[sources[PERSONA_SOURCE]["slug"]]))
+        g.add((iri, DCTERMS.source, SRC[sources[p["source"]]["slug"]]))
     for r in rows:
         m, d = r["measure_id"], details[r["measure_id"]]
         iri = MEASURE[m]

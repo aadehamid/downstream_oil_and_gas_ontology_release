@@ -226,7 +226,8 @@ class Pricing(unittest.TestCase):
 class PricingSources(unittest.TestCase):
     """A new source is a row in pricing/sources.csv, with no change to build_pricing.py (KPI-DEC-0002, Q12)."""
 
-    def build_with(self, row):
+    def build_with(self, rows):
+        """Build from a temporary copy of pricing/ with each (file, row) in rows appended."""
         import build_pricing as bp
         import csv
         import shutil
@@ -235,22 +236,36 @@ class PricingSources(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             for name in os.listdir(bp.TABLES):
                 shutil.copy(os.path.join(bp.TABLES, name), d)
-            with open(os.path.join(d, "sources.csv"), "a", newline="", encoding="utf-8") as f:
-                csv.DictWriter(f, fieldnames=["key", "title"], lineterminator="\n").writerow(row)
+            for name, row in rows:
+                with open(os.path.join(d, name), newline="", encoding="utf-8") as f:
+                    fields = csv.DictReader(f).fieldnames
+                with open(os.path.join(d, name), "a", newline="", encoding="utf-8") as f:
+                    csv.DictWriter(f, fieldnames=fields, lineterminator="\n").writerow(row)
             with mock.patch.object(bp, "TABLES", d):
                 return bp.build(*bp.load())
 
-    def test_a_new_source_is_one_row(self):
-        g = self.build_with({"key": "dama-dmbok-2", "title": "DAMA, DMBOK 2, a test title"})
+    def test_a_new_source_is_one_row_and_an_agent_can_cite_it(self):
+        agent = {"slug": "test-agent", "label": "Test agent", "uses": "view-mpr-mips-crack-spread-price-fact-metrics-vw",
+                 "source": "dama-dmbok-2"}
+        g = self.build_with([("sources.csv", {"key": "dama-dmbok-2", "title": "DAMA, DMBOK 2, a test title"}),
+                             ("agents.csv", agent)])
         src = URIRef("https://w3id.org/mpc/ontology/source/dama-dmbok-2")
-        self.assertEqual(g.value(src, URIRef("http://purl.org/dc/terms/title")), Literal("DAMA, DMBOK 2, a test title", lang="en"))
-        self.assertIn((src, RDF.type, URIRef("http://purl.org/dc/terms/BibliographicResource")), g)
+        dcterms = "http://purl.org/dc/terms/"
+        self.assertEqual(g.value(src, URIRef(dcterms + "title")), Literal("DAMA, DMBOK 2, a test title", lang="en"))
+        self.assertEqual(g.value(URIRef("https://w3id.org/mpc/ontology/modules/data-product/agent/test-agent"),
+                                 URIRef(dcterms + "source")), src)
 
-    def test_a_source_listed_twice_or_without_a_title_fails(self):
-        for row, message in (({"key": "odps-4-0", "title": "x"}, "sources.csv lists odps-4-0 2 times"),
-                             ({"key": "test-source", "title": ""}, "sources.csv: 'test-source' has no title")):
+    def test_a_bad_row_fails(self):
+        agent = {"slug": "test-agent", "label": "Test agent", "uses": "view-mpr-mips-crack-spread-price-fact-metrics-vw",
+                 "source": "no-such-source"}
+        cases = (([("sources.csv", {"key": "odps-4-0", "title": "x"})], "sources.csv lists the key 'odps-4-0' 2 times"),
+                 ([("sources.csv", {"key": "a source", "title": "x"})],
+                  "sources.csv: the key 'a source' must not be empty or hold a space"),
+                 ([("sources.csv", {"key": "test-source", "title": "  "})], "sources.csv: 'test-source' has no title"),
+                 ([("agents.csv", agent)], "agent test-agent: unknown source 'no-such-source', which is not in sources.csv"))
+        for rows, message in cases:
             with self.assertRaises(SystemExit) as caught:
-                self.build_with(row)
+                self.build_with(rows)
             self.assertIn(message, str(caught.exception))
 
 

@@ -11,7 +11,9 @@ mark that its source does not list its legs. The build fails unless every region
 and blended series a row names exists, each leg-built series has one crude leg, at least one
 product leg and at most one compliance-cost leg, a blended series has no legs, a series with
 neither legs nor a blend is marked legs_unstated, and every source is in sources.csv, which gives each
-source its title. A new source is a new row there.
+source its title. Every region, benchmark, series, new price and enumeration names its source in a source column,
+and series.csv's note column holds a series' scope note, such as its blend weights. A new source or note is a new
+row or cell, with no code change.
 
 Since 1.1.0 (the decision of 2026-10-25, items 4 and 5): market-prices.csv names the prices the decision owner's pricing
 views report for the other pricing measures, each linked to its measure, reusing a benchmark of the same name;
@@ -42,22 +44,6 @@ MEASURE_ID = "crack-spreads"
 # sources.csv gives each cited source its key (the tables' source column), the end of its IRI and its title. A source
 # the kpi module also declares keeps the title build_measures.py gives it (kpi/measure-sources.csv).
 SOURCE_TABLE = "sources.csv"
-REGION_SOURCE = "MPC-S01"
-# The blended series' weights change by period, so they are a note with their source, not a value.
-BLEND_NOTE = ("Beginning in the second quarter of 2024, MPC weighted the blended crack spread 42 percent Gulf Coast, "
-              "40 percent Mid-Continent and 18 percent West Coast, based on its refining capacity by region in each "
-              "period (MPC FY2025 Form 10-K, Item 7). The weights for 2026 are in the Q2 2026 Form 10-Q (MPC-S03; "
-              "mpc-performance-measures-evidence.md, row 10).")
-NYMEX_NOTE = ("Shares the name 3-2-1 with MPC's regional crack spreads but is a different series: its legs are "
-              "exchange futures, and its gasoline leg is RBOB, which MPC's benchmarks do not use. MPC Economics "
-              "publishes it as NYMEX 3-2-1 Crack (Price Master 39998) and calls the diesel leg NYMEX Heating Oil "
-              "(crack-spread-kpi-definition.md, section 4.3).")
-ECON_BLEND_NOTE = ("MPC Economics weights the three ex-RIN cracks USGC 0.40, Chicago 0.40 and LA 0.20 before 5 May 2024, "
-                   "and USGC 0.42, Chicago 0.40 and LA 0.18 after (crack-spread-kpi-definition.md, section 4.4).")
-EX_RVO_NOTE = ("Computed daily by MPC Economics' Ex-RVO formula, ((CBOB x 42 x 2) + (ULSD x 42 x 1)) / 3 - Crude - (RVO x 42), "
-               "with product prices in dollars per gallon and crude in dollars per barrel; the monthly series is the mean of "
-               "the daily published values (crack-spread-kpi-definition.md, sections 3.2 and 5.3). MPC's price data labels "
-               "this treatment ex-RIN.")
 SCHEMES = {"refining": MKT.RefiningRegions, "market": MKT.MarketRegions}
 PRICE = Namespace("https://w3id.org/mpc/ontology/modules/market-data/price/")
 ENUM = Namespace("https://w3id.org/mpc/ontology/modules/market-data/enumeration/")
@@ -71,15 +57,23 @@ def read_csv(name):
         return list(csv.DictReader(f))
 
 
+def source_problems(rows, table, has_slug=True):
+    """What is wrong with a sources table: a key or slug that is empty, holds a space or is used twice, or an empty
+    title. The same check is in kpi/build_measures.py and data-product/build_pricing.py."""
+    problems = []
+    for column in ("key", "slug") if has_slug else ("key",):
+        values = [r[column] for r in rows]
+        problems += [f"{table}: the {column} {v!r} must not be empty or hold a space" for v in values
+                     if not v.strip() or any(c.isspace() for c in v)]
+        problems += [f"{table} lists the {column} {v!r} {values.count(v)} times" for v in sorted(set(values)) if values.count(v) > 1]
+    problems += [f"{table}: {r['key']!r} has no title" for r in rows if not r["title"].strip()]
+    return problems
+
+
 def read_sources():
     """Key -> (IRI, title), from sources.csv, and the problems the table has."""
     rows = read_csv(SOURCE_TABLE)
-    keys = [r["key"] for r in rows]
-    problems = [f"sources.csv lists {k!r} {keys.count(k)} times" for k in sorted(set(keys)) if keys.count(k) > 1]
-    problems += [f"sources.csv: {r['key']!r} has no slug or no title" for r in rows if not r["slug"] or not r["title"]]
-    problems += [f"sources.csv has no {k!r} source, which the build cites" for k in (REGION_SOURCE, "MPC-ECON", "OWNER-ASSETS")
-                 if k not in keys]
-    return {r["key"]: (SRC[r["slug"]], r["title"]) for r in rows}, problems
+    return {r["key"]: (SRC[r["slug"]], r["title"]) for r in rows}, source_problems(rows, "sources.csv")
 
 
 def legs(text):
@@ -96,6 +90,11 @@ def load():
     sources, problems = read_sources()
     problems += [] if MEASURE_ID in measures else [f"{MEASURE_ID} is not a measure of the kpi module"]
     problems += [f"region {r['slug']}: unknown scheme {r['scheme']!r}" for r in regions if r["scheme"] not in SCHEMES]
+    problems += [f"region {r['slug']}: unknown source {r['source']!r}, which is not in sources.csv" for r in regions
+                 if r["source"] not in sources]
+    problems += [f"enumeration {e['slug']}: unknown source {e['source']!r}, which is not in sources.csv" for e in enums
+                 if e["source"] not in sources]
+    problems += [f"series {s['slug']}: its note is blank" for s in series if s["note"] and not s["note"].strip()]
     for b in benchmarks:
         if b["region"] and b["region"] not in region_ids:
             problems.append(f"benchmark {b['slug']}: unknown region {b['region']!r}")
@@ -132,6 +131,8 @@ def load():
                 problems.append(f"price {p['slug']}: reuses unknown benchmark {p['reuses']!r}")
             elif p["mpr"] and bench[p["reuses"]]["mpr"] != p["mpr"]:
                 problems.append(f"price {p['slug']}: its Price Master ID differs from the benchmark it reuses")
+        elif p["source"] not in sources:
+            problems.append(f"price {p['slug']}: a new price needs a source in sources.csv, not {p['source']!r}")
         elif not p["definition"]:
             problems.append(f"price {p['slug']}: a new price needs a definition")
         elif p["label"] in labels:
@@ -164,7 +165,7 @@ def build(regions, benchmarks, series, prices=(), enums=()):
         g.add((iri, DCTERMS.source, sources[source][0]))
 
     for r in regions:
-        concept(REGION[r["slug"]], SCHEMES[r["scheme"]], r, REGION_SOURCE if r["scheme"] == "refining" else "MPC-ECON")
+        concept(REGION[r["slug"]], SCHEMES[r["scheme"]], r, r["source"])
     for b in benchmarks:
         iri = BENCH[b["slug"]]
         concept(iri, MKT.Series, b, b["source"])
@@ -197,17 +198,14 @@ def build(regions, benchmarks, series, prices=(), enums=()):
             g.add((iri, MKT.priceMasterId, Literal(s["mpr"], datatype=XSD.string)))
         if s["legs_unstated"]:
             g.add((iri, MKT.legsUnstated, Literal(True)))
-        note = (NYMEX_NOTE if s["slug"] == "crack-nymex-3-2-1"
-                else (ECON_BLEND_NOTE if s["source"] == "MPC-ECON" else BLEND_NOTE) if s["blend_of"]
-                else EX_RVO_NOTE if s["excludes_rin_cost"] == "false" else None)
-        if note:
-            g.add((iri, SKOS.scopeNote, Literal(note, lang="en")))
+        if s["note"]:
+            g.add((iri, SKOS.scopeNote, Literal(s["note"], lang="en")))
     for p in prices:
         if p["reuses"]:
             iri = BENCH[p["reuses"]]
         else:
             iri = PRICE[p["slug"].removeprefix("price-")]
-            concept(iri, MKT.Series, p, "OWNER-ASSETS")
+            concept(iri, MKT.Series, p, p["source"])
             g.add((iri, RDF.type, MKT.MarketPrice))
             g.add((iri, SKOS.editorialNote, Literal(TEMPLATE_NOTE, lang="en")))
             if p["mpr"]:
@@ -215,8 +213,6 @@ def build(regions, benchmarks, series, prices=(), enums=()):
         g.add((iri, MKT.priceOf, MEASURE[p["measure"]]))
         for x in p["reported_as"].split(";"):
             g.add((iri, MKT.reportedAs, Literal(x, datatype=XSD.string)))
-    if prices:
-        g.add((sources["OWNER-ASSETS"][0], RDF.type, DCTERMS.BibliographicResource))
     for e in enums:
         iri = ENUM[e["slug"]]
         g.add((iri, RDF.type, MKT.SeriesEnumeration))
@@ -230,7 +226,7 @@ def build(regions, benchmarks, series, prices=(), enums=()):
             g.add((iri, MKT.rowFilter, Literal(e["filter"], lang="en")))
         if e["count"]:
             g.add((iri, SKOS.note, Literal(e["count"], lang="en")))
-        g.add((iri, DCTERMS.source, sources["OWNER-ASSETS"][0]))
+        g.add((iri, DCTERMS.source, sources[e["source"]][0]))
     return g
 
 

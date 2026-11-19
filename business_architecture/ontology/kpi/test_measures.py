@@ -93,7 +93,7 @@ class Build(unittest.TestCase):
         # The decision owner named the list's source (the review comments of a subject matter expert reviewing the documents); the source keeps its IRI.
         from rdflib.namespace import DCTERMS
         g = Graph().parse(os.path.join(HERE, "measures.ttl"))
-        src = bm.SRC[{r["key"]: r["slug"] for r in bm.read_csv(bm.SOURCE_TABLE)}["planner list"]]
+        src = bm.SRC[{r["key"]: r["slug"] for r in bm.read_csv(bm.SOURCE_TABLE)}["planner-list"]]
         self.assertEqual(str(src), "https://w3id.org/mpc/ontology/source/planner-measure-list-2026-10-18")
         self.assertIn("Value Chain Optimization Decision Support and Visualization (VCO DSV)", str(g.value(src, DCTERMS.title)))
         self.assertEqual(g.value(src, DCTERMS.alternative), Literal("VCO DSV", lang="en"))
@@ -248,13 +248,21 @@ class Tables(unittest.TestCase):
     def test_a_new_source_is_one_row(self):
         from unittest import mock
         from rdflib.namespace import DCTERMS
-        source = {"key": "peer", "slug": "valero-fy2025-10k", "title": "Valero FY2025 Form 10-K", "short_name": ""}
+        source = {"key": "peer", "slug": "valero-fy2025-10k", "title": "Valero FY2025 Form 10-K", "short_name": "VLO 10-K"}
         with mock.patch.object(bm, "CLASSIFICATION", self.edited_classification("crude-utilization", "peer")):
             g = self.with_rows("SOURCE_TABLE", [source])
         iri = URIRef("https://w3id.org/mpc/ontology/source/valero-fy2025-10k")
         self.assertEqual(g.value(iri, DCTERMS.title), Literal("Valero FY2025 Form 10-K", lang="en"))
         self.assertIn(iri, set(g.objects(MEASURE["crude-utilization"], DCTERMS.source)))
-        self.assertIsNone(g.value(iri, DCTERMS.alternative))
+        self.assertEqual(g.value(iri, DCTERMS.alternative), Literal("VLO 10-K", lang="en"))
+
+    def test_a_new_persona_cites_the_source_its_row_names(self):
+        from rdflib.namespace import DCTERMS
+        persona = {"slug": "test-planner", "label": "Test Planner", "definition": "A test persona.", "plan_type": "test",
+                   "horizon": "test", "source": "MPC"}
+        g = self.with_rows("PERSONAS", [persona])
+        self.assertEqual(g.value(bm.PERSONA["test-planner"], DCTERMS.source),
+                         URIRef("https://w3id.org/mpc/ontology/source/mpc-performance-measures-evidence"))
 
     def test_a_new_change_note_is_one_row(self):
         note = "kpi 1.4.0 (2026-11-18): a test note (the decision of 2026-11-18)."
@@ -274,9 +282,18 @@ class Tables(unittest.TestCase):
                   "change-notes.csv: 'no-such-measure' is not a measure"),
                  ("IDENTIFIER_NOTE_TABLE", {"measure_id": "no-such-measure", "note": "x"},
                   "identifier-notes.csv: 'no-such-measure' is not a measure"),
-                 ("CHANGE_NOTE_TABLE", {"measure_id": "crude-utilization", "note": ""}, "has an empty note"),
+                 ("CHANGE_NOTE_TABLE", {"measure_id": "crude-utilization", "note": "   "}, "has an empty note"),
                  ("SOURCE_TABLE", {"key": "MPC", "slug": "x", "title": "x", "short_name": ""},
-                  "measure-sources.csv lists 'MPC' 2 times"))
+                  "measure-sources.csv lists the key 'MPC' 2 times"),
+                 ("SOURCE_TABLE", {"key": "a peer", "slug": "x", "title": "x", "short_name": ""},
+                  "measure-sources.csv: the key 'a peer' must not be empty or hold a space"),
+                 ("SOURCE_TABLE", {"key": "peer", "slug": "mpc-performance-measures-evidence", "title": "x", "short_name": ""},
+                  "measure-sources.csv lists the slug 'mpc-performance-measures-evidence' 2 times"),
+                 ("SOURCE_TABLE", {"key": "peer", "slug": "x", "title": "  ", "short_name": ""},
+                  "measure-sources.csv: 'peer' has no title"),
+                 ("PERSONAS", {"slug": "test-planner", "label": "Test Planner", "definition": "x", "plan_type": "x",
+                               "horizon": "x", "source": "peer"},
+                  "persona test-planner: unknown source 'peer', which is not in measure-sources.csv"))
         for constant, row, message in cases:
             with self.assertRaises(SystemExit) as caught:
                 self.with_rows(constant, [row])
