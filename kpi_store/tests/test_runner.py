@@ -87,7 +87,10 @@ def test_an_empty_only_runs_no_step_and_the_command_refuses_it(setup, capsys):
         runner.step_list("", allow_empty=False)
     with pytest.raises(Exception, match="--only names no step"):
         runner.step_list(",", allow_empty=False)
-    for value in ("", ","):
+    with pytest.raises(Exception, match="--only names no step"):
+        runner.step_list(" , ", allow_empty=False)
+    assert runner.step_list("zip, upload") == ["zip", "upload"]
+    for value in ("", ",", " "):
         with pytest.raises(SystemExit) as stop:
             runner.main(["--stores", str(setup.local.path), "--release", str(setup.root), "--only", value])
         assert stop.value.code == 2

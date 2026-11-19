@@ -942,7 +942,7 @@ def step_list(text, known=STEPS, what="step", allow_empty=True):
     """Reads the value of --only or --skip: names with commas between them. An unknown name is an error. The names
     are steps, or stores when the command is a reset. --only reads with allow_empty=False: an empty value, such as a
     script's unset variable, is an error rather than a run of every step."""
-    names = [n for n in (text or "").split(",") if n]
+    names = [n.strip() for n in (text or "").split(",") if n.strip()]   # "zip, upload" and " " read as meant
     if not names and not allow_empty:
         raise argparse.ArgumentTypeError(f"--only names no {what}; give at least one of: {', '.join(known)}")
     unknown = [n for n in names if n not in known]
