@@ -446,3 +446,56 @@ def test_the_rm_margin_example_cites_a_source_the_form_offers_and_apply_adds_its
     apply_cmd.apply([folder], root, say=quiet, now=NOW)
     sources = list(csv.DictReader((root / kpi_tables.KPI_FOLDER / "measure-sources.csv").open(encoding="utf-8")))
     assert [r["slug"] for r in sources].count("mpc-s01") == 1
+
+
+# ---------- a source that the kpi module gains (round 2 of the review) ----------
+
+MPC = "https://w3id.org/mpc/ontology/source/mpc-s01"
+MPC_TITLE = "Marathon Petroleum Corporation, Form 10-K for the fiscal year ended 2025-12-31"
+
+
+def test_the_round_trip_requires_a_new_source_to_gain_one_type_and_one_title(tmp_path):
+    from rdflib.namespace import RDF
+    root = scratch_release(tmp_path, git_copy=False)
+    before = Graph().parse(root / kpi_tables.MEASURES)
+    lines = [line.replace("src:planner-measure-list-2026-10-18", "src:mpc-s01") for line in LINES]
+    nm.apply_changes(kgcl.read_lines("\n".join(lines)), FACTS, root)
+    after = Graph().parse(root / kpi_tables.MEASURES)
+    src, title = URIRef(MPC), DCTERMS.title
+    assert (src, title, Literal(MPC_TITLE, lang="en")) in after and nm.compare(before, after)[1] == sorted(FACTS)
+    stray = URIRef(nm.PREFIXES["kind"] + "a-made-up-kind")
+    for change, message in (
+            (lambda g: g.remove((src, RDF.type, DCTERMS.BibliographicResource)), "lacks .*BibliographicResource"),
+            (lambda g: g.remove((src, title, None)), "lacks http://purl.org/dc/terms/title"),
+            (lambda g: g.add((src, title, Literal("A second title", lang="en"))), "differ in 1 ways"),
+            (lambda g: (g.remove((src, title, None)), g.add((src, title, Literal("   ", lang="en")))), "differ in 2 ways"),
+            # a source link to a node outside src: does not make that node a source with a type and a title
+            (lambda g: (g.add((URIRef(nm.iri(M)), DCTERMS.source, stray)), g.add((stray, RDF.type, DCTERMS.BibliographicResource)),
+                        g.add((stray, title, Literal("x", lang="en")))), "differ in 3 ways")):
+        changed = Graph() + after
+        change(changed)
+        with pytest.raises(ChangeRefused, match=message):
+            nm.compare(before, changed)
+
+
+def test_a_new_source_whose_slug_is_another_rows_key_is_refused_by_name(tmp_path):
+    root = scratch_release(tmp_path, git_copy=False)
+    path = root / kpi_tables.KPI_FOLDER / "measure-sources.csv"
+    with path.open("a", encoding="utf-8", newline="") as f:
+        f.write('mpc-s01,mpc-s01-2024,"A made-up row whose key is the slug of the Form 10-K",\n')
+    lines = [line.replace("src:planner-measure-list-2026-10-18", "src:mpc-s01") for line in LINES]
+    with pytest.raises(ChangeRefused, match="src:mpc-s01 needs a row of kpi/measure-sources.csv under the key mpc-s01, "
+                                            "and the row of src:mpc-s01-2024 holds that key"):
+        nm.check_changes(kgcl.read_lines("\n".join(lines)), FACTS, root)
+
+
+def test_a_source_takes_one_non_blank_english_or_untagged_title(tmp_path):
+    root = scratch_release(tmp_path, git_copy=False)
+    package = next((root / cut.ONTOLOGY / "releases" / "ref-mpc").glob("*/ref-mpc.ttl"))
+    with package.open("a", encoding="utf-8") as f:
+        f.write(f'\n<{MPC}> <http://purl.org/dc/terms/title> ""@en, "   "@en, "A Form 10-K (in French)"@fr .\n')
+    assert nm.source_records(root)[MPC] == MPC_TITLE
+    with package.open("a", encoding="utf-8") as f:   # a source with no usable title is not a record the kpi module takes
+        f.write('\n<https://w3id.org/mpc/ontology/source/mplx-s01> <http://purl.org/dc/terms/title> "   "@en .\n')
+    records = nm.source_records(root)
+    assert records["https://w3id.org/mpc/ontology/source/mplx-s01"] == "MPLX LP, Form 10-K for the fiscal year ended 2025-12-31"

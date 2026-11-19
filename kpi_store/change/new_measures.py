@@ -230,9 +230,10 @@ def _read(root, names):
 
 def source_records(root):
     """{source IRI: its title} for each source that the release's newest packages give a title and integration gives
-    an evidence tier: the sources the kpi module may cite without a specialist. The first title in text order, as the
-    intake's pick lists show it."""
-    from rdflib import URIRef
+    an evidence tier: the sources the kpi module may cite without a specialist. A title counts when it is not blank and
+    is tagged English or not tagged, since the kpi builder writes it as English; of several, the first English one in
+    text order, else the first untagged one."""
+    from rdflib import Literal, URIRef
     from kpi_store.intake import picklists
     from kpi_store import ontology_view
     try:
@@ -244,9 +245,9 @@ def source_records(root):
     titles = {}
     for module in sorted(release.graphs):
         for s, title in release.graph(module).subject_objects(URIRef(PREFIXES["dcterms"] + "title")):
-            if str(s) in tiered:
-                titles.setdefault(str(s), set()).add(str(title))
-    return {s: sorted(t)[0] for s, t in titles.items()}
+            if str(s) in tiered and isinstance(title, Literal) and str(title).strip() and title.language in (None, LANGUAGE):
+                titles.setdefault(str(s), set()).add((title.language != LANGUAGE, str(title)))
+    return {s: sorted(t)[0][1] for s, t in titles.items()}
 
 
 def next_numbers(rows):
@@ -292,10 +293,14 @@ def _edit(changes, facts, root):
             if records is None:
                 records = source_records(root)
             title = records.get(iri(source))
-            if not title or tail(source) in sources.values():
+            if not title:
                 raise ChangeRefused(f"{source} is neither a document of kpi/measure-sources.csv nor a source with a title "
                                     "and an evidence tier in the release. A new source document needs a specialist, "
                                     "because its evidence tier is in the integration module")
+            if tail(source) in sources.values():
+                other = next(slug for slug, key in sources.items() if key == tail(source))
+                raise ChangeRefused(f"{source} needs a row of kpi/measure-sources.csv under the key {tail(source)}, and "
+                                    f"the row of src:{other} holds that key")
             # A source the ontology records already: the kpi module gains its row, under its title there.
             tables.rows[SOURCES].append({"key": tail(source), "slug": tail(source), "title": title, "short_name": ""})
             sources[tail(source)] = tail(source)
@@ -394,11 +399,16 @@ def compare(before, after):
     facts = {URIRef(iri(p)): p for p in FACTS}
     lines, rows, idents = {s: [] for s in new}, [], {}
     # A source that a new measure cites and the kpi module did not hold gains its type and its title.
-    cited = {o for s, p, o in added if s in new and p == DCTERMS.source and o not in held}
+    cited = {o for s, p, o in added if s in new and p == DCTERMS.source and o not in held and isinstance(o, URIRef)
+             and (curie(str(o)) or ":").split(":", 1)[0] == "src"}
+    titled = set()
     for s, p, o in added:
         if s == scheme and p == SKOS.hasTopConcept and o in new:
             continue
-        if s in cited and ((p, o) == (RDF.type, DCTERMS.BibliographicResource) or p == DCTERMS.title and _value(o, "text")):
+        if s in cited and (p, o) == (RDF.type, DCTERMS.BibliographicResource):
+            continue
+        if s in cited and p == DCTERMS.title and (_value(o, "text") or "").strip() and s not in titled:
+            titled.add(s)   # one title, as its row of measure-sources.csv gives it
             continue
         if s not in new:
             unsupported.append(f"+ {s} {p} {o!r}")
@@ -417,6 +427,11 @@ def compare(before, after):
             unsupported.append(f"+ {s} {p} {o!r}")
     for s in sorted(new):
         unsupported += [f"{s} lacks {p} {o!r}, which every measure has" for _, p, o in sorted(_expected(s, scheme) - added)]
+    for s in sorted(cited):
+        if (s, RDF.type, DCTERMS.BibliographicResource) not in added:
+            unsupported.append(f"{s} lacks {RDF.type} {DCTERMS.BibliographicResource}, which every source has")
+        if s not in titled:
+            unsupported.append(f"{s} lacks {DCTERMS.title}, which every source has")
     unsupported += _identifier_problems(before, after, new, idents)
     if unsupported:
         shown = sorted(unsupported)[:10]
