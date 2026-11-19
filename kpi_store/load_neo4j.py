@@ -12,9 +12,11 @@ writes no file of the release and never touches the Enterprise server. Python ma
 the release code this process imports; the steps it starts as separate commands are told to write none.
 
 The local Neo4j is Neo4j Desktop on the machine that runs the loads. THE LOAD EMPTIES THE DATABASE that
-[neo4j.local] names, then builds the graph again from the release files. The steps and their checks are the
-ontology-to-lpg skill's (skills/ontology-to-lpg/scripts/run_projection.py), run from this release's own run
-configuration with this Python and no other tool:
+[neo4j.local] names, then builds the graph again from the release files. So before it changes anything, it
+checks the database (check_local_database) and stops, with nothing changed, when the database is the Enterprise
+database, or holds nodes but no marker of an earlier local load. An empty database or a marked one is loaded.
+The steps and their checks are the ontology-to-lpg skill's (skills/ontology-to-lpg/scripts/run_projection.py),
+run from this release's own run configuration with this Python and no other tool:
 
   project         check the rules, validate with SHACL, reason with ROBOT, write the files the load reads
   load            send the triples in the request, validate in the graph (SHACL), one fail case per compiled
@@ -48,6 +50,7 @@ import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.parse import urlsplit
 
 from . import load_databricks as ldb
 from . import load_fuseki
@@ -67,6 +70,9 @@ REPORT, RECORDS, RUN_MANIFEST, INFERRED = "projection-report.json", "release-rec
 ENV_FILE, LOG_FILE, CONFIG_FILE = "neo4j-local.env", "neo4j-load.log", "projection-run.json"
 PROJECTION_CONFIG_FILE = "projection-config.json"   # the projection configuration's copy, also in the run folder
 MARKER_HASH = "graph_hash"   # this load's own marker field: the verified graph's hash
+LOOPBACK = ("localhost", "127.0.0.1", "::1")   # names of this machine, which all reach one server
+DEDICATED = ("Give [neo4j.local] a Neo4j instance of its own that holds nothing else, as the runbook's section "
+             "\"Set up the local Neo4j\" says, then run the load again")
 
 
 class LoadError(Exception):
@@ -314,6 +320,54 @@ def is_current(session, store, want, report, code, sep):
     return code.lv.hash_graph(session, sep)[0] == report["determinism_hash_sorted"]
 
 
+# ---- the database the load may empty -------------------------------------------------------------
+
+def same_address(one, two):
+    """True when two Neo4j settings name one server and one database: the same host (any name of this machine
+    counts as one), the same port and the same database name."""
+    def where(neo4j):
+        parts = urlsplit(neo4j.uri)
+        host = (parts.hostname or "").lower()
+        try:
+            port = parts.port or 7687
+        except ValueError:   # a port that is not a number names no server the load could reach
+            port = None
+        return ("localhost" if host in LOOPBACK else host), port, neo4j.database.strip().lower()
+    return where(one) == where(two)
+
+
+def enterprise_identity(enterprise, code, connect):
+    """The database ID the Enterprise server gives its database, or None when it cannot be read. The local load
+    does not need Enterprise, so an Enterprise that does not answer does not stop it."""
+    try:
+        with connect(enterprise) as driver, driver.session(database=enterprise.database) as session:
+            return code.cg.database_identity(session)
+    except Exception:   # any failure to reach or read Enterprise: only the address check then applies
+        return None
+
+
+def check_local_database(local, code, connect):
+    """Raises LoadError, and changes nothing, when the database [neo4j.local] names is the Enterprise database, or
+    holds nodes but no marker of an earlier local load. The load's first step empties the database, so this runs
+    before it."""
+    neo4j, enterprise = local.need("neo4j_local"), local.neo4j_enterprise
+    same = (f"[neo4j.local] names the Enterprise database {enterprise.database if enterprise else ''}. The load empties "
+            f"the database it loads into, so it stopped before it changed anything. Nothing was changed. {DEDICATED}")
+    if enterprise is not None and same_address(neo4j, enterprise):
+        raise LoadError(same)
+    with connect(neo4j) as driver, driver.session(database=neo4j.database) as session:
+        # Compared by the server's own database ID, as the copy compares its two databases: two addresses can
+        # reach one database.
+        if enterprise is not None and code.cg.database_identity(session) == enterprise_identity(enterprise, code, connect):
+            raise LoadError(same)
+        nodes = session.run("MATCH (n) RETURN count(n) AS n").single()["n"]
+        if nodes and not code.ss.read_neo4j(session, STORE)[0]:
+            raise LoadError(f"the local database {neo4j.database} holds {nodes} node(s) and no marker of an earlier KPI "
+                            "Store load. The load empties the database it loads into, so it stopped before it changed "
+                            f"anything. Nothing was changed. {DEDICATED}. If this database holds only the KPI Store's "
+                            "nodes, from a load that stopped part-way, empty it in Neo4j Desktop and run the load again")
+
+
 # ---- the load ------------------------------------------------------------------------------------
 
 def load(local, release_root, run_dir=None, force=False, code=None, connect=connect, run=subprocess.run,
@@ -351,7 +405,9 @@ def load(local, release_root, run_dir=None, force=False, code=None, connect=conn
         except LoadError:
             pass   # a report that did not pass is replaced by the load below
 
-    # The load itself. From here the skill's load step empties the database and builds the graph again.
+    # The load itself. The skill's load step empties the database and builds the graph again, so the database is
+    # checked first: it must not be Enterprise, and it must be empty or hold an earlier local load.
+    check_local_database(local, code, connect)
     java = load_fuseki.find_java((local.fuseki.java if local.fuseki else None))   # ROBOT runs on Java
     config_path = run_dir / CONFIG_FILE
     config_path.write_text(json.dumps(with_newest_inputs(cfg_doc, release_root, want["newest"], code, run_dir), indent=2) + "\n",
@@ -423,7 +479,7 @@ def main(argv=None):
     ap.add_argument("--stores", help=f"the local settings file (default: the one {ls.ENV_VAR} names)")
     ap.add_argument("--release", default=str(ls.ROOT), help="the release folder (default: the one this code is in)")
     ap.add_argument("--tech-graph", help="the technical graph's file, tech-graph.nq, to load beside the ontology")
-    ap.add_argument("--force", action="store_true", help="empty the local database and load again, even when it is current")
+    ap.add_argument("--force", action="store_true", help="load again, even when the local database is current; it still stops on a database without its marker")
     ap.add_argument("--json", action="store_true", help="print the result as JSON instead of one line")
     args = ap.parse_args(argv)
     try:
