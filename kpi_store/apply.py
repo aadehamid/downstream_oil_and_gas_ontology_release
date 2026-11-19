@@ -79,7 +79,10 @@ def target_of(proposals):
     if True in measures:
         raise ChangeRefused("these proposals change two modules: term changes of the kpi module and new reference "
                             "items. Apply them one module at a time")
-    return _item_target(reference_items.kind_of(changes))
+    kinds = {reference_items.kind_of(p.changes).name for p in proposals}   # each proposal must make whole items itself
+    if len(kinds) != 1:
+        raise ChangeRefused("one apply adds items of one kind. Apply the proposals for each kind of item on its own")
+    return _item_target(reference_items.KINDS[kinds.pop()])
 
 
 def next_version(current, route, newest):

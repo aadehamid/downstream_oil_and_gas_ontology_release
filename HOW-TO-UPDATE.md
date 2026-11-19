@@ -584,7 +584,7 @@ The commands start in the release folder. Keep the filled form and the proposal 
 
 7. Run the full check, as in "Before you change anything", step 3. Then load the stores with the runner, as in step 11 of "The release steps".
 
-A table goes the same way. Its form names the table's full name in R1 (for example `synapse_dev.replica_mips.mips_pricecurve`), "table" in R2, the system whose table it copies in R8 and the document that records it in R9. The apply then releases the `data-product` module.
+A table goes the same way. Its form names the table's full name in R1 (for example `synapse_dev.replica_mips.mips_sample`), "table" in R2, the system whose table it copies in R8 and the document that records it in R9. The apply then releases the `data-product` module.
 
 ## Change a concept's definition
 

@@ -169,7 +169,7 @@ def items(changes):
         elif change.kind == "create synonym" and kind.definition:
             if ";" in change.text:
                 raise ChangeRefused(f"an other name may not hold a semicolon, which separates them in the table: {line}")
-            if change.text in item.synonyms or change.text == item.label:
+            if change.text.casefold() in {n.casefold() for n in (item.label, *item.synonyms)}:
                 raise ChangeRefused(f"the item has this name already: {line}")
             item.synonyms.append(change.text)
         elif change.kind == "create edge" and change.predicate in kind.edges:

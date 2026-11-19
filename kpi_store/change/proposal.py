@@ -32,7 +32,8 @@ ROUTE_OF = {"create synonym": "minor", "create edge": "minor", "rename": "patch"
             "remove synonym": "patch", "delete edge": "patch", "create node": "minor", "add definition": "minor"}
 RAISED_BY = ("no", "not-sure")   # the answers to the compatibility question that make a change major
 FIELD = {"rename": "name", "change definition": "definition", "create synonym": "other names",
-         "remove synonym": "other names", "create edge": "process links", "delete edge": "process links"}
+         "remove synonym": "other names", "create edge": "process links", "delete edge": "process links",
+         "add definition": "definition"}
 
 
 def highest(routes):

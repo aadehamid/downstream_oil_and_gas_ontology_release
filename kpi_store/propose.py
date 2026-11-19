@@ -26,7 +26,7 @@ outside it too): the apply command commits the release, and refuses a release wi
 Each proposal is a folder named by the form's request number, such as TC-2026-001, or <date>-<the short key of the
 measure or the new item> when the form has none; with -2, -3 and so on when the name is taken.
 
-What it reads: the answers files, the release's KPI intake pack (kpi-intake/) and the kpi module's tables. What it
+What it reads: the answers files, the release's KPI intake pack (kpi-intake/) and the tables of the module it changes. What it
 writes: the proposal folders, and nothing else. Needs Python 3.11 or later with rdflib, and openpyxl for a workbook.
 """
 import argparse
@@ -258,7 +258,7 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
         intake = read_form(path, cat, data, root, stale_check=pack is None)
         if intake.form == ITEM:
             key, changes = item_changes(intake, data["lists"])
-            module, checks, compatible = reference_items.kind_of(changes).module, reference_items.check_changes, "yes"
+            module, checks, compatible = "new item's", reference_items.check_changes, "yes"
         else:
             measure, changes = changes_of(intake, data["lists"])
             key, module, checks = measure["notation"], "kpi", kpi_tables.check_changes

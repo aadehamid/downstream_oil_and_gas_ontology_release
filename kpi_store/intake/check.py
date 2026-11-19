@@ -366,9 +366,10 @@ def _reference_item(lists, terms, intake, report):
         for o in others:
             if ";" in o:
                 lines.append(f'R4: "{_short(o)}" holds a semicolon, which the ontology\'s tables use between other names')
-            elif o == name:
+            elif o.casefold() == name.casefold():
                 lines.append(f'R4: "{o}" is the name of the system, so it cannot be an other name too')
-        for o in sorted({o for o in others if others.count(o) > 1}):
+        folded = [o.casefold() for o in others]
+        for o in sorted({o for o in others if folded.count(o.casefold()) > 1}):
             lines.append(f'R4 names "{o}" twice')
     if kind == "table" and name:
         if not FULL_NAME.fullmatch(name):
@@ -379,7 +380,9 @@ def _reference_item(lists, terms, intake, report):
             lines.append(f'R1: the ontology holds the table {name} already')
         system = "".join(rules.real_values(answers, "R8")[:1])
         key = slug_of("table", name, system.rsplit("/", 1)[-1]) if system else ""
-        if key and key in {i["id"].rsplit("/", 1)[-1] for i in lists["platform-tables"]}:
+        if system and FULL_NAME.fullmatch(name) and not key:
+            lines.append(f'R1: "{_short(name)}" has no letter or digit in its table name to make the short key from')
+        elif key and key in {i["id"].rsplit("/", 1)[-1] for i in lists["platform-tables"]}:
             lines.append(f'R1: the ontology has a table with the short key "{key}" already')
     report.say("Checks of the new item")
     for line in lines:

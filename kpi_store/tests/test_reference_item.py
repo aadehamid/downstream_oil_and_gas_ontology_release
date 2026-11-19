@@ -109,11 +109,15 @@ def test_a_complete_system_and_a_complete_table_pass_the_check():
     (dict(SYSTEM_ANSWERS, R1="--"), 'R1: "--" has no letter or digit to make the short key of the system from'),
     (dict(SYSTEM_ANSWERS, R4=["A;B"]), 'R4: "A;B" holds a semicolon, which the ontology\'s tables use between other names'),
     (dict(SYSTEM_ANSWERS, R4=["Acme Scheduler"]), 'R4: "Acme Scheduler" is the name of the system, so it cannot be an other name too'),
+    (dict(SYSTEM_ANSWERS, R4=["acme scheduler"]), 'R4: "acme scheduler" is the name of the system, so it cannot be an other name too'),
+    (dict(SYSTEM_ANSWERS, R4=["ACS", "acs"]), 'R4 names "ACS" twice'),     # case does not count, as for the names held
     (dict(SYSTEM_ANSWERS, R3="Two\nlines."), 'R3: "Two\nlines.": the text holds a line break or another control character, and a KGCL line is one line'),
     (dict(TABLE_ANSWERS, R1="replica_mips.pricecurve"), 'R1: "replica_mips.pricecurve" is not a full name of the form catalog.schema.table'),
     (dict(TABLE_ANSWERS, R1="prod.replica_mips.pricecurve"),
      "R1: the ontology holds the sandbox's tables only, whose names start with idp_sbx. or synapse_dev."),
     (dict(TABLE_ANSWERS, R1="synapse_dev.replica_mips.MIPS_CURRENCY"), "R1: the ontology holds the table synapse_dev.replica_mips.MIPS_CURRENCY already"),
+    (dict(TABLE_ANSWERS, R1="synapse_dev.replica_mips.___"),
+     'R1: "synapse_dev.replica_mips.___" has no letter or digit in its table name to make the short key from'),
     (dict(TABLE_ANSWERS, R1="synapse_dev.other.currency"), 'R1: the ontology has a table with the short key "replica-mips-currency" already'),
 ])
 def test_the_check_refuses_an_item_that_does_not_fit_the_ontology(answers, blocking):
@@ -166,6 +170,7 @@ def test_the_prefixes_are_the_builders_namespaces():
     ([TABLE_LINES[0], "create edge table:replica-mips-pricecurve dp:layer layer:gold", *TABLE_LINES[2:]], "the form adds a replica only"),
     ([TABLE_LINES[0].replace("synapse_dev.", "prod."), *TABLE_LINES[1:]], "the module holds the sandbox's tables only"),
     (SYSTEM_LINES + TABLE_LINES, "one apply adds items of one kind"),
+    (SYSTEM_LINES + ["create exact synonym 'acme scheduler' for system:acme-scheduler"], "the item has this name already"),
     (["create exact synonym 'x' for measure:a"], "a reference item is a system (system:<id>) or a table (table:<id>)"),
 ])
 def test_the_lines_of_a_new_item_are_refused_unless_complete(lines, message):
@@ -333,9 +338,17 @@ def test_apply_refuses_two_modules_and_two_proposals_that_add_the_same_item(tmp_
     table = _write(tmp_path / "table", TABLE_LINES)
     for folders, message in (([term, one], "these proposals change two modules"),
                              ([one, table], "one apply adds items of one kind"),
+                             # Each proposal makes whole items itself: a second one may not add to the first one's item.
+                             ([one, _write(tmp_path / "more", ["create exact synonym 'Acme' for system:acme-scheduler"])],
+                              "no 'create node' line before it makes"),
                              ([one, two], "the proposals one and two both add system:acme-scheduler")):
         with pytest.raises(ChangeRefused, match=message):
             apply_cmd.apply(folders, ROOT, say=quiet)
+
+
+def test_every_kind_of_line_has_the_field_that_two_proposals_may_not_both_change():
+    # A line whose kind had no field made the conflict check fail with a KeyError instead of refusing.
+    assert set(proposal.FIELD) == set(proposal.ROUTE_OF) - {"create node"}
 
 
 def test_the_round_trip_refuses_a_difference_that_no_line_of_a_new_item_states(tmp_path):

@@ -497,7 +497,7 @@ python next_version.py current system</code></pre>
 <pre><code class="lang-text">&lt;commit&gt; Apply the reference item RI-2026-001: system 1.6.0
 1.6.0</code></pre></li></ol>
 <ol start="7"><li>Run the full check, as in "Before you change anything", step 3. Then load the stores with the runner, as in step 11 of "The release steps".</li></ol>
-<p>A table goes the same way. Its form names the table's full name in R1 (for example <code>synapse_dev.replica_mips.mips_pricecurve</code>), "table" in R2, the system whose table it copies in R8 and the document that records it in R9. The apply then releases the <code>data-product</code> module.</p>
+<p>A table goes the same way. Its form names the table's full name in R1 (for example <code>synapse_dev.replica_mips.mips_sample</code>), "table" in R2, the system whose table it copies in R8 and the document that records it in R9. The apply then releases the <code>data-product</code> module.</p>
 <h2 id="change-a-concept-s-definition">Change a concept's definition<a class="hl" href="#change-a-concept-s-definition" aria-label="Link to this section">#</a></h2>
 <p>A new wording with the same meaning is a patch. If the meaning changes, the release is a major, and the ontology owner approves it.</p>
 <ol><li>Find where the definition lives. Most sources are tables and Turtle files in the module's folder, so search there for the text. A file that starts "Built by" is generated: edit the source it names.</li><li>Edit the text in that source. Keep the citation of its source. If the new wording rests on a new source, cite it.</li><li>Follow "The release steps" from step 3. In step 5, use <code>patch</code> and the next patch version.</li></ol>
