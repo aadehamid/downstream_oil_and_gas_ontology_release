@@ -9,8 +9,9 @@
 ## Question
 
 The owner gave an instruction, then answered four questions asked as choices and four rounds of numbered
-questions (Q1 to Q28). Every question, with its options or recommended answer, is saved in full in the answers
-file, in a comment above the owner's reply.
+questions (Q1 to Q28). Every question, with its options or recommended answer, is saved in the answers file, in a
+comment above the owner's reply; in the questions, references to things outside this release are replaced by
+descriptions in square brackets.
 
 ## Context
 
@@ -162,11 +163,13 @@ The other options and recommendations not taken are saved with each question in 
 
 ## The owner's recorded words
 
-Saved in `answers/2026-11-18-kpi-store-1.2.md`: every quote in the Decision section above, word for word. Square
-brackets in that file replace references to things outside this release, so the release stands alone (KPI-DEC-0001);
-the agent decided that under the delegation in KPI-DEC-0003, and the unchanged text is kept outside the release.
+Saved in `answers/2026-11-18-kpi-store-1.2.md`: every quote in the Decision section above, word for word. The
+owner's words in that file are unchanged. In the agent's questions, square brackets replace references to things
+outside this release, so the release stands alone (KPI-DEC-0001): Decided (delegated under KPI-DEC-0003), with the
+unchanged questions kept outside the release.
 
-The agent's text, not the owner's words: the owner can reverse any reading in the Context section.
+The agent's text, not the owner's words: the owner can reverse any reading in the Context section and any decision
+marked as delegated.
 
 ## Evidence
 
