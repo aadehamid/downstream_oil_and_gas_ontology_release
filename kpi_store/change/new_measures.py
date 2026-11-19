@@ -8,7 +8,8 @@ A new measure is two files of its proposal (proposal.py). change.kgcl holds ever
     add definition '<text>' to measure:<key>                            measure-details.csv, definition
     create exact synonym '<text>' for measure:<key>                     measure-details.csv, aliases   any number
     create edge measure:<key> kpi:measureKind kind:<kind>               measure-classification.csv, class
-    create edge measure:<key> dcterms:source src:<slug>                 measure-classification.csv, source (its key)
+    create edge measure:<key> dcterms:source src:<slug>                 measure-classification.csv, source (its key);
+                                                                        a new row of measure-sources.csv, when needed
     create edge measure:<key> kpi:usedBy persona:<slug>                 measure-classification.csv, personas   any number
     create edge measure:<key> kpi:informsProcess proc:<id>              measure-details.csv, informs_process   any number
     create edge measure:<key> kpi:notToBeConfusedWith measure:<other>   measure-details.csv, not_to_be_confused_with
@@ -29,6 +30,12 @@ have no KGCL line (KPI-DEC-0004):
     skos:note                       text                   identifier-notes.csv
 
 A fact that a KGCL line can carry (a name, a definition, an other name or a link) is refused in facts.csv.
+
+The source is a document of measure-sources.csv, or a source that the release's newest packages give a title and
+the integration module an evidence tier: the propose command lets a form cite such a document only when question 3.5
+offers it. For one of those, the apply adds its row to measure-sources.csv, under its key and its title there, and
+the builder then gives it its type and its title in the kpi module too, the same triples the module that cites it
+first holds. A document with neither needs a specialist.
 
 The builder writes the rest by rule, and compare expects it: the measure's types, its scheme both ways, its short
 key, the classification evidence as a second source, and its identifier. The apply gives each new measure of a kind
@@ -54,7 +61,7 @@ PREFIXES = {**kpi_tables.PREFIXES, "kind": KPI_NS + "measure-kind/", "persona": 
 FOLDER = kpi_tables.KPI_FOLDER
 CLASSIFICATION, DETAILS = kpi_tables.CLASSIFICATION, kpi_tables.DETAILS
 IDENTIFIERS, NOTES, PERSONAS, SOURCES = "measure-identifiers", "identifier-notes", "personas", "measure-sources"
-TABLES = (CLASSIFICATION, DETAILS, IDENTIFIERS, NOTES)
+TABLES = (CLASSIFICATION, DETAILS, IDENTIFIERS, NOTES, SOURCES)
 # build_measures.py's kinds, its identifier prefix for each kind, the one exception to the run, and the source every
 # measure cites; a test checks that they are the builder's.
 KINDS = ("kpi", "operational-metric", "plan-variance-diagnostic", "market-indicator", "decision-support-indicator",
@@ -221,6 +228,27 @@ def _read(root, names):
         raise ChangeRefused(f"{root} holds no kpi tables: it is not a KPI Store release") from None
 
 
+def source_records(root):
+    """{source IRI: its title} for each source that the release's newest packages give a title and integration gives
+    an evidence tier: the sources the kpi module may cite without a specialist. The first title in text order, as the
+    intake's pick lists show it."""
+    from rdflib import URIRef
+    from kpi_store.intake import picklists
+    from kpi_store import ontology_view
+    try:
+        release = picklists.Release(root)
+    except (OSError, ontology_view.ReleaseError) as err:
+        raise ChangeRefused(f"{root} has no readable release packages, which a new source's row needs ({err})") from None
+    tier = URIRef(picklists.AUTHORITY + "evidenceTier")
+    tiered = {str(s) for s in release.graph("integration").subjects(tier, None)}
+    titles = {}
+    for module in sorted(release.graphs):
+        for s, title in release.graph(module).subject_objects(URIRef(PREFIXES["dcterms"] + "title")):
+            if str(s) in tiered:
+                titles.setdefault(str(s), set()).add(str(title))
+    return {s: sorted(t)[0] for s, t in titles.items()}
+
+
 def next_numbers(rows):
     """{prefix: the next number of its run} from the identifier rows, leaving out the exception to the run."""
     out = {}
@@ -238,7 +266,8 @@ def _edit(changes, facts, root):
     found = measures(changes, facts)
     tables = _read(root, TABLES)
     personas = {r["slug"]: r["label"] for r in _read(root, (PERSONAS,)).rows[PERSONAS]}
-    sources = {r["slug"]: r["key"] for r in _read(root, (SOURCES,)).rows[SOURCES]}
+    sources = {r["slug"]: r["key"] for r in tables.rows[SOURCES]}
+    records = None
     ids = {r["measure_id"] for r in tables.rows[CLASSIFICATION]}
     details = {r["measure_id"]: r for r in tables.rows[DETAILS]}
     names = {}
@@ -260,8 +289,16 @@ def _edit(changes, facts, root):
             raise ChangeRefused(f"kind:{kind} is not a kind of measure ({', '.join(KINDS)})")
         [source] = m.targets("dcterms:source")
         if tail(source) not in sources:
-            raise ChangeRefused(f"{source} is not a document of kpi/measure-sources.csv. A new source document needs a "
-                                "specialist, because its evidence tier is in the integration module")
+            if records is None:
+                records = source_records(root)
+            title = records.get(iri(source))
+            if not title or tail(source) in sources.values():
+                raise ChangeRefused(f"{source} is neither a document of kpi/measure-sources.csv nor a source with a title "
+                                    "and an evidence tier in the release. A new source document needs a specialist, "
+                                    "because its evidence tier is in the integration module")
+            # A source the ontology records already: the kpi module gains its row, under its title there.
+            tables.rows[SOURCES].append({"key": tail(source), "slug": tail(source), "title": title, "short_name": ""})
+            sources[tail(source)] = tail(source)
         for p in m.targets("kpi:usedBy"):
             if tail(p) not in personas:
                 raise ChangeRefused(f"{p} is not a planning persona of kpi/personas.csv, and the kpi builder writes only "
@@ -334,7 +371,11 @@ def _value(o, form):
     datatype = {"boolean": XSD.boolean, "integer": XSD.integer, "string": XSD.string}[form]
     if o.datatype != datatype:
         return None
-    return str(o.toPython()).lower() if form == "boolean" else str(o)
+    # rdflib writes a malformed boolean or integer as a well-formed one ("not-a-bool" as "false"), and marks it
+    # ill-typed; such a value states no fact.
+    if o.ill_typed:
+        return None
+    return str(o)
 
 
 def compare(before, after):
@@ -352,19 +393,23 @@ def compare(before, after):
     edges = {URIRef(iri(p)): p for p in EDGES}
     facts = {URIRef(iri(p)): p for p in FACTS}
     lines, rows, idents = {s: [] for s in new}, [], {}
+    # A source that a new measure cites and the kpi module did not hold gains its type and its title.
+    cited = {o for s, p, o in added if s in new and p == DCTERMS.source and o not in held}
     for s, p, o in added:
         if s == scheme and p == SKOS.hasTopConcept and o in new:
+            continue
+        if s in cited and ((p, o) == (RDF.type, DCTERMS.BibliographicResource) or p == DCTERMS.title and _value(o, "text")):
             continue
         if s not in new:
             unsupported.append(f"+ {s} {p} {o!r}")
         elif (s, p, o) in _expected(s, scheme):
             continue
-        elif p == DCTERMS.identifier and isinstance(o, Literal) and o.datatype == XSD.string:
+        elif p == DCTERMS.identifier and isinstance(o, Literal) and o.datatype == XSD.string and s not in idents:
             idents[s] = str(o)
         elif p in (SKOS.prefLabel, SKOS.definition, SKOS.altLabel) and _value(o, "text") is not None:
             kind = {SKOS.prefLabel: "create node", SKOS.definition: "add definition", SKOS.altLabel: "create synonym"}[p]
             lines[s].append(Change(kind, curie(str(s)), text=str(o)))
-        elif p in edges and (curie(str(o)) or ":").split(":", 1)[0] == EDGES[edges[p]][0]:
+        elif p in edges and isinstance(o, URIRef) and (curie(str(o)) or ":").split(":", 1)[0] == EDGES[edges[p]][0]:
             lines[s].append(Change("create edge", curie(str(s)), predicate=edges[p], target=curie(str(o))))
         elif p in facts and _value(o, FACTS[facts[p]][2]) is not None:
             rows.append((curie(str(s)), facts[p], _value(o, FACTS[facts[p]][2])))

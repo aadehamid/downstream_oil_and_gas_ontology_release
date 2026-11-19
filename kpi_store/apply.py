@@ -82,6 +82,9 @@ def target_of(proposals):
     changes = [c for p in proposals for c in p.changes]
     measures = {c.subject.startswith("measure:") for c in changes}
     new = [p for p in proposals if any(c.kind == "create node" for c in p.changes)]
+    if measures == {True, False}:
+        raise ChangeRefused("these proposals change two modules: the kpi module and the module of a new reference "
+                            "item. Apply them one module at a time")
     if measures == {True} and new:
         if len(new) != len(proposals):
             raise ChangeRefused("these proposals are term changes and new KPIs. Apply the new KPIs first, then the "
@@ -94,9 +97,6 @@ def target_of(proposals):
         raise ChangeRefused(f"the proposal {', '.join(stray)} holds {proposal.FACTS_FILE}, which only a new KPI has")
     if measures == {True}:
         return KPI
-    if True in measures:
-        raise ChangeRefused("these proposals change two modules: term changes of the kpi module and new reference "
-                            "items. Apply them one module at a time")
     kinds = {reference_items.kind_of(p.changes).name for p in proposals}   # each proposal must make whole items itself
     if len(kinds) != 1:
         raise ChangeRefused("one apply adds items of one kind. Apply the proposals for each kind of item on its own")

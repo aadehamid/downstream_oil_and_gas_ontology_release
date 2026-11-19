@@ -50,7 +50,7 @@ SIGNERS = {"data-owner": "Data Owner", "ontology-owner": "Ontology Owner", "arch
 ELSEWHERE = {"2.3": "population", "2.4": "population", "6.3": "value-stream", "6.4": "value-stream",
              "6.5": "value-stream", "6.6": "data-product", "6.7": "market-data", "7.1": "data-product",
              "7.2": "data-product", "7.3": "data-product", "7.4": "data-product", "7.5": "data-product",
-             "7.6": "data-product", "7.8": "data-product", "7.9": "data-product"}
+             "7.6": "data-product", "7.7": "data-product", "7.8": "data-product", "7.9": "data-product"}
 ROUTE_WHY = {"patch": "a patch: the changes correct or reword, and the old meaning still holds",
              "minor": "a minor: the changes add content, and the old meaning still holds",
              "major": "a major: the form says a report or an answer that used the old meaning may now be wrong"}
@@ -165,7 +165,7 @@ def item_changes(intake, lists):
     return key, changes
 
 
-def kpi_changes(cat, intake, lists):
+def kpi_changes(cat, intake, lists, root):
     """The short key of a new measure, the KGCL changes and the facts a KPI intake asks for, and the questions it
     answers that feed another module: (key, changes, facts, [(question, module)]). The facts are those KGCL cannot
     write (kpi_store/change/new_measures.py)."""
@@ -191,6 +191,12 @@ def kpi_changes(cat, intake, lists):
     if len(sources) != 1:
         raise ProposeRefused(f"3.5 names {len(sources)} documents, and the kpi module records one source for each measure. "
                              "Name the document that defines the measure")
+    offered = {i["id"] for i in lists["sources"] if not i.get("hidden")}
+    held = {new_measures.PREFIXES["src"] + r["slug"]
+            for r in new_measures._read(root, (new_measures.SOURCES,)).rows[new_measures.SOURCES]}
+    if sources[0] not in offered | held:
+        raise ProposeRefused("3.5 names a document that the form does not offer. The kpi module takes a document of its "
+                             "own sources or one that 3.5 offers")
     changes = [Change("create node", subject, text=name), Change("add definition", subject, text=one("2.2"))]
     changes += [Change("create synonym", subject, text=t) for t in rules.values(answers, "5.1")]
     edge = lambda predicate, target: Change("create edge", subject, predicate=predicate, target=target)
@@ -365,7 +371,7 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
         intake = read_form(path, cat, data, root, stale_check=pack is None)
         facts = []
         if intake.form == KPI:
-            key, changes, facts, elsewhere = kpi_changes(cat, intake, data["lists"])
+            key, changes, facts, elsewhere = kpi_changes(cat, intake, data["lists"], root)
             module, compatible = "kpi", "yes"
             checks = lambda changes, root: new_measures.check_changes(changes, facts, root)
         elif intake.form == ITEM:

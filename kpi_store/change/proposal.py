@@ -79,7 +79,10 @@ def facts_text(facts):
 
 def read_facts(text, name):
     """The facts of a facts.csv text, as (measure, property, value) rows. Refuses another header or a short row."""
-    rows = list(csv.reader(io.StringIO(text, newline="")))
+    try:
+        rows = list(csv.reader(io.StringIO(text, newline="")))
+    except csv.Error as err:
+        raise ChangeRefused(f"the proposal {name}: {FACTS_FILE} cannot be read ({err})") from None
     if not rows or tuple(rows[0]) != FACT_COLUMNS:
         raise ChangeRefused(f"the proposal {name}: {FACTS_FILE} must start with the header {','.join(FACT_COLUMNS)}")
     for n, row in enumerate(rows[1:], 2):

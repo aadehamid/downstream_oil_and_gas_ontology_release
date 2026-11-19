@@ -599,7 +599,7 @@ The propose command refuses a form that the `kpi` module cannot take as it stand
 
 - a name or an other name that a measure has already. A change to that measure goes through the term-change form;
 - a role in 6.1 that is not one of the four planning personas, the only roles the `kpi` module records today;
-- a document in 3.5 that `kpi/measure-sources.csv` does not hold, or more than one document. A new source document needs a specialist, because its evidence tier is in the `integration` module.
+- more than one document in 3.5, or a document that 3.5 does not offer and `kpi/measure-sources.csv` does not hold. A new source document needs a specialist, because its evidence tier is in the `integration` module. A document that 3.5 offers is in the ontology already, with its title and its tier: when `kpi/measure-sources.csv` has no row for it yet, the apply adds one, with that title.
 
 The commands start in the release folder. Keep the filled form and the proposal in a folder beside the release folder, never inside it, as for a term change. The example uses the folder `new-kpi` beside the release folder.
 

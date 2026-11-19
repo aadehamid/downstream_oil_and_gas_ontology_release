@@ -134,7 +134,9 @@ def test_the_lines_of_a_new_measure_are_refused_unless_complete(lines, message):
 
 
 @pytest.mark.parametrize("old,new,message", [
-    ("src:planner-measure-list-2026-10-18", "src:mpc-s01", "src:mpc-s01 is not a document of kpi/measure-sources.csv. A new source document needs a specialist"),
+    ("src:planner-measure-list-2026-10-18", "src:a-made-up-document",
+     "src:a-made-up-document is neither a document of kpi/measure-sources.csv nor a source with a title and an evidence "
+     "tier in the release. A new source document needs a specialist"),
     ("persona:prompt-planner", "persona:asphalt-manager", "persona:asphalt-manager is not a planning persona of kpi/personas.csv"),
     ("kind:market-indicator", "kind:target", "kind:target is not a kind of measure"),
     ("proc:CM-1-1-4-7-4", "proc:CM-9-9", "proc:CM-9-9 is not a process of the newest core"),
@@ -151,7 +153,8 @@ def test_a_new_measure_that_does_not_fit_the_tables_is_refused(old, new, message
 
 def test_propose_writes_the_lines_the_facts_the_route_and_the_signers_of_a_new_kpi(tmp_path):
     said = []
-    [folder] = propose_cmd.propose([kpi_form(tmp_path, number="NK-TEST-1")], tmp_path / "out", ROOT, now=NOW, say=said.append)
+    form = kpi_form(tmp_path, {"7.7": "The margin column, for the gasoline series"}, number="NK-TEST-1")
+    [folder] = propose_cmd.propose([form], tmp_path / "out", ROOT, now=NOW, say=said.append)
     assert folder == tmp_path / "out" / "NK-TEST-1"
     assert (folder / "change.kgcl").read_text(encoding="utf-8") == "".join(line + "\n" for line in LINES)
     with (folder / "facts.csv").open(encoding="utf-8", newline="") as f:
@@ -171,7 +174,7 @@ def test_propose_writes_the_lines_the_facts_the_route_and_the_signers_of_a_new_k
                  '  - How often it is stated, and its breakdowns: "daily, by market hub"',
                  "Its identifier: the apply gives it the next free OPM- number.",
                  "  - 2.3, 2.4: the population module", "  - 6.3, 6.4, 6.5: the value-stream module",
-                 "  - 6.6, 7.1, 7.8: the data-product module", "  - 6.7: the market-data module",
+                 "  - 6.6, 7.1, 7.7, 7.8: the data-product module", "  - 6.7: the market-data module",
                  "The route: minor. This is a minor: the changes add content, and the old meaning still holds."):
         assert line in summary, line
 
@@ -193,8 +196,9 @@ def test_a_kpi_and_a_note_on_its_identifier_give_their_own_facts(tmp_path):
     ({}, {k: v for k, v in SIGNED.items() if k != "architect"}, "is not complete and signed. .*the Architect has not signed"),
     ({"6.1": ["https://w3id.org/mpc/ontology/modules/organization/role/asphalt-manager"]}, SIGNED,
      '6.1 names "Asphalt Manager", which is not one of the planning personas'),
-    ({"3.5": ["https://w3id.org/mpc/ontology/source/mpc-s01"]}, SIGNED,
-     "src:mpc-s01 is not a document of kpi/measure-sources.csv"),
+    ({"3.5": ["https://w3id.org/mpc/ontology/source/src-cftc-p180-001"]}, SIGNED,
+     "3.5 names a document that the form does not offer. The kpi module takes a document of its own sources or one "
+     "that 3.5 offers"),
     ({"3.5": ["https://w3id.org/mpc/ontology/source/mpc-s01", "https://w3id.org/mpc/ontology/source/planner-measure-list-2026-10-18"]},
      SIGNED, "3.5 names 2 documents, and the kpi module records one source for each measure"),
     ({"5.1": ["the crack"]}, SIGNED, "the measure crack-spreads has the name 'the crack' already"),
@@ -232,6 +236,25 @@ def _write(folder, lines, facts=(), change=None):
         {"role": "Architect", "name": "An Architect", "date": "2026-11-19", "words": "Approved."}]}
     (folder / "approval.json").write_text(json.dumps(record), encoding="utf-8")
     return folder
+
+
+def test_apply_refuses_a_new_kpi_with_a_reference_item_as_two_modules(tmp_path):
+    from kpi_store.tests.test_reference_item import SYSTEM_LINES
+    kpi, item = _write(tmp_path / "kpi", LINES, FACTS), _write(tmp_path / "item", SYSTEM_LINES)
+    for folders in ([kpi, item], [item, kpi]):
+        with pytest.raises(ChangeRefused, match="these proposals change two modules: the kpi module and the module of a new "
+                                                "reference item. Apply them one module at a time"):
+            apply_cmd.apply(folders, ROOT, say=quiet)
+
+
+def test_a_facts_file_that_is_not_csv_is_refused_in_plain_words(tmp_path, capsys):
+    # A field longer than the csv module's limit (131,072 characters); Python 3.11 and later read a NUL byte.
+    folder = _write(tmp_path / "nul", LINES, FACTS)
+    (folder / "facts.csv").write_text(f"measure,property,value\nmeasure:x,kpi:grain,{'a' * 200_000}\n", encoding="utf-8")
+    with pytest.raises(ChangeRefused, match="the proposal nul: facts.csv cannot be read"):
+        proposal.read(folder)
+    assert apply_cmd.main([str(folder), "--release", str(ROOT)]) == 1
+    assert capsys.readouterr().err.startswith("Not applied: the proposal nul: facts.csv cannot be read")
 
 
 def test_apply_refuses_a_new_kpi_with_a_term_change_stray_facts_and_the_same_kpi_twice(tmp_path):
@@ -337,6 +360,14 @@ def test_the_round_trip_refuses_a_difference_that_neither_file_states(tmp_path):
             # an identifier off the run
             (lambda g: (g.remove((s, DCTERMS.identifier, None)), g.add((s, DCTERMS.identifier, Literal("OPM-0040", datatype=XSD.string)))),
              rf"the new OPM identifiers are \[40\], and the run needs \[{opm}\]"),
+            # a second identifier beside the right one (round 1, finding 3)
+            (lambda g: g.add((s, DCTERMS.identifier, Literal("OPM-9999", datatype=XSD.string))), "dc/terms/identifier"),
+            # a link written as a text that holds the target's IRI (finding 4)
+            (lambda g: (g.remove((s, URIRef(kpi + "usedBy"), URIRef(nm.iri("persona:prompt-planner")))),
+                        g.add((s, URIRef(kpi + "usedBy"), Literal(nm.iri("persona:prompt-planner"))))), "1 ways"),
+            # a candidate flag that is not a boolean (finding 5)
+            (lambda g: (g.remove((s, URIRef(kpi + "kpiCandidate"), None)),
+                        g.add((s, URIRef(kpi + "kpiCandidate"), Literal("not-a-bool", datatype=XSD.boolean)))), "1 ways"),
             # no identifier at all
             (lambda g: g.remove((s, DCTERMS.identifier, None)), "needs a OPM-nnnn identifier, not None"),
             # the classification evidence, which every measure cites
@@ -363,10 +394,55 @@ def test_apply_stops_when_the_rebuilt_module_holds_what_neither_file_states(tmp_
         built = nm.apply_changes(changes, facts, staging)
         with built.open("a", encoding="utf-8") as f:
             f.write('\n<https://w3id.org/mpc/ontology/modules/kpi/measure/test-spread-margin> '
-                    '<https://w3id.org/mpc/ontology/modules/kpi/grain> "weekly" .\n')
+                    '<https://w3id.org/mpc/ontology/modules/kpi/grain> "weekly"^^<http://www.w3.org/2001/XMLSchema#string> .\n')
         return built
     monkeypatch.setattr(apply_cmd, "NEW_KPI", apply_cmd.NEW_KPI.__class__(
         **{**apply_cmd.NEW_KPI.__dict__, "apply_changes": and_one_more_triple}))
-    with pytest.raises(cut.CutFailed, match="the step 'compare the kpi module before and after' failed"):
+    # The extra value is a fact of the right form, so the module's compare returns it, and the apply's round trip finds
+    # that facts.csv does not hold it.
+    with pytest.raises(cut.CutFailed, match=r"the kpi module does not hold exactly the proposals' changes: missing none, "
+                                            r"more \['measure:test-spread-margin,kpi:grain,weekly'\]"):
         apply_cmd.apply([folder], root, say=quiet, now=NOW)
     assert digest(root) == before
+
+
+RM = ROOT / "kpi-intake" / "examples" / "rm-margin-per-barrel.json"
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="Git is not installed")
+def test_the_rm_margin_example_cites_a_source_the_form_offers_and_apply_adds_its_row(tmp_path, no_global_git):
+    # The shipped R&M Margin example cites the MPC Form 10-K (3.5), which the form offers and the ontology records with a
+    # title and an evidence tier, and which kpi/measure-sources.csv does not hold yet. The apply adds its row.
+    root = scratch_release(tmp_path, git_copy=True)
+    data = json.loads(RM.read_text(encoding="utf-8"))
+    data["answers"].update({"2.1": "Test Margin per Barrel", "2.2": "A made-up margin per barrel for tests.", "5.1": []})
+    data.update(kpi_name="Test Margin per Barrel", example_of="", comment="", request={"number": "NK-RM-1"},
+                sign_offs=SIGNED)
+    form = tmp_path / "rm.kpi-intake.json"
+    form.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    [folder] = propose_cmd.propose([form], tmp_path / "proposals", root, now=NOW, say=quiet)
+    read = proposal.read(folder)
+    assert "create edge measure:test-margin-per-barrel dcterms:source src:mpc-s01" in read.lines
+    assert "create edge measure:test-margin-per-barrel kpi:measureKind kind:operational-metric" in read.lines
+    assert ("measure:test-margin-per-barrel", "kpi:kpiCandidate", "true") in read.facts
+    kept = tmp_path / "measures-before.ttl"
+    shutil.copy2(root / kpi_tables.MEASURES, kept)
+    apply_cmd.apply([folder], root, say=quiet, now=NOW)
+    assert git(root, "status", "--porcelain") == ""
+    sources = list(csv.DictReader((root / kpi_tables.KPI_FOLDER / "measure-sources.csv").open(encoding="utf-8")))
+    assert sources[-1] == {"key": "mpc-s01", "slug": "mpc-s01",
+                           "title": "Marathon Petroleum Corporation, Form 10-K for the fiscal year ended 2025-12-31",
+                           "short_name": ""}
+    row = list(csv.DictReader((root / kpi_tables.KPI_FOLDER / "measure-classification.csv").open(encoding="utf-8")))[-1]
+    assert (row["measure_id"], row["source"], row["class"], row["kpi_candidate"]) == (
+        "test-margin-per-barrel", "mpc-s01", "operational-metric", "yes")
+    lines, facts = nm.compare(kept, root / kpi_tables.MEASURES)
+    assert sorted(lines) == sorted(read.lines) and facts == sorted(read.facts)
+    # A second KPI that cites the same document takes the row the first one added.
+    data["answers"].update({"2.1": "Test Margin per Barrel Two", "2.2": "Another made-up margin per barrel for tests."})
+    data.update(kpi_name="Test Margin per Barrel Two", request={"number": "NK-RM-2"})
+    form.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    [folder] = propose_cmd.propose([form], tmp_path / "proposals", root, now=NOW, say=quiet)
+    apply_cmd.apply([folder], root, say=quiet, now=NOW)
+    sources = list(csv.DictReader((root / kpi_tables.KPI_FOLDER / "measure-sources.csv").open(encoding="utf-8")))
+    assert [r["slug"] for r in sources].count("mpc-s01") == 1
