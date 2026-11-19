@@ -7,7 +7,8 @@
 pricing/tables.csv names each table and view of the subject matter expert's pricing assets, its layer, the system a
 replica copies, and for a data product its kind, the criterion that decided it and why; lineage.csv says which
 table each is derived from, at every hop; columns.csv the value columns' lineage only; agents.csv the Genie
-agents and the metric views they use; view-systems.csv the systems each view's lineage reaches. The names are the
+agents and the metric views they use; view-systems.csv the systems each view's lineage reaches; sources.csv the
+title of each source the module cites, which each table and agent names in its source column. The names are the
 idp_sbx sandbox's, marked sandbox. The build fails unless every name resolves, a replica copies a known system and
 is no data product, every other table is a data product with a kind, a foundational one is derived only from
 replicas, a derived one from at least one data product, and every view's systems are the ones its lineage reaches.
@@ -42,28 +43,28 @@ WHOLE = PRODUCT["master-pricing"]  # all pricing sits under Master Pricing (the 
 LAYERS = ("replica", "silver", "gold", "metric-view")
 KINDS = ("foundational", "derived")
 TESTS = ("inputs", "logic")
-ASSETS = SRC["decision-owner-pricing-assets-2026-10-25"]
-SOURCES = {
-    ASSETS: "the subject matter expert's Databricks pricing metric views, their lineage and the Genie agents' instructions "
-            "(idp_sbx sandbox), shared on 2026-10-25 (the decision of 2026-10-25)",
-    # The data product kinds' sources, all generic frameworks (tier 5): no MPC, peer or downstream source defines
-    # the kinds (the decision of 2026-10-25, item 14; data-product-kinds research of 2026-10-25).
-    SRC["dehghani-data-mesh-2019"]: "Z. Dehghani, How to Move Beyond a Monolithic Data Lake to a Distributed Data Mesh, "
-                                    "martinfowler.com, 20 May 2019, https://martinfowler.com/articles/data-monolith-to-mesh.html",
-    SRC["datamesh-architecture-innoq"]: "L. Visengeriyeva, J. Christ and S. Harrer (INNOQ), Data Mesh Architecture, https://www.datamesh-architecture.com/, "
-                                        "retrieved 2026-10-25",
-    SRC["databricks-medallion-architecture"]: "Databricks, What is the medallion lakehouse architecture?, updated 2026-09-11, "
-                                              "https://docs.databricks.com/aws/en/lakehouse/medallion",
-    SRC["purview-data-products"]: "Microsoft Purview, Create and manage data products, updated 2026-09-09, "
-                                  "https://learn.microsoft.com/en-us/purview/unified-catalog-data-products-create-manage",
-    SRC["odps-4-0"]: "Linux Foundation, Open Data Product Standard 4.0, released 2025-07-24, https://opendataproducts.org/v4.0/",
-    SRC["w3c-prov-o"]: "W3C, PROV-O: The PROV Ontology, W3C Recommendation, 30 April 2013, https://www.w3.org/TR/prov-o/",
-}
+# pricing/sources.csv gives each source its key (the end of its IRI) and its title: the pricing assets, which each
+# table and agent names in its source column, and the data
+# product kinds' sources, all generic frameworks (tier 5), since no MPC, peer or downstream source defines the kinds
+# (the decision of 2026-10-25, item 14; data-product-kinds research of 2026-10-25). A new source is a new row there.
 
 
 def read(name):
     with open(os.path.join(TABLES, name), newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
+
+
+def source_problems(rows, table, has_slug=True):
+    """What is wrong with a sources table: a key or slug that is empty, holds a space or is used twice, or an empty
+    title. The same check is in kpi/build_measures.py and market-data/build_market_data.py."""
+    problems = []
+    for column in ("key", "slug") if has_slug else ("key",):
+        values = [r[column] for r in rows]
+        problems += [f"{table}: the {column} {v!r} must not be empty or hold a space" for v in values
+                     if not v.strip() or any(c.isspace() for c in v)]
+        problems += [f"{table} lists the {column} {v!r} {values.count(v)} times" for v in sorted(set(values)) if values.count(v) > 1]
+    problems += [f"{table}: {r['key']!r} has no title" for r in rows if not r["title"].strip()]
+    return problems
 
 
 def split(text):
@@ -72,6 +73,7 @@ def split(text):
 
 def load():
     tables, lineage, columns = read("tables.csv"), read("lineage.csv"), read("columns.csv")
+    source_rows = read("sources.csv")
     agents, view_systems = read("agents.csv"), read("view-systems.csv")
     systems = set()
     for path in (SYSTEMS, os.path.join(os.path.dirname(SYSTEMS), "other-systems.csv")):
@@ -80,6 +82,10 @@ def load():
     measures = {str(n) for n in Graph().parse(MEASURES).objects(None, SKOS.notation)}
     by = {t["slug"]: t for t in tables}
     problems = [f"tables.csv lists {s} {n} times" for s, n in Counter(t["slug"] for t in tables).items() if n > 1]
+    problems += source_problems(source_rows, "sources.csv", has_slug=False)
+    keys = {r["key"] for r in source_rows}
+    problems += [f"{name} {r['slug']}: unknown source {r['source']!r}, which is not in sources.csv"
+                 for name, rows in (("table", tables), ("agent", agents)) for r in rows if r["source"] not in keys]
     for t in tables:
         s = t["slug"]
         if t["layer"] not in LAYERS:
@@ -129,18 +135,18 @@ def load():
             problems.append(f"{s}: its lineage reaches {sorted(reach(s))}, but view-systems.csv says {sorted(stated.get(s, ()))}")
     if problems:
         sys.exit("pricing tables do not reconcile:\n  " + "\n  ".join(problems))
-    return tables, lineage, columns, agents, view_systems
+    return tables, lineage, columns, agents, view_systems, source_rows
 
 
-def build(tables, lineage, columns, agents, view_systems):
+def build(tables, lineage, columns, agents, view_systems, sources):
     g = Graph()
     for prefix, ns in (("dp", DP), ("table", TABLE), ("column", COLUMN), ("agent", AGENT), ("kind", KIND), ("layer", LAYER),
                        ("product", PRODUCT), ("system", SYSTEM), ("measure", MEASURE), ("src", SRC), ("prov", PROV),
                        ("skos", SKOS), ("dcterms", DCTERMS)):
         g.bind(prefix, ns)
-    for iri, title in SOURCES.items():
-        g.add((iri, RDF.type, DCTERMS.BibliographicResource))
-        g.add((iri, DCTERMS.title, Literal(title, lang="en")))
+    for r in sources:
+        g.add((SRC[r["key"]], RDF.type, DCTERMS.BibliographicResource))
+        g.add((SRC[r["key"]], DCTERMS.title, Literal(r["title"], lang="en")))
     for t in tables:
         iri = TABLE[t["slug"]]
         g.add((iri, RDF.type, DP.PlatformTable))
@@ -153,7 +159,7 @@ def build(tables, lineage, columns, agents, view_systems):
         g.add((iri, DP.fullName, Literal(t["name"], datatype=XSD.string)))
         g.add((iri, DP.sandbox, Literal(t["name"].startswith("idp_sbx.") or t["name"].startswith("synapse_dev."))))
         g.add((iri, DP.layer, LAYER[t["layer"]]))
-        g.add((iri, DCTERMS.source, ASSETS))
+        g.add((iri, DCTERMS.source, SRC[t["source"]]))
         if t["layer"] == "replica":
             g.add((iri, DP.copiesSystem, SYSTEM[t["copies_system"]]))
         else:
@@ -181,13 +187,13 @@ def build(tables, lineage, columns, agents, view_systems):
         iri = AGENT[a["slug"]]
         g.add((iri, RDF.type, PROV.SoftwareAgent))
         g.add((iri, RDFS.label, Literal(a["label"], lang="en")))
-        g.add((iri, DCTERMS.source, ASSETS))
+        g.add((iri, DCTERMS.source, SRC[a["source"]]))
         for v in split(a["uses"]):
             g.add((iri, PROV.used, TABLE[v]))
     return g
 
 
-def figures(tables, lineage, columns, agents, view_systems):
+def figures(tables, lineage, columns, agents, view_systems, sources=()):
     layers = Counter(t["layer"] for t in tables)
     kinds = Counter(t["kind"] for t in tables if t["kind"])
     return {"tables": len(tables), **{l: layers[l] for l in LAYERS}, **{k: kinds[k] for k in KINDS},

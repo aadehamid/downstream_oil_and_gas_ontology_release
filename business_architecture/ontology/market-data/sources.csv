@@ -1,0 +1,6 @@
+key,slug,title
+MPC-S01,mpc-performance-measures-evidence,"MPC performance measures, business_architecture/reference/mpc/mpc-performance-measures-evidence.md"
+CME-CRACK,cme-trading-crack-spreads-2024,"CME Group, Trading Crack Spreads (2024), https://www.cmegroup.com/articles/2024/trading-crack-spreads.html, retrieved 2026-10-19"
+MPC-ECON,mpc-economics-crack-spread-kpi-definition,"MPC Economics, 3-2-1 Crack Spread KPI Definition, provided by the subject matter expert on 2026-10-20, business_architecture/reference/internal/crack-spread-kpi-definition.md"
+OWNER-ASSETS,decision-owner-pricing-assets-2026-10-25,"the subject matter expert's Databricks pricing metric views, their lineage and the Genie agents' instructions (idp_sbx sandbox), shared on 2026-10-25 (the decision of 2026-10-25)"
+CME-FRESH,cme-fresh-from-the-trading-room-2026-07-14,"CME Group, Fresh from the Trading Room: Papering over the cracks (2026-07-14), https://www.cmegroup.com/newsletters/fresh-from-the-trading-room/2026-07-14.html, retrieved 2026-10-19"

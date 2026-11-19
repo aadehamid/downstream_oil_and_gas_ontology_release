@@ -128,7 +128,7 @@ The ontology has no place for a KPI's domain yet, and holds no list of domains. 
 | F6 Which test decided the kind | `kpi:classificationTest`, 1 to 5 | kpi | required | 4.1, 4.2, 4.3, 4.4, 4.5, 4.6 | Derived. |
 | F7 Why it has that kind | `kpi:classificationReason`, exactly one | kpi | required | 4.8 |  |
 | F8 KPI candidate | `kpi:kpiCandidate`, true or false. Only an operational metric can be true | kpi | required | 4.7 | False unless the kind is operational metric. |
-| F9 Source | `dcterms:source`, at least one IRI. The IRI needs a row in `authority/source-tiers.csv` | kpi and integration | required | 3.5 | A new source document needs a change to the kpi builder and an evidence tier. |
+| F9 Source | `dcterms:source`, at least one IRI. The IRI needs a row in `authority/source-tiers.csv` | kpi and integration | required | 3.5 | A new source document needs a row in `kpi/measure-sources.csv` and an evidence tier. |
 | F10 Identifier | `dcterms:identifier`, `KPI-nnnn` or `OPM-nnnn`. Required unless the kind is tracker or report, or not a measure | kpi | required | Derived | The next free `KPI-` or `OPM-` number. |
 | F11 Where the source says it | `dcterms:bibliographicCitation`, at most one | kpi | usual | 3.5, 4.6 |  |
 | F12 Process it informs | `kpi:informsProcess`, any number | kpi, pointing into core | usual | 1.2, 1.3, 6.2 |  |

@@ -6,8 +6,11 @@
 
 measure-classification.csv holds each measure's kind and why; measure-details.csv its
 definition, grain, basis, aliases and the processes it informs; personas.csv the planning
-roles; measure-identifiers.csv each measure's KPI or OPM identifier (kpi 1.3.0, the decision of 2026-10-28).
-The build fails unless both measure tables list the same measures once each, every
+roles; measure-identifiers.csv each measure's KPI or OPM identifier (kpi 1.3.0, the decision of 2026-10-28);
+measure-sources.csv the sources a measure comes from; identifier-notes.csv and change-notes.csv the notes kept on
+a measure. A new source or note is a new row in its table.
+The build fails unless every source and note row names a known source or measure, both measure tables list the
+same measures once each, every
 kind is on the measure-kind list, every persona and process named exists, every
 "not to be confused with" names another measure, and every identifier follows its kind, is used once,
 keeps the KPI-0001 exception and sits in its prefix's run in the classification table's order with no gap.
@@ -42,44 +45,40 @@ ORG = Namespace("http://www.w3.org/ns/org#")
 SRC = Namespace("https://w3id.org/mpc/ontology/source/")
 KINDS = ("kpi", "operational-metric", "plan-variance-diagnostic", "market-indicator",
          "decision-support-indicator", "tracker-or-report", "alert", "not-a-measure")
-SOURCES = {  # where a measure comes from -> the source it cites
-    "planner list": SRC["planner-measure-list-2026-10-18"],
-    "MPC": SRC["mpc-performance-measures-evidence"],
-    "industry": SRC["kpi-classification-evidence"],
-}
-SOURCE_TITLES = {
-    SOURCES["planner list"]: "Value Chain Optimization Decision Support and Visualization (VCO DSV): the planning team's measure list, as the subject matter expert sent it on 2026-10-18 (the decision of 2026-10-18)",
-    SOURCES["MPC"]: "MPC performance measures, business_architecture/reference/mpc/mpc-performance-measures-evidence.md",
-    SOURCES["industry"]: "KPI or operational metric, business_architecture/reference/industry-view/kpi-classification-evidence.md",
-}
-# Every measure also cites the classification evidence, which holds the rule it was sorted by.
-CLASSIFIED_BY = SOURCES["industry"]
-# The note on an identifier the decision owner's assets give a measure (the decision of 2026-10-25, item 3). Every other
-# measure's identifier follows the rule in the decision of 2026-10-28 and carries no note.
-IDENTIFIER_NOTES = {
-    "crack-spreads": "KPI-0001 is the crack-spread Genie agent's identifier for this measure. The gold table "
-                     "behind its metric view holds the constant KPI_ID value 'KPI Crack Spread 3-2-1' on every "
-                     "one of its 127 series and all 1,090,423 rows of the gold table alike, so the identifier names the measure, "
-                     "not a series "
-                     "(the decision of 2026-10-25, item 3). It keeps KPI-0001 although the module classes it as a market indicator, "
-                     "because the pricing assets already use it (kpi 1.3.0, the decision of 2026-10-28).",
-}
+# Where a measure comes from: measure-sources.csv gives each source its key (the classification table's source
+# column), the end of its IRI, its title and, if it has one, its short name.
+SOURCE_TABLE = os.path.join(HERE, "measure-sources.csv")
+# Every measure also cites the classification evidence, which holds the rule it was sorted by. This is a rule, not
+# content: it holds for every measure. Each persona names its source in personas.csv.
+CLASSIFIED_BY = "industry"
+# identifier-notes.csv gives the note on an identifier the decision owner's assets give a measure (the decision of
+# 2026-10-25, item 3); every other measure's identifier follows the rule in the decision of 2026-10-28 and carries no
+# note. change-notes.csv gives what changed in a measure since an earlier release, kept on the measure (kpi 1.2.0).
+IDENTIFIER_NOTE_TABLE = os.path.join(HERE, "identifier-notes.csv")
+CHANGE_NOTE_TABLE = os.path.join(HERE, "change-notes.csv")
 # Which identifier prefix each kind takes (the decision of 2026-10-28); a kind not listed takes none.
 PREFIX = {"kpi": "KPI", "operational-metric": "OPM", "market-indicator": "OPM", "plan-variance-diagnostic": "OPM",
           "decision-support-indicator": "OPM", "alert": "OPM"}
 # The one measure whose identifier does not follow its kind: the pricing assets' KPI-0001 (the decision of 2026-10-25).
 PREFIX_EXCEPTIONS = {"crack-spreads": "KPI-0001"}
-# What changed in a measure since an earlier release, kept on the measure (kpi 1.2.0).
-CHANGES = {
-    "additional-market-prices": "kpi 1.2.0 (2026-10-25): narrowed to renewables and NGLs; the planner list's name was "
-                                "'Additional Market Prices (Benchmark, Crude, Renewables, NGLs)'. Benchmark and crude "
-                                "prices are Crude Market Pricing's (the decision of 2026-10-25, item 4).",
-}
 
 
 def read_csv(path):
     with open(path, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
+
+
+def source_problems(rows, table, has_slug=True):
+    """What is wrong with a sources table: a key or slug that is empty, holds a space or is used twice, or an empty
+    title. The same check is in market-data/build_market_data.py and data-product/build_pricing.py."""
+    problems = []
+    for column in ("key", "slug") if has_slug else ("key",):
+        values = [r[column] for r in rows]
+        problems += [f"{table}: the {column} {v!r} must not be empty or hold a space" for v in values
+                     if not v.strip() or any(c.isspace() for c in v)]
+        problems += [f"{table} lists the {column} {v!r} {values.count(v)} times" for v in sorted(set(values)) if values.count(v) > 1]
+    problems += [f"{table}: {r['key']!r} has no title" for r in rows if not r["title"].strip()]
+    return problems
 
 
 def process_index():
@@ -103,6 +102,23 @@ def load():
     by_detail = {d["measure_id"]: d for d in details}
     procs = process_index()
     identifiers = {i["measure_id"]: i["identifier"] for i in read_csv(IDENTIFIER_TABLE)}
+    sources = read_csv(SOURCE_TABLE)
+    problems += source_problems(sources, "measure-sources.csv")
+    sources = {s["key"]: s for s in sources}
+    if CLASSIFIED_BY not in sources:
+        problems.append(f"measure-sources.csv has no {CLASSIFIED_BY!r} source, which every measure cites")
+    problems += [f"persona {p['slug']}: unknown source {p['source']!r}, which is not in measure-sources.csv"
+                 for p in personas if p["source"] not in sources]
+    notes = {}
+    for path, prop in ((IDENTIFIER_NOTE_TABLE, SKOS.note), (CHANGE_NOTE_TABLE, SKOS.changeNote)):
+        for n in read_csv(path):
+            name = os.path.basename(path)
+            if n["measure_id"] not in ids:
+                problems.append(f"{name}: {n['measure_id']!r} is not a measure of the classification table")
+            elif not n["note"].strip():
+                problems.append(f"{name}: {n['measure_id']!r} has an empty note")
+            else:
+                notes.setdefault(n["measure_id"], []).append((prop, n["note"]))
     problems += [f"identifier {v!r} is used {n} times" for v, n in Counter(identifiers.values()).items() if n > 1]
     problems += [f"identifier row {m!r} has no classification" for m in identifiers if m not in ids]
     for r in rows:
@@ -136,8 +152,9 @@ def load():
             problems.append(f"{m}: only an operational metric can be a KPI candidate")
         if r["name"] in split(by_detail.get(m, {}).get("aliases", "")):
             problems.append(f"{m}: an alias repeats the measure's name, which SKOS forbids (S13; the decision of 2026-10-25)")
-        if r["source"] not in SOURCES:
-            problems.append(f"{m}: unknown source {r['source']!r}")
+        if r["source"] not in sources:
+            problems.append(f"{m}: unknown source {r['source']!r}, which is not in measure-sources.csv")
+        r["notes"] = notes.get(m, [])
         if not r["rule_test"].isdigit() or not 1 <= int(r["rule_test"]) <= 5:
             problems.append(f"{m}: rule_test must be 1 to 5")
         problems += [f"{m}: unknown persona {p!r}" for p in split(r["personas"]) if p not in labels]
@@ -152,23 +169,25 @@ def load():
             problems.append(f"{m}: a confused-with link needs a note saying how they differ")
     if problems:
         sys.exit("kpi tables do not reconcile:\n  " + "\n  ".join(problems))
-    return rows, {d["measure_id"]: d for d in details}, personas, labels, procs
+    return rows, {d["measure_id"]: d for d in details}, personas, labels, procs, sources
 
 
 def split(text):
     return [t.strip() for t in text.split(";") if t.strip()]
 
 
-def build(rows, details, personas, labels, procs):
+def build(rows, details, personas, labels, procs, sources):
     g = Graph()
     for prefix, ns in (("kpi", KPI), ("kind", KIND), ("measure", MEASURE), ("persona", PERSONA),
                        ("proc", PROC), ("org", ORG), ("src", SRC), ("skos", SKOS), ("dcterms", DCTERMS)):
         g.bind(prefix, ns)
-    for iri, title in SOURCE_TITLES.items():
-        g.add((iri, RDF.type, DCTERMS.BibliographicResource))
-        g.add((iri, DCTERMS.title, Literal(title, lang="en")))
-    # The planner list's short name, as the decision owner gave it (the review comments of a subject matter expert reviewing the documents).
-    g.add((SOURCES["planner list"], DCTERMS.alternative, Literal("VCO DSV", lang="en")))
+    for s in sources.values():
+        g.add((SRC[s["slug"]], RDF.type, DCTERMS.BibliographicResource))
+        g.add((SRC[s["slug"]], DCTERMS.title, Literal(s["title"], lang="en")))
+        # The planner list's short name, as the decision owner gave it (the review comments of a subject matter expert
+        # reviewing the documents).
+        if s["short_name"]:
+            g.add((SRC[s["slug"]], DCTERMS.alternative, Literal(s["short_name"], lang="en")))
     for p in personas:
         iri = PERSONA[p["slug"]]
         g.add((iri, RDF.type, ORG.Role))
@@ -176,7 +195,7 @@ def build(rows, details, personas, labels, procs):
         g.add((iri, SKOS.definition, Literal(p["definition"], lang="en")))
         g.add((iri, KPI.planType, Literal(p["plan_type"], datatype=XSD.string)))
         g.add((iri, KPI.planHorizon, Literal(p["horizon"], datatype=XSD.string)))
-        g.add((iri, DCTERMS.source, SOURCES["planner list"]))
+        g.add((iri, DCTERMS.source, SRC[sources[p["source"]]["slug"]]))
     for r in rows:
         m, d = r["measure_id"], details[r["measure_id"]]
         iri = MEASURE[m]
@@ -208,12 +227,10 @@ def build(rows, details, personas, labels, procs):
                 g.add((iri, prop, Literal(value, datatype=XSD.string)))
         if r["identifier"]:
             g.add((iri, DCTERMS.identifier, Literal(r["identifier"], datatype=XSD.string)))
-        if m in IDENTIFIER_NOTES:
-            g.add((iri, SKOS.note, Literal(IDENTIFIER_NOTES[m], lang="en")))
-        if m in CHANGES:
-            g.add((iri, SKOS.changeNote, Literal(CHANGES[m], lang="en")))
-        g.add((iri, DCTERMS.source, SOURCES[r["source"]]))
-        g.add((iri, DCTERMS.source, CLASSIFIED_BY))
+        for prop, note in r["notes"]:
+            g.add((iri, prop, Literal(note, lang="en")))
+        g.add((iri, DCTERMS.source, SRC[sources[r["source"]]["slug"]]))
+        g.add((iri, DCTERMS.source, SRC[sources[CLASSIFIED_BY]["slug"]]))
         if r["evidence"]:
             g.add((iri, DCTERMS.bibliographicCitation, Literal(r["evidence"], datatype=XSD.string)))
     return g
@@ -240,11 +257,12 @@ def main():
     ap.add_argument("--write", action="store_true")
     ap.add_argument("--verify", action="store_true")
     args = ap.parse_args()
-    rows, details, personas, labels, procs = load()
+    loaded = load()
+    rows, details, personas = loaded[:3]
     text = ("# Measures of the kpi module (Step 7; the decision of 2026-10-18, the decision of 2026-10-18).\n"
             "# Built by build_measures.py from measure-classification.csv, measure-details.csv and\n"
             "# personas.csv. Do not edit by hand.\n"
-            + build(rows, details, personas, labels, procs).serialize(format="turtle"))
+            + build(*loaded).serialize(format="turtle"))
     print("; ".join(f"{k} {v}" for k, v in figures(rows, details, personas).items()))
     if args.verify:
         current = os.path.exists(OUTPUT) and open(OUTPUT, encoding="utf-8").read() == text

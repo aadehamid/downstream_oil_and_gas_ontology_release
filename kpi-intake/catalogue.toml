@@ -1524,7 +1524,7 @@ property = "`dcterms:source`, at least one IRI. The IRI needs a row in `authorit
 module = "kpi and integration"
 status = "required"
 supplied_by = ["3.5"]
-note = "A new source document needs a change to the kpi builder and an evidence tier."
+note = "A new source document needs a row in `kpi/measure-sources.csv` and an evidence tier."
 
 [[fact]]
 id = "F10"
