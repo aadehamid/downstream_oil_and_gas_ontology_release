@@ -81,11 +81,24 @@ def test_a_double_quote_inside_text_reads_and_writes():
     assert official(line).new_value == 'The "3-2-1" crack spread, in $/bbl.'
 
 
-def test_a_typographic_apostrophe_and_other_unicode_read_and_write():
+def test_a_straight_apostrophe_is_written_as_the_typographic_one_and_read_back():
+    # The grammar has no escape for ', so a line writes it as ’, which the official tools take unchanged.
     line = "create exact synonym 'MPC’s margin – R&M' for measure:rm-margin-per-barrel"
-    assert kgcl.read_line(line).text == "MPC’s margin – R&M"
+    assert kgcl.read_line(line).text == "MPC's margin – R&M"
     assert kgcl.write_line(kgcl.read_line(line)) == line
-    official(line)
+    assert official(line).new_value == "MPC’s margin – R&M"
+    rename = Change("rename", "measure:x", old="MPC's margin", text="MPC's R&M margin")
+    assert kgcl.write_line(rename) == "rename measure:x from 'MPC’s margin' to 'MPC’s R&M margin'"
+    official(kgcl.write_line(rename))
+    assert kgcl.read_line(kgcl.write_line(rename)) == rename
+
+
+def test_a_text_that_holds_a_real_typographic_apostrophe_is_refused():
+    for change in (Change("change definition", "measure:x", text="MPC’s margin"),
+                   Change("rename", "measure:x", old="Old", text="MPC’s"),
+                   Change("create synonym", "measure:x", text="it’s")):
+        with pytest.raises(ChangeRefused, match="typographic apostrophe"):
+            kgcl.write_line(change)
 
 
 def test_a_change_file_reads_line_by_line_and_skips_blank_lines():
@@ -97,17 +110,13 @@ def test_a_change_file_reads_line_by_line_and_skips_blank_lines():
 
 def test_the_grammar_has_no_escape_for_a_straight_single_quote():
     # kgcl.lark: SINGLE_QUOTE_LITERAL is "'" /((?!\').)*/ "'". Neither doubling nor a backslash escapes a quote,
-    # and a synonym cannot be double-quoted. So the reader and the writer refuse such text.
+    # and a synonym cannot be double-quoted. So a line that tries any of them is refused.
     for line in ("create exact synonym 'MPC''s margin' for measure:x", "create exact synonym 'MPC\\'s margin' for measure:x",
                  "create exact synonym \"MPC's margin\" for measure:x"):
         with pytest.raises(Exception):
             parse_statement(line)
         with pytest.raises(ChangeRefused):
             kgcl.read_line(line)
-    with pytest.raises(ChangeRefused, match="straight single quote"):
-        kgcl.write_line(Change("change definition", "measure:x", text="MPC's margin"))
-    with pytest.raises(ChangeRefused, match="straight single quote"):
-        kgcl.write_line(Change("rename", "measure:x", old="MPC's", text="New"))
 
 
 def test_the_official_renderer_writes_a_backslash_twice_so_the_text_is_refused():
@@ -378,3 +387,21 @@ def test_an_empty_change_list_and_a_folder_without_kpi_tables_are_refused(tmp_pa
         kpi_tables.apply_changes([], tmp_path)
     with pytest.raises(ChangeRefused, match="not a KPI Store release"):
         kpi_tables.apply_changes([FORMS[0][1]], tmp_path)
+
+
+def test_a_definition_with_a_straight_apostrophe_round_trips_and_the_table_keeps_it(scratch):
+    a, b, process, name, alias = _pick(scratch)
+    before = Graph().parse(scratch / kpi_tables.MEASURES)
+    text = "MPC's made-up definition, for the round trip of an apostrophe."
+    line = kgcl.write_line(Change("change definition", f"measure:{b}", text=text))
+    assert line == f"change definition of measure:{b} to 'MPC’s made-up definition, for the round trip of an apostrophe.'"
+    assert render(parse_statement(line)) == line
+    after = kpi_tables.apply_changes([kgcl.read_line(render(parse_statement(line)))], scratch)
+    assert _rows(scratch, kpi_tables.DETAILS)[b]["definition"] == text
+    assert kpi_tables.compare(before, after) == [line]
+
+
+def test_apply_refuses_a_value_that_holds_a_real_typographic_apostrophe(scratch):
+    a, b, process, name, alias = _pick(scratch)
+    with pytest.raises(ChangeRefused, match="typographic apostrophe"):
+        kpi_tables.apply_changes([Change("change definition", f"measure:{b}", text="MPC’s margin")], scratch)

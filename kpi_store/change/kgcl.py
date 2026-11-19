@@ -17,8 +17,12 @@ An <id> is a CURIE: a prefix of letters, digits and underscores, a colon, then n
 
 Quotes. The grammar's single-quoted text is "'" INNER "'", where INNER is /((?!\').)*/: it has no escape, so a
 straight single quote (') cannot appear inside the text at all. Tested on kgcl-schema 0.7.0: 'MPC''s' and 'MPC\'s'
-both fail to parse, and a synonym cannot be double-quoted. A double quote inside the text is fine. So this module
-refuses text that holds a straight single quote, and says to write the typographic apostrophe (U+2019) or reword.
+both fail to parse, and a synonym cannot be double-quoted. A double quote inside the text is fine. So the writer
+puts each straight apostrophe of a text as the typographic one, ’ (U+2019), which the grammar takes and the
+official renderer writes unchanged, and the reader turns each ’ back into a straight apostrophe. The tables keep
+straight apostrophes, and the round trip is exact. A text that already holds a real ’ is refused, because the
+reader could not tell it from an apostrophe (decided under the delegation on 2026-11-19: 487 of 17,101
+source-table cells hold a straight apostrophe, and none of the tables the change forms write holds a ’).
 It also refuses a backslash, because the official renderer writes it twice, and a line break or other control
 character, because a KGCL line is one line. Text may not be empty or start or end with a space.
 
@@ -33,6 +37,7 @@ from . import ChangeRefused
 
 KINDS = ("create synonym", "remove synonym", "change definition", "rename", "create edge", "delete edge")
 NOT_APPLIED = "not a change this release applies"
+TYPOGRAPHIC = "\u2019"   # how a KGCL line writes a straight apostrophe of a text
 
 _ID = r"[A-Za-z0-9_]+:[^\s']+"
 _TEXT = r"'([^']*)'"
@@ -65,9 +70,9 @@ def text_problem(text):
         return "the text is empty"
     if text != text.strip():
         return "the text starts or ends with a space"
-    if "'" in text:
-        return ("the text holds a straight single quote ('), which KGCL has no way to write inside quoted text; "
-                "write the apostrophe as ’ or reword it")
+    if TYPOGRAPHIC in text:
+        return (f"the text holds the typographic apostrophe {TYPOGRAPHIC}, which a KGCL line uses to write a straight "
+                "apostrophe; write it as a straight apostrophe (')")
     if "\\" in text:
         return "the text holds a backslash, which the official KGCL tools would write twice"
     if any(unicodedata.category(c) == "Cc" for c in text):
@@ -80,6 +85,14 @@ def _texts(change):
     if change.kind == "rename":
         return (change.old, change.text)
     return () if change.kind.endswith("edge") else (change.text,)
+
+
+def _encode(text):
+    return text.replace("'", TYPOGRAPHIC)
+
+
+def _decode(text):
+    return text.replace(TYPOGRAPHIC, "'")
 
 
 def _check_text(text, line):
@@ -95,11 +108,11 @@ def read_line(line):
         if not m:
             continue
         if kind in ("create synonym", "remove synonym"):
-            change = Change(kind, subject=m.group(2), text=m.group(1))
+            change = Change(kind, subject=m.group(2), text=_decode(m.group(1)))
         elif kind == "change definition":
-            change = Change(kind, subject=m.group(1), text=m.group(2))
+            change = Change(kind, subject=m.group(1), text=_decode(m.group(2)))
         elif kind == "rename":
-            change = Change(kind, subject=m.group(1), old=m.group(2), text=m.group(3))
+            change = Change(kind, subject=m.group(1), old=_decode(m.group(2)), text=_decode(m.group(3)))
         else:
             change = Change(kind, subject=m.group(1), predicate=m.group(2), target=m.group(3))
         for text in _texts(change):
@@ -126,13 +139,13 @@ def write_line(change):
         if problem:
             raise ChangeRefused(f"{problem} (for {change.kind} of {change.subject})")
     if change.kind == "create synonym":
-        return f"create exact synonym '{change.text}' for {change.subject}"
+        return f"create exact synonym '{_encode(change.text)}' for {change.subject}"
     if change.kind == "remove synonym":
-        return f"remove synonym '{change.text}' for {change.subject}"
+        return f"remove synonym '{_encode(change.text)}' for {change.subject}"
     if change.kind == "change definition":
-        return f"change definition of {change.subject} to '{change.text}'"
+        return f"change definition of {change.subject} to '{_encode(change.text)}'"
     if change.kind == "rename":
-        return f"rename {change.subject} from '{change.old}' to '{change.text}'"
+        return f"rename {change.subject} from '{_encode(change.old)}' to '{_encode(change.text)}'"
     return f"{change.kind} {change.subject} {change.predicate} {change.target}"
 
 
