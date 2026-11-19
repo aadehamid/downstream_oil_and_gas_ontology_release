@@ -49,7 +49,9 @@ ROBOT_SHA256 = "16a73c074f3df359a7338a84b4e0788785fe06117f931bb9796e9619ea776105
 # accepts no other: n10s imports the ontology, and its result must be the one the checks expect.
 NEO4J_VERSION, N10S_VERSION, APOC_VERSION = "2025.06.2", "2025.06.1", "2025.06.2"
 # Where Git for Windows puts bash.exe. C:\Windows\System32\bash.exe is not a bash: it starts the Linux subsystem.
-GIT_BASH_FOLDERS = ("{ProgramFiles}/Git/bin", "{ProgramFiles(x86)}/Git/bin", "{LOCALAPPDATA}/Programs/Git/bin")
+# The names are in capitals: on Windows, os.environ gives its keys in capitals (PROGRAMFILES), and find_bash reads
+# the environment with case ignored.
+GIT_BASH_FOLDERS = ("{PROGRAMFILES}/Git/bin", "{PROGRAMFILES(X86)}/Git/bin", "{LOCALAPPDATA}/Programs/Git/bin")
 # What scripts/check.sh does to find its Python, then uv. Prints "<name> <major> <minor>" and uv's version line.
 CHECK_SCRIPT_TOOLS = ("for p in python3 python py; do "
                       "if \"$p\" -c 'import sys; sys.exit(sys.version_info < (3, 11))' >/dev/null 2>&1; then "
@@ -132,9 +134,10 @@ def find_bash(setting=None, environ=None, which=shutil.which, windows=None):
     git = which("git")
     if git:   # <Git>/cmd/git.exe or <Git>/bin/git.exe; bash.exe is in <Git>/bin
         candidates.append(Path(git).parent.parent / "bin" / "bash.exe")
+    named = {key.upper(): value for key, value in environ.items()}
     for folder in GIT_BASH_FOLDERS:
         try:
-            candidates.append(Path(folder.format(**environ)) / "bash.exe")
+            candidates.append(Path(folder.format(**named)) / "bash.exe")
         except KeyError:
             continue
     found = which("bash")
