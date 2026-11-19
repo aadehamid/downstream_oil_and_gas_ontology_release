@@ -76,7 +76,7 @@ def architect_text(cat, lists=None):
     built lists, what the organization's settings hide from and add to them."""
     out = ["# For the Architect: what each question feeds", "",
            "This page maps the KPI intake form to the ontology. The business never sees it. It is built from `catalogue.toml`, so change the text there and run the build command of [the guide](README.md).", "",
-           "The check of a filled form changes nothing in the ontology. In this release you apply a complete intake by hand, with the release steps of [`HOW-TO-UPDATE.md`](../HOW-TO-UPDATE.md).", "",
+           "The check of a filled form changes nothing in the ontology. A complete KPI form becomes a proposal with the propose command, and the apply command adds it to the `kpi` module: [`HOW-TO-UPDATE.md`](../HOW-TO-UPDATE.md), \"Add a KPI with the KPI intake form\", has the steps. The proposal holds what the `kpi` module records. An answer that feeds another module stays in the form's file, and its summary names it.", "",
            "## Business area and domain", ""]
     for note in cat.architect_notes:
         out += [note, ""]

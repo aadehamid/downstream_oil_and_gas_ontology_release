@@ -16,7 +16,7 @@ If your copy includes `viewer/index.html`, that page shows the ontology as you r
 | Ontology owner | The person your organisation names to decide what the ontology means. |
 | Module owner | The person the ontology owner names for one module. Until a module has an owner, the ontology owner decides for it. |
 | Correction version | A version that the cut tool wrote from a cleared report. Its name carries a marker: `1.2.1-correction.1`. |
-| Proposal | A folder that the propose command writes from one signed term-change or reference-item form: the changes as KGCL lines, the approval record and a summary. The apply command applies it. |
+| Proposal | A folder that the propose command writes from one signed KPI intake, term-change or reference-item form: the changes as KGCL lines, the approval record and a summary, and for a new KPI a table of the facts KGCL cannot write. The apply command applies it. |
 | Route | Whether a change is released as a patch, a minor or a major. "Patch, minor or major" below says which is which. |
 
 The ontology owner approves every major release and every module's first release. The module owner approves minor and patch releases. The person who runs the cut approves a correction, at the cut's prompt.
@@ -58,6 +58,7 @@ Keep the release folder in Git. The runbook's section "Keep the release folder i
 | Databricks renamed or removed a column, a table or a view that the ontology names. | A correction, through the report and the cut. | "A correction through the loop" |
 | A column's spelling differs only in case. | The same correction. | "A correction through the loop" |
 | A report row says "needs a minor version": a measure link with its filter, a new object, a new table edge, or the table that a Databricks table replaces. | A minor version of the module, with the release steps. | "The release steps" |
+| A new KPI. | The KPI intake form, then the propose and apply commands. No file is edited by hand. | "Add a KPI with the KPI intake form" |
 | A measure's name, definition, other names or process links. | The term-change form, then the propose and apply commands. No file is edited by hand. | "Change a measure with the term-change form" |
 | A new system that a document names, or a new table that copies a table of a system. | The reference-item form, then the propose and apply commands. No file is edited by hand. | "Add a system or a table with the reference-item form" |
 | A definition's wording, with the same meaning. | A patch, with the release steps. | "Change a concept's definition" |
@@ -585,6 +586,146 @@ The commands start in the release folder. Keep the filled form and the proposal 
 7. Run the full check, as in "Before you change anything", step 3. Then load the stores with the runner, as in step 11 of "The release steps".
 
 A table goes the same way. Its form names the table's full name in R1 (for example `synapse_dev.replica_mips.mips_sample`), "table" in R2, the system whose table it copies in R8 and the document that records it in R9. The apply then releases the `data-product` module.
+
+## Add a KPI with the KPI intake form
+
+A new KPI goes in through the KPI intake form and the same two commands as a term change. Nobody edits a table or a Turtle file. The form is the "KPI intake" tab of the HTML form and the KPI sheets of the workbook. `kpi-intake/README.md` says what it asks and who signs.
+
+The proposal of a new KPI holds two files of changes. `change.kgcl` holds what KGCL can say: the KPI's name, definition, other names, kind, source, roles, processes and the measures it is mistaken for. `facts.csv` holds the text facts that KGCL cannot write, one row each, with the columns measure, property and value: how it is worked out, how often it is stated, what it is compared against, why it has its kind, and the like. On kgcl-schema 0.7.0 a quoted text in a KGCL line about a link loses its quotes, so these facts have no KGCL line (KPI-DEC-0004). The apply writes both, checks both against the rebuilt module, and gives the KPI its identifier, the next free `KPI-` or `OPM-` number.
+
+The proposal holds only what the `kpi` module records. The answers that feed another module stay in the form's file, and `summary.txt` names each one: what the KPI counts and leaves out (2.3, 2.4) for `population`, the value stream steps (6.3 to 6.5) for `value-stream`, the data product and the view (6.6, 7.1 to 7.9) for `data-product`, and the market series (6.7) for `market-data`. Add those with "The release steps".
+
+The propose command refuses a form that the `kpi` module cannot take as it stands, and says why:
+
+- a name or an other name that a measure has already. A change to that measure goes through the term-change form;
+- a role in 6.1 that is not one of the four planning personas, the only roles the `kpi` module records today;
+- a document in 3.5 that `kpi/measure-sources.csv` does not hold, or more than one document. A new source document needs a specialist, because its evidence tier is in the `integration` module.
+
+The commands start in the release folder. Keep the filled form and the proposal in a folder beside the release folder, never inside it, as for a term change. The example uses the folder `new-kpi` beside the release folder.
+
+1. Fill in the form, and save it to that folder. The example starts from the shipped example Crack Spreads Pricing and gives it a made-up name, Sample Spread Margin, a definition and an other name of its own, so it is a new measure. It also leaves out the example's answer to 3.6, which is about the measure the example copies. The Data Owner, the Domain Owner and the Architect sign it.
+
+   The document test writes the form's answers file with this block. If you saved the file from the form, skip it.
+
+   ```python run=new-kpi
+   import json
+   from pathlib import Path
+
+   folder = Path("../new-kpi")
+   folder.mkdir(exist_ok=True)
+   form = json.loads(Path("kpi-intake/examples/crack-spreads-pricing.json").read_text(encoding="utf-8"))
+   answers = form["answers"]
+   answers["2.1"] = form["kpi_name"] = "Sample Spread Margin"
+   answers["2.2"] = "A made-up market margin for this guide: a product's price less the price of the crude it is made from."
+   answers["5.1"] = ["sample spread"]
+   del answers["3.6"]
+   form["example_of"], form["comment"] = "", ""
+   form["request"] = {"number": "NK-2026-001", "date": "2026-11-19", "requester_role": "Data Owner", "invited": ""}
+   form["sign_offs"] = {"data-owner": {"name": "A Data Owner", "date": "2026-11-19"},
+                        "domain-confirmation": {"name": "A Domain Owner", "date": "2026-11-19"},
+                        "architect": {"name": "An Architect", "date": "2026-11-19"}}
+   path = folder / "sample-spread-margin.kpi-intake.json"
+   path.write_text(json.dumps(form, indent=2) + "\n", encoding="utf-8")
+   print("wrote", path.name)
+   ```
+
+   ```text expect
+   wrote sample-spread-margin.kpi-intake.json
+   ```
+
+2. Check the form. It must end with `the intake is complete and signed`.
+
+   ```powershell run=new-kpi
+   python -m kpi_store.intake check ../new-kpi/sample-spread-margin.kpi-intake.json
+   ```
+
+   ```text expect
+   KPI intake check: Sample Spread Margin
+   ...
+   Kind of measure: market indicator (decided by 4.3, test 3).
+   ...
+     The name is new, and the chosen process agrees with the business area.
+   ...
+   Result: the intake is complete and signed.
+   This check changes nothing in the ontology. The Architect turns a complete KPI intake into a proposal with python -m kpi_store.propose <this file>, as HOW-TO-UPDATE.md says.
+   ```
+
+3. Turn the form into a proposal. The command writes the folder `proposals/NK-2026-001` beside the form, with `change.kgcl`, `facts.csv`, `approval.json` and `summary.txt`. It changes nothing in the ontology. A new KPI is always a minor.
+
+   ```powershell run=new-kpi
+   python -m kpi_store.propose ../new-kpi/sample-spread-margin.kpi-intake.json
+   ```
+
+   ```text expect
+   wrote the proposal ../new-kpi/proposals/NK-2026-001: 12 changes and 9 facts, route minor
+   Nothing in the ontology has changed. Read each summary.txt, then apply with: python -m kpi_store.apply <proposal folder>
+   ```
+
+4. Read `summary.txt`. It says what the new KPI is, what it links to, its facts, the answers the proposal leaves out, and who signed.
+
+   ```python run=new-kpi
+   print(open("../new-kpi/proposals/NK-2026-001/summary.txt", encoding="utf-8").read())
+   ```
+
+   ```text expect
+   Proposal NK-2026-001
+   ...
+   What it adds, as KGCL lines in change.kgcl:
+     - A measure named "Sample Spread Margin".
+     - Its definition: "A made-up market margin for this guide: a product's price less the price of the crude it is made from."
+     - The other name "sample spread".
+     - Its kind: market indicator.
+   ...
+   What it adds, as facts in facts.csv (KGCL cannot write them):
+     - A strong candidate to become a KPI: false.
+     - The test that decided its kind: 3.
+   ...
+   Its identifier: the apply gives it the next free OPM- number.
+
+   Not in this proposal: these answers feed another module, so they stay in the form's file until a change to that module records them:
+     - 2.3, 2.4: the population module
+     - 6.3, 6.4, 6.5: the value-stream module
+     - 6.6, 7.1, 7.8: the data-product module
+     - 6.7: the market-data module
+
+   The route: minor. This is a minor: the changes add content, and the old meaning still holds.
+   ...
+   ```
+
+5. Apply the proposal. The command works as it does for a term change: it adds the KPI's rows to the `kpi` tables in a temporary copy of the release, rebuilds the module, checks that the difference is exactly the proposal's lines and facts, releases `kpi` and every module that depends on it, rebuilds the catalog, the projection manifest and the KPI intake pack, and runs the checks. Only when every step has passed does it write the release and commit it. It keeps the proposal's lines and facts beside the approval record, as `approvals/NK-2026-001.kgcl` and `approvals/NK-2026-001.facts.csv`. If a step fails, the release is as it was. It took about 80 seconds on a Mac.
+
+   ```powershell run=new-kpi
+   python -m kpi_store.apply ../new-kpi/proposals/NK-2026-001
+   ```
+
+   ```text expect
+   1 proposal to apply:
+     NK-2026-001: minor, signed by Data Owner, Domain Owner, Architect
+   ...
+     kpi 1.3.0 -> 1.4.0
+   ...
+   ... write the release
+   Done. kpi is now 1.4.0 (minor), and 6 modules that depend on it took a new patch. The apply changed <count> files, and Git committed them.
+   Run the full check before you load: bash scripts/check.sh (on Windows, in Git Bash). Then load the stores with the runner: python -m kpi_store.runner
+   ```
+
+6. See the commit, the new version and the KPI's identifier.
+
+   ```powershell run=new-kpi
+   git --no-pager log --oneline -1
+   cd business_architecture/ontology/release
+   python next_version.py current kpi
+   cd ../kpi
+   python -c "print(open('measure-identifiers.csv', encoding='utf-8').read().splitlines()[-1])"
+   ```
+
+   ```text expect
+   <commit> Apply the new KPI NK-2026-001: kpi 1.4.0
+   1.4.0
+   sample-spread-margin,OPM-0031
+   ```
+
+7. Run the full check, as in "Before you change anything", step 3. Then load the stores with the runner, as in step 11 of "The release steps".
 
 ## Change a concept's definition
 

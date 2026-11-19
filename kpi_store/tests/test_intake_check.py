@@ -44,7 +44,7 @@ def test_a_complete_signed_form_passes(report_of):
     assert "Kind of measure: operational metric (decided by 4.6, test 5)." in text
     assert "  The name is new, and the chosen process agrees with the business area.\n" in text
     assert "Result: the intake is complete and signed.\n" in text
-    assert text.endswith("This check changes nothing in the ontology. The Architect applies a complete intake by hand, with HOW-TO-UPDATE.md.\n")
+    assert text.endswith("This check changes nothing in the ontology. The Architect turns a complete KPI intake into a proposal with python -m kpi_store.propose <this file>, as HOW-TO-UPDATE.md says.\n")
 
 
 def test_a_missing_required_answer_is_named(report_of):

@@ -7,8 +7,9 @@ questions the rules rightly skipped, where an answer routes the request, and wha
 ends with exit status 0 only when the intake is complete and signed, 1 when something is still to do, and 2 when
 the file cannot be read.
 
-It changes nothing in the ontology. The Architect applies a complete KPI intake by hand, with HOW-TO-UPDATE.md. A
-complete term change or reference item goes to the propose command (kpi_store/propose.py).
+It changes nothing in the ontology. A complete KPI intake, term change or reference item goes to the propose
+command (kpi_store/propose.py). The Architect applies a complete domain activation or process map request by hand,
+with HOW-TO-UPDATE.md.
 
 The derived checks compare the form with kpi-intake/pick-lists.json, which the build command writes from the
 release packages:
@@ -493,7 +494,10 @@ def check(cat, data, intake, stale=None):
         report.say(f"Result: not complete. {count} {'thing' if count == 1 else 'things'} to settle:")
         for line in report.blocking:
             report.say("  - " + line)
-    report.say(PROPOSE.format(FORMS[intake.form].lower()) if intake.form in ("term-change", "reference-item") else APPLY)
+    if intake.form == "kpi-intake":
+        report.say(PROPOSE.format(FORMS[intake.form]))
+    else:
+        report.say(PROPOSE.format(FORMS[intake.form].lower()) if intake.form in ("term-change", "reference-item") else APPLY)
     return report
 
 

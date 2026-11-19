@@ -195,14 +195,11 @@ def test_propose_refuses_a_form_that_is_not_complete_and_signed_and_writes_nothi
     assert not (tmp_path / "out").exists()
 
 
-def test_propose_refuses_a_new_kpi_another_form_and_a_folder_inside_the_release(tmp_path):
-    example = ROOT / "kpi-intake" / "examples" / "crack-spreads-pricing.json"
-    with pytest.raises(propose_cmd.ProposeRefused, match="is a KPI intake form, for a new KPI. The propose command takes "
-                                                         "term changes and reference items only for now: the path for a new KPI comes in a later step"):
-        propose_cmd.propose([example], tmp_path / "out", ROOT, now=NOW, say=quiet)
+def test_propose_refuses_another_form_and_a_folder_inside_the_release(tmp_path):
+    # A KPI intake form is a new KPI's: kpi_store/tests/test_new_kpi.py tests it.
     other = tmp_path / "x.process-map-request.json"
     other.write_text(json.dumps({"format": 1, "form": "process-map-request", "answers": {}}), encoding="utf-8")
-    with pytest.raises(propose_cmd.ProposeRefused, match="is a process map request form, not a term change"):
+    with pytest.raises(propose_cmd.ProposeRefused, match="is a process map request form, not a KPI intake, a term change or a reference item"):
         propose_cmd.propose([other], tmp_path / "out", ROOT, now=NOW, say=quiet)
     measure, linked, free = pick(ROOT)
     with pytest.raises(propose_cmd.ProposeRefused, match="is inside the release folder"):

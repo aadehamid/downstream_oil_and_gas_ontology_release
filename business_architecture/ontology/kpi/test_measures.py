@@ -30,6 +30,7 @@ SH = Namespace("http://www.w3.org/ns/shacl#")
 VOCAB = Graph().parse(os.path.join(HERE, "vocabulary.ttl"))
 SHAPES = Graph().parse(os.path.join(HERE, "shapes.ttl"))
 MEASURES = Graph().parse(os.path.join(HERE, "measures.ttl"))
+APPROVALS = os.path.join(HERE, "..", "approvals")
 CORE = Graph().parse(bm.CORE)
 KINDS = (OWL.ObjectProperty, OWL.DatatypeProperty, OWL.AnnotationProperty)
 PROPS = {p for k in KINDS for p in VOCAB.subjects(RDF.type, k)} | set(VOCAB.subjects(RDFS.domain, None))
@@ -50,6 +51,26 @@ def module_graph():
     g += POPULATION
     g += CORE
     return g
+
+
+def added_by_forms():
+    """The measures that the KPI intake form added (KPI-DEC-0004, item 1): the short key of each line
+    "create node measure:<key> '<name>'" of a change file, which the apply command keeps beside its approval record.
+    The figures below were counted by hand before any form added a measure, so they leave these measures out; the
+    apply command checked each one against its signed lines and facts."""
+    keys = set()
+    for path in glob.glob(os.path.join(APPROVALS, "*.kgcl")):
+        with open(path, encoding="utf-8") as f:
+            keys |= set(re.findall(r"^create node measure:([a-z0-9-]+) '", f.read(), re.M))
+    return keys
+
+
+ADDED = added_by_forms()
+
+
+def counted(subjects):
+    """The measures among these that were counted by hand: all but the ones the form added."""
+    return {s for s in subjects if str(s)[len(str(MEASURE)):] not in ADDED}
 
 
 def conforms(g):
@@ -106,7 +127,8 @@ class Build(unittest.TestCase):
     def test_every_row_becomes_one_measure(self):
         ids = [r["measure_id"] for r in rows()]
         built = set(MEASURES.subjects(RDF.type, KPI.MeasureDefinition))
-        self.assertEqual(len(ids), 41)
+        self.assertLessEqual(ADDED, set(ids), "a change file names a measure that the module does not hold")
+        self.assertEqual(len(ids) - len(ADDED), 41)
         self.assertEqual(built, {MEASURE[i] for i in ids})
 
     def test_kinds_and_candidates_match_the_classification(self):
@@ -117,6 +139,8 @@ class Build(unittest.TestCase):
 
     def test_the_figures(self):
         _rows, details, personas, _labels, _procs, _sources = bm.load()
+        _rows = [r for r in _rows if r["measure_id"] not in ADDED]
+        details = {m: d for m, d in details.items() if m not in ADDED}
         f = bm.figures(_rows, details, personas)
         self.assertEqual((f["kpi"], f["operational-metric"], f["plan-variance-diagnostic"], f["market-indicator"],
                           f["decision-support-indicator"], f["tracker-or-report"], f["alert"], f["not-a-measure"]),
@@ -136,7 +160,7 @@ class Release120(unittest.TestCase):
         self.assertEqual(str(MEASURES.value(MEASURE["crack-spreads"], self.DCT.identifier)), "KPI-0001")
         self.assertIn("KPI Crack Spread 3-2-1", str(MEASURES.value(MEASURE["crack-spreads"], SKOS.note)))
         # Since kpi 1.3.0 every measure but the trackers, reports and non-measures carries one (Release130).
-        self.assertEqual(len(set(MEASURES.subjects(self.DCT.identifier, None))), 33)
+        self.assertEqual(len(counted(MEASURES.subjects(self.DCT.identifier, None))), 33)
 
     def test_additional_market_prices_is_narrowed_to_renewables_and_ngls(self):
         m = MEASURE["additional-market-prices"]
@@ -151,7 +175,7 @@ class Release120(unittest.TestCase):
     def test_both_schemes_state_their_top_concepts_both_ways(self):
         for g, scheme, n in ((MEASURES, KPI.Measures, 41), (VOCAB, KPI.MeasureKind, 8)):
             tops = set(g.objects(scheme, SKOS.hasTopConcept))
-            self.assertEqual(len(tops), n)
+            self.assertEqual(len(counted(tops)), n)
             self.assertEqual(tops, set(g.subjects(SKOS.topConceptOf, scheme)))
 
 
@@ -164,10 +188,11 @@ class Release130(unittest.TestCase):
         return str(v) if v is not None else None
 
     def test_the_counts_by_prefix(self):
-        values = [str(o) for o in MEASURES.objects(None, self.DCT.identifier)]
+        values = [str(o) for s, o in MEASURES.subject_objects(self.DCT.identifier) if counted([s])]
         self.assertEqual(sum(v.startswith("KPI-") for v in values), 3)
         self.assertEqual(sum(v.startswith("OPM-") for v in values), 30)
-        self.assertEqual(len(values), len(set(values)))
+        every = [str(o) for o in MEASURES.objects(None, self.DCT.identifier)]
+        self.assertEqual(len(every), len(set(every)))
 
     def test_the_kpis_and_the_ends_of_the_opm_run(self):
         self.assertEqual(self.ident("crack-spreads"), "KPI-0001")

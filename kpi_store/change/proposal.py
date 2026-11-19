@@ -1,15 +1,18 @@
-"""A proposal: one signed term change or new reference item, as the files the apply command reads (KPI-DEC-0002, Q4,
-Q5, Q6, Q10 and Q13).
+"""A proposal: one signed term change, new reference item or new KPI, as the files the apply command reads
+(KPI-DEC-0002, Q4, Q5, Q6, Q10 and Q13; KPI-DEC-0004, item 1).
 
-One form gives one proposal (Q6). A proposal is one folder, named by its change id, that holds three files:
+One form gives one proposal (Q6). A proposal is one folder, named by its change id, that holds three files, and a
+fourth for a new KPI:
 
     change.kgcl     the KGCL lines, one per change, as kgcl.py writes them
     approval.json   the approval record of the change, in the form approval.py checks, written from the form's
                     sign-off: each signer's role, name, date and the words the signature means
     summary.txt     the same for a person, in plain words: what changes, the route, and who signed
+    facts.csv       a new KPI only: the facts KGCL cannot write, one row each, with the columns measure, property
+                    and value (new_measures.py says which)
 
 The route (Q5). Each kind of change suggests one: a new other name and a new process link add content, so they
-are minor, and so is a new reference item (its create node line and the lines about the new node); a rename, a new
+are minor, and so is a new reference item or a new KPI (its create node line and the lines about the new node); a rename, a new
 definition, a removed other name and a removed process link are patch. A proposal takes
 the highest route among its changes. The answer to "Would every report and answer that used the old meaning still
 be correct?" can only raise it: "no" or "not sure" makes it major. The approval record holds the route, and read()
@@ -21,13 +24,17 @@ proposals before it writes anything.
 
 Nothing here writes outside the folder it is given.
 """
+import csv
+import dataclasses
+import io
 import json
 from dataclasses import dataclass
 from pathlib import Path
 
 from . import ChangeRefused, approval, kgcl
 
-CHANGE_FILE, APPROVAL_FILE, SUMMARY_FILE = "change.kgcl", "approval.json", "summary.txt"
+CHANGE_FILE, APPROVAL_FILE, SUMMARY_FILE, FACTS_FILE = "change.kgcl", "approval.json", "summary.txt", "facts.csv"
+FACT_COLUMNS = ("measure", "property", "value")
 ROUTE_OF = {"create synonym": "minor", "create edge": "minor", "rename": "patch", "change definition": "patch",
             "remove synonym": "patch", "delete edge": "patch", "create node": "minor", "add definition": "minor"}
 RAISED_BY = ("no", "not-sure")   # the answers to the compatibility question that make a change major
@@ -54,15 +61,36 @@ class Proposal:
     changes: list        # the kgcl.Change of each line, in the file's order
     lines: list          # the KGCL lines
     record: dict         # the approval record, checked
+    facts: list = dataclasses.field(default_factory=list)   # (measure, property, value) of facts.csv, in order
 
     @property
     def route(self):
         return self.record["route"]
 
 
-def write(folder, changes, record, summary):
-    """Writes one proposal folder and returns it. Refuses a folder that exists, an incomplete record and a change
-    that has no KGCL line."""
+def facts_text(facts):
+    """facts.csv's text: the header and one row per fact, with LF line ends."""
+    out = io.StringIO(newline="")
+    writer = csv.writer(out, lineterminator="\n")
+    writer.writerow(FACT_COLUMNS)
+    writer.writerows(facts)
+    return out.getvalue()
+
+
+def read_facts(text, name):
+    """The facts of a facts.csv text, as (measure, property, value) rows. Refuses another header or a short row."""
+    rows = list(csv.reader(io.StringIO(text, newline="")))
+    if not rows or tuple(rows[0]) != FACT_COLUMNS:
+        raise ChangeRefused(f"the proposal {name}: {FACTS_FILE} must start with the header {','.join(FACT_COLUMNS)}")
+    for n, row in enumerate(rows[1:], 2):
+        if len(row) != len(FACT_COLUMNS):
+            raise ChangeRefused(f"the proposal {name}: row {n} of {FACTS_FILE} has {len(row)} values, not 3")
+    return [tuple(row) for row in rows[1:]]
+
+
+def write(folder, changes, record, summary, facts=()):
+    """Writes one proposal folder and returns it, with facts.csv when there are facts. Refuses a folder that exists,
+    an incomplete record and a change that has no KGCL line."""
     folder = Path(folder)
     record = approval.check(record)
     if record["change"] != folder.name:
@@ -71,8 +99,11 @@ def write(folder, changes, record, summary):
     if folder.exists():
         raise ChangeRefused(f"{folder} exists already; a proposal is written once")
     folder.mkdir(parents=True)
-    for name, content in ((CHANGE_FILE, text), (APPROVAL_FILE, json.dumps(record, ensure_ascii=False, indent=2) + "\n"),
-                          (SUMMARY_FILE, summary)):
+    files = [(CHANGE_FILE, text), (APPROVAL_FILE, json.dumps(record, ensure_ascii=False, indent=2) + "\n"),
+             (SUMMARY_FILE, summary)]
+    if facts:
+        files.append((FACTS_FILE, facts_text(facts)))
+    for name, content in files:
         with (folder / name).open("w", encoding="utf-8", newline="\n") as f:
             f.write(content)
     return folder
@@ -90,6 +121,8 @@ def read(folder):
     try:
         lines = [line for line in (folder / CHANGE_FILE).read_text(encoding="utf-8").splitlines() if line.strip()]
         record = json.loads((folder / APPROVAL_FILE).read_text(encoding="utf-8"))
+        facts_file = folder / FACTS_FILE
+        facts = read_facts(facts_file.read_text(encoding="utf-8"), folder.name) if facts_file.is_file() else []
     except (OSError, UnicodeDecodeError, ValueError) as err:
         raise ChangeRefused(f"the proposal {folder.name} cannot be read ({type(err).__name__}: {err})") from None
     changes = [kgcl.read_line(line) for line in lines]
@@ -105,7 +138,7 @@ def read(folder):
     if approval.ROUTES.index(record["route"]) < approval.ROUTES.index(least):
         raise ChangeRefused(f"the proposal {folder.name} is approved as {record['route']}, and its changes need at least "
                             f"{least}")
-    return Proposal(folder, record["change"], changes, lines, record)
+    return Proposal(folder, record["change"], changes, lines, record, facts)
 
 
 def conflicts(proposals):
