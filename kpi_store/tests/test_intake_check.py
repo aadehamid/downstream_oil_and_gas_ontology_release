@@ -128,9 +128,54 @@ def test_a_name_the_ontology_already_holds_as_a_measure_stops_the_form(report_of
     close = report_of(made_up.intake(change={"2.1": "Tank Turn"}))
     assert close.complete
     assert '  Close match: the measure "Tank Turns" has a name close to "Tank Turn".' in close.text()
-    # A shipped example copies a measure on purpose, and says which.
-    example = report_of(made_up.intake(change={"2.1": "Tank Turns"}, example_of="tank-turns"))
-    assert example.complete and "so the match is expected" in example.text()
+
+
+TURNS_DEFINITION = "How often the stored volume is replaced in a month."     # the made-up measure's own definition
+
+
+def test_a_shipped_example_left_as_it_is_matches_its_measure_on_purpose(report_of):
+    example = report_of(made_up.intake(change={"2.1": "Tank Turns", "2.2": TURNS_DEFINITION}, example_of="tank-turns"))
+    assert example.complete, example.text()
+    assert ('  Same measure: the ontology already holds "Tank Turns". This file is a shipped example of that measure, '
+            "filled in as if it were new, so the match is expected.\n") in example.text()
+    assert "Example changed" not in example.text()
+    # Case and punctuation do not count as a change, as everywhere in the check.
+    example = report_of(made_up.intake(change={"2.1": "tank turns", "2.2": TURNS_DEFINITION.upper()}, example_of="tank-turns"))
+    assert example.complete, example.text()
+
+
+CHANGED = ('  Example changed: this file started from the shipped example of "Tank Turns", and its name (2.1) or its '
+           "definition (2.2) has changed since. It is checked as a new request, like any other form.\n")
+
+
+def test_an_example_renamed_with_its_definition_kept_is_the_same_measure(report_of):
+    report = report_of(made_up.intake(change={"2.1": "Tank Throughput Ratio", "2.2": TURNS_DEFINITION}, example_of="tank-turns"))
+    assert report.blocking == ['the measure "Tank Turns" already has this definition']
+    text = report.text()
+    assert CHANGED in text
+    assert ('  Same measure: the measure "Tank Turns" already has this definition. '
+            "Stop the form. The request becomes a change to that measure.\n") in text
+    assert "so the match is expected" not in text
+
+
+def test_an_example_with_its_name_kept_and_a_new_definition_is_the_same_measure(report_of):
+    report = report_of(made_up.intake(change={"2.1": "Tank Turns", "2.2": "The number of tanks emptied in a week."}, example_of="tank-turns"))
+    assert report.blocking == ['the measure "Tank Turns" already has this name']
+    assert CHANGED in report.text()
+    assert "so the match is expected" not in report.text()
+
+
+def test_a_measure_typed_into_example_of_does_not_waive_the_match(report_of):
+    # A new request whose author typed a measure's notation into "Example of", and copied that measure's definition.
+    report = report_of(made_up.intake(change={"2.2": TURNS_DEFINITION}, example_of="tank-turns"))
+    assert report.blocking == ['the measure "Tank Turns" already has this definition']
+    assert CHANGED in report.text()
+    assert "so the match is expected" not in report.text()
+    # A notation that names no measure waives nothing either.
+    report = report_of(made_up.intake(change={"2.1": "Tank Turns", "2.2": TURNS_DEFINITION}, example_of="no-such-measure"))
+    assert report.blocking == ['the measure "Tank Turns" already has this name']
+    assert '"Example of" holds "no-such-measure", which is not a measure in the ontology' in report.text()
+    assert CHANGED not in report.text()
 
 
 def test_the_same_name_in_another_module_asks_for_enterprise_data_governance(report_of):

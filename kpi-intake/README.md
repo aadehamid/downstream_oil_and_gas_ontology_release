@@ -180,7 +180,7 @@ The check prints, section by section, what is missing and which questions the ru
 
 The check looks for these things in the ontology:
 
-- **The same measure.** The name, or one of its other names, is already a measure. The form stops, and the request becomes a change to that measure. A name that is only close is shown for a person to judge.
+- **The same measure.** The name, or one of its other names, is already a measure, or the definition is a measure's definition. The form stops, and the request becomes a change to that measure. A name that is only close is shown for a person to judge. A shipped example matches its own measure on purpose, and the check expects that match only while the example's name (2.1) and definition (2.2) are unchanged.
 - **The same name in another module.** The check asks you to consult Enterprise Data Governance and to record the date and the outcome in the sign-off block. If that term's definition differs, the Domain Owner decides between the two and signs.
 - **Area and process.** The chosen process belongs to another business area than the answer to 1.1.
 - **Values.** An answer names something that the lists do not hold, or a term the ontology marks as deprecated. An answer that names an entry your settings now hide still passes, with a note.
@@ -347,6 +347,8 @@ In the workbook, column G of each sheet is hidden and names each row. The check 
 ## The two examples
 
 Each example is a measure the ontology already holds, filled in as if it were new. The build reads every answer it can from the ontology, word for word. The few answers that the ontology does not hold start with "Illustration:", and each example's comment lists them. The signer names are placeholders.
+
+To start a new KPI from an example, change its name and its definition. The check then treats the file as a new request. A file that keeps an example's definition under a new name, or its name with a new definition, is stopped as the same measure.
 
 - Crack Spreads Pricing is a market indicator. The third question of section 4 decides its kind, so the rest are skipped. It has a view, a data product and two value stream steps.
 - R&M Margin per Barrel is an operational metric and a KPI candidate. It answers all the questions of section 4. The ontology names no role, no data product and no view for it.
