@@ -43,7 +43,7 @@
         "properties": {"date": {"type": "string"}, "outcome": {"type": "string"}}
       }
     },
-    "example_of": {"type": "string", "description": "Only in the shipped examples: the notation of the measure the example copies. Leave it empty."},
+    "example_of": {"type": "string", "description": "Only in the shipped examples: the notation of the measure the example copies. It counts only while 2.1 and 2.2 still equal that measure's name and definition. Leave it empty."},
     "comment": {"type": "string"}
   }
 }

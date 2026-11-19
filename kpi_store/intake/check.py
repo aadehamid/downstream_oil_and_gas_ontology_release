@@ -179,6 +179,17 @@ def _routing(cat, lists, intake, report):
     return needs
 
 
+def _example(lists, notation, name, definition):
+    """The measure that a shipped example copies, while the file is still that example: its name and its definition
+    still equal the measure's label and definition. Once either one changes, the file is a new request, and None
+    comes back. The form clears the mark when either answer is edited, but this rule does not rely on the form."""
+    for measure in lists["measures"]:
+        if (notation and measure.get("notation") == notation and _norm(name) == _norm(measure["label"])
+                and _norm(definition) == _norm(measure.get("definition", ""))):
+            return measure
+    return None
+
+
 def _derived(cat, lists, terms, intake, report):
     """The checks of the KPI form against the ontology. Returns what they require of the sign-off:
     (the consultations to record, whether the Domain Owner must sign)."""
@@ -188,6 +199,12 @@ def _derived(cat, lists, terms, intake, report):
     name = "".join(rules.values(answers, "2.1")[:1])
     definition = "".join(rules.values(answers, "2.2")[:1])
     consult, conflict = set(), False
+    example = _example(lists, intake.example_of, name, definition)
+    if intake.example_of and not example:
+        found = True
+        copied = next((m["label"] for m in lists["measures"] if m.get("notation") == intake.example_of), intake.example_of)
+        report.say(f'  Example changed: this file started from the shipped example of "{copied}", and its name (2.1) '
+                   "or its definition (2.2) has changed since. It is checked as a new request, like any other form.")
     if name:
         wanted = _norm(name)
         for measure in lists["measures"]:
@@ -198,7 +215,7 @@ def _derived(cat, lists, terms, intake, report):
             if exact or same_text:
                 found = True
                 why = "has this name" if exact else "has this definition"
-                if intake.example_of and intake.example_of == measure.get("notation"):
+                if measure is example:
                     report.say(f'  Same measure: the ontology already holds "{measure["label"]}". This file is a shipped example '
                                "of that measure, filled in as if it were new, so the match is expected.")
                 else:
