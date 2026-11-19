@@ -26,6 +26,7 @@ The ontology has no place for a KPI's domain yet, and holds no list of domains. 
 | D | Domain activation | a data domain that is not active yet |
 | P | Process map request | a business area, process, step or role that the process map lacks |
 | T | Term change | a change to a measure the ontology already holds |
+| R | Reference item | a new system or a new table in a module that the ontology already holds |
 
 ## What each question feeds
 
@@ -129,6 +130,20 @@ The ontology has no place for a KPI's domain yet, and holds no list of domains. 
 | T6 | Which processes should the measure be linked to, in addition to the ones it has? | Optional | A new link: `kpi:informsProcess`. |
 | T7 | Which processes should the measure no longer be linked to? | Optional | A removed link: `kpi:informsProcess`. |
 | T8 | Would every report and answer that used the old meaning still be correct? | Required | The route of the proposal. The answer can only raise the route that the changes suggest, never lower it. |
+
+### Reference item
+
+| No. | Question | Rule | Feeds |
+|---|---|---|---|
+| R1 | What is the new item called? | Required | The new item and its name: `skos:prefLabel` (the KGCL line `create node`). The item's short key is made from it. |
+| R2 | What kind of item is it? | Required | The module that holds the item: system for a system, data-product for a table. |
+| R3 | What does the system do? Say it in one or two sentences, without repeating its name. | Required if R2 is "a system that a document names: an application, an office tool or a working document" | `skos:definition` (the KGCL line `add definition`). |
+| R4 | What other names or short forms do people use for the system? | Optional if R2 is "a system that a document names: an application, an office tool or a working document" | `skos:altLabel`, one for each name. |
+| R5 | What kind of system is it? | Required if R2 is "a system that a document names: an application, an office tool or a working document" | `sys:systemKind`. |
+| R6 | Which document names the system? | Required if R2 is "a system that a document names: an application, an office tool or a working document" | `sys:namedBy`, and `dcterms:source`. |
+| R7 | Which other documents does the description of the system rest on? | Optional if R2 is "a system that a document names: an application, an office tool or a working document" | More `dcterms:source` links. |
+| R8 | Which system's table does the table copy? | Required if R2 is "a table in databricks that copies a table of a system (a replica)" | `dp:copiesSystem`. The table is a replica: `dp:layer` is `layer:replica`. |
+| R9 | Which document records the table? | Required if R2 is "a table in databricks that copies a table of a system (a replica)" | `dcterms:source`. |
 
 ## The facts one new KPI needs, and the questions that supply them
 

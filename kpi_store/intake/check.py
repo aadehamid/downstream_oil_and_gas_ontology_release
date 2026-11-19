@@ -8,7 +8,7 @@ ends with exit status 0 only when the intake is complete and signed, 1 when some
 the file cannot be read.
 
 It changes nothing in the ontology. The Architect applies a complete KPI intake by hand, with HOW-TO-UPDATE.md. A
-complete term change goes to the propose command (kpi_store/propose.py).
+complete term change or reference item goes to the propose command (kpi_store/propose.py).
 
 The derived checks compare the form with kpi-intake/pick-lists.json, which the build command writes from the
 release packages:
@@ -24,6 +24,10 @@ release packages:
 A term change is also checked against the measure it names: it asks for at least one change, a new name or
 definition differs from the one the measure has, an other name to add is not one already, and an other name to
 remove is one the measure has.
+
+A reference item is checked against the lists too: a kind that needs a specialist routes the form there, the name
+and the other names are texts a KGCL line can hold and that no system of the ontology has, and a table's name is a
+full name of the sandbox that the ontology does not hold yet.
 """
 import dataclasses
 import difflib
@@ -36,7 +40,7 @@ from kpi_store.intake.catalogue import ADDED_MARK, CHOICE_TYPES, FORMS, HIDDEN_M
 
 CLOSE = 0.88        # two names at least this alike are shown to a person as a possible match
 APPLY = "This check changes nothing in the ontology. The Architect applies a complete intake by hand, with HOW-TO-UPDATE.md."
-PROPOSE = ("This check changes nothing in the ontology. The Architect turns a complete term change into a proposal with "
+PROPOSE = ("This check changes nothing in the ontology. The Architect turns a complete {} into a proposal with "
            "python -m kpi_store.propose <this file>, as HOW-TO-UPDATE.md says.")
 TERM_CHANGES = ("T2", "T3", "T4", "T5", "T6", "T7")   # the questions of the term change that each ask for a change
 
@@ -326,6 +330,70 @@ def _term_change(lists, intake, report):
     report.say()
 
 
+def _reference_item(lists, terms, intake, report):
+    """The checks of a new system or table against the lists. The propose command checks the same against the
+    module's tables again. A kind that needs a specialist is refused by its route, so it is not checked here."""
+    from kpi_store.change.kgcl import text_problem
+    from kpi_store.change.reference_items import SANDBOX, slug_of
+    from kpi_store.cut import FULL_NAME
+    answers = intake.answers
+    kind = "".join(rules.values(answers, "R2")[:1])
+    if kind not in ("system", "table"):
+        return
+    name = "".join(rules.values(answers, "R1")[:1])
+    others = rules.values(answers, "R4") if kind == "system" else []
+    lines = []
+    for key, text in [("R1", name), *(("R4", o) for o in others), ("R3", "".join(rules.values(answers, "R3")[:1]))]:
+        problem = text and text_problem(text)
+        if problem:
+            lines.append(f'{key}: "{_short(text)}": {problem}')
+    if kind == "system" and name:
+        system_ns = "https://w3id.org/mpc/ontology/modules/system/system/"
+        held = {}
+        for term in terms:
+            if term["id"].startswith(system_ns):
+                for n in term["names"]:
+                    held.setdefault(n.casefold(), n)
+        keys = {i["id"].rsplit("/", 1)[-1] for i in lists["systems"]}
+        key = slug_of("system", name)
+        if not key:
+            lines.append(f'R1: "{_short(name)}" has no letter or digit to make the short key of the system from')
+        elif key in keys:
+            lines.append(f'R1: the ontology has a system with the short key "{key}" already. Give the system a name of its own')
+        for k, n in [("R1", name), *(("R4", o) for o in others)]:
+            if n.casefold() in held:
+                lines.append(f'{k}: "{n}" is a name of a system the ontology holds already')
+        for o in others:
+            if ";" in o:
+                lines.append(f'R4: "{_short(o)}" holds a semicolon, which the ontology\'s tables use between other names')
+            elif o.casefold() == name.casefold():
+                lines.append(f'R4: "{o}" is the name of the system, so it cannot be an other name too')
+        folded = [o.casefold() for o in others]
+        first = {o.casefold(): o for o in reversed(others)}     # one line per name, in its first spelling
+        for o in sorted(o for key, o in first.items() if folded.count(key) > 1):
+            lines.append(f'R4 names "{o}" twice')
+    if kind == "table" and name:
+        if not FULL_NAME.fullmatch(name):
+            lines.append(f'R1: "{_short(name)}" is not a full name of the form catalog.schema.table')
+        elif not name.startswith(SANDBOX):
+            lines.append(f'R1: the ontology holds the sandbox\'s tables only, whose names start with {" or ".join(SANDBOX)}')
+        if name.casefold() in {i["label"].casefold() for i in lists["platform-tables"]}:
+            lines.append(f'R1: the ontology holds the table {name} already')
+        system = "".join(rules.real_values(answers, "R8")[:1])
+        key = slug_of("table", name, system.rsplit("/", 1)[-1]) if system else ""
+        if system and FULL_NAME.fullmatch(name) and not key:
+            lines.append(f'R1: "{_short(name)}" has no letter or digit in its table name to make the short key from')
+        elif key and key in {i["id"].rsplit("/", 1)[-1] for i in lists["platform-tables"]}:
+            lines.append(f'R1: the ontology has a table with the short key "{key}" already')
+    report.say("Checks of the new item")
+    for line in lines:
+        report.say("  " + line + ".")
+        report.block(line)
+    if not lines:
+        report.say("  The new item fits the ontology.")
+    report.say()
+
+
 def _sign_off(cat, intake, report, consult, conflict):
     report.say("Sign-off")
     for signer in cat.signers(intake.form):
@@ -415,6 +483,8 @@ def check(cat, data, intake, stale=None):
         consult |= more
     if intake.form == "term-change":
         _term_change(lists, intake, report)
+    if intake.form == "reference-item":
+        _reference_item(lists, terms, intake, report)
     _sign_off(cat, intake, report, consult, conflict)
     if report.complete:
         report.say("Result: the intake is complete and signed.")
@@ -423,7 +493,7 @@ def check(cat, data, intake, stale=None):
         report.say(f"Result: not complete. {count} {'thing' if count == 1 else 'things'} to settle:")
         for line in report.blocking:
             report.say("  - " + line)
-    report.say(PROPOSE if intake.form == "term-change" else APPLY)
+    report.say(PROPOSE.format(FORMS[intake.form].lower()) if intake.form in ("term-change", "reference-item") else APPLY)
     return report
 
 

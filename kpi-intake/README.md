@@ -2,7 +2,7 @@
 
 Start here when the business wants a new KPI in the KPI Store. The pack holds the form that collects what the ontology needs for one KPI, a check that says whether a filled form is complete, and two filled examples.
 
-The pack does not change the ontology. A complete, signed KPI form goes to the Architect, who adds the KPI by hand with the release steps of [`HOW-TO-UPDATE.md`](../HOW-TO-UPDATE.md). A complete, signed term change, for a measure the ontology already holds, goes through two commands, propose and apply, and nobody edits a file: "The term change" below says how. Commands for a new KPI are planned for a later step.
+The pack does not change the ontology. A complete, signed KPI form goes to the Architect, who adds the KPI by hand with the release steps of [`HOW-TO-UPDATE.md`](../HOW-TO-UPDATE.md). A complete, signed term change, for a measure the ontology already holds, goes through two commands, propose and apply, and nobody edits a file: "The term change" below says how. A complete, signed reference item, for a new system or a new table, goes through the same two commands: "The reference item" below says how. Commands for a new KPI are planned for a later step.
 
 ## What is in this folder
 
@@ -239,6 +239,35 @@ The check refuses a term change that asks for no change, and a change that does 
 Who signs: the Data Owner, then the Architect, last. When the answer to T8 is "no" or "not sure", the change is a major, and the Ontology Owner signs too. The propose command copies each signature into the proposal's approval record, with the words the signature means on the form.
 
 Check a term change as any other form: `python -m kpi_store.intake check <the file>`. Then the Architect turns it into a proposal and applies it, with the steps of "Change a measure with the term-change form" in [`HOW-TO-UPDATE.md`](../HOW-TO-UPDATE.md). Keep the filled form and its proposal in a folder outside the release folder.
+
+## The reference item
+
+The fifth form adds a new item to a module the ontology already holds. It is the "Reference item" tab of the HTML form and the "Reference item" sheet of the workbook, and it saves to its own answers file, `<item>.reference-item.json`. It adds two kinds of item: a system that a document names, and a table in Databricks that copies a table of a system (a replica).
+
+| No. | Question | Rule |
+|---|---|---|
+| R1 | What is the new item called? (a table's full name: catalog.schema.table) | Required |
+| R2 | What kind of item is it? (a list of six kinds) | Required |
+| R3 | What does the system do? | Required for a system |
+| R4 | What other names or short forms do people use for the system? | Optional, for a system |
+| R5 | What kind of system is it? (application, office tool or working document) | Required for a system |
+| R6 | Which document names the system? (a list of the documents the system module cites) | Required for a system |
+| R7 | Which other documents does the description of the system rest on? (the same list) | Optional, for a system |
+| R8 | Which system's table does the table copy? (a list of the systems) | Required for a table |
+| R9 | Which document records the table? (a list of the documents that record the module's tables) | Required for a table |
+
+Four kinds in R2 route the form to "needs a specialist", and the form says why:
+
+- A table or a view that Databricks builds from other tables is a data product. It needs its kind, the test that decided it, the reason and its lineage.
+- A source document changes two modules: the one that cites it, and the integration module, which gives it its evidence tier.
+- A role comes from the RACI lists of the process map. It starts with the process map request.
+- A data product of the catalog comes from the portfolio file of the process authority.
+
+The check also refuses an item that does not fit the ontology: a name or an other name that a system has already, a name with no letter or digit, an other name with a semicolon, and a table whose name is not a full name of the sandbox or is one the ontology holds.
+
+Who signs: the Data Owner, then the Architect, last. A new item is always a minor, so the Ontology Owner does not sign.
+
+Check a reference item as any other form: `python -m kpi_store.intake check <the file>`. Then the Architect turns it into a proposal and applies it, with the steps of "Add a system or a table with the reference-item form" in [`HOW-TO-UPDATE.md`](../HOW-TO-UPDATE.md).
 
 ## What happens after
 

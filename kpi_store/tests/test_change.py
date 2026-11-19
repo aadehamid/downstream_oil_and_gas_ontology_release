@@ -50,6 +50,10 @@ FORMS = [
      Change("create edge", "measure:crude-utilization", predicate="kpi:informsProcess", target="proc:CM-1-1-4-4")),
     ("delete edge measure:unit-utilization kpi:informsProcess proc:CM-1-1-7-2-5",
      Change("delete edge", "measure:unit-utilization", predicate="kpi:informsProcess", target="proc:CM-1-1-7-2-5")),
+    ("create node system:acme-scheduler 'Acme Scheduler'",
+     Change("create node", "system:acme-scheduler", text="Acme Scheduler")),
+    ("add definition 'A made-up application that schedules the made-up work.' to system:acme-scheduler",
+     Change("add definition", "system:acme-scheduler", text="A made-up application that schedules the made-up work.")),
 ]
 
 
@@ -148,7 +152,9 @@ def test_text_that_a_line_cannot_carry_is_refused(text, reason):
     "create edge <https://w3id.org/mpc/ontology/modules/kpi/measure/x> kpi:informsProcess proc:CM-1",
     "create  edge measure:x kpi:informsProcess proc:CM-1",                 # two spaces
     "create edge measure:x kpi:informsProcess proc:CM-1 ",                 # a space at the end
-    "add definition 'text' to measure:x",
+    "remove definition for measure:x",
+    "create node system:x 'X'@en",                                          # a language tag
+    "create node 'X'",                                                       # no id
     "",
 ])
 def test_any_other_line_is_not_a_change_this_release_applies(line):

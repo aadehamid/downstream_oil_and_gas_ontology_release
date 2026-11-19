@@ -21,14 +21,14 @@ from pathlib import Path
 
 PACK = Path(__file__).resolve().parents[2] / "kpi-intake"   # the pack's folder in this release
 FORMS = {"kpi-intake": "KPI intake", "domain-activation": "Domain activation", "process-map-request": "Process map request",
-         "term-change": "Term change"}
+         "term-change": "Term change", "reference-item": "Reference item"}
 TYPES = ("text", "long_text", "choice", "multi_choice", "list")
 CHOICE_TYPES = ("choice", "multi_choice")
 MANY_TYPES = ("multi_choice", "list")          # the answer is a list of values
 ONTOLOGY_LISTS = (
     "business-areas", "processes", "measures", "roles", "value-stream-steps", "measure-relationships",
     "data-products", "platform-tables", "layers", "data-product-kinds", "systems", "sources", "modules",
-    "areas-and-modules",
+    "areas-and-modules", "system-kinds", "system-sources", "table-sources",
 )
 # The lists of the ontology that settings.toml may change, each with the module that holds its entries. An entry the
 # settings add must go into that module before a KPI that names it is applied.
@@ -88,9 +88,10 @@ class Catalogue:
         return [s for s in self.sign_off["signer"] if form in s["forms"]]
 
     def meaning(self, signer, form):
-        """What the signature means on this form: a domain activation and a term change may give a signer its own
-        words (activation_meaning, change_meaning)."""
-        own = {"domain-activation": "activation_meaning", "term-change": "change_meaning"}.get(form)
+        """What the signature means on this form: a domain activation, a term change and a reference item may give a
+        signer its own words (activation_meaning, change_meaning, item_meaning)."""
+        own = {"domain-activation": "activation_meaning", "term-change": "change_meaning",
+               "reference-item": "item_meaning"}.get(form)
         return signer.get(own) or signer["meaning"] if own else signer["meaning"]
 
     def is_needed(self, signer, form, answers, conflict=False):

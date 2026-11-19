@@ -4,7 +4,9 @@ match the map, and SHACL accepts the module and rejects broken systems.
 
 Run: python3 -m pytest test_systems.py (needs rdflib, pyshacl).
 """
+import glob
 import os
+import re
 import subprocess
 import sys
 import unittest
@@ -21,6 +23,19 @@ SYS, KIND, SYSTEM, PROC = bs.SYS, bs.KIND, bs.SYSTEM, bs.PROC
 VOCAB = Graph().parse(os.path.join(HERE, "vocabulary.ttl"))
 SHAPES = Graph().parse(os.path.join(HERE, "shapes.ttl"))
 SYSTEMS = Graph().parse(os.path.join(HERE, "systems.ttl"))
+APPROVALS = os.path.join(HERE, "..", "approvals")
+
+
+def added_by_forms():
+    """The systems that the reference-item form added (KPI-DEC-0002, Q10 form 5): the short key of each line
+    "create node system:<key> '<name>'" of a change file, which the apply command keeps beside its approval record.
+    The figures below were counted by hand before any form added a system, so they leave these systems out; the
+    apply command checked each one against its signed lines."""
+    keys = set()
+    for path in glob.glob(os.path.join(APPROVALS, "*.kgcl")):
+        with open(path, encoding="utf-8") as f:
+            keys |= set(re.findall(r"^create node system:([a-z0-9-]+) '", f.read(), re.M))
+    return keys
 
 
 def conforms(data):
@@ -41,7 +56,11 @@ class Build(unittest.TestCase):
         # linked, and 21 more links: 37 + 8 = 45, 34 + 7 = 41, 32 + 7 = 39, 153 + 12 = 165, 150 + 12 = 162, 285 + 21 = 306.
         # 2026-10-27, system 1.5.0 (the decision of 2026-10-27): eight systems the process map does not name, each defined, all
         # applications: 41 + 8 = 49, 39 + 8 = 47, 32 + 8 = 40. The map's strings and links do not change.
-        self.assertEqual(bs.figures(*bs.load()), {
+        register, slugs, uses, procs, sources = bs.load()
+        added = added_by_forms()
+        self.assertLessEqual(added, set(slugs), "a change file names a system that the module does not hold")
+        slugs = {k: v for k, v in slugs.items() if k not in added}
+        self.assertEqual(bs.figures(register, slugs, uses, procs), {
             "map strings": 45, "systems": 49, "defined": 47, "application": 40, "office-tool": 4, "document": 5,
             "no-system strings": 4, "processes with a systems field": 165,
             "processes with a link": 162, "links": 306,
@@ -77,7 +96,8 @@ class Build(unittest.TestCase):
     def test_definitions(self):
         # Item G (the decision of 2026-10-25), checked by hand against definitions.csv on 2026-10-25: 15 systems are
         # defined; full forms are preferred labels, with the process map's abbreviation as an alternative.
-        defined = {s for s in SYSTEMS.subjects(SKOS.definition, None)}
+        added = {SYSTEM[k] for k in added_by_forms()}
+        defined = {s for s in SYSTEMS.subjects(SKOS.definition, None) if s not in added}
         self.assertEqual(len(defined), 47)  # 15, then MIPS, MPR and Databricks in 1.2.0 (the decision of 2026-10-25), then 14 in 1.3.0 (the decision of 2026-10-26), then MPC-P11's 7 in 1.4.0 (the decision of 2026-10-26), then the eight of 2026-10-27 in 1.5.0 (the decision of 2026-10-27)
         for slug, label, alt in (("dpo", "Distribution Planning Optimizer", "DPO"), ("aps", "Aspen Petroleum Scheduler", "APS"),
                                  ("sap", "SAP S/4HANA", "SAP"), ("hyperion", "Oracle Hyperion Planning", "Hyperion"),

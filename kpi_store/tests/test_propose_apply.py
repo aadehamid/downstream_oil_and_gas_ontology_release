@@ -198,7 +198,7 @@ def test_propose_refuses_a_form_that_is_not_complete_and_signed_and_writes_nothi
 def test_propose_refuses_a_new_kpi_another_form_and_a_folder_inside_the_release(tmp_path):
     example = ROOT / "kpi-intake" / "examples" / "crack-spreads-pricing.json"
     with pytest.raises(propose_cmd.ProposeRefused, match="is a KPI intake form, for a new KPI. The propose command takes "
-                                                         "term changes only for now: the path for a new KPI comes in a later step"):
+                                                         "term changes and reference items only for now: the path for a new KPI comes in a later step"):
         propose_cmd.propose([example], tmp_path / "out", ROOT, now=NOW, say=quiet)
     other = tmp_path / "x.process-map-request.json"
     other.write_text(json.dumps({"format": 1, "form": "process-map-request", "answers": {}}), encoding="utf-8")

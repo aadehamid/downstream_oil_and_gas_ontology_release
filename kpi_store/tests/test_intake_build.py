@@ -37,7 +37,10 @@ def committed():
 def test_every_pick_list_a_question_names_resolves_to_a_list_that_is_not_empty(cat, committed):
     for question in cat.questions:
         if question["type"] in ("choice", "multi_choice"):
-            assert len(rules.options(cat, committed["lists"], question)) >= 2, question["id"]
+            # R9 offers the documents that record the module's tables, and this release has one; a new one needs a
+            # specialist, because its evidence tier is in the integration module.
+            least = 1 if question["source"] == "table-sources" else 2
+            assert len(rules.options(cat, committed["lists"], question)) >= least, question["id"]
     assert set(committed["lists"]) == set(catalogue.ONTOLOGY_LISTS)
     for name, items in committed["lists"].items():
         labels = [item["label"] for item in items]
@@ -53,7 +56,8 @@ def test_the_pick_lists_hold_the_counts_of_this_release(committed):
     assert {name: sum(1 for item in items if not item.get("added")) for name, items in lists.items()} == {
         "business-areas": 7, "processes": 707, "measures": 41, "roles": 64, "value-stream-steps": 58,
         "measure-relationships": 3, "data-products": 49, "platform-tables": 33, "layers": 4, "data-product-kinds": 2,
-        "systems": 49, "sources": 106, "modules": 13, "areas-and-modules": 20}
+        "systems": 49, "sources": 106, "modules": 13, "areas-and-modules": 20, "system-kinds": 3, "system-sources": 25,
+        "table-sources": 1}
     by_level = {}
     for process in lists["processes"]:
         by_level[process["level"]] = by_level.get(process["level"], 0) + 1
@@ -166,9 +170,9 @@ def test_the_page_is_one_offline_file_with_lf_line_ends():
     assert "fetch(" not in text and "XMLHttpRequest" not in text
     assert "<pre" not in text                               # the document check would read a <pre> as a command
     data = json.loads(text.split('<script id="intake-data" type="application/json">')[1].split("</script>")[0])
-    assert list(data["forms"]) == ["kpi-intake", "domain-activation", "process-map-request", "term-change"]
+    assert list(data["forms"]) == ["kpi-intake", "domain-activation", "process-map-request", "term-change", "reference-item"]
     assert data["release"] == "KPI Store 1.1" and data["catalogue_version"] == "1.2"
-    assert len(data["questions"]) == 81 and data["lists"]["processes"]
+    assert len(data["questions"]) == 90 and data["lists"]["processes"]
     assert data["guide"] == "how-to-use-the-form.html" and (PACK / data["guide"]).is_file()     # the guide, beside the form
     # The names of the other modules' terms, and whether each has a definition, with no definition text.
     core = data["term_names"]["core"]
@@ -210,7 +214,7 @@ def test_the_workbook_has_a_sheet_per_section_dropdowns_and_a_hidden_lists_sheet
     wb = load_workbook(PACK / build.FORM_XLSX)
     assert wb.sheetnames == ["Start", "1 The business area", "2 What the KPI means", "3 The facts about it", "4 Where it belongs",
                              "5 Other names for it", "6 What it connects to", "7 Where the data lives", "Sign-off",
-                             "Domain activation", "Process map request", "Term change", "Roles", "lists"]
+                             "Domain activation", "Process map request", "Term change", "Reference item", "Roles", "lists"]
     assert wb["lists"].sheet_state == "hidden" and wb["Start"].sheet_state == "visible"
     ws = wb["1 The business area"]
     header = next(row for row in ws.iter_rows(values_only=True) if row[0] == "No.")
@@ -236,7 +240,7 @@ def test_the_workbook_has_a_sheet_per_section_dropdowns_and_a_hidden_lists_sheet
     signers = [row[0] for row in wb["Sign-off"].iter_rows(values_only=True) if str(row[6] or "").startswith("sign:")]
     assert signers == ["Data Owner", "Domain Owner", "Domain Owner", "Architect"]
     roles = [row[0] for row in wb["Roles"].iter_rows(min_row=2, values_only=True)]
-    assert len(roles) == 11 and roles[0] == "Global Process Owner (or a named delegate)" and "Ontology Owner" in roles
+    assert len(roles) == 11 and roles[0] == "Global Process Owner (or a named delegate)" and roles[-1] == "Ontology Owner"
 
 
 def test_a_filled_workbook_reads_back_as_the_same_answers(cat, committed):

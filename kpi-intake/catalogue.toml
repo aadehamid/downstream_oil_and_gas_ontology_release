@@ -38,6 +38,32 @@ label = "No"
 id = "not-sure"
 label = "Not sure"
 
+# The kinds of item the reference-item form names (KPI-DEC-0002, Q10 form 5). The form adds the first two; each of
+# the others routes to "needs a specialist", with the reason in its route's notice.
+[[choices.reference-item-kinds]]
+id = "system"
+label = "A system that a document names: an application, an office tool or a working document"
+
+[[choices.reference-item-kinds]]
+id = "table"
+label = "A table in Databricks that copies a table of a system (a replica)"
+
+[[choices.reference-item-kinds]]
+id = "built-table"
+label = "A table or a view that Databricks builds from other tables"
+
+[[choices.reference-item-kinds]]
+id = "source"
+label = "A source document"
+
+[[choices.reference-item-kinds]]
+id = "role"
+label = "A role"
+
+[[choices.reference-item-kinds]]
+id = "data-product"
+label = "A data product of the data-product catalog"
+
 [[choices.environment]]
 id = "sandbox"
 label = "Sandbox"
@@ -65,6 +91,11 @@ title = "Restricted: bring in Privacy, Security, Compliance and Risk"
 blocks = false
 consult = "privacy-security-compliance-risk"
 next = "Record the date and the outcome of their review in the sign-off block before the signatures."
+
+[outcome.needs-specialist]
+title = "Needs a specialist"
+blocks = true
+next = "This form cannot add this kind of item. The Architect takes the request to a specialist, who changes the ontology with HOW-TO-UPDATE.md."
 
 [outcome.note]
 title = "For the Architect"
@@ -97,8 +128,9 @@ id = "data-owner"
 role = "data-owner"
 meaning = "The KPI's definition in this form is right: its name, its meaning, what it counts and what it leaves out."
 change_meaning = "The measure's name, definition, other names and process links are right as this form changes them."
-required = "Every KPI and every term change"
-forms = ["kpi-intake", "term-change"]
+item_meaning = "The new item is right as this form describes it: its name, what it is and what it links to."
+required = "Every KPI, every term change and every reference item"
+forms = ["kpi-intake", "term-change", "reference-item"]
 when = "always"
 
 [[sign_off.signer]]
@@ -141,8 +173,8 @@ answers = ["no", "not-sure"]
 id = "architect"
 role = "architect"
 meaning = "The form is complete, and I approve the change to the ontology."
-required = "Every KPI and every term change, last"
-forms = ["kpi-intake", "domain-activation", "process-map-request", "term-change"]
+required = "Every KPI, every term change and every reference item, last"
+forms = ["kpi-intake", "domain-activation", "process-map-request", "term-change", "reference-item"]
 when = "always"
 
 [[sign_off.consulted]]
@@ -279,6 +311,18 @@ who = "The Data Owner answers and signs. The Architect checks the form and signs
 done_when = "The form names one measure and asks for at least one change. T8 is answered. The Data Owner and the Architect have signed, and the Ontology Owner too when the change is major."
 typical = "3 to 8"
 minutes = "15"
+
+[[section]]
+id = "R"
+form = "reference-item"
+name = "Reference item"
+technical_name = "a new system or a new table in a module that the ontology already holds"
+audience = "business"
+about = "Use this form to add a reference item to the ontology: a system that a document names, or a table in Databricks that copies a table of a system. The form asks only what the ontology needs: the item's name, what it is, and what it links to, picked from the ontology's own lists. A new source document, a role, a data product and a table built from other tables need a specialist, and the form says why. When the form is complete and signed, the Architect turns it into a proposal with one command and applies the proposal with another. Nobody edits a file of the ontology by hand."
+who = "The Data Owner answers and signs. Digital IT names a table's system and its record. The Architect checks the form and signs last. The Business analyst fills the form."
+done_when = "The form names one new item of a kind the form adds, with every answer its kind needs. The Data Owner and the Architect have signed."
+typical = "4 to 7"
+minutes = "10"
 
 # ---- The kind of measure ---------------------------------------------------------------------------------------
 # Section 4 asks up to five tests in order. The first answer below that matches decides the kind.
@@ -1542,6 +1586,144 @@ source = "choices:yes-no-not-sure"
 required = "required"
 why = "A \"no\" or a \"not sure\" makes the change major: people who used the old meaning may now be wrong, so the Ontology Owner signs too."
 feeds = "The route of the proposal. The answer can only raise the route that the changes suggest, never lower it."
+fact = []
+
+[[question]]
+id = "R1"
+section = "R"
+text = "What is the new item called?"
+asked_of = ["data-owner"]
+type = "text"
+required = "required"
+help = "For a table, write its full name as Databricks writes it: catalog.schema.table."
+why = "The name is how people find the item. Each item has its own name."
+feeds = "The new item and its name: `skos:prefLabel` (the KGCL line `create node`). The item's short key is made from it."
+fact = []
+
+[[question]]
+id = "R2"
+section = "R"
+text = "What kind of item is it?"
+asked_of = ["data-owner"]
+type = "choice"
+source = "choices:reference-item-kinds"
+required = "required"
+why = "The kind decides where the item goes in the ontology and what else the form asks."
+feeds = "The module that holds the item: system for a system, data-product for a table."
+fact = []
+
+  [[question.route]]
+  when = "built-table"
+  outcome = "needs-specialist"
+  notice = "A table that Databricks builds from other tables is a data product. It needs its kind, the test that decided it, the reason and its lineage, which a specialist works out. This form adds only a table that copies a table of a system."
+
+  [[question.route]]
+  when = "source"
+  outcome = "needs-specialist"
+  notice = "A new source document changes two modules: the module that cites it, and the integration module, which gives every source its evidence tier. This form changes one module, so a new source document needs a specialist for now."
+
+  [[question.route]]
+  when = "role"
+  outcome = "needs-specialist"
+  notice = "Every role of the ontology comes from the RACI lists of the process map, which is the process authority. A new role starts with the process map request, and a specialist then changes the RACI."
+
+  [[question.route]]
+  when = "data-product"
+  outcome = "needs-specialist"
+  notice = "The data-product catalog is built from the portfolio file of the process authority, not from a table that this form can change. A new data product needs a specialist."
+
+[[question]]
+id = "R3"
+section = "R"
+text = "What does the system do? Say it in one or two sentences, without repeating its name."
+asked_of = ["data-owner"]
+type = "long_text"
+required = "required"
+ask_when = [{ question = "R2", is = "system" }]
+why = "The definition tells people what the system is for, so they do not mistake it for another."
+feeds = "`skos:definition` (the KGCL line `add definition`)."
+fact = []
+
+[[question]]
+id = "R4"
+section = "R"
+text = "What other names or short forms do people use for the system?"
+asked_of = ["data-owner"]
+type = "list"
+rows = 4
+required = "optional"
+ask_when = [{ question = "R2", is = "system" }]
+why = "A person who searches with their own word then finds the system."
+feeds = "`skos:altLabel`, one for each name."
+fact = []
+
+[[question]]
+id = "R5"
+section = "R"
+text = "What kind of system is it?"
+asked_of = ["data-owner"]
+type = "choice"
+source = "system-kinds"
+required = "required"
+ask_when = [{ question = "R2", is = "system" }]
+why = "An application, an office tool and a working document are read in different ways."
+feeds = "`sys:systemKind`."
+fact = []
+
+[[question]]
+id = "R6"
+section = "R"
+text = "Which document names the system?"
+asked_of = ["data-owner"]
+type = "choice"
+source = "system-sources"
+required = "required"
+ask_when = [{ question = "R2", is = "system" }]
+help = "The list holds the documents the system module already cites. A document that is not in the list needs a specialist first."
+why = "Every system of the ontology is named by a document that a reader can check."
+feeds = "`sys:namedBy`, and `dcterms:source`."
+fact = []
+
+[[question]]
+id = "R7"
+section = "R"
+text = "Which other documents does the description of the system rest on?"
+asked_of = ["data-owner"]
+type = "multi_choice"
+source = "system-sources"
+rows = 4
+required = "optional"
+ask_when = [{ question = "R2", is = "system" }]
+why = "A reader can check the definition against each document it rests on."
+feeds = "More `dcterms:source` links."
+fact = []
+
+[[question]]
+id = "R8"
+section = "R"
+text = "Which system's table does the table copy?"
+asked_of = ["digital-it"]
+type = "choice"
+source = "systems"
+required = "required"
+ask_when = [{ question = "R2", is = "table" }]
+help = "A system that is not in the list goes in first, with a reference-item form of its own."
+why = "A replica is a copy of one system's table, and the lineage of every table built from it reaches that system."
+feeds = "`dp:copiesSystem`. The table is a replica: `dp:layer` is `layer:replica`."
+fact = []
+
+[[question]]
+id = "R9"
+section = "R"
+text = "Which document records the table?"
+asked_of = ["digital-it"]
+type = "choice"
+source = "table-sources"
+required = "required"
+ask_when = [{ question = "R2", is = "table" }]
+help = "The list holds the documents that record the module's tables. A document that is not in the list needs a specialist first."
+why = "Every table of the ontology is recorded by a document that a reader can check."
+feeds = "`dcterms:source`."
 fact = []
 
 # ---- The explainer (what-we-will-ask-you.md and the "What we will ask you" view of the HTML form) ---------------

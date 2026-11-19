@@ -51,7 +51,10 @@ def lists():
         "layers": [{"id": LAYER_GOLD, "label": "Gold"}, {"id": LAYER_REPLICA, "label": "Replica"}],
         "data-product-kinds": [{"id": KIND_DERIVED, "label": "Derived data product"}],
         "systems": [{"id": SYSTEM, "label": "Stock Ledger"}],
+        "system-kinds": [{"id": X + "system-kind/application", "label": "Application"}],
         "sources": [{"id": SOURCE, "label": "Stock manual, 2026 edition", "tier": "industry"}],
+        "system-sources": [{"id": SOURCE, "label": "Stock manual, 2026 edition", "tier": "industry"}],
+        "table-sources": [{"id": SOURCE, "label": "Stock manual, 2026 edition", "tier": "industry"}],
         "modules": [{"id": "core", "label": "core"}, {"id": "kpi", "label": "kpi"}],
         "areas-and-modules": [{"id": a["id"], "label": "Business area: " + a["label"]} for a in areas],
     }

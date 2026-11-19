@@ -1,6 +1,6 @@
 r"""KPI Store's own small reader and writer of KGCL, the Knowledge Graph Change Language (KPI-DEC-0002, "Change format").
 
-It reads and writes six statement forms only, spelled as the official grammar spells them (kgcl-schema 0.7.0,
+It reads and writes eight statement forms only, spelled as the official grammar spells them (kgcl-schema 0.7.0,
 src/kgcl_schema/grammar/kgcl.lark), with one space between words:
 
     create exact synonym '<text>' for <id>
@@ -9,6 +9,8 @@ src/kgcl_schema/grammar/kgcl.lark), with one space between words:
     rename <id> from '<old text>' to '<new text>'
     create edge <id> <predicate> <id>
     delete edge <id> <predicate> <id>
+    create node <id> '<label>'                 a new item, by its name (the reference-item form)
+    add definition '<text>' to <id>            the definition of a new item
 
 Any other line is refused with "not a change this release applies".
 
@@ -35,7 +37,8 @@ from dataclasses import dataclass
 
 from . import ChangeRefused
 
-KINDS = ("create synonym", "remove synonym", "change definition", "rename", "create edge", "delete edge")
+KINDS = ("create synonym", "remove synonym", "change definition", "rename", "create edge", "delete edge", "create node",
+         "add definition")
 NOT_APPLIED = "not a change this release applies"
 TYPOGRAPHIC = "\u2019"   # how a KGCL line writes a straight apostrophe of a text
 
@@ -48,14 +51,17 @@ _FORMS = {
     "rename": re.compile(rf"rename ({_ID}) from {_TEXT} to {_TEXT}"),
     "create edge": re.compile(rf"create edge ({_ID}) ({_ID}) ({_ID})"),
     "delete edge": re.compile(rf"delete edge ({_ID}) ({_ID}) ({_ID})"),
+    "create node": re.compile(rf"create node ({_ID}) {_TEXT}"),
+    "add definition": re.compile(rf"add definition {_TEXT} to ({_ID})"),
 }
 ID = re.compile(_ID)
 
 
 @dataclass(frozen=True)
 class Change:
-    """One KGCL statement. `subject` is the id the statement is about. `text` is the synonym, the new definition
-    or the new name; `old` is a rename's current name. An edge has `predicate` and `target` instead of text."""
+    """One KGCL statement. `subject` is the id the statement is about. `text` is the synonym, the new definition,
+    the new name or a new node's label; `old` is a rename's current name. An edge has `predicate` and `target`
+    instead of text."""
     kind: str
     subject: str
     text: str = ""
@@ -107,9 +113,9 @@ def read_line(line):
         m = form.fullmatch(line)
         if not m:
             continue
-        if kind in ("create synonym", "remove synonym"):
+        if kind in ("create synonym", "remove synonym", "add definition"):
             change = Change(kind, subject=m.group(2), text=_decode(m.group(1)))
-        elif kind == "change definition":
+        elif kind in ("change definition", "create node"):
             change = Change(kind, subject=m.group(1), text=_decode(m.group(2)))
         elif kind == "rename":
             change = Change(kind, subject=m.group(1), old=_decode(m.group(2)), text=_decode(m.group(3)))
@@ -146,6 +152,10 @@ def write_line(change):
         return f"change definition of {change.subject} to '{_encode(change.text)}'"
     if change.kind == "rename":
         return f"rename {change.subject} from '{_encode(change.old)}' to '{_encode(change.text)}'"
+    if change.kind == "create node":
+        return f"create node {change.subject} '{_encode(change.text)}'"
+    if change.kind == "add definition":
+        return f"add definition '{_encode(change.text)}' to {change.subject}"
     return f"{change.kind} {change.subject} {change.predicate} {change.target}"
 
 

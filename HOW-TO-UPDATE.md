@@ -16,7 +16,7 @@ If your copy includes `viewer/index.html`, that page shows the ontology as you r
 | Ontology owner | The person your organisation names to decide what the ontology means. |
 | Module owner | The person the ontology owner names for one module. Until a module has an owner, the ontology owner decides for it. |
 | Correction version | A version that the cut tool wrote from a cleared report. Its name carries a marker: `1.2.1-correction.1`. |
-| Proposal | A folder that the propose command writes from one signed term-change form: the changes as KGCL lines, the approval record and a summary. The apply command applies it. |
+| Proposal | A folder that the propose command writes from one signed term-change or reference-item form: the changes as KGCL lines, the approval record and a summary. The apply command applies it. |
 | Route | Whether a change is released as a patch, a minor or a major. "Patch, minor or major" below says which is which. |
 
 The ontology owner approves every major release and every module's first release. The module owner approves minor and patch releases. The person who runs the cut approves a correction, at the cut's prompt.
@@ -59,6 +59,7 @@ Keep the release folder in Git. The runbook's section "Keep the release folder i
 | A column's spelling differs only in case. | The same correction. | "A correction through the loop" |
 | A report row says "needs a minor version": a measure link with its filter, a new object, a new table edge, or the table that a Databricks table replaces. | A minor version of the module, with the release steps. | "The release steps" |
 | A measure's name, definition, other names or process links. | The term-change form, then the propose and apply commands. No file is edited by hand. | "Change a measure with the term-change form" |
+| A new system that a document names, or a new table that copies a table of a system. | The reference-item form, then the propose and apply commands. No file is edited by hand. | "Add a system or a table with the reference-item form" |
 | A definition's wording, with the same meaning. | A patch, with the release steps. | "Change a concept's definition" |
 | A new concept, alias, property or shape. | A minor version, with the release steps. | "Add a concept or a property" |
 | A new process, or a changed one. | A release of `core`, then every module. | "Change a process" |
@@ -466,6 +467,125 @@ The commands start in the release folder. Keep the filled form and the proposals
 
 7. Run the full check, as in "Before you change anything", step 3. Then load the stores with the runner, as in step 11 of "The release steps".
 
+## Add a system or a table with the reference-item form
+
+A new system or a new table goes in through a form and the same two commands as a term change. Nobody edits a table or a Turtle file. The form is the "Reference item" tab of the HTML form and the "Reference item" sheet of the workbook. `kpi-intake/README.md`, "The reference item", says what it asks and who signs.
+
+The form adds two kinds of item:
+
+- a system that a document names, such as an application. It goes into the `system` module.
+- a table in Databricks that copies a table of a system (a replica). It goes into the `data-product` module.
+
+The form refuses the other kinds it names, and says why each needs a specialist: a table built from other tables, a source document, a role and a data product.
+
+The commands start in the release folder. Keep the filled form and the proposal in a folder beside the release folder, never inside it, as for a term change. The example uses the folder `reference-item` beside the release folder.
+
+1. Fill in the form, and save it to that folder. The example adds a made-up system, Sample Scheduler, which the document of the pricing assets names. The Data Owner and the Architect sign it.
+
+   The document test writes the form's answers file with this block. If you saved the file from the form, skip it.
+
+   ```python run=reference-item
+   import json
+   from pathlib import Path
+
+   folder = Path("../reference-item")
+   folder.mkdir(exist_ok=True)
+   source = "https://w3id.org/mpc/ontology/source/decision-owner-pricing-assets-2026-10-25"
+   answers = {"R1": "Sample Scheduler", "R2": "system",
+              "R3": "A made-up application that schedules the work of a made-up refinery, for this guide.",
+              "R4": ["SSched"], "R5": "https://w3id.org/mpc/ontology/modules/system/kind/application", "R6": source}
+   form = {"format": 1, "form": "reference-item", "catalogue_version": "1.2", "kpi_name": "Sample Scheduler",
+           "request": {"number": "RI-2026-001", "date": "2026-11-19", "requester_role": "Data Owner", "invited": ""},
+           "answers": answers,
+           "sign_offs": {"data-owner": {"name": "A Data Owner", "date": "2026-11-19"},
+                         "architect": {"name": "An Architect", "date": "2026-11-19"}},
+           "consulted": {}, "example_of": "", "comment": ""}
+   path = folder / "sample-scheduler.reference-item.json"
+   path.write_text(json.dumps(form, indent=2) + "\n", encoding="utf-8")
+   print("wrote", path.name)
+   ```
+
+   ```text expect
+   wrote sample-scheduler.reference-item.json
+   ```
+
+2. Check the form. It must end with `the intake is complete and signed`. The check also refuses an item that does not fit the ontology, such as a name that a system has already.
+
+   ```powershell run=reference-item
+   python -m kpi_store.intake check ../reference-item/sample-scheduler.reference-item.json
+   ```
+
+   ```text expect
+   Reference item check: Sample Scheduler
+   ...
+   Result: the intake is complete and signed.
+   This check changes nothing in the ontology. The Architect turns a complete reference item into a proposal with python -m kpi_store.propose <this file>, as HOW-TO-UPDATE.md says.
+   ```
+
+3. Turn the form into a proposal. The command writes the folder `proposals/RI-2026-001` beside the form, with `change.kgcl`, `approval.json` and `summary.txt`. It changes nothing in the ontology. A new item is always a minor.
+
+   ```powershell run=reference-item
+   python -m kpi_store.propose ../reference-item/sample-scheduler.reference-item.json
+   ```
+
+   ```text expect
+   wrote the proposal ../reference-item/proposals/RI-2026-001: 6 changes, route minor
+   Nothing in the ontology has changed. Read each summary.txt, then apply with: python -m kpi_store.apply <proposal folder>
+   ```
+
+4. Read `summary.txt`. It says what the new item is, what it links to and who signed.
+
+   ```python run=reference-item
+   print(open("../reference-item/proposals/RI-2026-001/summary.txt", encoding="utf-8").read())
+   ```
+
+   ```text expect
+   Proposal RI-2026-001
+   ...
+   What it adds:
+     - A system named "Sample Scheduler".
+     - Its definition: "A made-up application that schedules the work of a made-up refinery, for this guide."
+     - The other name "SSched".
+     - Its kind: Application.
+   ...
+   The route: minor. This is a minor: the changes add content, and the old meaning still holds.
+   ...
+   ```
+
+5. Apply the proposal. The command works as it does for a term change, on the item's module: it adds the item's rows to the module's tables in a temporary copy of the release, rebuilds the module, checks that the difference is exactly the proposal's lines, releases the module and every module that depends on it, and runs the checks. Only when every step has passed does it write the release and commit it. It also keeps the proposal's lines beside the approval record, as `approvals/RI-2026-001.kgcl`. If a step fails, the release is as it was.
+
+   ```powershell run=reference-item
+   python -m kpi_store.apply ../reference-item/proposals/RI-2026-001
+   ```
+
+   ```text expect
+   1 proposal to apply:
+     RI-2026-001: minor, signed by Data Owner, Architect
+   ...
+     system 1.5.0 -> 1.6.0
+   ...
+   ... write the release
+   Done. system is now 1.6.0 (minor), and 7 modules that depend on it took a new patch. The apply changed <count> files, and Git committed them.
+   Run the full check before you load: bash scripts/check.sh (on Windows, in Git Bash). Then load the stores with the runner: python -m kpi_store.runner
+   ```
+
+6. See the commit and the new version.
+
+   ```powershell run=reference-item
+   git --no-pager log --oneline -1
+   cd business_architecture/ontology/release
+   python next_version.py current system
+   ```
+
+   ```text expect
+   <commit> Apply the reference item RI-2026-001: system 1.6.0
+   1.6.0
+   ```
+
+7. Run the full check, as in "Before you change anything", step 3. Then load the stores with the runner, as in step 11 of "The release steps".
+
+A table goes the same way. Its form names the table's full name in R1 (for example `synapse_dev.replica_mips.mips_sample`), "table" in R2, the system whose table it copies in R8 and the document that records it in R9. The apply then releases the `data-product` module.
+
 ## Change a concept's definition
 
 A new wording with the same meaning is a patch. If the meaning changes, the release is a major, and the ontology owner approves it.
@@ -502,7 +622,7 @@ A role is in two tables of `business_architecture\ontology\organization`.
 4. Change the figures in `test_roles.py`, then run `python build_roles.py --write` and `python build_assignments.py --write`.
 5. Change the count of roles in `kpi-intake\README.md`, as step 12 of "Change the RACI" says.
 
-A system is in the tables of `business_architecture\ontology\system`.
+A system is in the tables of `business_architecture\ontology\system`. A system that a document names, and not the process map, goes in with the reference-item form: see "Add a system or a table with the reference-item form". The steps below are for a system the process map names, or one that cites a new source.
 
 1. For a system that the process map names in a `systems` field, add its row to `systems.csv` and its name to `register.csv`.
 2. For a system that another source names, such as SharePoint, add its row to `other-systems.csv`, with the key of that source in `named_by`.

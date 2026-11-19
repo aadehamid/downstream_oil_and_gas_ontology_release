@@ -1,4 +1,5 @@
-"""A proposal: one signed term change, as the files the apply command reads (KPI-DEC-0002, Q4, Q5, Q6 and Q13).
+"""A proposal: one signed term change or new reference item, as the files the apply command reads (KPI-DEC-0002, Q4,
+Q5, Q6, Q10 and Q13).
 
 One form gives one proposal (Q6). A proposal is one folder, named by its change id, that holds three files:
 
@@ -8,13 +9,15 @@ One form gives one proposal (Q6). A proposal is one folder, named by its change 
     summary.txt     the same for a person, in plain words: what changes, the route, and who signed
 
 The route (Q5). Each kind of change suggests one: a new other name and a new process link add content, so they
-are minor; a rename, a new definition, a removed other name and a removed process link are patch. A proposal takes
+are minor, and so is a new reference item (its create node line and the lines about the new node); a rename, a new
+definition, a removed other name and a removed process link are patch. A proposal takes
 the highest route among its changes. The answer to "Would every report and answer that used the old meaning still
 be correct?" can only raise it: "no" or "not sure" makes it major. The approval record holds the route, and read()
 refuses a record whose route is lower than its changes suggest.
 
 Two proposals conflict when they touch the same field of the same measure: its name, its definition, its other
-names or its process links (Q6). The apply command refuses conflicting proposals before it writes anything.
+names or its process links, or when both add the same new item (Q6). The apply command refuses conflicting
+proposals before it writes anything.
 
 Nothing here writes outside the folder it is given.
 """
@@ -26,10 +29,11 @@ from . import ChangeRefused, approval, kgcl
 
 CHANGE_FILE, APPROVAL_FILE, SUMMARY_FILE = "change.kgcl", "approval.json", "summary.txt"
 ROUTE_OF = {"create synonym": "minor", "create edge": "minor", "rename": "patch", "change definition": "patch",
-            "remove synonym": "patch", "delete edge": "patch"}
+            "remove synonym": "patch", "delete edge": "patch", "create node": "minor", "add definition": "minor"}
 RAISED_BY = ("no", "not-sure")   # the answers to the compatibility question that make a change major
 FIELD = {"rename": "name", "change definition": "definition", "create synonym": "other names",
-         "remove synonym": "other names", "create edge": "process links", "delete edge": "process links"}
+         "remove synonym": "other names", "create edge": "process links", "delete edge": "process links",
+         "add definition": "definition"}
 
 
 def highest(routes):
@@ -105,11 +109,17 @@ def read(folder):
 
 
 def conflicts(proposals):
-    """Each pair of proposals that touch the same field of the same measure, as a sentence. Empty when none do."""
+    """Each pair of proposals that touch the same field of the same measure, or add the same item, as a sentence.
+    Empty when none do."""
     seen, out = {}, []
     for proposal in proposals:
-        for key in sorted({(c.subject, FIELD[c.kind]) for c in proposal.changes}):
+        made = {c.subject for c in proposal.changes if c.kind == "create node"}
+        keys = {(s, "new item") for s in made} | {(c.subject, FIELD[c.kind]) for c in proposal.changes if c.subject not in made}
+        for key in sorted(keys):
             if key in seen and seen[key] != proposal.change:
-                out.append(f"the proposals {seen[key]} and {proposal.change} both change the {key[1]} of {key[0]}")
+                if key[1] == "new item":
+                    out.append(f"the proposals {seen[key]} and {proposal.change} both add {key[0]}")
+                else:
+                    out.append(f"the proposals {seen[key]} and {proposal.change} both change the {key[1]} of {key[0]}")
             seen.setdefault(key, proposal.change)
     return out
