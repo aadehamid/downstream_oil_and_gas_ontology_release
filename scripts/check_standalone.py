@@ -46,7 +46,7 @@ OWN_FILES = {"scripts/check_standalone.py", "scripts/test_check_standalone.py", 
 # owner here only when the link is a public source or a licence.
 GITHUB_OWNERS = {
     "adoptium", "apache", "cmader", "databricks", "databrickslabs", "datatreehouse", "dbpedia", "dgarijo", "jbarrasa",
-    "kvistgaard", "mattpocock", "monarch-initiative", "neo4j", "neo4j-contrib", "neo4j-labs", "ontodev", "rdflib",
+    "hydra-db", "kvistgaard", "mattpocock", "monarch-initiative", "neo4j", "neo4j-contrib", "neo4j-labs", "ontodev", "rdflib",
     "stevehedden",
 }
 
