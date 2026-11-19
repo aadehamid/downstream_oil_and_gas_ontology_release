@@ -32,10 +32,10 @@ This accepts each recommendation:
 
 1. A new KPI's proposal holds `change.kgcl` for everything KGCL can say, and `facts.csv` (measure, property, value)
    for the text facts KGCL cannot write. Apply writes both, and the round trip checks both.
-2. Approval records keep each signer's name, role, date and words. The ontology records roles and never a person's
-   name.
-3. A straight apostrophe in a KGCL line is written as ’ and read back as ', so the tables keep their text; text that
-   already holds a real ’ is refused.
+2. Approval records (`approvals/<change>.json`, sign-off files next to the ontology and not part of it) keep each
+   signer's name. The ontology records roles and never a person's name.
+3. A straight apostrophe (`'`) from a table value is written as a curly apostrophe (`’`) in a KGCL line, and apply
+   turns it back into `'`, so the tables keep their text. Text that already holds a real `’` is refused.
 4. The handout's rehearser (Q25 of KPI-DEC-0002) is the teammate who tested the KPI intake form.
 5. The owner removes the old 1.1 folder from the client laptop.
 
@@ -48,8 +48,8 @@ So KGCL, with the facts table for a new KPI, stays the one change format. No sec
 ## Alternatives considered
 
 - **A format of KPI Store's own instead of KGCL.** Not chosen: "Yes to all" accepted KGCL plus a facts table.
-- **An extended KGCL that writes text facts.** Not chosen, for the same answer; the official parser would refuse the
-  lines.
+- **An extended KGCL that writes text facts.** Not chosen: "Yes to all" accepted KGCL plus a facts table, and the
+  official parser would refuse the lines.
 - **Roles only in approval records.** Not chosen: "Yes to all".
 - **Refuse any value that holds an apostrophe.** Not chosen: "Yes to all".
 - **A second change format beside KGCL.** Not chosen: "ok go ahead, keep working on the plan", after the agent's
