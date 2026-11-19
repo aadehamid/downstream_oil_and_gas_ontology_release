@@ -9,7 +9,9 @@ import sys
 import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, ".."))
+ROOT = os.path.dirname(HERE)
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
 from kpi_store.setup_check import find_bash  # noqa: E402  (Git Bash on Windows, not the Linux subsystem's launcher)
 
 BASH = find_bash()
