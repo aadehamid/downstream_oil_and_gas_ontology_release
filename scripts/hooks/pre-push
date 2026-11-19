@@ -2,17 +2,18 @@
 # Runs the release's full check before every push. Turn it on once per clone:
 #   git config core.hooksPath scripts/hooks
 # A push that only deletes remote branches sends no commits, so it runs no check. Git gives the hook one line per
-# ref, "<local ref> <local sha> <remote ref> <remote sha>", and a delete's local sha is all zeros. With no lines at
+# ref, "<local ref> <local sha> <remote ref> <remote sha>", and a delete is "(delete)" with a local sha of zeros. With no lines at
 # all, as `git hook run pre-push` gives, the check runs.
 refs=0
 deletes=0
 while read -r _local_ref local_sha _remote_ref _remote_sha; do
   refs=$((refs + 1))
-  [[ $local_sha =~ ^0+$ ]] && deletes=$((deletes + 1))
+  [ "$_local_ref" = "(delete)" ] && [[ $local_sha =~ ^0+$ ]] && deletes=$((deletes + 1))
 done
 if [ "$refs" -gt 0 ] && [ "$refs" -eq "$deletes" ]; then
   echo "pre-push: the push only deletes remote branches; no commits to check"
   exit 0
 fi
-cd "$(git rev-parse --show-toplevel)" || exit 1
+top=$(git rev-parse --show-toplevel) || exit 1
+cd "$top" || exit 1
 exec bash scripts/check.sh

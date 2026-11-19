@@ -25,10 +25,10 @@ def repo(tmp_path):
     return tmp_path
 
 
-def push(repo, lines, code=0):
+def push(repo, lines, code=0, cwd=None):
     env = dict(CLEAN_ENV, STAND_IN_EXIT=str(code))
     return subprocess.run(["bash", HOOK, "origin", "https://example.invalid/r.git"], input=lines, text=True,
-                          capture_output=True, cwd=repo, env=env)
+                          capture_output=True, cwd=cwd or repo, env=env)
 
 
 def test_a_push_with_commits_runs_the_check_and_keeps_its_exit_code(repo):
@@ -36,7 +36,14 @@ def test_a_push_with_commits_runs_the_check_and_keeps_its_exit_code(repo):
     assert push(repo, line).returncode == 0
     assert (repo / "scripts" / "ran.txt").exists()
     (repo / "scripts" / "ran.txt").unlink()
-    assert push(repo, line, code=1).returncode == 1
+    assert push(repo, line, code=2, cwd=repo / "scripts").returncode == 2   # from a subfolder, exit code kept
+    assert (repo / "scripts" / "ran.txt").exists()
+
+
+def test_a_line_that_only_looks_like_a_delete_runs_the_check(repo):
+    # A commit expression with a space can put zeros in the second field; only "(delete)" marks a delete.
+    line = f"HEAD^{{/fix 0000 bug}} {'a' * 40} refs/heads/topic {ZEROS}\n"
+    assert push(repo, line, code=2).returncode == 2
     assert (repo / "scripts" / "ran.txt").exists()
 
 
@@ -54,4 +61,5 @@ def test_a_push_that_only_deletes_branches_runs_no_check(repo):
 
 def test_a_push_that_deletes_one_branch_and_sends_another_runs_the_check(repo):
     lines = f"(delete) {ZEROS} refs/heads/old {'b' * 40}\nrefs/heads/new {'d' * 40} refs/heads/new {ZEROS}\n"
-    assert push(repo, lines, code=1).returncode == 1
+    assert push(repo, lines, code=2).returncode == 2
+    assert (repo / "scripts" / "ran.txt").exists()
