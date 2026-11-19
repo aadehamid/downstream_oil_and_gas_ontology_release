@@ -38,7 +38,7 @@ REPLICA = {
 # Objects the skip rules must drop, and one replica table no data product reads.
 REPLICA_NOISE = (("replica_mpr", "pricedetail__ct"), ("replica_mips", "attrep_apply_exceptions"), ("replica_mpr", "sample_unused_source"))
 
-# Silver table -> (the columns it selects from its first source, its replica sources). The first source is the base.
+# Silver table -> its replica sources in the source catalog. The first source is the base; the others are joined.
 SILVER = {
     "silver_mdm_core.mips_price_assessment_group_dim": ("replica_mips.mips_priceassessmentgroup", "replica_mips.mips_currency", "replica_mips.mips_unitofmeasure"),
     "silver_mdm_core.mips_price_batch_dim": ("replica_mips.mips_pricebatch",),
@@ -65,9 +65,9 @@ ROWS = "(1, 'Sample A', 10.5000, TIMESTAMP'2026-11-01 06:00:00'), (2, 'Sample B'
 BASE_COLUMNS = "id INT, name STRING, amount DECIMAL(18,4), updated_at TIMESTAMP"
 
 
-def silver_select(main, source, table, sources):
+def silver_select(table, sources):
     """The SELECT that builds a silver table from every one of its replica sources, so each is a lineage edge."""
-    joins = "".join(f" LEFT JOIN {source}.{s} s{i} ON s0.id = s{i}.id" for i, s in enumerate(sources[1:], 1))
+    joins = "".join(f" LEFT JOIN {SOURCE}.{s} s{i} ON s0.id = s{i}.id" for i, s in enumerate(sources[1:], 1))
     extra = "".join(f", s{i}.name AS Source_{i}_Name" for i in range(1, len(sources)))
     special = {
         "mips_price_assessment_fact": "s0.id AS Price_Batch_ID, s0.id AS Price_Group_ID, s0.id AS Price_Sheet_ID, s0.amount AS Assessment_Amount, s0.amount - 1 AS Previous_Amount",
@@ -78,15 +78,15 @@ def silver_select(main, source, table, sources):
         "mips_price_assessment_group_dim": "s0.id AS Price_Assessment_Group_ID, s0.name AS MIPS_Display_Name",
         "mpr_price_master_dim": "s0.id AS Price_Master_ID, s0.name AS Price_Master_Name",
     }[table.split(".")[1]]
-    return f"SELECT {special}{extra} FROM {source}.{sources[0]} s0{joins}"
+    return f"SELECT {special}{extra} FROM {SOURCE}.{sources[0]} s0{joins}"
 
 
-def gold_summary_select(main, change_column, assessment="Assessment_Amount", previous="Previous_Amount"):
-    s = f"{main}.silver_mdm_core"
+def gold_summary_select(change_column, assessment="Assessment_Amount", previous="Previous_Amount"):
+    s = f"{MAIN}.silver_mdm_core"
     return (f"SELECT sh.Price_Sheet_Name, ag.MIPS_Display_Name, pg.Price_Group_Name, b.Batch_Datetime, pm.Price_Master_Name, "
             f"f.Assessment_Amount AS {assessment}, f.Previous_Amount AS {previous}, "
             f"f.Assessment_Amount - f.Previous_Amount AS {change_column} "
-            f"FROM {main}.silver_udm_core.mips_price_assessment_fact f "
+            f"FROM {MAIN}.silver_udm_core.mips_price_assessment_fact f "
             f"LEFT JOIN {s}.mips_price_sheet_dim sh ON f.Price_Sheet_ID = sh.Price_Sheet_ID "
             f"LEFT JOIN {s}.mips_price_assessment_group_dim ag ON f.Price_Group_ID = ag.Price_Assessment_Group_ID "
             f"LEFT JOIN {s}.mips_price_group_dim pg ON f.Price_Group_ID = pg.Price_Group_ID "
@@ -94,12 +94,12 @@ def gold_summary_select(main, change_column, assessment="Assessment_Amount", pre
             f"LEFT JOIN {s}.mpr_price_master_dim pm ON f.Price_Batch_ID = pm.Price_Master_ID")
 
 
-def gold_crack_select(main):
-    s = f"{main}.silver_mdm_core"
+def gold_crack_select():
+    s = f"{MAIN}.silver_mdm_core"
     return (f"SELECT 'SAMPLE KPI' AS KPI_ID, d.Effective_Date AS Price_Date, d.Settle_Price_Amount - f.Assessment_Amount AS Crack_Spread_Price_Amount, "
             f"'Y' AS Record_Active_Indicator, sh.Price_Sheet_Name, ag.MIPS_Display_Name, pg.Price_Group_Name, b.Batch_Datetime, pm.Price_Master_Name "
-            f"FROM {main}.silver_udm_core.mips_price_assessment_fact f "
-            f"JOIN {main}.silver_udm_core.mpr_price_detail_fact d ON f.Price_Batch_ID = d.Price_Master_ID "
+            f"FROM {MAIN}.silver_udm_core.mips_price_assessment_fact f "
+            f"JOIN {MAIN}.silver_udm_core.mpr_price_detail_fact d ON f.Price_Batch_ID = d.Price_Master_ID "
             f"LEFT JOIN {s}.mips_price_sheet_dim sh ON f.Price_Sheet_ID = sh.Price_Sheet_ID "
             f"LEFT JOIN {s}.mips_price_assessment_group_dim ag ON f.Price_Group_ID = ag.Price_Assessment_Group_ID "
             f"LEFT JOIN {s}.mips_price_group_dim pg ON f.Price_Group_ID = pg.Price_Group_ID "
@@ -111,35 +111,36 @@ def metric_view(name, yaml_text):
     return f"CREATE VIEW {name} WITH METRICS LANGUAGE YAML AS $$\n{yaml_text.strip()}\n$$"
 
 
-def statements(main, source):
-    """[(kind, full name, SQL)] in the order to run. kind is schema, table or view; INSERTs carry kind "insert" and
-    create nothing. Schemas are created without IF NOT EXISTS, so an existing schema stops the run instead of being
-    adopted and later dropped."""
-    out = [("schema", f"{source}.{s}", f"CREATE SCHEMA {source}.{s}") for s in SOURCE_SCHEMAS]
-    out += [("schema", f"{main}.{s}", f"CREATE SCHEMA {main}.{s}") for s in MAIN_SCHEMAS]
+def create_statements():
+    """[(kind, full name, SQL)] in the order to run: the two catalogs, then every object. kind is catalog, schema,
+    table or view; "insert" and "replace" create nothing new. Catalogs and schemas are created without IF NOT
+    EXISTS, so one that already exists stops the run instead of being adopted and later dropped."""
+    out = [("catalog", c, f"CREATE CATALOG {c} COMMENT '{COMMENT}'") for c in (SOURCE, MAIN)]
+    out += [("schema", f"{SOURCE}.{s}", f"CREATE SCHEMA {SOURCE}.{s}") for s in SOURCE_SCHEMAS]
+    out += [("schema", f"{MAIN}.{s}", f"CREATE SCHEMA {MAIN}.{s}") for s in MAIN_SCHEMAS]
     plain = [(schema, t) for schema, tables in REPLICA.items() for t in tables] + list(REPLICA_NOISE)
     for schema, table in plain:
-        name = f"{source}.{schema}.{table}"
+        name = f"{SOURCE}.{schema}.{table}"
         out.append(("table", name, f"CREATE TABLE {name} ({BASE_COLUMNS})"))
         out.append(("insert", name, f"INSERT INTO {name} VALUES {ROWS}"))
-    out.append(("table", f"{main}.bronze_replica_mpr.pricedetail", f"CREATE TABLE {main}.bronze_replica_mpr.pricedetail ({BASE_COLUMNS})"))
+    out.append(("table", f"{MAIN}.bronze_replica_mpr.pricedetail", f"CREATE TABLE {MAIN}.bronze_replica_mpr.pricedetail ({BASE_COLUMNS})"))
     for table, sources in SILVER.items():
-        out.append(("table", f"{main}.{table}", f"CREATE TABLE {main}.{table} AS {silver_select(main, source, table, sources)}"))
-    summary, crack = f"{main}.gold_commercial_core.mips_mpr_executive_summary_fact", f"{main}.gold_commercial_core.mpr_mips_crack_spread_price_fact"
+        out.append(("table", f"{MAIN}.{table}", f"CREATE TABLE {MAIN}.{table} AS {silver_select(table, sources)}"))
+    summary, crack = f"{MAIN}.gold_commercial_core.mips_mpr_executive_summary_fact", f"{MAIN}.gold_commercial_core.mpr_mips_crack_spread_price_fact"
     # First with the old column names, then replaced with the current ones: column lineage then holds both spellings,
     # as it does in the sandbox, and the table holds only the current ones.
-    out.append(("table", summary, f"CREATE TABLE {summary} AS {gold_summary_select(main, 'ChangeValue', 'assessment_amount', 'Previous_amount')}"))
-    out.append(("insert", summary, f"CREATE OR REPLACE TABLE {summary} AS {gold_summary_select(main, 'Change_Value_Amount')}"))
-    out.append(("table", crack, f"CREATE TABLE {crack} AS {gold_crack_select(main)}"))
+    out.append(("table", summary, f"CREATE TABLE {summary} AS {gold_summary_select('ChangeValue', 'assessment_amount', 'Previous_amount')}"))
+    out.append(("replace", summary, f"CREATE OR REPLACE TABLE {summary} AS {gold_summary_select('Change_Value_Amount')}"))
+    out.append(("table", crack, f"CREATE TABLE {crack} AS {gold_crack_select()}"))
     # The replaced tables, each a copy of the current table; the INSERT back is the lineage edge of the migration pair.
     for schema, table in REPLACED:
         layer = "gold" if schema == "commercial_core" else "silver"
-        old, new = f"{source}.{schema}.{table}", f"{main}.{layer}_{schema}.{table}"
+        old, new = f"{SOURCE}.{schema}.{table}", f"{MAIN}.{layer}_{schema}.{table}"
         out.append(("table", old, f"CREATE TABLE {old} AS SELECT * FROM {new} LIMIT 0"))
         out.append(("insert", new, f"INSERT INTO {new} SELECT * FROM {old}"))
     for table in EXTRA_TABLES:
-        out.append(("table", f"{main}.{table}", f"CREATE TABLE {main}.{table} ({BASE_COLUMNS})"))
-    sem = f"{main}.semantic_sem_commercial"
+        out.append(("table", f"{MAIN}.{table}", f"CREATE TABLE {MAIN}.{table} ({BASE_COLUMNS})"))
+    sem = f"{MAIN}.semantic_sem_commercial"
     out.append(("view", f"{sem}.mips_mpr_executive_summary_fact_vw", metric_view(f"{sem}.mips_mpr_executive_summary_fact_vw", f"""
 version: 1.1
 source: {summary}
@@ -158,10 +159,10 @@ measures:
 """)))
     out.append(("view", f"{sem}.mips_mpr_benchmark_prices_fact_vw", metric_view(f"{sem}.mips_mpr_benchmark_prices_fact_vw", f"""
 version: 1.1
-source: {main}.silver_udm_core.mpr_price_detail_fact
+source: {MAIN}.silver_udm_core.mpr_price_detail_fact
 joins:
   - name: master
-    source: {main}.silver_mdm_core.mpr_price_master_dim
+    source: {MAIN}.silver_mdm_core.mpr_price_master_dim
     on: source.Price_Master_ID = master.Price_Master_ID
 filter: source.Price_Master_ID IN (1, 2, 3)
 dimensions:
@@ -177,7 +178,7 @@ measures:
 """)))
     out.append(("view", f"{sem}.mpr_mips_crack_spread_price_fact_metrics_vw", metric_view(f"{sem}.mpr_mips_crack_spread_price_fact_metrics_vw", f"""
 version: 1.1
-source: {main}.gold_commercial_core.MPR_MIPS_Crack_Spread_Price_Fact
+source: {MAIN}.gold_commercial_core.MPR_MIPS_Crack_Spread_Price_Fact
 filter: Record_Active_Indicator = 'Y'
 dimensions:
   - name: Price_Date
@@ -198,10 +199,10 @@ measures:
 version: 1.1
 source: |-
   WITH assessments AS (
-    SELECT a.Price_Batch_ID, a.Assessment_Amount FROM {main}.silver_udm_core.mips_price_assessment_fact a
+    SELECT a.Price_Batch_ID, a.Assessment_Amount FROM {MAIN}.silver_udm_core.mips_price_assessment_fact a
   ),
   settles AS (
-    SELECT d.Price_Master_ID, d.Settle_Price_Amount FROM {main}.silver_udm_core.mpr_price_detail_fact d
+    SELECT d.Price_Master_ID, d.Settle_Price_Amount FROM {MAIN}.silver_udm_core.mpr_price_detail_fact d
   )
   SELECT 'SAMPLE KPI' AS KPI_ID, settles.Settle_Price_Amount - assessments.Assessment_Amount AS Crack_Spread
   FROM assessments JOIN settles ON assessments.Price_Batch_ID = settles.Price_Master_ID
@@ -215,10 +216,6 @@ measures:
     out.append(("view", f"{sem}.mpr_mips_crack_spread_price_fact_vw",
                 f"CREATE VIEW {sem}.mpr_mips_crack_spread_price_fact_vw AS SELECT * FROM {crack} WHERE Record_Active_Indicator = 'Y'"))
     return out
-
-def create_statements():
-    """[(kind, name, SQL)]: the two catalogs, then every object in the order to run."""
-    return [("catalog", c, f"CREATE CATALOG {c} COMMENT '{COMMENT}'") for c in (SOURCE, MAIN)] + statements(MAIN, SOURCE)
 
 
 def drop_statement(catalog):
@@ -247,7 +244,10 @@ def main(argv):
     run_sql = runner(args.profile)
     if args.command == "drop":
         for catalog in CATALOGS:
-            run_sql(drop_statement(catalog))
+            try:
+                run_sql(drop_statement(catalog))
+            except RuntimeError as err:
+                raise SystemExit(f"drop {catalog}: {err}")
             print("dropped", catalog)
         return 0
     plan = create_statements()
@@ -257,8 +257,8 @@ def main(argv):
         except RuntimeError as err:
             raise SystemExit(f"{kind} {name}: {err}\n{statement[:300]}")
         print(f"{kind:8} {name}")
-    made = sum(kind not in ("catalog", "insert") for kind, _, _ in plan)
-    print(f"created 2 catalogs and {made} objects; lineage appears in system.access.table_lineage some time later")
+    made = {k: sum(kind == k for kind, _, _ in plan) for k in ("catalog", "schema", "table", "view")}
+    print(", ".join(f"{n} {k}s" for k, n in made.items()) + " created; lineage appears in system.access.table_lineage some time later")
     return 0
 
 
