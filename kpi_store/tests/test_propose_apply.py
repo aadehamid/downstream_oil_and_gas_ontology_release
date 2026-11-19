@@ -350,6 +350,7 @@ def scratch_release(tmp_path, git_copy):
     shutil.copytree(ROOT / "business_architecture" / "business_process", root / "business_architecture" / "business_process",
                     ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copy2(ROOT / "release.json", root / "release.json")
+    shutil.copy2(ROOT / ".gitignore", root / ".gitignore")   # as a real release has it, so Python's cache stays out
     (root / "scripts").mkdir()
     shutil.copy2(ROOT / cut.EXCEPTIONS, root / cut.EXCEPTIONS)
     shutil.copytree(ROOT / "kpi-intake", root / "kpi-intake")
