@@ -197,8 +197,9 @@ jobs:
   # Databricks is a rehearsal workspace, never the client's. The job writes the command line's profile DEFAULT into
   # the runner's own .databrickscfg from the secrets, as `databricks auth login` leaves it for a reader; the SDK reads
   # the same profile. The settings name the two rehearsal catalogs: kpi_reh_idp_sbx plays idp_sbx and
-  # kpi_reh_synapse_dev plays synapse_dev. Each part writes to two schemas of its own, named after this run, and to
-  # one workspace folder of its own. The last steps drop exactly those two schemas and that folder, also after a
+  # kpi_reh_synapse_dev plays synapse_dev. `python scripts/rehearsal_workspace.py create` builds both catalogs and
+  # their made-up objects, and `drop` removes them. Each part writes to two schemas of its own, named after this run,
+  # and to one workspace folder of its own. The last steps drop exactly those two schemas and that folder, also after a
   # failure. The job creates, changes and drops nothing else in the workspace.
   #
   # The parts:
