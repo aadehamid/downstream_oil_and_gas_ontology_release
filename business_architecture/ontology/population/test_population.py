@@ -3,7 +3,9 @@ counts, and pinned statements match MPC's wording in the evidence file.
 
 Run: python3 -m pytest test_population.py (needs rdflib).
 """
+import glob
 import os
+import re
 import subprocess
 import sys
 import unittest
@@ -17,6 +19,17 @@ import build_population as bp  # noqa: E402
 DATA = Graph().parse(os.path.join(HERE, "population.ttl"))
 
 
+def added_by_forms():
+    """The measures that the KPI intake form added (KPI-DEC-0004, item 1): the short key of each line
+    "create node measure:<key> '<name>'" of a change file beside an approval record. The count below was made by
+    hand before any form added a measure, so it leaves these out."""
+    keys = set()
+    for path in glob.glob(os.path.join(HERE, "..", "approvals", "*.kgcl")):
+        with open(path, encoding="utf-8") as f:
+            keys |= set(re.findall(r"^create node measure:([a-z0-9-]+) '", f.read(), re.M))
+    return keys
+
+
 class Population(unittest.TestCase):
     def test_build_is_current(self):
         r = subprocess.run([sys.executable, os.path.join(HERE, "build_population.py"), "--verify"], capture_output=True, text=True, encoding="utf-8")
@@ -25,7 +38,7 @@ class Population(unittest.TestCase):
     def test_counts(self):
         rows, total = bp.load()
         # Eight MPC-defined measures; the kpi module has 41 measures.
-        self.assertEqual((len(rows), total), (8, 41))
+        self.assertEqual((len(rows), total - len(added_by_forms())), (8, 41))
 
     def test_pinned_statements(self):
         # MPC FY2025 Form 10-K: "Refining operating costs exclude planned turnaround and depreciation and amortization expense."

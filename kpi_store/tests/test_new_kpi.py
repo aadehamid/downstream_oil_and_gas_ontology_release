@@ -3,7 +3,8 @@ KPI-DEC-0002, Q4 to Q7, Q10 form 1 and Q13).
 
 The propose tests read this tree's own KPI intake pack and kpi tables, and write proposals into a temporary folder
 only. The form is the shipped example Crack Spreads Pricing with a name, a definition and an other name of its own,
-as the update guide's example has it. The KGCL lines, the facts, the routes and the table rows they expect are
+as the update guide's example does, under names the guide's example does not use, so the tests also hold on a
+release where the guide's example was applied. The KGCL lines, the facts, the routes and the table rows they expect are
 written by hand. The apply tests run on a temporary copy of the release; the tree itself is never written.
 """
 import csv
@@ -26,11 +27,11 @@ EXAMPLE = ROOT / "kpi-intake" / "examples" / "crack-spreads-pricing.json"
 SIGNED = {"data-owner": {"name": "A Data Owner", "date": "2026-11-19"},
           "domain-confirmation": {"name": "A Domain Owner", "date": "2026-11-19"},
           "architect": {"name": "An Architect", "date": "2026-11-19"}}
-M = "measure:sample-spread-margin"
+M = "measure:test-spread-margin"
 DEFINITION = "A made-up market margin for tests: a product's price less the price of the crude it is made from."
-LINES = [f"create node {M} 'Sample Spread Margin'",
+LINES = [f"create node {M} 'Test Spread Margin'",
          f"add definition 'A made-up market margin for tests: a product’s price less the price of the crude it is made from.' to {M}",
-         f"create exact synonym 'sample spread' for {M}",
+         f"create exact synonym 'test spread' for {M}",
          f"create edge {M} kpi:measureKind kind:market-indicator",
          f"create edge {M} dcterms:source src:planner-measure-list-2026-10-18",
          f"create edge {M} kpi:usedBy persona:distribution-planner",
@@ -44,6 +45,14 @@ REASON = ("MPC files crack spreads under market indicators and calls margins dep
           "The list's cracks (NYMEX 3-2-1, USGC 3-2-1 MEH ex-RIN, Chicago WTI 3-2-1 ex-RIN) are benchmarks, not performance.")
 NOT_NOTE = ("Not realized refinery margin, not margin capture, and not MPC's R&M Margin Indicator. A 3-2-1 built from "
             "separate product and crude legs is not the published series.")
+
+
+def next_opm(root=ROOT):
+    """The OPM- number after the highest that the tree's identifier table holds."""
+    rows = csv.DictReader((root / kpi_tables.KPI_FOLDER / "measure-identifiers.csv").open(encoding="utf-8"))
+    return 1 + max(int(r["identifier"][4:]) for r in rows if r["identifier"].startswith("OPM-"))
+
+
 FACTS = [(M, "kpi:kpiCandidate", "false"), (M, "kpi:classificationTest", "3"), (M, "kpi:classificationReason", REASON),
          (M, "kpi:comparedAgainst", "30-day trend; 5-year history"),
          (M, "kpi:publicCounterpart", "MPC 10 (Gulf Coast, Mid-Continent, West Coast and blended 3-2-1 cracks)"),
@@ -58,7 +67,7 @@ def kpi_form(folder, changes=None, sign_offs=SIGNED, number="", drop=("3.6",), n
     """The shipped example as a new measure, written to the folder, with these answers changed. Returns its path."""
     data = json.loads(EXAMPLE.read_text(encoding="utf-8"))
     answers = data["answers"]
-    answers.update({"2.1": "Sample Spread Margin", "2.2": DEFINITION, "5.1": ["sample spread"], **(changes or {})})
+    answers.update({"2.1": "Test Spread Margin", "2.2": DEFINITION, "5.1": ["test spread"], **(changes or {})})
     for key in drop:
         answers.pop(key, None)
     data.update(kpi_name=answers["2.1"], example_of="", comment="", sign_offs=sign_offs,
@@ -112,12 +121,12 @@ def test_facts_are_refused_unless_they_are_facts_kgcl_cannot_carry(facts, messag
 
 @pytest.mark.parametrize("lines,message", [
     (LINES[1:], "this line is about a measure that no 'create node' line before it makes"),
-    ([LINES[0], *LINES[2:]], "measure:sample-spread-margin has no definition"),
+    ([LINES[0], *LINES[2:]], "measure:test-spread-margin has no definition"),
     ([*LINES[:3], *LINES[4:]], "needs exactly one kpi:measureKind link, and has 0"),
     ([*LINES, f"create edge {M} dcterms:source src:mpc-s01"], "needs exactly one dcterms:source link, and has 2"),
-    ([*LINES, f"rename {M} from 'Sample Spread Margin' to 'Other'"], "a new KPI takes a name, a definition, other names and links"),
+    ([*LINES, f"rename {M} from 'Test Spread Margin' to 'Other'"], "a new KPI takes a name, a definition, other names and links"),
     ([*LINES, "create exact synonym 'x' for system:mips"], r"a new KPI is a measure \(measure:<id>\)"),
-    ([*LINES, f"create exact synonym 'Sample spread margin' for {M}"], "the measure has this name already"),
+    ([*LINES, f"create exact synonym 'Test spread margin' for {M}"], "the measure has this name already"),
 ])
 def test_the_lines_of_a_new_measure_are_refused_unless_complete(lines, message):
     with pytest.raises(ChangeRefused, match=message):
@@ -130,7 +139,7 @@ def test_the_lines_of_a_new_measure_are_refused_unless_complete(lines, message):
     ("kind:market-indicator", "kind:target", "kind:target is not a kind of measure"),
     ("proc:CM-1-1-4-7-4", "proc:CM-9-9", "proc:CM-9-9 is not a process of the newest core"),
     ("measure:margin-capture", "measure:a-made-up-measure", "measure:a-made-up-measure is not another measure of the kpi module"),
-    ("'sample spread'", "'crack spread'", "the measure crack-spreads has the name 'crack spread' already. A change to it goes through the term-change form"),
+    ("'test spread'", "'crack spread'", "the measure crack-spreads has the name 'crack spread' already. A change to it goes through the term-change form"),
 ])
 def test_a_new_measure_that_does_not_fit_the_tables_is_refused(old, new, message):
     changes = kgcl.read_lines("\n".join(line.replace(old, new) for line in LINES))
@@ -156,7 +165,7 @@ def test_propose_writes_the_lines_the_facts_the_route_and_the_signers_of_a_new_k
     read = proposal.read(folder)
     assert (read.lines, read.facts, read.route) == (LINES, FACTS, "minor")
     summary = (folder / "summary.txt").read_text(encoding="utf-8").splitlines()
-    for line in ('The new measure: "Sample Spread Margin" (measure:sample-spread-margin), in the kpi module',
+    for line in ('The new measure: "Test Spread Margin" (measure:test-spread-margin), in the kpi module',
                  "  - Its kind: market indicator.", "  - A role that uses it: Prompt Planner.",
                  "  - A process it informs: CM 1.1.4.7.4 Capture Product/Crude/Feedstock Price.",
                  '  - How often it is stated, and its breakdowns: "daily, by market hub"',
@@ -231,7 +240,7 @@ def test_apply_refuses_a_new_kpi_with_a_term_change_stray_facts_and_the_same_kpi
     stray = _write(tmp_path / "stray", ["create exact synonym 'a made-up other name' for measure:unit-utilization"], FACTS)
     for folders, message in (([one, term], "these proposals are term changes and new KPIs"),
                              ([stray], "the proposal stray holds facts.csv, which only a new KPI has"),
-                             ([one, two], "the proposals one and two both add measure:sample-spread-margin")):
+                             ([one, two], "the proposals one and two both add measure:test-spread-margin")):
         with pytest.raises(ChangeRefused, match=message):
             apply_cmd.apply(folders, ROOT, say=quiet)
 
@@ -239,6 +248,7 @@ def test_apply_refuses_a_new_kpi_with_a_term_change_stray_facts_and_the_same_kpi
 @pytest.mark.skipif(shutil.which("git") is None, reason="Git is not installed")
 def test_a_new_kpi_goes_from_the_form_to_a_committed_minor_release(tmp_path, no_global_git):
     root = scratch_release(tmp_path, git_copy=True)
+    opm = next_opm(root)
     measures = root / kpi_tables.MEASURES
     kept = tmp_path / "measures-before.ttl"
     shutil.copy2(measures, kept)
@@ -254,22 +264,22 @@ def test_a_new_kpi_goes_from_the_form_to_a_committed_minor_release(tmp_path, no_
     assert _versions(root)["kpi"] == new and git(root, "status", "--porcelain") == ""
     assert git(root, "log", "-1", "--format=%s").strip() == f"Apply the new KPI NK-1: kpi {new}"
     body = git(root, "log", "-1", "--format=%b")
-    assert "The facts (measure, property, value):\nmeasure:sample-spread-margin,kpi:kpiCandidate,false\n" in body
+    assert "The facts (measure, property, value):\nmeasure:test-spread-margin,kpi:kpiCandidate,false\n" in body
     assert set(git(root, "show", "--name-only", "--no-renames", "--format=", "HEAD").split()) == set(files)
     # The rows the form added, written by hand.
     rows = lambda name: list(csv.DictReader((root / kpi_tables.KPI_FOLDER / f"{name}.csv").open(encoding="utf-8")))
     assert rows("measure-classification")[-1] == {
-        "measure_id": "sample-spread-margin", "name": "Sample Spread Margin", "source": "planner-list", "topic": "",
+        "measure_id": "test-spread-margin", "name": "Test Spread Margin", "source": "planner-list", "topic": "",
         "personas": "Distribution Planner; Prompt Planner; Short-Term Planner", "class": "market-indicator",
         "kpi_candidate": "no", "rule_test": "3", "compared_against": "30-day trend; 5-year history",
         "mpc_counterpart": "MPC 10 (Gulf Coast, Mid-Continent, West Coast and blended 3-2-1 cracks)", "reason": REASON,
         "evidence": "MPC-S01 Item 7 pp. 46, 51; KI-27; KI-28"}
     assert rows("measure-details")[-1] == {
-        "measure_id": "sample-spread-margin", "definition": DEFINITION, "grain": "daily, by market hub",
+        "measure_id": "test-spread-margin", "definition": DEFINITION, "grain": "daily, by market hub",
         "basis": "products price - crude price, for a stated crude:product ratio (for example 3-2-1); unit: Illustration: US dollars per barrel",
-        "aliases": "sample spread", "not_to_be_confused_with": "margin-capture;rm-margin-indicator;rm-margin-per-barrel",
+        "aliases": "test spread", "not_to_be_confused_with": "margin-capture;rm-margin-indicator;rm-margin-per-barrel",
         "not_note": NOT_NOTE, "informs_process": "CM 1.1.4.7.4"}
-    assert rows("measure-identifiers")[-1] == {"measure_id": "sample-spread-margin", "identifier": "OPM-0031"}
+    assert rows("measure-identifiers")[-1] == {"measure_id": "test-spread-margin", "identifier": f"OPM-{opm:04d}"}
     # The round trip, and the record, the change file and the facts the release keeps.
     lines, facts = nm.compare(kept, measures)
     assert (sorted(lines), facts) == (sorted(LINES), sorted(FACTS))
@@ -278,7 +288,7 @@ def test_a_new_kpi_goes_from_the_form_to_a_committed_minor_release(tmp_path, no_
     assert record.with_suffix(".kgcl").read_text(encoding="utf-8").splitlines() == LINES
     assert proposal.read_facts(record.with_suffix(".facts.csv").read_text(encoding="utf-8"), "NK-1") == FACTS
     lists = picklists.load(root / "kpi-intake")
-    assert "Sample Spread Margin" in {m["label"] for m in lists["lists"]["measures"]} and picklists.stale_modules(lists, root) == {}
+    assert "Test Spread Margin" in {m["label"] for m in lists["lists"]["measures"]} and picklists.stale_modules(lists, root) == {}
     # The ontology records roles and never a person's name (KPI-DEC-0004, item 2).
     for path in (root / cut.ONTOLOGY).rglob("*"):
         if path.suffix in (".ttl", ".jsonld", ".nt", ".trig"):
@@ -325,7 +335,7 @@ def test_the_round_trip_refuses_a_difference_that_neither_file_states(tmp_path):
             (lambda g: g.add((URIRef(nm.iri("measure:unit-utilization")), SKOS.altLabel, Literal("x", lang="en"))), "1 ways"),
             # an identifier off the run
             (lambda g: (g.remove((s, DCTERMS.identifier, None)), g.add((s, DCTERMS.identifier, Literal("OPM-0040", datatype=XSD.string)))),
-             r"the new OPM identifiers are \[40\], and the run needs \[31\]"),
+             rf"the new OPM identifiers are \[40\], and the run needs \[{next_opm(root)}\]"),
             # no identifier at all
             (lambda g: g.remove((s, DCTERMS.identifier, None)), "needs a OPM-nnnn identifier, not None"),
             # the classification evidence, which every measure cites
@@ -351,7 +361,7 @@ def test_apply_stops_when_the_rebuilt_module_holds_what_neither_file_states(tmp_
     def and_one_more_triple(changes, facts, staging):
         built = nm.apply_changes(changes, facts, staging)
         with built.open("a", encoding="utf-8") as f:
-            f.write('\n<https://w3id.org/mpc/ontology/modules/kpi/measure/sample-spread-margin> '
+            f.write('\n<https://w3id.org/mpc/ontology/modules/kpi/measure/test-spread-margin> '
                     '<https://w3id.org/mpc/ontology/modules/kpi/grain> "weekly" .\n')
         return built
     monkeypatch.setattr(apply_cmd, "NEW_KPI", apply_cmd.NEW_KPI.__class__(
