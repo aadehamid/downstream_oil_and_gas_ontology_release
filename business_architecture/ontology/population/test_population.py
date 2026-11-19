@@ -38,7 +38,8 @@ class Population(unittest.TestCase):
     def test_counts(self):
         rows, total = bp.load()
         # Eight MPC-defined measures; the kpi module has 41 measures.
-        self.assertEqual((len(rows), total - len(added_by_forms())), (8, 41))
+        added = added_by_forms()
+        self.assertEqual((len([r for r in rows if r["measure_id"] not in added]), total - len(added)), (8, 41))
 
     def test_pinned_statements(self):
         # MPC FY2025 Form 10-K: "Refining operating costs exclude planned turnaround and depreciation and amortization expense."
@@ -56,9 +57,10 @@ class Population(unittest.TestCase):
             "turnaround-cost-per-barrel": "row 16", "crack-spreads": "row 10",
             "relative-refining-margin-by-region": "row 19", "relative-adjusted-ebitda-per-barrel": "row 20"}
         rows, _ = bp.load()
-        self.assertEqual({r["measure_id"]: r["evidence"].split(", ", 1)[1] for r in rows}, decided)
+        added = added_by_forms()   # a measure the KPI intake form added brings its own population, which apply checked
+        self.assertEqual({r["measure_id"]: r["evidence"].split(", ", 1)[1] for r in rows if r["measure_id"] not in added}, decided)
         populated = {str(s)[len(str(bp.MEASURE)):] for s in DATA.subjects(bp.POP.includes, None)}
-        self.assertEqual(populated, set(decided))
+        self.assertEqual(populated - added, set(decided))
 
     def test_every_statement_starts_as_decided(self):
         # The opening words of each statement, copied by hand from population.csv as reviewed.

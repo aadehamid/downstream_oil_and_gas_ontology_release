@@ -2,7 +2,7 @@
 
 This page maps the KPI intake form to the ontology. The business never sees it. It is built from `catalogue.toml`, so change the text there and run the build command of [the guide](README.md).
 
-The check of a filled form changes nothing in the ontology. A complete KPI form becomes a proposal with the propose command, and the apply command adds it to the `kpi` module: [`HOW-TO-UPDATE.md`](../HOW-TO-UPDATE.md), "Add a KPI with the KPI intake form", has the steps. The proposal holds what the `kpi` module records. An answer that feeds another module stays in the form's file, and its summary names it.
+The check of a filled form changes nothing in the ontology. A complete KPI form becomes a proposal with the propose command, and the apply command adds it to the `kpi` module: [`HOW-TO-UPDATE.md`](../HOW-TO-UPDATE.md), "Add a KPI with the KPI intake form", has the steps. One proposal holds every module the form changes: `kpi` with the population, `value-stream` and `data-product`. The market series of 6.7 and the answer to 7.7 stay in the form's file, and the proposal's summary says so.
 
 ## Business area and domain
 

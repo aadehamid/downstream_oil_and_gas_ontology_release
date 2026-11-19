@@ -61,13 +61,23 @@ FACTS = [(M, "kpi:kpiCandidate", "false"), (M, "kpi:classificationTest", "3"), (
          (M, "kpi:basis", "products price - crude price, for a stated crude:product ratio (for example 3-2-1); "
                           "unit: Illustration: US dollars per barrel"),
          (M, "skos:scopeNote", NOT_NOTE)]
+# A sentence back in the scope note of each measure that 5.2 names (test_new_kpi_modules.py tests the other modules).
+RETURN = "Not Test Spread Margin: the scope note of Test Spread Margin says how the two differ."
+RETURNS = [(f"measure:{m}", "skos:scopeNote", RETURN) for m in ("margin-capture", "rm-margin-indicator", "rm-margin-per-barrel")]
+# The answers of the example that feed the modules beside kpi, which the tests of this file leave out.
+OTHERS = ("2.3", "2.4", "6.3", "6.4", "6.5", "6.6", "7.8")
 
 
-def kpi_form(folder, changes=None, sign_offs=SIGNED, number="", drop=("3.6",), name="sample"):
-    """The shipped example as a new measure, written to the folder, with these answers changed. Returns its path."""
+def kpi_form(folder, changes=None, sign_offs=SIGNED, number="", drop=("3.6", *OTHERS), name="sample"):
+    """The shipped example as a new measure, written to the folder, with these answers changed. Returns its path. By
+    default it leaves out the answers that feed the modules beside kpi, and names no view in 7.1."""
     data = json.loads(EXAMPLE.read_text(encoding="utf-8"))
     answers = data["answers"]
-    answers.update({"2.1": "Test Spread Margin", "2.2": DEFINITION, "5.1": ["test spread"], **(changes or {})})
+    if set(OTHERS) <= set(drop):
+        answers["7.1"] = "@no-data-yet"
+    # The pack rebuilds the example from the ontology, so a sentence another form returned to the scope note of Crack
+    # Spreads Pricing would reach 5.3: the tests set it.
+    answers.update({"2.1": "Test Spread Margin", "2.2": DEFINITION, "5.1": ["test spread"], "5.3": NOT_NOTE, **(changes or {})})
     for key in drop:
         answers.pop(key, None)
     data.update(kpi_name=answers["2.1"], example_of="", comment="", sign_offs=sign_offs,
@@ -158,23 +168,24 @@ def test_propose_writes_the_lines_the_facts_the_route_and_the_signers_of_a_new_k
     assert folder == tmp_path / "out" / "NK-TEST-1"
     assert (folder / "change.kgcl").read_text(encoding="utf-8") == "".join(line + "\n" for line in LINES)
     with (folder / "facts.csv").open(encoding="utf-8", newline="") as f:
-        assert [tuple(r) for r in csv.reader(f)] == [("measure", "property", "value"), *FACTS]
+        assert [tuple(r) for r in csv.reader(f)] == [("measure", "property", "value"), *FACTS, *RETURNS]
     record = json.loads((folder / "approval.json").read_text(encoding="utf-8"))
     assert record["route"] == "minor" and record["new_module"] is False
     assert [(s["role"], s["name"]) for s in record["signatures"]] == [
         ("Data Owner", "A Data Owner"), ("Domain Owner", "A Domain Owner"), ("Architect", "An Architect")]
     assert record["signatures"][1]["words"] == "This KPI belongs to my domain."
-    assert said[0] == f"wrote the proposal {folder.as_posix()}: 12 changes and 9 facts, route minor"
+    assert said[0] == f"wrote the proposal {folder.as_posix()}: 12 changes and 12 facts, route minor"
     read = proposal.read(folder)
-    assert (read.lines, read.facts, read.route) == (LINES, FACTS, "minor")
+    assert (read.lines, read.facts, read.route) == (LINES, FACTS + RETURNS, "minor")
     summary = (folder / "summary.txt").read_text(encoding="utf-8").splitlines()
     for line in ('The new measure: "Test Spread Margin" (measure:test-spread-margin), in the kpi module',
                  "  - Its kind: market indicator.", "  - A role that uses it: Prompt Planner.",
                  "  - A process it informs: CM 1.1.4.7.4 Capture Product/Crude/Feedstock Price.",
                  '  - How often it is stated, and its breakdowns: "daily, by market hub"',
                  "Its identifier: the apply gives it the next free OPM- number.",
-                 "  - 2.3, 2.4: the population module", "  - 6.3, 6.4, 6.5: the value-stream module",
-                 "  - 6.6, 7.1, 7.7, 7.8: the data-product module", "  - 6.7: the market-data module",
+                 "The changes reach these modules: kpi (minor).",
+                 "For the Architect: 7.7 stays in the form's file: the ontology has no property for the measure or column "
+                 "of a view yet.",
                  "The route: minor. This is a minor: the changes add content, and the old meaning still holds."):
         assert line in summary, line
 
@@ -186,7 +197,7 @@ def test_a_kpi_and_a_note_on_its_identifier_give_their_own_facts(tmp_path):
     read = proposal.read(folder)
     assert f"create edge {M} kpi:measureKind kind:kpi" in read.lines
     assert (M, "kpi:classificationTest", "5") in read.facts and (M, "kpi:kpiCandidate", "false") in read.facts
-    assert read.facts[-1] == (M, "skos:note", "PLAN-7 in the planning dashboard")
+    assert (M, "skos:note", "PLAN-7 in the planning dashboard") in read.facts
     assert (M, "dcterms:bibliographicCitation", "MPC-S01 Item 7 pp. 46, 51; KI-27; KI-28; A made-up scorecard of 2026") in read.facts
     assert "Its identifier: the apply gives it the next free KPI- number." in (folder / "summary.txt").read_text(encoding="utf-8")
 
@@ -305,11 +316,11 @@ def test_a_new_kpi_goes_from_the_form_to_a_committed_minor_release(tmp_path, no_
     assert rows("measure-identifiers")[-1] == {"measure_id": "test-spread-margin", "identifier": f"OPM-{opm:04d}"}
     # The round trip, and the record, the change file and the facts the release keeps.
     lines, facts = nm.compare(kept, measures)
-    assert (sorted(lines), facts) == (sorted(LINES), sorted(FACTS))
+    assert (sorted(lines), facts) == (sorted(LINES), sorted(FACTS + RETURNS))
     record = approval.record_path(root, "NK-1")
     assert approval.read_record(record)["route"] == "minor"
     assert record.with_suffix(".kgcl").read_text(encoding="utf-8").splitlines() == LINES
-    assert proposal.read_facts(record.with_suffix(".facts.csv").read_text(encoding="utf-8"), "NK-1") == FACTS
+    assert proposal.read_facts(record.with_suffix(".facts.csv").read_text(encoding="utf-8"), "NK-1") == FACTS + RETURNS
     lists = picklists.load(root / "kpi-intake")
     assert "Test Spread Margin" in {m["label"] for m in lists["lists"]["measures"]} and picklists.stale_modules(lists, root) == {}
     # The ontology records roles and never a person's name (KPI-DEC-0004, item 2).
@@ -390,14 +401,16 @@ def test_apply_stops_when_the_rebuilt_module_holds_what_neither_file_states(tmp_
     [folder] = propose_cmd.propose([kpi_form(tmp_path)], tmp_path / "proposals", root, now=NOW, say=quiet)
     before = digest(root)
 
+    from kpi_store.change import other_modules
+    real = other_modules.apply_changes
+
     def and_one_more_triple(changes, facts, staging):
-        built = nm.apply_changes(changes, facts, staging)
+        built = real(changes, facts, staging)
         with built.open("a", encoding="utf-8") as f:
             f.write('\n<https://w3id.org/mpc/ontology/modules/kpi/measure/test-spread-margin> '
                     '<https://w3id.org/mpc/ontology/modules/kpi/grain> "weekly"^^<http://www.w3.org/2001/XMLSchema#string> .\n')
         return built
-    monkeypatch.setattr(apply_cmd, "NEW_KPI", apply_cmd.NEW_KPI.__class__(
-        **{**apply_cmd.NEW_KPI.__dict__, "apply_changes": and_one_more_triple}))
+    monkeypatch.setattr(other_modules, "apply_changes", and_one_more_triple)
     # The extra value is a fact of the right form, so the module's compare returns it, and the apply's round trip finds
     # that facts.csv does not hold it.
     with pytest.raises(cut.CutFailed, match=r"the kpi module does not hold exactly the proposals' changes: missing none, "
@@ -416,6 +429,8 @@ def test_the_rm_margin_example_cites_a_source_the_form_offers_and_apply_adds_its
     root = scratch_release(tmp_path, git_copy=True)
     data = json.loads(RM.read_text(encoding="utf-8"))
     data["answers"].update({"2.1": "Test Margin per Barrel", "2.2": "A made-up margin per barrel for tests.", "5.1": []})
+    for key in OTHERS:   # this test is about the kpi module; test_new_kpi_modules.py tests the others
+        data["answers"].pop(key, None)
     data.update(kpi_name="Test Margin per Barrel", example_of="", comment="", request={"number": "NK-RM-1"},
                 sign_offs=SIGNED)
     form = tmp_path / "rm.kpi-intake.json"

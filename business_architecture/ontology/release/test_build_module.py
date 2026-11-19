@@ -375,7 +375,15 @@ class EarlierReleases(unittest.TestCase):
         sources.remove((header, None, None))
         self.assertEqual(set(released), set(sources))
         pop = URIRef(bm.MODULES_NS + "population/includes")
-        self.assertEqual(len(list(released.subject_objects(pop))), 8)
+        # The eight decided populations; a measure that the KPI intake form added brings its own (KPI-DEC-0004), and its
+        # change file beside its approval record names it.
+        added = set()
+        approvals = os.path.join(bm.ONTOLOGY, "approvals")
+        for path in sorted(os.listdir(approvals)) if os.path.isdir(approvals) else ():
+            if path.endswith(".kgcl"):
+                with open(os.path.join(bm.ONTOLOGY, "approvals", path), encoding="utf-8") as f:
+                    added |= set(re.findall(r"^create node measure:([a-z0-9-]+) '", f.read(), re.M))
+        self.assertEqual(len([s for s, _ in released.subject_objects(pop) if str(s).rsplit("/", 1)[-1] not in added]), 8)
         xsd_string = URIRef("http://www.w3.org/2001/XMLSchema#string")
         rng = URIRef("http://www.w3.org/2000/01/rdf-schema#range")
         self.assertEqual(set(released.objects(URIRef(bm.MODULES_NS + "population/populationEvidence"), rng)), {xsd_string})

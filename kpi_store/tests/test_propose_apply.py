@@ -477,7 +477,7 @@ def test_a_failing_step_and_a_builder_error_roll_everything_back(tmp_path):
             raise RuntimeError("made-up failure")
     with pytest.raises(cut.CutFailed, match="the step 'rebuild the catalog' failed: RuntimeError: made-up failure. The release is as it was."):
         apply_cmd.apply([folder], root, say=quiet, now=NOW, before_step=fail_at_the_catalog)
-    assert "release the modules that depend on kpi" in steps and "write the release" not in steps
+    assert "finish kpi" in steps and "write the release" not in steps
     assert digest(root) == before
 
     # The kpi builder fails on the changed tables.

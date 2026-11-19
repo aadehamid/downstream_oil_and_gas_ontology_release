@@ -474,8 +474,8 @@ class ValueStreamLinks(unittest.TestCase):
 
     def test_p09_links_are_present(self):
         links = [(process, m["measureId"], m["relationship"]) for _, process, m in self.links()]
-        got = set(links)
-        self.assertEqual(len(links), len(got), "a measure link is listed twice")
+        self.assertEqual(len(links), len(set(links)), "a measure link is listed twice")
+        got = {link for link in links if link[1] not in ADDED}   # the links of the forms' measures came after
         price, perf = "p-market-price-calculation-validation", "p-performance-tracking-analysis"
         self.assertEqual(got, {
             (price, "crack-spreads", "benchmarks"), (price, "rm-margin-per-barrel", "informs"),

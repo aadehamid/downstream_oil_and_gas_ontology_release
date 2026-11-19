@@ -593,12 +593,20 @@ A new KPI goes in through the KPI intake form and the same two commands as a ter
 
 The proposal of a new KPI holds two files of changes. `change.kgcl` holds what KGCL can say: the KPI's name, definition, other names, kind, source, roles, processes and the measures it is mistaken for. `facts.csv` holds the text facts that KGCL cannot write, one row each, with the columns measure, property and value: how it is worked out, how often it is stated, what it is compared against, why it has its kind, and the like. On kgcl-schema 0.7.0 a quoted text in a KGCL line about a link loses its quotes, so these facts have no KGCL line (KPI-DEC-0004). The apply writes both, checks both against the rebuilt module, and gives the KPI its identifier, the next free `KPI-` or `OPM-` number.
 
-The proposal holds only what the `kpi` module records. The answers that feed another module stay in the form's file, and `summary.txt` names each one: what the KPI counts and leaves out (2.3, 2.4) for `population`, the value stream steps (6.3 to 6.5) for `value-stream`, the data product and the view (6.6, 7.1 to 7.9) for `data-product`, and the market series (6.7) for `market-data`. Add those with "The release steps".
+One proposal holds every module the form changes, and one apply releases them all:
 
-The propose command refuses a form that the `kpi` module cannot take as it stands, and says why:
+- `kpi`: the KPI, and what it counts and leaves out (2.3, 2.4), which ship in the `kpi` package as its population. Each measure that 5.2 names as mistaken for it gains a sentence at the end of its own scope note, which names the new KPI.
+- `value-stream`: a link from each value stream step of 6.3 to the KPI, with how the step uses it (6.4) and the document that says so (6.5). The apply writes each link into the step's list in `business_architecture/business_process/value_stream_*.json`, which the module's builder reads.
+- `data-product`: the view of 7.1 serves the KPI, and the assistant of 7.8 answers from that view. The apply checks that 6.6 names the data product the view is part of.
+
+Each changed module takes its own minor, and every module that depends on one takes a patch, once. The apply compares each rebuilt module with the proposal's lines and facts, and makes one commit. Two answers stay in the form's file, and `summary.txt` says so: the market series of 6.7, which the form does not collect, and 7.7, for which the ontology has no property yet.
+
+The propose command refuses a form that the modules cannot take as they stand, and says why:
 
 - a name or an other name that a measure has already. A change to that measure goes through the term-change form;
 - a role in 6.1 that is not one of the four planning personas, the only roles the `kpi` module records today;
+- a view in 7.1 that the ontology does not hold, a table that is not a metric view, or an assistant in 7.8 that the `data-product` module does not hold. A new view or assistant needs a specialist, as the reference-item form says of a table built from other tables. A new value stream step goes to the process map request;
+- 2.4 without 2.3, because a population says what the KPI counts before what it leaves out;
 - more than one document in 3.5, or a document that 3.5 does not offer and `kpi/measure-sources.csv` does not hold. A new source document needs a specialist, because its evidence tier is in the `integration` module. A document that 3.5 offers is in the ontology already, with its title and its tier: when `kpi/measure-sources.csv` has no row for it yet, the apply adds one, with that title.
 
 The commands start in the release folder. Keep the filled form and the proposal in a folder beside the release folder, never inside it, as for a term change. The example uses the folder `new-kpi` beside the release folder.
@@ -657,11 +665,11 @@ The commands start in the release folder. Keep the filled form and the proposal 
    ```
 
    ```text expect
-   wrote the proposal ../new-kpi/proposals/NK-2026-001: 12 changes and 9 facts, route minor
+   wrote the proposal ../new-kpi/proposals/NK-2026-001: 19 changes and 17 facts, route minor
    Nothing in the ontology has changed. Read each summary.txt, then apply with: python -m kpi_store.apply <proposal folder>
    ```
 
-4. Read `summary.txt`. It says what the new KPI is, what it links to, its facts, the answers the proposal leaves out, and who signed.
+4. Read `summary.txt`. It says what the new KPI is, what it links to in each module, its facts, the modules it reaches, what the Architect must still do outside the form, and who signed.
 
    ```python run=new-kpi
    print(open("../new-kpi/proposals/NK-2026-001/summary.txt", encoding="utf-8").read())
@@ -682,17 +690,15 @@ The commands start in the release folder. Keep the filled form and the proposal 
    ...
    Its identifier: the apply gives it the next free OPM- number.
 
-   Not in this proposal: these answers feed another module, so they stay in the form's file until a change to that module records them:
-     - 2.3, 2.4: the population module
-     - 6.3, 6.4, 6.5: the value-stream module
-     - 6.6, 7.1, 7.8: the data-product module
-     - 6.7: the market-data module
+   The changes reach these modules: kpi (minor), data-product (minor), value-stream (minor).
+
+   For the Architect: 6.7 is yes. The market-data module needs the KPI's named series, which this form does not collect. Model them in market-data, as the check's routing says.
 
    The route: minor. This is a minor: the changes add content, and the old meaning still holds.
    ...
    ```
 
-5. Apply the proposal. The command works as it does for a term change: it adds the KPI's rows to the `kpi` tables in a temporary copy of the release, rebuilds the module, checks that the difference is exactly the proposal's lines and facts, releases `kpi` and every module that depends on it, rebuilds the catalog, the projection manifest and the KPI intake pack, and runs the checks. Only when every step has passed does it write the release and commit it. It keeps the proposal's lines and facts beside the approval record, as `approvals/NK-2026-001.kgcl` and `approvals/NK-2026-001.facts.csv`. If a step fails, the release is as it was. It took about 80 seconds on a Mac.
+5. Apply the proposal. The command works as it does for a term change, on each module the proposal changes: in a temporary copy of the release it adds the KPI's rows to the `kpi` tables, its population, its value stream links and its view's row, rebuilds `kpi`, `data-product` and `value-stream`, checks that each module's difference is exactly the proposal's lines and facts, releases each changed module at its own minor and gives every module that depends on them a patch, rebuilds the catalog, the projection manifest and the KPI intake pack, and runs the checks. Only when every step has passed does it write the release and commit it. It keeps the proposal's lines and facts beside the approval record, as `approvals/NK-2026-001.kgcl` and `approvals/NK-2026-001.facts.csv`. If a step fails, the release is as it was. It took about 100 seconds on a Mac.
 
    ```powershell run=new-kpi
    python -m kpi_store.apply ../new-kpi/proposals/NK-2026-001
@@ -703,9 +709,12 @@ The commands start in the release folder. Keep the filled form and the proposal 
      NK-2026-001: minor, signed by Data Owner, Domain Owner, Architect
    ...
      kpi 1.3.0 -> 1.4.0
+     data-product 1.2.0 -> 1.3.0
+   ...
+     value-stream 1.2.0 -> 1.3.0
    ...
    ... write the release
-   Done. kpi is now 1.4.0 (minor), and 6 modules that depend on it took a new patch. The apply changed <count> files, and Git committed them.
+   Done. kpi is now 1.4.0, data-product 1.3.0 and value-stream 1.3.0 (minor), and 4 modules that depend on them took a new patch. The apply changed <count> files, and Git committed them.
    Run the full check before you load: bash scripts/check.sh (on Windows, in Git Bash). Then load the stores with the runner: python -m kpi_store.runner
    ```
 
@@ -720,7 +729,7 @@ The commands start in the release folder. Keep the filled form and the proposal 
    ```
 
    ```text expect
-   <commit> Apply the new KPI NK-2026-001: kpi 1.4.0
+   <commit> Apply the new KPI NK-2026-001: kpi 1.4.0, data-product 1.3.0, value-stream 1.3.0
    1.4.0
    sample-spread-margin,OPM-0031
    ```
