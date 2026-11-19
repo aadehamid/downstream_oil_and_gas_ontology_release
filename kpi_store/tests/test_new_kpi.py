@@ -319,6 +319,7 @@ def test_a_failing_step_and_a_builder_error_roll_everything_back(tmp_path):
 def test_the_round_trip_refuses_a_difference_that_neither_file_states(tmp_path):
     root = scratch_release(tmp_path, git_copy=False)
     before = Graph().parse(root / kpi_tables.MEASURES)
+    opm = next_opm(root)
     nm.apply_changes(kgcl.read_lines("\n".join(LINES)), FACTS, root)
     after = Graph().parse(root / kpi_tables.MEASURES)
     lines, facts = nm.compare(before, after)
@@ -335,7 +336,7 @@ def test_the_round_trip_refuses_a_difference_that_neither_file_states(tmp_path):
             (lambda g: g.add((URIRef(nm.iri("measure:unit-utilization")), SKOS.altLabel, Literal("x", lang="en"))), "1 ways"),
             # an identifier off the run
             (lambda g: (g.remove((s, DCTERMS.identifier, None)), g.add((s, DCTERMS.identifier, Literal("OPM-0040", datatype=XSD.string)))),
-             rf"the new OPM identifiers are \[40\], and the run needs \[{next_opm(root)}\]"),
+             rf"the new OPM identifiers are \[40\], and the run needs \[{opm}\]"),
             # no identifier at all
             (lambda g: g.remove((s, DCTERMS.identifier, None)), "needs a OPM-nnnn identifier, not None"),
             # the classification evidence, which every measure cites
