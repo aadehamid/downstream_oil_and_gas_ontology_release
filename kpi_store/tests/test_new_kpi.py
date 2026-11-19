@@ -452,17 +452,30 @@ def test_the_rm_margin_example_cites_a_source_the_form_offers_and_apply_adds_its
 
 MPC = "https://w3id.org/mpc/ontology/source/mpc-s01"
 MPC_TITLE = "Marathon Petroleum Corporation, Form 10-K for the fiscal year ended 2025-12-31"
+# The documents 3.5 offers that the ontology records and kpi/measure-sources.csv may not hold yet, with their titles.
+OFFERED = {"mpc-s01": MPC_TITLE, "mplx-s01": "MPLX LP, Form 10-K for the fiscal year ended 2025-12-31"}
+
+
+def fresh_source(root):
+    """A document of OFFERED that the release's measure-sources.csv does not hold yet: after the guide's examples a
+    release holds some of them."""
+    held = {r["slug"] for r in csv.DictReader((root / kpi_tables.KPI_FOLDER / "measure-sources.csv").open(encoding="utf-8"))}
+    slug = next((s for s in OFFERED if s not in held), None)
+    if slug is None:
+        pytest.skip("the release holds a row for every document these tests may cite")
+    return slug
 
 
 def test_the_round_trip_requires_a_new_source_to_gain_one_type_and_one_title(tmp_path):
     from rdflib.namespace import RDF
     root = scratch_release(tmp_path, git_copy=False)
+    slug = fresh_source(root)
     before = Graph().parse(root / kpi_tables.MEASURES)
-    lines = [line.replace("src:planner-measure-list-2026-10-18", "src:mpc-s01") for line in LINES]
+    lines = [line.replace("src:planner-measure-list-2026-10-18", f"src:{slug}") for line in LINES]
     nm.apply_changes(kgcl.read_lines("\n".join(lines)), FACTS, root)
     after = Graph().parse(root / kpi_tables.MEASURES)
-    src, title = URIRef(MPC), DCTERMS.title
-    assert (src, title, Literal(MPC_TITLE, lang="en")) in after and nm.compare(before, after)[1] == sorted(FACTS)
+    src, title = URIRef(nm.PREFIXES["src"] + slug), DCTERMS.title
+    assert (src, title, Literal(OFFERED[slug], lang="en")) in after and nm.compare(before, after)[1] == sorted(FACTS)
     stray = URIRef(nm.PREFIXES["kind"] + "a-made-up-kind")
     for change, message in (
             (lambda g: g.remove((src, RDF.type, DCTERMS.BibliographicResource)), "lacks .*BibliographicResource"),
@@ -480,12 +493,13 @@ def test_the_round_trip_requires_a_new_source_to_gain_one_type_and_one_title(tmp
 
 def test_a_new_source_whose_slug_is_another_rows_key_is_refused_by_name(tmp_path):
     root = scratch_release(tmp_path, git_copy=False)
+    slug = fresh_source(root)
     path = root / kpi_tables.KPI_FOLDER / "measure-sources.csv"
     with path.open("a", encoding="utf-8", newline="") as f:
-        f.write('mpc-s01,mpc-s01-2024,"A made-up row whose key is the slug of the Form 10-K",\n')
-    lines = [line.replace("src:planner-measure-list-2026-10-18", "src:mpc-s01") for line in LINES]
-    with pytest.raises(ChangeRefused, match="src:mpc-s01 needs a row of kpi/measure-sources.csv under the key mpc-s01, "
-                                            "and the row of src:mpc-s01-2024 holds that key"):
+        f.write(f'{slug},{slug}-2024,"A made-up row whose key is the slug of a document 3.5 offers",\n')
+    lines = [line.replace("src:planner-measure-list-2026-10-18", f"src:{slug}") for line in LINES]
+    with pytest.raises(ChangeRefused, match=f"src:{slug} needs a row of kpi/measure-sources.csv under the key {slug}, "
+                                            f"and the row of src:{slug}-2024 holds that key"):
         nm.check_changes(kgcl.read_lines("\n".join(lines)), FACTS, root)
 
 
