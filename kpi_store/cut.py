@@ -214,12 +214,14 @@ class Outcome:
 # ---------- the module's input tables ----------
 
 class Tables:
-    """The data-product module's pricing tables, the files that build_pricing.py reads."""
+    """A module's input tables, read into memory and written back as CSV. By default the data-product module's
+    pricing tables, the files that build_pricing.py reads; kpi_store/change passes the kpi module's folder and names."""
 
-    def __init__(self, release_root):
+    def __init__(self, release_root, folder=PRICING, names=TABLES):
+        self.folder, self.names = folder, tuple(names)
         self.rows, self.fields = {}, {}
-        for name in TABLES:
-            path = Path(release_root) / PRICING / f"{name}.csv"
+        for name in self.names:
+            path = Path(release_root) / folder / f"{name}.csv"
             try:
                 with path.open(encoding="utf-8", newline="") as f:
                     reader = csv.DictReader(f)
@@ -236,8 +238,8 @@ class Tables:
         return out.getvalue()
 
     def write(self, release_root):
-        for name in TABLES:
-            _write(Path(release_root) / PRICING / f"{name}.csv", self.text(name))
+        for name in self.names:
+            _write(Path(release_root) / self.folder / f"{name}.csv", self.text(name))
 
     def matches(self, full_name):
         """The slugs of the tables that have the full name; when none has, of those that have it under another catalog."""
