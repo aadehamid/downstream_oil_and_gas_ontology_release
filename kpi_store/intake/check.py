@@ -369,7 +369,8 @@ def _reference_item(lists, terms, intake, report):
             elif o.casefold() == name.casefold():
                 lines.append(f'R4: "{o}" is the name of the system, so it cannot be an other name too')
         folded = [o.casefold() for o in others]
-        for o in sorted({o for o in others if folded.count(o.casefold()) > 1}):
+        first = {o.casefold(): o for o in reversed(others)}     # one line per name, in its first spelling
+        for o in sorted(o for key, o in first.items() if folded.count(key) > 1):
             lines.append(f'R4 names "{o}" twice')
     if kind == "table" and name:
         if not FULL_NAME.fullmatch(name):

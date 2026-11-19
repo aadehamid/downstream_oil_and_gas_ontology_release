@@ -125,6 +125,11 @@ def test_the_check_refuses_an_item_that_does_not_fit_the_ontology(answers, block
     assert blocking in r.blocking, r.blocking
 
 
+def test_a_name_given_twice_in_two_cases_is_one_line_of_the_report():
+    r = report(dict(SYSTEM_ANSWERS, R4=["ACS", "acs"]))
+    assert [b for b in r.blocking if "twice" in b] == ['R4 names "ACS" twice']
+
+
 def test_the_check_asks_a_systems_questions_only_for_a_system_and_both_signatures():
     r = report({**TABLE_ANSWERS, "R3": "A definition a table does not take."})
     assert any(b.startswith("R3 has an answer, but its rule says it is not asked") for b in r.blocking)
