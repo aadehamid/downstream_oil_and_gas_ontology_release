@@ -174,6 +174,8 @@ def test_a_measure_typed_into_example_of_does_not_waive_the_match(report_of):
     # A notation that names no measure waives nothing either.
     report = report_of(made_up.intake(change={"2.1": "Tank Turns", "2.2": TURNS_DEFINITION}, example_of="no-such-measure"))
     assert report.blocking == ['the measure "Tank Turns" already has this name']
+    assert '"Example of" holds "no-such-measure", which is not a measure in the ontology' in report.text()
+    assert CHANGED not in report.text()
 
 
 def test_the_same_name_in_another_module_asks_for_enterprise_data_governance(report_of):
