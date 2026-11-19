@@ -210,7 +210,7 @@ def test_the_workbook_has_a_sheet_per_section_dropdowns_and_a_hidden_lists_sheet
     wb = load_workbook(PACK / build.FORM_XLSX)
     assert wb.sheetnames == ["Start", "1 The business area", "2 What the KPI means", "3 The facts about it", "4 Where it belongs",
                              "5 Other names for it", "6 What it connects to", "7 Where the data lives", "Sign-off",
-                             "Domain activation", "Process map request", "Roles", "lists"]
+                             "Domain activation", "Process map request", "Term change", "Roles", "lists"]
     assert wb["lists"].sheet_state == "hidden" and wb["Start"].sheet_state == "visible"
     ws = wb["1 The business area"]
     header = next(row for row in ws.iter_rows(values_only=True) if row[0] == "No.")
@@ -236,7 +236,7 @@ def test_the_workbook_has_a_sheet_per_section_dropdowns_and_a_hidden_lists_sheet
     signers = [row[0] for row in wb["Sign-off"].iter_rows(values_only=True) if str(row[6] or "").startswith("sign:")]
     assert signers == ["Data Owner", "Domain Owner", "Domain Owner", "Architect"]
     roles = [row[0] for row in wb["Roles"].iter_rows(min_row=2, values_only=True)]
-    assert len(roles) == 10 and roles[0] == "Global Process Owner (or a named delegate)"
+    assert len(roles) == 11 and roles[0] == "Global Process Owner (or a named delegate)" and "Ontology Owner" in roles
 
 
 def test_a_filled_workbook_reads_back_as_the_same_answers(cat, committed):
