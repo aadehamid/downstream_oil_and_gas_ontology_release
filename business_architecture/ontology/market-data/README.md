@@ -6,6 +6,7 @@ The `market-data` module defines the published series of the `kpi` module's crac
 |---|---|
 | `regions.csv`, `benchmarks.csv`, `series.csv` | MPC's three refining regions and MPC Economics' six market regions; 24 benchmarks (7 crude markers, 16 product benchmarks, the RVO cost); 15 series, with their legs (13 until 1.1.0 added NYMEX cracks 44934 and 44935) |
 | `market-prices.csv`, `enumerations.csv` | Item F (the decision of 2026-10-25): the 44 named prices of the pricing views (40 new market prices, 4 reused benchmarks), each linked to its measure, and the six series enumerations that name the view columns listing every series |
+| `sources.csv` | The five sources the tables cite: each one's key (the tables' `source` column), the end of its IRI and its title. A new source is a new row here, with no code change (KPI-DEC-0002, Q12). The build fails if a row of another table names a key this table lacks |
 | `vocabulary.ttl`, `shapes.ttl` | Classes (benchmark series, benchmark, leg), properties, the benchmark-kind code list, and shapes: a series has legs, a blend, or is marked legs unstated, exactly one; a series is of one kpi measure; no price on a series, benchmark, leg or region |
 | `build_market_data.py`, `market-data.ttl` | The build. `--verify` fails unless `market-data.ttl` equals a fresh build. `scripts/check.sh` runs it |
 | `test_market_data.py` | Tests: the recipes match MPC Economics', MPC's and CME's wording, the blends, the Price Master IDs, the planner's names resolve to MPC Economics' ex-RIN series, and SHACL rejects broken series |

@@ -93,7 +93,7 @@ class Build(unittest.TestCase):
         # The decision owner named the list's source (the review comments of a subject matter expert reviewing the documents); the source keeps its IRI.
         from rdflib.namespace import DCTERMS
         g = Graph().parse(os.path.join(HERE, "measures.ttl"))
-        src = bm.SOURCES["planner list"]
+        src = bm.SRC[{r["key"]: r["slug"] for r in bm.read_csv(bm.SOURCE_TABLE)}["planner list"]]
         self.assertEqual(str(src), "https://w3id.org/mpc/ontology/source/planner-measure-list-2026-10-18")
         self.assertIn("Value Chain Optimization Decision Support and Visualization (VCO DSV)", str(g.value(src, DCTERMS.title)))
         self.assertEqual(g.value(src, DCTERMS.alternative), Literal("VCO DSV", lang="en"))
@@ -116,7 +116,7 @@ class Build(unittest.TestCase):
             self.assertEqual(MEASURES.value(iri, KPI.kpiCandidate).toPython(), r["kpi_candidate"] == "yes")
 
     def test_the_figures(self):
-        _rows, details, personas, _labels, _procs = bm.load()
+        _rows, details, personas, _labels, _procs, _sources = bm.load()
         f = bm.figures(_rows, details, personas)
         self.assertEqual((f["kpi"], f["operational-metric"], f["plan-variance-diagnostic"], f["market-indicator"],
                           f["decision-support-indicator"], f["tracker-or-report"], f["alert"], f["not-a-measure"]),
@@ -208,6 +208,83 @@ class Release130(unittest.TestCase):
                 self.assertIn(message, str(caught.exception), measure)
             finally:
                 os.unlink(t.name)
+
+
+class Tables(unittest.TestCase):
+    """A new source or note is a row in a table, with no change to build_measures.py (KPI-DEC-0002, Q12)."""
+
+    def with_rows(self, constant, extra):
+        """Build with the table that `constant` names extended by `extra` rows, in a temporary copy."""
+        import tempfile
+        from unittest import mock
+        path = getattr(bm, constant)
+        with open(path, newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            fields, table = reader.fieldnames, list(reader)
+        with tempfile.TemporaryDirectory() as d:
+            copy = os.path.join(d, os.path.basename(path))
+            with open(copy, "w", newline="", encoding="utf-8") as f:
+                w = csv.DictWriter(f, fieldnames=fields, lineterminator="\n")
+                w.writeheader()
+                w.writerows(table + extra)
+            with mock.patch.object(bm, constant, copy):
+                return bm.build(*bm.load())
+
+    def edited_classification(self, measure, source):
+        """The classification table with one measure's source changed, as a temporary file's path."""
+        import tempfile
+        table = rows()
+        for r in table:
+            if r["measure_id"] == measure:
+                r["source"] = source
+        t = tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False, newline="", encoding="utf-8")
+        with t:
+            w = csv.DictWriter(t, fieldnames=list(table[0].keys()), lineterminator="\n")
+            w.writeheader()
+            w.writerows(table)
+        self.addCleanup(os.unlink, t.name)
+        return t.name
+
+    def test_a_new_source_is_one_row(self):
+        from unittest import mock
+        from rdflib.namespace import DCTERMS
+        source = {"key": "peer", "slug": "valero-fy2025-10k", "title": "Valero FY2025 Form 10-K", "short_name": ""}
+        with mock.patch.object(bm, "CLASSIFICATION", self.edited_classification("crude-utilization", "peer")):
+            g = self.with_rows("SOURCE_TABLE", [source])
+        iri = URIRef("https://w3id.org/mpc/ontology/source/valero-fy2025-10k")
+        self.assertEqual(g.value(iri, DCTERMS.title), Literal("Valero FY2025 Form 10-K", lang="en"))
+        self.assertIn(iri, set(g.objects(MEASURE["crude-utilization"], DCTERMS.source)))
+        self.assertIsNone(g.value(iri, DCTERMS.alternative))
+
+    def test_a_new_change_note_is_one_row(self):
+        note = "kpi 1.4.0 (2026-11-18): a test note (the decision of 2026-11-18)."
+        g = self.with_rows("CHANGE_NOTE_TABLE", [{"measure_id": "crude-utilization", "note": note}])
+        self.assertEqual(set(g.objects(MEASURE["crude-utilization"], SKOS.changeNote)), {Literal(note, lang="en")})
+        # The note already in the table stays on its measure.
+        self.assertEqual(len(list(g.objects(MEASURE["additional-market-prices"], SKOS.changeNote))), 1)
+
+    def test_a_new_identifier_note_is_one_row(self):
+        note = "A test note on this measure's identifier."
+        g = self.with_rows("IDENTIFIER_NOTE_TABLE", [{"measure_id": "crude-utilization", "note": note}])
+        self.assertEqual(set(g.objects(MEASURE["crude-utilization"], SKOS.note)), {Literal(note, lang="en")})
+
+    def test_a_row_naming_an_unknown_measure_or_source_fails(self):
+        from unittest import mock
+        cases = (("CHANGE_NOTE_TABLE", {"measure_id": "no-such-measure", "note": "x"},
+                  "change-notes.csv: 'no-such-measure' is not a measure"),
+                 ("IDENTIFIER_NOTE_TABLE", {"measure_id": "no-such-measure", "note": "x"},
+                  "identifier-notes.csv: 'no-such-measure' is not a measure"),
+                 ("CHANGE_NOTE_TABLE", {"measure_id": "crude-utilization", "note": ""}, "has an empty note"),
+                 ("SOURCE_TABLE", {"key": "MPC", "slug": "x", "title": "x", "short_name": ""},
+                  "measure-sources.csv lists 'MPC' 2 times"))
+        for constant, row, message in cases:
+            with self.assertRaises(SystemExit) as caught:
+                self.with_rows(constant, [row])
+            self.assertIn(message, str(caught.exception), constant)
+        with mock.patch.object(bm, "CLASSIFICATION", self.edited_classification("crude-utilization", "peer")), \
+                self.assertRaises(SystemExit) as caught:
+            bm.load()
+        self.assertIn("crude-utilization: unknown source 'peer', which is not in measure-sources.csv", str(caught.exception))
 
 
 class Shapes(unittest.TestCase):

@@ -1,0 +1,8 @@
+key,title
+decision-owner-pricing-assets-2026-10-25,"the subject matter expert's Databricks pricing metric views, their lineage and the Genie agents' instructions (idp_sbx sandbox), shared on 2026-10-25 (the decision of 2026-10-25)"
+dehghani-data-mesh-2019,"Z. Dehghani, How to Move Beyond a Monolithic Data Lake to a Distributed Data Mesh, martinfowler.com, 20 May 2019, https://martinfowler.com/articles/data-monolith-to-mesh.html"
+datamesh-architecture-innoq,"L. Visengeriyeva, J. Christ and S. Harrer (INNOQ), Data Mesh Architecture, https://www.datamesh-architecture.com/, retrieved 2026-10-25"
+databricks-medallion-architecture,"Databricks, What is the medallion lakehouse architecture?, updated 2026-09-11, https://docs.databricks.com/aws/en/lakehouse/medallion"
+purview-data-products,"Microsoft Purview, Create and manage data products, updated 2026-09-09, https://learn.microsoft.com/en-us/purview/unified-catalog-data-products-create-manage"
+odps-4-0,"Linux Foundation, Open Data Product Standard 4.0, released 2025-07-24, https://opendataproducts.org/v4.0/"
+w3c-prov-o,"W3C, PROV-O: The PROV Ontology, W3C Recommendation, 30 April 2013, https://www.w3.org/TR/prov-o/"

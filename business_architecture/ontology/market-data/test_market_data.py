@@ -4,10 +4,14 @@ treatment is a different series, and SHACL accepts the module and rejects broken
 
 Run: python3 -m pytest test_market_data.py (needs rdflib, pyshacl).
 """
+import csv
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
+from unittest import mock
 
 from pyshacl import validate
 from rdflib import Graph, Literal, URIRef
@@ -135,6 +139,51 @@ class Build(unittest.TestCase):
         self.assertEqual(set(DATA.subjects(SKOS.altLabel, Literal("NYMEX 3-2-1", lang="en"))), {SERIES["crack-nymex-3-2-1"]})
 
 
+class Tables(unittest.TestCase):
+    """A new source is a row in sources.csv, with no change to build_market_data.py (KPI-DEC-0002, Q12)."""
+
+    def build_with(self, edit):
+        """Build from a temporary copy of the module's tables after edit(folder) changes them."""
+        with tempfile.TemporaryDirectory() as d:
+            for name in os.listdir(HERE):
+                if name.endswith(".csv"):
+                    shutil.copy(os.path.join(HERE, name), d)
+            edit(d)
+            with mock.patch.object(bm, "HERE", d):
+                return bm.build(*bm.load())
+
+    @staticmethod
+    def append(folder, name, row):
+        with open(os.path.join(folder, name), newline="", encoding="utf-8") as f:
+            fields = csv.DictReader(f).fieldnames
+        with open(os.path.join(folder, name), "a", newline="", encoding="utf-8") as f:
+            csv.DictWriter(f, fieldnames=fields, lineterminator="\n").writerow(row)
+
+    def test_a_new_source_is_one_row(self):
+        def edit(d):
+            self.append(d, "sources.csv", {"key": "ARGUS", "slug": "argus-crack-spreads-2026", "title": "Argus, a test title"})
+            self.append(d, "benchmarks.csv", {"slug": "test-crude", "label": "Test crude", "kind": "crude-marker",
+                                              "region": "", "definition": "A test crude marker.", "source": "ARGUS", "mpr": ""})
+        g = self.build_with(edit)
+        src = URIRef("https://w3id.org/mpc/ontology/source/argus-crack-spreads-2026")
+        dcterms = "http://purl.org/dc/terms/"
+        self.assertEqual(g.value(src, URIRef(dcterms + "title")), Literal("Argus, a test title", lang="en"))
+        self.assertEqual(g.value(BENCH["test-crude"], URIRef(dcterms + "source")), src)
+
+    def test_a_row_naming_an_unknown_source_fails(self):
+        def edit(d):
+            self.append(d, "benchmarks.csv", {"slug": "test-crude", "label": "Test crude", "kind": "crude-marker",
+                                              "region": "", "definition": "A test crude marker.", "source": "ARGUS", "mpr": ""})
+        with self.assertRaises(SystemExit) as caught:
+            self.build_with(edit)
+        self.assertIn("benchmark test-crude: unknown source 'ARGUS', which is not in sources.csv", str(caught.exception))
+
+    def test_a_source_listed_twice_fails(self):
+        with self.assertRaises(SystemExit) as caught:
+            self.build_with(lambda d: self.append(d, "sources.csv", {"key": "MPC-S01", "slug": "x", "title": "x"}))
+        self.assertIn("sources.csv lists 'MPC-S01' 2 times", str(caught.exception))
+
+
 class Shapes(unittest.TestCase):
     def test_module_conforms(self):
         self.assertTrue(conforms(DATA))
@@ -170,7 +219,7 @@ class Shapes(unittest.TestCase):
     def test_shared_source_keeps_one_title(self):
         # src:mpc-performance-measures-evidence is also declared by the kpi module.
         kpi = Graph().parse(bm.MEASURES)
-        src = bm.SOURCES["MPC-S01"][0]
+        src = bm.read_sources()[0]["MPC-S01"][0]
         both = set(DATA.objects(src, URIRef("http://purl.org/dc/terms/title"))) | set(kpi.objects(src, URIRef("http://purl.org/dc/terms/title")))
         self.assertEqual(len(both), 1, both)
 
