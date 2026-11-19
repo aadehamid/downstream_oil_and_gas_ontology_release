@@ -194,8 +194,20 @@ def apply_csv_decisions(report, csv_path):
     """The report with the decision, decided_by and note of each row taken from a cleared CSV, matched by ID. The
     CSV may be the one a person edited in a spreadsheet. A row ID the report does not have raises ReportError."""
     # utf-8-sig: a spreadsheet may save the file with a byte-order mark in front of the first column's name.
-    with Path(csv_path).open(encoding="utf-8-sig", newline="") as f:
-        cleared = {r["id"]: r for r in csv.DictReader(f)}
+    try:
+        with Path(csv_path).open(encoding="utf-8-sig", newline="") as f:
+            read = list(csv.DictReader(f))
+    except UnicodeDecodeError:   # a spreadsheet saved the file in the machine's own encoding
+        raise ReportError(f"save {csv_path} as UTF-8: in Excel choose File, Save As, and the file type \"CSV UTF-8 "
+                          "(Comma delimited)\"; then run the same command again") from None
+    ids = [r["id"] for r in read]   # a CSV with no id column raises KeyError, as before
+    if not all(ids):
+        raise ReportError(f"a row of {csv_path} has no ID. Delete empty rows, keep the report's rows as they are, and "
+                          "run the same command again")
+    twice = sorted({i for i in ids if ids.count(i) > 1})
+    if twice:   # the later copy would silently replace the earlier one's decision
+        raise ReportError(f"the CSV holds a row ID more than once: {', '.join(twice)}. Keep one copy of each row")
+    cleared = {r["id"]: r for r in read}
     unknown = sorted(set(cleared) - {r["id"] for r in report["rows"]})
     if unknown:
         raise ReportError(f"the CSV holds row IDs the report does not have: {', '.join(unknown)}")
