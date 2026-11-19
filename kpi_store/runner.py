@@ -888,7 +888,7 @@ def selected(only=None, start=None, skip=()):
     names = list(STEPS)
     if start:
         names = names[names.index(start):]
-    if only:
+    if only is not None:   # an empty list selects no step; it never means "every step"
         names = [n for n in names if n in only]
     return [n for n in names if n not in skip]
 
@@ -938,10 +938,13 @@ def newest_run(run_root):
     return runs[-1] if runs else None
 
 
-def step_list(text, known=STEPS, what="step"):
+def step_list(text, known=STEPS, what="step", allow_empty=True):
     """Reads the value of --only or --skip: names with commas between them. An unknown name is an error. The names
-    are steps, or stores when the command is a reset."""
+    are steps, or stores when the command is a reset. --only reads with allow_empty=False: an empty value, such as a
+    script's unset variable, is an error rather than a run of every step."""
     names = [n for n in (text or "").split(",") if n]
+    if not names and not allow_empty:
+        raise argparse.ArgumentTypeError(f"--only names no {what}; give at least one of: {', '.join(known)}")
     unknown = [n for n in names if n not in known]
     if unknown:
         raise argparse.ArgumentTypeError(f"unknown {what} {unknown[0]}; the {what}s are {', '.join(known)}")
@@ -981,7 +984,7 @@ def main(argv=None, **context_options):
         ap.error("--yes belongs to --reset")
     try:
         known, what = (reset.STORES, "store") if args.reset else (STEPS, "step")
-        args.only = step_list(args.only, known, what) if args.only is not None else None
+        args.only = step_list(args.only, known, what, allow_empty=False) if args.only is not None else None
         args.skip = step_list(args.skip, known, what)
     except argparse.ArgumentTypeError as err:
         ap.error(str(err))

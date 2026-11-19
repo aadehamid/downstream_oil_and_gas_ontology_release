@@ -79,6 +79,25 @@ def test_the_steps_run_in_this_order():
         runner.step_list("zipp")
 
 
+def test_an_empty_only_runs_no_step_and_the_command_refuses_it(setup, capsys):
+    # An --only with an empty value, such as a batch file's unset variable, ran every step.
+    assert runner.selected(only=[]) == []
+    assert runner.step_list("", allow_empty=True) == []
+    with pytest.raises(Exception, match="--only names no step"):
+        runner.step_list("", allow_empty=False)
+    with pytest.raises(Exception, match="--only names no step"):
+        runner.step_list(",", allow_empty=False)
+    for value in ("", ","):
+        with pytest.raises(SystemExit) as stop:
+            runner.main(["--stores", str(setup.local.path), "--release", str(setup.root), "--only", value])
+        assert stop.value.code == 2
+        assert "--only names no step" in capsys.readouterr().err
+    with pytest.raises(SystemExit) as stop:
+        runner.main(["--stores", str(setup.local.path), "--release", str(setup.root), "--reset", "--only", ""])
+    assert stop.value.code == 2
+    assert "--only names no store" in capsys.readouterr().err
+
+
 def test_run_ids_are_utc_times_and_the_newest_is_found(tmp_path):
     assert runner.new_run_id(dt.datetime(2026, 11, 11, 12, 0, 0, tzinfo=dt.timezone.utc)) == RUN
     assert runner.newest_run(tmp_path / "none") is None
