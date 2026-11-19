@@ -249,12 +249,12 @@ def test_apply_refuses_a_new_kpi_with_a_reference_item_as_two_modules(tmp_path):
 
 def test_a_facts_file_that_is_not_csv_is_refused_in_plain_words(tmp_path, capsys):
     # A field longer than the csv module's limit (131,072 characters); Python 3.11 and later read a NUL byte.
-    folder = _write(tmp_path / "nul", LINES, FACTS)
+    folder = _write(tmp_path / "long-field", LINES, FACTS)
     (folder / "facts.csv").write_text(f"measure,property,value\nmeasure:x,kpi:grain,{'a' * 200_000}\n", encoding="utf-8")
-    with pytest.raises(ChangeRefused, match="the proposal nul: facts.csv cannot be read"):
+    with pytest.raises(ChangeRefused, match="the proposal long-field: facts.csv cannot be read"):
         proposal.read(folder)
     assert apply_cmd.main([str(folder), "--release", str(ROOT)]) == 1
-    assert capsys.readouterr().err.startswith("Not applied: the proposal nul: facts.csv cannot be read")
+    assert capsys.readouterr().err.startswith("Not applied: the proposal long-field: facts.csv cannot be read")
 
 
 def test_apply_refuses_a_new_kpi_with_a_term_change_stray_facts_and_the_same_kpi_twice(tmp_path):
