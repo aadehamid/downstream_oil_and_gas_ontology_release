@@ -384,6 +384,21 @@ def test_settings_that_name_the_enterprise_database_are_refused_when_enterprise_
     assert ln.same_address(one("bolt://127.0.0.1:7687"), one("neo4j://LOCALHOST", "NEO4J"))
     assert not ln.same_address(one("bolt://127.0.0.1:7687"), one("bolt://127.0.0.1:7688"))
     assert not ln.same_address(one("bolt://127.0.0.1:7687"), one("bolt://127.0.0.1:7687", "kpi"))
+    # An address that cannot be read names no server, so two of them never match.
+    assert not ln.same_address(one("localhost:7687"), one("enterprise.example:7687"))
+    assert not ln.same_address(one("bolt://localhost:abc"), one("bolt://127.0.0.1:xyz"))
+    # A load report from an earlier run makes no difference: the settings are refused before anything connects.
+    (tmp_path / "same" / "lpg-out").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "same" / "lpg-out" / ln.REPORT).write_text("{}", encoding="utf-8")
+    with pytest.raises(ln.LoadError, match=r"^\[neo4j.local\] names the Enterprise database"):
+        ln.load(same, support.ROOT, tmp_path / "run", code=stub_code(calls), connect=unreachable)
+
+
+def test_two_unreadable_database_ids_do_not_count_as_one_database(tmp_path, local):
+    calls, db = [], stores_support.FakeNeo4j(ident=None)
+    other = stores_support.FakeNeo4j("businessprocessarchitecturegraph", ident=None)
+    connect = lambda neo4j: stores_support.FakeDriver({"neo4j": db, "businessprocessarchitecturegraph": other})  # noqa: E731
+    ln.check_local_database(local, stub_code(calls), connect)   # an empty database with no readable ID: no refusal
 
 
 def test_the_command_refuses_bad_settings_before_anything_else(tmp_path, capsys):
