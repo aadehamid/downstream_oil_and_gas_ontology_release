@@ -166,7 +166,7 @@ def test_the_page_is_one_offline_file_with_lf_line_ends():
     assert "fetch(" not in text and "XMLHttpRequest" not in text
     assert "<pre" not in text                               # the document check would read a <pre> as a command
     data = json.loads(text.split('<script id="intake-data" type="application/json">')[1].split("</script>")[0])
-    assert list(data["forms"]) == ["kpi-intake", "domain-activation", "process-map-request"]
+    assert list(data["forms"]) == ["kpi-intake", "domain-activation", "process-map-request", "term-change"]
     assert data["release"] == "KPI Store 1.1" and data["catalogue_version"] == "1.2"
     assert len(data["questions"]) == 73 and data["lists"]["processes"]
     assert data["guide"] == "how-to-use-the-form.html" and (PACK / data["guide"]).is_file()     # the guide, beside the form

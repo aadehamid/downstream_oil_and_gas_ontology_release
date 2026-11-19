@@ -2,7 +2,7 @@
 
 Start here when the business wants a new KPI in the KPI Store. The pack holds the form that collects what the ontology needs for one KPI, a check that says whether a filled form is complete, and two filled examples.
 
-The pack does not change the ontology. A complete, signed form goes to the Architect, who adds the KPI by hand with the release steps of [`HOW-TO-UPDATE.md`](../HOW-TO-UPDATE.md). Commands that propose and apply the change from a form are planned for a later release.
+The pack does not change the ontology. A complete, signed KPI form goes to the Architect, who adds the KPI by hand with the release steps of [`HOW-TO-UPDATE.md`](../HOW-TO-UPDATE.md). A complete, signed term change, for a measure the ontology already holds, goes through two commands, propose and apply, and nobody edits a file: "The term change" below says how. Commands for a new KPI are planned for a later step.
 
 ## What is in this folder
 
@@ -219,7 +219,30 @@ The blank form has eight required questions and two signatures, so the check lis
 
 When a domain activation is signed, set that domain to `active = true` in `settings.toml` and rebuild the forms. The KPI form can then go on. This step is the analyst's. The form keeps it out of the notice that the business reads, under "For the analyst".
 
+## The term change
+
+The fourth form changes a measure the ontology already holds. It is the "Term change" tab of the HTML form and the "Term change" sheet of the workbook, and it saves to its own answers file, `<measure>.term-change.json`. A new KPI uses the KPI form instead.
+
+| No. | Question | Rule |
+|---|---|---|
+| T1 | Which measure do you want to change? (a list of the ontology's measures) | Required |
+| T2 | What should the measure be called from now on? | Optional |
+| T3 | What should its definition say from now on? | Optional |
+| T4 | Which other names should it gain? | Optional |
+| T5 | Which of its other names should it lose? | Optional |
+| T6 | Which processes should the measure be linked to, in addition to the ones it has? (a list of the processes) | Optional |
+| T7 | Which processes should the measure no longer be linked to? (a list of the processes) | Optional |
+| T8 | Would every report and answer that used the old meaning still be correct? (yes, no, not sure) | Required |
+
+The check refuses a term change that asks for no change, and a change that does not fit the measure: a new name or definition that is the one it has, an other name it has already, or an other name to remove that it does not have.
+
+Who signs: the Data Owner, then the Architect, last. When the answer to T8 is "no" or "not sure", the change is a major, and the Ontology Owner signs too. The propose command copies each signature into the proposal's approval record, with the words the signature means on the form.
+
+Check a term change as any other form: `python -m kpi_store.intake check <the file>`. Then the Architect turns it into a proposal and applies it, with the steps of "Change a measure with the term-change form" in [`HOW-TO-UPDATE.md`](../HOW-TO-UPDATE.md). Keep the filled form and its proposal in a folder outside the release folder.
+
 ## What happens after
+
+For a KPI form:
 
 1. The Architect reads [`for-the-architect.md`](for-the-architect.md), which says what each answer feeds.
 2. The Architect adds the KPI to the `kpi` module's tables and follows "The release steps" in [`HOW-TO-UPDATE.md`](../HOW-TO-UPDATE.md). A KPI with a value stream step, a new view or a new source document also needs a release of `value-stream`, `data-product` or `integration`.
@@ -385,5 +408,5 @@ intake  18 added       pass
 intake  19 new fields  pass
 intake  20 guide       pass
 intake  21 alias       pass
-the intake form passed all 21 proofs
+the intake form passed all 22 proofs
 ```

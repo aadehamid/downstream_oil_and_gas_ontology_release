@@ -193,9 +193,9 @@ a[data-state="routed"] progress::-moz-progress-bar { background: var(--stop-line
 .tabs button:focus-visible { outline-offset: -4px; }
 .tabs button[aria-selected="true"] { color: var(--ink); }
 .tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 5px; height: 2px; background: var(--ink); }
-/* Three groups: the KPI form, the two smaller forms an answer can route to, and the two pages to read. */
-.tabs [data-view="domain-activation"], .tabs [data-view="roles"] { margin-left: 21px; }
-.tabs [data-view="domain-activation"]::before, .tabs [data-view="roles"]::before { content: ""; position: absolute; left: -11px; top: 12px; bottom: 12px; width: 1px; background: var(--control); }
+/* Four groups: the KPI form, the two smaller forms an answer can route to, the term change, and the two pages to read. */
+.tabs [data-view="domain-activation"], .tabs [data-view="term-change"], .tabs [data-view="roles"] { margin-left: 21px; }
+.tabs [data-view="domain-activation"]::before, .tabs [data-view="term-change"]::before, .tabs [data-view="roles"]::before { content: ""; position: absolute; left: -11px; top: 12px; bottom: 12px; width: 1px; background: var(--control); }
 
 .view { min-width: 0; min-height: calc(100vh - var(--bar) - var(--inset)); padding: 32px var(--pad) 56px; border: 1px solid var(--border); border-radius: var(--radius-sheet); background: var(--surface); }
 .view > * { max-width: var(--measure); margin-inline: auto; }
@@ -370,8 +370,8 @@ td:last-child, th:last-child { padding-right: 0; }
   .signer { grid-template-columns: minmax(0, 1fr); align-items: start; }
   .tabs button { padding: 0 9px; }
   .tabs button[aria-selected="true"]::after { left: 9px; right: 9px; }
-  .tabs [data-view="domain-activation"], .tabs [data-view="roles"] { margin-left: 17px; }
-  .tabs [data-view="domain-activation"]::before, .tabs [data-view="roles"]::before { left: -9px; }
+  .tabs [data-view="domain-activation"], .tabs [data-view="term-change"], .tabs [data-view="roles"] { margin-left: 17px; }
+  .tabs [data-view="domain-activation"]::before, .tabs [data-view="term-change"]::before, .tabs [data-view="roles"]::before { left: -9px; }
 }
 
 /* ---- A phone, a narrow window or a zoomed page: the frame folds into a view selector and a Sections button ------------- */
@@ -828,7 +828,7 @@ function partsProblem(held) {
 function fileProblem(data) {
   if (!isObject(data)) return "it is not a JSON object";
   if (data.format !== 1) return 'its "format" is not 1';
-  if (!FORMS.includes(data.form)) return 'its "form" names none of the three forms';
+  if (!FORMS.includes(data.form)) return 'its "form" names none of the four forms';
   return partsProblem(data);
 }
 function saveDraft() {
@@ -1098,6 +1098,7 @@ function drawForm(form) {
   intro.querySelector(".intro-title").textContent = DATA.forms[form];
   intro.querySelector(".intro-text").textContent = form === FORMS[0]
     ? "One form is for one KPI. Sections 1 to 6 are for the business. Section 7 is for Digital IT, after the business has signed. Save the answers to a file when you stop, and load the file to go on."
+    : form === "term-change" ? "Use this form to change a measure the ontology already holds. Save it to its own file."
     : "Fill in this form only when the KPI form sends you here. Save it to its own file.";
   const requestBox = intro.querySelector('[data-part="request"]');
   // The request details stay open while they are empty. Once filled, they close to one line.
@@ -1158,14 +1159,15 @@ function drawForm(form) {
     const node = clone("tpl-signer");
     node.dataset.signer = signer.id;
     node.querySelector(".signer-role").textContent = DATA.roles.find((r) => r.id === signer.role).short;
-    node.querySelector(".signer-meaning").textContent = `"${form === "domain-activation" && signer.activation_meaning ? signer.activation_meaning : signer.meaning}"`;
+    node.querySelector(".signer-meaning").textContent = `"${meaningOf(signer, form)}"`;
     node.querySelector(".signer-required").textContent = "Required: " + signer.required;
-    // A signature that only a conflict calls for says so, until the check has found one.
-    const needed = isNeeded(signer, form);
+    // A signature that only a conflict calls for says so, until the check has found one. One that only an answer
+    // calls for says when it is needed, and refresh() shows it as required once the answer is given.
+    const needed = isNeeded(signer, form, held.answers);
     node.querySelector(".signer-label").textContent = form === FORMS[0] ? SIGNER_LABELS[signer.id] || "" : "";
     node.querySelector(".signer-required").hidden = !needed;
     node.querySelector(".signer-status").hidden = needed;
-    node.querySelector(".signer-status").textContent = "Only if the check finds a conflicting definition";
+    node.querySelector(".signer-status").textContent = signer.when === "answer" ? signer.required : "Only if the check finds a conflicting definition";
     node.querySelectorAll("[data-sign]").forEach((input) => {
       const key = input.dataset.sign;
       input.id = `sign-${signer.id}-${key}`;
@@ -1239,8 +1241,17 @@ function routeNotice(box, hit) {
     consult ? { reviewers: consult.who.split(/,\s*|\s+and\s+/).filter(Boolean), open: "Go to the sign-off block", go: goToSignoff } : {});
 }
 function goToSignoff() { $("signoff").scrollIntoView(); $("signoff").querySelector("[data-consult]").focus({ preventScroll: true }); }
-// A signature is needed for every KPI, or only when the check finds a conflict. A smaller form needs each of its own.
-function isNeeded(signer, form) { return signer.when === "always" || form !== FORMS[0]; }
+// A signature is needed for every KPI, or only when the check finds a conflict. A smaller form needs each of its
+// own, except one that only an answer calls for: the Ontology Owner signs a term change only when it is major.
+function isNeeded(signer, form, answers) {
+  if (signer.when === "answer") return signer.answers.some((a) => values(answers || {}, signer.answer_of).includes(a));
+  return signer.when === "always" || form !== FORMS[0];
+}
+// What a signature means on this form: a domain activation and a term change may give a signer its own words.
+function meaningOf(signer, form) {
+  const own = { "domain-activation": signer.activation_meaning, "term-change": signer.change_meaning }[form];
+  return own || signer.meaning;
+}
 function left(count) { return count ? `${count} required ${count === 1 ? "answer" : "answers"} left` : "Required answers complete"; }
 function refresh() {
   if (!FORMS.includes(view)) return;
@@ -1339,8 +1350,16 @@ function refresh() {
   // module defines the KPI's name differently. The page holds those names and whether each has a definition, and
   // not the definitions. So when both definitions are there, that signature counts until the check has run, though
   // the check may then find the two equal. Otherwise it is named apart.
-  const conflict = signers.filter((s) => !isNeeded(s, view));
-  const needed = mayConflict ? signers : signers.filter((s) => isNeeded(s, view));
+  const byAnswer = signers.filter((s) => s.when === "answer");
+  const conflict = signers.filter((s) => s.when !== "answer" && !isNeeded(s, view, answers));
+  const needed = (mayConflict ? signers.filter((s) => s.when !== "answer") : signers.filter((s) => s.when !== "answer" && isNeeded(s, view, answers)))
+    .concat(byAnswer.filter((s) => isNeeded(s, view, answers)));
+  for (const s of byAnswer) {
+    const node = document.querySelector(`[data-signer="${s.id}"]`);
+    if (!node) continue;
+    node.querySelector(".signer-required").hidden = !isNeeded(s, view, answers);
+    node.querySelector(".signer-status").hidden = isNeeded(s, view, answers);
+  }
   const signed = needed.filter(isSigned).length;
   for (const s of conflict) {
     const status = document.querySelector(`[data-signer="${s.id}"] .signer-status`);
@@ -1413,11 +1432,18 @@ function asFile(form) {
   const pick = (map, keys) => Object.fromEntries(Object.entries(map).filter(([, v]) => keys.some((k) => (v[k] || "").trim())).map(([id, v]) => [id, Object.fromEntries(keys.map((k) => [k, (v[k] || "").trim()]))]));
   return {
     format: 1, form, catalogue_version: DATA.catalogue_version,
-    kpi_name: form === FORMS[0] ? (values(answers, first)[0] || "") : values(answers, first).join("; "),
+    kpi_name: form === FORMS[0] ? (values(answers, first)[0] || "") : values(answers, first).map((v) => labelOf(questionsOf(form)[0], v)).join("; "),
     request: Object.fromEntries(DATA.request_fields.map((f) => [f.id, (held.request[f.id] || "").trim()])),
     answers, sign_offs: pick(held.sign_offs, ["name", "date"]), consulted: pick(held.consulted, ["date", "outcome"]),
     example_of: held.example_of || "", comment: held.comment || "",
   };
+}
+// The label of a chosen item, or the value itself when the question is not a choice: a term change names its file
+// after the measure's name, not its IRI.
+function labelOf(q, value) {
+  if (!isChoice(q)) return value;
+  const item = optionsOf(q, {}, false).find((o) => o.id === value);
+  return item ? item.label : value;
 }
 function fileName(data) {
   const slug = (data.kpi_name || "untitled").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "untitled";

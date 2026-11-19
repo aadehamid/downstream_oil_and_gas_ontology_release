@@ -25,9 +25,10 @@ def changed(tmp_path, old, new, file="catalogue.toml", count=1):
 def test_the_catalogue_holds_the_approved_questions(cat):
     # Written by hand from the approved list: 34 business questions in six sections, plus the topic question and
     # the two domain questions the owner added; 9 for Digital IT; then the two smaller forms. Catalogue 1.1 added
-    # ten questions for the seven field groups: 2.5, 3.8 to 3.13, 6.8, 6.9 and 7.10.
+    # ten questions for the seven field groups: 2.5, 3.8 to 3.13, 6.8, 6.9 and 7.10. KPI Store 1.2 added the term
+    # change (KPI-DEC-0002, Q10 form 4): the measure, six changes and the compatibility question of Q5.
     per_section = {s["id"]: len(cat.questions_of(section=s["id"])) for s in cat.sections}
-    assert per_section == {"1": 6, "2": 5, "3": 13, "4": 9, "5": 4, "6": 9, "7": 10, "D": 10, "P": 7}
+    assert per_section == {"1": 6, "2": 5, "3": 13, "4": 9, "5": 4, "6": 9, "7": 10, "D": 10, "P": 7, "T": 8}
     assert cat.version == "1.2"      # 1.1 added the ten questions; 1.2 reworded them
     assert [s["name"] for s in cat.sections][:7] == [
         "The business area", "What the KPI means", "The facts about it", "Where it belongs", "Other names for it",
@@ -39,7 +40,7 @@ def test_the_catalogue_holds_the_approved_questions(cat):
 
 def test_every_question_id_is_unique_and_every_rule_names_a_question(cat):
     ids = [q["id"] for q in cat.questions]
-    assert len(ids) == len(set(ids)) == 73
+    assert len(ids) == len(set(ids)) == 81
     for q in cat.questions:
         for cond in q.get("ask_when", []):
             assert cond["question"] in cat.by_id, q["id"]
@@ -49,12 +50,13 @@ def test_every_question_id_is_unique_and_every_rule_names_a_question(cat):
 
 
 def test_the_role_titles_and_definitions_are_the_approved_ones(cat):
-    # Two of the ten, copied by hand from the approved role table.
+    # Two of the ten, copied by hand from the approved role table, and the Ontology Owner, who signs a major term change.
     assert cat.roles["data-owner"]["definition"] == \
         "Data Owners are accountable for a specific subset of the domains data. Approves definitions, access, and quality targets."
     assert cat.roles["global-process-owner"]["title"] == "Global Process Owner (or a named delegate)"
     assert list(cat.roles) == ["global-process-owner", "domain-owner", "data-owner", "data-product-owner", "data-steward",
-                               "digital-it", "enterprise-data-governance", "business-analyst", "program-manager", "architect"]
+                               "digital-it", "enterprise-data-governance", "business-analyst", "program-manager", "architect",
+                               "ontology-owner"]
 
 
 def test_every_required_fact_has_a_question_or_is_derived(cat):

@@ -77,12 +77,30 @@ def _process_index(root):
     return index, notation
 
 
+def check_changes(changes, release_root):
+    """Raises ChangeRefused when any change does not fit the kpi tables of the release, read in order as
+    apply_changes reads them. Writes nothing and runs no builder: the propose command calls it on the real release."""
+    _edit(changes, Path(release_root).resolve())
+
+
 def apply_changes(changes, release_root):
     """Writes the changes into the kpi tables of a scratch copy of the release, in order, and rebuilds measures.ttl
     with the module's builder. Returns the path of the rebuilt measures.ttl. Raises ChangeRefused, and writes
     nothing, when any change does not fit the tables. When the builder refuses the changed tables, they stay
     written in the scratch copy, and ChangeRefused carries the builder's message."""
     root = Path(release_root).resolve()
+    tables = _edit(changes, root)
+    tables.write(root)
+    try:
+        cut._run("rebuild the kpi module", [BUILDER, "--write"], root / KPI_FOLDER)
+    except cut.CutFailed as err:
+        raise ChangeRefused(f"the kpi builder refused the changed tables: {err}") from None
+    return root / MEASURES
+
+
+def _edit(changes, root):
+    """The kpi tables of the release with the changes made in memory, in order. Raises ChangeRefused when any
+    change does not fit them."""
     changes = list(changes)
     if not changes:
         raise ChangeRefused("there are no changes to apply")
@@ -150,12 +168,7 @@ def apply_changes(changes, release_root):
                     raise ChangeRefused(f"the measure does not inform this process: {line}")
                 current = [p for p in current if p not in linked]
             detail["informs_process"] = ";".join(current)
-    tables.write(root)
-    try:
-        cut._run("rebuild the kpi module", [BUILDER, "--write"], root / KPI_FOLDER)
-    except cut.CutFailed as err:
-        raise ChangeRefused(f"the kpi builder refused the changed tables: {err}") from None
-    return root / MEASURES
+    return tables
 
 
 def compare(before, after):
