@@ -636,7 +636,7 @@ def cut(report_path, release_root=".", decisions=None, approver=None, ask=input,
         if _finish_tag(root, report, outcome, say):
             _follow_up(report, True, outcome, say)
         return outcome
-    git = _git_ready(root, plan_)
+    git = _git_ready(root, _tag(plan_))
     # A breaking change can stop a query or a load that holds the old name. The person types the new name, or
     # the name of what is removed, so the change was read and not only approved with the rest.
     for item in plan_.applied:
@@ -779,43 +779,40 @@ def _build(plan_, staging, approver, now, step):
         step(f"move {module} {old} to releases/previous", lambda module=module, old=old: _run(
             f"move {module} {old}", ["next_version.py", "finish", module, old], release))
     step("carry the stand-alone exceptions to the moved packages", lambda: _carry_exceptions(staging, plan_.versions))
+    _outputs(staging, plan_.versions, plan_.intake, step,
+             ("the module's Turtle", ["build_pricing.py", "--verify"], ontology / MODULE))
+    step("check that the release agrees with itself", lambda: _agreement(plan_, staging))
+
+
+def _outputs(staging, versions, intake_pack, step, turtle):
+    """After the new packages are written and the old ones moved: rebuilds the catalog, the projection manifest and,
+    when the release holds it, the KPI intake pack, runs the competency questions, then verifies the module's Turtle
+    (`turtle`: the name, the builder's arguments and its folder), each new package, the catalog and the pack against a
+    fresh build. The cut and the apply command (kpi_store/apply.py) both end a release with this."""
+    ontology, release = staging / ONTOLOGY, staging / ONTOLOGY / "release"
     step("rebuild the catalog", lambda: _run("rebuild the catalog", ["build_catalog.py", "--write"], release))
     step("rebuild the projection manifest", lambda: _run("rebuild the projection manifest", ["pipeline.py", "build"], ontology / "projection"))
     # The pack's pick lists name each module's version, and `python -m kpi_store.intake check` refuses lists that are
     # older than the packages. The module is the staging copy's own: -m finds kpi_store in the folder the command
     # runs in before any installed copy.
     intake = [*INTAKE, "--root", str(staging)]
-    if plan_.intake:
+    if intake_pack:
         step("rebuild the KPI intake pack", lambda: _run("rebuild the KPI intake pack", intake, staging))
     step("run the competency questions", lambda: _run("run the competency questions", ["run.py"], ontology / "regression"))
-    # The checks of scripts/check.sh that need no bash and that this cut can change: each written file must equal
+    # The checks of scripts/check.sh that need no bash and that this change can change: each written file must equal
     # a fresh build of its source. The projection manifest was built one step ago by the same code.
-    verify = [("the module's Turtle", ["build_pricing.py", "--verify"], ontology / MODULE)]
-    verify += [(f"the {module} package", ["build_module.py", module, "--verify"], release) for module in plan_.versions]
+    verify = [turtle]
+    verify += [(f"the {module} package", ["build_module.py", module, "--verify"], release) for module in versions]
     verify += [("the catalog", ["build_catalog.py", "--verify"], release)]
-    verify += [("the KPI intake pack", [*intake, "--check"], staging)] if plan_.intake else []
+    verify += [("the KPI intake pack", [*intake, "--check"], staging)] if intake_pack else []
     for name, args, cwd in verify:
         step(f"verify {name}", lambda name=name, args=args, cwd=cwd: _run(f"verify {name}", args, cwd))
-    step("check that the release agrees with itself", lambda: _agreement(plan_, staging))
 
 
 def _agreement(plan_, staging):
     """The checks a load makes before it reads the release: each version is the newest folder and the catalog's
     newest, the projection manifest names it, and the data-product package holds every applied change."""
-    from rdflib import Graph, Namespace
-    releases = staging / ov.RELEASES
-    held = ov.newest_versions(releases)
-    # A dataset's IRI in the catalog ends in <module>/<version>.
-    listed = {str(d).rsplit("/", 2)[-2]: str(d).rsplit("/", 1)[-1] for d in Graph().parse(releases / "catalog.ttl", format="turtle")
-              .objects(None, Namespace("http://www.w3.org/ns/dcat#").dataset)}
-    manifest = json.loads((staging / ONTOLOGY / "projection" / "projection-manifest.json").read_text(encoding="utf-8"))
-    for module, (old, new) in plan_.versions.items():
-        if held.get(module) != new or listed.get(module) != new:
-            raise CutFailed(f"{module}: the newest folder is {held.get(module)} and the catalog lists {listed.get(module)}, not {new}")
-        if f"releases/{module}/{new}/{module}.ttl" not in manifest["inputs"]:
-            raise CutFailed(f"the projection manifest does not name {module} {new}")
-        if not (releases / "previous" / module / old / "manifest.json").is_file():
-            raise CutFailed(f"{module} {old} is not in releases/previous")
+    _versions_agree(staging, plan_.versions)
     after = Tables(staging)
     for name in TABLES:
         if after.text(name) != plan_.tables.text(name):
@@ -828,6 +825,25 @@ def _agreement(plan_, staging):
             table = plan_.tables.name(plan_.tables.slug(item.row["object"])).lower()
             if (table, fix["to"]) not in columns or (table, fix["from"]) in columns:
                 raise CutFailed(f"the {MODULE} package does not hold row {item.row['id']}'s change")
+
+
+def _versions_agree(staging, versions):
+    """Each new version is the newest folder and the catalog's newest, the projection manifest names it, and the old
+    package is in releases/previous. Raises CutFailed otherwise. The apply command calls this too."""
+    from rdflib import Graph, Namespace
+    releases = staging / ov.RELEASES
+    held = ov.newest_versions(releases)
+    # A dataset's IRI in the catalog ends in <module>/<version>.
+    listed = {str(d).rsplit("/", 2)[-2]: str(d).rsplit("/", 1)[-1] for d in Graph().parse(releases / "catalog.ttl", format="turtle")
+              .objects(None, Namespace("http://www.w3.org/ns/dcat#").dataset)}
+    manifest = json.loads((staging / ONTOLOGY / "projection" / "projection-manifest.json").read_text(encoding="utf-8"))
+    for module, (old, new) in versions.items():
+        if held.get(module) != new or listed.get(module) != new:
+            raise CutFailed(f"{module}: the newest folder is {held.get(module)} and the catalog lists {listed.get(module)}, not {new}")
+        if f"releases/{module}/{new}/{module}.ttl" not in manifest["inputs"]:
+            raise CutFailed(f"the projection manifest does not name {module} {new}")
+        if not (releases / "previous" / module / old / "manifest.json").is_file():
+            raise CutFailed(f"{module} {old} is not in releases/previous")
 
 
 def _carry_exceptions(staging, versions):
@@ -1109,23 +1125,24 @@ def _tag_exists(root, tag):
     return _git(root, "rev-parse", "-q", "--verify", f"refs/tags/{tag}").returncode == 0
 
 
-def _git_ready(root, plan_):
+def _git_ready(root, tag, what="the cut"):
     """What Git is known to need for the commit and the tag, checked before any file changes: Git itself, a clean
-    copy, an author, and a free tag name. The commit can still fail later, for example in a hook. Returns "none"
-    for a plain folder and "ready" for a Git copy; anything else stops the cut."""
+    copy, an author, and a free tag name ("" for no tag). The commit can still fail later, for example in a hook.
+    Returns "none" for a plain folder and "ready" for a Git copy; anything else stops the cut. `what` names the
+    command in the messages: the apply command (kpi_store/apply.py) calls this too."""
     state = _git_state(root)
     plain = "A plain folder, one with no .git folder, needs no Git."
+    again = "cut" if what == "the cut" else "run it again"
     if state == "no git":
-        raise CutRefused(f"this folder is a Git copy, and Git is not installed, so the cut could not commit. Install Git, then cut. {plain}")
+        raise CutRefused(f"this folder is a Git copy, and Git is not installed, so {what} could not commit. Install Git, then {again}. {plain}")
     if state == "dirty":
         changed = _uncommitted(root)
         more = f" and {len(changed) - 5} more" if len(changed) > 5 else ""
         raise CutRefused(f"this Git copy has changes that are not committed: {', '.join(changed[:5])}{more}. "
-                         "Commit them or put them aside, then cut.")
+                         f"Commit them or put them aside, then {again}.")
     if state == "no author":
-        raise CutRefused("this Git copy has no user.name or user.email, so the cut could not commit. Run these two commands, "
-                         'then cut:\n  git config user.name "<your name or role>"\n  git config user.email "<your e-mail address>"\n' + plain)
-    tag = _tag(plan_)
+        raise CutRefused(f"this Git copy has no user.name or user.email, so {what} could not commit. Run these two commands, "
+                         f'then {again}:\n  git config user.name "<your name or role>"\n  git config user.email "<your e-mail address>"\n' + plain)
     if state == "ready" and tag and _tag_exists(root, tag):
         raise CutRefused(f"this Git copy already has the tag {tag}, which the cut would make. Find out what it marks, "
                          f"and delete it (git tag -d {tag}) only if it is a mistake. Then cut.")
@@ -1141,24 +1158,30 @@ def _commit(root, git, plan_, outcome, backup):
     run, tag = plan_.report["run"]["id"], _tag(plan_)
     subject = (f"Cut {MODULE} {plan_.versions[MODULE][1]} from discovery run {run}" if plan_.versions
                else f"Record the decisions of discovery run {run}")
-    # Only the cut's own paths are named to git add and git commit, so no other path enters the commit.
+    _commit_paths(root, outcome.files, subject, f"The record is {outcome.record.as_posix()}.", backup)
+    outcome.committed = True
+    if tag:
+        _make_tag(root, tag, "HEAD")
+        outcome.tag = tag
+
+
+def _commit_paths(root, files, subject, body, backup, what="the cut"):
+    """Adds and commits exactly these paths, with this message. A failed commit, or Ctrl+C before the commit is
+    made, puts the paths back from the backup (_undo) and raises CutFailed. The apply command calls this too."""
+    # Only the paths named are given to git add and git commit, so no other path enters the commit.
     spec = ["--pathspec-from-file=-", "--pathspec-file-nul"]
     head = _git(root, "rev-parse", "-q", "--verify", "HEAD").stdout.strip()
-    for args in (["add", "-A", *spec], ["commit", "-q", "-m", subject, "-m", f"The record is {outcome.record.as_posix()}.", *spec]):
+    for args in (["add", "-A", *spec], ["commit", "-q", "-m", subject, "-m", body, *spec]):
         try:
-            done = _git(root, *args, stdin=_paths(outcome.files))
+            done = _git(root, *args, stdin=_paths(files))
         except KeyboardInterrupt:
             # Ctrl+C while Git worked. When no commit was made, the files go back as after a failed commit. When
             # the commit is there, it stays, and the stop goes on as it came.
             if _git(root, "rev-parse", "-q", "--verify", "HEAD").stdout.strip() != head:
                 raise
-            raise CutFailed("the cut was stopped while Git committed it. " + _undo(root, outcome.files, backup)) from None
+            raise CutFailed(f"{what} was stopped while Git committed it. " + _undo(root, files, backup)) from None
         if done.returncode != 0:
-            raise CutFailed(f"git {args[0]} failed: {(done.stderr or done.stdout).strip()}. " + _undo(root, outcome.files, backup))
-    outcome.committed = True
-    if tag:
-        _make_tag(root, tag, "HEAD")
-        outcome.tag = tag
+            raise CutFailed(f"git {args[0]} failed: {(done.stderr or done.stdout).strip()}. " + _undo(root, files, backup))
 
 
 def _undo(root, files, backup):

@@ -22,5 +22,6 @@ Where each part is:
     build.py       the one command that writes or compares all of them
     folders.py     the shared folder for a team that works offline
 
-The check changes nothing in the ontology. The Architect applies a complete intake by hand, with HOW-TO-UPDATE.md.
+The check changes nothing in the ontology. The Architect applies a complete KPI intake by hand, with HOW-TO-UPDATE.md.
+A complete term change, the fourth form, goes to the propose and apply commands (kpi_store/propose.py, apply.py).
 """

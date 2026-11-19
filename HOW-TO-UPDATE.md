@@ -16,6 +16,8 @@ If your copy includes `viewer/index.html`, that page shows the ontology as you r
 | Ontology owner | The person your organisation names to decide what the ontology means. |
 | Module owner | The person the ontology owner names for one module. Until a module has an owner, the ontology owner decides for it. |
 | Correction version | A version that the cut tool wrote from a cleared report. Its name carries a marker: `1.2.1-correction.1`. |
+| Proposal | A folder that the propose command writes from one signed term-change form: the changes as KGCL lines, the approval record and a summary. The apply command applies it. |
+| Route | Whether a change is released as a patch, a minor or a major. "Patch, minor or major" below says which is which. |
 
 The ontology owner approves every major release and every module's first release. The module owner approves minor and patch releases. The person who runs the cut approves a correction, at the cut's prompt.
 
@@ -56,6 +58,7 @@ Keep the release folder in Git. The runbook's section "Keep the release folder i
 | Databricks renamed or removed a column, a table or a view that the ontology names. | A correction, through the report and the cut. | "A correction through the loop" |
 | A column's spelling differs only in case. | The same correction. | "A correction through the loop" |
 | A report row says "needs a minor version": a measure link with its filter, a new object, a new table edge, or the table that a Databricks table replaces. | A minor version of the module, with the release steps. | "The release steps" |
+| A measure's name, definition, other names or process links. | The term-change form, then the propose and apply commands. No file is edited by hand. | "Change a measure with the term-change form" |
 | A definition's wording, with the same meaning. | A patch, with the release steps. | "Change a concept's definition" |
 | A new concept, alias, property or shape. | A minor version, with the release steps. | "Add a concept or a property" |
 | A new process, or a changed one. | A release of `core`, then every module. | "Change a process" |
@@ -354,6 +357,114 @@ The versions in the commands are those of the release as you received it. Read t
     ```
 
     If the `enterprise` step stops because the database holds the earlier release, see step 4 of "A correction through the loop".
+
+## Change a measure with the term-change form
+
+A measure of `kpi` changes through a form and two commands. Nobody edits a table or a Turtle file. The form is the "Term change" tab of the HTML form and the "Term change" sheet of the workbook. `kpi-intake/README.md`, "The term change", says what it asks and who signs.
+
+The commands start in the release folder. Keep the filled form and the proposals in a folder beside the release folder, never inside it: the apply command commits the release, and it refuses a release with files that are not committed. The example uses the folder `term-change` beside the release folder.
+
+1. Fill in the form, and save it to that folder. The example asks for three changes to the measure Unit Utilization: the new name "Process Unit Utilization", the other name "unit capacity utilization", and a link to the process CM 1.1.1.1 Produce Demand Forecast. The Data Owner and the Architect sign it.
+
+   The document test writes the form's answers file with this block. If you saved the file from the form, skip it.
+
+   ```python run=term-change
+   import json
+   from pathlib import Path
+
+   folder = Path("../term-change")
+   folder.mkdir(exist_ok=True)
+   measure = "https://w3id.org/mpc/ontology/modules/kpi/measure/unit-utilization"
+   process = "https://w3id.org/mpc/ontology/process/CM-1-1-1-1"
+   answers = {"T1": measure, "T2": "Process Unit Utilization", "T4": ["unit capacity utilization"], "T6": [process], "T8": "yes"}
+   form = {"format": 1, "form": "term-change", "catalogue_version": "1.2", "kpi_name": "Unit Utilization",
+           "request": {"number": "TC-2026-001", "date": "2026-11-19", "requester_role": "Data Owner", "invited": ""},
+           "answers": answers,
+           "sign_offs": {"data-owner": {"name": "A Data Owner", "date": "2026-11-19"},
+                         "architect": {"name": "An Architect", "date": "2026-11-19"}},
+           "consulted": {}, "example_of": "", "comment": ""}
+   path = folder / "unit-utilization.term-change.json"
+   path.write_text(json.dumps(form, indent=2) + "\n", encoding="utf-8")
+   print("wrote", path.name)
+   ```
+
+   ```text expect
+   wrote unit-utilization.term-change.json
+   ```
+
+2. Check the form. It must end with `the intake is complete and signed`. The check also refuses a change that does not fit the measure, such as an other name it already has.
+
+   ```powershell run=term-change
+   python -m kpi_store.intake check ../term-change/unit-utilization.term-change.json
+   ```
+
+   ```text expect
+   Term change check: Unit Utilization
+   ...
+   Result: the intake is complete and signed.
+   This check changes nothing in the ontology. The Architect turns a complete term change into a proposal with python -m kpi_store.propose <this file>, as HOW-TO-UPDATE.md says.
+   ```
+
+3. Turn the form into a proposal. The command writes the folder `proposals/TC-2026-001` beside the form, named by the form's request number. It holds `change.kgcl` (the changes as KGCL lines), `approval.json` (the signatures, from the form) and `summary.txt`. It changes nothing in the ontology. Several forms in one command give one proposal each.
+
+   ```powershell run=term-change
+   python -m kpi_store.propose ../term-change/unit-utilization.term-change.json
+   ```
+
+   ```text expect
+   wrote the proposal ../term-change/proposals/TC-2026-001: 3 changes, route minor
+   Nothing in the ontology has changed. Read each summary.txt, then apply with: python -m kpi_store.apply <proposal folder>
+   ```
+
+4. Read `summary.txt`. It says what changes, the route and who signed. The route comes from the changes: a new other name or a new process link is a minor, and a rename, a new definition or a removal is a patch. When the form's answer to T8 is "no" or "not sure", the route is a major, and the Ontology Owner must have signed the form.
+
+   ```python run=term-change
+   print(open("../term-change/proposals/TC-2026-001/summary.txt", encoding="utf-8").read())
+   ```
+
+   ```text expect
+   Proposal TC-2026-001
+   ...
+   What changes:
+     - Rename it from "Unit Utilization" to "Process Unit Utilization".
+     - Add the other name "unit capacity utilization".
+     - Link it to the process CM 1.1.1.1 Produce Demand Forecast.
+   ...
+   The route: minor. This is a minor: the changes add content, and the old meaning still holds.
+   ...
+   ```
+
+5. Apply the proposal. The command refuses a proposal that lacks a signature, and two proposals that change the same field of the same measure. It then works on a temporary copy of the release: it changes the `kpi` tables, rebuilds the module, checks that the difference is exactly the proposal's lines, releases `kpi` and every module that depends on it, rebuilds the catalog, the projection manifest and the KPI intake pack, and runs the checks. Only when every step has passed does it write the release and commit it. If a step fails, the release is as it was, and the command says why. It took about 90 seconds on a Mac.
+
+   ```powershell run=term-change
+   python -m kpi_store.apply ../term-change/proposals/TC-2026-001
+   ```
+
+   ```text expect
+   1 proposal to apply:
+     TC-2026-001: minor, signed by Data Owner, Architect
+   ...
+     kpi 1.3.0 -> 1.4.0
+   ...
+   ... write the release
+   Done. kpi is now 1.4.0 (minor), and 6 modules that depend on it took a new patch. The apply changed <count> files, and Git committed them.
+   Run the full check before you load: bash scripts/check.sh (on Windows, in Git Bash). Then load the stores with the runner: python -m kpi_store.runner
+   ```
+
+6. See the commit and the new version.
+
+   ```powershell run=term-change
+   git --no-pager log --oneline -1
+   cd business_architecture/ontology/release
+   python next_version.py current kpi
+   ```
+
+   ```text expect
+   <commit> Apply the term change TC-2026-001: kpi 1.4.0
+   1.4.0
+   ```
+
+7. Run the full check, as in "Before you change anything", step 3. Then load the stores with the runner, as in step 11 of "The release steps".
 
 ## Change a concept's definition
 

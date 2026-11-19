@@ -1,7 +1,7 @@
 """The Excel form: write it from the catalogue, read a filled one back, and compare two workbooks by content.
 
 The workbook has a Start sheet, one sheet per section of the KPI form, a Sign-off sheet, one sheet for each of the
-two smaller forms (Domain activation and Process map request), a Roles sheet and a hidden lists sheet that the
+three smaller forms (Domain activation, Process map request and Term change), a Roles sheet and a hidden lists sheet that the
 dropdowns read. On a section sheet the columns are: number, question, asked of,
 answer (the cell to fill), why we ask, example. Column G is hidden and holds each row's key, for example "6.1#2"
 for the second answer to 6.1 or "3.5.detail" for the extra text of 3.5. The reader finds an answer by its key, so
@@ -155,7 +155,7 @@ def build(cat, lists, examples=None, intake=None, others=None):
             row += 1
             given = (held.sign_offs if held else {}).get(signer["id"], {})
             put(ws, row, 1, cat.roles[signer["role"]]["short"])
-            meaning = signer.get("activation_meaning") if form == "domain-activation" and signer.get("activation_meaning") else signer["meaning"]
+            meaning = cat.meaning(signer, form)
             put(ws, row, 2, f'"{meaning}"')
             put(ws, row, 3, signer["required"])
             put(ws, row, ANSWER_COLUMN, given.get("name", ""), answer=True)

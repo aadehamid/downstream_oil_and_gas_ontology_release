@@ -25,6 +25,7 @@ The ontology has no place for a KPI's domain yet, and holds no list of domains. 
 | 7 | Where the data lives (IT only) | the knowledge graph |
 | D | Domain activation | a data domain that is not active yet |
 | P | Process map request | a business area, process, step or role that the process map lacks |
+| T | Term change | a change to a measure the ontology already holds |
 
 ## What each question feeds
 
@@ -115,6 +116,19 @@ The ontology has no place for a KPI's domain yet, and holds no list of domains. 
 | P5 | Which roles work in these processes? | Optional | `org:Role` in `organization`, with `skos:prefLabel` and `skos:definition`. |
 | P6 | For each process, which role does the work, which answers for it, which is consulted, and which is informed? Write one line for each: the process, the role, and one of responsible, accountable, consulted or informed. | Optional | `orgx:ResponsibilityAssignment` with `forProcess`, `assignedRole`, `raciLevel`. |
 | P7 | Which documents describe them: a process manual, a policy, a published report? | Required | `dcterms:source` IRIs and their tiers in `authority/source-tiers.csv`. |
+
+### Term change
+
+| No. | Question | Rule | Feeds |
+|---|---|---|---|
+| T1 | Which measure do you want to change? | Required | The measure the KGCL lines are about: `measure:<its short key>`. |
+| T2 | What should the measure be called from now on? Leave this empty to keep its name. | Optional | A rename: `skos:prefLabel`. |
+| T3 | What should its definition say from now on? Leave this empty to keep the definition. | Optional | A changed definition: `skos:definition`. |
+| T4 | Which other names should it gain? | Optional | A new other name: `skos:altLabel`. |
+| T5 | Which of its other names should it lose? Write each one as the ontology holds it. | Optional | A removed other name: `skos:altLabel`. |
+| T6 | Which processes should the measure be linked to, in addition to the ones it has? | Optional | A new link: `kpi:informsProcess`. |
+| T7 | Which processes should the measure no longer be linked to? | Optional | A removed link: `kpi:informsProcess`. |
+| T8 | Would every report and answer that used the old meaning still be correct? | Required | The route of the proposal. The answer can only raise the route that the changes suggest, never lower it. |
 
 ## The facts one new KPI needs, and the questions that supply them
 

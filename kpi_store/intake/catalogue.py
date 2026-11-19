@@ -20,7 +20,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 PACK = Path(__file__).resolve().parents[2] / "kpi-intake"   # the pack's folder in this release
-FORMS = {"kpi-intake": "KPI intake", "domain-activation": "Domain activation", "process-map-request": "Process map request"}
+FORMS = {"kpi-intake": "KPI intake", "domain-activation": "Domain activation", "process-map-request": "Process map request",
+         "term-change": "Term change"}
 TYPES = ("text", "long_text", "choice", "multi_choice", "list")
 CHOICE_TYPES = ("choice", "multi_choice")
 MANY_TYPES = ("multi_choice", "list")          # the answer is a list of values
@@ -85,6 +86,21 @@ class Catalogue:
 
     def signers(self, form):
         return [s for s in self.sign_off["signer"] if form in s["forms"]]
+
+    def meaning(self, signer, form):
+        """What the signature means on this form: a domain activation and a term change may give a signer its own
+        words (activation_meaning, change_meaning)."""
+        own = {"domain-activation": "activation_meaning", "term-change": "change_meaning"}.get(form)
+        return signer.get(own) or signer["meaning"] if own else signer["meaning"]
+
+    def is_needed(self, signer, form, answers, conflict=False):
+        """True when the signer must sign this form: always; for a "conflict" signer of the KPI form only when the
+        check finds a conflicting definition (a smaller form needs each of its own); for an "answer" signer only when
+        the question it names has one of its answers."""
+        if signer["when"] == "answer":
+            held = answers.get(signer["answer_of"])
+            return any(a in (held if isinstance(held, list) else [held]) for a in signer["answers"])
+        return signer["when"] == "always" or conflict or form != "kpi-intake"
 
     def asked_of(self, question):
         """Who answers, as the forms print it."""
@@ -271,8 +287,14 @@ def _problems(cat):
             out.append(f"the signer {signer.get('id')!r} has the role {signer.get('role')!r}, which is no role")
         if not set(signer.get("forms", [])) <= set(FORMS):
             out.append(f"the signer {signer.get('id')!r} names a form that does not exist")
-        if signer.get("when") not in ("always", "conflict"):
-            out.append(f"the signer {signer.get('id')!r}: `when` is \"always\" or \"conflict\"")
+        if signer.get("when") not in ("always", "conflict", "answer"):
+            out.append(f"the signer {signer.get('id')!r}: `when` is \"always\", \"conflict\" or \"answer\"")
+        if signer.get("when") == "answer":
+            asked = cat.by_id.get(signer.get("answer_of"))
+            if asked is None or set(signer.get("forms", [])) != {cat.form_of(asked)}:
+                out.append(f"the signer {signer.get('id')!r}: `answer_of` names no question of its form")
+            elif not signer.get("answers") or not all(isinstance(a, str) for a in signer["answers"]):
+                out.append(f"the signer {signer.get('id')!r}: `answers` lists the answers of {signer['answer_of']} that need the signature")
     for name, outcome in cat.outcomes.items():
         if outcome.get("consult") and outcome["consult"] not in consulted:
             out.append(f"the outcome {name!r} names {outcome['consult']!r}, which the sign-off block does not hold")

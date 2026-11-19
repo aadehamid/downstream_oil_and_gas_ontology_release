@@ -1,13 +1,14 @@
 """The completeness check of a filled intake form.
 
-    python -m kpi_store.intake check <answers.json or filled.xlsx> [--form domain-activation] [--pack <folder>]
+    python -m kpi_store.intake check <answers.json or filled.xlsx> [--form term-change] [--pack <folder>]
 
 It reads the form, in either format, and says in plain words, section by section, what is missing, which
 questions the rules rightly skipped, where an answer routes the request, and what the derived checks found. It
 ends with exit status 0 only when the intake is complete and signed, 1 when something is still to do, and 2 when
 the file cannot be read.
 
-It changes nothing in the ontology. The Architect applies a complete intake by hand, with HOW-TO-UPDATE.md.
+It changes nothing in the ontology. The Architect applies a complete KPI intake by hand, with HOW-TO-UPDATE.md. A
+complete term change goes to the propose command (kpi_store/propose.py).
 
 The derived checks compare the form with kpi-intake/pick-lists.json, which the build command writes from the
 release packages:
@@ -19,6 +20,10 @@ release packages:
     values                  an id or a list value that the ontology does not hold
     to add first            an answer that the organization's settings added and the ontology does not hold yet
     sign-off                a signature, or the record of a consultation, is missing
+
+A term change is also checked against the measure it names: it asks for at least one change, a new name or
+definition differs from the one the measure has, an other name to add is not one already, and an other name to
+remove is one the measure has.
 """
 import dataclasses
 import difflib
@@ -31,6 +36,9 @@ from kpi_store.intake.catalogue import ADDED_MARK, CHOICE_TYPES, FORMS, HIDDEN_M
 
 CLOSE = 0.88        # two names at least this alike are shown to a person as a possible match
 APPLY = "This check changes nothing in the ontology. The Architect applies a complete intake by hand, with HOW-TO-UPDATE.md."
+PROPOSE = ("This check changes nothing in the ontology. The Architect turns a complete term change into a proposal with "
+           "python -m kpi_store.propose <this file>, as HOW-TO-UPDATE.md says.")
+TERM_CHANGES = ("T2", "T3", "T4", "T5", "T6", "T7")   # the questions of the term change that each ask for a change
 
 
 @dataclass
@@ -269,13 +277,62 @@ def _derived(cat, lists, terms, intake, report):
     return consult, conflict
 
 
+def _term_change(lists, intake, report):
+    """The checks of a term change against the measure it names: it asks for at least one change, and each change
+    fits the measure as the pick lists hold it. The apply command checks the same against the kpi tables again."""
+    from kpi_store.change.kgcl import text_problem
+    answers = intake.answers
+    measure = next((m for m in lists["measures"] if m["id"] in rules.values(answers, "T1")), None)
+    lines = []
+    if not any(rules.values(answers, q) for q in TERM_CHANGES):
+        lines.append("the form asks for no change: answer at least one of T2 to T7")
+    for key in ("T2", "T3", "T4", "T5"):
+        for text in rules.values(answers, key):
+            problem = text_problem(text)
+            if problem:
+                lines.append(f'{key}: "{_short(text)}": {problem}')
+    name, definition = "".join(rules.values(answers, "T2")[:1]), "".join(rules.values(answers, "T3")[:1])
+    gained, lost = rules.values(answers, "T4"), rules.values(answers, "T5")
+    if measure:
+        others = measure.get("other_names", [])
+        if name == measure["label"]:
+            lines.append(f'T2: "{name}" is the measure\'s name already. Leave T2 empty to keep it')
+        elif name in others and name not in lost:
+            lines.append(f'T2: "{name}" is an other name of the measure. List it under T5 too, so it stops being one')
+        if definition and definition == measure.get("definition", ""):
+            lines.append("T3 is the measure's definition already. Leave T3 empty to keep it")
+        for other in gained:
+            if ";" in other:
+                lines.append(f'T4: "{_short(other)}" holds a semicolon, which the ontology\'s tables use between other names')
+            elif other in others:
+                lines.append(f'T4: "{other}" is an other name of the measure already')
+            elif other == (name or measure["label"]):   # the old name may stay as an other name after a rename
+                lines.append(f'T4: "{other}" is the measure\'s name, so it cannot be an other name too')
+        for other in lost:
+            if other not in others:
+                held = "; ".join(f'"{o}"' for o in others) or "none"
+                lines.append(f'T5: "{other}" is not an other name of the measure. Its other names are: {held}')
+    for other in sorted(set(gained) & set(lost)):
+        lines.append(f'T4 and T5 both name "{other}"')
+    labels = {p["id"]: p["label"] for p in lists["processes"]}
+    for process in sorted(set(rules.real_values(answers, "T6")) & set(rules.real_values(answers, "T7"))):
+        lines.append(f'T6 and T7 both name the process "{labels.get(process, process)}"')
+    report.say("Checks of the change")
+    for line in lines:
+        report.say("  " + line + ".")
+        report.block(line)
+    if not lines:
+        report.say("  Each change fits the measure.")
+    report.say()
+
+
 def _sign_off(cat, intake, report, consult, conflict):
     report.say("Sign-off")
     for signer in cat.signers(intake.form):
-        needed = signer["when"] == "always" or conflict or intake.form != "kpi-intake"
+        needed = cat.is_needed(signer, intake.form, intake.answers, conflict)
         given = intake.sign_offs.get(signer["id"], {})
         signed = bool(given.get("name", "").strip() and given.get("date", "").strip())
-        meaning = signer.get("activation_meaning") if intake.form == "domain-activation" and signer.get("activation_meaning") else signer["meaning"]
+        meaning = cat.meaning(signer, intake.form)
         role = f'{cat.roles[signer["role"]]["short"]} ("{meaning}")'
         if signed:
             report.say(f'  {role}: signed on {given["date"].strip()}.')
@@ -326,6 +383,8 @@ def check(cat, data, intake, stale=None):
     intake, renamed = _resolve(cat, lists, intake)
     first = "2.1" if intake.form == "kpi-intake" else cat.questions_of(intake.form)[0]["id"]
     name = intake.kpi_name or "; ".join(rules.values(intake.answers, first)[:2])
+    if intake.form == "term-change":   # the name of the measure, not its IRI
+        name = next((m["label"] for m in lists["measures"] if m["id"] == name), name)
     report.say(f'{FORMS[intake.form]} check: {name or "(no name yet)"}')
     report.say(f'Catalogue {cat.version}. Pick lists of {data.get("release", cat.release)}.')
     if intake.catalogue_version and intake.catalogue_version != cat.version:
@@ -354,6 +413,8 @@ def check(cat, data, intake, stale=None):
     if intake.form == "kpi-intake":
         more, conflict = _derived(cat, lists, terms, intake, report)
         consult |= more
+    if intake.form == "term-change":
+        _term_change(lists, intake, report)
     _sign_off(cat, intake, report, consult, conflict)
     if report.complete:
         report.say("Result: the intake is complete and signed.")
@@ -362,7 +423,7 @@ def check(cat, data, intake, stale=None):
         report.say(f"Result: not complete. {count} {'thing' if count == 1 else 'things'} to settle:")
         for line in report.blocking:
             report.say("  - " + line)
-    report.say(APPLY)
+    report.say(PROPOSE if intake.form == "term-change" else APPLY)
     return report
 
 

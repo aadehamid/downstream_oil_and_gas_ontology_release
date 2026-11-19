@@ -26,6 +26,18 @@ label = "Yes"
 id = "no"
 label = "No"
 
+[[choices.yes-no-not-sure]]
+id = "yes"
+label = "Yes"
+
+[[choices.yes-no-not-sure]]
+id = "no"
+label = "No"
+
+[[choices.yes-no-not-sure]]
+id = "not-sure"
+label = "Not sure"
+
 [[choices.environment]]
 id = "sandbox"
 label = "Sandbox"
@@ -84,8 +96,9 @@ intro = "The check refuses a form that lacks a signature it requires. The form r
 id = "data-owner"
 role = "data-owner"
 meaning = "The KPI's definition in this form is right: its name, its meaning, what it counts and what it leaves out."
-required = "Every KPI"
-forms = ["kpi-intake"]
+change_meaning = "The measure's name, definition, other names and process links are right as this form changes them."
+required = "Every KPI and every term change"
+forms = ["kpi-intake", "term-change"]
 when = "always"
 
 [[sign_off.signer]]
@@ -113,12 +126,23 @@ required = "Every process map request"
 forms = ["process-map-request"]
 when = "always"
 
+# A signer with when = "answer" signs only when the question `answer_of` has one of `answers`.
+[[sign_off.signer]]
+id = "ontology-owner"
+role = "ontology-owner"
+meaning = "This change alters what the measure means, and I approve it as a major change."
+required = "Only when the change is major: the answer to T8 is \"no\" or \"not sure\""
+forms = ["term-change"]
+when = "answer"
+answer_of = "T8"
+answers = ["no", "not-sure"]
+
 [[sign_off.signer]]
 id = "architect"
 role = "architect"
 meaning = "The form is complete, and I approve the change to the ontology."
-required = "Every KPI, last"
-forms = ["kpi-intake", "domain-activation", "process-map-request"]
+required = "Every KPI and every term change, last"
+forms = ["kpi-intake", "domain-activation", "process-map-request", "term-change"]
 when = "always"
 
 [[sign_off.consulted]]
@@ -243,6 +267,18 @@ who = "The Global Process Owner, or a named delegate, answers and signs. The Pro
 done_when = "The form names what is missing, where it sits in the process map, and a document that describes it. The Global Process Owner and the Architect have signed."
 typical = "4 to 7"
 minutes = "30"
+
+[[section]]
+id = "T"
+form = "term-change"
+name = "Term change"
+technical_name = "a change to a measure the ontology already holds"
+audience = "business"
+about = "Use this form to change a measure the ontology already holds: its name, its definition, its other names, or the processes it is linked to. A new KPI goes through the KPI form instead. When the form is complete and signed, the Architect turns it into a proposal with one command and applies the proposal with another. Nobody edits a file of the ontology by hand."
+who = "The Data Owner answers and signs. The Architect checks the form and signs last. When the answer to T8 is \"no\" or \"not sure\", the Ontology Owner signs too. The Business analyst fills the form."
+done_when = "The form names one measure and asks for at least one change. T8 is answered. The Data Owner and the Architect have signed, and the Ontology Owner too when the change is major."
+typical = "3 to 8"
+minutes = "15"
 
 # ---- The kind of measure ---------------------------------------------------------------------------------------
 # Section 4 asks up to five tests in order. The first answer below that matches decides the kind.
@@ -1404,6 +1440,108 @@ rows = 6
 required = "required"
 why = "Every fact added needs a written source."
 feeds = "`dcterms:source` IRIs and their tiers in `authority/source-tiers.csv`."
+fact = []
+
+# ---- Term change -----------------------------------------------------------------------------------------------
+# The propose command turns a complete, signed term change into KGCL lines (kpi_store/propose.py). T2 to T7 are
+# each optional, and the check refuses a form that asks for no change.
+
+[[question]]
+id = "T1"
+section = "T"
+text = "Which measure do you want to change?"
+asked_of = ["data-owner"]
+type = "choice"
+source = "measures"
+required = "required"
+why = "A term change changes one measure the ontology already holds. A new KPI uses the KPI form."
+feeds = "The measure the KGCL lines are about: `measure:<its short key>`."
+fact = []
+
+[[question]]
+id = "T2"
+section = "T"
+text = "What should the measure be called from now on? Leave this empty to keep its name."
+asked_of = ["data-owner"]
+type = "text"
+required = "optional"
+why = "A new name replaces the old one everywhere the ontology shows the measure."
+feeds = "A rename: `skos:prefLabel`."
+fact = []
+
+[[question]]
+id = "T3"
+section = "T"
+text = "What should its definition say from now on? Leave this empty to keep the definition."
+asked_of = ["data-owner"]
+type = "long_text"
+required = "optional"
+why = "The definition says what the number means. Every report and answer reads it."
+feeds = "A changed definition: `skos:definition`."
+fact = []
+
+[[question]]
+id = "T4"
+section = "T"
+text = "Which other names should it gain?"
+asked_of = ["data-owner"]
+type = "list"
+rows = 4
+required = "optional"
+why = "A person who searches with their own word then finds the measure."
+feeds = "A new other name: `skos:altLabel`."
+fact = []
+
+[[question]]
+id = "T5"
+section = "T"
+text = "Which of its other names should it lose? Write each one as the ontology holds it."
+asked_of = ["data-owner"]
+type = "list"
+rows = 4
+required = "optional"
+why = "An other name that is wrong leads people to the wrong measure."
+feeds = "A removed other name: `skos:altLabel`."
+fact = []
+
+[[question]]
+id = "T6"
+section = "T"
+text = "Which processes should the measure be linked to, in addition to the ones it has?"
+asked_of = ["data-owner"]
+type = "multi_choice"
+source = "processes"
+levels = [0, 6]
+rows = 4
+required = "optional"
+why = "The link says which work the number tells people about."
+feeds = "A new link: `kpi:informsProcess`."
+fact = []
+
+[[question]]
+id = "T7"
+section = "T"
+text = "Which processes should the measure no longer be linked to?"
+asked_of = ["data-owner"]
+type = "multi_choice"
+source = "processes"
+levels = [0, 6]
+rows = 4
+required = "optional"
+why = "A link that is wrong points people at the wrong work."
+feeds = "A removed link: `kpi:informsProcess`."
+fact = []
+
+[[question]]
+id = "T8"
+section = "T"
+text = "Would every report and answer that used the old meaning still be correct?"
+asked_of = ["data-owner", "architect"]
+type = "choice"
+source = "choices:yes-no-not-sure"
+required = "required"
+why = "A \"no\" or a \"not sure\" makes the change major: people who used the old meaning may now be wrong, so the Ontology Owner signs too."
+feeds = "The route of the proposal. The answer can only raise the route that the changes suggest, never lower it."
 fact = []
 
 # ---- The explainer (what-we-will-ask-you.md and the "What we will ask you" view of the HTML form) ---------------

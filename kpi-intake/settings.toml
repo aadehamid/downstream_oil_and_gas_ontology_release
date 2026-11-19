@@ -87,6 +87,13 @@ short = "Architect"
 definition = "Delivery role"
 in_intake = "Reviews the form, runs the completeness check and signs the change."
 
+[[role]]
+id = "ontology-owner"
+title = "Ontology Owner"
+short = "Ontology Owner"
+definition = "The person the organization names to decide what the ontology means."
+in_intake = "Signs a term change that is major: one where a report or an answer that used the old meaning may now be wrong."
+
 # ---- Who may see a KPI -----------------------------------------------------------------------------------------
 # Replace these two choices with your organization's own classification levels. Question 3.7 routes the answer
 # "restricted" to the Privacy, Security, Compliance and Risk reviews. If you rename that level, change the route

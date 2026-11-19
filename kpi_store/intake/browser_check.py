@@ -1,4 +1,4 @@
-"""Open the HTML intake form in a real browser and prove the twenty-one things a person filling it relies on.
+"""Open the HTML intake form in a real browser and prove the twenty-two things a person filling it relies on.
 
     uv run --no-project --with playwright==1.65.0 python kpi_store/intake/browser_check.py
 
@@ -36,6 +36,8 @@ Each proof starts from a fresh load of kpi-intake/kpi-intake-form.html, with emp
  20 guide        "How to use this form" links to the guide beside the form, which opens with no network request
  21 alias        an answer saved under an added entry that the ontology has since gained is read as the ontology's
                  entry, from a file and from a draft; the entry is offered once, and the form says what it did
+ 22 term change  the Term change form asks for the Ontology Owner's signature only when T8 is "no" or "not sure",
+                 and saves its file under the measure's name with the measure's id as the answer to T1
 
 Every expected value below is written by hand from the catalogue and the release packages. The script exits 1
 when a proof fails and names it. scripts/check.sh does not run it, because it needs a browser.
@@ -57,6 +59,7 @@ NEW_ROLE = "new:value-chain-optimization-director"
 EXAMPLE = ROOT / "kpi-intake" / "examples" / "crack-spreads-pricing.json"
 COMMERCIAL = "https://w3id.org/mpc/ontology/modules/core/business-domain/commercial"
 REFINERY_OPTIMIZATION = "https://w3id.org/mpc/ontology/process/CM-1-1-4-7"
+UNIT_UTILIZATION = "https://w3id.org/mpc/ontology/modules/kpi/measure/unit-utilization"
 PRICE_STEP = "https://w3id.org/mpc/ontology/process/CM-1-1-4-7-4"
 
 
@@ -114,7 +117,7 @@ def load(s):
     same(page.locator("h1").inner_text(), "KPI intake form", "the page's heading")
     holds(page.locator("#release-line").text_content(), "KPI Store 1.1, catalogue 1.2", "the release line")
     same(page.locator("#tabs [role=tab]").all_inner_texts(),
-         ["KPI intake", "Domain activation", "Process map request", "The roles", "What we will ask you"], "the tabs")
+         ["KPI intake", "Domain activation", "Process map request", "Term change", "The roles", "What we will ask you"], "the tabs")
     same(page.locator("[data-section]").count(), 7, "sections of the KPI form")
     same(page.locator("[data-question]").count(), 56, "questions of the KPI form")
     holds(page.locator(".brand-line").inner_text(), "Works offline. Sends nothing.", "the line under the name")
@@ -278,7 +281,7 @@ def phone(s):
     assert page.locator("#contents").is_hidden(), "the section list stays open after a choice"
     page.wait_for_function("document.getElementById('sections-now').textContent.startsWith('3. The facts about it')")
     assert page.evaluate("parseFloat(getComputedStyle(document.body).paddingBottom) >= document.getElementById('dock').offsetHeight - 1"), "the page does not clear the bar of file buttons"
-    for tab in ("kpi-intake", "domain-activation", "process-map-request", "roles", "explainer"):
+    for tab in ("kpi-intake", "domain-activation", "process-map-request", "term-change", "roles", "explainer"):
         page.locator("#view-select").select_option(tab)
         same(page.locator(f'[data-view="{tab}"]').get_attribute("aria-selected"), "true", f"the view after choosing {tab}")
         assert not page.evaluate("document.documentElement.scrollWidth > innerWidth"), f"the {tab} view scrolls sideways at 390 px"
@@ -337,7 +340,7 @@ def bad_file(s):
         ("not json at all", "it is not JSON."),
         ("[1, 2]", "it is not a JSON object."),
         ('{"format":2,"form":"kpi-intake","answers":{}}', 'its "format" is not 1.'),
-        ('{"format":1,"form":"something-else","answers":{}}', 'its "form" names none of the three forms.'),
+        ('{"format":1,"form":"something-else","answers":{}}', 'its "form" names none of the four forms.'),
         ('{"format":1,"form":"kpi-intake","answers":["2.1"]}', 'it has no "answers" object.'),
         ('{"format":1,"form":"kpi-intake","answers":{"5.1":["a",3]}}', "the answer to 5.1 is neither a text nor a list of texts."),
         ('{"format":1,"form":"kpi-intake","answers":{},"comment":{"a":1}}', '"comment" is not a text.'),
@@ -447,7 +450,7 @@ def bad_draft(s):
     page = s.open()
     good = {"answers": {"2.1": "Tank Turnover"}, "request": {}, "sign_offs": {}, "consulted": {}, "example_of": "", "comment": ""}
     empty = dict(good, answers={})
-    forms = ("kpi-intake", "domain-activation", "process-map-request")
+    forms = ("kpi-intake", "domain-activation", "process-map-request", "term-change")
 
     def seeded(**changed):
         state = {form: empty for form in forms}
@@ -712,11 +715,37 @@ def alias(s):
     context.close()
 
 
+def term_change(s):
+    page = s.open()
+    page.locator('[data-view="term-change"]').click()
+    same(page.locator("[data-question]").count(), 8, "questions of the term change")
+    measure = card(page, "T1")
+    measure.locator(".picker-search").fill("Unit Utilization")
+    measure.locator(f'.picker-list input[value="{UNIT_UTILIZATION}"]').check()
+    owner, line = page.locator('[data-signer="ontology-owner"]'), page.locator('[data-nav="signoff"] .nav-count')
+    same(owner.locator(".signer-status").inner_text(), 'Only when the change is major: the answer to T8 is "no" or "not sure"',
+         "the Ontology Owner before T8")
+    same(line.inner_text(), "0 of 2 required signed", "the sign-off line before T8")
+    for answer, needed in (("no", 3), ("not-sure", 3), ("yes", 2)):
+        choose(page, "T8", answer)
+        same(line.inner_text(), f"0 of {needed} required signed", f"the sign-off line when T8 is {answer}")
+        same(owner.locator(".signer-required").is_visible(), needed == 3, f"the Ontology Owner's requirement when T8 is {answer}")
+    card(page, "T4").locator("textarea").fill("unit capacity utilization")
+    with page.expect_download() as download:
+        page.locator("#save").click()
+    same(download.value.suggested_filename, "unit-utilization.term-change.json", "the file's name")
+    data = json.loads(Path(download.value.path()).read_text(encoding="utf-8"))
+    same((data["form"], data["kpi_name"]), ("term-change", "Unit Utilization"), "the form and the name")
+    same(data["answers"], {"T1": UNIT_UTILIZATION, "T4": ["unit capacity utilization"], "T8": "yes"}, "answers")
+    s.shot(page, "22-term-change")
+
+
 PROOFS = [("1 load", load), ("2 fill", fill), ("3 narrow list", narrow_list), ("4 conditional", conditional),
           ("5 routing", routing), ("6 save", save), ("7 load file", load_file), ("8 draft", draft), ("9 phone", phone),
           ("10 theme", theme), ("11 next step", next_step), ("12 bad file", bad_file), ("13 other form", other_form),
           ("14 detail", detail), ("15 conflict", conflict), ("16 bad draft", bad_draft), ("17 hidden", hidden),
-          ("18 added", added), ("19 new fields", new_fields), ("20 guide", guide), ("21 alias", alias)]
+          ("18 added", added), ("19 new fields", new_fields), ("20 guide", guide), ("21 alias", alias),
+          ("22 term change", term_change)]
 
 
 def launch(playwright, channels):
