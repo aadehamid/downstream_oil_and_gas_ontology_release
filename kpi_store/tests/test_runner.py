@@ -843,3 +843,25 @@ def test_the_sync_step_fails_on_a_technical_graph_that_was_not_checked_and_names
 def test_the_command_refuses_bad_settings_before_anything_else(tmp_path, capsys):
     assert runner.main(["--stores", str(tmp_path / "missing.toml")]) == 2
     assert "cannot read the local settings file" in capsys.readouterr().err
+
+
+def test_an_error_no_step_expected_ends_the_run_with_one_line_and_a_detail_file(setup, monkeypatch):
+    monkeypatch.setitem(runner.STEP_FUNCTIONS, "zip", lambda ctx: {}["no such key"])
+    ctx = setup.make()
+    assert runner.run_steps(ctx, ["zip", "volume"]) == 1
+    detail = setup.run_dir / "zip.error.txt"
+    assert setup.lines == [f"zip: FAILED. an unexpected error stopped the step (KeyError); the detail is in {detail}. "
+                           "Fix the cause, then run the same command with --from zip"]
+    assert "KeyError" in detail.read_text(encoding="utf-8")
+    assert json.loads((setup.run_dir / "steps" / "03-zip.json").read_text(encoding="utf-8"))["status"] == "failed"
+    assert not (setup.run_dir / "steps" / "04-volume.json").exists()
+
+
+def test_a_release_error_in_the_fuseki_step_is_a_step_failure(setup, monkeypatch):
+    from kpi_store import load_fuseki
+    def broken(*args, **kwargs):
+        raise load_fuseki.ldb.ov.ReleaseError("the release lacks the catalog")
+    monkeypatch.setattr(load_fuseki, "run", broken)
+    ctx = setup.make()
+    with pytest.raises(runner.StepFailed, match="the release lacks the catalog"):
+        runner.step_fuseki(ctx)

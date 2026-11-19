@@ -77,6 +77,7 @@ import subprocess
 import sys
 import time
 import tomllib
+import traceback
 import zipfile
 from pathlib import Path
 
@@ -775,8 +776,10 @@ def step_fuseki(ctx):
     extra = ctx.hooks["extra_graphs"](ctx.release_root, ctx.run_dir) if ctx.hooks["extra_graphs"] else None
     try:
         result = load_fuseki.run(ctx.local, ctx.release_root, extra_graphs=extra, tech_graph_files=tech_graph_files(ctx))
-    except (load_fuseki.FusekiError, OSError) as err:
-        raise StepFailed(str(err) if isinstance(err, load_fuseki.FusekiError) else f"Fuseki did not answer ({type(err).__name__})") from None
+    except (load_fuseki.FusekiError, load_fuseki.ldb.ov.ReleaseError) as err:
+        raise StepFailed(str(err)) from None
+    except OSError as err:
+        raise StepFailed(f"Fuseki did not answer ({type(err).__name__})") from None
     if result["status"] == "mismatch":
         raise StepFailed(load_fuseki.line(result))
     # The module's own line starts with the store's name; the runner prints the step's name in its place.
@@ -906,7 +909,24 @@ def run_steps(ctx, names):
         except Stop as stop:
             ctx.out(f"{name}: STOPPED. Next step: {stop}")
             return 3
-        except StepFailed as err:
+        except Exception as err:   # pylint: disable=broad-except
+            if isinstance(err, StepFailed):
+                failure = err
+            else:
+                # An error no step expected still ends the run with one line and a step file, never a traceback.
+                # Only the error's type is printed, because an error's text can name an address or a path on this
+                # machine; the whole traceback goes to a file in the run folder for whoever investigates.
+                detail, where = ctx.run_dir / f"{name}.error.txt", ""
+                if not ctx.dry_run:   # a dry run writes nothing
+                    try:
+                        ctx.run_dir.mkdir(parents=True, exist_ok=True)
+                        write_text(detail, "".join(traceback.format_exception(err)))
+                        where = f"; the detail is in {detail}"
+                    except OSError:
+                        pass
+                failure = StepFailed(f"an unexpected error stopped the step ({type(err).__name__}){where}. Fix the "
+                                     f"cause, then run the same command with --from {name}")
+            err = failure
             if not ctx.dry_run:
                 # The sync step wrote its rows before it failed. They are kept, not replaced by a bare "failed".
                 kept = ctx.earlier(name) if name in ("sync", "notebook") else None

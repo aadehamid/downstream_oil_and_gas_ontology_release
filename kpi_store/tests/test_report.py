@@ -106,3 +106,18 @@ def test_a_row_id_that_is_not_an_r_and_digits_is_refused(row_id):
     r["rows"][0]["id"] = row_id
     assert report.problems(r) == [f"row {row_id}: the ID must be R and three or more digits, such as R001"]
     assert report.problems(build([row()] * 1000)) == []   # R1000 is an ID too
+
+
+def test_a_csv_saved_in_another_encoding_or_with_a_row_twice_is_a_report_error(tmp_path):
+    # The stand-alone cut reads the cleared CSV through apply_csv_decisions; it must refuse both cases in one line.
+    r = build([row(), row("object-extra")])
+    _, csv_path = report.write(r, tmp_path)
+    lines = csv_path.read_text(encoding="utf-8").split("\n")
+    lines[1] = lines[1][: -len(",,,")] + ",accept,the owner,vérifié"
+    csv_path.write_bytes("\n".join(lines).encode("cp1252"))   # as Excel saves "CSV (Comma delimited)"
+    with pytest.raises(report.ReportError, match="save .* as UTF-8"):
+        report.apply_csv_decisions(r, csv_path)
+    twice = [lines[0], lines[1], lines[2], lines[2].replace(",,,", ",reject,the owner,")]
+    csv_path.write_text("\n".join(twice), encoding="utf-8", newline="\n")
+    with pytest.raises(report.ReportError, match="more than once: R002"):
+        report.apply_csv_decisions(r, csv_path)
