@@ -75,8 +75,9 @@ def read_form(path, cat, data, root, stale_check=True):
     report = check.check(cat, data, intake, stale)
     if not report.complete:
         things = "; ".join(report.blocking)
-        raise ProposeRefused(f"{path.name} is not complete and signed. Run python -m kpi_store.intake check {path.name} "
-                             f"for the whole report. To settle: {things}")
+        flag = f" --form {FORM}" if form else ""
+        raise ProposeRefused(f"{path.name} is not complete and signed. Run python -m kpi_store.intake check {path.as_posix()}"
+                             f"{flag} for the whole report. To settle: {things}")
     return intake
 
 
@@ -150,7 +151,7 @@ def _change_id(out, root, number, notation, today, taken):
     short key>; with -2, -3 and so on when a proposal or an approval record of that name exists already."""
     base = number if approval.CHANGE_ID.fullmatch(number or "") else f"{today}-{notation}"
     change, n = base, 1
-    while change in taken or (out / change).exists() or approval.record_path(root, change).exists():
+    while change.lower() in taken or (out / change).exists() or approval.record_path(root, change).exists():
         n += 1
         change = f"{base}-{n}"
     return change
@@ -185,7 +186,7 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
         compatible = "".join(intake.answers.get("T8", "") or "")
         route = proposal.route_of(changes, compatible)
         change = _change_id(out, root, intake.request.get("number", "").strip(), measure["notation"], today, taken)
-        taken.add(change)
+        taken.add(change.lower())   # case does not count: on Windows and macOS TC-1 and tc-1 are one folder
         record = {"change": change, "route": route, "new_module": False, "signatures": signatures(cat, intake)}
         try:
             approval.check(record)

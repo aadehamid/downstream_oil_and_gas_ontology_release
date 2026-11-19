@@ -306,7 +306,7 @@ def _term_change(lists, intake, report):
                 lines.append(f'T4: "{_short(other)}" holds a semicolon, which the ontology\'s tables use between other names')
             elif other in others:
                 lines.append(f'T4: "{other}" is an other name of the measure already')
-            elif other in (measure["label"], name):
+            elif other == (name or measure["label"]):   # the old name may stay as an other name after a rename
                 lines.append(f'T4: "{other}" is the measure\'s name, so it cannot be an other name too')
         for other in lost:
             if other not in others:

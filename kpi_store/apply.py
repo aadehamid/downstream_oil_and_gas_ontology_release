@@ -58,8 +58,9 @@ def plan(folders, root):
     if not folders:
         raise ChangeRefused("name at least one proposal folder")
     proposals = [proposal.read(f) for f in folders]
-    ids = [p.change for p in proposals]
-    twice = sorted({i for i in ids if ids.count(i) > 1})
+    # Case does not count: on Windows and macOS approvals/TC-1.json and approvals/tc-1.json are one file.
+    ids = [p.change.lower() for p in proposals]
+    twice = sorted({p.change for p in proposals if ids.count(p.change.lower()) > 1})
     if twice:
         raise ChangeRefused(f"the proposal {', '.join(twice)} is named twice")
     clash = proposal.conflicts(proposals)
@@ -128,13 +129,15 @@ def apply(folders, release_root=".", say=print, now=None, before_step=None):
     date = now.strftime("%Y-%m-%d")
     old, new = versions[MODULE]
     records = [f"approvals/{p.change}.json" for p in proposals]
-    # The approval that the new kpi version names: the first record, and the Architect's words, which every record
-    # holds, as signed. The changelog lists every record.
-    words = next(s["words"] for s in proposals[0].record["signatures"] if s["role"] == "Architect")
-    approver = "The Ontology Owner" if route == "major" else "The Architect"
+    # The approval that the new kpi version names: the record of a proposal on the release's route, and the words of
+    # the signer that route needs, as signed: the Ontology Owner for a major, else the Architect. The changelog lists
+    # every record.
+    lead = next(p for p in proposals if p.route == route)
+    role = "Ontology Owner" if route == "major" else "Architect"
+    words = next(s["words"] for s in lead.record["signatures"] if s["role"] == role)
     why = (f"Applies the term change{'s' if len(proposals) > 1 else ''} {', '.join(p.change for p in proposals)}: "
            + "; ".join(line for p in proposals for line in p.lines) + f". Approval records: {', '.join(records)}.")
-    signed = ["--approver", approver, "--where", records[0], "--words", words, "--date", date]
+    signed = ["--approver", f"The {role}", "--where", f"approvals/{lead.change}.json", "--words", words, "--date", date]
     ontology = cut.ONTOLOGY
     step = cut._Steps(say, before_step)
     with tempfile.TemporaryDirectory(prefix="kpi-store-apply-") as tmp:

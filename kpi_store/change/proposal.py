@@ -77,7 +77,7 @@ def write(folder, changes, record, summary):
 def read(folder):
     """One proposal folder, checked: its KGCL lines read, its approval record complete for its route, and that route
     not lower than its changes suggest. Raises ChangeRefused with the reason in plain words."""
-    folder = Path(folder)
+    folder = Path(folder).resolve()   # so "." has a name, and on Windows the name has the case it has on disk
     if not folder.is_dir():
         raise ChangeRefused(f"{folder} is not a proposal folder: it does not exist or is not a folder")
     missing = [name for name in (CHANGE_FILE, APPROVAL_FILE) if not (folder / name).is_file()]

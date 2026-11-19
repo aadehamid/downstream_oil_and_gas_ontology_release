@@ -104,6 +104,14 @@ def test_the_check_refuses_a_term_change_that_asks_for_nothing_or_does_not_fit_t
         assert any(line.startswith(reason) for line in report.blocking), (answers, report.blocking)
 
 
+def test_a_rename_may_keep_the_old_name_as_an_other_name():
+    measure, linked, free = pick(ROOT)
+    renamed = f"{measure['label']} (renamed)"
+    assert _report(ROOT, measure, {"T2": renamed, "T4": [measure["label"]]}).complete
+    report = _report(ROOT, measure, {"T2": renamed, "T4": [renamed]})
+    assert report.blocking == [f'T4: "{renamed}" is the measure\'s name, so it cannot be an other name too']
+
+
 def test_the_check_asks_for_the_ontology_owner_only_when_the_answer_makes_the_change_major():
     measure, linked, free = pick(ROOT)
     report = _report(ROOT, measure, {"T3": "A made-up definition.", "T8": "not-sure"})
@@ -157,7 +165,7 @@ def test_propose_writes_the_kgcl_lines_and_the_route_for_each_kind_of_change(tmp
     assert record["signatures"][-1]["words"] == "The form is complete, and I approve the change to the ontology."
     summary = (folder / "summary.txt").read_text(encoding="utf-8")
     assert f"The route: {route}." in summary and f"The measure: {measure['label']} (measure:{measure['notation']})" in summary
-    assert said[0] == f"wrote the proposal {folder}: {len(lines)} change{'s' if len(lines) > 1 else ''}, route {route}"
+    assert said[0] == f"wrote the proposal {folder.as_posix()}: {len(lines)} change{'s' if len(lines) > 1 else ''}, route {route}"
     # The proposal reads back as the apply command reads it.
     read = proposal.read(folder)
     assert (read.lines, read.route) == (lines, route)
@@ -216,6 +224,42 @@ def test_two_forms_give_two_proposals_and_a_taken_name_counts_up(tmp_path):
     one.write_text(json.dumps(numbered), encoding="utf-8")
     assert [f.name for f in propose_cmd.propose([one], tmp_path / "out", ROOT, now=NOW, say=quiet)] == ["TC-2026-007"]
     assert proposal.read(tmp_path / "out" / "TC-2026-007").change == "TC-2026-007"
+    # Case does not count in a change id: Windows and macOS read TC-2026-009 and tc-2026-009 as one folder.
+    for path, number in ((one, "TC-2026-009"), (two, "tc-2026-009")):
+        held = json.loads(path.read_text(encoding="utf-8"))
+        held["request"] = {"number": number}
+        path.write_text(json.dumps(held), encoding="utf-8")
+    assert [f.name for f in propose_cmd.propose([one, two], tmp_path / "out", ROOT, now=NOW, say=quiet)] == [
+        "TC-2026-009", "tc-2026-009-2"]
+
+
+def test_a_proposal_folder_is_read_by_its_own_name_from_any_path(tmp_path, monkeypatch):
+    measure, linked, free = pick(ROOT)
+    [folder] = propose_cmd.propose([form(tmp_path, measure, {"T4": ["a made-up other name"]})], tmp_path / "out", ROOT,
+                                   now=NOW, say=quiet)
+    monkeypatch.chdir(folder)
+    assert proposal.read(".").change == folder.name
+
+
+def _workbook(path, measure, answers, sign_offs):
+    """A filled workbook whose Term change sheet holds these answers and signatures."""
+    from kpi_store.intake import workbook
+    cat, data = catalogue.load(ROOT / "kpi-intake"), picklists.load(ROOT / "kpi-intake")
+    filled = Intake(form="term-change", answers={"T1": measure["id"], "T8": "yes", **answers}, sign_offs=sign_offs)
+    workbook.save(workbook.build(cat, data["lists"], others={"term-change": filled}), path)
+    return path
+
+
+def test_propose_reads_a_filled_workbook_and_names_the_whole_check_command_when_it_refuses_one(tmp_path):
+    measure, linked, free = pick(ROOT)
+    good = _workbook(tmp_path / "good.xlsx", measure, {"T4": ["a made-up other name"]}, SIGNED)
+    [folder] = propose_cmd.propose([good], tmp_path / "out", ROOT, now=NOW, say=quiet)
+    assert (folder / "change.kgcl").read_text(encoding="utf-8") == \
+        f"create exact synonym 'a made-up other name' for measure:{measure['notation']}\n"
+    unsigned = _workbook(tmp_path / "unsigned.xlsx", measure, {"T4": ["a made-up other name"]}, {"data-owner": SIGNED["data-owner"]})
+    with pytest.raises(propose_cmd.ProposeRefused) as refused:
+        propose_cmd.propose([unsigned], tmp_path / "out2", ROOT, now=NOW, say=quiet)
+    assert f"Run python -m kpi_store.intake check {unsigned.as_posix()} --form term-change for the whole report" in str(refused.value)
 
 
 def test_the_command_line_says_why_in_one_line(tmp_path, capsys):
@@ -279,6 +323,11 @@ def test_apply_refuses_proposals_that_conflict_or_repeat_before_it_writes_anythi
         apply_cmd.apply([one, two, three], ROOT, say=quiet)
     with pytest.raises(ChangeRefused, match="the proposal one is named twice"):
         apply_cmd.apply([one, one], ROOT, say=quiet)
+    # Two folders whose names differ only in case would write one approval record on Windows and macOS.
+    upper = _write(tmp_path / "a" / "TC-1", ["create exact synonym 'y' for measure:c"])
+    lower = _write(tmp_path / "b" / "tc-1", ["create exact synonym 'y' for measure:d"])
+    with pytest.raises(ChangeRefused, match="the proposal TC-1, tc-1 is named twice"):
+        apply_cmd.apply([upper, lower], ROOT, say=quiet)
     # A definition and a process link of the same measure are other fields, so they do not conflict.
     assert proposal.conflicts([proposal.read(_write(tmp_path / "four", ["change definition of measure:a to 'D'"], "patch")),
                                proposal.read(_write(tmp_path / "five", ["create edge measure:a kpi:informsProcess proc:p"]))]) == []
@@ -395,6 +444,23 @@ def test_a_rename_a_new_other_name_and_a_process_link_go_from_the_form_to_a_comm
     # The same proposal again is refused: the release holds its record.
     with pytest.raises(ChangeRefused, match=f"the proposal {folder.name} was applied before"):
         apply_cmd.apply([folder], root, say=quiet, now=NOW)
+
+
+def test_a_minor_and_a_major_together_release_a_major_that_names_the_ontology_owners_record_and_words(tmp_path):
+    root = scratch_release(tmp_path, git_copy=False)
+    measure, linked, free = pick(root)
+    lists = picklists.load(root / "kpi-intake")["lists"]
+    other = next(m for m in lists["measures"] if m["id"] != measure["id"])
+    one = form(tmp_path, measure, {"T4": ["a made-up other name"]}, name="minor")
+    two = form(tmp_path, other, {"T3": "A made-up definition.", "T8": "no"}, MAJOR_SIGNED, name="major")
+    minor, major = propose_cmd.propose([one, two], tmp_path / "proposals", root, now=NOW, say=quiet)
+    held = _versions(root)["kpi"]
+    apply_cmd.apply([minor, major], root, say=quiet, now=NOW)
+    new = f"{ov.version_key(held)[0] + 1}.0.0"
+    assert _versions(root)["kpi"] == new
+    manifest = json.loads((root / ov.RELEASES / "kpi" / new / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["approved_by"] == {"who": "The Ontology Owner", "recorded_in": f"approvals/{major.name}.json",
+                                       "words": "This change alters what the measure means, and I approve it as a major change."}
 
 
 def test_a_failing_step_and_a_builder_error_roll_everything_back(tmp_path):
