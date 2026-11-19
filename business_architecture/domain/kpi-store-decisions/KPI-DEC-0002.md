@@ -42,6 +42,9 @@ How the agent reads the answers, for the owner to correct:
   on this record's first commit and returned a full review when the change was given in the prompt; Antigravity's
   headless mode refused tool commands. The agent reads Q1's list as replacing the order for every pull request,
   not only the high-risk ones; the owner has not confirmed that reading.
+- Round 4's "yes to all" answered a message that ended with the agent's list of glossary terms to add: proposal,
+  change file, change form, route and approval record (saved in the answers file's round 4 comment). The glossary
+  uses those names; "change file" is the glossary's name for the change record that the KGCL option describes.
 - The owner's reply on AI amends the accepted Q3: propose stays rule-based by default, and AI becomes an option
   (Q16 to Q20).
 - This record changes three things that KPI-DEC-0001 set for this release: what the next version builds; how a
