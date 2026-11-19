@@ -166,6 +166,7 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   kpi_store/tests/test_reset.py \
   scripts/test_check_script.py \
   scripts/test_check_standalone.py \
+  scripts/test_pre_push_hook.py \
   scripts/test_doc_snippets.py \
   scripts/test_docs_html.py \
   scripts/test_epm_facts.py \
