@@ -186,11 +186,15 @@ class Tables(unittest.TestCase):
             self.append(d, "enumerations.csv", {"slug": "test-enum", "measure": "crack-spreads", "view": "v", "id_column": "i",
                                                 "name_column": "n", "group_column": "", "filter": "", "count": "",
                                                 "source": "ARGUS"})
+            self.append(d, "market-prices.csv", {"slug": "price-test-price", "label": "Test price", "measure": "crack-spreads",
+                                                 "reported_as": "cash", "mpr": "", "definition": "A test price.",
+                                                 "reuses": "", "source": "ARGUS"})
         g = self.build_with(edit)
         src = URIRef("https://w3id.org/mpc/ontology/source/argus-crack-spreads-2026")
         dcterms = URIRef("http://purl.org/dc/terms/source")
         self.assertEqual(g.value(REGION["test-region"], dcterms), src)
         self.assertEqual(g.value(URIRef(str(bm.ENUM) + "test-enum"), dcterms), src)
+        self.assertEqual(g.value(URIRef(str(bm.PRICE) + "test-price"), dcterms), src)
 
     def test_a_series_note_is_its_note_cell(self):
         def edit(d):
@@ -219,6 +223,18 @@ class Tables(unittest.TestCase):
             with self.assertRaises(SystemExit) as caught:
                 self.build_with(lambda d: self.append(d, "sources.csv", row))
             self.assertIn(message, str(caught.exception))
+
+
+    def test_a_bad_price_source_fails(self):
+        new = {"slug": "price-test-price", "label": "Test price", "measure": "crack-spreads", "reported_as": "cash",
+               "mpr": "", "definition": "A test price.", "reuses": "", "source": "NO-SUCH"}
+        with self.assertRaises(SystemExit) as caught:
+            self.build_with(lambda d: self.append(d, "market-prices.csv", new))
+        self.assertIn("price price-test-price: a new price needs a source in sources.csv, not 'NO-SUCH'", str(caught.exception))
+        reused = dict(new, slug="price-test-reuse", label="Test reuse", definition="", reuses="la-carbob", source="ARGUS")
+        with self.assertRaises(SystemExit) as caught:
+            self.build_with(lambda d: self.append(d, "market-prices.csv", reused))
+        self.assertIn("price price-test-reuse: a reused benchmark keeps its source in benchmarks.csv", str(caught.exception))
 
 
 class Shapes(unittest.TestCase):

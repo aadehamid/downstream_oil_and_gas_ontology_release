@@ -131,6 +131,9 @@ def load():
                 problems.append(f"price {p['slug']}: reuses unknown benchmark {p['reuses']!r}")
             elif p["mpr"] and bench[p["reuses"]]["mpr"] != p["mpr"]:
                 problems.append(f"price {p['slug']}: its Price Master ID differs from the benchmark it reuses")
+            if p["source"]:
+                problems.append(f"price {p['slug']}: a reused benchmark keeps its source in benchmarks.csv; leave source "
+                                "empty")
         elif p["source"] not in sources:
             problems.append(f"price {p['slug']}: a new price needs a source in sources.csv, not {p['source']!r}")
         elif not p["definition"]:
