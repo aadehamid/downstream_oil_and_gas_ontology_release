@@ -193,7 +193,7 @@ a[data-state="routed"] progress::-moz-progress-bar { background: var(--stop-line
 .tabs button:focus-visible { outline-offset: -4px; }
 .tabs button[aria-selected="true"] { color: var(--ink); }
 .tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 5px; height: 2px; background: var(--ink); }
-/* Four groups: the KPI form, the two smaller forms an answer can route to, the term change, and the two pages to read. */
+/* Four groups: the KPI form, the two smaller forms an answer can route to, the two change forms, and the two pages to read. */
 .tabs [data-view="domain-activation"], .tabs [data-view="term-change"], .tabs [data-view="roles"] { margin-left: 21px; }
 .tabs [data-view="domain-activation"]::before, .tabs [data-view="term-change"]::before, .tabs [data-view="roles"]::before { content: ""; position: absolute; left: -11px; top: 12px; bottom: 12px; width: 1px; background: var(--control); }
 
@@ -828,7 +828,7 @@ function partsProblem(held) {
 function fileProblem(data) {
   if (!isObject(data)) return "it is not a JSON object";
   if (data.format !== 1) return 'its "format" is not 1';
-  if (!FORMS.includes(data.form)) return 'its "form" names none of the four forms';
+  if (!FORMS.includes(data.form)) return 'its "form" names none of the five forms';
   return partsProblem(data);
 }
 function saveDraft() {
@@ -1099,6 +1099,7 @@ function drawForm(form) {
   intro.querySelector(".intro-text").textContent = form === FORMS[0]
     ? "One form is for one KPI. Sections 1 to 6 are for the business. Section 7 is for Digital IT, after the business has signed. Save the answers to a file when you stop, and load the file to go on."
     : form === "term-change" ? "Use this form to change a measure the ontology already holds. Save it to its own file."
+    : form === "reference-item" ? "Use this form to add a new system or a new table to the ontology. Save it to its own file."
     : "Fill in this form only when the KPI form sends you here. Save it to its own file.";
   const requestBox = intro.querySelector('[data-part="request"]');
   // The request details stay open while they are empty. Once filled, they close to one line.
@@ -1249,7 +1250,8 @@ function isNeeded(signer, form, answers) {
 }
 // What a signature means on this form: a domain activation and a term change may give a signer its own words.
 function meaningOf(signer, form) {
-  const own = { "domain-activation": signer.activation_meaning, "term-change": signer.change_meaning }[form];
+  const own = { "domain-activation": signer.activation_meaning, "term-change": signer.change_meaning,
+    "reference-item": signer.item_meaning }[form];
   return own || signer.meaning;
 }
 function left(count) { return count ? `${count} required ${count === 1 ? "answer" : "answers"} left` : "Required answers complete"; }

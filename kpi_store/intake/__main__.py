@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def report_path(file, form=None):
     """Where `check --report` writes: beside the file, under its name with .check.txt in place of its ending. For a
     workbook the name also says the form, unless the file's name already ends with it, and then "workbook":
-    a workbook holds four forms, and a KPI may have an answers file and a workbook of the same name. So no two
+    a workbook holds five forms, and a KPI may have an answers file and a workbook of the same name. So no two
     checks share a report.
 
         crack-spreads-pricing.kpi-intake.json   crack-spreads-pricing.kpi-intake.check.txt

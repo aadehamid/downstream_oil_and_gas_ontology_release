@@ -1,4 +1,4 @@
-"""Open the HTML intake form in a real browser and prove the twenty-two things a person filling it relies on.
+"""Open the HTML intake form in a real browser and prove the twenty-three things a person filling it relies on.
 
     uv run --no-project --with playwright==1.65.0 python kpi_store/intake/browser_check.py
 
@@ -38,6 +38,8 @@ Each proof starts from a fresh load of kpi-intake/kpi-intake-form.html, with emp
                  entry, from a file and from a draft; the entry is offered once, and the form says what it did
  22 term change  the Term change form asks for the Ontology Owner's signature only when T8 is "no" or "not sure",
                  and saves its file under the measure's name with the measure's id as the answer to T1
+ 23 reference    the Reference item form says that a role needs a specialist, asks a system's questions only for a
+                 system, and saves its file under the item's name
 
 Every expected value below is written by hand from the catalogue and the release packages. The script exits 1
 when a proof fails and names it. scripts/check.sh does not run it, because it needs a browser.
@@ -117,7 +119,7 @@ def load(s):
     same(page.locator("h1").inner_text(), "KPI intake form", "the page's heading")
     holds(page.locator("#release-line").text_content(), "KPI Store 1.1, catalogue 1.2", "the release line")
     same(page.locator("#tabs [role=tab]").all_inner_texts(),
-         ["KPI intake", "Domain activation", "Process map request", "Term change", "The roles", "What we will ask you"], "the tabs")
+         ["KPI intake", "Domain activation", "Process map request", "Term change", "Reference item", "The roles", "What we will ask you"], "the tabs")
     same(page.locator("[data-section]").count(), 7, "sections of the KPI form")
     same(page.locator("[data-question]").count(), 56, "questions of the KPI form")
     holds(page.locator(".brand-line").inner_text(), "Works offline. Sends nothing.", "the line under the name")
@@ -281,7 +283,7 @@ def phone(s):
     assert page.locator("#contents").is_hidden(), "the section list stays open after a choice"
     page.wait_for_function("document.getElementById('sections-now').textContent.startsWith('3. The facts about it')")
     assert page.evaluate("parseFloat(getComputedStyle(document.body).paddingBottom) >= document.getElementById('dock').offsetHeight - 1"), "the page does not clear the bar of file buttons"
-    for tab in ("kpi-intake", "domain-activation", "process-map-request", "term-change", "roles", "explainer"):
+    for tab in ("kpi-intake", "domain-activation", "process-map-request", "term-change", "reference-item", "roles", "explainer"):
         page.locator("#view-select").select_option(tab)
         same(page.locator(f'[data-view="{tab}"]').get_attribute("aria-selected"), "true", f"the view after choosing {tab}")
         assert not page.evaluate("document.documentElement.scrollWidth > innerWidth"), f"the {tab} view scrolls sideways at 390 px"
@@ -340,7 +342,7 @@ def bad_file(s):
         ("not json at all", "it is not JSON."),
         ("[1, 2]", "it is not a JSON object."),
         ('{"format":2,"form":"kpi-intake","answers":{}}', 'its "format" is not 1.'),
-        ('{"format":1,"form":"something-else","answers":{}}', 'its "form" names none of the four forms.'),
+        ('{"format":1,"form":"something-else","answers":{}}', 'its "form" names none of the five forms.'),
         ('{"format":1,"form":"kpi-intake","answers":["2.1"]}', 'it has no "answers" object.'),
         ('{"format":1,"form":"kpi-intake","answers":{"5.1":["a",3]}}', "the answer to 5.1 is neither a text nor a list of texts."),
         ('{"format":1,"form":"kpi-intake","answers":{},"comment":{"a":1}}', '"comment" is not a text.'),
@@ -450,7 +452,7 @@ def bad_draft(s):
     page = s.open()
     good = {"answers": {"2.1": "Tank Turnover"}, "request": {}, "sign_offs": {}, "consulted": {}, "example_of": "", "comment": ""}
     empty = dict(good, answers={})
-    forms = ("kpi-intake", "domain-activation", "process-map-request", "term-change")
+    forms = ("kpi-intake", "domain-activation", "process-map-request", "term-change", "reference-item")
 
     def seeded(**changed):
         state = {form: empty for form in forms}
@@ -740,12 +742,36 @@ def term_change(s):
     s.shot(page, "22-term-change")
 
 
+def reference_item(s):
+    page = s.open()
+    page.locator('[data-view="reference-item"]').click()
+    same(page.locator("[data-question]").count(), 9, "questions of the reference item")
+    card(page, "R1").locator("input").fill("Acme Scheduler")
+    choose(page, "R2", "role")
+    holds(card(page, "R2").locator('[data-notice="needs-specialist"]').inner_text(), "Needs a specialist", "the notice for a role")
+    assert card(page, "R3").is_hidden(), "the system's definition is asked for a role"
+    choose(page, "R2", "system")
+    same(card(page, "R2").locator("[data-notice]").count(), 0, "notices for a system")
+    assert card(page, "R3").is_visible() and card(page, "R8").is_hidden(), "a system's questions are not the ones shown"
+    card(page, "R3").locator("textarea").fill("A made-up application that schedules the made-up work.")
+    choose(page, "R5", "https://w3id.org/mpc/ontology/modules/system/kind/application")
+    same(page.locator('[data-nav="signoff"] .nav-count').inner_text(), "0 of 2 required signed", "the sign-off line")
+    with page.expect_download() as download:
+        page.locator("#save").click()
+    same(download.value.suggested_filename, "acme-scheduler.reference-item.json", "the file's name")
+    data = json.loads(Path(download.value.path()).read_text(encoding="utf-8"))
+    same((data["form"], data["kpi_name"]), ("reference-item", "Acme Scheduler"), "the form and the name")
+    same(data["answers"], {"R1": "Acme Scheduler", "R2": "system", "R3": "A made-up application that schedules the made-up work.",
+                           "R5": "https://w3id.org/mpc/ontology/modules/system/kind/application"}, "answers")
+    s.shot(page, "23-reference-item")
+
+
 PROOFS = [("1 load", load), ("2 fill", fill), ("3 narrow list", narrow_list), ("4 conditional", conditional),
           ("5 routing", routing), ("6 save", save), ("7 load file", load_file), ("8 draft", draft), ("9 phone", phone),
           ("10 theme", theme), ("11 next step", next_step), ("12 bad file", bad_file), ("13 other form", other_form),
           ("14 detail", detail), ("15 conflict", conflict), ("16 bad draft", bad_draft), ("17 hidden", hidden),
           ("18 added", added), ("19 new fields", new_fields), ("20 guide", guide), ("21 alias", alias),
-          ("22 term change", term_change)]
+          ("22 term change", term_change), ("23 reference", reference_item)]
 
 
 def launch(playwright, channels):

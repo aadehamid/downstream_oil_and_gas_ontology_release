@@ -230,6 +230,25 @@ def _sources(release):
     return _sorted(items)
 
 
+def _system_sources(release, sources):
+    """The documents a new system may cite (the reference-item form, R6 and R7): those the system module titles or
+    names a system by. Each is a row of system/sources.csv, as its builder checks."""
+    from rdflib import URIRef
+    g = release.graph("system")
+    held = {str(s) for s in g.subjects(URIRef(DCTERMS + "title"), None)}
+    held |= {str(o) for o in g.objects(None, URIRef(SYSTEM + "namedBy"))}
+    return [dict(item) for item in sources if item["id"] in held]
+
+
+def _table_sources(release, sources):
+    """The documents a new table may cite (the reference-item form, R9): those that record the module's tables."""
+    from rdflib import URIRef
+    g = release.graph("data-product")
+    held = {str(o) for s in release.instances("data-product", DP + "PlatformTable")
+            for o in g.objects(URIRef(s), URIRef(DCTERMS + "source"))}
+    return [dict(item) for item in sources if item["id"] in held]
+
+
 def _terms(release):
     """Every named term of every module except the measures, with its names and its definition. The check looks a
     new KPI's name up here."""
@@ -255,6 +274,7 @@ def build(root, release=None):
     processes = _processes(release)
     areas = _business_areas(release, processes)
     modules = [{"id": m, "label": m} for m in sorted(release.versions)]
+    sources = _sources(release)
     lists = {
         "business-areas": areas,
         "processes": processes,
@@ -267,7 +287,10 @@ def build(root, release=None):
         "layers": _simple(release, "data-product", release.subjects("data-product", SKOS + "inScheme", DP + "Layer")),
         "data-product-kinds": _simple(release, "data-product", release.subjects("data-product", SKOS + "inScheme", DP + "DataProductKind")),
         "systems": _simple(release, "system", release.instances("system", SYSTEM + "System")),
-        "sources": _sources(release),
+        "system-kinds": _simple(release, "system", release.subjects("system", SKOS + "inScheme", SYSTEM + "SystemKind")),
+        "sources": sources,
+        "system-sources": _system_sources(release, sources),
+        "table-sources": _table_sources(release, sources),
         "modules": modules,
         "areas-and-modules": [{"id": a["id"], "label": "Business area: " + a["label"]} for a in areas]
                              + [{"id": "module:" + m["id"], "label": "Module: " + m["label"]} for m in modules],

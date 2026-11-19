@@ -8671,6 +8671,147 @@
     "tier": "framework"
    }
   ],
+  "system-kinds": [
+   {
+    "id": "https://w3id.org/mpc/ontology/modules/system/kind/application",
+    "label": "Application"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/modules/system/kind/office-tool",
+    "label": "Office tool"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/modules/system/kind/document",
+    "label": "Working document"
+   }
+  ],
+  "system-sources": [
+   {
+    "id": "https://w3id.org/mpc/ontology/source/vendor-aspentech-aspen-petroleum-scheduler",
+    "label": "AspenTech, Aspen Petroleum Scheduler, https://www.aspentech.com/en/products/msc/aspen-petroleum-scheduler, retrieved 2026-10-25",
+    "tier": "industry"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/vendor-aspentech-aspen-pims-brochure",
+    "label": "AspenTech, Aspen PIMS brochure (AT-06696, 2021), https://www.aspentech.com/-/media/aspentech/home/resources/brochure/pdfs/fy21/q3/at-03906-bro-aspen-pims.pdf, retrieved 2026-10-25",
+    "tier": "industry"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/vendor-aspentech-ppims-course",
+    "label": "AspenTech, course RPA206, Multi-Period Refinery Modeling with Aspen PPIMS, https://esupport.aspentech.com/UniversityCourse?Id=a3p0B0000004YnsQAE, retrieved 2026-10-25",
+    "tier": "industry"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/vendor-aspentech-mpims-course",
+    "label": "AspenTech, course RPA207 on Aspen MPIMS, https://esupport.aspentech.com/UniversityCourse?Id=a3p0B0000004YwmQAE, retrieved 2026-10-25",
+    "tier": "industry"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/vendor-aveva-pi-system",
+    "label": "AVEVA, AVEVA PI System, https://www.aveva.com/en/products/aveva-pi-system/ (published 2026-09-23), retrieved 2026-10-25",
+    "tier": "industry"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/vendor-databricks-introduction",
+    "label": "Databricks, What is Databricks?, https://docs.databricks.com/aws/en/introduction/ (updated 2026-09-11), retrieved 2026-10-25",
+    "tier": "industry"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/vendor-ion-rightangle",
+    "label": "ION, RightAngle, https://iongroup.com/products/commodities/rightangle/ (page modified 2026-08-10), retrieved 2026-10-25",
+    "tier": "industry"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/vendor-lexisnexis-bridger-insight-xg",
+    "label": "LexisNexis Risk Solutions, Bridger Insight XG, https://risk.lexisnexis.com/products/bridger-insight-xg, retrieved 2026-10-25",
+    "tier": "industry"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/vendor-microsoft-excel",
+    "label": "Microsoft, Microsoft Excel, https://www.microsoft.com/en-us/microsoft-365/excel, retrieved 2026-10-25",
+    "tier": "industry"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/vendor-microsoft-powerpoint",
+    "label": "Microsoft, Microsoft PowerPoint, https://www.microsoft.com/en-us/microsoft-365/powerpoint, retrieved 2026-10-25",
+    "tier": "industry"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/vendor-microsoft-teams",
+    "label": "Microsoft, Microsoft Teams, https://www.microsoft.com/en-us/microsoft-teams/group-chat-software, retrieved 2026-10-25",
+    "tier": "industry"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/vendor-microsoft-outlook-business",
+    "label": "Microsoft, Outlook for business, https://www.microsoft.com/en-us/microsoft-365/outlook/outlook-for-business, retrieved 2026-10-25",
+    "tier": "industry"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/core-2-3-0-process-definitions",
+    "label": "MPC core 2.3.0, the names and definitions of the processes each system supports, business_architecture/ontology/releases/previous/core/2.3.0/core.ttl",
+    "tier": "process-authority"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/vendor-oracle-hyperion-planning-11-2",
+    "label": "Oracle, Hyperion Planning User's Guide, Release 11.2.0 (F12986-01, December 2019), chapter 1, https://docs.oracle.com/en/applications/enterprise-performance-management/11.2/pustd/GUID102XD8E9FC8A10...",
+    "tier": "industry"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/vendor-profisee-platform",
+    "label": "Profisee, Platform, https://profisee.com/platform/, retrieved 2026-10-25",
+    "tier": "industry"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/vendor-salesforce",
+    "label": "Salesforce, What is Salesforce?, https://www.salesforce.com/products/what-is-salesforce/ (page modified 2026-09-24), retrieved 2026-10-25",
+    "tier": "industry"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/vendor-sap-s4hana-help",
+    "label": "SAP, Conversion Guide for SAP S/4HANA 2025, document version 3.0 (2026-10-07), https://help.sap.com/doc/2b87656c4eee4284a5eb8976c0fe88fc/2025/en-US/CONV_OP2025.pdf, retrieved 2026-10-26",
+    "tier": "industry"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/vendor-sap-information-steward",
+    "label": "SAP, SAP Information Steward, https://www.sap.com/products/data-cloud/data-profiling-steward.html, retrieved 2026-10-25",
+    "tier": "industry"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/vendor-sap-mdg",
+    "label": "SAP, SAP Master Data Governance, https://www.sap.com/products/data-cloud/master-data-governance.html, retrieved 2026-10-25",
+    "tier": "industry"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/vendor-sirion",
+    "label": "Sirion, https://www.sirion.ai/, retrieved 2026-10-25",
+    "tier": "industry"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/sme-review-2026-10-25-item-g",
+    "label": "the subject matter expert's answers to the item G questions, session of 2026-10-25, (the review comments of a subject matter expert reviewing the documents)",
+    "tier": "process-authority"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/decision-owner-customer-inputs",
+    "label": "the subject matter expert's customer inputs (seven files), as the party module holds them in its customer roles, data flows and attributes",
+    "tier": "process-authority"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/decision-owner-customer-inputs-2026-10-27",
+    "label": "the subject matter expert's customer inputs of 2026-10-27 (including two Dealer Master documents), as the party module holds them",
+    "tier": "process-authority"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/decision-owner-pricing-assets-2026-10-25",
+    "label": "the subject matter expert's Databricks pricing metric views, their lineage and the Genie agents' instructions (idp_sbx sandbox), shared on 2026-10-25 (the decision of 2026-10-25)",
+    "tier": "process-authority"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/source/sme-review-2026-10-24-systems",
+    "label": "the subject matter expert's identifications of systems, session of 2026-10-24, (the review comments of a subject matter expert reviewing the documents)",
+    "tier": "process-authority"
+   }
+  ],
   "systems": [
    {
     "id": "https://w3id.org/mpc/ontology/modules/system/system/actuals-case-prep-file",
@@ -8877,6 +9018,13 @@
    {
     "id": "https://w3id.org/mpc/ontology/modules/system/system/xpims-dpo-integration-macro",
     "label": "XPIMS <> DPO Integration Macro"
+   }
+  ],
+  "table-sources": [
+   {
+    "id": "https://w3id.org/mpc/ontology/source/decision-owner-pricing-assets-2026-10-25",
+    "label": "the subject matter expert's Databricks pricing metric views, their lineage and the Genie agents' instructions (idp_sbx sandbox), shared on 2026-10-25 (the decision of 2026-10-25)",
+    "tier": "process-authority"
    }
   ],
   "value-stream-steps": [
