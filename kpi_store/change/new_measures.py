@@ -231,9 +231,9 @@ def _read(root, names):
 def source_records(root):
     """{source IRI: its title} for each source that the release's newest packages give a title and integration gives
     an evidence tier: the sources the kpi module may cite without a specialist. A title counts when it is not blank and
-    is tagged English or not tagged, since the kpi builder writes it as English; of several, the first English one in
+    is tagged English or is a plain untagged string, since the kpi builder writes it as English; of several, the first English one in
     text order, else the first untagged one."""
-    from rdflib import Literal, URIRef
+    from rdflib import XSD, Literal, URIRef
     from kpi_store.intake import picklists
     from kpi_store import ontology_view
     try:
@@ -245,7 +245,9 @@ def source_records(root):
     titles = {}
     for module in sorted(release.graphs):
         for s, title in release.graph(module).subject_objects(URIRef(PREFIXES["dcterms"] + "title")):
-            if str(s) in tiered and isinstance(title, Literal) and str(title).strip() and title.language in (None, LANGUAGE):
+            english = title.language == LANGUAGE if isinstance(title, Literal) else False
+            untagged = isinstance(title, Literal) and title.language is None and title.datatype in (None, XSD.string)
+            if str(s) in tiered and (english or untagged) and str(title).strip():   # a date or a number is no title
                 titles.setdefault(str(s), set()).add((title.language != LANGUAGE, str(title)))
     return {s: sorted(t)[0][1] for s, t in titles.items()}
 

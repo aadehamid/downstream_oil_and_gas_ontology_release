@@ -509,7 +509,20 @@ def test_a_source_takes_one_non_blank_english_or_untagged_title(tmp_path):
     with package.open("a", encoding="utf-8") as f:
         f.write(f'\n<{MPC}> <http://purl.org/dc/terms/title> ""@en, "   "@en, "A Form 10-K (in French)"@fr .\n')
     assert nm.source_records(root)[MPC] == MPC_TITLE
-    with package.open("a", encoding="utf-8") as f:   # a source with no usable title is not a record the kpi module takes
-        f.write('\n<https://w3id.org/mpc/ontology/source/mplx-s01> <http://purl.org/dc/terms/title> "   "@en .\n')
+    # Three made-up sources with an evidence tier: one with only unusable titles, one with only an untagged title,
+    # one with an English title and an untagged title that sorts before it.
+    src = "https://w3id.org/mpc/ontology/source/"
+    tier = "<https://w3id.org/mpc/ontology/modules/authority/evidenceTier>"
+    for integration in (root / cut.ONTOLOGY / "releases" / "integration").glob("*/integration.ttl"):
+        with integration.open("a", encoding="utf-8") as f:
+            for name in ("test-unusable", "test-untagged", "test-both"):
+                f.write(f'\n<{src}{name}> {tier} "made-up tier" .\n')
+    with package.open("a", encoding="utf-8") as f:
+        title = "<http://purl.org/dc/terms/title>"
+        f.write(f'\n<{src}test-unusable> {title} "   "@en, "Un titre"@fr, "2025-12-31"^^<http://www.w3.org/2001/XMLSchema#date> .\n'
+                f'<{src}test-untagged> {title} "An untagged title" .\n'
+                f'<{src}test-both> {title} "A untagged title, first in text order", "The English title"@en .\n')
     records = nm.source_records(root)
-    assert records["https://w3id.org/mpc/ontology/source/mplx-s01"] == "MPLX LP, Form 10-K for the fiscal year ended 2025-12-31"
+    assert src + "test-unusable" not in records
+    assert records[src + "test-untagged"] == "An untagged title"
+    assert records[src + "test-both"] == "The English title"
