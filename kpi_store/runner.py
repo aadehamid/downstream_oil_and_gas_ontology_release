@@ -910,7 +910,8 @@ def run_steps(ctx, names):
             ctx.out(f"{name}: STOPPED. Next step: {stop}")
             return 3
         except Exception as err:   # pylint: disable=broad-except
-            if isinstance(err, StepFailed):
+            expected = isinstance(err, StepFailed)
+            if expected:
                 failure = err
             else:
                 # An error no step expected still ends the run with one line and a step file, never a traceback.
@@ -929,7 +930,8 @@ def run_steps(ctx, names):
             err = failure
             if not ctx.dry_run:
                 # The sync step wrote its rows before it failed. They are kept, not replaced by a bare "failed".
-                kept = ctx.earlier(name) if name in ("sync", "notebook") else None
+                # An unexpected error in the sync step wrote no new rows, so an older file is not kept.
+                kept = ctx.earlier(name) if (name == "sync" and expected) or name == "notebook" else None
                 # A notebook run that is still waited for keeps its record: the record holds the Databricks run ID,
                 # and without it the next run would submit a second job.
                 if name == "notebook" and (kept or {}).get("status") != "waiting":

@@ -865,3 +865,11 @@ def test_a_release_error_in_the_fuseki_step_is_a_step_failure(setup, monkeypatch
     ctx = setup.make()
     with pytest.raises(runner.StepFailed, match="the release lacks the catalog"):
         runner.step_fuseki(ctx)
+
+
+def test_an_unexpected_error_in_the_sync_step_replaces_an_older_sync_file(setup, monkeypatch):
+    ctx = setup.make()
+    runner.write_text(ctx.step_file("sync"), json.dumps({"status": "current", "rows": []}))
+    monkeypatch.setitem(runner.STEP_FUNCTIONS, "sync", lambda c: [][1])
+    assert runner.run_steps(ctx, ["sync"]) == 1
+    assert json.loads(ctx.step_file("sync").read_text(encoding="utf-8"))["status"] == "failed"

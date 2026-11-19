@@ -200,7 +200,10 @@ def apply_csv_decisions(report, csv_path):
     except UnicodeDecodeError:   # a spreadsheet saved the file in the machine's own encoding
         raise ReportError(f"save {csv_path} as UTF-8: in Excel choose File, Save As, and the file type \"CSV UTF-8 "
                           "(Comma delimited)\"; then run the same command again") from None
-    ids = [r.get("id") or "" for r in read]
+    ids = [r["id"] for r in read]   # a CSV with no id column raises KeyError, as before
+    if not all(ids):
+        raise ReportError(f"a row of {csv_path} has no ID. Delete empty rows, keep the report's rows as they are, and "
+                          "run the same command again")
     twice = sorted({i for i in ids if ids.count(i) > 1})
     if twice:   # the later copy would silently replace the earlier one's decision
         raise ReportError(f"the CSV holds a row ID more than once: {', '.join(twice)}. Keep one copy of each row")

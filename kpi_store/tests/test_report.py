@@ -121,3 +121,6 @@ def test_a_csv_saved_in_another_encoding_or_with_a_row_twice_is_a_report_error(t
     csv_path.write_text("\n".join(twice), encoding="utf-8", newline="\n")
     with pytest.raises(report.ReportError, match="more than once: R002"):
         report.apply_csv_decisions(r, csv_path)
+    csv_path.write_text("\n".join([lines[0], lines[1], ",,,,,,,,,,,", ",,,,,,,,,,,"]), encoding="utf-8", newline="\n")
+    with pytest.raises(report.ReportError, match="has no ID. Delete empty rows"):
+        report.apply_csv_decisions(r, csv_path)
