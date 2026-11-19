@@ -597,7 +597,7 @@ One proposal holds every module the form changes, and one apply releases them al
 
 - `kpi`: the KPI, and what it counts and leaves out (2.3, 2.4), which ship in the `kpi` package as its population. Each measure that 5.2 names as mistaken for it gains a sentence at the end of its own scope note, which names the new KPI.
 - `value-stream`: a link from each value stream step of 6.3 to the KPI, with how the step uses it (6.4) and the document that says so (6.5). The apply writes each link into the step's list in `business_architecture/business_process/value_stream_*.json`, which the module's builder reads.
-- `data-product`: the view of 7.1 serves the KPI, and the assistant of 7.8 answers from that view. The apply checks that 6.6 names the data product the view is part of.
+- `data-product`: the view of 7.1 serves the KPI, and the assistant of 7.8 answers from that view. The propose command checks that 6.6 names the data product the view is part of.
 
 Each changed module takes its own minor, and every module that depends on one takes a patch, once. The apply compares each rebuilt module with the proposal's lines and facts, and makes one commit. Two answers stay in the form's file, and `summary.txt` says so: the market series of 6.7, which the form does not collect, and 7.7, for which the ontology has no property yet.
 
@@ -605,7 +605,10 @@ The propose command refuses a form that the modules cannot take as they stand, a
 
 - a name or an other name that a measure has already. A change to that measure goes through the term-change form;
 - a role in 6.1 that is not one of the four planning personas, the only roles the `kpi` module records today;
-- a view in 7.1 that the ontology does not hold, a table that is not a metric view, or an assistant in 7.8 that the `data-product` module does not hold. A new view or assistant needs a specialist, as the reference-item form says of a table built from other tables. A new value stream step goes to the process map request;
+- a view in 7.1 that the ontology does not hold, a table that is not a metric view, or an assistant in 7.8 that the `data-product` module does not hold. A new view or assistant needs a specialist, as the reference-item form says of a table built from other tables;
+- a data product in 6.6 other than the one the view of 7.1 is part of, or one that the ontology does not hold;
+- an assistant in 7.8 when 7.1 names no view for it to answer from;
+- a step in 6.3 that the ontology does not hold. A new value stream step goes to the process map request;
 - 2.4 without 2.3, because a population says what the KPI counts before what it leaves out;
 - more than one document in 3.5, or a document that 3.5 does not offer and `kpi/measure-sources.csv` does not hold. A new source document needs a specialist, because its evidence tier is in the `integration` module. A document that 3.5 offers is in the ontology already, with its title and its tier: when `kpi/measure-sources.csv` has no row for it yet, the apply adds one, with that title.
 

@@ -88,6 +88,8 @@ def split(changes, facts):
         elif change.kind == "create edge" and prefix == "table" and change.predicate == "dp:servesMeasure":
             served.append((tail(change.subject), change.target))
         elif change.kind == "create edge" and prefix == "agent" and change.predicate == "prov:used":
+            if not change.target.startswith("table:"):
+                raise ChangeRefused(f"prov:used of an assistant points at table:<id>: {line}")
             used.append((tail(change.subject), tail(change.target)))
         else:
             raise ChangeRefused("a new KPI changes another module only by these links: vs:measureLink, vs:measure and "
@@ -175,12 +177,18 @@ def _edit(changes, facts, root):
         if any(m["measureId"] == s["measure"] for m in process.get("measures", [])):
             raise ChangeRefused(f"the step vsprocess:{s['step']} is linked to measure:{s['measure']} already")
         entry = {"measureId": s["measure"], "relationship": s["relationship"], "basis": s["basis"]}
-        texts[path] = _add_entry(texts[path], process, entry)
+        try:
+            texts[path] = _add_entry(texts[path], process, entry)
+        except ValueError:
+            raise ChangeRefused(_LAYOUT.format(path.as_posix())) from None
         process.setdefault("measures", []).append(entry)
     for path, _, data in streams:
-        if json.loads(texts[path]) != data:   # the text edit must give exactly the entries added
-            raise ChangeRefused(f"{path.as_posix()} is not laid out as the release ships it, so its entries cannot be "
-                                "added; it needs a specialist")
+        try:   # the text edit must give exactly the entries added, and no key twice
+            same = json.loads(texts[path], object_pairs_hook=_once) == data
+        except ValueError:
+            same = False
+        if not same:
+            raise ChangeRefused(_LAYOUT.format(path.as_posix()))
     pricing = _pricing(root, ("tables", "agents"))
     tables = {t["slug"]: t for t in pricing.rows["tables"]}
     agents = {a["slug"]: a for a in pricing.rows["agents"]}
@@ -190,6 +198,8 @@ def _edit(changes, facts, root):
             raise ChangeRefused(f"table:{view} is not a metric view of the data-product module. Only a metric view "
                                 "serves a measure")
         held = [m for m in t["serves_measures"].split(";") if m]
+        if tail(measure) in held:
+            raise ChangeRefused(f"table:{view} serves {measure} already in this change")
         t["serves_measures"] = ";".join([*held, tail(measure)])
     for agent, view in used:
         a = agents.get(agent)
@@ -207,23 +217,45 @@ def _edit(changes, facts, root):
     return kpi_tables, {p: t for p, t in texts.items() if t != originals[p]}, pricing, changed
 
 
+_LAYOUT = "{} is not laid out as the release ships it, so its entries cannot be added; it needs a specialist"
+
+
+def _once(pairs):
+    """A JSON object's pairs as a dict, refusing a key that is given twice (json.loads would keep the last)."""
+    keys = [k for k, _ in pairs]
+    if len(keys) != len(set(keys)):
+        raise ValueError(f"a key is given twice: {sorted(k for k in set(keys) if keys.count(k) > 1)}")
+    return dict(pairs)
+
+
 def _add_entry(text, process, entry):
     """The stream file's text with one entry added to the step's "measures" list, as the file lays one out: one line
-    for each entry, at the list's indent plus two. A step without the list gains it after its last field."""
+    for each entry, at the list's indent plus two. A list empty on one line opens up; a step without the list gains
+    it after its last field. Raises ValueError for a layout it does not know."""
     lines = text.split("\n")
-    start = next(i for i, line in enumerate(lines) if line.strip() == f'"id": "{process["id"]}",')
+    start = next((i for i, line in enumerate(lines) if line.strip() == f'"id": "{process["id"]}",'), None)
+    if start is None:
+        raise ValueError("the step's id is not on a line of its own")
     indent = len(lines[start]) - len(lines[start].lstrip())
-    end = next(i for i in range(start + 1, len(lines)) if lines[i].startswith(" " * (indent - 2) + "}"))
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith(" " * (indent - 2) + "}")), None)
+    if end is None or indent < 2:
+        raise ValueError("the step's object does not close at its indent")
     item = "{ " + ", ".join(f"{json.dumps(k)}: {json.dumps(v, ensure_ascii=False)}" for k, v in entry.items()) + " }"
     pad = " " * indent
-    opening = next((i for i in range(start, end) if lines[i] == f'{pad}"measures": ['), None)
-    if opening is not None:
-        closing = next(i for i in range(opening, end) if lines[i] == f"{pad}]" or lines[i] == f"{pad}],")
-        lines[closing - 1] += ","
-        lines.insert(closing, f"{pad}  {item}")
-    else:
-        lines[end - 1] += ","
-        lines[end:end] = [f'{pad}"measures": [', f"{pad}  {item}", f"{pad}]"]
+    for i in range(start, end):
+        if lines[i] in (f'{pad}"measures": []', f'{pad}"measures": [],'):
+            lines[i:i + 1] = [f'{pad}"measures": [', f"{pad}  {item}", f"{pad}]" + ("," if lines[i].endswith(",") else "")]
+            return "\n".join(lines)
+        if lines[i] == f'{pad}"measures": [':
+            closing = next((j for j in range(i + 1, end) if lines[j] in (f"{pad}]", f"{pad}],")), None)
+            if closing is None:
+                raise ValueError("the step's list of measures does not close at its indent")
+            if closing > i + 1:
+                lines[closing - 1] += ","
+            lines.insert(closing, f"{pad}  {item}")
+            return "\n".join(lines)
+    lines[end - 1] += ","
+    lines[end:end] = [f'{pad}"measures": [', f"{pad}  {item}", f"{pad}]"]
     return "\n".join(lines)
 
 

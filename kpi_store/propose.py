@@ -228,6 +228,9 @@ def kpi_changes(cat, intake, lists, root):
     steps, relationships, bases = (rules.positions(answers, q) for q in ("6.3", "6.4", "6.5"))
     seen = set()
     for i, step in enumerate(steps):
+        if step == "@not-in-list":
+            raise ProposeRefused("6.3 names a step that the ontology does not hold. A new value stream step goes to the "
+                                 "process map request")
         if not step or step.startswith("@"):
             continue
         step = linked("6.3", step, "vsprocess", "a step of a value stream")
@@ -250,6 +253,9 @@ def kpi_changes(cat, intake, lists, root):
         row = next((t for t in pricing.rows["tables"] if t["slug"] == view.split(":", 1)[1]), {})
         if row.get("layer") != "metric-view":
             raise ProposeRefused(f"7.1 names {view}, which is not a metric view. Only a metric view serves a measure")
+        if "@not-in-list" in rules.values(answers, "6.6"):
+            raise ProposeRefused(f"6.6 names a data product that the ontology does not hold, and the view of 7.1 is part "
+                                 f"of {other_modules.WHOLE}")
         product = linked("6.6", one("6.6"), "product", "a data product") if one("6.6") else other_modules.WHOLE
         if product != other_modules.WHOLE:
             raise ProposeRefused(f"6.6 names {product}, and the view of 7.1 is part of {other_modules.WHOLE}")

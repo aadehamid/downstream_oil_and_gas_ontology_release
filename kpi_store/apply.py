@@ -103,12 +103,18 @@ def target_of(proposals):
         raise ChangeRefused("these proposals are term changes and new KPIs. Apply the new KPIs first, then the "
                             "term changes, one run each")
     if kinds == {"new KPI"}:
-        changed = {}
+        changed, noted = {}, {}
         for p in proposals:   # each proposal must make whole measures, and whole links, itself
             kpi, kpi_facts, *_ = other_modules.split(p.changes, p.facts)
             new_measures.measures(kpi, kpi_facts)
-            new_measures.return_notes(kpi, kpi_facts)
-            changed.update(other_modules.modules_of(p.changes))
+            for subject, _ in new_measures.return_notes(kpi, kpi_facts):
+                if subject in noted:
+                    raise ChangeRefused(f"the proposals {noted[subject]} and {p.change} both add a sentence to the scope "
+                                        f"note of {subject}. Apply them one at a time")
+                noted[subject] = p.change
+            # Each module the proposal changes takes the higher of the route its lines suggest and the proposal's.
+            for m, suggested in other_modules.modules_of(p.changes).items():
+                changed[m] = proposal.highest([changed.get(m, suggested), suggested, p.route])
         return _new_kpi_target({m: changed[m] for m in other_modules.BUILDERS if m in changed})
     stray = [p.change for p in proposals if p.facts]
     if stray:

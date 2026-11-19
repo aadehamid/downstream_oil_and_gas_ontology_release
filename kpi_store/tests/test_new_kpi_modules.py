@@ -9,6 +9,7 @@ temporary copy of the release; the tree itself is never written.
 import csv
 import json
 import shutil
+from pathlib import Path
 
 import pytest
 from rdflib import Graph, Literal, URIRef
@@ -257,3 +258,107 @@ def test_a_failing_step_rolls_every_module_back(tmp_path):
     with pytest.raises(cut.CutFailed, match="the step 'run the value-stream module's tests' failed"):
         apply_cmd.apply([folder], root, say=quiet, now=NOW, before_step=fail)
     assert digest(root) == before
+
+
+# ---------- round 1 of the review ----------
+
+def _stream_with(root, text_of):
+    """Rewrites the scratch release's first value stream file with text_of(its text)."""
+    path = root / om.STREAM_FILES[0]
+    path.write_text(text_of(path.read_text(encoding="utf-8")), encoding="utf-8", newline="\n")
+
+
+def test_a_step_whose_list_is_empty_on_one_line_or_on_two_takes_its_entry_once(tmp_path):
+    step = "p-supply-procurement-strategy"   # a step of the first file with no measure link
+    line = f'          "id": "{step}",'
+    for n, empty in enumerate(('"measures": [],', '"measures": [\n          ],')):
+        root = scratch_release(tmp_path / str(n), git_copy=False)
+        _stream_with(root, lambda t: t.replace(line, f"{line}\n          {empty}", 1))
+        lines = [f"create edge vsprocess:{step[2:]} vs:measureLink mlink:{step[2:]}--test-spread-margin",
+                 f"create edge mlink:{step[2:]}--test-spread-margin vs:measure {M}",
+                 f"create edge mlink:{step[2:]}--test-spread-margin vs:relationship rel:informs"]
+        facts = [(f"mlink:{step[2:]}--test-spread-margin", "dcterms:bibliographicCitation", "A made-up basis.")]
+        _, texts, _, _ = om._edit(kgcl.read_lines("\n".join(KPI_LINES + lines)), KPI_FACTS + facts, root)
+        text = texts[om.STREAM_FILES[0]]
+        assert text.count('"measures"') == (root / om.STREAM_FILES[0]).read_text(encoding="utf-8").count('"measures"'), empty
+        process = next(p for s in json.loads(text)["stages"] for p in s["processes"] if p["id"] == step)
+        assert process["measures"] == [{"measureId": "test-spread-margin", "relationship": "informs", "basis": "A made-up basis."}]
+
+
+def test_a_value_stream_file_laid_out_otherwise_is_refused_in_plain_words(tmp_path):
+    root = scratch_release(tmp_path, git_copy=False)
+    _stream_with(root, lambda t: t.replace(f'"id": "p-{STEPS[0]}",', f'"id":"p-{STEPS[0]}",', 1))
+    with pytest.raises(ChangeRefused, match="is not laid out as the release ships it, so its entries cannot be added"):
+        om.check_changes(kgcl.read_lines("\n".join(LINES)), FACTS, root)
+
+
+@pytest.mark.parametrize("changes,message", [
+    ({"6.3": [om.PREFIXES["vsprocess"] + STEPS[0], "@not-in-list"], "6.4": [om.PREFIXES["rel"] + "benchmarks"] * 2,
+      "6.5": list(BASES)}, "6.3 names a step that the ontology does not hold. A new value stream step goes to the process "
+                           "map request"),
+    ({"6.6": "@not-in-list", "6.6.detail": "A made-up data product"},
+     "6.6 names a data product that the ontology does not hold, and the view of 7.1 is part of product:master-pricing"),
+])
+def test_propose_refuses_a_step_or_a_data_product_that_is_not_in_the_list(tmp_path, changes, message):
+    from kpi_store.intake import catalogue, picklists
+    from kpi_store.intake.answers import Intake
+    cat, lists = catalogue.load(ROOT / "kpi-intake"), picklists.load(ROOT / "kpi-intake")["lists"]
+    data = json.loads((ROOT / "kpi-intake" / "examples" / "crack-spreads-pricing.json").read_text(encoding="utf-8"))
+    answers = dict(data["answers"], **{"2.1": NAME, **changes})
+    with pytest.raises(propose_cmd.ProposeRefused, match=message):
+        propose_cmd.kpi_changes(cat, Intake(answers=answers), lists, ROOT)
+
+
+@pytest.mark.parametrize("lines,message", [
+    ([f"create edge table:{VIEW} dp:servesMeasure {M}", f"create edge agent:crack-spread-price-analytics prov:used product:{VIEW}"],
+     "prov:used of an assistant points at table:<id>"),
+    ([f"create edge table:{VIEW} dp:servesMeasure {M}"] * 2, f"table:{VIEW} serves {M} already in this change"),
+])
+def test_the_data_product_links_are_refused_unless_they_fit(lines, message):
+    with pytest.raises(ChangeRefused, match=message):
+        om.check_changes(kgcl.read_lines("\n".join(KPI_LINES + lines)), KPI_FACTS, ROOT)
+
+
+def test_a_token_with_no_prefix_is_refused_before_it_is_split():
+    # Round 1, finding 6: kgcl.write_line refuses an id with no colon before split reads its parts.
+    change = kgcl.Change("create edge", "agent:crack-spread-price-analytics", predicate="prov:used", target=VIEW)
+    with pytest.raises(ChangeRefused, match="is not an id of the form prefix:name"):
+        om.split([change], [])
+
+
+def _proposal(folder, lines, facts, route="minor", owner=False):
+    folder.mkdir(parents=True)
+    (folder / "change.kgcl").write_text("".join(line + "\n" for line in lines), encoding="utf-8")
+    (folder / "facts.csv").write_text(proposal.facts_text(facts), encoding="utf-8")
+    signatures = [{"role": "Data Owner", "name": "A Data Owner", "date": "2026-11-19", "words": "Right."},
+                  {"role": "Architect", "name": "An Architect", "date": "2026-11-19", "words": "Approved."}]
+    if owner:
+        signatures.append({"role": "Ontology Owner", "name": "An Ontology Owner", "date": "2026-11-19", "words": "Major."})
+    (folder / "approval.json").write_text(json.dumps({"change": folder.name, "route": route, "new_module": False,
+                                                      "signatures": signatures}), encoding="utf-8")
+    return folder
+
+
+def test_a_major_new_kpi_releases_each_changed_module_as_a_major(tmp_path):
+    read = proposal.read(_proposal(tmp_path / "NK-MAJOR", LINES, FACTS, route="major", owner=True))
+    target = apply_cmd.target_of([read])
+    assert target.changed == {"kpi": "major", "data-product": "major", "value-stream": "major"}
+
+
+def test_two_new_kpis_that_share_a_returned_note_or_an_assistant_are_applied_one_at_a_time(tmp_path):
+    other = [line.replace("test-spread-margin", "test-spread-margin-two").replace("Test Spread Margin", "Test Spread Margin Two")
+             for line in LINES]
+    other_facts = [tuple(x.replace("test-spread-margin", "test-spread-margin-two") for x in f) for f in FACTS]
+    one, two = _proposal(tmp_path / "one", LINES, FACTS), _proposal(tmp_path / "two", other, other_facts)
+    with pytest.raises(ChangeRefused, match="the proposals one and two both add a sentence to the scope note of "
+                                            "measure:margin-capture. Apply them one at a time"):
+        apply_cmd.plan([one, two], ROOT)
+    used = f"create edge agent:executive-summary-kpis-analytics prov:used table:{VIEW}"
+    three = _proposal(tmp_path / "three", LINES + [used], FACTS[:-3])
+    four = _proposal(tmp_path / "four", other + [used], other_facts[:-3])
+    with pytest.raises(ChangeRefused, match=f"the proposals three and four both add the line {used}. Apply one, then make a "
+                                            "new form for the other from the changed ontology"):
+        apply_cmd.plan([three, four], ROOT)
+    # Two new KPIs on the same step and the same view, each with its own lines, go in one run.
+    five, six = _proposal(tmp_path / "five", LINES, FACTS[:-3]), _proposal(tmp_path / "six", other, other_facts[:-3])
+    assert apply_cmd.plan([five, six], ROOT)[1].changed == {"kpi": "minor", "data-product": "minor", "value-stream": "minor"}

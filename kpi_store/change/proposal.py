@@ -150,11 +150,17 @@ def conflicts(proposals):
     seen, out = {}, []
     for proposal in proposals:
         made = {c.subject for c in proposal.changes if c.kind == "create node"}
-        keys = {(s, "new item") for s in made} | {(c.subject, FIELD[c.kind]) for c in proposal.changes if c.subject not in made}
+        # A line about anything but a measure (a new KPI's link from a value stream step, a view or an assistant)
+        # conflicts only with the same line: two new KPIs may each link the same step or view.
+        keys = {(s, "new item") for s in made} | {
+            (c.subject, FIELD[c.kind] if c.subject.startswith("measure:") else kgcl.write_line(c))
+            for c in proposal.changes if c.subject not in made}
         for key in sorted(keys):
             if key in seen and seen[key] != proposal.change:
                 if key[1] == "new item":
                     out.append(f"the proposals {seen[key]} and {proposal.change} both add {key[0]}")
+                elif not key[0].startswith("measure:"):
+                    out.append(f"the proposals {seen[key]} and {proposal.change} both add the line {key[1]}")
                 else:
                     out.append(f"the proposals {seen[key]} and {proposal.change} both change the {key[1]} of {key[0]}")
             seen.setdefault(key, proposal.change)
