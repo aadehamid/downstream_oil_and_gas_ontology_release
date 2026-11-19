@@ -123,7 +123,7 @@ def test_bash_on_windows_is_git_bash_and_never_the_linux_subsystems(tmp_path):
     only_wsl = lambda name: wsl if name == "bash" else None   # noqa: E731
     assert sc.find_bash(None, {}, only_wsl, windows=True) is None
     assert sc.find_bash(None, {"ProgramFiles": str(tmp_path)}, only_wsl, windows=True) == tmp_path / "Git" / "bin" / "bash.exe"
-    # On Windows, os.environ gives its keys in capitals (issue #49): both Program Files folders are still searched.
+    # On Windows, os.environ gives its keys in capitals: both Program Files folders are still searched.
     assert sc.find_bash(None, {"PROGRAMFILES": str(tmp_path)}, only_wsl, windows=True) == tmp_path / "Git" / "bin" / "bash.exe"
     assert sc.find_bash(None, {"PROGRAMFILES(X86)": str(tmp_path)}, only_wsl, windows=True) == tmp_path / "Git" / "bin" / "bash.exe"
     assert sc.find_bash(git / "bin" / "bash.exe", {}, lambda name: None, windows=True) == git / "bin" / "bash.exe"
