@@ -21,7 +21,8 @@ url = "http://127.0.0.1:3030/ds"                  # the dataset's URL; the load 
 data_folder = "fuseki-db"                         # the dataset is kept here across restarts; empty keeps it in memory
 java = ""                                         # the java executable, for Fuseki and for ROBOT; empty means JAVA_HOME, then PATH
 
-[neo4j.local]                                     # Neo4j Desktop, with the n10s and APOC plugins. The load EMPTIES this database.
+[neo4j.local]                                     # Neo4j Desktop, with the n10s and APOC plugins. The load EMPTIES this database;
+                                                  # it stops, changing nothing, when the database is Enterprise's or holds nodes but no KPI Store marker.
 uri = "bolt://127.0.0.1:7687"
 username = "neo4j"
 password = "<the local password>"                 # or leave out and set password_env = "<an environment variable's name>"

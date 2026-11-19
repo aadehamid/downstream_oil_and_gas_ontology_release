@@ -91,7 +91,7 @@ The runbook says when to run each command and what it prints. This table says on
 | `python -m kpi_store.runner --reset` | Empties the four stores after it shows what it will delete and you type `reset`, so the next run loads them again from nothing |
 | `python -m kpi_store.cut` | Turns a cleared report into a correction version of the ontology |
 | `python -m kpi_store.load_fuseki` | Loads the release into the local Fuseki and proves by a hash that the store holds exactly the release |
-| `python -m kpi_store.load_neo4j` | Empties the local Neo4j database, loads the release into it and runs every check there |
+| `python -m kpi_store.load_neo4j` | Empties the local Neo4j database, loads the release into it and runs every check there. It stops, and changes nothing, when that database is the Enterprise database, or holds nodes but no marker of an earlier KPI Store load |
 | `python -m kpi_store.copy_enterprise` | Copies the checked graph from the local Neo4j to the one named database on Neo4j Enterprise, and checks the copy |
 | `python -m kpi_store.sync_check` | Says whether each store holds the release in this folder: current, or behind |
 | `python -m kpi_store.questions.run ask <question> --settings <file> --mapping <file> --out <folder>` | Asks one of the four cross-graph questions (`q1`, `q4`, `q6`, `q7`) and writes its rows. The other subcommands are `discover`, `confirm` and `check`, which make and check the mapping file that `ask` needs. `python -m kpi_store.questions.run --help` lists them |

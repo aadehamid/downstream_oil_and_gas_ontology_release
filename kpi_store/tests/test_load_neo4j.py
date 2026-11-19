@@ -54,7 +54,7 @@ def stub_code(calls, fails=None, report=REPORT):
         lv=SimpleNamespace(hash_graph=lambda session, sep=None: (session.graph_hash, 0, 0, 0), N10S_SEP="__"),
         build=SimpleNamespace(report_earned=lambda rep: [] if rep.get("passed") else ["report passed is false"],
                               load_config=REAL.build.load_config),
-        lm=SimpleNamespace(models=lambda newest: []), ss=REAL.ss)
+        lm=SimpleNamespace(models=lambda newest: []), ss=REAL.ss, cg=REAL.cg)
 
 
 @pytest.fixture
@@ -66,6 +66,13 @@ def local(tmp_path, monkeypatch):
 
 def connect_to(db):
     return lambda neo4j: stores_support.FakeDriver({"neo4j": db})
+
+
+def loaded_by_the_steps(calls, after=None):
+    """connect() for a database that is empty until the skill's steps have run, and holds `after` (by default the
+    verified graph, unmarked) from then on."""
+    empty, after = stores_support.FakeNeo4j(), after if after is not None else graph(marked=False)
+    return lambda neo4j: stores_support.FakeDriver({"neo4j": after if any(c[0] == "steps" for c in calls) else empty})
 
 
 # ---- running the skill's steps with this Python ----------------------------------------------------
@@ -140,7 +147,7 @@ def test_the_login_file_is_gone_after_an_interrupted_write_or_block(tmp_path, lo
         raise KeyboardInterrupt()
     monkeypatch.setattr(ln.os, "fdopen", interrupted)
     with pytest.raises(KeyboardInterrupt):
-        ln.load(local, support.ROOT, tmp_path / "run", code=stub_code([]), connect=connect_to(graph(marked=False)))
+        ln.load(local, support.ROOT, tmp_path / "run", code=stub_code([]), connect=loaded_by_the_steps([]))
     assert not (tmp_path / "run" / "neo4j-local.env").exists()
 
 
@@ -226,7 +233,7 @@ def test_current_needs_the_marker_the_hash_the_counts_and_the_records(change, cu
 
 def test_the_load_runs_the_five_steps_then_marks_and_removes_the_login_file(tmp_path, local):
     calls, db = [], graph(marked=False)
-    result = ln.load(local, support.ROOT, tmp_path / "run", code=stub_code(calls), connect=connect_to(db))
+    result = ln.load(local, support.ROOT, tmp_path / "run", code=stub_code(calls), connect=loaded_by_the_steps(calls, db))
     assert calls[1][1] == ["project", "load", "review", "tags", "release-record"]
     assert f"NEO4J_PASSWORD={SECRET}" in calls[1][2]                    # the steps could read the login
     assert not (tmp_path / "run" / "neo4j-local.env").exists()          # and it is gone afterwards
@@ -282,13 +289,15 @@ def test_a_database_that_moved_is_loaded_again(tmp_path, local):
     (tmp_path / "lpg-out").mkdir()
     (tmp_path / "lpg-out" / "projection-report.json").write_text(json.dumps(REPORT), encoding="utf-8", newline="\n")
     db_after = graph(marked=False)
-    drivers = iter([stores_support.FakeDriver({"neo4j": db}), stores_support.FakeDriver({"neo4j": db_after})])
+    # The current check, the check of the database before the load (the local one, then Enterprise), the marker.
+    drivers = iter([stores_support.FakeDriver({"neo4j": db}), stores_support.FakeDriver({"neo4j": db}),
+                    stores_support.FakeDriver({}), stores_support.FakeDriver({"neo4j": db_after})])
     result = ln.load(local, support.ROOT, tmp_path / "run", code=stub_code(calls), connect=lambda neo4j: next(drivers))
     assert result["status"] == "loaded" and len(calls) == 2
 
 
 def test_a_failed_step_stops_the_load_and_still_removes_the_login_file(tmp_path, local):
-    db = graph(marked=False)
+    db = stores_support.FakeNeo4j()
     with pytest.raises(ln.LoadError, match="the local load stopped: load_verify.py exited 1"):
         ln.load(local, support.ROOT, tmp_path / "run", code=stub_code([], fails="load_verify.py exited 1"), connect=connect_to(db))
     assert not (tmp_path / "run" / "neo4j-local.env").exists() and db.writes() == []
@@ -297,10 +306,10 @@ def test_a_failed_step_stops_the_load_and_still_removes_the_login_file(tmp_path,
 def test_a_step_that_cannot_open_a_file_gives_a_whole_message(tmp_path, local):
     missing = FileNotFoundError(2, "No such file or directory", "robot.jar")
     with pytest.raises(ln.LoadError) as stopped:
-        ln.load(local, support.ROOT, tmp_path / "run", code=stub_code([], fails=missing), connect=connect_to(graph(marked=False)))
+        ln.load(local, support.ROOT, tmp_path / "run", code=stub_code([], fails=missing), connect=connect_to(stores_support.FakeNeo4j()))
     assert str(stopped.value) == f"the local load stopped (FileNotFoundError). The log is {tmp_path / 'run' / 'neo4j-load.log'}"
     with pytest.raises(ln.LoadError) as stopped:
-        ln.load(local, support.ROOT, tmp_path / "run", code=stub_code([], fails=ValueError("made up")), connect=connect_to(graph(marked=False)))
+        ln.load(local, support.ROOT, tmp_path / "run", code=stub_code([], fails=ValueError("made up")), connect=connect_to(stores_support.FakeNeo4j()))
     assert str(stopped.value) == f"the local load stopped (ValueError): made up. The log is {tmp_path / 'run' / 'neo4j-load.log'}"
 
 
@@ -312,12 +321,84 @@ def test_a_logical_model_the_release_cannot_list_is_a_load_error_not_an_exit():
 
 
 def test_an_extra_load_runs_before_the_marker(tmp_path, local):
-    db, order = graph(marked=False), []
+    calls, order = [], []
     def technical_graph(session, store):
         order.append((store, session.count("EpmStoreMarker")))
         return {"nodes": 0}
-    result = ln.load(local, support.ROOT, tmp_path / "run", code=stub_code([]), connect=connect_to(db), extra_loads=(technical_graph,))
+    result = ln.load(local, support.ROOT, tmp_path / "run", code=stub_code(calls), connect=loaded_by_the_steps(calls), extra_loads=(technical_graph,))
     assert order == [("neo4j", 0)] and result["extra_loads"] == [{"nodes": 0}]
+
+
+# ---- the database the load may empty --------------------------------------------------------------
+
+DEDICATED = ("Give [neo4j.local] a Neo4j instance of its own that holds nothing else, as the runbook's section "
+             '"Set up the local Neo4j" says, then run the load again')
+
+
+def test_a_database_with_nodes_and_no_marker_is_refused_before_anything_changes(tmp_path, local):
+    calls, db = [], stores_support.FakeNeo4j()
+    db.add(["Person"], 3, uri="https://example.org/people/ada")   # another writer's nodes, or a load that stopped part-way
+    with pytest.raises(ln.LoadError) as stopped:
+        ln.load(local, support.ROOT, tmp_path / "run", force=True, code=stub_code(calls), connect=connect_to(db))
+    assert str(stopped.value) == (
+        "the local database neo4j holds 3 node(s) and no marker of an earlier KPI Store load. The load empties the "
+        "database it loads into, so it stopped before it changed anything. Nothing was changed. " + DEDICATED + ". If "
+        "this database holds only the KPI Store's nodes, from a load that stopped part-way, empty it in Neo4j Desktop "
+        "and run the load again")
+    assert calls == [] and db.writes() == [] and len(db.nodes) == 3   # the skill's steps never started
+    assert not (tmp_path / "run" / "neo4j-local.env").exists()
+
+
+def test_an_empty_or_marked_database_is_loaded(tmp_path, local):
+    calls = []
+    result = ln.load(local, support.ROOT, tmp_path / "run", code=stub_code(calls), connect=loaded_by_the_steps(calls))
+    assert result["status"] == "loaded" and calls[1][0] == "steps"
+    calls, marked = [], graph(hash_="hash-0")   # an earlier load's graph, with its marker
+    result = ln.load(local, support.ROOT, tmp_path / "run", force=True, code=stub_code(calls), connect=connect_to(marked))
+    assert result["status"] == "loaded" and calls[1][0] == "steps"
+
+
+def test_the_enterprise_database_is_refused_by_its_database_id(tmp_path, local):
+    calls, db = [], stores_support.FakeNeo4j()
+    same = stores_support.FakeNeo4j("businessprocessarchitecturegraph", ident=db.ident)   # one database, two names
+    connect = lambda neo4j: stores_support.FakeDriver({"neo4j": db, "businessprocessarchitecturegraph": same})  # noqa: E731
+    with pytest.raises(ln.LoadError) as stopped:
+        ln.load(local, support.ROOT, tmp_path / "run", code=stub_code(calls), connect=connect)
+    assert str(stopped.value) == ("[neo4j.local] names the Enterprise database businessprocessarchitecturegraph. The load "
+                                  "empties the database it loads into, so it stopped before it changed anything. Nothing was "
+                                  "changed. " + DEDICATED)
+    assert calls == [] and db.writes() == [] and same.writes() == []
+
+
+def test_settings_that_name_the_enterprise_database_are_refused_when_enterprise_does_not_answer(tmp_path, local):
+    same = stores_support.local_settings(tmp_path / "same", password=f'password = "{SECRET}"', uri='uri = "bolt://localhost:7687"',
+                                         database='database = "Neo4j"')
+    def unreachable(neo4j):
+        raise ConnectionError("no server answers")
+    calls = []
+    with pytest.raises(ln.LoadError, match=r"^\[neo4j.local\] names the Enterprise database Neo4j\. .*Nothing was changed\."):
+        ln.load(same, support.ROOT, tmp_path / "run", code=stub_code(calls), connect=unreachable)
+    assert calls == []
+    # Any name of this machine is one server; another port or another database name is another database.
+    one = lambda uri, database="neo4j": SimpleNamespace(uri=uri, database=database)  # noqa: E731
+    assert ln.same_address(one("bolt://127.0.0.1:7687"), one("neo4j://LOCALHOST", "NEO4J"))
+    assert not ln.same_address(one("bolt://127.0.0.1:7687"), one("bolt://127.0.0.1:7688"))
+    assert not ln.same_address(one("bolt://127.0.0.1:7687"), one("bolt://127.0.0.1:7687", "kpi"))
+    # An address that cannot be read names no server, so two of them never match.
+    assert not ln.same_address(one("localhost:7687"), one("enterprise.example:7687"))
+    assert not ln.same_address(one("bolt://localhost:abc"), one("bolt://127.0.0.1:xyz"))
+    # A load report from an earlier run makes no difference: the settings are refused before anything connects.
+    (tmp_path / "same" / "lpg-out").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "same" / "lpg-out" / ln.REPORT).write_text(json.dumps(REPORT), encoding="utf-8")   # a passing report
+    with pytest.raises(ln.LoadError, match=r"^\[neo4j.local\] names the Enterprise database"):
+        ln.load(same, support.ROOT, tmp_path / "run", code=stub_code(calls), connect=unreachable)
+
+
+def test_two_unreadable_database_ids_do_not_count_as_one_database(tmp_path, local):
+    calls, db = [], stores_support.FakeNeo4j(ident=None)
+    other = stores_support.FakeNeo4j("businessprocessarchitecturegraph", ident=None)
+    connect = lambda neo4j: stores_support.FakeDriver({"neo4j": db, "businessprocessarchitecturegraph": other})  # noqa: E731
+    ln.check_local_database(local, stub_code(calls), connect)   # an empty database with no readable ID: no refusal
 
 
 def test_the_command_refuses_bad_settings_before_anything_else(tmp_path, capsys):

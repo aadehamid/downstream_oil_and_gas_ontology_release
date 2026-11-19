@@ -895,3 +895,15 @@ def test_an_unexpected_error_in_the_sync_step_replaces_an_older_sync_file(setup,
     monkeypatch.setitem(runner.STEP_FUNCTIONS, "sync", lambda c: [][1])
     assert runner.run_steps(ctx, ["sync"]) == 1
     assert json.loads(ctx.step_file("sync").read_text(encoding="utf-8"))["status"] == "failed"
+
+
+def test_a_local_database_the_neo4j_step_refuses_ends_the_step_with_its_one_line(setup, monkeypatch):
+    from kpi_store import load_neo4j
+    said = "the local database neo4j holds 3 node(s) and no marker of an earlier KPI Store load. Nothing was changed"
+    def refuse(local, root, run_dir=None, extra_loads=()):
+        raise load_neo4j.LoadError(said)
+    monkeypatch.setattr(load_neo4j, "load", refuse)
+    with pytest.raises(runner.StepFailed) as stopped:
+        runner.step_neo4j(setup.make())
+    assert str(stopped.value) == said and stopped.value.__cause__ is None and stopped.value.__suppress_context__
+    assert runner.run_steps(setup.make(), ["neo4j"]) == 1 and setup.lines[-1] == f"neo4j: FAILED. {said}"

@@ -50,7 +50,7 @@ A node that another writer made with all the marks of one row counts as the KPI 
 | Databricks, schema `idp_sbx.tech_graph` | The schema, when it is missing. The tables `tech_graph_triples` and `tech_graph_markers`. |
 | Databricks, the workspace | One notebook, `kpi_store_load`, in the folder that your local settings name. One job run per runner run, named `KPI Store load` and the run's ID. |
 | Your Windows machine | The folder `%USERPROFILE%\kpi-store-local`: each run's files, the Fuseki dataset and the Neo4j load's working files. |
-| The local Neo4j | The database that your local settings name. **The load empties it first.** |
+| The local Neo4j | The database that your local settings name. **The load empties it first.** It stops, and changes nothing, when the database is the Enterprise database, or holds nodes but no marker of an earlier KPI Store load. |
 | Neo4j Enterprise | Nodes and relationships in `businessprocessarchitecturegraph`, and one constraint there, `n10s_unique_uri`. |
 | The release folder | Nothing, except in the cut. The cut writes the correction version and its record, and rebuilds the KPI intake pack in `kpi-intake`. |
 
@@ -234,7 +234,7 @@ The Windows test job proved each point below on Windows Server 2025 with Python 
 
 The local Neo4j checks the graph before anything goes to Enterprise. It needs two plugins that Enterprise does not have.
 
-**The load empties the local database every time.** Make a new instance for the KPI Store. Do not use one that holds other work.
+**The load empties the local database every time.** Make a new instance for the KPI Store. Do not use one that holds other work. The load checks the database before it empties anything. When the database is the Enterprise database, or holds nodes but no marker of an earlier KPI Store load, the load stops and changes nothing.
 
 1. Open Neo4j Desktop.
 2. Create a local instance. Choose version `2025.06.2`, and choose a password. Note the password.
@@ -828,7 +828,7 @@ the steps that ran passed; left out: <the other steps> (not run, so not checked)
 
 ### `neo4j`
 
-It calls `kpi_store/load_neo4j.py`, which runs the `ontology-to-lpg` skill's steps. It checks the projection's rules, validates the release with SHACL, and runs the reasoner with ROBOT. **It empties the local database.** It sends the triples in the request, validates the graph with SHACL in the database, and proves each compiled constraint with a failing case. It exports the graph again and compares it with what it loaded. It loads twice and compares the two graph hashes. Last, it loads the logical models and the technical graph, and writes the marker.
+It calls `kpi_store/load_neo4j.py`, which runs the `ontology-to-lpg` skill's steps. It checks the projection's rules, validates the release with SHACL, and runs the reasoner with ROBOT. **It empties the local database.** Before that, it stops, and changes nothing, when the database is the Enterprise database, or holds nodes but no marker of an earlier KPI Store load. It sends the triples in the request, validates the graph with SHACL in the database, and proves each compiled constraint with a failing case. It exports the graph again and compares it with what it loaded. It loads twice and compares the two graph hashes. Last, it loads the logical models and the technical graph, and writes the marker.
 
 It reads the release folder and `robot.jar`. It writes to the local database, and its working files and report to `%USERPROFILE%\kpi-store-local\lpg-out`. When the database already holds this release, it writes nothing.
 
@@ -931,6 +931,7 @@ The steps, in order, are `cut`, `check`, `zip`, `volume`, `upload`, `notebook`, 
 | `notebook`, with `ModuleNotFoundError: No module named 'tomllib'` | The compute runs Python 3.10, and your zip is the first cut of KPI Store 1.1, whose notebook needed Python 3.11. Serverless compute of environment version 1 has Python 3.10.12 (Databricks' release notes "Environment version 1", last updated 2026-11-05). | Take the corrected zip, unpack it in place of the release folder, and run the runner again. Its notebook runs on Python 3.10, and its run asks for environment version 2. |
 | `fuseki` | Java or the jar is missing, or the port is in use. | Run the setup check. Then run `python -m kpi_store.runner --from fuseki`. |
 | `neo4j` | The local instance is stopped, or a plugin is missing. | Start the instance. Run the setup check. Then run `python -m kpi_store.runner --from neo4j`. |
+| `neo4j`, with `no marker of an earlier KPI Store load` or `names the Enterprise database` | `[neo4j.local]` names the Enterprise database, or a database that holds nodes but no KPI Store marker: other work, or a KPI Store load that stopped part-way. The load stopped before it changed anything. | If `[neo4j.local]` names the Enterprise database, or a database that holds other work, make a new, empty instance for the KPI Store, as "Set up the local Neo4j" says, and name it in `[neo4j.local]`. If it holds only a KPI Store load that stopped part-way, empty it in Neo4j Desktop. Then run `python -m kpi_store.runner --from neo4j`. |
 | `enterprise` | The server did not answer, or the database holds nodes. | Read the line. For KPI Store nodes of another release, see "Replace what Enterprise holds". For any other node, stop and ask whose it is. |
 | `sync` | A store is not current. The lines above name it. | Run the runner from the step that loads that store. |
 
@@ -1086,7 +1087,7 @@ The reset empties the stores one after another, and it cannot undo a deletion.
 | The `databricks` line prints four `DROP TABLE` statements | `kpi_store.toml` names no `warehouse_id`, so the reset cannot run SQL from your machine. The exit code is 1. | Set `warehouse_id` and run the reset again. Or run the four statements in a Databricks SQL editor, and add `--skip databricks` to the reset. |
 | A Neo4j line says that relationships join a KPI Store node to a node without its marks | Another writer attached its own nodes to KPI Store nodes. The line says whether the reset deleted nothing in that database, or how many nodes it had deleted before it found them. | Ask the owner of those nodes to remove the relationships, then run the same command again. |
 | The `enterprise` line says that nodes without the marks stay | Another writer's nodes are in the database, with no relationship to a KPI Store node. The reset does not delete them, and the next copy stops while they are there. | Ask the owner of those nodes. |
-| The `neo4j` line says that constraints that the load did not make stay | Someone made another constraint in the local database. The reset leaves it. The next load drops it, because the load empties this database. | Nothing, unless the constraint is yours to keep. Then move that work to another database. |
+| The `neo4j` line says that constraints that the load did not make stay | Someone made another constraint in the local database. The reset leaves it. The next load drops it, because the load empties this database. The load's check of the database looks at nodes and the marker only, so a constraint does not stop it. | Nothing, unless the constraint is yours to keep. Then move that work to another database. |
 
 ## How to undo
 
@@ -1268,7 +1269,7 @@ Nothing in this section is part of this release's tested path.
 
 Today the load runs on a local Neo4j that has the two plugins, and a copy in plain Cypher takes the checked graph to Enterprise. That is what the code supports.
 
-With the plugins on Enterprise, the load and the SHACL checks could run there directly. That is not built. Pointing `[neo4j.local]` at the Enterprise database is not the way: the load empties the database it is pointed at, every node of it, and the limit of this release is that it deletes KPI Store nodes only. A direct load needs new code that removes only the KPI Store's nodes before it loads, as the copy does today. Until then, keep the local Neo4j and the copy.
+With the plugins on Enterprise, the load and the SHACL checks could run there directly. That is not built. Pointing `[neo4j.local]` at the Enterprise database is not the way: the load empties the database it is pointed at, every node of it, and the limit of this release is that it deletes KPI Store nodes only. The load refuses such settings and changes nothing. A direct load needs new code that removes only the KPI Store's nodes before it loads, as the copy does today. Until then, keep the local Neo4j and the copy.
 
 ## What ran where
 
