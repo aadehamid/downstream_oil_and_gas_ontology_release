@@ -4,10 +4,15 @@ throwaway Git repository whose scripts/check.sh is a stand-in that records that 
 import os
 import shutil
 import subprocess
+import sys
 
 import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, ".."))
+from kpi_store.setup_check import find_bash  # noqa: E402  (Git Bash on Windows, not the Linux subsystem's launcher)
+
+BASH = find_bash()
 HOOK = os.path.join(HERE, "hooks", "pre-push")
 ZEROS = "0" * 40
 # A pre-push hook may run with GIT_DIR set; a test repository must not inherit it.
@@ -16,7 +21,7 @@ CLEAN_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 
 @pytest.fixture
 def repo(tmp_path):
-    if shutil.which("git") is None or shutil.which("bash") is None:
+    if shutil.which("git") is None or BASH is None:
         pytest.skip("needs git and bash")
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, env=CLEAN_ENV)
     (tmp_path / "scripts").mkdir()
@@ -27,7 +32,7 @@ def repo(tmp_path):
 
 def push(repo, lines, code=0, cwd=None):
     env = dict(CLEAN_ENV, STAND_IN_EXIT=str(code))
-    return subprocess.run(["bash", HOOK, "origin", "https://example.invalid/r.git"], input=lines, text=True,
+    return subprocess.run([str(BASH), HOOK, "origin", "https://example.invalid/r.git"], input=lines, text=True,
                           capture_output=True, cwd=cwd or repo, env=env)
 
 
