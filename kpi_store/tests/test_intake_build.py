@@ -172,7 +172,7 @@ def test_the_page_is_one_offline_file_with_lf_line_ends():
     data = json.loads(text.split('<script id="intake-data" type="application/json">')[1].split("</script>")[0])
     assert list(data["forms"]) == ["kpi-intake", "domain-activation", "process-map-request", "term-change", "reference-item", "new-module"]
     assert data["release"] == "KPI Store 1.1" and data["catalogue_version"] == "1.2"
-    assert len(data["questions"]) == 91 and data["lists"]["processes"]
+    assert len(data["questions"]) == 103 and data["lists"]["processes"]
     assert data["guide"] == "how-to-use-the-form.html" and (PACK / data["guide"]).is_file()     # the guide, beside the form
     # The names of the other modules' terms, and whether each has a definition, with no definition text.
     core = data["term_names"]["core"]

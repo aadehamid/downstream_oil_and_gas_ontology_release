@@ -42,7 +42,7 @@ def test_the_catalogue_holds_the_approved_questions(cat):
 
 def test_every_question_id_is_unique_and_every_rule_names_a_question(cat):
     ids = [q["id"] for q in cat.questions]
-    assert len(ids) == len(set(ids)) == 91
+    assert len(ids) == len(set(ids)) == 103
     for q in cat.questions:
         for cond in q.get("ask_when", []):
             assert cond["question"] in cat.by_id, q["id"]

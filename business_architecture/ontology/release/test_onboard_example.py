@@ -24,6 +24,10 @@ CHANGED = [f"{ONT}/release/build_module.py", "scripts/check.sh", f"{ONT}/project
            f"{ONT}/validation/test_all_module_shapes.py", f"{ONT}/competency-questions.md", f"{ONT}/MODULES.md",
            "scripts/build_docs_html.py"]
 HAS_MODULE = os.path.exists(os.path.join(oe.ROOT, ONT, "sample-area"))
+# The number the example's question takes: one after the highest, which is 58 in the release as shipped and higher
+# after the new-module form has added a module.
+with open(os.path.join(oe.ROOT, ONT, "regression", "expected.csv"), encoding="utf-8") as _f:
+    N = max(int(line.split(",", 1)[0]) for line in _f.read().splitlines()[1:] if line) + 1
 
 
 def copy_of_the_places(tmp):
@@ -61,7 +65,7 @@ class Onboard(unittest.TestCase):
                 [f"{ONT}/sample-area/{name}" for name in ("README.md", "vocabulary.ttl", "shapes.ttl", "sample-areas.csv",
                                                            "build_sample_areas.py", "test_sample_areas.py")]
                 + [f"{ONT}/approvals/sample-area-1.0.0.md", f"{ONT}/releases/sample-area/CHANGELOG.md",
-                   f"{ONT}/regression/queries/q58-sample-area-processes.rq"]))
+                   f"{ONT}/regression/queries/q{N}-sample-area-processes.rq"]))
             self.assertEqual(sorted(p for p in before if before[p] != after[p]), sorted(CHANGED))
             text = {p: after[p].decode("utf-8") for p in CHANGED}
             self.assertRegex(text[f"{ONT}/projection/pipeline.py"], r'\("lane", "[^"]+"\), \("sample-area", "1\.0\.0"\),')
@@ -71,8 +75,8 @@ class Onboard(unittest.TestCase):
             self.assertIn('        "version": "1.0.0", "stage": None, "approver": "the ontology owner", "issued": "2026-11-12",\n',
                           text[f"{ONT}/release/build_module.py"])
             self.assertEqual(text["scripts/check.sh"].count("sample-area"), 3)
-            self.assertTrue(text[f"{ONT}/regression/expected.csv"].endswith("58,answerable,q58-sample-area-processes.rq,\n"))
-            self.assertIn("58. Which processes does each sample area cover?\n", text[f"{ONT}/competency-questions.md"])
+            self.assertTrue(text[f"{ONT}/regression/expected.csv"].endswith(f"{N},answerable,q{N}-sample-area-processes.rq,\n"))
+            self.assertIn(f"{N}. Which processes does each sample area cover?\n", text[f"{ONT}/competency-questions.md"])
             self.assertIn('MODULE_READMES = ["kpi", "lane", "sample-area",', text["scripts/build_docs_html.py"])
             self.assertIn("<!-- module: sample-area -->", text[f"{ONT}/MODULES.md"])
 
