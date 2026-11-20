@@ -47,8 +47,15 @@ LINES, FACTS = KPI_LINES + OTHER_LINES, KPI_FACTS + OTHER_FACTS
 WHOLE = dict(drop=("3.6",))   # the example's answers of 2.3 to 7.8 stay in
 
 
+# The pack builds the example's answers from the ontology, and a cut or another form can change them (a correction
+# makes another view serve Crack Spreads Pricing): the answers these tests read are set here.
+PINNED = {"2.3": INCLUDES, "2.4": EXCLUDES, "6.3": [om.PREFIXES["vsprocess"] + s for s in STEPS],
+          "6.4": [om.PREFIXES["rel"] + "benchmarks"] * 2, "6.5": list(BASES), "6.6": om.PREFIXES["product"] + "master-pricing",
+          "7.1": om.PREFIXES["table"] + VIEW, "7.8": "Crack Spread Price Analytics"}
+
+
 def whole_form(folder, changes=None, number="", sign_offs=SIGNED):
-    return kpi_form(folder, changes, sign_offs, number, **WHOLE)
+    return kpi_form(folder, {**PINNED, **(changes or {})}, sign_offs, number, **WHOLE)
 
 
 def test_the_new_prefixes_are_the_builders_namespaces():
@@ -177,8 +184,9 @@ def test_one_apply_releases_every_changed_module_and_commits_once(tmp_path, no_g
     said = []
     files = apply_cmd.apply([folder], root, say=said.append, now=NOW)
     now = _versions(root)
-    minor = lambda v: f"{v.split('.')[0]}.{int(v.split('.')[1]) + 1}.0"
-    patch = lambda v: f"{v.rsplit('.', 1)[0]}.{int(v.rsplit('.', 1)[1]) + 1}"
+    from kpi_store import ontology_view as ov
+    minor = lambda v: f"{ov.version_key(v)[0]}.{ov.version_key(v)[1] + 1}.0"
+    patch = lambda v: f"{ov.version_key(v)[0]}.{ov.version_key(v)[1]}.{ov.version_key(v)[2] + 1}"   # after a correction too
     for module in order:
         assert now[module] == (minor if module in ("kpi", "data-product", "value-stream") else patch)(held[module]), module
     for module in order:   # each changelog names its own route: the changed modules a minor, the others a patch
