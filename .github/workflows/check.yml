@@ -89,7 +89,7 @@ jobs:
   check-plain-account:
     name: check (no links, no py)
     runs-on: windows-2025
-    timeout-minutes: 60
+    timeout-minutes: 75
     defaults:
       run:
         shell: bash
