@@ -45,13 +45,14 @@ def is_frozen(commit, path):
 
 def pinned():
     """(id, path) for every frozen map a core builder names."""
+    import importlib
+    import re
     sys.path.insert(0, HERE)
-    import build_core_2_2 as b22
-    import build_core_2_3 as b23
-    import build_core_2_4 as b24
-    import build_core_next as b20
+    # build_core_next.py built 2.0.0; each later builder is build_core_<major>_<minor>.py, the apply command's too.
+    numbered = sorted((int(m.group(1)), int(m.group(2)), m.group(0)[:-3]) for f in os.listdir(HERE)
+                      for m in [re.fullmatch(r"build_core_(\d+)_(\d+)\.py", f)] if m)
     seen = []
-    for mod in (b20, b22, b23, b24):
+    for mod in [importlib.import_module("build_core_next")] + [importlib.import_module(n) for *_, n in numbered]:
         for name in ("EARLIER_COMMIT", "SOURCE_COMMIT"):
             commit = getattr(mod, name, None)
             if commit and (commit, mod.SOURCE_PATH) not in seen:

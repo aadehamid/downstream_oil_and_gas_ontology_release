@@ -294,7 +294,7 @@ form = "process-map-request"
 name = "Process map request"
 technical_name = "a business area, process, step or role that the process map lacks"
 audience = "business"
-about = "Use this form when a question of the KPI form ends in \"not in the list\" for the business area, the process, the step or a role. It is smaller than a domain activation and it is not one. It collects what the Architect needs to change the process map. When the Global Process Owner and the Architect have signed, the Architect turns the form into a proposal with one command and applies the proposal with another. The two commands add new roles and their RACI entries for processes the map holds. A new business area, process or step needs a release of core, which the commands cannot make, so the Architect takes it to a specialist."
+about = "Use this form when a question of the KPI form ends in \"not in the list\" for the business area, the process, the step or a role. It is smaller than a domain activation and it is not one. It collects what the Architect needs to change the process map. When the Global Process Owner and the Architect have signed, the Architect turns the form into a proposal with one command and applies the proposal with another. The two commands add new business areas, processes and steps, which the apply command releases in a new version of core, and new roles and their RACI entries. A request adds one level of the map: a step of a new process goes in with a request of its own, once the process is in the map."
 who = "The Global Process Owner, or a named delegate, answers and signs. The Program manager owns the request. The Business analyst fills the form."
 done_when = "The form names what is missing, where it sits in the process map, and a document that describes it. The Global Process Owner and the Architect have signed."
 typical = "4 to 7"
@@ -1399,33 +1399,41 @@ type = "list"
 rows = 6
 required = "required"
 why = "The KPI must hang on a process the ontology knows."
-feeds = "A proposal for the process map, then a `core` release: `skos:prefLabel`."
+feeds = "`skos:prefLabel` of each new process, step and business area, which the apply command adds in a `core` release, and the name of each new role."
 fact = []
 
 [[question]]
 id = "P2"
 section = "P"
-text = "For each missing process or step, which process in the map sits above it?"
+text = "For each, which process in the map sits above it? For a new business area or a new role, choose that instead."
 asked_of = ["global-process-owner"]
 type = "multi_choice"
 source = "processes"
 levels = [0, 6]
-rows = 6
+per = "P1"
 required = "optional"
 why = "The parent says where the new entry goes in the tree."
-feeds = "`skos:broader` and `core:businessDomain`."
+feeds = "`skos:broader`. A new process or step is numbered under its parent, one level below it."
 fact = []
+
+  [[question.option]]
+  id = "@business-area"
+  label = "It is a new business area"
+
+  [[question.option]]
+  id = "@role"
+  label = "It is a new role"
 
 [[question]]
 id = "P3"
 section = "P"
-text = "What is the purpose of each missing process or step, in one sentence?"
+text = "For each, what is its purpose? Start with one sentence that defines it."
 asked_of = ["global-process-owner"]
 type = "list"
-rows = 6
+per = "P1"
 required = "optional"
-why = "The first sentence becomes the definition."
-feeds = "`skos:definition`."
+why = "For a new process or step, the first sentence becomes the definition, and the rest the scope note. A new business area takes all of it as its definition."
+feeds = "`skos:definition`, and for a new process or step `skos:scopeNote` for the rest. A new role takes its definition from P5."
 fact = []
 
 [[question]]
@@ -1437,7 +1445,7 @@ type = "list"
 rows = 12
 required = "optional"
 why = "KPIs attach to steps where they can."
-feeds = "Lower levels of the process map, `core:precedes`."
+feeds = "Kept in the form's file. Each step goes in as an entry of P1 of a request of its own, once its process is in the map."
 fact = []
 
 [[question]]
@@ -1483,8 +1491,24 @@ type = "list"
 rows = 6
 required = "required"
 why = "Every fact added needs a written source."
-feeds = "`dcterms:source` IRIs and their tiers in `authority/source-tiers.csv`."
+feeds = "The note of each new role. For a new process, step or business area, the documents stay in the form's file."
 fact = []
+
+[[question]]
+id = "P8"
+section = "P"
+text = "Which business area do the new processes and steps belong to? Leave it empty when their parent's processes all belong to one."
+asked_of = ["global-process-owner"]
+type = "choice"
+source = "business-areas"
+required = "optional"
+why = "The KPI form offers a process under its business area."
+feeds = "`core:businessDomain` of each new process and step."
+fact = []
+
+  [[question.option]]
+  id = "@new-area"
+  label = "The new business area of this request"
 
 # ---- Term change -----------------------------------------------------------------------------------------------
 # The propose command turns a complete, signed term change into KGCL lines (kpi_store/propose.py). T2 to T7 are

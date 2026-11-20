@@ -63,7 +63,8 @@ Keep the release folder in Git. The runbook's section "Keep the release folder i
 | A new system that a document names, or a new table that copies a table of a system. | The reference-item form, then the propose and apply commands. No file is edited by hand. | "Add a system or a table with the reference-item form" |
 | A definition's wording, with the same meaning. | A patch, with the release steps. | "Change a concept's definition" |
 | A new concept, alias, property or shape. | A minor version, with the release steps. | "Add a concept or a property" |
-| A new business area, process or step, or a changed one. | A release of `core`, then every module. The process map request form collects it, and the propose command refuses it, because the commands cannot make a release of `core`. | "Change a process" |
+| A new business area, process or step. | The process map request form, then the propose and apply commands. The apply releases `core` and every module. No file is edited by hand. | "Add a process, a step or a business area with the process map request" |
+| A process renamed, moved, described anew or removed. | A release of `core` that a specialist writes, then every module. | "Change a process" |
 | The same ontology in another workspace, such as production. | New settings files. The ontology does not change. | "A new environment" |
 | A data area that no module covers. | A new module at 1.0.0. | "Onboard another module" |
 | A term that the business no longer uses, or two terms that are one. | A major version. The term is deprecated, never deleted. | "Deprecate a term" |
@@ -844,7 +845,7 @@ New roles, and new RACI entries for processes that the process map holds, go in 
 
 The change is in the `organization` module. A new role becomes a row of `organization/roles.csv` and of `organization/role-register.csv`. A RACI entry becomes the role's name in one of the four lists of the process's `raci` object in `business_architecture/business_process/downstream_process_map.json`. `change.kgcl` holds each new role and the three links of each assignment. `facts.csv` holds each new role's note and the role's name as each entry gives it. The figures in `organization/test_roles.py` leave out what the form added, as the figures in the other modules' tests do.
 
-A new business area, process or step needs a release of `core`, and the commands cannot make one. The propose command refuses a form that asks for one, and the Architect takes it to a specialist, who follows "Change a process".
+A new business area, process or step goes in through the same form, with a release of `core`: see "Add a process, a step or a business area with the process map request".
 
 The commands start in the release folder. Keep the filled form and the proposal in a folder beside the release folder, never inside it. The example uses the folder `process-map-request` beside the release folder.
 
@@ -1737,19 +1738,131 @@ The commands start in the top folder of the copy.
    all checks passed
    ```
 
+## Add a process, a step or a business area with the process map request
+
+A new business area, process or step goes in through the process map request form and the same two commands. Nobody edits the process map, a builder or a Turtle file by hand. `kpi-intake/README.md`, "The process map request", says what the propose command reads and who signs.
+
+The process map is the source of `core`, and every module depends on `core`. So the apply makes a release of `core` at its next minor version, and every module that depends on it takes a patch. It does each of the steps that "Change a process" below lists for a specialist:
+
+- it adds each new node to `business_architecture/business_process/downstream_process_map.json`, under its parent, and its row to `business_architecture/ontology/build/output/step2-identity-map.json`;
+- it freezes the map as it leaves it in `business_architecture/ontology/release/frozen`, named by the first twelve characters of the map's SHA-256;
+- it writes the next core builder, such as `build_core_2_5.py`, from `build_core_template.py`, with the template's block of constants filled in from the proposal, and checks that the builder compiles and holds those constants;
+- it writes the core changelog, runs the builder, and checks that the difference between the two core releases is exactly the proposal's lines and facts;
+- it checks that every module's source Turtle still equals a fresh build, releases every module, and runs the checks.
+
+`change.kgcl` holds each new node's name, definition, parent and business area. `facts.csv` holds its number, its level and its scope note, which KGCL cannot write. A request adds one level of the map: a step of a new process goes in with a request of its own, once the process is in the map.
+
+The commands start in the release folder. Keep the filled form and the proposal in a folder beside the release folder, never inside it. The example uses the folder `new-process` beside the release folder.
+
+1. Fill in the form, and save it to that folder. The example is the shipped example `kpi-intake/examples/sample-blend-planning.process-map-request.json`. It adds a made-up process, Sample Blend Planning, under CM 1.1 Planning & Scheduling, and makes the role Business Analyst accountable for it. The processes under CM 1.1 all belong to the business area Commercial, so P8 is empty and the new process takes Commercial. The Global Process Owner and the Architect sign it.
+
+   The document test copies the example to the folder with this block. If you saved the file from the form, skip it.
+
+   ```python run=new-process
+   import shutil
+   from pathlib import Path
+
+   folder = Path("../new-process")
+   folder.mkdir(exist_ok=True)
+   path = shutil.copy("kpi-intake/examples/sample-blend-planning.process-map-request.json", folder)
+   print("copied", Path(path).name)
+   ```
+
+   ```text expect
+   copied sample-blend-planning.process-map-request.json
+   ```
+
+2. Check the form. It must end with `the intake is complete and signed`.
+
+   ```powershell run=new-process
+   python -m kpi_store.intake check ../new-process/sample-blend-planning.process-map-request.json
+   ```
+
+   ```text expect
+   Process map request check: Sample Blend Planning
+   ...
+   Result: the intake is complete and signed.
+   This check changes nothing in the ontology. The Architect turns a complete process map request into a proposal with python -m kpi_store.propose <this file>, as HOW-TO-UPDATE.md says.
+   ```
+
+3. Turn the form into a proposal. The command writes the folder `proposals/PM-2026-002` beside the form. It gives the new process its number, CM 1.1.8: the first number under CM 1.1 that no process of the map holds.
+
+   ```powershell run=new-process
+   python -m kpi_store.propose ../new-process/sample-blend-planning.process-map-request.json
+   ```
+
+   ```text expect
+   wrote the proposal ../new-process/proposals/PM-2026-002: 7 changes and 4 facts, route minor
+   Nothing in the ontology has changed. Read each summary.txt, then apply with: python -m kpi_store.apply <proposal folder>
+   ```
+
+4. Read `summary.txt`. It names the new process, where it goes, its business area and its RACI entry.
+
+   ```python run=new-process
+   print(open("../new-process/proposals/PM-2026-002/summary.txt", encoding="utf-8").read())
+   ```
+
+   ```text expect
+   Proposal PM-2026-002
+   ...
+   What it adds:
+     - A new process, CM 1.1.8 Sample Blend Planning (proc:CM-1-1-8), at level 3, under CM 1.1 Planning & Scheduling, in the business area Commercial.
+       Its definition: "Plan the made-up blends of one made-up region for the coming month."
+       Its scope note: "It covers the blend recipes, not the blending itself."
+     - A RACI entry: "Business Analyst" is accountable for the process CM 1.1.8 Sample Blend Planning.
+   ...
+   ```
+
+5. Apply the proposal. The command refuses a proposal that lacks the Global Process Owner's or the Architect's signature. It works on a temporary copy of the release, and writes the release and commits it only when every step has passed. It took about three minutes on a Mac.
+
+   ```powershell run=new-process
+   python -m kpi_store.apply ../new-process/proposals/PM-2026-002
+   ```
+
+   ```text expect
+   1 proposal to apply:
+     PM-2026-002: minor, signed by Global Process Owner, Architect
+   ...
+     core 2.4.0 -> 2.5.0
+   ...
+     organization 2.2.0 -> 2.3.0
+   ...
+   ... write the release
+   Done. core is now 2.5.0 and organization 2.3.0 (minor), and 11 modules that depend on them took a new patch. The apply changed <count> files, and Git committed them.
+   Run the full check before you load: bash scripts/check.sh (on Windows, in Git Bash). Then load the stores with the runner: python -m kpi_store.runner
+   ```
+
+6. See the commit, the new core builder and the new process in the KPI form's list.
+
+   ```powershell run=new-process
+   git --no-pager log --oneline -1
+   python -c "import json; print([p['label'] for p in json.load(open('kpi-intake/pick-lists.json', encoding='utf-8'))['lists']['processes'] if p['label'].startswith('CM 1.1.8 ')])"
+   cd business_architecture/ontology/release
+   python -c "import newest; print(newest.core_builder())"
+   cd ../../..
+   ```
+
+   ```text expect
+   <commit> Apply the process map request PM-2026-002: core 2.5.0, organization 2.3.0
+   ['CM 1.1.8 Sample Blend Planning']
+   build_core_2_5
+   ```
+
+7. Run the full check, as in "Before you change anything", step 3. Then load the stores with the runner, as in step 11 of "The release steps".
+
 ## Change a process
 
-The process map is the source of the taxonomy in `core`. Every module depends on `core`, so this is the widest change. A change to an existing process's meaning is a major. A new process is a minor.
+This section is for a specialist. A process that is renamed, moved, described anew or removed has no form: the process map request adds new processes only. A change to an existing process's meaning is a major.
 
 The document test does not run this section's commands. Each needs your own edits to a new builder first. The steps it ends with, the cascade and the check, are tested in "The release steps".
 
 1. Copy `business_architecture\business_process\downstream_process_map.json` into `business_architecture\ontology\release\frozen`. Name the copy with a label of 12 letters or digits, a hyphen, and the file's name, such as `before202611-downstream_process_map.json`.
-2. Add the node to `downstream_process_map.json`, with its `id`, `level`, `name` and `description`. The builder makes the description's first sentence the definition and the rest the scope note. So put the whole definition in the first sentence.
-3. Add its row to `business_architecture\ontology\build\output\step2-identity-map.json`, beside its siblings, with the same fields. Copy `minted` and `deprecated` from a sibling: `false` for an ordinary new process.
+2. Make the change to the node in `downstream_process_map.json`. A builder makes a description's first sentence the definition and the rest the scope note. So put the whole definition in the first sentence.
+3. Make the same change to its row of `business_architecture\ontology\build\output\step2-identity-map.json`.
 4. Copy the changed map into `frozen` too, under a second label, such as `after2026110-downstream_process_map.json`.
 5. Save the approval, as step 3 of "The release steps" says.
 6. In `business_architecture\ontology\release`, copy `build_core_template.py` to `build_core_2_5.py`. The name is for the first change to this release. A later change raises it.
-7. Fill in the block that the new builder marks: the two labels, the new version and the approval. To change an existing node's ID or description, read `build_core_2_2.py`, which applies those changes.
+7. Fill in the block that the new builder marks: the two labels, the new version and the approval. The template adds nodes only and stops on any other change, so write the builder's change of your own: `build_core_2_2.py` applies new IDs and descriptions, and `build_core_2_4.py` renames.
 8. Write the changelog `business_architecture\ontology\releases\core\CHANGELOG-2.5.0.md`, in the form of `CHANGELOG-2.4.0.md` beside it.
 9. Add a short test, `test_build_core_2_5.py`, beside the builder. It says what the release adds and that it removes no IRI. Add it to the test list in `scripts/check.sh`.
 10. From the folder `release`, write the package with `python build_core_2_5.py --write`.

@@ -13,7 +13,7 @@ fourth when some facts are ones KGCL cannot write:
                     request's (process_map.py) and a domain activation's, which holds nothing else (domains.py)
 
 Who answers for the content, and so signs beside the Architect (Q4), follows from what the proposal changes: the
-Domain Owner for a domain activation, the Global Process Owner for roles and their RACI entries, and the Data Owner
+Domain Owner for a domain activation, the Global Process Owner for a process map request (roles, RACI entries, processes, steps and business areas), and the Data Owner
 for everything else (owner_of).
 
 The route (Q5). Each kind of change suggests one: a new other name and a new process link add content, so they
@@ -62,7 +62,7 @@ def route_of(changes, compatible="yes"):
 
 
 DOMAIN = "domain:"                     # the subject of a domain activation's facts (domains.py)
-PROCESS_MAP_PREFIXES = ("role", "asg")  # the subjects of a process map request's lines (process_map.py)
+PROCESS_MAP_PREFIXES = ("role", "asg", "proc", "area")  # the subjects of a process map request (process_map.py, core_release.py)
 
 
 def owner_of(changes, facts=()):
