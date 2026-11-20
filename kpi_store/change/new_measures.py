@@ -57,8 +57,9 @@ KPI_NS = kpi_tables.PREFIXES["kpi"]
 # The namespaces of build_measures.py; a test checks that they are the builder's.
 PREFIXES = {**kpi_tables.PREFIXES, "kind": KPI_NS + "measure-kind/", "persona": KPI_NS + "persona/",
             "src": BASE + "source/", "dcterms": "http://purl.org/dc/terms/",
-            "skos": "http://www.w3.org/2004/02/skos/core#"}
+            "skos": "http://www.w3.org/2004/02/skos/core#", "pop": BASE + "modules/population/"}
 FOLDER = kpi_tables.KPI_FOLDER
+POP_FOLDER, POPULATION = cut.ONTOLOGY / "population", "population"   # ships in the kpi package (build_module.py)
 CLASSIFICATION, DETAILS = kpi_tables.CLASSIFICATION, kpi_tables.DETAILS
 IDENTIFIERS, NOTES, PERSONAS, SOURCES = "measure-identifiers", "identifier-notes", "personas", "measure-sources"
 TABLES = (CLASSIFICATION, DETAILS, IDENTIFIERS, NOTES, SOURCES)
@@ -86,7 +87,10 @@ FACTS = {"kpi:kpiCandidate": (CLASSIFICATION, "kpi_candidate", "boolean"),
          "kpi:grain": (DETAILS, "grain", "string"),
          "kpi:basis": (DETAILS, "basis", "string"),
          "skos:scopeNote": (DETAILS, "not_note", "text"),
-         "skos:note": (NOTES, "note", "text")}
+         "skos:note": (NOTES, "note", "text"),
+         "pop:includes": (POPULATION, "includes", "text"),
+         "pop:excludes": (POPULATION, "excludes", "text"),
+         "pop:populationEvidence": (POPULATION, "evidence", "string")}
 REQUIRED = ("kpi:kpiCandidate", "kpi:classificationTest", "kpi:classificationReason")
 CARRIED = ("skos:prefLabel", "skos:definition", "skos:altLabel", *EDGES)   # what KGCL lines say
 
@@ -187,8 +191,11 @@ def measures(changes, facts=()):
     for subject, prop, value in facts:
         row = f"{subject},{prop},{value}"
         m = found.get(subject)
+        if m is None and prop == "skos:scopeNote" and subject.startswith("measure:"):
+            continue   # a sentence for the scope note of a measure that a new one names in 5.2: return_notes reads it
         if m is None:
-            raise ChangeRefused(f"a fact of facts.csv is about a new measure that a 'create node' line makes: {row}")
+            raise ChangeRefused(f"a fact of facts.csv is about a new measure that a 'create node' line makes, or is a "
+                                f"sentence for the scope note of a measure it is mistaken for: {row}")
         problem = _fact_problem(prop, value)
         if problem:
             raise ChangeRefused(f"{problem}: {row}")
@@ -198,6 +205,27 @@ def measures(changes, facts=()):
     for m in found.values():
         _complete(m)
     return list(found.values())
+
+
+def return_notes(changes, facts):
+    """The sentences for the scope notes of measures that the new measures name as mistaken for them: [(the measure,
+    the sentence)], in order. Each names a measure that a new one names (kpi:notToBeConfusedWith)."""
+    made = {c.subject for c in changes if c.kind == "create node"}
+    named = {c.target for c in changes if c.kind == "create edge" and c.predicate == "kpi:notToBeConfusedWith"}
+    out = []
+    for subject, prop, value in facts:
+        if subject in made or prop != "skos:scopeNote" or not subject.startswith("measure:"):
+            continue
+        if subject not in named:
+            raise ChangeRefused(f"a sentence for the scope note of {subject}, which no new measure names as mistaken for "
+                                f"it: {subject},{prop},{value}")
+        problem = _fact_problem(prop, value)
+        if problem:
+            raise ChangeRefused(f"{problem}: {subject},{prop},{value}")
+        if subject in {s for s, _ in out}:
+            raise ChangeRefused(f"{subject} takes one sentence for its scope note from one change")
+        out.append((subject, value))
+    return out
 
 
 def _complete(m):
@@ -216,6 +244,10 @@ def _complete(m):
         raise ChangeRefused(f"{name}: only an operational metric can be a KPI candidate, and this measure is {kind}")
     if m.targets("kpi:notToBeConfusedWith") and "skos:scopeNote" not in m.facts:
         raise ChangeRefused(f"{name}: a measure it is mistaken for needs a skos:scopeNote fact that says how they differ")
+    if ("pop:excludes" in m.facts or "pop:populationEvidence" in m.facts) and "pop:includes" not in m.facts:
+        raise ChangeRefused(f"{name}: a population says what the measure counts (pop:includes) before what it leaves out")
+    if "pop:includes" in m.facts and "pop:populationEvidence" not in m.facts:
+        raise ChangeRefused(f"{name}: a population cites its evidence (pop:populationEvidence)")
     if tail(m.targets("dcterms:source")[0]) == CLASSIFIED_BY:
         raise ChangeRefused(f"{name}: every measure cites src:{CLASSIFIED_BY} already. Name the document the measure "
                             "comes from")
@@ -267,7 +299,12 @@ def _edit(changes, facts, root):
     """The kpi tables of the release with the new measures' rows added in memory. Raises ChangeRefused when any
     measure does not fit them."""
     found = measures(changes, facts)
+    notes = return_notes(changes, facts)
     tables = _read(root, TABLES)
+    try:
+        population = cut.Tables(root, POP_FOLDER, (POPULATION,))
+    except cut.CutRefused:
+        raise ChangeRefused(f"{root} holds no population table: it is not a KPI Store release") from None
     personas = {r["slug"]: r["label"] for r in _read(root, (PERSONAS,)).rows[PERSONAS]}
     sources = {r["slug"]: r["key"] for r in tables.rows[SOURCES]}
     records = None
@@ -341,10 +378,21 @@ def _edit(changes, facts, root):
             numbers[prefix] += 1
         if "skos:note" in f:
             tables.rows[NOTES].append({"measure_id": m.key, "note": f["skos:note"]})
+        if "pop:includes" in f:
+            population.rows[POPULATION].append({"measure_id": m.key, "includes": f["pop:includes"],
+                                                "excludes": f.get("pop:excludes", ""), "evidence": f["pop:populationEvidence"]})
         ids.add(m.key)
         for n in [m.label, *m.synonyms]:
             names[n.casefold()] = m.key
-    return found, tables
+    by_id = {r["measure_id"]: r for r in tables.rows[DETAILS]}
+    for subject, sentence in notes:
+        row = by_id.get(tail(subject))
+        if row is None or tail(subject) in {m.key for m in found}:
+            raise ChangeRefused(f"{subject} is not a measure of the kpi module, so its scope note cannot take a sentence")
+        if sentence in row["not_note"]:
+            raise ChangeRefused(f"the scope note of {subject} holds this sentence already: {sentence}")
+        row["not_note"] = f"{row['not_note']} {sentence}" if row["not_note"] else sentence
+    return found, (tables, population)
 
 
 def check_changes(changes, facts, release_root):
@@ -358,10 +406,12 @@ def apply_changes(changes, facts, release_root):
     Returns its path. Raises ChangeRefused, and writes nothing, when any measure does not fit the tables. When the
     builder refuses the changed tables, they stay written in the scratch copy, and ChangeRefused carries its message."""
     root = Path(release_root).resolve()
-    _, tables = _edit(changes, facts, root)
+    _, (tables, population) = _edit(changes, facts, root)
     tables.write(root)
+    population.write(root)
     try:
         cut._run("rebuild the kpi module", [kpi_tables.BUILDER, "--write"], root / FOLDER)
+        cut._run("rebuild the populations", ["build_population.py", "--write"], root / POP_FOLDER)
     except cut.CutFailed as err:
         raise ChangeRefused(f"the kpi builder refused the changed tables: {err}") from None
     return root / kpi_tables.MEASURES
@@ -393,13 +443,26 @@ def compare(before, after):
     from rdflib.namespace import DCTERMS, RDF, SKOS, XSD
     before, after = (g if isinstance(g, Graph) else Graph().parse(str(g), format="turtle") for g in (before, after))
     removed, added = set(before) - set(after), set(after) - set(before)
-    unsupported = [f"- {s} {p} {o}" for s, p, o in removed]
     ns, held = PREFIXES["measure"], set(before.subjects())
+    # A sentence added to the scope note of a measure the module held: the old note goes, the longer one comes.
+    rows = []
+    for s in sorted({s for s, p, o in added if p == SKOS.scopeNote and s in held and str(s).startswith(ns)}):
+        old = [o for o in before.objects(s, SKOS.scopeNote)]
+        new = [o for o in after.objects(s, SKOS.scopeNote)]
+        if len(new) != 1 or len(old) > 1 or _value(new[0], "text") is None:
+            continue
+        text, was = str(new[0]), str(old[0]) if old else ""
+        if was and not text.startswith(was + " "):
+            continue
+        rows.append((curie(str(s)), "skos:scopeNote", text[len(was) + 1:] if was else text))
+        added.discard((s, SKOS.scopeNote, new[0]))
+        removed -= {(s, SKOS.scopeNote, o) for o in old}
+    unsupported = [f"- {s} {p} {o}" for s, p, o in removed]
     new = {s for s, p, o in added if p == SKOS.prefLabel and s not in held and str(s).startswith(ns) and len(str(s)) > len(ns)}
     scheme = URIRef(KPI_NS + "Measures")
     edges = {URIRef(iri(p)): p for p in EDGES}
     facts = {URIRef(iri(p)): p for p in FACTS}
-    lines, rows, idents = {s: [] for s in new}, [], {}
+    lines, idents = {s: [] for s in new}, {}
     # A source that a new measure cites and the kpi module did not hold gains its type and its title.
     cited = {o for s, p, o in added if s in new and p == DCTERMS.source and o not in held and isinstance(o, URIRef)
              and (curie(str(o)) or ":").split(":", 1)[0] == "src"}
@@ -442,6 +505,28 @@ def compare(before, after):
     order = {"create node": 0, "add definition": 1, "create synonym": 2, "create edge": 3}
     out = [write_line(c) for s in sorted(new) for c in sorted(lines[s], key=lambda c: (order[c.kind], write_line(c)))]
     return out, sorted(rows)
+
+
+def compare_population(before, after):
+    """The facts that take the built population graph `before` to `after` (files or Graphs): what each new measure
+    counts and leaves out and its evidence. Raises ChangeRefused for any other difference."""
+    from rdflib import Graph, URIRef
+    before, after = (g if isinstance(g, Graph) else Graph().parse(str(g), format="turtle") for g in (before, after))
+    removed, added = set(before) - set(after), set(after) - set(before)
+    unsupported = [f"- {s} {p} {o}" for s, p, o in removed]
+    props = {URIRef(iri(p)): p for p in FACTS if p.startswith("pop:")}
+    held, rows = set(before.subjects()), []
+    for s, p, o in added:
+        prop = props.get(p)
+        subject = curie(str(s)) or ""
+        if prop and subject.startswith("measure:") and s not in held and _value(o, FACTS[prop][2]) is not None:
+            rows.append((subject, prop, _value(o, FACTS[prop][2])))
+        else:
+            unsupported.append(f"+ {s} {p} {o!r}")
+    if unsupported:
+        raise ChangeRefused(f"the graphs differ in {len(unsupported)} ways that no fact of a new measure's population "
+                            "states: " + "; ".join(sorted(unsupported)[:10]))
+    return [], sorted(rows)
 
 
 def _expected(s, scheme):

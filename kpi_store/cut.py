@@ -787,7 +787,7 @@ def _build(plan_, staging, approver, now, step):
 def _outputs(staging, versions, intake_pack, step, turtle):
     """After the new packages are written and the old ones moved: rebuilds the catalog, the projection manifest and,
     when the release holds it, the KPI intake pack, runs the competency questions, then verifies the module's Turtle
-    (`turtle`: the name, the builder's arguments and its folder), each new package, the catalog and the pack against a
+    (`turtle`: the name, the builder's arguments and its folder, or a list of them), each new package, the catalog and the pack against a
     fresh build. The cut and the apply command (kpi_store/apply.py) both end a release with this."""
     ontology, release = staging / ONTOLOGY, staging / ONTOLOGY / "release"
     step("rebuild the catalog", lambda: _run("rebuild the catalog", ["build_catalog.py", "--write"], release))
@@ -801,7 +801,7 @@ def _outputs(staging, versions, intake_pack, step, turtle):
     step("run the competency questions", lambda: _run("run the competency questions", ["run.py"], ontology / "regression"))
     # The checks of scripts/check.sh that need no bash and that this change can change: each written file must equal
     # a fresh build of its source. The projection manifest was built one step ago by the same code.
-    verify = [turtle]
+    verify = list(turtle) if isinstance(turtle, list) else [turtle]
     verify += [(f"the {module} package", ["build_module.py", module, "--verify"], release) for module in versions]
     verify += [("the catalog", ["build_catalog.py", "--verify"], release)]
     verify += [("the KPI intake pack", [*intake, "--check"], staging)] if intake_pack else []

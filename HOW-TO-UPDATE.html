@@ -502,9 +502,11 @@ python next_version.py current system</code></pre>
 <h2 id="add-a-kpi-with-the-kpi-intake-form">Add a KPI with the KPI intake form<a class="hl" href="#add-a-kpi-with-the-kpi-intake-form" aria-label="Link to this section">#</a></h2>
 <p>A new KPI goes in through the KPI intake form and the same two commands as a term change. Nobody edits a table or a Turtle file. The form is the "KPI intake" tab of the HTML form and the KPI sheets of the workbook. <code>kpi-intake/README.md</code> says what it asks and who signs.</p>
 <p>The proposal of a new KPI holds two files of changes. <code>change.kgcl</code> holds what KGCL can say: the KPI's name, definition, other names, kind, source, roles, processes and the measures it is mistaken for. <code>facts.csv</code> holds the text facts that KGCL cannot write, one row each, with the columns measure, property and value: how it is worked out, how often it is stated, what it is compared against, why it has its kind, and the like. On kgcl-schema 0.7.0 a quoted text in a KGCL line about a link loses its quotes, so these facts have no KGCL line (KPI-DEC-0004). The apply writes both, checks both against the rebuilt module, and gives the KPI its identifier, the next free <code>KPI-</code> or <code>OPM-</code> number.</p>
-<p>The proposal holds only what the <code>kpi</code> module records. The answers that feed another module stay in the form's file, and <code>summary.txt</code> names each one: what the KPI counts and leaves out (2.3, 2.4) for <code>population</code>, the value stream steps (6.3 to 6.5) for <code>value-stream</code>, the data product and the view (6.6, 7.1 to 7.9) for <code>data-product</code>, and the market series (6.7) for <code>market-data</code>. Add those with "The release steps".</p>
-<p>The propose command refuses a form that the <code>kpi</code> module cannot take as it stands, and says why:</p>
-<ul><li>a name or an other name that a measure has already. A change to that measure goes through the term-change form;</li><li>a role in 6.1 that is not one of the four planning personas, the only roles the <code>kpi</code> module records today;</li><li>more than one document in 3.5, or a document that 3.5 does not offer and <code>kpi/measure-sources.csv</code> does not hold. A new source document needs a specialist, because its evidence tier is in the <code>integration</code> module. A document that 3.5 offers is in the ontology already, with its title and its tier: when <code>kpi/measure-sources.csv</code> has no row for it yet, the apply adds one, with that title.</li></ul>
+<p>One proposal holds every module the form changes, and one apply releases them all:</p>
+<ul><li><code>kpi</code>: the KPI, and what it counts and leaves out (2.3, 2.4), which ship in the <code>kpi</code> package as its population. Each measure that 5.2 names as mistaken for it gains a sentence at the end of its own scope note, which names the new KPI.</li><li><code>value-stream</code>: a link from each value stream step of 6.3 to the KPI, with how the step uses it (6.4) and the document that says so (6.5). The apply writes each link into the step's list in <code>business_architecture/business_process/value_stream_*.json</code>, which the module's builder reads.</li><li><code>data-product</code>: the view of 7.1 serves the KPI, and the assistant of 7.8 answers from that view. The propose command checks that 6.6 names the data product the view is part of.</li></ul>
+<p>Each changed module takes its own minor, and every module that depends on one takes a patch, once. The apply compares each rebuilt module with the proposal's lines and facts, and makes one commit. Two answers stay in the form's file, and <code>summary.txt</code> says so: the market series of 6.7, which the form does not collect, and 7.7, for which the ontology has no property yet.</p>
+<p>The propose command refuses a form that the modules cannot take as they stand, and says why:</p>
+<ul><li>a name or an other name that a measure has already. A change to that measure goes through the term-change form;</li><li>a role in 6.1 that is not one of the four planning personas, the only roles the <code>kpi</code> module records today;</li><li>a view in 7.1 that the ontology does not hold, a table that is not a metric view, or an assistant in 7.8 that the <code>data-product</code> module does not hold. A new view or assistant needs a specialist, as the reference-item form says of a table built from other tables;</li><li>when 7.1 names a view, a data product in 6.6 other than the one that view is part of, or one that the ontology does not hold;</li><li>an assistant in 7.8 when 7.1 names no view for it to answer from;</li><li>a step in 6.3 that the ontology does not hold. A new value stream step goes to the process map request;</li><li>2.4 without 2.3, because a population says what the KPI counts before what it leaves out;</li><li>more than one document in 3.5, or a document that 3.5 does not offer and <code>kpi/measure-sources.csv</code> does not hold. A new source document needs a specialist, because its evidence tier is in the <code>integration</code> module. A document that 3.5 offers is in the ontology already, with its title and its tier: when <code>kpi/measure-sources.csv</code> has no row for it yet, the apply adds one, with that title.</li></ul>
 <p>The commands start in the release folder. Keep the filled form and the proposal in a folder beside the release folder, never inside it, as for a term change. The example uses the folder <code>new-kpi</code> beside the release folder.</p>
 <ol><li>Fill in the form, and save it to that folder. The example starts from the shipped example Crack Spreads Pricing and gives it a made-up name, Sample Spread Margin, a definition and an other name of its own, so it is a new measure. It also leaves out the example's answer to 3.6, which is about the measure the example copies. The Data Owner, the Domain Owner and the Architect sign it.
 <p>The document test writes the form's answers file with this block. If you saved the file from the form, skip it.</p>
@@ -540,9 +542,9 @@ Result: the intake is complete and signed.
 This check changes nothing in the ontology. The Architect turns a complete KPI intake into a proposal with python -m kpi_store.propose &lt;this file&gt;, as HOW-TO-UPDATE.md says.</code></pre></li></ol>
 <ol start="3"><li>Turn the form into a proposal. The command writes the folder <code>proposals/NK-2026-001</code> beside the form, with <code>change.kgcl</code>, <code>facts.csv</code>, <code>approval.json</code> and <code>summary.txt</code>. It changes nothing in the ontology. A new KPI is always a minor.
 <pre><code class="lang-powershell">python -m kpi_store.propose ../new-kpi/sample-spread-margin.kpi-intake.json</code></pre>
-<pre><code class="lang-text">wrote the proposal ../new-kpi/proposals/NK-2026-001: 12 changes and 9 facts, route minor
+<pre><code class="lang-text">wrote the proposal ../new-kpi/proposals/NK-2026-001: 19 changes and 17 facts, route minor
 Nothing in the ontology has changed. Read each summary.txt, then apply with: python -m kpi_store.apply &lt;proposal folder&gt;</code></pre></li></ol>
-<ol start="4"><li>Read <code>summary.txt</code>. It says what the new KPI is, what it links to, its facts, the answers the proposal leaves out, and who signed.
+<ol start="4"><li>Read <code>summary.txt</code>. It says what the new KPI is, what it links to in each module, its facts, the modules it reaches, what the Architect must still do outside the form, and who signed.
 <pre><code class="lang-python">print(open("../new-kpi/proposals/NK-2026-001/summary.txt", encoding="utf-8").read())</code></pre>
 <pre><code class="lang-text">Proposal NK-2026-001
 ...
@@ -558,23 +560,24 @@ What it adds, as facts in facts.csv (KGCL cannot write them):
 ...
 Its identifier: the apply gives it the next free OPM- number.
 
-Not in this proposal: these answers feed another module, so they stay in the form's file until a change to that module records them:
-  - 2.3, 2.4: the population module
-  - 6.3, 6.4, 6.5: the value-stream module
-  - 6.6, 7.1, 7.8: the data-product module
-  - 6.7: the market-data module
+The changes reach these modules: kpi (minor), data-product (minor), value-stream (minor).
+
+For the Architect: 6.7 is yes. The market-data module needs the KPI's named series, which this form does not collect. Model them in market-data, as the check's routing says.
 
 The route: minor. This is a minor: the changes add content, and the old meaning still holds.
 ...</code></pre></li></ol>
-<ol start="5"><li>Apply the proposal. The command works as it does for a term change: it adds the KPI's rows to the <code>kpi</code> tables in a temporary copy of the release, rebuilds the module, checks that the difference is exactly the proposal's lines and facts, releases <code>kpi</code> and every module that depends on it, rebuilds the catalog, the projection manifest and the KPI intake pack, and runs the checks. Only when every step has passed does it write the release and commit it. It keeps the proposal's lines and facts beside the approval record, as <code>approvals/NK-2026-001.kgcl</code> and <code>approvals/NK-2026-001.facts.csv</code>. If a step fails, the release is as it was. It took about 80 seconds on a Mac.
+<ol start="5"><li>Apply the proposal. The command works as it does for a term change, on each module the proposal changes: in a temporary copy of the release it adds the KPI's rows to the <code>kpi</code> tables, its population, its value stream links and its view's row, rebuilds <code>kpi</code>, <code>data-product</code> and <code>value-stream</code>, checks that each module's difference is exactly the proposal's lines and facts, releases each changed module at its own minor and gives every module that depends on them a patch, rebuilds the catalog, the projection manifest and the KPI intake pack, and runs the checks. Only when every step has passed does it write the release and commit it. It keeps the proposal's lines and facts beside the approval record, as <code>approvals/NK-2026-001.kgcl</code> and <code>approvals/NK-2026-001.facts.csv</code>. If a step fails, the release is as it was. It took about 100 seconds on a Mac.
 <pre><code class="lang-powershell">python -m kpi_store.apply ../new-kpi/proposals/NK-2026-001</code></pre>
 <pre><code class="lang-text">1 proposal to apply:
   NK-2026-001: minor, signed by Data Owner, Domain Owner, Architect
 ...
   kpi 1.3.0 -&gt; 1.4.0
+  data-product 1.2.0 -&gt; 1.3.0
+...
+  value-stream 1.2.0 -&gt; 1.3.0
 ...
 ... write the release
-Done. kpi is now 1.4.0 (minor), and 6 modules that depend on it took a new patch. The apply changed &lt;count&gt; files, and Git committed them.
+Done. kpi is now 1.4.0, data-product 1.3.0 and value-stream 1.3.0 (minor), and 4 modules that depend on them took a new patch. The apply changed &lt;count&gt; files, and Git committed them.
 Run the full check before you load: bash scripts/check.sh (on Windows, in Git Bash). Then load the stores with the runner: python -m kpi_store.runner</code></pre></li></ol>
 <ol start="6"><li>See the commit, the new version and the KPI's identifier.
 <pre><code class="lang-powershell">git --no-pager log --oneline -1
@@ -582,7 +585,7 @@ cd business_architecture/ontology/release
 python next_version.py current kpi
 cd ../kpi
 python -c "print(open('measure-identifiers.csv', encoding='utf-8').read().splitlines()[-1])"</code></pre>
-<pre><code class="lang-text">&lt;commit&gt; Apply the new KPI NK-2026-001: kpi 1.4.0
+<pre><code class="lang-text">&lt;commit&gt; Apply the new KPI NK-2026-001: kpi 1.4.0, data-product 1.3.0, value-stream 1.3.0
 1.4.0
 sample-spread-margin,OPM-0031</code></pre></li></ol>
 <ol start="7"><li>Run the full check, as in "Before you change anything", step 3. Then load the stores with the runner, as in step 11 of "The release steps".</li></ol>

@@ -18,9 +18,12 @@ as JSON or filled in the workbook. For each file the command:
 4. writes one proposal folder: change.kgcl, approval.json (written from the form's sign-off) and summary.txt, and
    for a new KPI facts.csv, the facts KGCL cannot write (KPI-DEC-0004, item 1).
 
-A new KPI's proposal holds what the kpi module records. The answers that feed another module (what it counts and
-leaves out, the value stream steps, the data product and the view) are not in it: summary.txt names each one, and
-they stay in the form's file, as the answers the ontology has no place for do.
+A new KPI's proposal holds every module it changes (kpi_store/change/other_modules.py): the measure and what it counts
+and leaves out (kpi), the value stream steps that use it (value-stream), the view that gives its values and the
+assistant that answers from it (data-product), and a sentence back in the scope note of each measure it is mistaken
+for. A new step, view or assistant is refused: the step goes to the process map request, and a view or an assistant
+needs a specialist. The answers the ontology has no place for stay in the form's file, and summary.txt names what
+the Architect must still do outside the form.
 
 It checks every file before it writes any proposal, so a refused file leaves no proposal at all. One form gives
 one proposal (KPI-DEC-0002, Q6).
@@ -39,18 +42,13 @@ import datetime as dt
 import sys
 from pathlib import Path
 
-from kpi_store.change import ChangeRefused, approval, kgcl, kpi_tables, new_measures, proposal, reference_items
+from kpi_store.change import ChangeRefused, approval, kgcl, kpi_tables, new_measures, other_modules, proposal, reference_items
 from kpi_store.change.kgcl import Change
 
 FORM, ITEM, KPI = "term-change", "reference-item", "kpi-intake"
 FORMS = (FORM, ITEM)
 SIGNERS = {"data-owner": "Data Owner", "ontology-owner": "Ontology Owner", "architect": "Architect",
            "domain-confirmation": "Domain Owner", "domain-owner": "Domain Owner"}
-# The answers of the KPI form that feed a module other than kpi, so a new KPI's proposal does not hold them.
-ELSEWHERE = {"2.3": "population", "2.4": "population", "6.3": "value-stream", "6.4": "value-stream",
-             "6.5": "value-stream", "6.6": "data-product", "6.7": "market-data", "7.1": "data-product",
-             "7.2": "data-product", "7.3": "data-product", "7.4": "data-product", "7.5": "data-product",
-             "7.6": "data-product", "7.7": "data-product", "7.8": "data-product", "7.9": "data-product"}
 ROUTE_WHY = {"patch": "a patch: the changes correct or reword, and the old meaning still holds",
              "minor": "a minor: the changes add content, and the old meaning still holds",
              "major": "a major: the form says a report or an answer that used the old meaning may now be wrong"}
@@ -179,7 +177,7 @@ def kpi_changes(cat, intake, lists, root):
     subject = f"measure:{key}"
 
     def linked(question, value, prefix, what):
-        found = new_measures.curie(value)
+        found = other_modules.curie(value)
         if not found or found.split(":", 1)[0] != prefix:
             label = next((i["label"] for items in lists.values() if isinstance(items, list) for i in items
                           if isinstance(i, dict) and i.get("id") == value), value)
@@ -219,11 +217,75 @@ def kpi_changes(cat, intake, lists, root):
     if one("3.6").lower() not in ("", "no", "none"):
         facts.append(("skos:note", one("3.6")))
     facts = [(subject, prop, value) for prop, value in facts if value]
-    elsewhere = [(q, module) for q, module in ELSEWHERE.items() if rules.real_values(answers, q)]
-    return key, changes, facts, elsewhere
+    # What it counts and leaves out (2.3, 2.4): the populations, which ship in the kpi package.
+    if one("2.4") and not one("2.3"):
+        raise ProposeRefused("2.4 says what the KPI leaves out, and 2.3 does not say what it counts. Answer 2.3 too, "
+                             "or leave 2.4 empty")
+    if one("2.3"):
+        facts += [(subject, "pop:includes", one("2.3"))] + ([(subject, "pop:excludes", one("2.4"))] if one("2.4") else [])
+        facts.append((subject, "pop:populationEvidence", one("3.5.detail")))
+    # The value stream steps that use it (6.3 to 6.5): one measure link each.
+    steps, relationships, bases = (rules.positions(answers, q) for q in ("6.3", "6.4", "6.5"))
+    seen = set()
+    for i, step in enumerate(steps):
+        if step == "@not-in-list":
+            raise ProposeRefused("6.3 names a step that the ontology does not hold. A new value stream step goes to the "
+                                 "process map request")
+        if not step or step.startswith("@"):
+            continue
+        step = linked("6.3", step, "vsprocess", "a step of a value stream")
+        if step in seen:
+            raise ProposeRefused(f"6.3 names the step {step} twice. A step takes one link to a measure")
+        seen.add(step)
+        relationship = linked("6.4", relationships[i] if i < len(relationships) else "", "rel", "a way a step uses a measure")
+        link = f"mlink:{step.split(':', 1)[1]}--{key}"
+        changes += [Change("create edge", step, predicate="vs:measureLink", target=link),
+                    Change("create edge", link, predicate="vs:measure", target=subject),
+                    Change("create edge", link, predicate="vs:relationship", target=relationship)]
+        facts.append((link, "dcterms:bibliographicCitation", bases[i] if i < len(bases) else ""))
+    # The view that gives its values (7.1), the data product it is part of (6.6) and the assistant (7.8).
+    if "@not-in-list" in rules.values(answers, "7.1"):
+        raise ProposeRefused("7.1 names a view that the ontology does not hold. A new view is a data product, and needs a "
+                             "specialist, as the reference-item form says of a table built from other tables")
+    pricing = other_modules._pricing(root, ("tables", "agents"))
+    if one("7.1"):
+        view = linked("7.1", one("7.1"), "table", "a table of the data-product module")
+        row = next((t for t in pricing.rows["tables"] if t["slug"] == view.split(":", 1)[1]), {})
+        if row.get("layer") != "metric-view":
+            raise ProposeRefused(f"7.1 names {view}, which is not a metric view. Only a metric view serves a measure")
+        if "@not-in-list" in rules.values(answers, "6.6"):
+            raise ProposeRefused(f"6.6 names a data product that the ontology does not hold, and the view of 7.1 is part "
+                                 f"of {other_modules.WHOLE}")
+        product = linked("6.6", one("6.6"), "product", "a data product") if one("6.6") else other_modules.WHOLE
+        if product != other_modules.WHOLE:
+            raise ProposeRefused(f"6.6 names {product}, and the view of 7.1 is part of {other_modules.WHOLE}")
+        changes.append(Change("create edge", view, predicate="dp:servesMeasure", target=subject))
+        if one("7.8"):
+            agent = next((a for a in pricing.rows["agents"] if a["label"].casefold() == one("7.8").casefold()), None)
+            if agent is None:
+                raise ProposeRefused(f'7.8 names "{one("7.8")}", which is not an assistant of the data-product module. '
+                                     "A new assistant needs a specialist")
+            if view.split(":", 1)[1] not in agent["uses"].split(";"):
+                changes.append(Change("create edge", f"agent:{agent['slug']}", predicate="prov:used", target=view))
+    elif one("7.8"):
+        raise ProposeRefused("7.8 names an assistant, and 7.1 names no view for it to answer from")
+    # A sentence back in the scope note of each measure it is mistaken for (5.2).
+    for m in rules.real_values(answers, "5.2"):
+        facts.append((linked("5.2", m, "measure", "a measure of the kpi module"), "skos:scopeNote",
+                      f"Not {name}: the scope note of {name} says how the two differ."))
+    notes = []
+    if one("6.7") == "yes":
+        notes.append("6.7 is yes. The market-data module needs the KPI's named series, which this form does not "
+                     "collect. Model them in market-data, as the check's routing says.")
+    if one("7.7"):
+        notes.append("7.7 stays in the form's file: the ontology has no property for the measure or column of a view yet.")
+    return key, changes, facts, notes
 
 
-FACT_WORDS = {"kpi:kpiCandidate": "A strong candidate to become a KPI: {}.", "kpi:classificationTest": "The test that decided its kind: {}.",
+RELATIONSHIP_WORDS = {"informs": "as an input", "benchmarks": "as a benchmark", "measures-performance": "as a result it tracks"}
+FACT_WORDS = {"pop:includes": 'What it counts: "{}"', "pop:excludes": 'What it leaves out: "{}"',
+              "pop:populationEvidence": 'Where its population is written down: "{}"',
+              "kpi:kpiCandidate": "A strong candidate to become a KPI: {}.", "kpi:classificationTest": "The test that decided its kind: {}.",
               "kpi:classificationReason": 'Why it has that kind: "{}"', "kpi:comparedAgainst": 'What it is compared against: "{}"',
               "kpi:publicCounterpart": 'Its closest published measure: "{}"', "dcterms:bibliographicCitation": 'Where the source says it: "{}"',
               "kpi:grain": 'How often it is stated, and its breakdowns: "{}"', "kpi:basis": 'How it is worked out: "{}"',
@@ -231,37 +293,53 @@ FACT_WORDS = {"kpi:kpiCandidate": "A strong candidate to become a KPI: {}.", "kp
               "skos:note": 'An ID another asset gives it: "{}"'}
 
 
-def kpi_summary(change_id, source, changes, facts, elsewhere, lines, route, record, lists):
-    """summary.txt of a new KPI: the new measure in plain words."""
-    label = {i["id"]: i["label"] for name in ("sources", "roles", "processes", "measures") for i in lists.get(name, [])}
+def kpi_summary(change_id, source, changes, facts, notes, lines, route, record, lists):
+    """summary.txt of a new KPI: the new measure, and what it changes in the other modules, in plain words."""
+    label = {i["id"]: i["label"] for name in ("sources", "roles", "processes", "measures", "value-stream-steps", "platform-tables")
+             for i in lists.get(name, [])}
 
     def named(target):
-        return label.get(new_measures.iri(target), target)
+        return label.get(other_modules.iri(target), target)
+    step_of = {c.target: c.subject for c in changes if c.predicate == "vs:measureLink"}
     edge = {"kpi:measureKind": lambda t: f"Its kind: {new_measures.tail(t).replace('-', ' ')}.",
             "dcterms:source": lambda t: f"The document it comes from: {named(t)}.",
             "kpi:usedBy": lambda t: f"A role that uses it: {named(t)}.",
             "kpi:informsProcess": lambda t: f"A process it informs: {named(t)}.",
             "kpi:notToBeConfusedWith": lambda t: f"A measure it is mistaken for: {named(t)}."}
-    said = {"add definition": lambda c: f'Its definition: "{c.text}"', "create synonym": lambda c: f'The other name "{c.text}".',
-            "create edge": lambda c: edge[c.predicate](c.target)}
+
+    def said(c):
+        if c.kind == "add definition":
+            return f'Its definition: "{c.text}"'
+        if c.kind == "create synonym":
+            return f'The other name "{c.text}".'
+        if c.predicate == "vs:relationship":
+            return (f"A value stream step that uses it: {named(step_of[c.subject])}, "
+                    f"{RELATIONSHIP_WORDS[new_measures.tail(c.target)]}.")
+        if c.predicate == "dp:servesMeasure":
+            return f"The view that gives its values: {named(c.subject)}."
+        if c.predicate == "prov:used":
+            return f"An assistant that now answers from that view: {c.subject}."
+        return edge[c.predicate](c.target) if c.predicate in edge else None
     first = changes[0]
     text = [f"Proposal {change_id}", "", f"From the form: {source}",
             f'The new measure: "{first.text}" ({first.subject}), in the kpi module', "",
             f"What it adds, as KGCL lines in {proposal.CHANGE_FILE}:", f'  - A measure named "{first.text}".']
-    text += [f"  - {said[c.kind](c)}" for c in changes[1:]]
+    text += [f"  - {said(c)}" for c in changes[1:] if said(c)]
     text += ["", f"What it adds, as facts in {proposal.FACTS_FILE} (KGCL cannot write them):"]
-    text += [f"  - {FACT_WORDS[prop].format(value)}" for _, prop, value in facts]
+    for subject, prop, value in facts:
+        if subject.startswith("mlink:"):
+            text.append(f'  - What says the step {named(step_of[subject])} uses it: "{value}"')
+        elif subject != first.subject:
+            text.append(f'  - A sentence for the scope note of {named(subject)}: "{value}"')
+        else:
+            text.append(f"  - {FACT_WORDS[prop].format(value)}")
     kind = new_measures.tail(next(c.target for c in changes if c.predicate == "kpi:measureKind"))
     prefix = new_measures.PREFIX.get(kind)
     text += ["", f"Its identifier: the apply gives it the next free {prefix}- number." if prefix else
              f"Its identifier: none, because a {kind.replace('-', ' ')} takes none."]
-    if elsewhere:
-        text += ["", "Not in this proposal: these answers feed another module, so they stay in the form's file until a "
-                     "change to that module records them:"]
-        modules = {}
-        for q, module in elsewhere:
-            modules.setdefault(module, []).append(q)
-        text += [f"  - {', '.join(qs)}: the {module} module" for module, qs in modules.items()]
+    reached = other_modules.modules_of(changes)
+    text += ["", "The changes reach these modules: " + ", ".join(f"{m} ({r})" for m, r in reached.items()) + "."]
+    text += [""] + [f"For the Architect: {note}" for note in notes] if notes else []
     text += ["", f"The route: {route}. This is {ROUTE_WHY[route]}.", "", "Who signed:"]
     text += [f"  - {s['role']}, on {s['date']}" for s in record["signatures"]]
     text += ["", f"The KGCL lines, in {proposal.CHANGE_FILE}:"] + [f"  {line}" for line in lines]
@@ -371,9 +449,9 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
         intake = read_form(path, cat, data, root, stale_check=pack is None)
         facts = []
         if intake.form == KPI:
-            key, changes, facts, elsewhere = kpi_changes(cat, intake, data["lists"], root)
+            key, changes, facts, notes = kpi_changes(cat, intake, data["lists"], root)
             module, compatible = "kpi", "yes"
-            checks = lambda changes, root: new_measures.check_changes(changes, facts, root)
+            checks = lambda changes, root: other_modules.check_changes(changes, facts, root)
         elif intake.form == ITEM:
             key, changes = item_changes(intake, data["lists"])
             module, checks, compatible = "new item's", reference_items.check_changes, "yes"
@@ -395,7 +473,7 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
             raise ProposeRefused(f"{path.name}: the sign-off cannot become an approval record: {err}") from None
         lines = [kgcl.write_line(c) for c in changes]
         if intake.form == KPI:
-            text = kpi_summary(change, path.name, changes, facts, elsewhere, lines, route, record, data["lists"])
+            text = kpi_summary(change, path.name, changes, facts, notes, lines, route, record, data["lists"])
         elif intake.form == ITEM:
             text = item_summary(change, path.name, key, changes, lines, route, record, data["lists"])
         else:

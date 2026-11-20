@@ -15,6 +15,19 @@ from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import OWL, RDF, RDFS, SKOS
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def added_by_forms():
+    """The measures that the KPI intake form added (KPI-DEC-0004, item 1): the short key of each line
+    "create node measure:<key> '<name>'" of a change file beside an approval record. A view that serves such a measure
+    gained it after the statements below were written, and the apply command checked it against its signed lines."""
+    import glob
+    import re
+    keys = set()
+    for path in glob.glob(os.path.join(HERE, "..", "approvals", "*.kgcl")):
+        with open(path, encoding="utf-8") as f:
+            keys |= set(re.findall(r"^create node measure:([a-z0-9-]+) '", f.read(), re.M))
+    return keys
 sys.path.insert(0, HERE)
 import build_data_products as bd  # noqa: E402
 
@@ -191,7 +204,8 @@ class Pricing(unittest.TestCase):
 
     def test_the_crack_view_serves_crack_spreads_and_its_value_comes_from_the_mpr_settle(self):
         view = TABLE["view-mpr-mips-crack-spread-price-fact-metrics-vw"]
-        self.assertEqual({str(m).rsplit("/", 1)[1] for m in PRICING.objects(view, DP.servesMeasure)}, {"crack-spreads"})
+        served = {str(m).rsplit("/", 1)[1] for m in PRICING.objects(view, DP.servesMeasure)}
+        self.assertEqual(served - added_by_forms(), {"crack-spreads"})
         gold = URIRef(str(TABLE).replace("/table/", "/column/") + "gold-mpr-mips-crack-spread-price-fact--crack_spread_price_amount")
         self.assertEqual({str(PRICING.value(c, DP.columnName)) for c in PRICING.objects(gold, PROV.wasDerivedFrom)},
                          {"Settle_Price_Amount"})
