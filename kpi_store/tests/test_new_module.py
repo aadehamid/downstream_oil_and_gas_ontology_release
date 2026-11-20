@@ -457,11 +457,14 @@ def test_a_closed_shape_refuses_a_citation_on_an_item_so_the_form_says_where_n12
     data = Graph()
     item = URIRef(nm.MODULES_NS + "x/item/a")
     data.add((item, URIRef(nm.RDF + "type"), URIRef(mkt + "Benchmark")))
-    data.add((item, URIRef(mkt + "benchmarkKind"), URIRef(mkt + "kind/product-benchmark")))
-    conforms_before = validate(data, shacl_graph=shapes, advanced=True)[0]
+    data.add((item, URIRef(mkt + "benchmarkKind"), URIRef(mkt + "benchmark-kind/product-benchmark")))
+    before = validate(data, shacl_graph=shapes, advanced=True)[1]   # other shapes ask for more of a benchmark
     data.add((item, URIRef(nm.DCTERMS + "bibliographicCitation"), Literal("A document, 2026", lang="en")))
-    report_ = validate(data, shacl_graph=shapes, advanced=True)[2]
-    assert "bibliographicCitation" in report_ and "never a price" in report_, (conforms_before, report_)
+    conforms_after, after, text = validate(data, shacl_graph=shapes, advanced=True)
+    release, own = small_release(), nm.MODULES_NS + "x/"
+    price = "item:a: A series or benchmark carries its definition, never a price."
+    assert price not in nm._violations(before, release, own), nm._violations(before, release, own)
+    assert not conforms_after and price in nm._violations(after, release, own), text
     n12 = catalogue.load(ROOT / "kpi-intake").by_id["N12"]["feeds"]
     assert "each term or item" not in n12 and "README" in n12
 
