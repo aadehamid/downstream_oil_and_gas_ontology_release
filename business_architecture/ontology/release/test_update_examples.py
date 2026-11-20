@@ -32,7 +32,7 @@ CHANGED = {
                    f"{ONT}/data-product/vocabulary.ttl", f"{ONT}/data-product/shapes.ttl",
                    f"{ONT}/data-product/build_data_products.py", f"{ONT}/data-product/test_data_products.py"],
     "raci": [f"{PROCESS}/downstream_process_map.json", f"{ONT}/organization/role-register.csv", f"{ONT}/organization/roles.csv",
-             f"{ONT}/organization/test_roles.py", "scripts/pinned-tests.txt", "kpi-intake/README.md"],
+             f"{ONT}/organization/test_roles.py", "scripts/pinned-tests.txt"],
     "domain-list": [f"{ONT}/kpi/vocabulary.ttl", f"{ONT}/kpi/shapes.ttl", f"{ONT}/release/build_module.py",
                     f"{ONT}/release/test_build_module.py", "scripts/check.sh",
                     f"{ONT}/regression/expected.csv", f"{ONT}/regression/run.py", f"{ONT}/competency-questions.md", f"{ONT}/MODULES.md"],
@@ -238,7 +238,6 @@ class Raci(Example, unittest.TestCase):
             "Sample Data Steward,sample-data-steward,exact,\nSample Domain Owner,sample-domain-owner,exact,\n"))
         self.assertEqual(after[f"{ONT}/organization/roles.csv"].count("\nsample-"), 2)
         self.assertIn("(154, 917, 93, 62, 56, 6, 11, 944))", after[f"{ONT}/organization/test_roles.py"])
-        self.assertIn("| `roles` | 6.1 and P5 | 66 of 67 | 1 | Value Chain Optimization Director |", after["kpi-intake/README.md"])
 
 
 @as_shipped("domain-list")

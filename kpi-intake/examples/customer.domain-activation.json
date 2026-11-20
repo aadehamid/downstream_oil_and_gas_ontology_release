@@ -1,0 +1,24 @@
+{
+  "format": 1,
+  "form": "domain-activation",
+  "catalogue_version": "1.2",
+  "kpi_name": "Customer",
+  "request": {"number": "DA-2026-001", "date": "2026-11-19", "requester_role": "Program manager", "invited": "Domain Owner, Data Product Owner"},
+  "answers": {
+    "D1": "Customer",
+    "D2": "Who the company sells to: accounts, sites, contracts and the terms agreed with each. Prices and product codes stay in the Market Price and Product domains.",
+    "D3": "Customer Data Lead (a made-up position)",
+    "D4": ["Customer Accounts Owner (a made-up position): accounts and sites", "Contracts Owner (a made-up position): contracts and terms"],
+    "D5": ["Customer Data Steward (a made-up position)"],
+    "D7": ["https://w3id.org/mpc/ontology/modules/core/business-domain/marketing"],
+    "D9": ["Active customer accounts"],
+    "D10": "A made-up charter of the Customer domain, 2026-11-19"
+  },
+  "sign_offs": {
+    "domain-owner": {"name": "Placeholder for the Domain Owner's name", "date": "2026-11-19"},
+    "architect": {"name": "Placeholder for the Architect's name", "date": "2026-11-19"}
+  },
+  "consulted": {},
+  "example_of": "",
+  "comment": "A made-up example. The domain list that ships in settings.toml is an example, and so is every answer here. The signer names are placeholders."
+}

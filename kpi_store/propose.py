@@ -1,22 +1,29 @@
-"""The propose command: turns signed term-change, reference-item and KPI intake forms into proposals, and changes
-nothing in the ontology.
+"""The propose command: turns signed KPI intake, term-change, reference-item, domain activation and process map request
+forms into proposals, and changes nothing in the ontology.
 
     python -m kpi_store.propose <answers file> [<answers file> ...] [--out <folder>] [--release <folder>]
 
-Each answers file is a term-change, reference-item or KPI intake form of the KPI intake pack (kpi-intake/README.md,
-"The term change", "The reference item" and "Turning a filled KPI form into a proposal"), saved from the HTML form
-as JSON or filled in the workbook. For each file the command:
+Each answers file is a form of the KPI intake pack (kpi-intake/README.md, "The term change", "The reference item",
+"Turning a filled KPI form into a proposal", "The domain activation" and "The process map request"), saved from the
+HTML form as JSON or filled in the workbook. For each file the command:
 
 1. runs the form's completeness check (python -m kpi_store.intake check) and refuses a form that is not complete
    and signed;
 2. turns the answers into KGCL lines (kpi_store/change/kgcl.py), and checks them against the release's tables as
    the apply command will apply them, without writing anything: the kpi tables for a term change or a new KPI
    (kpi_store/change/new_measures.py), the system or the data-product tables for a new item
-   (kpi_store/change/reference_items.py);
+   (kpi_store/change/reference_items.py), the list of domains of kpi-intake/settings.toml for a domain activation
+   (kpi_store/change/domains.py), and the organization tables and the process map's RACI lists for a process map
+   request (kpi_store/change/process_map.py);
 3. suggests the route from the kinds of change, raised by the compatibility answer of a term change
-   (kpi_store/change/proposal.py); a new item and a new KPI are a minor;
+   (kpi_store/change/proposal.py); a new item, a new KPI, a domain activation and a process map request are a minor;
 4. writes one proposal folder: change.kgcl, approval.json (written from the form's sign-off) and summary.txt, and
-   for a new KPI facts.csv, the facts KGCL cannot write (KPI-DEC-0004, item 1).
+   facts.csv, the facts KGCL cannot write (KPI-DEC-0004, item 1), when there are some.
+
+A domain activation makes a domain of settings.toml active, or adds it: the ontology holds no list of domains, so
+its proposal holds facts and no KGCL line. A process map request adds new roles and new RACI entries for processes
+the map holds. A new business area, process or step is refused: each needs a release of core, which this release
+cannot make by command.
 
 A new KPI's proposal holds every module it changes (kpi_store/change/other_modules.py): the measure and what it counts
 and leaves out (kpi), the value stream steps that use it (value-stream), the view that gives its values and the
@@ -39,16 +46,21 @@ writes: the proposal folders, and nothing else. Needs Python 3.11 or later with 
 """
 import argparse
 import datetime as dt
+import re
 import sys
 from pathlib import Path
 
-from kpi_store.change import ChangeRefused, approval, kgcl, kpi_tables, new_measures, other_modules, proposal, reference_items
+from kpi_store.change import (ChangeRefused, approval, domains, kgcl, kpi_tables, new_measures, other_modules, process_map,
+                              proposal, reference_items)
 from kpi_store.change.kgcl import Change
 
-FORM, ITEM, KPI = "term-change", "reference-item", "kpi-intake"
-FORMS = (FORM, ITEM)
+FORM, ITEM, KPI, DOMAIN, PROCESS_MAP = "term-change", "reference-item", "kpi-intake", "domain-activation", "process-map-request"
+FORMS = (FORM, ITEM, DOMAIN, PROCESS_MAP)
 SIGNERS = {"data-owner": "Data Owner", "ontology-owner": "Ontology Owner", "architect": "Architect",
-           "domain-confirmation": "Domain Owner", "domain-owner": "Domain Owner"}
+           "domain-confirmation": "Domain Owner", "domain-owner": "Domain Owner",
+           "global-process-owner": "Global Process Owner"}
+NEEDS_CORE = ("needs a release of core, which this release cannot make by command. The Architect takes the request to "
+              "a specialist")
 ROUTE_WHY = {"patch": "a patch: the changes correct or reword, and the old meaning still holds",
              "minor": "a minor: the changes add content, and the old meaning still holds",
              "major": "a major: the form says a report or an answer that used the old meaning may now be wrong"}
@@ -66,9 +78,9 @@ def _pack(root, pack):
 
 
 def read_form(path, cat, data, root, stale_check=True):
-    """The intake of one answers file, refused unless it is a complete, signed term change, reference item or KPI
-    intake. A workbook gives the form of its Term change sheet or of its Reference item sheet, whichever is filled,
-    and its KPI form when neither is."""
+    """The intake of one answers file, refused unless it is a complete and signed form of the pack. A workbook gives
+    the form of whichever of its Term change, Reference item, Domain activation and Process map request sheets is
+    filled, and its KPI form when none is."""
     from kpi_store.intake import answers, check, picklists
     path = Path(path)
     if not path.is_file():
@@ -83,15 +95,13 @@ def read_form(path, cat, data, root, stale_check=True):
     except answers.AnswersError as err:
         raise ProposeRefused(f"{path.name} cannot be read: {err}") from None
     if workbook and not filled:
-        raise ProposeRefused(f"{path.name}: the workbook holds no filled form: its KPI form, Term change and Reference item "
-                             "sheets are empty")
+        raise ProposeRefused(f"{path.name}: the workbook holds no filled form: its KPI form, Term change, Reference item, "
+                             "Domain activation and Process map request sheets are empty")
     if len(filled) > 1:
-        raise ProposeRefused(f"{path.name}: the workbook holds a term change and a reference item. One form gives one "
-                             "proposal: fill one of the two sheets in each workbook")
+        names = " and ".join(cat_form(i.form) for i in filled)
+        raise ProposeRefused(f"{path.name}: the workbook holds a {names}. One form gives one proposal: fill one of those "
+                             "sheets in each workbook")
     intake = filled[0]
-    if intake.form not in (*FORMS, KPI):
-        raise ProposeRefused(f"{path.name} is a {cat_form(intake.form)} form, not a KPI intake, a term change or a "
-                             "reference item. It changes nothing in the ontology")
     stale = picklists.stale_modules(data, root) if stale_check else None
     report = check.check(cat, data, intake, stale)
     if not report.complete:
@@ -282,6 +292,161 @@ def kpi_changes(cat, intake, lists, root):
     return key, changes, facts, notes
 
 
+def domain_facts(intake, root):
+    """The short key of the domain and the facts a domain activation asks for (kpi_store/change/domains.py)."""
+    from kpi_store.intake import rules
+    one = lambda key: "".join(rules.values(intake.answers, key)[:1])
+    _, held = domains.read(root)
+    try:
+        facts = domains.facts_of(one("D1"), one("D2"), held, reference_items.slug)
+    except ChangeRefused as err:
+        raise ProposeRefused(str(err)) from None
+    return facts[0][0].split(":", 1)[1], facts
+
+
+def _role_names(t):
+    """Each name that names one role of the organization tables, by its folded form: (the name as the map holds it,
+    the role it is registered to). A role's own name, and the name the organization gives it, find it too."""
+    roles = {r["slug"]: r for r in t.rows["roles"]}
+    single = [(row["source_text"], row["roles"]) for row in t.rows["role-register"] if ";" not in row["roles"]]
+    out = {text.casefold(): (text, slug) for text, slug in single}
+    for text, slug in single:
+        for label in (roles.get(slug, {}).get("label"), roles.get(slug, {}).get("preferred_label")):
+            if label:
+                out.setdefault(label.casefold(), (text, slug))
+    return out
+
+
+RACI_PROCESS = re.compile(r"[A-Z]+ \d+(?:\.\d+)*")
+
+
+def process_map_changes(intake, root):
+    """The short key of the proposal, the KGCL changes, the facts and the notes for the Architect of a process map
+    request: its new roles (P5) and its RACI lines (P6). A new business area, process or step is refused."""
+    from kpi_store.intake import rules
+    answers = intake.answers
+    for key, what in (("P2", "a parent process"), ("P3", "the purpose of a process or a step"),
+                      ("P4", "the steps of a process")):
+        if rules.real_values(answers, key):
+            raise ProposeRefused(f"{key} gives {what}. A new business area, process or step {NEEDS_CORE}")
+    t = process_map.tables(root)
+    known = _role_names(t)
+    new = {}
+    # A KGCL line writes a straight apostrophe as the typographic one and reads it back as straight, so the names
+    # and the definitions take the straight one: the facts, the ids and the lines then agree.
+    straight = lambda text: text.replace(kgcl.TYPOGRAPHIC, "'")
+    for line in (straight(l).strip() for l in "\n".join(rules.values(answers, "P5.detail")).splitlines()):
+        if not line:
+            continue
+        name, sep, definition = (part.strip() for part in line.partition(":"))
+        if not sep or not name or not definition:
+            raise ProposeRefused(f'P5: "{line}" is not a new role written as "<its name>: <what it does>". Write one line '
+                                 "for each new role")
+        if name.casefold() in known:
+            raise ProposeRefused(f'P5 names "{name}" as a new role, and the organization module holds that role already')
+        key = reference_items.slug(name)
+        if not key or name.casefold() in {n.casefold() for n in new}:
+            raise ProposeRefused(f'P5: "{name}" is named twice, or has no letter or digit to make its short key from')
+        other = next((n for n, (k, _) in new.items() if k == key), None)
+        if other:
+            raise ProposeRefused(f'P5: "{name}" has the short key {key}, as "{other}" has. Give each new role a name of '
+                                 "its own")
+        new[name] = (key, definition)
+    names = {n.casefold(): (n, key) for n, (key, _) in new.items()} | known
+    for item in map(straight, rules.values(answers, "P1")):
+        if item.casefold() not in names:
+            raise ProposeRefused(f'P1 names "{item}", which is neither a role of the organization module nor a new role '
+                                 f"of P5. A new business area, process or step {NEEDS_CORE}. A new value stream step "
+                                 "needs a specialist too")
+    sources = "; ".join(rules.values(answers, "P7"))
+    changes, facts = [], []
+    for name, (key, definition) in new.items():
+        changes += [Change("create node", f"role:{key}", text=name), Change("add definition", f"role:{key}", text=definition)]
+        facts.append((f"role:{key}", process_map.NOTE, f"Added from a process map request. Its sources: {sources}."))
+    slug_of = process_map.slugs(root)
+    nodes = process_map.processes(process_map.read_map(root)[1])
+    replaced = {r["slug"]: r["replaced_by"] for r in t.rows["roles"] if r["replaced_by"]}
+    for n, line in enumerate(map(straight, rules.values(answers, "P6")), 1):
+        parts = [part.strip() for part in line.split(",")]
+        if len(parts) < 3:
+            raise ProposeRefused(f'P6, line {n}: "{line}" is not written as "<the process>, <the role>, <responsible, '
+                                 'accountable, consulted or informed>"')
+        level, role, place = parts[-1].lower(), ", ".join(parts[1:-1]), parts[0]
+        if level not in process_map.LEVELS:
+            raise ProposeRefused(f'P6, line {n}: "{parts[-1]}" is not one of responsible, accountable, consulted or informed')
+        found = RACI_PROCESS.fullmatch(place)
+        if not found or found.group(0) not in nodes or found.group(0) not in slug_of:
+            raise ProposeRefused(f'P6, line {n}: "{place}" is not a process of the process map named by its number, such '
+                                 f"as CM 1.1.2. A new process {NEEDS_CORE}")
+        if role.casefold() not in names:
+            raise ProposeRefused(f'P6, line {n}: "{role}" is neither a role of the organization module nor a new role of P5')
+        text, registered = names[role.casefold()]
+        lines, fact = process_map.entry_changes(slug_of[found.group(0)], level, registered,
+                                                replaced.get(registered, registered), text)
+        changes += lines
+        facts.append(fact)
+    if not changes:
+        raise ProposeRefused("the request asks for no new role and no RACI entry")
+    notes = []
+    if rules.real_values(answers, "P5"):
+        notes.append("P5 names roles the organization module holds. A role changes only through the RACI lines of P6; "
+                     "the rest of P5 stays in the form's file.")
+    key = next(iter(new.values()))[0] if new else "raci"
+    return key, changes, facts, notes
+
+
+def domain_summary(change_id, source, facts, route, record, root):
+    """summary.txt of a domain activation."""
+    subject = facts[0][0]
+    _, held = domains.read(root)
+    entry = next((d for d in held if d["id"] == subject.split(":", 1)[1]), None)
+    said = {prop: value for _, prop, value in facts}
+    name = said.get("label") or entry["label"]
+    text = [f"Proposal {change_id}", "", f"From the form: {source}",
+            f'The domain: "{name}" ({subject}), in {domains.SETTINGS.as_posix()}', "", "What changes:"]
+    text.append("  - The domain is added to the list of domains." if entry is None else
+                "  - The domain is in the list of domains, and is not active.")
+    if "description" in said:
+        text.append(f'  - Its description becomes: "{said["description"]}"')
+    text += ["  - It becomes active, so the KPI form offers it in question 1.5.", "",
+             "The ontology holds no list of domains, so no module of the ontology changes. The proposal holds facts and "
+             f"no KGCL line: each row of {proposal.FACTS_FILE} is one field of the domain's entry.", "",
+             f"The route: {route}. This is {ROUTE_WHY[route]}.", "", "Who signed:"]
+    text += [f"  - {s['role']}, on {s['date']}" for s in record["signatures"]]
+    text += ["", f"The facts, in {proposal.FACTS_FILE}:"] + [f"  {row}" for row in proposal.facts_text(facts).splitlines()]
+    text += ["", "Nothing has changed yet. To apply this proposal, run in the release folder:",
+             "  python -m kpi_store.apply <the path of this folder>", ""]
+    return "\n".join(text)
+
+
+def process_map_summary(change_id, source, changes, facts, notes, lines, route, record, lists):
+    """summary.txt of a process map request: its new roles and its RACI entries, in plain words."""
+    label = {"proc:" + i["id"][len(kpi_tables.PREFIXES["proc"]):]: i["label"] for i in lists.get("processes", [])}
+    text = [f"Proposal {change_id}", "", f"From the form: {source}",
+            "The change: roles and their RACI entries, in the organization module", "", "What it adds:"]
+    for c in changes:
+        if c.kind == "create node":
+            text.append(f'  - A new role named "{c.text}" ({c.subject}), a position.')
+        elif c.kind == "add definition":
+            text.append(f'    Its definition: "{c.text}"')
+    said = {}
+    for c in changes:
+        if c.kind == "create edge":
+            said.setdefault(c.subject, {})[c.predicate] = c.target
+    names = {s: v for s, p, v in facts if p == process_map.TEXT}
+    for a, parts in said.items():
+        text.append(f'  - A RACI entry: "{names[a]}" is {parts["orgm:raciLevel"].split(":", 1)[1]} for the process '
+                    f'{label.get(parts["orgm:forProcess"], parts["orgm:forProcess"])}.')
+    text += [""] + [f"For the Architect: {note}" for note in notes] if notes else []
+    text += ["", f"The route: {route}. This is {ROUTE_WHY[route]}.", "", "Who signed:"]
+    text += [f"  - {s['role']}, on {s['date']}" for s in record["signatures"]]
+    text += ["", f"The KGCL lines, in {proposal.CHANGE_FILE}:"] + [f"  {line}" for line in lines]
+    text += ["", f"The facts, in {proposal.FACTS_FILE}:"] + [f"  {row}" for row in proposal.facts_text(facts).splitlines()]
+    text += ["", "Nothing in the ontology has changed yet. To apply this proposal, run in the release folder:",
+             "  python -m kpi_store.apply <the path of this folder>", ""]
+    return "\n".join(text)
+
+
 RELATIONSHIP_WORDS = {"informs": "as an input", "benchmarks": "as a benchmark", "measures-performance": "as a result it tracks"}
 FACT_WORDS = {"pop:includes": 'What it counts: "{}"', "pop:excludes": 'What it leaves out: "{}"',
               "pop:populationEvidence": 'Where its population is written down: "{}"',
@@ -452,6 +617,20 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
             key, changes, facts, notes = kpi_changes(cat, intake, data["lists"], root)
             module, compatible = "kpi", "yes"
             checks = lambda changes, root: other_modules.check_changes(changes, facts, root)
+        elif intake.form == DOMAIN:
+            try:
+                key, facts = domain_facts(intake, root)
+            except ChangeRefused as err:   # the release's settings.toml cannot be read
+                raise ProposeRefused(str(err)) from None
+            changes, module, compatible = [], "settings", "yes"
+            checks = lambda changes, root: domains.check_changes(facts, root)
+        elif intake.form == PROCESS_MAP:
+            try:
+                key, changes, facts, notes = process_map_changes(intake, root)
+            except ChangeRefused as err:   # the release's map or organization tables cannot be read
+                raise ProposeRefused(str(err)) from None
+            module, compatible = "organization", "yes"
+            checks = lambda changes, root: process_map.check_changes(changes, facts, root)
         elif intake.form == ITEM:
             key, changes = item_changes(intake, data["lists"])
             module, checks, compatible = "new item's", reference_items.check_changes, "yes"
@@ -462,18 +641,23 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
         try:
             checks(changes, root)
         except ChangeRefused as err:
-            raise ProposeRefused(f"{path.name} asks for a change the {module} module cannot take: {err}") from None
+            where = f"the {module} module" if module != "settings" else domains.SETTINGS.as_posix()
+            raise ProposeRefused(f"{path.name} asks for a change {where} cannot take: {err}") from None
         route = proposal.route_of(changes, compatible)
         change = _change_id(out, root, intake.request.get("number", "").strip(), key, today, taken)
         taken.add(change.lower())   # case does not count: on Windows and macOS TC-1 and tc-1 are one folder
         record = {"change": change, "route": route, "new_module": False, "signatures": signatures(cat, intake)}
         try:
-            approval.check(record)
+            approval.check(record, proposal.owner_of(changes, facts))
         except ChangeRefused as err:
             raise ProposeRefused(f"{path.name}: the sign-off cannot become an approval record: {err}") from None
         lines = [kgcl.write_line(c) for c in changes]
         if intake.form == KPI:
             text = kpi_summary(change, path.name, changes, facts, notes, lines, route, record, data["lists"])
+        elif intake.form == DOMAIN:
+            text = domain_summary(change, path.name, facts, route, record, root)
+        elif intake.form == PROCESS_MAP:
+            text = process_map_summary(change, path.name, changes, facts, notes, lines, route, record, data["lists"])
         elif intake.form == ITEM:
             text = item_summary(change, path.name, key, changes, lines, route, record, data["lists"])
         else:
@@ -483,8 +667,9 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
     for folder, changes, record, text, lines, facts in planned:
         proposal.write(folder, changes, record, text, facts)
         written.append(folder)
-        more = f" and {len(facts)} fact{'s' if len(facts) != 1 else ''}" if facts else ""
-        say(f"wrote the proposal {folder.as_posix()}: {len(lines)} change{'s' if len(lines) != 1 else ''}{more}, "
+        counted = ([f"{len(lines)} change{'s' if len(lines) != 1 else ''}"] if lines else []) + \
+            ([f"{len(facts)} fact{'s' if len(facts) != 1 else ''}"] if facts else [])
+        say(f"wrote the proposal {folder.as_posix()}: {' and '.join(counted)}, "
             f"route {record['route']}")
     say("Nothing in the ontology has changed. Read each summary.txt, then apply with: python -m kpi_store.apply <proposal folder>")
     return written
@@ -492,9 +677,9 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m kpi_store.propose",
-                                 description="Turn signed KPI intake, term-change and reference-item forms into proposals. "
+                                 description="Turn signed forms of the KPI intake pack into proposals. "
                                              "Changes nothing in the ontology.")
-    ap.add_argument("files", nargs="+", help="KPI intake, term-change or reference-item answers files (.json, or a filled workbook)")
+    ap.add_argument("files", nargs="+", help="answers files of the KPI intake pack's forms (.json, or a filled workbook)")
     ap.add_argument("--out", help="the folder the proposals go in (default: a folder named proposals beside the first file); "
                                   "it must be outside the release folder")
     ap.add_argument("--release", default=".", help="the release's top folder (default: this folder)")

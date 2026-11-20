@@ -9,7 +9,7 @@ from kpi_store.tests import intake_support as made_up
 
 @pytest.fixture(scope="module")
 def cat():
-    return catalogue.load()
+    return made_up.as_shipped(catalogue.load())   # the domain list as shipped, which the tests write by hand
 
 
 def changed(tmp_path, old, new, file="catalogue.toml", count=1):

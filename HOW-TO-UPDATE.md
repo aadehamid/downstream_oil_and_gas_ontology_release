@@ -63,13 +63,15 @@ Keep the release folder in Git. The runbook's section "Keep the release folder i
 | A new system that a document names, or a new table that copies a table of a system. | The reference-item form, then the propose and apply commands. No file is edited by hand. | "Add a system or a table with the reference-item form" |
 | A definition's wording, with the same meaning. | A patch, with the release steps. | "Change a concept's definition" |
 | A new concept, alias, property or shape. | A minor version, with the release steps. | "Add a concept or a property" |
-| A new process, or a changed one. | A release of `core`, then every module. | "Change a process" |
+| A new business area, process or step, or a changed one. | A release of `core`, then every module. The process map request form collects it, and the propose command refuses it, because the commands cannot make a release of `core`. | "Change a process" |
 | The same ontology in another workspace, such as production. | New settings files. The ontology does not change. | "A new environment" |
 | A data area that no module covers. | A new module at 1.0.0. | "Onboard another module" |
 | A term that the business no longer uses, or two terms that are one. | A major version. The term is deprecated, never deleted. | "Deprecate a term" |
 | A term that is listed under the wrong kind, such as a system's kind. | A major version, when an answer under the old kind is no longer right. | "Change the kind of a term" |
 | Entries of the data-product catalog that are not data products. | A proposal to the portfolio file, then a major version of `data-product`. | "Move catalog entries to another class" |
-| New roles, or a new or changed RACI for a process. | A proposal to the process map, then a version of `organization`. | "Change the RACI" |
+| A data domain that the KPI form must offer in question 1.5. | The domain activation form, then the propose and apply commands. No file is edited by hand. | "Activate a domain with the domain activation form" |
+| New roles, or new RACI entries for processes the map holds. | The process map request form, then the propose and apply commands. No file is edited by hand. | "Add roles and RACI entries with the process map request" |
+| A RACI entry removed or replaced. | A proposal to the process map, then a version of `organization`. | "Change the RACI" |
 | A list of allowed values that the ontology lacks, such as the data domains. | A minor version of the module that holds the list. | "Add a controlled list to a module" |
 
 ## Patch, minor or major
@@ -739,6 +741,204 @@ The commands start in the release folder. Keep the filled form and the proposal 
 
 7. Run the full check, as in "Before you change anything", step 3. Then load the stores with the runner, as in step 11 of "The release steps".
 
+## Activate a domain with the domain activation form
+
+A data domain becomes active through a form and the same two commands as a term change. Nobody edits `settings.toml` by hand. The form is the "Domain activation" tab of the HTML form and the "Domain activation" sheet of the workbook. `kpi-intake/README.md`, "The domain activation", says what it asks and who signs.
+
+The ontology holds no list of domains. Question 1.5 of the KPI form reads the list in `kpi-intake/settings.toml`. So the apply changes that list and rebuilds the forms, and no module of the ontology changes. The proposal holds no KGCL line. Its `facts.csv` gives each field of the domain's entry that changes: `active`, the `description` from D2, and the `label` of a domain the list does not hold yet.
+
+The commands start in the release folder. Keep the filled form and the proposal in a folder beside the release folder, never inside it, as for a term change. The example uses the folder `domain-activation` beside the release folder.
+
+1. Fill in the form, and save it to that folder. The example is the shipped example `kpi-intake/examples/customer.domain-activation.json`. It activates Customer, a domain of the example list that is not active. Its people and documents are made up, and the Domain Owner and the Architect sign it.
+
+   The document test copies the example to the folder with this block. If you saved the file from the form, skip it.
+
+   ```python run=domain-activation
+   import shutil
+   from pathlib import Path
+
+   folder = Path("../domain-activation")
+   folder.mkdir(exist_ok=True)
+   path = shutil.copy("kpi-intake/examples/customer.domain-activation.json", folder)
+   print("copied", Path(path).name)
+   ```
+
+   ```text expect
+   copied customer.domain-activation.json
+   ```
+
+2. Check the form. It must end with `the intake is complete and signed`.
+
+   ```powershell run=domain-activation
+   python -m kpi_store.intake check ../domain-activation/customer.domain-activation.json
+   ```
+
+   ```text expect
+   Domain activation check: Customer
+   ...
+   Result: the intake is complete and signed.
+   This check changes nothing in the ontology. The Architect turns a complete domain activation into a proposal with python -m kpi_store.propose <this file>, as HOW-TO-UPDATE.md says.
+   ```
+
+3. Turn the form into a proposal. The command writes the folder `proposals/DA-2026-001` beside the form. It refuses a domain that is active already.
+
+   ```powershell run=domain-activation
+   python -m kpi_store.propose ../domain-activation/customer.domain-activation.json
+   ```
+
+   ```text expect
+   wrote the proposal ../domain-activation/proposals/DA-2026-001: 2 facts, route minor
+   Nothing in the ontology has changed. Read each summary.txt, then apply with: python -m kpi_store.apply <proposal folder>
+   ```
+
+4. Read `summary.txt`. It says what changes and who signed.
+
+   ```python run=domain-activation
+   print(open("../domain-activation/proposals/DA-2026-001/summary.txt", encoding="utf-8").read())
+   ```
+
+   ```text expect
+   Proposal DA-2026-001
+   ...
+   What changes:
+     - The domain is in the list of domains, and is not active.
+   ...
+     - It becomes active, so the KPI form offers it in question 1.5.
+   ...
+   ```
+
+5. Apply the proposal. The command refuses a proposal that lacks the Domain Owner's or the Architect's signature. It then works on a temporary copy of the release: it makes the domain active, checks that the list of domains differs by exactly the proposal's facts, and rebuilds and verifies the KPI intake pack. Only then does it write the release and commit it.
+
+   ```powershell run=domain-activation
+   python -m kpi_store.apply ../domain-activation/proposals/DA-2026-001
+   ```
+
+   ```text expect
+   1 proposal to apply:
+     DA-2026-001: minor, signed by Domain Owner, Architect
+   ...
+   No module of the ontology changes: the ontology holds no list of domains.
+   ...
+   ... write the release
+   Done. The domain Customer is now active, and the KPI form offers it in question 1.5. The apply changed <count> files, and Git committed them.
+   Run the full check: bash scripts/check.sh (on Windows, in Git Bash). No store needs loading: the ontology has not changed.
+   ```
+
+6. See the commit and the active domains.
+
+   ```powershell run=domain-activation
+   git --no-pager log --oneline -1
+   python -c "import tomllib; print([d['label'] for d in tomllib.load(open('kpi-intake/settings.toml', 'rb'))['list']['domains'] if d['active']])"
+   ```
+
+   ```text expect
+   <commit> Apply the domain activation DA-2026-001: Customer active
+   ['Customer', 'Market Price', 'Financial Performance']
+   ```
+
+7. Run the full check, as in "Before you change anything", step 3. The KPI form now offers the domain in question 1.5.
+
+## Add roles and RACI entries with the process map request
+
+New roles, and new RACI entries for processes that the process map holds, go in through the process map request form and the same two commands. Nobody edits the process map or a table by hand. The form is the "Process map request" tab of the HTML form and the "Process map request" sheet of the workbook. `kpi-intake/README.md`, "The process map request", says what the propose command reads and who signs.
+
+The change is in the `organization` module. A new role becomes a row of `organization/roles.csv` and of `organization/role-register.csv`. A RACI entry becomes the role's name in one of the four lists of the process's `raci` object in `business_architecture/business_process/downstream_process_map.json`. `change.kgcl` holds each new role and the three links of each assignment. `facts.csv` holds each new role's note and the role's name as each entry gives it. The figures in `organization/test_roles.py` leave out what the form added, as the figures in the other modules' tests do.
+
+A new business area, process or step needs a release of `core`, and the commands cannot make one. The propose command refuses a form that asks for one, and the Architect takes it to a specialist, who follows "Change a process".
+
+The commands start in the release folder. Keep the filled form and the proposal in a folder beside the release folder, never inside it. The example uses the folder `process-map-request` beside the release folder.
+
+1. Fill in the form, and save it to that folder. The example is the shipped example `kpi-intake/examples/sample-pricing-coordinator.process-map-request.json`. It adds a made-up role, Sample Pricing Coordinator. The role is responsible for CM 1.1.2.1 Model and System Maintenance and accountable for CM 1.1.2 Regional Optimization. The Global Process Owner and the Architect sign it.
+
+   The document test copies the example to the folder with this block. If you saved the file from the form, skip it.
+
+   ```python run=process-map-request
+   import shutil
+   from pathlib import Path
+
+   folder = Path("../process-map-request")
+   folder.mkdir(exist_ok=True)
+   path = shutil.copy("kpi-intake/examples/sample-pricing-coordinator.process-map-request.json", folder)
+   print("copied", Path(path).name)
+   ```
+
+   ```text expect
+   copied sample-pricing-coordinator.process-map-request.json
+   ```
+
+2. Check the form. It must end with `the intake is complete and signed`.
+
+   ```powershell run=process-map-request
+   python -m kpi_store.intake check ../process-map-request/sample-pricing-coordinator.process-map-request.json
+   ```
+
+   ```text expect
+   Process map request check: Sample Pricing Coordinator
+   ...
+   Result: the intake is complete and signed.
+   This check changes nothing in the ontology. The Architect turns a complete process map request into a proposal with python -m kpi_store.propose <this file>, as HOW-TO-UPDATE.md says.
+   ```
+
+3. Turn the form into a proposal. The command writes the folder `proposals/PM-2026-001` beside the form.
+
+   ```powershell run=process-map-request
+   python -m kpi_store.propose ../process-map-request/sample-pricing-coordinator.process-map-request.json
+   ```
+
+   ```text expect
+   wrote the proposal ../process-map-request/proposals/PM-2026-001: 8 changes and 3 facts, route minor
+   Nothing in the ontology has changed. Read each summary.txt, then apply with: python -m kpi_store.apply <proposal folder>
+   ```
+
+4. Read `summary.txt`. It names the new role and each RACI entry.
+
+   ```python run=process-map-request
+   print(open("../process-map-request/proposals/PM-2026-001/summary.txt", encoding="utf-8").read())
+   ```
+
+   ```text expect
+   Proposal PM-2026-001
+   ...
+   What it adds:
+     - A new role named "Sample Pricing Coordinator" (role:sample-pricing-coordinator), a position.
+       Its definition: "A made-up role that coordinates the daily price updates of one region."
+     - A RACI entry: "Sample Pricing Coordinator" is responsible for the process CM 1.1.2.1 Model and System Maintenance.
+     - A RACI entry: "Sample Pricing Coordinator" is accountable for the process CM 1.1.2 Regional Optimization.
+   ...
+   ```
+
+5. Apply the proposal. The command refuses a proposal that lacks the Global Process Owner's or the Architect's signature. It then works on a temporary copy of the release. It writes the rows and the RACI entries, rebuilds the roles and the assignments, and checks that the difference is exactly the proposal's lines and facts. It releases `organization` and the modules that depend on it, rebuilds the catalog, the projection manifest and the KPI intake pack, and runs the checks. Only then does it write the release and commit it.
+
+   ```powershell run=process-map-request
+   python -m kpi_store.apply ../process-map-request/proposals/PM-2026-001
+   ```
+
+   ```text expect
+   1 proposal to apply:
+     PM-2026-001: minor, signed by Global Process Owner, Architect
+   ...
+     organization 2.2.0 -> 2.3.0
+   ...
+   ... write the release
+   Done. organization is now 2.3.0 (minor), and 2 modules that depend on it took a new patch. The apply changed <count> files, and Git committed them.
+   Run the full check before you load: bash scripts/check.sh (on Windows, in Git Bash). Then load the stores with the runner: python -m kpi_store.runner
+   ```
+
+6. See the commit and the new version.
+
+   ```powershell run=process-map-request
+   git --no-pager log --oneline -1
+   cd business_architecture/ontology/release
+   python next_version.py current organization
+   ```
+
+   ```text expect
+   <commit> Apply the process map request PM-2026-001: organization 2.3.0
+   2.3.0
+   ```
+
+7. Run the full check, as in "Before you change anything", step 3. Then load the stores with the runner, as in step 11 of "The release steps". The forms list the new role after the apply's rebuild of the pack.
+
 ## Change a concept's definition
 
 A new wording with the same meaning is a patch. If the meaning changes, the release is a major, and the ontology owner approves it.
@@ -767,13 +967,14 @@ When the source of a term is your owner's request, cite the file that holds thei
 
 A role and a system are rows in tables. Neither needs a change to `vocabulary.ttl` or `shapes.ttl`, so steps 1 to 3 above do not apply. Both are a minor.
 
+A new role that a process names in its RACI goes in with the process map request form: see "Add roles and RACI entries with the process map request". The steps below are for any other role.
+
 A role is in two tables of `business_architecture\ontology\organization`.
 
 1. Add the role's row to `roles.csv`: its `slug`, its `label`, its `kind` (`position` or `team`), its `definition` and a `note` that names its source.
 2. Add the role's name to `role-register.csv`, as the process map spells it, with the role's `slug`.
 3. Check that a RACI list of the process map names the role. The build refuses a role that no process names. For a role that no process names yet, start with "Change the RACI", which has every step and a worked example.
 4. Change the figures in `test_roles.py`, then run `python build_roles.py --write` and `python build_assignments.py --write`.
-5. Change the count of roles in `kpi-intake\README.md`, as step 12 of "Change the RACI" says.
 
 A system is in the tables of `business_architecture\ontology\system`. A system that a document names, and not the process map, goes in with the reference-item form: see "Add a system or a table with the reference-item form". The steps below are for a system the process map names, or one that cites a new source.
 
@@ -1252,7 +1453,7 @@ The commands start in the top folder of the copy.
 
 ## Change the RACI
 
-Use this to add roles, or to add or replace who is responsible, accountable, consulted and informed for a process. This release leaves open the RACI of your organisation's governance roles (`KNOWN-OPEN-ITEMS.md`, item 8).
+Use this to replace or remove who is responsible, accountable, consulted and informed for a process. New roles and new entries for a process the map holds go in with the process map request form instead: see "Add roles and RACI entries with the process map request". The steps below still show how the sources fit together. This release leaves open the RACI of your organisation's governance roles (`KNOWN-OPEN-ITEMS.md`, item 8).
 
 `organization` builds its RACI from the process map. A process there may have a `raci` object with four lists, named `responsible`, `accountable`, `consulted` and `informed`. Each entry of a list is the name of a role, as text. The role register, `organization\role-register.csv`, maps each name to one or more roles of `organization\roles.csv`. The builder writes one assignment for each entry and each role it names. It infers nothing from the hierarchy. A process with no `raci` object gets no assignment, whatever the processes above and below it have.
 
@@ -1278,7 +1479,6 @@ The third case is never done in the process map. The build refuses a role that n
 9. Rebuild the roles, then the assignments, from the folder `organization`. The commands are `python build_roles.py --write` and `python build_assignments.py --write`. The second prints the ledger. In it, the entries plus the extra roles of entries that name two roles equal the assignments.
 10. Release `organization`, with "The release steps" from step 3. The cascade gives `integration` and `ref-mpc` a patch each.
 11. Add the line to `scripts/pinned-tests.txt` that "The worked examples of the next five sections" names.
-12. Change the count of roles in `kpi-intake\README.md`, under "Hide or add an entry of one of the ontology's lists". The page quotes the roles line of `kpi-intake\for-the-architect.md`, which the build of the pack writes, and the full check compares the two. Each new role raises both figures of the line by one.
 
 The shapes and the tests then hold you to these rules.
 
@@ -1318,11 +1518,10 @@ The commands start in the top folder of the copy.
    would change business_architecture/ontology/organization/roles.csv
    would change business_architecture/ontology/organization/test_roles.py
    would change scripts/pinned-tests.txt
-   would change kpi-intake/README.md
    would change business_architecture/ontology/approvals/example-raci.md
    ```
 
-3. Make the hand edits of steps 3 to 8 and of steps 11 and 12 above, and write the approval.
+3. Make the hand edits of steps 3 to 8 and of step 11 above, and write the approval.
 
    ```powershell run=slow
    python update_examples.py raci --write

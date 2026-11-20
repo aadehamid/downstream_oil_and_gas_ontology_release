@@ -3,13 +3,16 @@
     python -m kpi_store.apply <proposal folder> [<proposal folder> ...] [--release <folder>]
 
 A proposal folder is what the propose command wrote (kpi_store/propose.py): change.kgcl, approval.json and
-summary.txt, and facts.csv for a new KPI. A term change changes the kpi module; a new KPI changes kpi, and
-value-stream and data-product when it links to them (kpi_store/change/other_modules.py); a new reference item changes
-its own module, system for a system and data-product for a table (kpi_store/change/reference_items.py). One run
-applies proposals of one kind: term changes, new KPIs or reference items of one kind. Each changed module takes its
-own route, and every module that depends on one takes a patch, once. The command refuses, before it does anything else:
-- a proposal whose approval record lacks a signature its route needs (Data Owner and Architect; the Ontology Owner
-  too for a major), or whose route is lower than its changes suggest (KPI-DEC-0002, Q4, Q5 and Q13);
+summary.txt, and facts.csv when some facts are ones KGCL cannot write. A term change changes the kpi module; a new KPI
+changes kpi, and value-stream and data-product when it links to them (kpi_store/change/other_modules.py); a new
+reference item changes its own module, system for a system and data-product for a table
+(kpi_store/change/reference_items.py); a process map request changes organization: its roles and their RACI entries
+(kpi_store/change/process_map.py). One run applies proposals of one kind: term changes, new KPIs, reference items of
+one kind, process map requests or domain activations. Each changed module takes its own route, and every module that
+depends on one takes a patch, once. The command refuses, before it does anything else:
+- a proposal whose approval record lacks a signature its route needs (the Data Owner, or the Global Process Owner of
+  a process map request, and the Architect; the Ontology Owner too for a major), or whose route is lower than its
+  changes suggest (KPI-DEC-0002, Q4, Q5 and Q13);
 - proposals for two modules, for systems and tables together, or for term changes and new KPIs together;
 - proposals that conflict: two that change the same field of the same measure or add the same item (Q6), or the
   same proposal twice;
@@ -34,6 +37,12 @@ build scripts (Q7):
 A failure at any step leaves the release as it was, and the command says why. It does not load any store: load
 them afterwards with the runner (python -m kpi_store.runner).
 
+A domain activation changes no module: the ontology holds no list of domains. Its run writes the approval record and
+the facts, makes the domain active in kpi-intake/settings.toml (kpi_store/change/domains.py), checks that the list
+differs by exactly the facts, rebuilds the KPI intake pack and verifies it, so the KPI form offers the domain, and
+then writes and commits the release as above. A domain activation needs the Domain Owner's and the Architect's
+signatures.
+
 Needs Python 3.11 or later with rdflib and pyshacl, and openpyxl when the release holds the KPI intake pack. A Git
 copy needs Git; a plain folder needs none and gets the same files with no commit.
 """
@@ -47,7 +56,8 @@ from pathlib import Path
 
 from kpi_store import cut
 from kpi_store import ontology_view as ov
-from kpi_store.change import ChangeRefused, approval, kpi_tables, new_measures, other_modules, proposal, reference_items
+from kpi_store.change import (ChangeRefused, approval, domains, kpi_tables, new_measures, other_modules, process_map, proposal,
+                              reference_items)
 
 WHAT = "the apply command"
 
@@ -81,6 +91,14 @@ def _new_kpi_target(changed):
     return Target("kpi", "new KPI", other_modules.apply_changes, outputs, builders, tests, changed)
 
 
+ORGANIZATION = Target("organization", "process map request",
+                      lambda changes, facts, root: process_map.apply_changes(changes, facts, root),
+                      tuple((path, lambda before, after, name=name: process_map.compare(name, before, after))
+                            for name, path in process_map.BUILT.items()),
+                      process_map.BUILDERS, process_map.TESTS)
+DOMAINS = "domain activation"
+
+
 def _item_target(kind):
     return Target(kind.module, "reference item", lambda changes, facts, root: reference_items.apply_changes(changes, root),
                   ((kind.folder / kind.output, lambda before, after: (reference_items.compare(before, after, kind), [])),),
@@ -91,11 +109,22 @@ def target_of(proposals):
     """The one module the proposals change, and how. Raises ChangeRefused for proposals of two modules, of two kinds
     of item, or of term changes and new KPIs together."""
     def kind(p):
+        if p.owner == "Domain Owner":
+            return DOMAINS
+        if p.owner == "Global Process Owner":
+            return "process map request"
         made = {c.subject.split(":", 1)[0] for c in p.changes if c.kind == "create node"}
         if "measure" in made:
             return "new KPI"
         return "term change" if not made and all(c.subject.startswith("measure:") for c in p.changes) else "item"
     kinds = {kind(p) for p in proposals}
+    for one in (DOMAINS, "process map request"):
+        if one in kinds and len(kinds) > 1:
+            raise ChangeRefused(f"these proposals are {one}s and other changes. Apply the {one}s in a run of their own")
+    if kinds == {DOMAINS}:
+        return DOMAINS
+    if kinds == {"process map request"}:
+        return ORGANIZATION
     if "item" in kinds and len(kinds) > 1:
         raise ChangeRefused("these proposals change two modules: the kpi module and the module of a new reference "
                             "item. Apply them one module at a time")
@@ -158,7 +187,12 @@ def plan(folders, root):
         if approval.record_path(root, p.change).exists():
             raise ChangeRefused(f"the proposal {p.change} was applied before: "
                                 f"{approval.record_path(root, p.change).relative_to(root).as_posix()} holds its approval record")
+    if target == DOMAINS:
+        for p in proposals:
+            domains.check_changes(p.facts, root)
     route = proposal.highest(p.route for p in proposals)
+    if target == DOMAINS:
+        return proposals, target, route, {}
     release = root / cut.ONTOLOGY / "release"
     try:
         modules = cut._modules(release / "build_module.py")
@@ -184,6 +218,9 @@ def describe(proposals, route, versions):
         lines.append(f"  {p.change}: {p.route}, signed by {signed}")
         lines += [f"    {line}" for line in p.lines]
         lines += [f"    fact {','.join(f)}" for f in p.facts]
+    if not versions:
+        lines.append("No module of the ontology changes: the ontology holds no list of domains.")
+        return lines
     lines.append(f"The route of the release: {route}. Versions it writes:")
     lines += [f"  {m} {old} -> {new}" for m, (old, new) in versions.items()]
     return lines
@@ -216,9 +253,10 @@ DEPENDENT_WHY = "Takes the new version of what it requires; nothing else changes
 
 def _write_record(staging, p):
     """The approval record of one proposal, its change file beside it, and a new KPI's facts."""
-    path = approval.write_record(staging, p.change, p.route, p.record["signatures"], p.record["new_module"])
-    with path.with_suffix(".kgcl").open("w", encoding="utf-8", newline="\n") as f:
-        f.write("".join(line + "\n" for line in p.lines))
+    path = approval.write_record(staging, p.change, p.route, p.record["signatures"], p.record["new_module"], p.owner)
+    if p.lines:
+        with path.with_suffix(".kgcl").open("w", encoding="utf-8", newline="\n") as f:
+            f.write("".join(line + "\n" for line in p.lines))
     if p.facts:
         with path.with_suffix(".facts.csv").open("w", encoding="utf-8", newline="") as f:
             f.write(proposal.facts_text(p.facts))
@@ -234,13 +272,15 @@ def apply(folders, release_root=".", say=print, now=None, before_step=None):
     except cut.CutRefused as err:
         raise ChangeRefused(str(err)) from None
     proposals, target, route, versions = plan(folders, root)
-    module, changed = target.module, _changed(target)
     for line in describe(proposals, route, versions):
         say(line)
     try:
         git = cut._git_ready(root, "", WHAT)
     except cut.CutRefused as err:
         raise ChangeRefused(str(err)) from None
+    if target == DOMAINS:
+        return _apply_domains(root, proposals, git, say, before_step)
+    module, changed = target.module, _changed(target)
     now = now or dt.datetime.now(dt.timezone.utc)
     date = now.strftime("%Y-%m-%d")
     records = [f"approvals/{p.change}.json" for p in proposals]
@@ -307,6 +347,49 @@ def apply(folders, release_root=".", say=print, now=None, before_step=None):
         f"took a new patch. The apply changed {len(files)} files" + (", and Git committed them." if git != "none" else "."))
     say(f"Run the full check before you load: {cut.CHECK_COMMAND} (on Windows, in Git Bash). Then load the stores with "
         "the runner: python -m kpi_store.runner")
+    return files
+
+
+def _apply_domains(root, proposals, git, say, before_step):
+    """A run of domain activations: the approval records and facts, the list of domains of settings.toml, and the KPI
+    intake pack rebuilt and verified, in a temporary copy first. Returns the paths the release changed."""
+    if not cut._has_intake(root):
+        raise ChangeRefused("the release holds no KPI intake pack, and a domain activation changes the pack's settings")
+    records = [f"approvals/{p.change}.json" for p in proposals]
+    facts = [f for p in proposals for f in p.facts]
+    step = cut._Steps(say, before_step)
+    intake = [*cut.INTAKE]
+    with tempfile.TemporaryDirectory(prefix="kpi-store-apply-") as tmp:
+        staging, backup = Path(tmp) / "release", Path(tmp) / "backup"
+        step("copy the release", lambda: shutil.copytree(root, staging, ignore=shutil.ignore_patterns(*cut.IGNORED)))
+        for p in proposals:
+            step(f"write the approval record of {p.change}", lambda p=p: _write_record(staging, p))
+        step(f"make the domain active in {domains.SETTINGS.as_posix()}", lambda: domains.apply_changes(facts, staging))
+
+        def round_trip():
+            back = [",".join(f) for f in domains.compare(root, staging)]
+            if sorted(back) != sorted(",".join(f) for f in facts):
+                raise cut.CutFailed(f"{domains.SETTINGS.as_posix()} does not hold exactly the proposals' facts: "
+                                    f"{back}. The release is as it was.")
+        step(f"compare {domains.SETTINGS.as_posix()} before and after", round_trip)
+        step("rebuild the KPI intake pack", lambda: cut._run("rebuild the KPI intake pack", [*intake, "--root", str(staging)], staging))
+        step("verify the KPI intake pack", lambda: cut._run("verify the KPI intake pack",
+                                                            [*intake, "--root", str(staging), "--check"], staging))
+        labels = {d["id"]: d["label"] for d in domains.read(staging)[1]}
+        names = ", ".join(sorted(labels[s.split(":", 1)[1]] for s in {s for s, _, _ in facts}))
+        files = cut._difference(root, staging)
+        step("write the release", lambda: cut._apply(root, staging, files, backup))
+        if git != "none":
+            name = f"the domain activation {proposals[0].change}" if len(proposals) == 1 else f"{len(proposals)} domain activations"
+            body = "\n".join([f"Approval records: {', '.join(records)}.", "", "The facts (item, property, value):"]
+                             + [",".join(f) for f in facts])
+            cut._commit_paths(root, files, f"Apply {name}: {names} active", body, backup, WHAT)
+    many = len({s for s, _, _ in facts}) > 1
+    say(f"Done. The domain{'s' if many else ''} {names} {'are' if many else 'is'} now active, and the KPI form offers "
+        f"{'them' if many else 'it'} in question 1.5. The apply changed "
+        f"{len(files)} files" + (", and Git committed them." if git != "none" else "."))
+    say(f"Run the full check: {cut.CHECK_COMMAND} (on Windows, in Git Bash). No store needs loading: the ontology has "
+        "not changed.")
     return files
 
 

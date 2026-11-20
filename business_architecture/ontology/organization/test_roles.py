@@ -5,8 +5,10 @@ built roles conform to the organization shapes.
 Run: python3 -m pytest test_roles.py (needs rdflib, pyshacl).
 """
 import csv
+import glob
 import json
 import os
+import re
 import shutil
 import tempfile
 import unittest
@@ -19,6 +21,41 @@ from rdflib.namespace import OWL, RDF, SKOS
 import build_roles as br
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+APPROVALS = os.path.join(HERE, "..", "approvals")
+IDENTITY = os.path.join(HERE, "..", "build", "output", "step2-identity-map.json")
+
+
+def added_by_forms():
+    """What the process map request form added (KPI-DEC-0002, Q10 form 2), read from the change files and facts that
+    the apply command keeps beside each approval record: the slug and the name of each new role ("create node
+    role:<slug> '<name>'") and each new RACI entry, as (process slug, level, the name the map holds). The figures of
+    the decision record were counted before any form added a role, so they leave these out; the apply command checked
+    each one against its signed lines."""
+    roles, entries, texts = {}, {}, {}
+    for path in glob.glob(os.path.join(APPROVALS, "*.kgcl")):
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        roles.update(re.findall(r"^create node role:([a-z0-9-]+) '([^']*)'$", text, re.M))
+        for a, process in re.findall(r"^create edge asg:(\S+) orgm:forProcess proc:(\S+)$", text, re.M):
+            entries.setdefault(a, {})["process"] = process
+        for a, level in re.findall(r"^create edge asg:(\S+) orgm:raciLevel raci:(\S+)$", text, re.M):
+            entries.setdefault(a, {})["level"] = level
+    for path in glob.glob(os.path.join(APPROVALS, "*.facts.csv")):
+        with open(path, newline="", encoding="utf-8") as f:
+            texts.update((r["measure"][4:], r["value"]) for r in csv.DictReader(f)
+                         if r["measure"].startswith("asg:") and r["property"] == "orgm:sourceRoleText")
+    names = {slug: name.replace("\u2019", "'") for slug, name in roles.items()}   # KGCL writes ' as a curly one
+    return names, {(e["process"], e["level"], texts[a]) for a, e in entries.items()}
+
+
+def before_the_forms(entries, register, roles):
+    """The register's inputs without what the forms added, so the decision record's figures still hold."""
+    names, added = added_by_forms()
+    with open(IDENTITY, encoding="utf-8") as f:
+        slug_of = {r["skos_notation"]: r["slug"] for r in json.load(f) if r["skos_notation"]}
+    entries = [(p, lv, t) for p, lv, t in entries if (slug_of.get(p), lv, t) not in added]
+    register = [r for r in register if r["source_text"] not in names.values() or r["roles"] not in names]
+    return entries, register, [r for r in roles if r["slug"] not in names]
 
 
 def rows(path):
@@ -43,8 +80,10 @@ class RegisterReconciles(unittest.TestCase):
         self.assertEqual(f["role references after splitting"], f["RACI entries"] + extra)
 
     def test_the_figures_match_the_decision_record(self):
-        # the decision of 2026-10-13 states these; a register change that moves them must amend the record too.
-        f = br.figures(*br.load())
+        # the decision of 2026-10-13 states these; a register change that moves them must amend the record too. What
+        # the process map request form added is left out (added_by_forms).
+        entries, register, roles = br.load()
+        f = br.figures(*before_the_forms(entries, register, roles))
         self.assertEqual((f["processes with RACI"], f["RACI entries"], f["distinct source strings"], f["roles"],
                           f["positions"], f["teams"], f["compound strings"], f["role references after splitting"]),
                          (153, 913, 91, 60, 54, 6, 11, 940))
