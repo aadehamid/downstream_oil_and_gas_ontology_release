@@ -316,7 +316,7 @@ def shapes_text(spec):
             rule = f"sh:datatype <{p['datatype']}>"
         else:
             rule = "sh:nodeKind sh:IRI"
-        message = re.sub(r"[^\w ,.-]", "", p["label"])
+        message = re.sub(r"[^\w ,.-]", "", p["label"].split(" (")[0])   # the label without its prefix:name
         lines[-1] += " ;"
         lines.append(f'    sh:property [ sh:path <{p["iri"]}> ; sh:minCount 1 ; sh:maxCount 1 ; {rule} ;')
         lines.append(f'                  sh:message "An item has one value of {message}." ]')
