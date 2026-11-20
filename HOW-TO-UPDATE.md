@@ -606,7 +606,7 @@ The propose command refuses a form that the modules cannot take as they stand, a
 - a name or an other name that a measure has already. A change to that measure goes through the term-change form;
 - a role in 6.1 that is not one of the four planning personas, the only roles the `kpi` module records today;
 - a view in 7.1 that the ontology does not hold, a table that is not a metric view, or an assistant in 7.8 that the `data-product` module does not hold. A new view or assistant needs a specialist, as the reference-item form says of a table built from other tables;
-- a data product in 6.6 other than the one the view of 7.1 is part of, or one that the ontology does not hold;
+- when 7.1 names a view, a data product in 6.6 other than the one that view is part of, or one that the ontology does not hold;
 - an assistant in 7.8 when 7.1 names no view for it to answer from;
 - a step in 6.3 that the ontology does not hold. A new value stream step goes to the process map request;
 - 2.4 without 2.3, because a population says what the KPI counts before what it leaves out;

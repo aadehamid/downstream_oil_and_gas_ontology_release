@@ -150,18 +150,21 @@ def conflicts(proposals):
     seen, out = {}, []
     for proposal in proposals:
         made = {c.subject for c in proposal.changes if c.kind == "create node"}
-        # A line about anything but a measure (a new KPI's link from a value stream step, a view or an assistant)
-        # conflicts only with the same line: two new KPIs may each link the same step or view.
-        keys = {(s, "new item") for s in made} | {
-            (c.subject, FIELD[c.kind] if c.subject.startswith("measure:") else kgcl.write_line(c))
+        # A link from anything but a measure (a new KPI's link from a value stream step, a view or an assistant)
+        # conflicts only with the same line: two new KPIs may each link the same step or view. Every other change
+        # conflicts by its field.
+        keys = {(s, "new item", "") for s in made} | {
+            (c.subject, "line", kgcl.write_line(c)) if c.kind == "create edge" and not c.subject.startswith("measure:")
+            else (c.subject, "field", FIELD[c.kind])
             for c in proposal.changes if c.subject not in made}
         for key in sorted(keys):
             if key in seen and seen[key] != proposal.change:
-                if key[1] == "new item":
-                    out.append(f"the proposals {seen[key]} and {proposal.change} both add {key[0]}")
-                elif not key[0].startswith("measure:"):
-                    out.append(f"the proposals {seen[key]} and {proposal.change} both add the line {key[1]}")
+                subject, kind, detail = key
+                if kind == "new item":
+                    out.append(f"the proposals {seen[key]} and {proposal.change} both add {subject}")
+                elif kind == "line":
+                    out.append(f"the proposals {seen[key]} and {proposal.change} both add the line {detail}")
                 else:
-                    out.append(f"the proposals {seen[key]} and {proposal.change} both change the {key[1]} of {key[0]}")
+                    out.append(f"the proposals {seen[key]} and {proposal.change} both change the {detail} of {subject}")
             seen.setdefault(key, proposal.change)
     return out

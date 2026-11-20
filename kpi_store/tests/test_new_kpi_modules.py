@@ -362,3 +362,14 @@ def test_two_new_kpis_that_share_a_returned_note_or_an_assistant_are_applied_one
     # Two new KPIs on the same step and the same view, each with its own lines, go in one run.
     five, six = _proposal(tmp_path / "five", LINES, FACTS[:-3]), _proposal(tmp_path / "six", other, other_facts[:-3])
     assert apply_cmd.plan([five, six], ROOT)[1].changed == {"kpi": "minor", "data-product": "minor", "value-stream": "minor"}
+
+
+def test_two_renames_of_one_table_conflict_and_two_identical_links_conflict_as_lines():
+    # Round 2 of the review: only a link (create edge) about a step, a view or an assistant is keyed by its whole line.
+    rename = lambda name: proposal.Proposal(None, name, [kgcl.read_line(
+        f"rename table:{VIEW} from 'Old Name' to '{name}'")], [], {})
+    assert proposal.conflicts([rename("Name A"), rename("Name B")]) == [
+        f"the proposals Name A and Name B both change the name of table:{VIEW}"]
+    link = lambda name: proposal.Proposal(None, name, [kgcl.read_line(f"create edge table:{VIEW} dp:servesMeasure {M}")], [], {})
+    assert proposal.conflicts([link("one"), link("two")]) == [
+        f"the proposals one and two both add the line create edge table:{VIEW} dp:servesMeasure {M}"]
