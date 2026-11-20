@@ -1,6 +1,14 @@
-"""Build the next core release: one or more added processes. Copy this file to build_core_<major>_<minor>.py and fill in
-the block marked FILL IN. It follows build_core_2_3.py, the builder that added a node. For a change to an existing
-node's ID or description, read build_core_2_2.py, which applies those; this file stops on them.
+"""Build the next core release: added processes, steps and business areas. The apply command writes a copy of this file
+as build_core_<major>_<minor>.py, with the block marked FILL IN filled from a signed process map request
+(kpi_store/change/core_release.py). A specialist may copy it and fill the block by hand the same way. It follows
+build_core_2_3.py, the builder that added a node. For a change to an existing node's ID or description, read
+build_core_2_2.py, which applies those; this file stops on them.
+
+A new node is shaped as 2.3.0's: prefLabel, notation, definition (the first sentence of its description), scope note
+(the rest), broader, inScheme, taxonomy level and provenance, and core:businessDomain when the block names its area.
+A new business area is a member of the core:BusinessDomain code list, a top concept both ways, as 2.4.0 made every
+code-list member. The map fields that core does not read (UNREAD_FIELDS, which other modules build from) may change
+between the two copies of the map; any other change stops the build.
 
     python3 build_core_<major>_<minor>.py --write    # write releases/core/<version>/
     python3 build_core_<major>_<minor>.py --verify   # fail unless the written package equals a fresh build
@@ -34,8 +42,11 @@ EARLIER_COMMIT = "the-commit-you-started-from"
 SOURCE_COMMIT = "the-commit-that-changed-the-map"
 APPROVAL = ("where the approval is recorded", "the sentence that approved this release")
 DECISIONS = ["your decision record"]
-# Each added node: its ID -> (its fields in the map beyond the description, its parent's slug).
-APPROVED_NODE = {"CM 9.9.9": ({"id": "CM 9.9.9", "level": 3, "name": "The process's name"}, "CM-9-9")}
+# Each added node: its ID -> (its fields in the map beyond the description, its parent's slug, the slug of its business
+# area or None).
+APPROVED_NODE = {"CM 9.9.9": ({"id": "CM 9.9.9", "level": 3, "name": "The process's name"}, "CM-9-9", "commercial")}
+# Each added business area: its slug -> (its name, its definition).
+APPROVED_AREAS = {}
 # ---------------------------------------------------------------------------------------------------------------------
 
 BASE = frozen_sources.package_dir(ONTOLOGY, "core", BASE_VERSION)
@@ -44,7 +55,16 @@ RELEASE_DIR = os.path.join(ONTOLOGY, "releases", "core", VERSION)
 CORE, PROC, ONTOLOGY_IRI, SCHEME = maps.CORE, maps.PROC, maps.ONTOLOGY_IRI, maps.SCHEME
 # What an earlier core release counted of its own changes; this release does not repeat them.
 EARLIER_COUNTS = ("renamed concepts", "alternative labels moved", "code-list top concepts", "IDs on stubs",
-                  "changed descriptions", "19948 references rejected", "19948 references confirmed")
+                  "changed descriptions", "19948 references rejected", "19948 references confirmed", "new business areas")
+AREA = first.DOMAIN                   # the namespace of the business areas
+AREAS = CORE.BusinessDomain           # their code list
+UNREAD_FIELDS = {"raci", "systems"}   # read by organization and system; build_core_2_4.py set the first such list
+
+
+def map_nodes(commit):
+    """The map at a commit, as build_core_2_2.map_nodes gives it, without the fields core does not read."""
+    return {slug: ({k: v for k, v in node.items() if k not in UNREAD_FIELDS}, parent)
+            for slug, (node, parent) in maps.map_nodes(commit).items()}
 
 
 def en(text):
@@ -54,13 +74,24 @@ def en(text):
 def build():
     g = Graph()
     g.parse(os.path.join(BASE, "core.ttl"))
-    new, ids, descriptions = maps.changes(base=g, earlier=maps.map_nodes(EARLIER_COMMIT), current=maps.map_nodes(SOURCE_COMMIT))
+    new, ids, descriptions = maps.changes(base=g, earlier=map_nodes(EARLIER_COMMIT), current=map_nodes(SOURCE_COMMIT))
     if ids or descriptions or sorted(node["id"] for _, node, _ in new) != sorted(APPROVED_NODE):
         sys.exit(f"the map changed more than APPROVED_NODE says: new {[n['id'] for _, n, _ in new]}, IDs {ids}, "
                  f"descriptions {[d[0] for d in descriptions]}")
+    for slug, (label, definition) in sorted(APPROVED_AREAS.items()):
+        a = URIRef(AREA + slug)
+        if (a, None, None) in g:
+            sys.exit(f"the business area {slug} is in core {BASE_VERSION} already")
+        g.add((a, RDF.type, SKOS.Concept))
+        g.add((a, SKOS.prefLabel, en(label)))
+        g.add((a, SKOS.definition, en(definition)))
+        g.add((a, SKOS.inScheme, AREAS))
+        g.add((a, SKOS.topConceptOf, AREAS))
+        g.add((AREAS, SKOS.hasTopConcept, a))
+        g.add((a, DCTERMS.provenance, en(f"Added in core {VERSION} from a process map request; {APPROVAL[0]} holds its approval.")))
     for slug, node, parent in new:
         s = URIRef(PROC + slug)
-        fields, approved_parent = APPROVED_NODE[node["id"]]
+        fields, approved_parent, area = APPROVED_NODE[node["id"]]
         if {k: v for k, v in node.items() if k != "description"} != fields or parent != approved_parent \
                 or not node.get("description"):
             sys.exit(f"{node['id']}: its map fields or parent differ from APPROVED_NODE: {node}, parent {parent}")
@@ -76,6 +107,10 @@ def build():
         g.add((s, SKOS.broader, URIRef(PROC + parent)))
         g.add((s, SKOS.inScheme, SCHEME))
         g.add((s, CORE.taxonomyLevel, Literal(node["level"])))
+        if area:
+            if (URIRef(AREA + area), SKOS.inScheme, AREAS) not in g:
+                sys.exit(f"{slug}: its business area {area} is not in the core:BusinessDomain list")
+            g.add((s, CORE.businessDomain, URIRef(AREA + area)))
         g.add((s, DCTERMS.provenance, en(f"Added in core {VERSION} from the process map; definition and scope note from the map's description.")))
     for p in (OWL.versionInfo, OWL.versionIRI, DCTERMS.issued, DCTERMS.modified, OWL.priorVersion):
         g.remove((ONTOLOGY_IRI, p, None))
@@ -90,6 +125,7 @@ def build():
     counts["new concepts"] = len(new)
     for key in EARLIER_COUNTS:
         counts.pop(key, None)
+    counts["new business areas"] = len(APPROVED_AREAS)
     return g, counts
 
 

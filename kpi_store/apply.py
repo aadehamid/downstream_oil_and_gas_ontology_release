@@ -6,8 +6,10 @@ A proposal folder is what the propose command wrote (kpi_store/propose.py): chan
 summary.txt, and facts.csv when some facts are ones KGCL cannot write. A term change changes the kpi module; a new KPI
 changes kpi, and value-stream and data-product when it links to them (kpi_store/change/other_modules.py); a new
 reference item changes its own module, system for a system and data-product for a table
-(kpi_store/change/reference_items.py); a process map request changes organization: its roles and their RACI entries
-(kpi_store/change/process_map.py). One run applies proposals of one kind: term changes, new KPIs, reference items of
+(kpi_store/change/reference_items.py); a process map request changes organization, its roles and their RACI entries
+(kpi_store/change/process_map.py), and core when it adds business areas, processes or steps
+(kpi_store/change/core_release.py): core takes its next minor, by a builder written from release/build_core_template.py,
+and every other module a patch. One run applies proposals of one kind: term changes, new KPIs, reference items of
 one kind, process map requests or domain activations. Each changed module takes its own route, and every module that
 depends on one takes a patch, once. The command refuses, before it does anything else:
 - a proposal whose approval record lacks a signature its route needs (the Data Owner, or the Global Process Owner of
@@ -47,6 +49,7 @@ Needs Python 3.11 or later with rdflib and pyshacl, and openpyxl when the releas
 copy needs Git; a plain folder needs none and gets the same files with no commit.
 """
 import argparse
+import dataclasses
 import datetime as dt
 import shutil
 import sys
@@ -56,8 +59,8 @@ from pathlib import Path
 
 from kpi_store import cut
 from kpi_store import ontology_view as ov
-from kpi_store.change import (ChangeRefused, approval, domains, kpi_tables, new_measures, other_modules, process_map, proposal,
-                              reference_items)
+from kpi_store.change import (ChangeRefused, approval, core_release, domains, kpi_tables, new_measures, other_modules,
+                              process_map, proposal, reference_items)
 
 WHAT = "the apply command"
 
@@ -70,7 +73,8 @@ class Target:
     module: str
     what: str            # what one proposal is: "term change", "new KPI" or "reference item"
     apply_changes: object  # (changes, facts, scratch release) -> the rebuilt file
-    outputs: tuple       # ((built file from the release's top folder, (before, after) -> (KGCL lines, facts)), ...)
+    outputs: tuple       # ((built file from the release's top folder, or (before, after) when the two differ,
+                         #   (before, after) -> (KGCL lines, facts)), ...)
     builders: tuple      # ((folder, builder script), ...), each verified against a fresh build
     tests: tuple         # ((folder, unittest module), ...), with the changed module's name
     changed: dict = field(default_factory=dict)
@@ -97,6 +101,38 @@ ORGANIZATION = Target("organization", "process map request",
                             for name, path in process_map.BUILT.items()),
                       process_map.BUILDERS, process_map.TESTS)
 DOMAINS = "domain activation"
+CORE = "core"   # a process map request that adds a process, a step or a business area: target_of, then _core_target
+
+
+def _core_target(root, proposals):
+    """A run of process map requests that adds processes, steps or business areas: core at its next minor, written by
+    core_release.release, and organization too when the requests add roles or RACI entries. Its apply_changes needs
+    the change id, the approval words and the date, which apply() gives it (_with_release)."""
+    try:
+        old, _ = core_release.core_graph(root)
+    except (KeyError, OSError, ValueError) as err:
+        raise ChangeRefused(f"{root} holds no released core: {err}") from None
+    new = core_release.next_minor(old)
+    org = any(not core_release.is_core(c) for p in proposals for c in p.changes)
+    outputs = (((cut.ONTOLOGY / "releases" / "core" / old / "core.ttl", cut.ONTOLOGY / "releases" / "core" / new / "core.ttl"),
+                core_release.compare),)
+    if org:
+        outputs += ORGANIZATION.outputs
+    builders = ((core_release.RELEASE, core_release.builder_name(new)),) + core_release.READERS
+    return Target(CORE, "process map request", None, outputs, builders, ORGANIZATION.tests if org else (),
+                  {"core": "minor", **({"organization": "minor"} if org else {})}), (old, new)
+
+
+def _with_release(target, change, words, date):
+    """The core target with its apply_changes: the core release, then the roles and RACI entries on the new map."""
+    def apply_changes(changes, facts, root):
+        core = [c for c in changes if core_release.is_core(c)]
+        core_facts = [f for f in facts if f[0].startswith("proc:")]
+        core_release.release(core, core_facts, root, change, words, date)
+        others = [c for c in changes if not core_release.is_core(c)]
+        if others:
+            process_map.apply_changes(others, [f for f in facts if not f[0].startswith("proc:")], root)
+    return dataclasses.replace(target, apply_changes=apply_changes)
 
 
 def _item_target(kind):
@@ -124,7 +160,7 @@ def target_of(proposals):
     if kinds == {DOMAINS}:
         return DOMAINS
     if kinds == {"process map request"}:
-        return ORGANIZATION
+        return CORE if any(core_release.is_core(c) for p in proposals for c in p.changes) else ORGANIZATION
     if "item" in kinds and len(kinds) > 1:
         raise ChangeRefused("these proposals change two modules: the kpi module and the module of a new reference "
                             "item. Apply them one module at a time")
@@ -193,13 +229,15 @@ def plan(folders, root):
     route = proposal.highest(p.route for p in proposals)
     if target == DOMAINS:
         return proposals, target, route, {}
+    versions = {}
+    if target == CORE:
+        target, versions["core"] = _core_target(root, proposals)
     release = root / cut.ONTOLOGY / "release"
     try:
         modules = cut._modules(release / "build_module.py")
         newest = ov.release_scripts_newest(root)
     except (OSError, cut.CutRefused, ov.ReleaseError) as err:
         raise ChangeRefused(f"{root} is not a KPI Store release: {err}") from None
-    versions = {}
     changed = target.changed or {target.module: route}
     order = cut._run("list the modules to release", ["dependents.py", target.module], release).split()
     for module in order:
@@ -230,7 +268,8 @@ def _round_trip(root, staging, proposals, target):
     """The difference between each built file before and after is exactly the proposals' KGCL lines and facts."""
     back = []
     for path, compare in target.outputs:
-        lines, facts = compare(root / path, staging / path)
+        before, after = path if isinstance(path, tuple) else (path, path)
+        lines, facts = compare(root / before, staging / after)
         back += lines + [",".join(f) for f in facts]
     wanted = [line for p in proposals for line in p.lines] + [",".join(f) for p in proposals for f in p.facts]
     if sorted(back) != sorted(wanted):
@@ -283,6 +322,7 @@ def apply(folders, release_root=".", say=print, now=None, before_step=None):
     module, changed = target.module, _changed(target)
     now = now or dt.datetime.now(dt.timezone.utc)
     date = now.strftime("%Y-%m-%d")
+    modules = {m: v for m, v in versions.items() if m != CORE}   # the modules build_module.py and next_version.py release
     records = [f"approvals/{p.change}.json" for p in proposals]
     # The approval that the new version names: the record of a proposal on the release's route, and the words of
     # the signer that route needs, as signed: the Ontology Owner for a major, else the Architect. The changelog lists
@@ -296,6 +336,8 @@ def apply(folders, release_root=".", say=print, now=None, before_step=None):
            + "; ".join(line for p in proposals for line in p.lines) + f". Approval records: {', '.join(records)}."
            + (f" Facts: {', '.join(kept)}." if kept else ""))
     signed = ["--approver", f"The {role}", "--where", f"approvals/{lead.change}.json", "--words", words, "--date", date]
+    if module == CORE:
+        target = _with_release(target, lead.change, words, date)
     ontology = cut.ONTOLOGY
     step = cut._Steps(say, before_step)
     with tempfile.TemporaryDirectory(prefix="kpi-store-apply-") as tmp:
@@ -315,7 +357,7 @@ def apply(folders, release_root=".", say=print, now=None, before_step=None):
         # Each module in release order: a changed one on its own route, every other one that depends on one a patch,
         # as next_version.py's cascade gives them. Each package is written after those it requires; then each module
         # is finished, which moves its old package to releases/previous/.
-        for m, (old_m, new_m) in versions.items():
+        for m, (old_m, new_m) in modules.items():   # core's package is written with the changes, by its own builder
             kind, reason = (routes[m], why) if m in routes else ("patch", DEPENDENT_WHY)
             step(f"set {m} to {new_m}", lambda m=m, new_m=new_m, kind=kind, reason=reason: cut._run(
                 f"set {m}", ["next_version.py", "start", m, new_m, kind, "--why", reason, *signed], release))
@@ -325,11 +367,11 @@ def apply(folders, release_root=".", say=print, now=None, before_step=None):
             step(f"finish {m}", lambda m=m, old_m=old_m: cut._run(f"finish {m}", ["next_version.py", "finish", m, old_m],
                                                                   release))
         verify = [(f"the Turtle of {b}", [b, "--verify"], staging / f) for f, b in target.builders]
-        cut._outputs(staging, versions, cut._has_intake(staging), step, verify)
+        cut._outputs(staging, modules, cut._has_intake(staging), step, verify)
         for m, f, t in target.tests:
             step(f"run the {m} module's tests", lambda m=m, f=f, t=t: cut._run(f"run the {m} module's tests",
                                                                                ["-m", "unittest", "-q", t], staging / f))
-        step("check that the release agrees with itself", lambda: cut._versions_agree(staging, versions))
+        step("check that the release agrees with itself", lambda: cut._versions_agree(staging, modules))
         files = cut._difference(root, staging)
         step("write the release", lambda: cut._apply(root, staging, files, backup))
         if git != "none":

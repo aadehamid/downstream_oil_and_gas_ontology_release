@@ -4,7 +4,7 @@ This page maps the KPI intake form to the ontology. The business never sees it. 
 
 The check of a filled form changes nothing in the ontology. A complete KPI form becomes a proposal with the propose command, and the apply command adds it to the `kpi` module: [`HOW-TO-UPDATE.md`](../HOW-TO-UPDATE.md), "Add a KPI with the KPI intake form", has the steps. One proposal holds every module the form changes: `kpi` with the population, `value-stream` and `data-product`. The market series of 6.7 and the answer to 7.7 stay in the form's file, and the proposal's summary says so.
 
-A complete domain activation and a complete process map request go through the same two commands. A domain activation sets the domain to active in `settings.toml`, since the ontology holds no list of domains: "Activate a domain with the domain activation form" in `HOW-TO-UPDATE.md` has the steps. A process map request adds new roles and their RACI entries to `organization`: "Add roles and RACI entries with the process map request" has the steps. A new business area, process or step needs a release of `core`, which the commands cannot make, and the propose command says so.
+A complete domain activation and a complete process map request go through the same two commands. A domain activation sets the domain to active in `settings.toml`, since the ontology holds no list of domains: "Activate a domain with the domain activation form" in `HOW-TO-UPDATE.md` has the steps. A process map request adds new roles and their RACI entries to `organization`, and new business areas, processes and steps to `core`, which the apply command releases at its next minor: "Add roles and RACI entries with the process map request" and "Add a process, a step or a business area with the process map request" have the steps.
 
 ## Business area and domain
 
@@ -112,13 +112,14 @@ The ontology has no place for a KPI's domain yet, and holds no list of domains. 
 
 | No. | Question | Rule | Feeds |
 |---|---|---|---|
-| P1 | What is missing from the process map: a business area, a process, a step or a role? Name each one. | Required | A proposal for the process map, then a `core` release: `skos:prefLabel`. |
-| P2 | For each missing process or step, which process in the map sits above it? | Optional | `skos:broader` and `core:businessDomain`. |
-| P3 | What is the purpose of each missing process or step, in one sentence? | Optional | `skos:definition`. |
-| P4 | What are the steps of each missing process, in order? | Optional | Lower levels of the process map, `core:precedes`. |
+| P1 | What is missing from the process map: a business area, a process, a step or a role? Name each one. | Required | `skos:prefLabel` of each new process, step and business area, which the apply command adds in a `core` release, and the name of each new role. |
+| P2 | For each, which process in the map sits above it? For a new business area or a new role, choose that instead. | Optional | `skos:broader`. A new process or step is numbered under its parent, one level below it. |
+| P3 | For each, what is its purpose? Start with one sentence that defines it. | Optional | `skos:definition`, and `skos:scopeNote` for the rest. A new role takes its definition from P5. |
+| P4 | What are the steps of each missing process, in order? | Optional | Kept in the form's file. Each step goes in as an entry of P1 of a request of its own, once its process is in the map. |
 | P5 | Which roles work in these processes? | Optional | `org:Role` in `organization`, with `skos:prefLabel` and `skos:definition`. |
 | P6 | For each process, which role does the work, which answers for it, which is consulted, and which is informed? Write one line for each: the process's number, the role and one of responsible, accountable, consulted or informed, with a comma between them, such as "CM 1.1.2, Business Analyst, consulted". | Optional | `orgx:ResponsibilityAssignment` with `forProcess`, `assignedRole`, `raciLevel`. |
-| P7 | Which documents describe them: a process manual, a policy, a published report? | Required | `dcterms:source` IRIs and their tiers in `authority/source-tiers.csv`. |
+| P7 | Which documents describe them: a process manual, a policy, a published report? | Required | The note of each new role. For a new process, step or business area, the documents stay in the form's file. |
+| P8 | Which business area do the new processes and steps belong to? Leave it empty when their parent's processes all belong to one. | Optional | `core:businessDomain` of each new process and step. |
 
 ### Term change
 

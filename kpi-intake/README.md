@@ -196,7 +196,7 @@ Three answers send the request somewhere before the KPI can be added. The form s
 | The answer | Where the request goes | Who acts |
 |---|---|---|
 | The domain in 1.5 is not active, or is not in the list | **Domain activation.** Fill in the "Domain activation" form | The Domain Owner answers and signs. The Architect signs the change, then turns the form into a proposal with `python -m kpi_store.propose` and applies it with `python -m kpi_store.apply` |
-| The business area, the process, the step or a role is not in the list (1.1, 1.2, 1.3, 6.1, 6.3) | **Process map request.** Fill in the "Process map request" form. It is smaller, and it is not a domain activation | The Global Process Owner answers and signs. The Architect signs the change, then proposes and applies it with the same two commands. They add new roles and RACI entries. A new business area, process or step needs a release of `core`, which the commands cannot make, so it needs a specialist |
+| The business area, the process, the step or a role is not in the list (1.1, 1.2, 1.3, 6.1, 6.3) | **Process map request.** Fill in the "Process map request" form. It is smaller, and it is not a domain activation | The Global Process Owner answers and signs. The Architect signs the change, then proposes and applies it with the same two commands. They add new business areas, processes, steps, roles and RACI entries, and release `core` when the request adds to it |
 | The KPI is restricted (3.7) | **Review.** Bring Privacy, Security, Compliance and Risk into the request, and record the date and the outcome in the sign-off block | The Program manager |
 
 The two smaller forms are tabs of the HTML form and sheets of the workbook. Each saves to its own answers file. "Load answers file" opens a file in the form it was saved from, whichever tab is open, and says which. It leaves out an answer under a number that form does not ask, and lists it. It refuses a file that is not an answers file, says what is wrong, and keeps the answers on the page.
@@ -227,18 +227,22 @@ Who signs: the Domain Owner, then the Architect, last. The apply then rebuilds t
 
 ## The process map request
 
-The process map request adds new roles and their RACI entries to the `organization` module. Each RACI entry names a process that the process map holds already.
+The process map request adds new business areas, processes and steps to `core`, and new roles and their RACI entries to `organization`. The apply command releases `core` at its next minor version when the request adds to it, and every module that depends on `core` takes a patch.
 
 | No. | What the propose command reads |
 |---|---|
-| P1 | Each name must be a role: one of the organization module, or a new role of P5 |
+| P1 | The name of each new business area, process, step or role |
+| P2 | For each name of P1, the process it goes under, or "It is a new business area", or "It is a new role". A name with no answer here must be a role |
+| P3 | For each new business area, process or step, its purpose. The first sentence becomes its definition, and the rest its scope note |
+| P4 | Kept in the form's file. Each step of a new process goes in with a request of its own, once the process is in the map |
 | P5 | The text field gives each new role on a line of its own, as its name, a colon and one sentence on what it does. That sentence becomes the role's definition. A new role is a position |
-| P6 | One RACI entry on each line: the process's number, the role and the level, with a comma between them, such as `CM 1.1.2, Business Analyst, consulted` |
+| P6 | One RACI entry on each line: the process, the role and the level, with a comma between them, such as `CM 1.1.2, Business Analyst, consulted`. Name a process of the map by its number, and a new process of P1 by its name |
 | P7 | The documents, which the note of each new role cites |
+| P8 | The business area of the new processes and steps. Leave it empty when the processes under their parent all belong to one area: the new ones take it |
 
-The propose command refuses an answer to P2, P3 or P4, and a name in P1 that is not a role. Each of them asks for a new business area, process or step, which needs a release of `core`. The commands cannot make one, so the Architect takes that request to a specialist. It also refuses a new role that no line of P6 names, because the module holds a role only when a process names it.
+A new process or step is numbered under its parent: the parent's number, a dot, and the first number that no process has yet. It sits one level below its parent, and the map has six levels. The propose command refuses a name of P1 that is neither a role nor placed by P2, a new item with no purpose in P3, a parent that the map does not number, and a new role that no line of P6 names, because the module holds a role only when a process names it.
 
-Who signs: the Global Process Owner, then the Architect, last. `HOW-TO-UPDATE.md`, "Add roles and RACI entries with the process map request", has the steps, with the example `examples/sample-pricing-coordinator.process-map-request.json`.
+Who signs: the Global Process Owner, then the Architect, last. `HOW-TO-UPDATE.md` has the steps: "Add roles and RACI entries with the process map request", with the example `examples/sample-pricing-coordinator.process-map-request.json`, and "Add a process, a step or a business area with the process map request", with the example `examples/sample-blend-planning.process-map-request.json`.
 
 ## The term change
 

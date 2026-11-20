@@ -18,8 +18,8 @@ writes:
 
 The assignment's id is build_assignments.py's: the process, the level, the role the name is registered to, and the
 first eight hex digits of the SHA-256 of the name. A RACI entry names one role, of the register or new in the same
-request, and a process the map and the identity map hold. A new business area, process or step is not made here:
-it needs a release of core, and the propose command refuses it.
+request, and a process the map and the identity map hold, or one the same request adds. A new business area, process
+or step is core_release.py's, which writes the map and the identity map first.
 
 apply_changes works on a scratch copy of the release. It edits the map as text, then checks the parsed result: the
 map must differ from the old one by exactly the entries added. compare is the round trip of roles.ttl and
@@ -180,9 +180,11 @@ def split(changes, facts):
     return new, entries
 
 
-def _edit(changes, facts, root):
+def _edit(changes, facts, root, after_core=None):
     """Every part checked against the release, and the new tables and map text in memory: (the tables, the map's new
-    text). Raises ChangeRefused when any part does not fit."""
+    text). `after_core` is (the map's text, the identity map's rows) as a core part of the same request leaves them
+    (core_release.py), so a RACI entry may name a process the request adds. Raises ChangeRefused when any part does
+    not fit."""
     new, entries = split(changes, facts)
     t = tables(root)
     roles = {r["slug"]: r for r in t.rows["roles"]}
@@ -201,15 +203,20 @@ def _edit(changes, facts, root):
                                         "roles": slug, "rule": "exact"})
         roles[slug] = t.rows["roles"][-1]
         register[label] = t.rows["role-register"][-1]
-    text, data = read_map(root)
-    nodes, slug_of = processes(data), slugs(root)
+    if after_core:
+        text, data = after_core[0], json.loads(after_core[0])
+        slug_of = {r["skos_notation"]: r["uri"].rsplit("/", 1)[1] for r in after_core[1] if r.get("skos_notation")}
+    else:
+        text, data = read_map(root)
+        slug_of = slugs(root)
+    nodes = processes(data)
     by_slug = {s: n for n, s in slug_of.items()}
-    named = set()
+    named, touched = set(), {}
     for process, level, registered, live, name, a in entries:
         node = nodes.get(by_slug.get(process, ""))
         if node is None:
-            raise ChangeRefused(f"proc:{process} is not a process of the process map. A new process needs a release of "
-                                "core, which this release cannot make by command: it needs a specialist")
+            raise ChangeRefused(f"proc:{process} is not a process of the process map, nor a new process of the same "
+                                "request")
         row = register.get(name)
         if row is None or row["roles"].split(";") != [registered]:
             raise ChangeRefused(f'the name "{name}" is not registered to the one role role:{registered}')
@@ -228,6 +235,12 @@ def _edit(changes, facts, root):
             raci = node["raci"]
         raci.setdefault(level, []).append(name)
         named.add(registered)
+        touched[node["id"]] = raci
+    # A process with RACI entries has an accountable role (the competency question q04b of regression/).
+    lacking = sorted(pid for pid, raci in touched.items() if not raci.get("accountable"))
+    if lacking:
+        raise ChangeRefused(f"the process {lacking[0]} would have RACI entries and no accountable role. Add a line to P6 "
+                            "that names who is accountable for it")
     unnamed = sorted(set(new) - named)
     if unnamed:
         raise ChangeRefused(f"the new role role:{unnamed[0]} is in no RACI entry. The organization module holds a role "
@@ -235,9 +248,9 @@ def _edit(changes, facts, root):
     return t, _dump(text, data)
 
 
-def check_changes(changes, facts, root):
+def check_changes(changes, facts, root, after_core=None):
     """Raises ChangeRefused when any part of a process map request does not fit the release. Writes nothing."""
-    _edit(changes, facts, Path(root).resolve())
+    _edit(changes, facts, Path(root).resolve(), after_core)
 
 
 def apply_changes(changes, facts, root):

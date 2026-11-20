@@ -349,12 +349,8 @@ def test_propose_turns_a_process_map_request_into_kgcl_lines_and_facts(tmp_path)
 
 
 @pytest.mark.parametrize("answers,message", [
-    ({"P2": ["https://w3id.org/mpc/ontology/process/CM-1-1"]}, "P2 gives a parent process. A new business area, process "
-                                                               "or step needs a release of core"),
-    ({"P3": ["Plan the made-up work."]}, "P3 gives the purpose of a process or a step"),
-    ({"P4": ["A made-up step"]}, "P4 gives the steps of a process"),
     ({"P1": ["Sample Terminal Scheduler", "A Made-up Area"]}, 'P1 names "A Made-up Area", which is neither a role'),
-    ({"P6": ["CM 9.9.9, Sample Terminal Scheduler, responsible"]}, 'P6, line 1: "CM 9.9.9" is not a process of the process map'),
+    ({"P6": ["CM 9.9.9, Sample Terminal Scheduler, responsible"]}, 'P6, line 1: "CM 9.9.9" is neither a process of the process map'),
     ({"P6": ["CM 1.1.2, Sample Terminal Scheduler, owner"]}, '"owner" is not one of responsible'),
     ({"P6": ["CM 1.1.2 Sample Terminal Scheduler responsible"]}, "is not written as"),
     ({"P6": ["CM 1.1.2, A Made-up Role, consulted", "CM 1.1.2, Sample Terminal Scheduler, consulted"]},

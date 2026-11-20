@@ -27,9 +27,10 @@ def test_the_catalogue_holds_the_approved_questions(cat):
     # the two domain questions the owner added; 9 for Digital IT; then the two smaller forms. Catalogue 1.1 added
     # ten questions for the seven field groups: 2.5, 3.8 to 3.13, 6.8, 6.9 and 7.10. KPI Store 1.2 added the term
     # change (KPI-DEC-0002, Q10 form 4): the measure, six changes and the compatibility question of Q5; and the
-    # reference item (Q10 form 5): the name, the kind, five questions for a system and two for a table.
+    # reference item (Q10 form 5): the name, the kind, five questions for a system and two for a table; and P8 of the
+    # process map request, the business area of its new processes, which the core release needs.
     per_section = {s["id"]: len(cat.questions_of(section=s["id"])) for s in cat.sections}
-    assert per_section == {"1": 6, "2": 5, "3": 13, "4": 9, "5": 4, "6": 9, "7": 10, "D": 10, "P": 7, "T": 8, "R": 9}
+    assert per_section == {"1": 6, "2": 5, "3": 13, "4": 9, "5": 4, "6": 9, "7": 10, "D": 10, "P": 8, "T": 8, "R": 9}
     assert cat.version == "1.2"      # 1.1 added the ten questions; 1.2 reworded them
     assert [s["name"] for s in cat.sections][:7] == [
         "The business area", "What the KPI means", "The facts about it", "Where it belongs", "Other names for it",
@@ -41,7 +42,7 @@ def test_the_catalogue_holds_the_approved_questions(cat):
 
 def test_every_question_id_is_unique_and_every_rule_names_a_question(cat):
     ids = [q["id"] for q in cat.questions]
-    assert len(ids) == len(set(ids)) == 90
+    assert len(ids) == len(set(ids)) == 91
     for q in cat.questions:
         for cond in q.get("ask_when", []):
             assert cond["question"] in cat.by_id, q["id"]

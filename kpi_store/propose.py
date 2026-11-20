@@ -21,9 +21,9 @@ HTML form as JSON or filled in the workbook. For each file the command:
    facts.csv, the facts KGCL cannot write (KPI-DEC-0004, item 1), when there are some.
 
 A domain activation makes a domain of settings.toml active, or adds it: the ontology holds no list of domains, so
-its proposal holds facts and no KGCL line. A process map request adds new roles and new RACI entries for processes
-the map holds. A new business area, process or step is refused: each needs a release of core, which this release
-cannot make by command.
+its proposal holds facts and no KGCL line. A process map request adds new business areas, processes and steps to core
+(kpi_store/change/core_release.py), and new roles and RACI entries to organization; the apply command releases core
+at its next minor when the request adds to it.
 
 A new KPI's proposal holds every module it changes (kpi_store/change/other_modules.py): the measure and what it counts
 and leaves out (kpi), the value stream steps that use it (value-stream), the view that gives its values and the
@@ -50,8 +50,8 @@ import re
 import sys
 from pathlib import Path
 
-from kpi_store.change import (ChangeRefused, approval, domains, kgcl, kpi_tables, new_measures, other_modules, process_map,
-                              proposal, reference_items)
+from kpi_store.change import (ChangeRefused, approval, core_release, domains, kgcl, kpi_tables, new_measures, other_modules,
+                              process_map, proposal, reference_items)
 from kpi_store.change.kgcl import Change
 
 FORM, ITEM, KPI, DOMAIN, PROCESS_MAP = "term-change", "reference-item", "kpi-intake", "domain-activation", "process-map-request"
@@ -59,12 +59,9 @@ FORMS = (FORM, ITEM, DOMAIN, PROCESS_MAP)
 SIGNERS = {"data-owner": "Data Owner", "ontology-owner": "Ontology Owner", "architect": "Architect",
            "domain-confirmation": "Domain Owner", "domain-owner": "Domain Owner",
            "global-process-owner": "Global Process Owner"}
-NEEDS_CORE = ("needs a release of core, which this release cannot make by command. The Architect takes the request to "
-              "a specialist")
 ROUTE_WHY = {"patch": "a patch: the changes correct or reword, and the old meaning still holds",
              "minor": "a minor: the changes add content, and the old meaning still holds",
              "major": "a major: the form says a report or an answer that used the old meaning may now be wrong"}
-
 
 class ProposeRefused(Exception):
     """A file is not a complete, signed KPI intake, term change or reference item, or the proposals cannot be
@@ -320,15 +317,74 @@ def _role_names(t):
 RACI_PROCESS = re.compile(r"[A-Z]+ \d+(?:\.\d+)*")
 
 
-def process_map_changes(intake, root):
+def _new_items(answers, lists, roles, slug_of, data, rows):
+    """The P1 entries that are new business areas, processes and steps (core_release.py), from P2, P3 and P8: (the
+    KGCL changes, the facts, {name: number} of the new processes). A P1 entry without an answer to P2 must be a role."""
+    from kpi_store.intake import rules
+    straight = lambda values: [v.replace(kgcl.TYPOGRAPHIC, "'") for v in values]   # as process_map_changes does
+    names, parents, purposes = (rules.positions(answers, q) for q in ("P1", "P2", "P3"))
+    names, purposes = straight(names), straight(purposes)
+    at = lambda values, i: values[i] if i < len(values) else ""
+    processes = {i["id"]: i for i in lists.get("processes", [])}
+    nodes = process_map.processes(data)
+    area_ids = {i["id"]: i for i in lists.get("business-areas", [])}
+    changes, facts, numbered, areas, pending = [], [], {}, {}, []
+    for i, name in enumerate(names):
+        if not name:
+            continue
+        where, purpose = at(parents, i), core_release.split_description(" ".join(at(purposes, i).split()))
+        if where == "@role" or (not where and name.casefold() in roles):
+            if name.casefold() not in roles:
+                raise ProposeRefused(f'P2 says "{name}" is a new role, and P5 does not describe it')
+            continue
+        if not where:
+            raise ProposeRefused(f'P1 names "{name}", which is neither a role of the organization module nor a new role '
+                                 "of P5. Say in P2 where it goes: under a process of the map, or as a new business area")
+        if not purpose[0]:
+            raise ProposeRefused(f'P3 gives no purpose for "{name}". Its first sentence becomes its definition')
+        if where == "@business-area":
+            slug = reference_items.slug(name)
+            if not slug:
+                raise ProposeRefused(f'P1: "{name}" has no letter or digit to make its short key from')
+            if area_ids.get(core_release.PREFIXES["area"] + slug) or slug in areas:
+                raise ProposeRefused(f'P1 names "{name}" as a new business area, and core holds that business area already')
+            areas[slug] = name
+            changes += core_release.area_changes(slug, name, " ".join(purpose).strip())
+            continue
+        if where not in processes or not where.startswith(core_release.PREFIXES["proc"]):
+            raise ProposeRefused(f'P2: the place of "{name}" is not a process of the process map')
+        pending.append((name, where, " ".join(p for p in purpose if p)))
+    chosen = "".join(rules.values(answers, "P8")[:1])
+    for name, where, description in pending:
+        parent = processes[where]
+        if chosen == "@new-area":
+            if len(areas) != 1:
+                raise ProposeRefused(f"P8 names the new business area of this request, and the request adds {len(areas)}")
+            area = next(iter(areas))
+        elif chosen:
+            area = chosen[len(core_release.PREFIXES["area"]):]
+        elif len(parent.get("areas", [])) == 1:
+            area = parent["areas"][0][len(core_release.PREFIXES["area"]):]
+        else:
+            raise ProposeRefused(f'"{name}" goes under {parent["label"]}, whose processes belong to '
+                                 f"{len(parent.get('areas', []))} business areas. Say in P8 which one it belongs to")
+        node = nodes.get(next((n for n, s in slug_of.items() if s == where[len(core_release.PREFIXES["proc"]):]), ""))
+        if node is None:
+            raise ProposeRefused(f'P2: {parent["label"]} has no number in the process map, so "{name}" cannot go under it')
+        number = core_release.next_number(node, data, rows, taken=set(numbered.values()))
+        lines, more = core_release.node_changes(number, node["level"] + 1, name, description, slug_of[node["id"]], area)
+        changes += lines
+        facts += more
+        numbered[name] = number
+    return changes, facts, numbered
+
+
+def process_map_changes(intake, root, lists):
     """The short key of the proposal, the KGCL changes, the facts and the notes for the Architect of a process map
-    request: its new roles (P5) and its RACI lines (P6). A new business area, process or step is refused."""
+    request: its new roles (P5), its new business areas, processes and steps (P1 with P2, P3 and P8), and its RACI
+    lines (P6)."""
     from kpi_store.intake import rules
     answers = intake.answers
-    for key, what in (("P2", "a parent process"), ("P3", "the purpose of a process or a step"),
-                      ("P4", "the steps of a process")):
-        if rules.real_values(answers, key):
-            raise ProposeRefused(f"{key} gives {what}. A new business area, process or step {NEEDS_CORE}")
     t = process_map.tables(root)
     known = _role_names(t)
     new = {}
@@ -353,19 +409,16 @@ def process_map_changes(intake, root):
                                  "its own")
         new[name] = (key, definition)
     names = {n.casefold(): (n, key) for n, (key, _) in new.items()} | known
-    for item in map(straight, rules.values(answers, "P1")):
-        if item.casefold() not in names:
-            raise ProposeRefused(f'P1 names "{item}", which is neither a role of the organization module nor a new role '
-                                 f"of P5. A new business area, process or step {NEEDS_CORE}. A new value stream step "
-                                 "needs a specialist too")
+    slug_of = process_map.slugs(root)
+    data = process_map.read_map(root)[1]
+    nodes = process_map.processes(data)
+    changes, facts, numbered = _new_items(answers, lists, names, slug_of, data, core_release.read_identity(root))
     sources = "; ".join(rules.values(answers, "P7"))
-    changes, facts = [], []
     for name, (key, definition) in new.items():
         changes += [Change("create node", f"role:{key}", text=name), Change("add definition", f"role:{key}", text=definition)]
         facts.append((f"role:{key}", process_map.NOTE, f"Added from a process map request. Its sources: {sources}."))
-    slug_of = process_map.slugs(root)
-    nodes = process_map.processes(process_map.read_map(root)[1])
     replaced = {r["slug"]: r["replaced_by"] for r in t.rows["roles"] if r["replaced_by"]}
+    new_slugs = {number: core_release.slug_of(number) for number in numbered.values()}
     for n, line in enumerate(map(straight, rules.values(answers, "P6")), 1):
         parts = [part.strip() for part in line.split(",")]
         if len(parts) < 3:
@@ -375,24 +428,44 @@ def process_map_changes(intake, root):
         if level not in process_map.LEVELS:
             raise ProposeRefused(f'P6, line {n}: "{parts[-1]}" is not one of responsible, accountable, consulted or informed')
         found = RACI_PROCESS.fullmatch(place)
-        if not found or found.group(0) not in nodes or found.group(0) not in slug_of:
-            raise ProposeRefused(f'P6, line {n}: "{place}" is not a process of the process map named by its number, such '
-                                 f"as CM 1.1.2. A new process {NEEDS_CORE}")
+        number = numbered.get(next((k for k in numbered if k.casefold() == place.casefold()), ""), "")
+        if not number and found and found.group(0) in nodes and found.group(0) in slug_of:
+            number = found.group(0)
+        if not number:
+            raise ProposeRefused(f'P6, line {n}: "{place}" is neither a process of the process map, named by its number '
+                                 "such as CM 1.1.2, nor a new process of P1, named as P1 names it")
         if role.casefold() not in names:
             raise ProposeRefused(f'P6, line {n}: "{role}" is neither a role of the organization module nor a new role of P5')
         text, registered = names[role.casefold()]
-        lines, fact = process_map.entry_changes(slug_of[found.group(0)], level, registered,
+        lines, fact = process_map.entry_changes(new_slugs.get(number) or slug_of[number], level, registered,
                                                 replaced.get(registered, registered), text)
         changes += lines
         facts.append(fact)
     if not changes:
-        raise ProposeRefused("the request asks for no new role and no RACI entry")
+        raise ProposeRefused("the request asks for no new role, process, step, business area or RACI entry")
     notes = []
     if rules.real_values(answers, "P5"):
         notes.append("P5 names roles the organization module holds. A role changes only through the RACI lines of P6; "
                      "the rest of P5 stays in the form's file.")
-    key = next(iter(new.values()))[0] if new else "raci"
+    if rules.values(answers, "P4"):
+        notes.append("P4 stays in the form's file. Each step of a new process goes in as an entry of P1 of a request of "
+                     "its own, once the process is in the map, with its parent in P2 and its purpose in P3.")
+    key = next((c.subject.split(":", 1)[1] for c in changes if c.kind == "create node"), "raci")
     return key, changes, facts, notes
+
+
+def check_process_map(changes, facts, root):
+    """The propose command's check of a process map request: its core part, then its roles and RACI entries on the
+    map as the core part leaves it."""
+    core = [c for c in changes if core_release.is_core(c)]
+    core_facts = [f for f in facts if f[0].startswith("proc:")]
+    others = [c for c in changes if not core_release.is_core(c)]
+    after = None
+    if core:
+        _, _, text, rows = core_release._edit(core, core_facts, root)
+        after = (text, rows)
+    if others:
+        process_map.check_changes(others, [f for f in facts if not f[0].startswith("proc:")], root, after)
 
 
 def domain_summary(change_id, source, facts, route, record, root):
@@ -420,23 +493,48 @@ def domain_summary(change_id, source, facts, route, record, root):
 
 
 def process_map_summary(change_id, source, changes, facts, notes, lines, route, record, lists):
-    """summary.txt of a process map request: its new roles and its RACI entries, in plain words."""
+    """summary.txt of a process map request: its new business areas, processes, steps and roles, and its RACI
+    entries, in plain words."""
     label = {"proc:" + i["id"][len(kpi_tables.PREFIXES["proc"]):]: i["label"] for i in lists.get("processes", [])}
+    label.update({"area:" + i["id"][len(core_release.PREFIXES["area"]):]: i["label"] for i in lists.get("business-areas", [])})
+    fact = {(s, p): v for s, p, v in facts}
+    label.update({c.subject: f'{fact.get((c.subject, core_release.NOTATION), "")} {c.text}'.strip() if c.subject.startswith("proc:")
+                  else c.text for c in changes if c.kind == "create node"})
+    core = any(core_release.is_core(c) for c in changes)
+    modules = " and ".join(m for m, on in (("core", core), ("organization", any(not core_release.is_core(c) for c in changes)))
+                           if on)
     text = [f"Proposal {change_id}", "", f"From the form: {source}",
-            "The change: roles and their RACI entries, in the organization module", "", "What it adds:"]
+            f"The change: the process map{' and its roles' if 'organization' in modules else ''}, in the {modules} "
+            f"module{'s' if ' and ' in modules else ''}", "",
+            "What it adds:"]
+    edges = {}
     for c in changes:
-        if c.kind == "create node":
+        if c.kind == "create edge":
+            edges.setdefault(c.subject, {})[c.predicate] = c.target
+    for c in changes:
+        if c.kind == "create node" and c.subject.startswith("area:"):
+            text.append(f'  - A new business area named "{c.text}" ({c.subject}).')
+        elif c.kind == "create node" and c.subject.startswith("proc:"):
+            level = int(fact[(c.subject, core_release.LEVEL)])
+            what = "process" if level <= 3 else "step"
+            parent, area = edges[c.subject]["skos:broader"], edges[c.subject]["core:businessDomain"]
+            text.append(f'  - A new {what}, {label[c.subject]} ({c.subject}), at level {level}, under '
+                        f'{label.get(parent, parent)}, in the business area {label.get(area, area)}.')
+        elif c.kind == "create node":
             text.append(f'  - A new role named "{c.text}" ({c.subject}), a position.')
         elif c.kind == "add definition":
             text.append(f'    Its definition: "{c.text}"')
-    said = {}
-    for c in changes:
-        if c.kind == "create edge":
-            said.setdefault(c.subject, {})[c.predicate] = c.target
+            if (c.subject, core_release.SCOPE) in fact:
+                text.append(f'    Its scope note: "{fact[(c.subject, core_release.SCOPE)]}"')
     names = {s: v for s, p, v in facts if p == process_map.TEXT}
-    for a, parts in said.items():
-        text.append(f'  - A RACI entry: "{names[a]}" is {parts["orgm:raciLevel"].split(":", 1)[1]} for the process '
-                    f'{label.get(parts["orgm:forProcess"], parts["orgm:forProcess"])}.')
+    for a, parts in edges.items():
+        if a.startswith("asg:"):
+            text.append(f'  - A RACI entry: "{names[a]}" is {parts["orgm:raciLevel"].split(":", 1)[1]} for the process '
+                        f'{label.get(parts["orgm:forProcess"], parts["orgm:forProcess"])}.')
+    if core:
+        text += ["", "core is released at its next minor version. The apply command writes the new processes into the "
+                 "process map, freezes the map, writes the core builder and its changelog, and releases every module "
+                 "that depends on core."]
     text += [""] + [f"For the Architect: {note}" for note in notes] if notes else []
     text += ["", f"The route: {route}. This is {ROUTE_WHY[route]}.", "", "Who signed:"]
     text += [f"  - {s['role']}, on {s['date']}" for s in record["signatures"]]
@@ -626,11 +724,11 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
             checks = lambda changes, root: domains.check_changes(facts, root)
         elif intake.form == PROCESS_MAP:
             try:
-                key, changes, facts, notes = process_map_changes(intake, root)
+                key, changes, facts, notes = process_map_changes(intake, root, data["lists"])
             except ChangeRefused as err:   # the release's map or organization tables cannot be read
                 raise ProposeRefused(str(err)) from None
             module, compatible = "organization", "yes"
-            checks = lambda changes, root: process_map.check_changes(changes, facts, root)
+            checks = lambda changes, root: check_process_map(changes, facts, root)
         elif intake.form == ITEM:
             key, changes = item_changes(intake, data["lists"])
             module, checks, compatible = "new item's", reference_items.check_changes, "yes"

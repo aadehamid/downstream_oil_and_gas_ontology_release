@@ -1,0 +1,21 @@
+{
+  "format": 1,
+  "form": "process-map-request",
+  "catalogue_version": "1.2",
+  "kpi_name": "Sample Blend Planning",
+  "request": {"number": "PM-2026-002", "date": "2026-11-20", "requester_role": "Program manager", "invited": "Global Process Owner"},
+  "answers": {
+    "P1": ["Sample Blend Planning"],
+    "P2": ["https://w3id.org/mpc/ontology/process/CM-1-1"],
+    "P3": ["Plan the made-up blends of one made-up region for the coming month. It covers the blend recipes, not the blending itself."],
+    "P6": ["Sample Blend Planning, Business Analyst, accountable"],
+    "P7": ["A made-up blend planning manual, 2026-11-20"]
+  },
+  "sign_offs": {
+    "global-process-owner": {"name": "Placeholder for the Global Process Owner's name", "date": "2026-11-20"},
+    "architect": {"name": "Placeholder for the Architect's name", "date": "2026-11-20"}
+  },
+  "consulted": {},
+  "example_of": "",
+  "comment": "A made-up example: the process, its purpose, its RACI entry and the document are made up. The signer names are placeholders."
+}
