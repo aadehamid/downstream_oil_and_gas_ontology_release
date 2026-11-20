@@ -361,9 +361,9 @@ def test_propose_turns_a_process_map_request_into_kgcl_lines_and_facts(tmp_path)
     ({"P5.detail": ""}, "To settle: P5 is missing"),
     ({"P1": ["Price-Lead", "Price Lead"], "P5.detail": "Price-Lead: Sets regional prices.\nPrice Lead: Reviews regional prices.",
       "P6": ["CM 1.1.2, Price Lead, consulted"]}, 'P5: "Price Lead" has the short key price-lead, as "Price-Lead" has'),
-    ({"P6": ["CM 1.1.2.new, Sample Terminal Scheduler, responsible"]}, '"CM 1.1.2.new" is not a process of the process map'),
-    ({"P6": ["CM 1.1.2a, Sample Terminal Scheduler, responsible"]}, '"CM 1.1.2a" is not a process of the process map'),
-    ({"P6": ["CM 1.1.2 New Pricing Step, Sample Terminal Scheduler, responsible"]}, "is not a process of the process map"),
+    ({"P6": ["CM 1.1.2.new, Sample Terminal Scheduler, responsible"]}, '"CM 1.1.2.new" is neither a process of the process map'),
+    ({"P6": ["CM 1.1.2a, Sample Terminal Scheduler, responsible"]}, '"CM 1.1.2a" is neither a process of the process map'),
+    ({"P6": ["CM 1.1.2 New Pricing Step, Sample Terminal Scheduler, responsible"]}, "is neither a process of the process map"),
     ({"P6": ["CM 1.1.2.1, Business Analyst, responsible"], "P1": ["Business Analyst"], "P5": [], "P5.detail": ""},
      'has "Business Analyst" as responsible already')])
 def test_propose_refuses_a_process_map_request_it_cannot_apply_and_writes_nothing(tmp_path, answers, message):
