@@ -10,7 +10,8 @@ What it holds, and nothing else:
      "route": "patch" | "minor" | "major",
      "new_module": false,
      "signatures": [{"role": "Data Owner", "name": "<name>", "date": "2026-11-19", "words": "<the approval words>"},
-                    ...]}
+                    ...],
+     "ai": {...}}                 only when the form had an AI step (check_ai says what it holds)
 
 Who signs (Q4): the Data Owner signs a KPI definition, and the Architect signs the change. A major change or a new
 module also needs the Ontology Owner. A domain activation needs the Domain Owner in place of the Data Owner, and a
@@ -35,6 +36,12 @@ ROUTES = ("patch", "minor", "major")
 ROLES = ("Data Owner", "Architect", "Ontology Owner", "Domain Owner", "Global Process Owner")
 FIELDS = ("change", "route", "new_module", "signatures")
 SIGNATURE_FIELDS = ("role", "name", "date", "words")
+# The record of an AI step (KPI-DEC-0002, Q20; kpi_store/ai/suggest.py): who was asked, under whose approval, with
+# which instructions and prompt, the fingerprint of what it answered, and each suggestion with the person's choice.
+AI_FIELDS = ("format", "form", "provider", "assistant", "model", "model_version", "approved_by", "approved_on",
+             "asked_on", "skills", "prompt", "prompt_sha256", "output_sha256", "suggestions")
+AI_SUGGESTION_FIELDS = ("question", "current", "suggested", "reason", "answer", "accepted")
+SHA256 = re.compile(r"[0-9a-f]{64}")
 # The change id names the file, so it holds no path separator: the same form as a discovery run's id (cut.RUN_ID).
 CHANGE_ID = re.compile(r"[0-9A-Za-z][0-9A-Za-z._-]{0,99}")
 DATE = re.compile(r"\d{4}-\d\d-\d\d")
@@ -64,9 +71,11 @@ def check(record, owner="Data Owner"):
     missing = [f for f in FIELDS if f not in record]
     if missing:
         raise ChangeRefused(f"the approval record has no {', no '.join(missing)}")
-    extra = sorted(set(record) - set(FIELDS))
+    extra = sorted(set(record) - set(FIELDS) - {"ai"})
     if extra:
         raise ChangeRefused(f"the approval record holds fields it should not: {', '.join(extra)}")
+    if "ai" in record:
+        check_ai(record["ai"])
     record_path(".", record["change"])   # the id's form
     if record["route"] not in ROUTES:
         raise ChangeRefused(f"the route {record['route']!r} is not patch, minor or major")
@@ -99,6 +108,30 @@ def check(record, owner="Data Owner"):
     return record
 
 
+def check_ai(ai, step=False):
+    """Refuses a record of an AI step that lacks a field or holds one more. `step` is the record as the AI step
+    writes it beside the form; the approval record's adds `kept` to each suggestion: whether the signed form holds
+    the suggested answer."""
+    if not isinstance(ai, dict) or tuple(sorted(ai)) != tuple(sorted(AI_FIELDS)):
+        raise ChangeRefused("the record of the AI step must hold exactly " + ", ".join(AI_FIELDS))
+    texts = [f for f in AI_FIELDS if f not in ("format", "skills", "suggestions")]
+    if ai["format"] != 1 or not all(isinstance(ai[f], str) for f in texts):
+        raise ChangeRefused("the record of the AI step has a field of the wrong type")
+    if not all(SHA256.fullmatch(ai[f]) for f in ("prompt_sha256", "output_sha256")):
+        raise ChangeRefused("the record of the AI step has a fingerprint that is not a SHA-256")
+    skills = ai["skills"]
+    if not isinstance(skills, list) or not skills or not all(
+            isinstance(s, dict) and set(s) == {"path", "sha256"} and isinstance(s["path"], str)
+            and isinstance(s["sha256"], str) and SHA256.fullmatch(s["sha256"]) for s in skills):
+        raise ChangeRefused("the record of the AI step must name each skill file with its SHA-256")
+    fields = set(AI_SUGGESTION_FIELDS) | (set() if step else {"kept"})
+    if not isinstance(ai["suggestions"], list) or not all(
+            isinstance(s, dict) and set(s) == fields and isinstance(s["accepted"], bool)
+            and isinstance(s.get("kept", False), bool) for s in ai["suggestions"]):
+        raise ChangeRefused("the record of the AI step must give each suggestion as " + ", ".join(sorted(fields)))
+    return ai
+
+
 def _is_date(text):
     try:
         dt.date.fromisoformat(text)
@@ -107,11 +140,12 @@ def _is_date(text):
         return False
 
 
-def write_record(release_root, change_id, route, signatures, new_module=False, owner="Data Owner"):
+def write_record(release_root, change_id, route, signatures, new_module=False, owner="Data Owner", ai=None):
     """Checks and writes the approval record of one change, and returns its path. Refuses an incomplete record,
-    and a record for a change that has one already."""
+    and a record for a change that has one already. `ai` is the record of the form's AI step, when it had one."""
     record = check({"change": change_id, "route": route, "new_module": new_module,
-                    "signatures": list(signatures) if isinstance(signatures, tuple) else signatures}, owner)
+                    "signatures": list(signatures) if isinstance(signatures, tuple) else signatures,
+                    **({"ai": ai} if ai is not None else {})}, owner)
     record["signatures"] = [{f: sig[f] for f in SIGNATURE_FIELDS} for sig in record["signatures"]]
     path = record_path(release_root, change_id)
     if path.exists():

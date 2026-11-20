@@ -2,6 +2,7 @@
 and new-module forms into proposals, and changes nothing in the ontology.
 
     python -m kpi_store.propose <answers file> [<answers file> ...] [--out <folder>] [--release <folder>]
+    python -m kpi_store.propose --ai <answers file> [--stores <file>] [--ai-answer <file>] [--ai-choices <file>]
 
 Each answers file is a form of the KPI intake pack (kpi-intake/README.md, "The term change", "The reference item",
 "Turning a filled KPI form into a proposal", "The domain activation" and "The process map request"), saved from the
@@ -45,6 +46,12 @@ file. That folder must be outside the release folder, as the filled forms are (t
 outside it too): the apply command commits the release, and refuses a release with files that are not committed.
 Each proposal is a folder named by the form's request number, such as TC-2026-001, or <date>-<the short key of the
 measure or the new item> when the form has none; with -2, -3 and so on when the name is taken.
+
+With --ai, the command asks the AI provider that the local settings name for suggestions on one form that is not
+signed yet, and writes no proposal (kpi_store/ai/suggest.py says the order). The person accepts or rejects each
+suggestion; the accepted ones go into the form, and the record of the AI step goes beside it as <form>.ai.json. Once
+the form is signed, the plain command finds that record and keeps it in the proposal's approval.json, under "ai", and
+in summary.txt. AI is off by default, and a form with no such record gives exactly the proposal it gave before.
 
 What it reads: the answers files, the release's KPI intake pack (kpi-intake/) and the tables of the module it changes. What it
 writes: the proposal folders, and nothing else. Needs Python 3.11 or later with rdflib, and openpyxl for a workbook.
@@ -717,6 +724,14 @@ def _change_id(out, root, number, notation, today, taken):
     return change
 
 
+def _with_ai(text, record):
+    """summary.txt with the lines of the form's AI step before its closing lines."""
+    from kpi_store.ai import suggest
+    lines = text.split("\n")
+    at = max(i for i, line in enumerate(lines) if line.startswith("Nothing"))
+    return "\n".join(lines[:at] + suggest.summary_lines(record) + [""] + lines[at:])
+
+
 def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
     """Checks every answers file, then writes one proposal folder for each and returns their paths. Raises
     ProposeRefused, with no proposal written, when any file is refused. `pack` is a KPI intake pack folder other
@@ -738,6 +753,7 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
     planned, taken = [], set()
     for path in files:
         intake = read_form(path, cat, data, root, stale_check=pack is None)
+        ai = _ai_record(path, intake)
         facts = []
         if intake.form == KPI:
             key, changes, facts, notes = kpi_changes(cat, intake, data["lists"], root)
@@ -781,7 +797,7 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
         change = _change_id(out, root, intake.request.get("number", "").strip(), key, today, taken)
         taken.add(change.lower())   # case does not count: on Windows and macOS TC-1 and tc-1 are one folder
         record = {"change": change, "route": route, "new_module": intake.form == NEW_MODULE,
-                  "signatures": signatures(cat, intake)}
+                  "signatures": signatures(cat, intake), **({"ai": ai} if ai else {})}
         try:
             approval.check(record, proposal.owner_of(changes, facts))
         except ChangeRefused as err:
@@ -799,6 +815,8 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
             text = item_summary(change, path.name, key, changes, lines, route, record, data["lists"])
         else:
             text = summary(change, path.name, measure, changes, lines, route, compatible, record, data["lists"]["processes"])
+        if ai:
+            text = _with_ai(text, ai)
         planned.append((out / change, changes, record, text, lines, facts))
     written = []
     for folder, changes, record, text, lines, facts in planned:
@@ -812,6 +830,15 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
     return written
 
 
+def _ai_record(path, intake):
+    """The record of the form's AI step, when one is beside it (kpi_store/ai/suggest.py), else None."""
+    from kpi_store.ai import AIRefused, suggest
+    try:
+        return suggest.audit(path, intake)
+    except AIRefused as err:
+        raise ProposeRefused(str(err)) from None
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m kpi_store.propose",
                                  description="Turn signed forms of the KPI intake pack into proposals. "
@@ -820,10 +847,32 @@ def main(argv=None):
     ap.add_argument("--out", help="the folder the proposals go in (default: a folder named proposals beside the first file); "
                                   "it must be outside the release folder")
     ap.add_argument("--release", default=".", help="the release's top folder (default: this folder)")
+    ap.add_argument("--ai", action="store_true",
+                    help="ask the approved AI provider for suggestions on one form that is not signed yet; writes no proposal")
+    ap.add_argument("--stores", help="with --ai: the local settings file that names the AI provider (default: the file "
+                                     "that KPI_STORE_LOCAL names)")
+    ap.add_argument("--ai-answer", help="with --ai and the by-hand provider: the file that holds the assistant's answer")
+    ap.add_argument("--ai-choices", help='with --ai: a JSON file of yes or no for each suggestion, as {"T3": "yes"}, in '
+                                         "place of typing them")
     a = ap.parse_args(argv)
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
+    if not a.ai and (a.ai_answer or a.ai_choices or a.stores):
+        print("Not proposed: --stores, --ai-answer and --ai-choices go with --ai. No proposal was written.", file=sys.stderr)
+        return 1
+    if a.ai:
+        from kpi_store.ai import AIRefused, suggest
+        if len(a.files) != 1 or a.out:
+            print("No AI suggestions: --ai takes one form, and writes no proposal, so it takes no --out. The form is as "
+                  "it was.", file=sys.stderr)
+            return 1
+        try:
+            suggest.run(a.files[0], a.release, a.stores, a.ai_answer, a.ai_choices)
+        except (AIRefused, OSError) as err:
+            print(f"No AI suggestions: {err}. The form is as it was.", file=sys.stderr)
+            return 1
+        return 0
     try:
         propose(a.files, a.out, a.release)
     except (ProposeRefused, ChangeRefused, OSError) as err:

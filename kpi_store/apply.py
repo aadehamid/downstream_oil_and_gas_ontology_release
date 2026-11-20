@@ -324,7 +324,8 @@ DEPENDENT_WHY = "Takes the new version of what it requires; nothing else changes
 
 def _write_record(staging, p):
     """The approval record of one proposal, its change file beside it, and a new KPI's facts."""
-    path = approval.write_record(staging, p.change, p.route, p.record["signatures"], p.record["new_module"], p.owner)
+    path = approval.write_record(staging, p.change, p.route, p.record["signatures"], p.record["new_module"], p.owner,
+                                 p.record.get("ai"))
     if p.lines:
         with path.with_suffix(".kgcl").open("w", encoding="utf-8", newline="\n") as f:
             f.write("".join(line + "\n" for line in p.lines))
