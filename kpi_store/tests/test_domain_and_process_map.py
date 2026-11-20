@@ -31,30 +31,33 @@ DOMAIN_SIGNED = {"domain-owner": {"name": "A Domain Owner", "date": "2026-11-19"
                  "architect": {"name": "An Architect", "date": "2026-11-19"}}
 PM_SIGNED = {"global-process-owner": {"name": "A Global Process Owner", "date": "2026-11-19"},
              "architect": {"name": "An Architect", "date": "2026-11-19"}}
-CUSTOMER_TEXT = ("Who the company sells to: accounts, sites, contracts and the terms agreed with each. Prices and "
-                 "product codes stay in the Market Price and Product domains.")
-NEW_ROLE = "Sample Pricing Coordinator: A made-up role that coordinates the daily price updates of one region."
-PM_ANSWERS = {"P1": ["Sample Pricing Coordinator"], "P5": ["@new-roles"], "P5.detail": NEW_ROLE,
-              "P6": ["CM 1.1.2.1, Sample Pricing Coordinator, responsible", "CM 1.1.2, Sample Pricing Coordinator, accountable",
+# A domain the tree holds and has not made active: the first one, so the tests hold also on a copy where the
+# guide's example has made Customer active.
+TARGET = next(d for d in domains.read(ROOT)[1] if d["active"] is False)
+SUBJECT = f"domain:{TARGET['id']}"
+CUSTOMER_TEXT = "A made-up description of the domain, for the tests: the data it covers and the data it leaves to others."
+NEW_ROLE = "Sample Terminal Scheduler: A made-up role that coordinates the daily price updates of one region."
+PM_ANSWERS = {"P1": ["Sample Terminal Scheduler"], "P5": ["@new-roles"], "P5.detail": NEW_ROLE,
+              "P6": ["CM 1.1.2.1, Sample Terminal Scheduler, responsible", "CM 1.1.3, Sample Terminal Scheduler, accountable",
                      "CM 1.1.2.1, Business Analyst, consulted"],
               "P7": ["A made-up regional pricing procedure, 2026-11-19"]}
-A1 = "asg:CM-1-1-2-1--responsible--sample-pricing-coordinator--7594e548"
-A2 = "asg:CM-1-1-2--accountable--sample-pricing-coordinator--7594e548"
+A1 = "asg:CM-1-1-2-1--responsible--sample-terminal-scheduler--6896e8f0"
+A2 = "asg:CM-1-1-3--accountable--sample-terminal-scheduler--6896e8f0"
 A3 = f"asg:CM-1-1-2-1--consulted--business-analyst--{pm.digest('Business Analyst')}"
-PM_LINES = ["create node role:sample-pricing-coordinator 'Sample Pricing Coordinator'",
-            "add definition 'A made-up role that coordinates the daily price updates of one region.' to role:sample-pricing-coordinator",
+PM_LINES = ["create node role:sample-terminal-scheduler 'Sample Terminal Scheduler'",
+            "add definition 'A made-up role that coordinates the daily price updates of one region.' to role:sample-terminal-scheduler",
             f"create edge {A1} orgm:forProcess proc:CM-1-1-2-1",
-            f"create edge {A1} orgm:assignedRole role:sample-pricing-coordinator",
+            f"create edge {A1} orgm:assignedRole role:sample-terminal-scheduler",
             f"create edge {A1} orgm:raciLevel raci:responsible",
-            f"create edge {A2} orgm:forProcess proc:CM-1-1-2",
-            f"create edge {A2} orgm:assignedRole role:sample-pricing-coordinator",
+            f"create edge {A2} orgm:forProcess proc:CM-1-1-3",
+            f"create edge {A2} orgm:assignedRole role:sample-terminal-scheduler",
             f"create edge {A2} orgm:raciLevel raci:accountable",
             f"create edge {A3} orgm:forProcess proc:CM-1-1-2-1",
             f"create edge {A3} orgm:assignedRole role:business-analyst",
             f"create edge {A3} orgm:raciLevel raci:consulted"]
-PM_FACTS = [("role:sample-pricing-coordinator", "skos:editorialNote",
+PM_FACTS = [("role:sample-terminal-scheduler", "skos:editorialNote",
              "Added from a process map request. Its sources: A made-up regional pricing procedure, 2026-11-19."),
-            (A1, "orgm:sourceRoleText", "Sample Pricing Coordinator"), (A2, "orgm:sourceRoleText", "Sample Pricing Coordinator"),
+            (A1, "orgm:sourceRoleText", "Sample Terminal Scheduler"), (A2, "orgm:sourceRoleText", "Sample Terminal Scheduler"),
             (A3, "orgm:sourceRoleText", "Business Analyst")]
 
 
@@ -69,6 +72,7 @@ def form(folder, kind, answers, sign_offs, name="form", number=""):
 
 def domain_form(folder, answers=None, sign_offs=DOMAIN_SIGNED, name="domain", number=""):
     given = json.loads(DOMAIN_EXAMPLE.read_text(encoding="utf-8"))["answers"]
+    given.update({"D1": TARGET["label"], "D2": CUSTOMER_TEXT})
     return form(folder, "domain-activation", {**given, **(answers or {})}, sign_offs, name, number)
 
 
@@ -132,13 +136,13 @@ def test_a_domain_activation_that_does_not_fit_is_refused(name, text, message):
 
 def test_the_edit_of_settings_changes_only_the_domains_lines_and_the_round_trip_gives_the_facts(tmp_path):
     text = (ROOT / domains.SETTINGS).read_text(encoding="utf-8")
-    facts = [("domain:customer", "description", 'A "quoted" text'), ("domain:customer", "active", "true"),
+    facts = [(SUBJECT, "description", 'A "quoted" text'), (SUBJECT, "active", "true"),
              ("domain:asset-data", "label", "Asset Data"), ("domain:asset-data", "description", "Equipment."),
              ("domain:asset-data", "active", "true")]
     new, wanted = domains.edit(text, facts)
     diff = [line for line in difflib.ndiff(text.split("\n"), new.split("\n")) if line[:1] in "+-"]
     assert sorted(line for line in diff if line[0] == "-") == [
-        '- active = false', '- description = "Who the company sells to: accounts, sites, contracts and the terms agreed with each."']
+        "- active = false", f"- description = {json.dumps(TARGET['description'], ensure_ascii=False)}"]
     assert sorted(line for line in diff if line[0] == "+") == sorted([
         '+ description = "A \\"quoted\\" text"', "+ active = true", "+ ", "+ [[list.domains]]", '+ id = "asset-data"',
         '+ label = "Asset Data"', '+ description = "Equipment."', "+ active = true"])
@@ -151,15 +155,17 @@ def test_the_edit_of_settings_changes_only_the_domains_lines_and_the_round_trip_
 
 def test_a_settings_file_laid_out_otherwise_and_a_fact_of_another_form_are_refused():
     text = (ROOT / domains.SETTINGS).read_text(encoding="utf-8")
-    inline = text.replace('id = "customer"\nlabel = "Customer"', 'id = "customer"\nlabel = "Customer" # a comment')
+    head = f'id = "{TARGET["id"]}"\nlabel = "{TARGET["label"]}"'
+    block = f'{head}\ndescription = {json.dumps(TARGET["description"], ensure_ascii=False)}\nactive = false\n'
+    assert head in text and block in text
+    inline = text.replace(head, head + " # a comment")
     with pytest.raises(ChangeRefused, match="is not laid out as the release ships it"):
-        domains.edit(text.replace('active = false\n\n[[list.domains]]\nid = "product"', '\n[[list.domains]]\nid = "product"'),
-                     [("domain:customer", "active", "true")])
-    assert domains.edit(inline, [("domain:customer", "active", "true")])[1][0]["active"] is True
+        domains.edit(text.replace(block, block.replace("active = false\n", "")), [(SUBJECT, "active", "true")])
+    assert next(d for d in domains.edit(inline, [(SUBJECT, "active", "true")])[1] if d["id"] == TARGET["id"])["active"] is True
     with pytest.raises(ChangeRefused, match="gets active false"):
-        domains.edit(text, [("domain:customer", "active", "false")])
+        domains.edit(text, [(SUBJECT, "active", "false")])
     with pytest.raises(ChangeRefused, match="domain:<id>,<label, description, active>"):
-        domains.edit(text, [("domain:customer", "owner", "Someone")])
+        domains.edit(text, [(SUBJECT, "owner", "Someone")])
     with pytest.raises(ChangeRefused, match="the facts give it no label"):
         domains.edit(text, [("domain:new-one", "active", "true")])
 
@@ -168,7 +174,7 @@ def test_propose_turns_a_domain_activation_into_facts_and_no_kgcl_line(tmp_path)
     [folder] = propose(tmp_path, domain_form(tmp_path, number="DA-1"))
     assert folder.name == "DA-1" and (folder / "change.kgcl").read_text(encoding="utf-8") == ""
     assert proposal.read_facts((folder / "facts.csv").read_text(encoding="utf-8"), "DA-1") == [
-        ("domain:customer", "description", CUSTOMER_TEXT), ("domain:customer", "active", "true")]
+        (SUBJECT, "description", CUSTOMER_TEXT), (SUBJECT, "active", "true")]
     record = json.loads((folder / "approval.json").read_text(encoding="utf-8"))
     assert record["route"] == "minor" and [s["role"] for s in record["signatures"]] == ["Domain Owner", "Architect"]
     assert record["signatures"][0]["words"] == "The domain is described rightly in this form, and I am its owner."
@@ -201,19 +207,19 @@ def test_a_domain_activation_goes_from_the_form_to_a_committed_release_and_the_k
     root = scratch_release(tmp_path, git_copy=True)
     held = _versions(root)
     cat = catalogue.load(root / "kpi-intake")
-    assert next(d for d in cat.fixed_list("settings:domains") if d["id"] == "customer")["active"] is False
+    assert next(d for d in cat.fixed_list("settings:domains") if d["id"] == TARGET["id"])["active"] is False
     [folder] = propose(tmp_path, domain_form(tmp_path, number="DA-1"), root)
     said = []
     files = apply_cmd.apply([folder], root, say=said.append, now=NOW)
     assert "No module of the ontology changes: the ontology holds no list of domains." in said
-    assert said[-2].startswith("Done. The domain Customer is now active, and the KPI form offers it in question 1.5.")
+    assert said[-2].startswith(f"Done. The domain {TARGET['label']} is now active, and the KPI form offers it in question 1.5.")
     assert _versions(root) == held and git(root, "status", "--porcelain") == ""
-    assert git(root, "log", "-1", "--format=%s").strip() == "Apply the domain activation DA-1: Customer active"
+    assert git(root, "log", "-1", "--format=%s").strip() == f"Apply the domain activation DA-1: {TARGET['label']} active"
     assert set(git(root, "show", "--name-only", "--format=", "HEAD").split()) == set(files)
     assert {"kpi-intake/settings.toml", "kpi-intake/kpi-intake-form.html", "business_architecture/ontology/approvals/DA-1.json",
             "business_architecture/ontology/approvals/DA-1.facts.csv"} <= set(files)
     assert not approval.record_path(root, "DA-1").with_suffix(".kgcl").exists()
-    entry = next(d for d in catalogue.load(root / "kpi-intake").fixed_list("settings:domains") if d["id"] == "customer")
+    entry = next(d for d in catalogue.load(root / "kpi-intake").fixed_list("settings:domains") if d["id"] == TARGET["id"])
     assert entry["active"] is True and entry["description"] == CUSTOMER_TEXT
     assert approval.read_record(approval.record_path(root, "DA-1"), "Domain Owner")["route"] == "minor"
     with pytest.raises(ChangeRefused, match="needs the signature of the Data Owner"):
@@ -222,10 +228,10 @@ def test_a_domain_activation_goes_from_the_form_to_a_committed_release_and_the_k
     # activation.
     cut._run("check the pack", [*cut.INTAKE, "--root", str(root), "--check"], root)
     cat, data = catalogue.load(root / "kpi-intake"), picklists.load(root / "kpi-intake")
-    kpi = check.check(cat, data, Intake(form="kpi-intake", answers={"1.5": "customer"}, sign_offs={}))
+    kpi = check.check(cat, data, Intake(form="kpi-intake", answers={"1.5": TARGET["id"]}, sign_offs={}))
     assert "Domain activation needed" not in kpi.text()
     before = check.check(catalogue.load(ROOT / "kpi-intake"), picklists.load(ROOT / "kpi-intake"),
-                         Intake(form="kpi-intake", answers={"1.5": "customer"}, sign_offs={}))
+                         Intake(form="kpi-intake", answers={"1.5": TARGET["id"]}, sign_offs={}))
     assert "Domain activation needed" in before.text()
     with pytest.raises(ChangeRefused, match="the proposal DA-1 was applied before"):
         apply_cmd.apply([folder], root, say=quiet, now=NOW)
@@ -235,7 +241,7 @@ def test_apply_refuses_a_domain_activation_with_other_changes_and_two_of_one_dom
     [one] = propose(tmp_path, domain_form(tmp_path, number="DA-1"))
     [two] = propose(tmp_path, domain_form(tmp_path, name="again", number="DA-2"))
     [request] = propose(tmp_path, pm_form(tmp_path, number="PM-1"))
-    with pytest.raises(ChangeRefused, match="the proposals DA-1 and DA-2 both change the domain domain:customer"):
+    with pytest.raises(ChangeRefused, match=f"the proposals DA-1 and DA-2 both change the domain {SUBJECT}"):
         apply_cmd.apply([one, two], ROOT, say=quiet)
     with pytest.raises(ChangeRefused, match="these proposals are domain activations and other changes"):
         apply_cmd.apply([one, request], ROOT, say=quiet)
@@ -281,7 +287,7 @@ def test_propose_turns_a_process_map_request_into_kgcl_lines_and_facts(tmp_path)
     record = json.loads((folder / "approval.json").read_text(encoding="utf-8"))
     assert record["route"] == "minor" and [s["role"] for s in record["signatures"]] == ["Global Process Owner", "Architect"]
     summary = (folder / "summary.txt").read_text(encoding="utf-8")
-    assert ('  - A RACI entry: "Sample Pricing Coordinator" is accountable for the process CM 1.1.2 Regional Optimization.'
+    assert ('  - A RACI entry: "Sample Terminal Scheduler" is accountable for the process CM 1.1.3 Distribution Planning & Scheduling and Inventory Management.'
             in summary)
     assert proposal.read(folder).owner == "Global Process Owner"
     for line in PM_LINES:   # each line is one the official parser reads and renders back
@@ -293,14 +299,14 @@ def test_propose_turns_a_process_map_request_into_kgcl_lines_and_facts(tmp_path)
                                                                "or step needs a release of core"),
     ({"P3": ["Plan the made-up work."]}, "P3 gives the purpose of a process or a step"),
     ({"P4": ["A made-up step"]}, "P4 gives the steps of a process"),
-    ({"P1": ["Sample Pricing Coordinator", "A Made-up Area"]}, 'P1 names "A Made-up Area", which is neither a role'),
-    ({"P6": ["CM 9.9.9, Sample Pricing Coordinator, responsible"]}, 'P6, line 1: "CM 9.9.9" is not a process of the process map'),
-    ({"P6": ["CM 1.1.2, Sample Pricing Coordinator, owner"]}, '"owner" is not one of responsible'),
-    ({"P6": ["CM 1.1.2 Sample Pricing Coordinator responsible"]}, "is not written as"),
-    ({"P6": ["CM 1.1.2, A Made-up Role, consulted", "CM 1.1.2, Sample Pricing Coordinator, consulted"]},
+    ({"P1": ["Sample Terminal Scheduler", "A Made-up Area"]}, 'P1 names "A Made-up Area", which is neither a role'),
+    ({"P6": ["CM 9.9.9, Sample Terminal Scheduler, responsible"]}, 'P6, line 1: "CM 9.9.9" is not a process of the process map'),
+    ({"P6": ["CM 1.1.2, Sample Terminal Scheduler, owner"]}, '"owner" is not one of responsible'),
+    ({"P6": ["CM 1.1.2 Sample Terminal Scheduler responsible"]}, "is not written as"),
+    ({"P6": ["CM 1.1.2, A Made-up Role, consulted", "CM 1.1.2, Sample Terminal Scheduler, consulted"]},
      '"A Made-up Role" is neither a role of the organization module nor a new role of P5'),
-    ({"P6": ["CM 1.1.2.1, Business Analyst, consulted"]}, "the new role role:sample-pricing-coordinator is in no RACI entry"),
-    ({"P5.detail": "Sample Pricing Coordinator coordinates prices"}, "is not a new role written as"),
+    ({"P6": ["CM 1.1.2.1, Business Analyst, consulted"]}, "the new role role:sample-terminal-scheduler is in no RACI entry"),
+    ({"P5.detail": "Sample Terminal Scheduler coordinates prices"}, "is not a new role written as"),
     ({"P5.detail": "Business Analyst: Analyses.", "P1": ["Business Analyst"]}, "holds that role already"),
     ({"P5.detail": ""}, "To settle: P5 is missing"),
     ({"P6": ["CM 1.1.2.1, Business Analyst, responsible"], "P1": ["Business Analyst"], "P5": [], "P5.detail": ""},
@@ -355,15 +361,15 @@ def test_the_role_figures_leave_out_what_the_form_added(tmp_path, monkeypatch):
     (tmp_path / "PM-1.facts.csv").write_text(proposal.facts_text(PM_FACTS), encoding="utf-8")
     monkeypatch.setattr(tr, "APPROVALS", str(tmp_path))
     names, entries = tr.added_by_forms()
-    assert names == {"sample-pricing-coordinator": "Sample Pricing Coordinator"}
-    assert entries == {("CM-1-1-2-1", "responsible", "Sample Pricing Coordinator"),
-                       ("CM-1-1-2", "accountable", "Sample Pricing Coordinator"),
+    assert names == {"sample-terminal-scheduler": "Sample Terminal Scheduler"}
+    assert entries == {("CM-1-1-2-1", "responsible", "Sample Terminal Scheduler"),
+                       ("CM-1-1-3", "accountable", "Sample Terminal Scheduler"),
                        ("CM-1-1-2-1", "consulted", "Business Analyst")}
     entries, register, roles = tr.br.load()
-    added = [("CM 1.1.2", "accountable", "Sample Pricing Coordinator")]
-    register = register + [{"source_text": "Sample Pricing Coordinator", "roles": "sample-pricing-coordinator",
+    added = [("CM 1.1.3", "accountable", "Sample Terminal Scheduler")]
+    register = register + [{"source_text": "Sample Terminal Scheduler", "roles": "sample-terminal-scheduler",
                             "rule": "exact", "qualifier": ""}]
-    roles = roles + [{"slug": "sample-pricing-coordinator", "kind": "position", "replaced_by": ""}]
+    roles = roles + [{"slug": "sample-terminal-scheduler", "kind": "position", "replaced_by": ""}]
     assert tr.before_the_forms(entries + added, register, roles) == (entries, register[:-1], roles[:-1])
 
 
@@ -374,6 +380,7 @@ def test_a_process_map_request_goes_from_the_form_to_a_committed_minor_release_o
     for name, path in pm.BUILT.items():
         shutil.copy2(root / path, kept[name])
     held = _versions(root)
+    had_raci = "raci" in pm.processes(json.loads((root / pm.MAP).read_text(encoding="utf-8")))["CM 1.1.3"]
     [folder] = propose(tmp_path, pm_form(tmp_path, number="PM-1"), root)
     said = []
     files = apply_cmd.apply([folder], root, say=said.append, now=NOW)
@@ -385,25 +392,27 @@ def test_a_process_map_request_goes_from_the_form_to_a_committed_minor_release_o
     assert git(root, "log", "-1", "--format=%s").strip() == f"Apply the process map request PM-1: organization {new}"
     assert set(git(root, "show", "--name-only", "--no-renames", "--format=", "HEAD").split()) == set(files)
     rows = lambda name: list(csv.DictReader((root / pm.FOLDER / f"{name}.csv").open(encoding="utf-8")))
-    assert rows("roles")[-1] == {"slug": "sample-pricing-coordinator", "label": "Sample Pricing Coordinator",
+    assert rows("roles")[-1] == {"slug": "sample-terminal-scheduler", "label": "Sample Terminal Scheduler",
                                  "preferred_label": "", "kind": "position", "replaced_by": "", "replaced_label_kind": "",
                                  "definition": "A made-up role that coordinates the daily price updates of one region.",
                                  "note": PM_FACTS[0][2], "question": ""}
-    assert rows("role-register")[-1] == {"source_text": "Sample Pricing Coordinator", "roles": "sample-pricing-coordinator",
+    assert rows("role-register")[-1] == {"source_text": "Sample Terminal Scheduler", "roles": "sample-terminal-scheduler",
                                          "rule": "exact", "qualifier": ""}
     nodes = pm.processes(json.loads((root / pm.MAP).read_text(encoding="utf-8")))
-    assert nodes["CM 1.1.2"]["raci"] == {"responsible": [], "accountable": ["Sample Pricing Coordinator"],
-                                         "consulted": [], "informed": []}
-    assert list(nodes["CM 1.1.2"]).index("raci") == list(nodes["CM 1.1.2"]).index("name") + 1
-    assert nodes["CM 1.1.2.1"]["raci"]["responsible"][-1] == "Sample Pricing Coordinator"
-    assert nodes["CM 1.1.2.1"]["raci"]["consulted"] == ["IT Data Custodian", "Business Analyst"]
+    if not had_raci:   # a process with no RACI gains the four lists, after its description
+        assert nodes["CM 1.1.3"]["raci"] == {"responsible": [], "accountable": ["Sample Terminal Scheduler"],
+                                             "consulted": [], "informed": []}
+        assert list(nodes["CM 1.1.3"]).index("raci") == list(nodes["CM 1.1.3"]).index("description") + 1
+    assert nodes["CM 1.1.3"]["raci"]["accountable"][-1] == "Sample Terminal Scheduler"
+    assert nodes["CM 1.1.2.1"]["raci"]["responsible"][-1] == "Sample Terminal Scheduler"
+    assert nodes["CM 1.1.2.1"]["raci"]["consulted"][-1] == "Business Analyst"
     # The round trip of both built files, and the change file and facts the release keeps.
     back = [pm.compare(name, kept[name], root / path) for name, path in pm.BUILT.items()]
     assert sorted(line for lines, _ in back for line in lines) == sorted(PM_LINES)
     assert sorted(row for _, rows_ in back for row in rows_) == sorted(PM_FACTS)
     assert approval.record_path(root, "PM-1").with_suffix(".kgcl").read_text(encoding="utf-8").splitlines() == PM_LINES
     lists = picklists.load(root / "kpi-intake")
-    assert "Sample Pricing Coordinator" in {i["label"] for i in lists["lists"]["roles"]}
+    assert "Sample Terminal Scheduler" in {i["label"] for i in lists["lists"]["roles"]}
     assert picklists.stale_modules(lists, root) == {}
 
 
