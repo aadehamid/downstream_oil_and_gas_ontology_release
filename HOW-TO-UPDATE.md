@@ -941,6 +941,170 @@ The commands start in the release folder. Keep the filled form and the proposal 
 
 7. Run the full check, as in "Before you change anything", step 3. Then load the stores with the runner, as in step 11 of "The release steps". The forms list the new role after the apply's rebuild of the pack.
 
+## Use AI to suggest answers (optional)
+
+An AI can read a filled form before anyone signs it, and suggest clearer answers. It is off until the client's IT approves a provider. What the AI writes is only a suggestion: you accept or reject each one, the signers sign the answers as they then stand, and the propose command checks the form as it checks every form. The AI never applies anything. Without `--ai`, the propose command works exactly as the sections above say.
+
+The AI reads the answers that people wrote in words, and the form's choices of a measure or a process. It also reads the names of what the release holds, such as its measures and its processes, so that it can say "this matches the measure Unit Utilization". Its instructions are the release's own skills, the files `skills/ontology/SKILL.md` and `skills/clear-writing/SKILL.md`, so the rules are the same whichever model the client picks. You never need to open them.
+
+Each AI step leaves a record beside the form: the provider, the model and its version, who approved the provider and when, each skill file with its SHA-256, the prompt and its SHA-256, the SHA-256 of the AI's answer, and each suggestion with your choice. The proposal keeps the record in `summary.txt` and in `approval.json`, and the apply command keeps it in the release's approval record.
+
+### Choose the provider
+
+The provider goes in the `[ai]` table of your local settings file, the file that `KPI_STORE_LOCAL` names. `kpi_store/stores.example.toml` shows the table, switched off. The client's IT chooses one provider and approves it once. Write who approved it in `approved_by`, and the date in `approved_on`. The command refuses AI until both are there. **Never write a key in the file.** Name the environment variable that holds the key in `key_env`.
+
+| `provider` | What the command uses | What the table also needs |
+|---|---|---|
+| `databricks`, the usual choice | A model served in the client's Databricks workspace, so the form stays with the client | `model`: the name of the serving endpoint. `profile`: the Databricks configuration profile you signed in with (`databricks auth login`) |
+| `anthropic` | The Anthropic Messages API | `model` and `key_env` |
+| `openai` | OpenAI chat completions | `model` and `key_env` |
+| `by-hand` | No call. The command writes the prompt to a file, you give it to an assistant such as Genie Code, and you save its answer to a file | `assistant`: its name, such as `"Genie Code"` |
+
+A table for a model served in Databricks looks like this:
+
+```toml parse
+[ai]
+provider = "databricks"
+model = "kpi-suggestions"
+profile = "DEFAULT"
+approved_by = "An IT Approver"
+approved_on = "2026-11-20"
+```
+
+### Use Genie Code as the assistant
+
+Genie Code is the assistant in the Databricks workspace. It follows Agent Skills, and the release's `skills` folder holds such skills. The prompt file already holds the text of the two skills the AI follows, so any assistant works. To give Genie Code the skills' reference files too, register the folder once. The Databricks page "Extend Genie Code with agent skills" (https://docs.databricks.com/aws/en/genie-code/skills, section "Add skills from another folder", last updated 2026-11-18) gives these steps:
+
+1. Put the release's `skills` folder in a workspace folder that you can read, such as a Databricks Git folder.
+2. In Genie Code, click **Customizations**, then **Skills**.
+3. Click **New**, then **Add from workspace folder**.
+4. Choose the `skills` folder itself: the folder that holds `ontology` and `clear-writing`, not one of them.
+
+### A worked example, by hand
+
+The example asks for suggestions on a term change of the measure Unit Utilization. Its requester wrote the new name as "process unit utilisation" and a new other name as "unit cap util". The commands start in the release folder. Keep the form, the settings and the AI's files in a folder beside the release folder. The example uses the folder `ai-suggestions`.
+
+1. Fill in the form and save it, but do not sign it yet. Add the `[ai]` table to your local settings file.
+
+   The document test writes the form and a settings file that holds only the `[ai]` table, with this block. If you saved the form from the HTML form, skip it, and name your own settings file in the commands below.
+
+   ```python run=ai-suggestions
+   import json
+   from pathlib import Path
+
+   folder = Path("../ai-suggestions")
+   folder.mkdir(exist_ok=True)
+   measure = "https://w3id.org/mpc/ontology/modules/kpi/measure/unit-utilization"
+   answers = {"T1": measure, "T2": "process unit utilisation", "T4": ["unit cap util"], "T8": "yes"}
+   form = {"format": 1, "form": "term-change", "catalogue_version": "1.2", "kpi_name": "Unit Utilization",
+           "request": {"number": "TC-2026-002", "date": "2026-11-20", "requester_role": "Data Owner", "invited": ""},
+           "answers": answers, "sign_offs": {}, "consulted": {}, "example_of": "", "comment": ""}
+   (folder / "unit-utilization.term-change.json").write_text(json.dumps(form, indent=2) + "\n", encoding="utf-8")
+   settings = ['[ai]', 'provider = "by-hand"', 'assistant = "Genie Code"', 'approved_by = "An IT Approver"',
+               'approved_on = "2026-11-20"']
+   (folder / "kpi-store-local.toml").write_text("\n".join(settings) + "\n", encoding="utf-8")
+   print("wrote the form and the settings")
+   ```
+
+   ```text expect
+   wrote the form and the settings
+   ```
+
+2. Ask for suggestions. With the by-hand provider, the command writes the prompt to a file and stops. It refuses a form that anyone has signed.
+
+   ```powershell run=ai-suggestions
+   python -m kpi_store.propose --ai ../ai-suggestions/unit-utilization.term-change.json --stores ../ai-suggestions/kpi-store-local.toml
+   ```
+
+   ```text expect
+   wrote the prompt for the AI: ../ai-suggestions/unit-utilization.term-change.ai-prompt.txt
+   Give that file to Genie Code. Save its answer, the JSON it writes, in a file such as ../ai-suggestions/unit-utilization.term-change.ai-answer.json. Then run this command again with --ai-answer <that file>.
+   ```
+
+3. Give the prompt file to the assistant. Save its answer, the JSON it writes, as `unit-utilization.term-change.ai-answer.json` in the same folder.
+
+   The document test copies the release's sample answer, which is made up, with this block.
+
+   ```powershell run=ai-suggestions status-only
+   python -c "import shutil; shutil.copy('kpi_store/ai/sample-answer.json', '../ai-suggestions/unit-utilization.term-change.ai-answer.json')"
+   ```
+
+4. Run the command again with the answer. It checks the answer strictly, and refuses the whole answer if it is not the JSON the prompt asks for. It then shows each suggestion and asks you to accept it or not. The example accepts the new name and rejects the other name, so you type `yes`, then `no`. To give the choices from a file instead, add `--ai-choices <file>`, where the file holds `{"T2": "yes", "T4": "no"}`. The command writes each accepted answer into the form, and the record of the AI step beside it.
+
+   ```powershell run=ai-suggestions types="yes,no"
+   python -m kpi_store.propose --ai ../ai-suggestions/unit-utilization.term-change.json --stores ../ai-suggestions/kpi-store-local.toml --ai-answer ../ai-suggestions/unit-utilization.term-change.ai-answer.json
+   ```
+
+   ```text expect
+   read the answer of Genie Code from ../ai-suggestions/unit-utilization.term-change.ai-answer.json
+   the AI suggested 2 changes
+   Suggestion 1 of 2, for T2: What should the measure be called from now on? Leave this empty to keep its name.
+     The answer now: "process unit utilisation"
+     The suggestion: "Process Unit Utilization"
+     Why: The release writes the names of its measures with capital initials and US spelling, as the measure Unit Utilization shows.
+   Accept this suggestion? Type yes or no: Suggestion 2 of 2, for T4: Which other names should it gain?
+     The answer now: ["unit cap util"]
+     The suggestion: ["unit capacity utilization"]
+     Why: An other name works best when it is the words people say in full, so a search finds it.
+   Accept this suggestion? Type yes or no: accepted 1 of 2 suggestions; wrote it into unit-utilization.term-change.json
+   wrote the record of the AI step: ../ai-suggestions/unit-utilization.term-change.ai.json
+   Next: the signers read the form as it now stands and sign it. Then turn it into a proposal with: python -m kpi_store.propose ../ai-suggestions/unit-utilization.term-change.json
+   ```
+
+   With the `databricks`, `anthropic` or `openai` provider, step 2 asks the AI itself and goes straight on to the suggestions, so there is no prompt file and no `--ai-answer`.
+
+5. The signers load the form in the HTML form ("Load answers file"), read the answers as they now stand, sign, and save it. The Data Owner and the Architect sign this one.
+
+   The document test signs the form with this block.
+
+   ```python run=ai-suggestions
+   import json
+   from pathlib import Path
+
+   path = Path("../ai-suggestions/unit-utilization.term-change.json")
+   form = json.loads(path.read_text(encoding="utf-8"))
+   form["sign_offs"] = {"data-owner": {"name": "A Data Owner", "date": "2026-11-20"},
+                        "architect": {"name": "An Architect", "date": "2026-11-20"}}
+   path.write_text(json.dumps(form, indent=2) + "\n", encoding="utf-8")
+   print("signed", form["answers"]["T2"])
+   ```
+
+   ```text expect
+   signed Process Unit Utilization
+   ```
+
+6. Turn the signed form into a proposal, as for any form. The command finds the record beside the form and keeps it.
+
+   ```powershell run=ai-suggestions
+   python -m kpi_store.propose ../ai-suggestions/unit-utilization.term-change.json
+   ```
+
+   ```text expect
+   wrote the proposal ../ai-suggestions/proposals/TC-2026-002: 2 changes, route minor
+   Nothing in the ontology has changed. Read each summary.txt, then apply with: python -m kpi_store.apply <proposal folder>
+   ```
+
+7. Read `summary.txt`. It lists each suggestion, your choice, and whether the signed form still holds an accepted answer.
+
+   ```python run=ai-suggestions
+   print(open("../ai-suggestions/proposals/TC-2026-002/summary.txt", encoding="utf-8").read())
+   ```
+
+   ```text expect
+   Proposal TC-2026-002
+   ...
+     - Rename it from "Unit Utilization" to "Process Unit Utilization".
+     - Add the other name "unit cap util".
+   ...
+   AI suggestions: Genie Code was asked on <date>, with the provider approved by An IT Approver on 2026-11-20.
+     - T2, accepted (the signed form holds it): "Process Unit Utilization". Why: The release writes the names of its measures with capital initials and US spelling, as the measure Unit Utilization shows.
+     - T4, rejected: ["unit capacity utilization"]. Why: An other name works best when it is the words people say in full, so a search finds it.
+     The whole record, with the prompt and the fingerprints, is in approval.json under "ai".
+   ...
+   ```
+
+You are done when the proposal's `summary.txt` lists each AI suggestion with your choice, and its `approval.json` holds the record under `"ai"`. Then apply the proposal as the section for its form says.
+
 ## Change a concept's definition
 
 A new wording with the same meaning is a patch. If the meaning changes, the release is a major, and the ontology owner approves it.

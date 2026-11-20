@@ -167,6 +167,10 @@ figure.pic figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
 <li class="l2"><a href="#add-a-kpi-with-the-kpi-intake-form">Add a KPI with the KPI intake form</a></li>
 <li class="l2"><a href="#activate-a-domain-with-the-domain-activation-form">Activate a domain with the domain activation form</a></li>
 <li class="l2"><a href="#add-roles-and-raci-entries-with-the-process-map-request">Add roles and RACI entries with the process map request</a></li>
+<li class="l2"><a href="#use-ai-to-suggest-answers-optional">Use AI to suggest answers (optional)</a></li>
+<li class="l3"><a href="#choose-the-provider">Choose the provider</a></li>
+<li class="l3"><a href="#use-genie-code-as-the-assistant">Use Genie Code as the assistant</a></li>
+<li class="l3"><a href="#a-worked-example-by-hand">A worked example, by hand</a></li>
 <li class="l2"><a href="#change-a-concept-s-definition">Change a concept's definition</a></li>
 <li class="l2"><a href="#add-a-concept-or-a-property">Add a concept or a property</a></li>
 <li class="l3"><a href="#a-new-role-or-a-new-system">A new role or a new system</a></li>
@@ -696,6 +700,95 @@ python next_version.py current organization</code></pre>
 <pre><code class="lang-text">&lt;commit&gt; Apply the process map request PM-2026-001: organization 2.3.0
 2.3.0</code></pre></li></ol>
 <ol start="7"><li>Run the full check, as in "Before you change anything", step 3. Then load the stores with the runner, as in step 11 of "The release steps". The forms list the new role after the apply's rebuild of the pack.</li></ol>
+<h2 id="use-ai-to-suggest-answers-optional">Use AI to suggest answers (optional)<a class="hl" href="#use-ai-to-suggest-answers-optional" aria-label="Link to this section">#</a></h2>
+<p>An AI can read a filled form before anyone signs it, and suggest clearer answers. It is off until the client's IT approves a provider. What the AI writes is only a suggestion: you accept or reject each one, the signers sign the answers as they then stand, and the propose command checks the form as it checks every form. The AI never applies anything. Without <code>--ai</code>, the propose command works exactly as the sections above say.</p>
+<p>The AI reads the answers that people wrote in words, and the form's choices of a measure or a process. It also reads the names of what the release holds, such as its measures and its processes, so that it can say "this matches the measure Unit Utilization". Its instructions are the release's own skills, the files <code>skills/ontology/SKILL.md</code> and <code>skills/clear-writing/SKILL.md</code>, so the rules are the same whichever model the client picks. You never need to open them.</p>
+<p>Each AI step leaves a record beside the form: the provider, the model and its version, who approved the provider and when, each skill file with its SHA-256, the prompt and its SHA-256, the SHA-256 of the AI's answer, and each suggestion with your choice. The proposal keeps the record in <code>summary.txt</code> and in <code>approval.json</code>, and the apply command keeps it in the release's approval record.</p>
+<h3 id="choose-the-provider">Choose the provider<a class="hl" href="#choose-the-provider" aria-label="Link to this section">#</a></h3>
+<p>The provider goes in the <code>[ai]</code> table of your local settings file, the file that <code>KPI_STORE_LOCAL</code> names. <code>kpi_store/stores.example.toml</code> shows the table, switched off. The client's IT chooses one provider and approves it once. Write who approved it in <code>approved_by</code>, and the date in <code>approved_on</code>. The command refuses AI until both are there. <strong>Never write a key in the file.</strong> Name the environment variable that holds the key in <code>key_env</code>.</p>
+<div class="tblwrap"><table><thead><tr><th><code>provider</code></th><th>What the command uses</th><th>What the table also needs</th></tr></thead><tbody><tr><td><code>databricks</code>, the usual choice</td><td>A model served in the client's Databricks workspace, so the form stays with the client</td><td><code>model</code>: the name of the serving endpoint. <code>profile</code>: the Databricks configuration profile you signed in with (<code>databricks auth login</code>)</td></tr><tr><td><code>anthropic</code></td><td>The Anthropic Messages API</td><td><code>model</code> and <code>key_env</code></td></tr><tr><td><code>openai</code></td><td>OpenAI chat completions</td><td><code>model</code> and <code>key_env</code></td></tr><tr><td><code>by-hand</code></td><td>No call. The command writes the prompt to a file, you give it to an assistant such as Genie Code, and you save its answer to a file</td><td><code>assistant</code>: its name, such as <code>"Genie Code"</code></td></tr></tbody></table></div>
+<p>A table for a model served in Databricks looks like this:</p>
+<pre><code class="lang-toml">[ai]
+provider = "databricks"
+model = "kpi-suggestions"
+profile = "DEFAULT"
+approved_by = "An IT Approver"
+approved_on = "2026-11-20"</code></pre>
+<h3 id="use-genie-code-as-the-assistant">Use Genie Code as the assistant<a class="hl" href="#use-genie-code-as-the-assistant" aria-label="Link to this section">#</a></h3>
+<p>Genie Code is the assistant in the Databricks workspace. It follows Agent Skills, and the release's <code>skills</code> folder holds such skills. The prompt file already holds the text of the two skills the AI follows, so any assistant works. To give Genie Code the skills' reference files too, register the folder once. The Databricks page "Extend Genie Code with agent skills" (<a href="https://docs.databricks.com/aws/en/genie-code/skills">https://docs.databricks.com/aws/en/genie-code/skills</a>, section "Add skills from another folder", last updated 2026-11-18) gives these steps:</p>
+<ol><li>Put the release's <code>skills</code> folder in a workspace folder that you can read, such as a Databricks Git folder.</li><li>In Genie Code, click <strong>Customizations</strong>, then <strong>Skills</strong>.</li><li>Click <strong>New</strong>, then <strong>Add from workspace folder</strong>.</li><li>Choose the <code>skills</code> folder itself: the folder that holds <code>ontology</code> and <code>clear-writing</code>, not one of them.</li></ol>
+<h3 id="a-worked-example-by-hand">A worked example, by hand<a class="hl" href="#a-worked-example-by-hand" aria-label="Link to this section">#</a></h3>
+<p>The example asks for suggestions on a term change of the measure Unit Utilization. Its requester wrote the new name as "process unit utilisation" and a new other name as "unit cap util". The commands start in the release folder. Keep the form, the settings and the AI's files in a folder beside the release folder. The example uses the folder <code>ai-suggestions</code>.</p>
+<ol><li>Fill in the form and save it, but do not sign it yet. Add the <code>[ai]</code> table to your local settings file.
+<p>The document test writes the form and a settings file that holds only the <code>[ai]</code> table, with this block. If you saved the form from the HTML form, skip it, and name your own settings file in the commands below.</p>
+<pre><code class="lang-python">import json
+from pathlib import Path
+
+folder = Path("../ai-suggestions")
+folder.mkdir(exist_ok=True)
+measure = "https://w3id.org/mpc/ontology/modules/kpi/measure/unit-utilization"
+answers = {"T1": measure, "T2": "process unit utilisation", "T4": ["unit cap util"], "T8": "yes"}
+form = {"format": 1, "form": "term-change", "catalogue_version": "1.2", "kpi_name": "Unit Utilization",
+        "request": {"number": "TC-2026-002", "date": "2026-11-20", "requester_role": "Data Owner", "invited": ""},
+        "answers": answers, "sign_offs": {}, "consulted": {}, "example_of": "", "comment": ""}
+(folder / "unit-utilization.term-change.json").write_text(json.dumps(form, indent=2) + "\n", encoding="utf-8")
+settings = ['[ai]', 'provider = "by-hand"', 'assistant = "Genie Code"', 'approved_by = "An IT Approver"',
+            'approved_on = "2026-11-20"']
+(folder / "kpi-store-local.toml").write_text("\n".join(settings) + "\n", encoding="utf-8")
+print("wrote the form and the settings")</code></pre>
+<pre><code class="lang-text">wrote the form and the settings</code></pre></li></ol>
+<ol start="2"><li>Ask for suggestions. With the by-hand provider, the command writes the prompt to a file and stops. It refuses a form that anyone has signed.
+<pre><code class="lang-powershell">python -m kpi_store.propose --ai ../ai-suggestions/unit-utilization.term-change.json --stores ../ai-suggestions/kpi-store-local.toml</code></pre>
+<pre><code class="lang-text">wrote the prompt for the AI: ../ai-suggestions/unit-utilization.term-change.ai-prompt.txt
+Give that file to Genie Code. Save its answer, the JSON it writes, in a file such as ../ai-suggestions/unit-utilization.term-change.ai-answer.json. Then run this command again with --ai-answer &lt;that file&gt;.</code></pre></li></ol>
+<ol start="3"><li>Give the prompt file to the assistant. Save its answer, the JSON it writes, as <code>unit-utilization.term-change.ai-answer.json</code> in the same folder.
+<p>The document test copies the release's sample answer, which is made up, with this block.</p>
+<pre><code class="lang-powershell">python -c "import shutil; shutil.copy('kpi_store/ai/sample-answer.json', '../ai-suggestions/unit-utilization.term-change.ai-answer.json')"</code></pre></li></ol>
+<ol start="4"><li>Run the command again with the answer. It checks the answer strictly, and refuses the whole answer if it is not the JSON the prompt asks for. It then shows each suggestion and asks you to accept it or not. The example accepts the new name and rejects the other name, so you type <code>yes</code>, then <code>no</code>. To give the choices from a file instead, add <code>--ai-choices &lt;file&gt;</code>, where the file holds <code>{"T2": "yes", "T4": "no"}</code>. The command writes each accepted answer into the form, and the record of the AI step beside it.
+<pre><code class="lang-powershell">python -m kpi_store.propose --ai ../ai-suggestions/unit-utilization.term-change.json --stores ../ai-suggestions/kpi-store-local.toml --ai-answer ../ai-suggestions/unit-utilization.term-change.ai-answer.json</code></pre>
+<pre><code class="lang-text">read the answer of Genie Code from ../ai-suggestions/unit-utilization.term-change.ai-answer.json
+the AI suggested 2 changes
+Suggestion 1 of 2, for T2: What should the measure be called from now on? Leave this empty to keep its name.
+  The answer now: "process unit utilisation"
+  The suggestion: "Process Unit Utilization"
+  Why: The release writes the names of its measures with capital initials and US spelling, as the measure Unit Utilization shows.
+Accept this suggestion? Type yes or no: Suggestion 2 of 2, for T4: Which other names should it gain?
+  The answer now: ["unit cap util"]
+  The suggestion: ["unit capacity utilization"]
+  Why: An other name works best when it is the words people say in full, so a search finds it.
+Accept this suggestion? Type yes or no: accepted 1 of 2 suggestions; wrote it into unit-utilization.term-change.json
+wrote the record of the AI step: ../ai-suggestions/unit-utilization.term-change.ai.json
+Next: the signers read the form as it now stands and sign it. Then turn it into a proposal with: python -m kpi_store.propose ../ai-suggestions/unit-utilization.term-change.json</code></pre>
+<p>With the <code>databricks</code>, <code>anthropic</code> or <code>openai</code> provider, step 2 asks the AI itself and goes straight on to the suggestions, so there is no prompt file and no <code>--ai-answer</code>.</p></li></ol>
+<ol start="5"><li>The signers load the form in the HTML form ("Load answers file"), read the answers as they now stand, sign, and save it. The Data Owner and the Architect sign this one.
+<p>The document test signs the form with this block.</p>
+<pre><code class="lang-python">import json
+from pathlib import Path
+
+path = Path("../ai-suggestions/unit-utilization.term-change.json")
+form = json.loads(path.read_text(encoding="utf-8"))
+form["sign_offs"] = {"data-owner": {"name": "A Data Owner", "date": "2026-11-20"},
+                     "architect": {"name": "An Architect", "date": "2026-11-20"}}
+path.write_text(json.dumps(form, indent=2) + "\n", encoding="utf-8")
+print("signed", form["answers"]["T2"])</code></pre>
+<pre><code class="lang-text">signed Process Unit Utilization</code></pre></li></ol>
+<ol start="6"><li>Turn the signed form into a proposal, as for any form. The command finds the record beside the form and keeps it.
+<pre><code class="lang-powershell">python -m kpi_store.propose ../ai-suggestions/unit-utilization.term-change.json</code></pre>
+<pre><code class="lang-text">wrote the proposal ../ai-suggestions/proposals/TC-2026-002: 2 changes, route minor
+Nothing in the ontology has changed. Read each summary.txt, then apply with: python -m kpi_store.apply &lt;proposal folder&gt;</code></pre></li></ol>
+<ol start="7"><li>Read <code>summary.txt</code>. It lists each suggestion, your choice, and whether the signed form still holds an accepted answer.
+<pre><code class="lang-python">print(open("../ai-suggestions/proposals/TC-2026-002/summary.txt", encoding="utf-8").read())</code></pre>
+<pre><code class="lang-text">Proposal TC-2026-002
+...
+  - Rename it from "Unit Utilization" to "Process Unit Utilization".
+  - Add the other name "unit cap util".
+...
+AI suggestions: Genie Code was asked on &lt;date&gt;, with the provider approved by An IT Approver on 2026-11-20.
+  - T2, accepted (the signed form holds it): "Process Unit Utilization". Why: The release writes the names of its measures with capital initials and US spelling, as the measure Unit Utilization shows.
+  - T4, rejected: ["unit capacity utilization"]. Why: An other name works best when it is the words people say in full, so a search finds it.
+  The whole record, with the prompt and the fingerprints, is in approval.json under "ai".
+...</code></pre></li></ol>
+<p>You are done when the proposal's <code>summary.txt</code> lists each AI suggestion with your choice, and its <code>approval.json</code> holds the record under <code>"ai"</code>. Then apply the proposal as the section for its form says.</p>
 <h2 id="change-a-concept-s-definition">Change a concept's definition<a class="hl" href="#change-a-concept-s-definition" aria-label="Link to this section">#</a></h2>
 <p>A new wording with the same meaning is a patch. If the meaning changes, the release is a major, and the ontology owner approves it.</p>
 <ol><li>Find where the definition lives. Most sources are tables and Turtle files in the module's folder, so search there for the text. A file that starts "Built by" is generated: edit the source it names.</li><li>Edit the text in that source. Keep the citation of its source. If the new wording rests on a new source, cite it.</li><li>Follow "The release steps" from step 3. In step 5, use <code>patch</code> and the next patch version.</li></ol>
