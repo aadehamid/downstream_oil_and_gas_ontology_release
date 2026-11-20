@@ -490,8 +490,8 @@ def test_the_command_line_refuses_ai_in_a_plain_sentence(tmp_path, capsys, monke
 def test_the_command_line_runs_the_ai_step_against_a_provider(tmp_path, stub, capsys, monkeypatch):
     path = form(tmp_path)
     stub.replies["/serving-endpoints/kpi-chat/invocations"] = (200, chat_reply(SAMPLE_TEXT))
-    monkeypatch.setenv("SAMPLE_DATABRICKS_TOKEN", "dapi-sample")
-    local = settings(tmp_path, '[ai]\nprovider = "databricks"\nmodel = "kpi-chat"\nkey_env = "SAMPLE_DATABRICKS_TOKEN"\n'
+    monkeypatch.setenv("SAMPLE_SERVING_KEY", "dapi-sample")
+    local = settings(tmp_path, '[ai]\nprovider = "databricks"\nmodel = "kpi-chat"\nkey_env = "SAMPLE_SERVING_KEY"\n'
                                f'url = "{stub.url}/serving-endpoints/kpi-chat/invocations"\n'
                                'approved_by = "An IT Approver"\napproved_on = "2026-11-18"\n')
     assert propose_cmd.main(["--ai", str(path), "--stores", str(local), "--release", str(ROOT),
