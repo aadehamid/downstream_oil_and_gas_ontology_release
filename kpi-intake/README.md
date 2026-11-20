@@ -360,10 +360,10 @@ label = "Value Chain Optimization Director"
 | `labels` | The label the forms and the check show for an entry, in place of the ontology's. The answers file still keeps the entry's id, and a workbook filled under the earlier label still reads |
 | `add` | An entry with an `id` and a `label`. The forms offer it, marked "new, not yet in the ontology" |
 
-After the build, [`for-the-architect.md`](for-the-architect.md) shows each list as the forms offer it: how many entries it offers, how many it hides, and what it adds. This is its line on what the roles list hides:
+After the build, [`for-the-architect.md`](for-the-architect.md) shows each list as the forms offer it: how many entries it offers, how many it hides, and what it adds. This is its line on what your settings add to the roles list:
 
 ```markdown excerpt=kpi-intake/for-the-architect.md
-- `roles` hides: Black Oil Manager.
+- `roles` adds: Value Chain Optimization Director. Each is offered with the mark "new, not yet in the ontology". When a form names one, the check tells you to add it to the `organization` module before you apply the KPI.
 ```
 
 A hidden entry stays known. An answers file that already holds it still passes the check, with the note "hidden in this organization's settings". When a form names an added entry, the check tells the Architect to add it to the ontology first. The build stops when a name under `hide` or `keep_only` matches no entry, so a misspelt name cannot go unnoticed. It also stops when `add` names an entry that `hide` names, when an added entry matches more than one entry, or when two added entries share a label.
