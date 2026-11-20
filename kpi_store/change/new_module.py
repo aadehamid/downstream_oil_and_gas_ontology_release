@@ -77,6 +77,9 @@ NOT_OFFERED = {"core": "the process map request adds processes", "kpi": "the KPI
                "technical-graph": "its classes describe records kept outside the ontology",
                "logical-model": "its classes describe logical data models"}
 NAME_LIMIT = 40   # the module's key names a folder, a package and a prefix
+MODULE_KEY = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")   # a Turtle prefix starts with a letter
+# The prefixes a new module's files bind beside its own: its terms or items, and its shapes.
+RESERVED_PREFIXES = {"term", "item", "sh", "shp"} | set(STANDARD_PREFIXES)
 
 
 # ---- the release's own pattern code ------------------------------------------------------------------
@@ -269,17 +272,31 @@ def from_form(answers, root):
             if k in keys.values():
                 raise ChangeRefused(f'N4: "{name}" has the short key {k}, as another term has. Give each term a name of its own')
             keys[name.casefold()] = k
+        under = {}
         for i, name in enumerate(names):
             if not name:
                 continue
             s = f"term:{keys[name.casefold()]}"
             changes += [Change("create node", s, text=name), Change("add definition", s, text=at(definitions, i))]
-            changes += [Change("create synonym", s, text=o.strip()) for o in at(others, i).split(";") if o.strip()]
+            own = [o.strip() for o in at(others, i).split(";") if o.strip()]
+            if len({o.casefold() for o in own}) != len(own) or name.casefold() in {o.casefold() for o in own}:
+                raise ChangeRefused(f'N6: an other name of "{name}" is named twice or is the term\'s own name. '
+                                    "Give each other name once")
+            changes += [Change("create synonym", s, text=o) for o in own]
             up = at(broader, i)
             if up:
                 if up.casefold() not in keys:
                     raise ChangeRefused(f'N7: "{name}" is under "{up}", which is not a term of N4. Name a term of this list')
+                under[name] = next(n for n in names if n and n.casefold() == up.casefold())
                 changes.append(Change("create edge", s, predicate="skos:broader", target=f"term:{keys[up.casefold()]}"))
+        for name in under:   # a chain of broader terms must end at a top term
+            seen, at_ = [], name
+            while at_ in under and at_ not in seen:
+                seen.append(at_)
+                at_ = under[at_]
+            if at_ in seen:
+                raise ChangeRefused(f'N7: the chain of broader terms of "{name}" comes back to "{at_}". '
+                                    "Give the chain a term at the top")
         if not changes:
             raise ChangeRefused("N4 names no term")
         return key, changes, facts, []
@@ -332,10 +349,17 @@ def from_form(answers, root):
 
 
 def _items_of(release, cls):
+    """The items of a class and of every class below it; every subject when there is no class."""
     from rdflib import URIRef
     if not cls:
         return set(release.union.subjects())
-    return set(release.union.subjects(URIRef(RDF + "type"), URIRef(cls)))
+    classes, todo = set(), [URIRef(cls)]
+    while todo:
+        c = todo.pop()
+        if c not in classes:
+            classes.add(c)
+            todo += list(release.union.subjects(URIRef(RDFS + "subClassOf"), c))
+    return {i for c in classes for i in release.union.subjects(URIRef(RDF + "type"), c)}
 
 
 def _item_named(release, info, text, name):
@@ -393,9 +417,9 @@ def split(changes, facts, root, release=None):
     pattern = said["pattern"][0]
     if pattern not in (VOCABULARY, REFERENCE_TABLE):
         raise ChangeRefused(f"{pattern!r} is not a pattern of the new-module form; it needs a specialist")
-    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", key) or len(key) > NAME_LIMIT:
-        raise ChangeRefused(f"the module's short key {key!r} must be lower-case letters and digits with hyphens, at most "
-                            f"{NAME_LIMIT} characters: give the module a shorter name")
+    if not MODULE_KEY.fullmatch(key) or len(key) > NAME_LIMIT:
+        raise ChangeRefused(f"the module's short key {key!r} must start with a letter and be lower-case letters and digits "
+                            f"with hyphens, at most {NAME_LIMIT} characters: give the module another name")
     if key != module_key(said["title"][0]):
         raise ChangeRefused(f"the module's short key {key} is not the one its title {said['title'][0]!r} gives")
     root = Path(root)
@@ -409,13 +433,13 @@ def split(changes, facts, root, release=None):
         problem = kgcl.text_problem(text)
         if problem:
             raise ChangeRefused(f"{problem}: {text!r}")
+    release = release or Release(root)
+    if prefix in RESERVED_PREFIXES or prefix in _taken_prefixes(root) or prefix in release.prefixes:
+        raise ChangeRefused(f"the prefix {prefix} that the module's name gives is taken. Give the module another name")
     if pattern == VOCABULARY:
         if "property" in said or len(facts) != len(module_facts):
             raise ChangeRefused("a vocabulary takes no property and no fact of a term: a term's facts are its lines")
         return spec, _terms(changes)
-    release = release or Release(root)
-    if prefix in _taken_prefixes(root) or prefix in release.prefixes:
-        raise ChangeRefused(f"the prefix {prefix} that the module's name gives is taken. Give the module another name")
     return _reference_table(spec, changes, facts, said.get("property", []), release)
 
 
@@ -465,8 +489,10 @@ def _name_property(release, cls, root):
 
 def _owner(release, iri, rng=""):
     """The module that owns an IRI: the integration module for a source document, which gives each its evidence
-    tier; else the module whose namespace holds it; else every module that gives it a type."""
-    found = release.defined_in(iri)
+    tier; else the module whose namespace holds it; else every module that gives it a type, or that holds it when
+    none gives it a type."""
+    from rdflib import URIRef
+    found = release.defined_in(iri) or sorted(m for m, g in release.graphs.items() if (URIRef(iri), None, None) in g)
     if rng == DCTERMS + "BibliographicResource" and "integration" in found:
         return ["integration"]
     own = [m for m in found if str(iri).startswith(f"{MODULES_NS}{m}/")]
@@ -567,7 +593,9 @@ def check_changes(changes, facts, root):
     release = Release(root)
     spec, rows = split(changes, facts, root, release)
     mp = patterns(root)
-    found = mp.problems(spec, rows, {str(s) for s in release.union.subjects()} if spec["pattern"] == REFERENCE_TABLE else None)
+    # The items a value may name are those of the modules the module requires, as the builder's own check reads them.
+    held = {str(s) for m in spec.get("depends_on", []) for s in release.graphs[m].subjects()}
+    found = mp.problems(spec, rows, held if spec["pattern"] == REFERENCE_TABLE else None)
     if found:
         raise ChangeRefused("the module's table does not reconcile: " + "; ".join(found))
     data = mp.build(spec, rows)
@@ -604,14 +632,15 @@ def _closure(depends_on, root):
 
 
 def _violations(report, release, own):
-    """At most five violations of a SHACL report whose focus is a term or an item of the namespace `own`, each as
-    "<the item>: <the shape's message>"."""
+    """At most five violations (not warnings or notes) of a SHACL report whose focus is a term or an item of the
+    namespace `own`, each as "<the item>: <the shape's message>"."""
     from rdflib import URIRef
     out = []
     for result in report.subjects(URIRef(RDF + "type"), URIRef(SH + "ValidationResult")):
         focus = report.value(result, URIRef(SH + "focusNode"))
-        if not str(focus).startswith(own):
-            continue
+        if not str(focus).startswith(own) or \
+                report.value(result, URIRef(SH + "resultSeverity")) not in (None, URIRef(SH + "Violation")):
+            continue   # a warning or a note of a shape does not refuse the module, as it fails no conformance
         message = report.value(result, URIRef(SH + "resultMessage"))
         path = report.value(result, URIRef(SH + "resultPath"))
         text = str(message) if message else f"a value of {release.curie(path) or path} is missing or wrong"
@@ -781,4 +810,41 @@ def compare_graph(g, spec, mp):
     if odd:
         raise ChangeRefused(f"the {key} module holds {len(odd)} triples that no line and no fact of the new-module "
                             "form states: " + "; ".join(sorted(odd)[:5]))
+    # Each triple has a line or a fact. The graph must also be the one those lines and facts build: none missing, and
+    # each text, value and code of the datatype and the language the pattern gives it.
+    try:
+        expected = set(mp.build(spec, _rows_of(spec, lines, facts)))
+    except mp.TableError as err:
+        raise ChangeRefused(f"the {key} module cannot be built again from its lines and facts: {err}") from None
+    held = set(g)
+    if expected != held:
+        show = lambda triples: "; ".join(sorted(f"{s} {p} {o!r}" for s, p, o in triples)[:3]) or "none"
+        raise ChangeRefused(f"the {key} module does not hold what its lines and facts state: {len(expected - held)} "
+                            f"triples missing or different ({show(expected - held)}), and {len(held - expected)} more "
+                            f"({show(held - expected)})")
     return sorted(kgcl.write_line(c) for c in lines), facts
+
+
+def _rows_of(spec, lines, facts):
+    """The table's rows that the lines and facts of compare_graph state."""
+    if spec["pattern"] == VOCABULARY:
+        return _terms(lines)
+    curie_of = {p["iri"]: p["curie"] for p in spec["properties"]}
+    rows = {}
+    row = lambda subject: rows.setdefault(subject, dict({"item_id": subject[len("item:"):], "name": ""},
+                                                        **{p["curie"]: "" for p in spec["properties"]}))
+    for c in lines:
+        if c.kind == "create node":
+            row(c.subject)["name"] = c.text
+        elif c.kind == "add definition":
+            row(c.subject)[curie_of[SKOS + "definition"]] = c.text
+        elif c.kind == "create synonym":
+            row(c.subject)[curie_of[SKOS + "altLabel"]] = c.text
+        elif c.predicate != "rdf:type":
+            row(c.subject)[c.predicate] = c.target
+        else:
+            row(c.subject)
+    for subject, curie, value in facts:
+        if not subject.startswith(SUBJECT):
+            row(subject)[curie] = value
+    return list(rows.values())

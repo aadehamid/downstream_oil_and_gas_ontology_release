@@ -164,7 +164,7 @@ The ontology has no place for a KPI's domain yet, and holds no list of domains. 
 | N9 | Which properties does each item have? Pick them in the order of the table's columns. | Optional if N3 is "a reference table: items of a class the ontology holds, each with values of properties the ontology holds" | One value of each property for each item: a KGCL line for a definition, an other name and a link to an item, and a row of facts.csv for a text or a value. |
 | N10 | Which items does the table hold? Name each one. | Required if N3 is "a reference table: items of a class the ontology holds, each with values of properties the ontology holds" | The name of each item (the KGCL line `create node`). The item's short key is made from its name. |
 | N11 | For each item, what are its values of the properties of N9? Write them in the order of N9, with a vertical bar (\|) between two values. | Optional if N3 is "a reference table: items of a class the ontology holds, each with values of properties the ontology holds" | The item's value of each property of N9. |
-| N12 | Which documents describe the module's content? Name each one with its date. | Required | `dcterms:bibliographicCitation` of each term or item, in words. |
+| N12 | Which documents describe the module's content? Name each one with its date. | Required | A vocabulary: `dcterms:bibliographicCitation` of its concept scheme and of each term, in words. A reference table: the module's README and the `source` fact beside its approval record, because the shapes of some classes, such as `mkt:Benchmark`, allow no citation on an item. |
 
 ## The facts one new KPI needs, and the questions that supply them
 

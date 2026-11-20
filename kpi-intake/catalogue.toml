@@ -1941,7 +1941,7 @@ type = "list"
 rows = 4
 required = "required"
 why = "Every fact the ontology holds cites a written source."
-feeds = "`dcterms:bibliographicCitation` of each term or item, in words."
+feeds = "A vocabulary: `dcterms:bibliographicCitation` of its concept scheme and of each term, in words. A reference table: the module's README and the `source` fact beside its approval record, because the shapes of some classes, such as `mkt:Benchmark`, allow no citation on an item."
 fact = []
 
 # ---- The explainer (what-we-will-ask-you.md and the "What we will ask you" view of the HTML form) ---------------

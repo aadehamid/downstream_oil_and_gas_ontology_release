@@ -19,7 +19,7 @@ every module of one pattern is built by the same code:
     python3 build_<module>.py --write    # also write the module's Turtle
     python3 build_<module>.py --verify   # fail unless the Turtle equals a fresh build
 
-The build fails, naming the row, unless every row has a key, a name and what the pattern needs, no key or name is
+The build fails, naming the row, unless every row has a cell for each column, a key, a name and what the pattern needs, no key or name is
 used twice, every broader term is a term of the table and no term is under itself, and every value fits its
 property: a text, a value of the property's datatype, or an item that the newest package of a module the module
 requires holds.
@@ -103,7 +103,12 @@ def read_table(folder, spec):
         reader = csv.DictReader(f)
         if reader.fieldnames != columns(spec):
             raise TableError(f"{TABLE[spec['pattern']]} must have the columns {', '.join(columns(spec))}")
-        return list(reader)
+        rows = list(reader)
+    for number, row in enumerate(rows, start=2):   # row 1 is the header
+        if None in row or None in row.values():
+            raise TableError(f"{TABLE[spec['pattern']]}, row {number}: the row must have {len(columns(spec))} cells, "
+                             f"one for each column: {', '.join(columns(spec))}")
+    return rows
 
 
 def held_items(spec):
@@ -325,10 +330,15 @@ def shapes_text(spec):
 
 # ---- the module's other files -----------------------------------------------------------------------
 
+def _in_docstring(text):
+    """A text as it can stand in a Python docstring of three double quotes."""
+    return text.replace("\\", "\\\\").replace('"', '\\"')
+
+
 def builder_text(spec, change):
     name = builder_name(spec["module"])
     output = OUTPUT[spec["pattern"]]
-    return f'''"""Build the {spec['title']} module, of the {spec['pattern']} pattern (written by the apply command).
+    return f'''"""Build the {_in_docstring(spec['title'])} module, of the {spec['pattern']} pattern (written by the apply command).
 
     python3 {name}            # check the table and print the figures
     python3 {name} --write    # also write {output}
@@ -354,7 +364,7 @@ if __name__ == "__main__":
 
 def test_text(spec, rows):
     key = "term_id" if spec["pattern"] == VOCABULARY else "item_id"
-    return f'''"""Tests for the {spec['title']} module (written by the apply command): the build is current, the module holds the
+    return f'''"""Tests for the {_in_docstring(spec['title'])} module (written by the apply command): the build is current, the module holds the
 table's {len(rows)} {'terms' if spec['pattern'] == VOCABULARY else 'items'}, its shapes accept it, and they reject a {'term' if spec['pattern'] == VOCABULARY else 'item'} that has lost {'its definition' if spec['pattern'] == VOCABULARY else 'a value'}.
 
 Run: python3 -m pytest {test_name(spec['module'])} (needs rdflib, pyshacl).

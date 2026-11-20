@@ -469,6 +469,23 @@ def _apply_domains(root, proposals, git, say, before_step):
     return files
 
 
+def _holds_the_proposal(key, lines, facts, proposed_lines, proposed_facts):
+    """Raises CutFailed unless a new module's lines and facts, read back from its Turtle, are the proposal's: the same
+    lines and facts, and the properties of a reference table in the proposal's order, which is the order of its
+    table's columns."""
+    facts, proposed = [tuple(f) for f in facts], [tuple(f) for f in proposed_facts]
+    if sorted(lines) != sorted(proposed_lines) or sorted(facts) != sorted(proposed):
+        missing = sorted(set(proposed_lines) - set(lines)) + sorted(",".join(f) for f in set(proposed) - set(facts))
+        extra = sorted(set(lines) - set(proposed_lines)) + sorted(",".join(f) for f in set(facts) - set(proposed))
+        raise cut.CutFailed(f"the {key} module does not hold exactly the proposal's changes: missing "
+                            f"{missing or 'none'}, more {extra or 'none'}. The release is as it was.")
+    order = lambda rows: [f[2] for f in rows if f[0].startswith(new_module.SUBJECT) and f[1] == "property"]
+    if order(facts) != order(proposed):
+        raise cut.CutFailed(f"the {key} module does not hold the proposal's properties in the order of the proposal: "
+                            f"{', '.join(order(facts))}, and the proposal asks for {', '.join(order(proposed))}. "
+                            "The release is as it was.")
+
+
 def _apply_new_module(root, p, versions, git, say, before_step, now):
     """A run of one new module: its folder written from the proposal and registered in every place, its Turtle built
     and compared with the proposal, its first package written, then the catalog, the projection manifest, the KPI
@@ -490,14 +507,8 @@ def _apply_new_module(root, p, versions, git, say, before_step, now):
         builder = mp.builder_name(key)
         step(f"build the {key} module's Turtle", lambda: cut._run(f"build the {key} module's Turtle", [builder, "--write"], folder))
 
-        def round_trip():
-            lines, facts = new_module.compare(staging, key)
-            if sorted(lines) != sorted(p.lines) or sorted(map(tuple, facts)) != sorted(map(tuple, p.facts)):
-                missing = sorted(set(p.lines) - set(lines)) + sorted(",".join(f) for f in set(p.facts) - set(map(tuple, facts)))
-                extra = sorted(set(lines) - set(p.lines)) + sorted(",".join(f) for f in set(map(tuple, facts)) - set(p.facts))
-                raise cut.CutFailed(f"the {key} module does not hold exactly the proposal's changes: missing "
-                                    f"{missing or 'none'}, more {extra or 'none'}. The release is as it was.")
-        step(f"compare the {key} module with the proposal", round_trip)
+        step(f"compare the {key} module with the proposal",
+             lambda: _holds_the_proposal(key, *new_module.compare(staging, key), p.lines, p.facts))
         step(f"write the {key} package", lambda: cut._run(f"write the {key} package", ["build_module.py", key, "--write"], release))
         cut._outputs(staging, versions, cut._has_intake(staging), step,
                      (f"the Turtle of {builder}", [builder, "--verify"], folder))

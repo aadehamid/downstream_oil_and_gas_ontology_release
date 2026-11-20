@@ -314,15 +314,25 @@ def check_places(tree, m, date):
     except (SyntaxError, ValueError) as err:
         wrong(path, f"it cannot be read ({err})")
     held = {k.value: v for k, v in zip(prefixes.keys, prefixes.values) if isinstance(k, ast.Constant)}
+    keys = [k.value for k in prefixes.keys if isinstance(k, ast.Constant)]
+    twice = sorted({k for k in keys if keys.count(k) > 1})
+    if twice:
+        wrong(path, f"PREFIXES binds {', '.join(twice)} twice")
     names = [c.value for c in ast.walk(own) if isinstance(c, ast.Constant)]
     if (m.name, m.version) not in packages or m.name not in names or \
             not isinstance(held.get(m.prefix), ast.Constant) or held[m.prefix].value != m.namespace:
         wrong(path, "PACKAGES, OWN or PREFIXES lacks it")
     path = f"{ONT}/projection/skill-run/epm-config.json"
+    def once(pairs):
+        keys = [k for k, _ in pairs]
+        twice = sorted({k for k in keys if keys.count(k) > 1})
+        if twice:
+            raise ValueError(f"{', '.join(twice)} twice")
+        return dict(pairs)
     try:
-        config = json.loads(tree.read(path))
+        config = json.loads(tree.read(path), object_pairs_hook=once)
     except ValueError as err:
-        wrong(path, f"it is not JSON ({err})")
+        wrong(path, f"it is not JSON with each key once ({err})")
     if m.namespace not in config["own_namespaces"] or config["prefixes"].get(m.prefix) != m.namespace or \
             config["packages"].get(m.name) != m.version:
         wrong(path, "own_namespaces, prefixes or packages lacks it")

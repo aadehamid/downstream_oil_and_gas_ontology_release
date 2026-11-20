@@ -318,3 +318,191 @@ def test_apply_writes_registers_and_releases_the_module(tmp_path, no_global_git,
     # The same proposal again is refused: the release holds its approval record and the module.
     with pytest.raises(ChangeRefused):
         apply_cmd.apply([folder], root, say=quiet, now=NOW)
+
+
+# ---------- the first review round's findings ----------
+
+def renamed(facts, key, title):
+    """The facts of a module under another name."""
+    return [(f"module:{key}" if s.startswith("module:") else s, p, title if p == "title" else v) for s, p, v in facts]
+
+
+@needs_fresh
+@pytest.mark.parametrize("lines,facts,key,title", [
+    (TERM_LINES, TERM_FACTS, "dp", "DP"),        # the data-product module's prefix
+    (TERM_LINES, TERM_FACTS, "term", "Term"),    # the prefix of a vocabulary's own terms
+    (TERM_LINES, TERM_FACTS, "skos", "SKOS"),    # a standard prefix
+    (ITEM_LINES, ITEM_FACTS, "item", "Item"),    # the prefix of a reference table's own items
+])
+def test_split_refuses_a_module_whose_prefix_is_taken_or_reserved(lines, facts, key, title):
+    with pytest.raises(ChangeRefused, match=f"the prefix {key} that the module's name gives is taken"):
+        nm.split([nm.kgcl.read_line(line) for line in lines], renamed(facts, key, title), ROOT)
+
+
+@needs_fresh
+def test_registering_refuses_a_prefix_the_release_binds_already():
+    spec, rows = nm.split([nm.kgcl.read_line(line) for line in TERM_LINES], TERM_FACTS, ROOT)
+    spec["prefix"] = "dp"
+    module = nm.module_of(spec, rows, "NM-7", "The words.", "2026-11-20", ROOT)
+    with pytest.raises(Exception, match="binds dp twice"):
+        nm.places(ROOT).register(module, str(ROOT), "2026-11-20", write=False)
+
+
+@needs_fresh
+def test_split_refuses_a_module_key_that_starts_with_a_digit():
+    with pytest.raises(ChangeRefused, match="must start with a letter"):
+        nm.split([nm.kgcl.read_line(line) for line in TERM_LINES], renamed(TERM_FACTS, "3pl-terms", "3PL Terms"), ROOT)
+
+
+@pytest.mark.parametrize("name,message", [
+    ("3PL Terms", "must start with a letter"), ("Term", "is a prefix the ontology keeps for itself")])
+def test_the_check_refuses_a_module_name_that_gives_no_prefix(tmp_path, name, message):
+    found = report(form(tmp_path, VOCABULARY, {"N1": name}))
+    assert any(message in b for b in found.blocking), found.blocking
+
+
+@needs_fresh
+def test_compare_refuses_a_vocabulary_that_lost_its_scheme_or_has_a_wrong_notation():
+    mp = nm.patterns(ROOT)
+    spec, rows = nm.split([nm.kgcl.read_line(line) for line in TERM_LINES], TERM_FACTS, ROOT)
+    scheme = URIRef(mp.scheme(spec))
+    g = mp.build(spec, rows)
+    for triple in [t for t in g if scheme in (t[0], t[2]) or t[1] in (SKOS.notation, SKOS.inScheme)]:
+        g.remove(triple)
+    with pytest.raises(ChangeRefused, match="does not hold"):
+        nm.compare_graph(g, spec, mp)
+    g = mp.build(spec, rows)
+    pump = URIRef(mp.item_base(spec) + "pump")
+    g.remove((pump, SKOS.notation, None))
+    g.add((pump, SKOS.notation, nm_literal("pump")))
+    with pytest.raises(ChangeRefused):
+        nm.compare_graph(g, spec, mp)
+
+
+@needs_fresh
+def test_compare_refuses_an_item_value_of_the_wrong_datatype_or_language():
+    from rdflib import Literal
+    from rdflib.namespace import XSD
+    mp = nm.patterns(ROOT)
+    spec, rows = nm.split([nm.kgcl.read_line(line) for line in ITEM_LINES], ITEM_FACTS, ROOT)
+    diesel = URIRef(mp.item_base(spec) + "sample-marine-diesel")
+    lines, facts = nm.compare_graph(mp.build(spec, rows), spec, mp)
+    assert (lines, sorted(facts)) == (sorted(ITEM_LINES), sorted(ITEM_FACTS))
+    for prop, wrong in ((URIRef(PARTY + "pidxProductFamily"), nm_literal("D")),
+                        (SKOS.definition, Literal("A made-up marine diesel fuel that the made-up terminal sells to ships.", lang="fr")),
+                        (SKOS.definition, Literal("A made-up marine diesel fuel that the made-up terminal sells to ships.",
+                                                  datatype=XSD.string))):
+        g = mp.build(spec, rows)
+        g.remove((diesel, prop, None))
+        g.add((diesel, prop, wrong))
+        with pytest.raises(ChangeRefused):
+            nm.compare_graph(g, spec, mp)
+
+
+def test_the_round_trip_compares_the_properties_in_their_order():
+    lines, facts = list(ITEM_LINES), [list(f) for f in ITEM_FACTS]
+    apply_cmd._holds_the_proposal("sample-products", lines, facts, ITEM_LINES, ITEM_FACTS)
+    moved = [f for f in facts if f[1] != "property"] + [f for f in reversed(facts) if f[1] == "property"]
+    with pytest.raises(cut.CutFailed, match="in the order"):
+        apply_cmd._holds_the_proposal("sample-products", lines, moved, ITEM_LINES, ITEM_FACTS)
+
+
+TST = nm.MODULES_NS + "tst/"
+
+
+def small_release(*triples):
+    """A release of one module, tst, that holds the triples."""
+    from rdflib import Namespace
+    g = Graph()
+    g.bind("tst", Namespace(TST))
+    for s, p, o in triples:
+        g.add((URIRef(TST + s), URIRef(p), o if not isinstance(o, str) else URIRef(TST + o)))
+    return nm.Release(ROOT, graphs={"tst": g})
+
+
+def test_an_item_of_a_subclass_of_the_range_is_a_value_of_the_property():
+    from rdflib import Literal
+    release = small_release(("Pump", nm.RDFS + "subClassOf", "Equipment"), ("p-101", nm.RDF + "type", "Pump"),
+                            ("p-101", nm.SKOS + "prefLabel", Literal("P-101", lang="en")))
+    info = {"range": TST + "Equipment", "label": "equipment (tst:equipment)"}
+    assert nm._item_named(release, info, "P-101", "An item") == "tst:p-101"
+
+
+def test_a_subject_with_no_type_belongs_to_the_module_that_holds_it():
+    from rdflib import Literal
+    release = small_release(("note", nm.SKOS + "prefLabel", Literal("A note", lang="en")))
+    assert nm._owner(release, TST + "note") == ["tst"]
+
+
+def test_a_warning_or_an_info_of_a_shape_does_not_refuse_the_module():
+    from rdflib import BNode, Literal
+    report_ = Graph()
+    own = nm.MODULES_NS + "x/"
+    for severity, message in (("Warning", "a warning"), ("Info", "a note"), ("Violation", "a violation")):
+        r = BNode()
+        report_.add((r, URIRef(nm.RDF + "type"), URIRef(nm.SH + "ValidationResult")))
+        report_.add((r, URIRef(nm.SH + "focusNode"), URIRef(own + "item/a")))
+        report_.add((r, URIRef(nm.SH + "resultSeverity"), URIRef(nm.SH + severity)))
+        report_.add((r, URIRef(nm.SH + "resultMessage"), Literal(message)))
+    assert nm._violations(report_, small_release(), own) == ["item:a: a violation"]
+
+
+def test_a_closed_shape_refuses_a_citation_on_an_item_so_the_form_says_where_n12_goes():
+    """A reference table's items carry no citation: the market-data module's closed shape mkt:NoPrices refuses
+    dcterms:bibliographicCitation on a benchmark, a class a reference table may hold items of. N12 says so."""
+    from pyshacl import validate
+    from rdflib import Literal
+    mkt = "https://w3id.org/mpc/ontology/modules/market-data/"
+    shapes = Graph().parse(ROOT / cut.ONTOLOGY / "market-data" / "shapes.ttl")
+    data = Graph()
+    item = URIRef(nm.MODULES_NS + "x/item/a")
+    data.add((item, URIRef(nm.RDF + "type"), URIRef(mkt + "Benchmark")))
+    data.add((item, URIRef(mkt + "benchmarkKind"), URIRef(mkt + "kind/product-benchmark")))
+    conforms_before = validate(data, shacl_graph=shapes, advanced=True)[0]
+    data.add((item, URIRef(nm.DCTERMS + "bibliographicCitation"), Literal("A document, 2026", lang="en")))
+    report_ = validate(data, shacl_graph=shapes, advanced=True)[2]
+    assert "bibliographicCitation" in report_ and "never a price" in report_, (conforms_before, report_)
+    n12 = catalogue.load(ROOT / "kpi-intake").by_id["N12"]["feeds"]
+    assert "each term or item" not in n12 and "README" in n12
+
+
+@pytest.mark.parametrize("answers,message", [
+    ({"N7": ["", "Pump", "Rotating equipment", "", "Static equipment"]}, "comes back to"),            # self
+    ({"N7": ["Pump", "Rotating equipment", "Rotating equipment", "", "Static equipment"]}, "comes back to"),  # a cycle
+    ({"N6": ["", "Pump", "gas compressor", "fixed equipment", "exchanger; HX"]}, "the term's own name"),
+    ({"N6": ["", "pump unit; Pump Unit", "gas compressor", "fixed equipment", "exchanger; HX"]}, "named twice"),
+])
+def test_the_check_refuses_a_vocabulary_whose_hierarchy_or_other_names_do_not_reconcile(tmp_path, answers, message):
+    found = report(form(tmp_path, VOCABULARY, answers))
+    assert not found.complete
+    assert any(message in b for b in found.blocking), found.blocking
+
+
+@pytest.mark.parametrize("answers,message", [
+    ({"N11": ["A made-up fuel. |  | D", "A made-up blend. | product | F"]}, "has an empty value"),
+    ({"N10": ["Marine Diesel", "Marine-Diesel"]}, "the same short key"),
+    ({"N10": ["Marine Diesel", "--"]}, "no letter or digit"),
+])
+def test_the_check_refuses_an_item_with_an_empty_value_or_a_short_key_that_does_not_fit(tmp_path, answers, message):
+    found = report(form(tmp_path, TABLE, answers))
+    assert not found.complete
+    assert any(message in b for b in found.blocking), found.blocking
+
+
+@pytest.mark.parametrize("row", ["pump,Pump", "pump,Pump,A pump.,,,extra"])
+def test_a_table_row_with_too_few_or_too_many_cells_is_refused_in_words(tmp_path, row):
+    mp = nm.patterns(ROOT)
+    spec = {"module": "x", "pattern": "vocabulary"}
+    (tmp_path / "terms.csv").write_text("term_id,name,definition,other_names,broader\n" + row + "\n", encoding="utf-8")
+    with pytest.raises(mp.TableError, match="row 2"):
+        mp.read_table(str(tmp_path), spec)
+
+
+@pytest.mark.parametrize("title", ['Tier """ A', 'Tier "A"', "Tier ''' A"])
+def test_a_title_with_quotes_gives_builder_and_test_files_that_parse(title):
+    import ast
+    mp = nm.patterns(ROOT)
+    spec = {"module": "tier-a", "pattern": "vocabulary", "prefix": "tier_a", "title": title, "description": "D.",
+            "citation": "C."}
+    for text in (mp.builder_text(spec, "NM-8"), mp.test_text(spec, [{"term_id": "a", "name": "A"}])):
+        assert title in ast.get_docstring(ast.parse(text))

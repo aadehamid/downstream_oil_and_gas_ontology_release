@@ -399,8 +399,10 @@ def _reference_item(lists, terms, intake, report):
 
 def _new_module(lists, intake, report):
     """The checks of a new module against the lists, without the release: the name gives a short key that no module
-    has, each text fits a KGCL line, a vocabulary's terms reconcile, and each item of a reference table has one value
-    for each property. The propose command checks the rest against the release: each value, and every shape."""
+    has, that starts with a letter and that is no prefix the ontology keeps for itself; each text fits a KGCL line; a
+    vocabulary's terms, other names and broader terms reconcile; and each item of a reference table has a short key of
+    its own and one value, not empty, for each property. The propose command checks the rest against the release:
+    the prefix, each value, and every shape."""
     from kpi_store.change import ChangeRefused
     from kpi_store.change import new_module
     from kpi_store.change.kgcl import text_problem
@@ -424,6 +426,10 @@ def _new_module(lists, intake, report):
         lines.append(f'N1: the ontology has a module with the short key "{module}" already. Give the module a name of its own')
     elif len(module) > new_module.NAME_LIMIT:
         lines.append(f'N1: the short key "{module}" is longer than {new_module.NAME_LIMIT} characters. Give the module a shorter name')
+    elif not new_module.MODULE_KEY.fullmatch(module):
+        lines.append(f'N1: the short key "{module}" must start with a letter. Give the module a name that starts with a letter')
+    elif module.replace("-", "_") in new_module.RESERVED_PREFIXES:
+        lines.append(f'N1: "{module}" is a prefix the ontology keeps for itself. Give the module another name')
     if not lines and pattern == new_module.VOCABULARY:
         try:
             new_module.from_form(answers, None)
@@ -432,11 +438,22 @@ def _new_module(lists, intake, report):
     if pattern == new_module.REFERENCE_TABLE:
         props = len(rules.real_values(answers, "N9"))
         values = rules.positions(answers, "N11")
+        keys = {}
         for i, item in enumerate(rules.positions(answers, "N10")):
             cells = [c for c in values[i].split("|")] if i < len(values) and values[i].strip() else []
             if item and len(cells) != props:
                 lines.append(f'N11: "{_short(item)}" has {len(cells)} value{"s" if len(cells) != 1 else ""}, and N9 picks '
                              f'{props}. Write one value for each property, with a vertical bar (|) between them')
+            elif item and any(not c.strip() for c in cells):
+                lines.append(f'N11: "{_short(item)}" has an empty value. Write one value for each property')
+            key = new_module.slug(item)
+            if item and not key:
+                lines.append(f'N10: "{_short(item)}" has no letter or digit to make the item\'s short key from')
+            elif key in keys:
+                lines.append(f'N10: "{_short(item)}" has the same short key, {key}, as "{_short(keys[key])}". '
+                             "Give each item a name of its own")
+            elif key:
+                keys[key] = item
     report.say("Checks of the new module")
     for line in lines:
         report.say("  " + line + ".")
