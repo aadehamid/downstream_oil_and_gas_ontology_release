@@ -283,7 +283,7 @@ def phone(s):
     assert page.locator("#contents").is_hidden(), "the section list stays open after a choice"
     page.wait_for_function("document.getElementById('sections-now').textContent.startsWith('3. The facts about it')")
     assert page.evaluate("parseFloat(getComputedStyle(document.body).paddingBottom) >= document.getElementById('dock').offsetHeight - 1"), "the page does not clear the bar of file buttons"
-    for tab in ("kpi-intake", "domain-activation", "process-map-request", "term-change", "reference-item", "roles", "explainer"):
+    for tab in ("kpi-intake", "domain-activation", "process-map-request", "term-change", "reference-item", "new-module", "roles", "explainer"):
         page.locator("#view-select").select_option(tab)
         same(page.locator(f'[data-view="{tab}"]').get_attribute("aria-selected"), "true", f"the view after choosing {tab}")
         assert not page.evaluate("document.documentElement.scrollWidth > innerWidth"), f"the {tab} view scrolls sideways at 390 px"
@@ -342,7 +342,7 @@ def bad_file(s):
         ("not json at all", "it is not JSON."),
         ("[1, 2]", "it is not a JSON object."),
         ('{"format":2,"form":"kpi-intake","answers":{}}', 'its "format" is not 1.'),
-        ('{"format":1,"form":"something-else","answers":{}}', 'its "form" names none of the five forms.'),
+        ('{"format":1,"form":"something-else","answers":{}}', 'its "form" names none of the six forms.'),
         ('{"format":1,"form":"kpi-intake","answers":["2.1"]}', 'it has no "answers" object.'),
         ('{"format":1,"form":"kpi-intake","answers":{"5.1":["a",3]}}', "the answer to 5.1 is neither a text nor a list of texts."),
         ('{"format":1,"form":"kpi-intake","answers":{},"comment":{"a":1}}', '"comment" is not a text.'),
@@ -452,7 +452,7 @@ def bad_draft(s):
     page = s.open()
     good = {"answers": {"2.1": "Tank Turnover"}, "request": {}, "sign_offs": {}, "consulted": {}, "example_of": "", "comment": ""}
     empty = dict(good, answers={})
-    forms = ("kpi-intake", "domain-activation", "process-map-request", "term-change", "reference-item")
+    forms = ("kpi-intake", "domain-activation", "process-map-request", "term-change", "reference-item", "new-module")
 
     def seeded(**changed):
         state = {form: empty for form in forms}

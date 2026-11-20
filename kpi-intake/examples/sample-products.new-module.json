@@ -1,0 +1,27 @@
+{
+  "format": 1,
+  "form": "new-module",
+  "catalogue_version": "1.2",
+  "kpi_name": "Sample Products",
+  "request": {"number": "NM-2026-002", "date": "2026-11-20", "requester_role": "Program manager", "invited": "Data Owner, Ontology Owner"},
+  "answers": {
+    "N1": "Sample Products",
+    "N2": "The made-up products that a made-up marine terminal sells, beside the products the party module lists.",
+    "N3": "reference-table",
+    "N8": "https://w3id.org/mpc/ontology/modules/party/Product",
+    "N9": ["http://www.w3.org/2004/02/skos/core#definition", "http://www.w3.org/2004/02/skos/core#inScheme",
+           "https://w3id.org/mpc/ontology/modules/party/pidxProductFamily"],
+    "N10": ["Sample Marine Diesel", "Sample Bunker Blend"],
+    "N11": ["A made-up marine diesel fuel that the made-up terminal sells to ships. | product | D",
+            "A made-up blend of residual fuel that the made-up terminal sells to ships. | product | F"],
+    "N12": ["A made-up product list of a made-up marine terminal, 2026-11-20"]
+  },
+  "sign_offs": {
+    "data-owner": {"name": "Placeholder for the Data Owner's name", "date": "2026-11-20"},
+    "ontology-owner": {"name": "Placeholder for the Ontology Owner's name", "date": "2026-11-20"},
+    "architect": {"name": "Placeholder for the Architect's name", "date": "2026-11-20"}
+  },
+  "consulted": {},
+  "example_of": "",
+  "comment": "A made-up example: the module, its products, their values and the document are made up. The signer names are placeholders."
+}

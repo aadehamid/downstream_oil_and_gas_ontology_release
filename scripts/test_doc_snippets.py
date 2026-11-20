@@ -1381,6 +1381,8 @@ def test_the_contexts_that_run_everywhere_need_no_variable_and_the_others_name_t
         "domain-activation": ("DOC_SNIPPETS_SLOW",),
         "process-map-request": ("DOC_SNIPPETS_SLOW",),
         "new-process": ("DOC_SNIPPETS_SLOW",),
+        "new-vocabulary": ("DOC_SNIPPETS_SLOW",),
+        "new-reference-table": ("DOC_SNIPPETS_SLOW",),
         "stores": ("KPI_STORE_TEST_FUSEKI_URL", "KPI_STORE_TEST_NEO4J_URI"),
         "databricks-free": ("KPI_STORE_TEST_DATABRICKS_PROFILE",),
         "reasoner": ("KPI_STORE_TEST_ROBOT_JAR",),

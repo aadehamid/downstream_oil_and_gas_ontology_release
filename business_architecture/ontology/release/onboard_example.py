@@ -8,7 +8,8 @@ and tested from start to end.
 The module is an example and no part of the ontology: three made-up areas, each a concept that covers one process
 of the core module. `--write` writes the module's own folder and then adds the module to every place the release
 lists its modules. It does not build or release anything: the guide's next commands do that. Read each function
-below as the pattern for a module of your own: one function per place.
+below, and register_module.py's functions, as the pattern for a module of your own: register_module.py has one
+function per place, and the new-module form's apply command uses the same functions.
 
 Every change is worked out before the first file is written, so a place that has moved stops the command with
 nothing changed. The command refuses a release that holds the module already. Exit 0 when done, 1 when refused.
@@ -16,10 +17,13 @@ nothing changed. The command refuses a release that holds the module already. Ex
 import argparse
 import datetime
 import os
-import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import register_module  # noqa: E402
+from register_module import Refused, Tree  # noqa: E402,F401  (update_examples.py imports both from here)
+
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 ONT = "business_architecture/ontology"
 MODULE = "sample-area"
@@ -29,10 +33,6 @@ PREFIX = "sa"
 QUESTION = "Which processes does each sample area cover?"
 APPROVAL = f"approvals/sample-area-{VERSION}.md"
 APPROVAL_WORDS = "Approved as the first release of the made-up sample-area module."
-
-
-class Refused(Exception):
-    """The release holds the module already, or a place is not where this example expects it. Nothing changed."""
 
 
 # ---- the module's own folder ------------------------------------------------------------------------
@@ -245,211 +245,48 @@ if __name__ == "__main__":
     unittest.main()
 '''
 
-QUERY = f"""# Q58 {QUESTION}
-PREFIX {PREFIX}: <{NAMESPACE}>
+QUERY = f"""PREFIX {PREFIX}: <{NAMESPACE}>
 SELECT ?area ?process WHERE {{
   ?area {PREFIX}:coversProcess ?process .
 }}
 """
 
 
-# ---- helpers ----------------------------------------------------------------------------------------
+# ---- the module, as the places need it ------------------------------------------------------------
 
-class Tree:
-    """The release's files as this run reads and changes them. Nothing is written until save().
-
-    Every path is checked before it is read and again before it is written (inside): a file that is a link, or
-    that lies under a folder that is a link, could send a write to a place outside the copy, so the run refuses
-    it. The copy's own top folder may be reached through a link: that is the reader's choice. The checks read the
-    disk as it is at that moment. They do not lock the copy: do not let another program change it during a run."""
-
-    def __init__(self, root):
-        self.root, self.texts, self.places = root, {}, []
-
-    def inside(self, path):
-        """The full path of a file of the copy. Raises Refused when the path, or a folder between the top folder
-        and it, is a link, or when the path does not resolve to a place inside the top folder."""
-        at = self.root
-        for part in path.replace("\\", "/").split("/"):
-            at = os.path.join(at, part)
-            if os.path.islink(at) or getattr(os.path, "isjunction", lambda p: False)(at):   # isjunction: Windows, Python 3.12
-                raise Refused(f"{os.path.relpath(at, self.root).replace(os.sep, '/')} is a link. This command changes only "
-                              "files inside the copy, so it does not follow a link. Remove the link and run the command again")
-        top, full = os.path.realpath(self.root), os.path.realpath(os.path.join(self.root, path))
-        if os.path.commonpath([top, full]) != top:
-            raise Refused(f"{path} is not inside the copy")
-        # A hard link is a second name of one file: a write through the name in the copy would change the other too.
-        if os.path.isfile(full) and os.stat(full).st_nlink > 1:
-            raise Refused(f"{path} has a second name on this disk (a hard link). This command changes only files inside "
-                          "the copy. Replace it with a copy of its own and run the command again")
-        return os.path.join(self.root, path)
-
-    def read(self, path):
-        if path not in self.texts:
-            full = self.inside(path)
-            if not os.path.isfile(full):
-                raise Refused(f"{path} is missing")
-            with open(full, encoding="utf-8", newline="") as f:
-                self.texts[path] = f.read()
-        return self.texts[path]
-
-    def new(self, path, text):
-        if os.path.lexists(self.inside(path)):
-            raise Refused(f"{path} exists already")
-        self.texts[path] = text
-
-    def after(self, path, pattern, added):
-        """Adds text right after the one place the pattern matches. A pattern that matches no place, or two,
-        stops the run: the file is not as this example expects it."""
-        text = self.read(path)
-        found = list(re.finditer(pattern, text, re.M))
-        if len(found) != 1:
-            raise Refused(f"{path}: expected one place that matches {pattern!r}, found {len(found)}")
-        self.texts[path] = text[:found[0].end()] + added + text[found[0].end():]
-
-    def save(self):
-        for path in self.texts:   # every path is checked before the first write
-            self.inside(path)
-        for path, text in self.texts.items():
-            os.makedirs(os.path.dirname(os.path.join(self.root, path)), exist_ok=True)
-            full = self.inside(path)   # and again right before its own write, after its folders exist
-            with open(full, "w", encoding="utf-8", newline="") as f:
-                f.write(text)
-
-
-# ---- one function per place -------------------------------------------------------------------------
-
-def module_folder(tree, date):
-    """The module's own folder: README, vocabulary, shapes, the table, the builder and the test."""
-    for name, text in (("README.md", README), ("vocabulary.ttl", VOCABULARY), ("shapes.ttl", SHAPES),
-                       ("sample-areas.csv", TABLE), ("build_sample_areas.py", BUILDER), ("test_sample_areas.py", TEST)):
-        tree.new(f"{ONT}/{MODULE}/{name}", text)
-    return f"{ONT}/{MODULE}/"
-
-
-def approval_file(tree, date):
-    """The sentence that approved the first release. The module's entry names this file."""
-    tree.new(f"{ONT}/{APPROVAL}", f"# Approval of {MODULE} {VERSION}\n\n{date}. The ontology owner: \"{APPROVAL_WORDS}\"\n\n"
-             "The ontology owner owns the module until they name a module owner.\n")
-    return f"{ONT}/{APPROVAL}"
-
-
-def release_builder(tree, date):
-    """An entry in MODULES: what the package is built from, its version, who approved it and what it requires."""
-    entry = f'''
-    "{MODULE}": {{
-        "title": "Sample Area Module",
-        "description": "Three made-up areas as a code list, and the process each covers. An example of onboarding a module.",
-        "version": "{VERSION}", "stage": None, "approver": "the ontology owner", "issued": "{date}",
-        "approval": ("{APPROVAL}", "{APPROVAL_WORDS}"),
-        "parts": ["{MODULE}/vocabulary.ttl", "{MODULE}/sample-areas.ttl"],
-        "shapes": ["{MODULE}/shapes.ttl"],
-        "depends_on": ["core"],
-        "decisions": ["{APPROVAL}"],
-    }},'''
-    tree.after(f"{ONT}/release/build_module.py", r'^    "lane": \{\n(?:.*\n)*?    \},', entry)
-    return f"{ONT}/release/build_module.py"
-
-
-def changelog(tree, date):
-    """The module's changelog: a title line, then the section of the first release."""
-    tree.new(f"{ONT}/releases/{MODULE}/CHANGELOG.md",
-             f"# {MODULE} changelog\n\n## {VERSION} ({date})\n\nThe module's first release, a major. Approved by the ontology owner "
-             f"({APPROVAL}). It holds three made-up areas as a code list and the process each covers. It requires the newest core.\n\n"
-             "### Known gaps\n\nNone.\n")
-    return f"{ONT}/releases/{MODULE}/CHANGELOG.md"
-
-
-def check_script(tree, date):
-    """Three lines: the package's --verify, the builder's --verify, and the test file in the test list."""
-    path = "scripts/check.sh"
-    tree.after(path, r"^\(cd \$ONT/release && run with_deps python build_module\.py lane --verify\)\n",
-               f"(cd $ONT/release && run with_deps python build_module.py {MODULE} --verify)\n")
-    tree.after(path, r"^\(cd \$ONT/lane && run with_deps python build_lanes\.py --verify\)\n",
-               f"(cd $ONT/{MODULE} && run with_deps python build_sample_areas.py --verify)\n")
-    tree.after(path, r"^  business_architecture/ontology/lane/test_lanes\.py \\\n",
-               f"  business_architecture/ontology/{MODULE}/test_sample_areas.py \\\n")
-    return path
-
-
-def projection_lists(tree, date):
-    """The projection's package list, its list of own namespaces and its fixed prefixes."""
-    path = f"{ONT}/projection/pipeline.py"
-    tree.after(path, r'\("lane", "[^"]+"\),', f' ("{MODULE}", "{VERSION}"),')
-    tree.after(path, r'"system", "lane",', f' "{MODULE}",')
-    tree.after(path, r'^    "lane": "https://w3id\.org/mpc/ontology/modules/lane/",\n', f'    "{PREFIX}": "{NAMESPACE}",\n')
-    return path
-
-
-def projection_config(tree, date):
-    """The same three facts in the skill's projection configuration."""
-    path = f"{ONT}/projection/skill-run/epm-config.json"
-    tree.after(path, r'^    "https://w3id\.org/mpc/ontology/modules/lane/",\n', f'    "{NAMESPACE}",\n')
-    tree.after(path, r'^    "lane": "https://w3id\.org/mpc/ontology/modules/lane/",\n', f'    "{PREFIX}": "{NAMESPACE}",\n')
-    tree.after(path, r'^    "lane": "\d[^"]*",\n', f'    "{MODULE}": "{VERSION}",\n')
-    return path
-
-
-def regression(tree, date):
-    """The module's competency question: its row in expected.csv, its query, and the module's files in run.py."""
-    tree.new(f"{ONT}/regression/queries/q58-sample-area-processes.rq", QUERY)
-    expected = tree.read(f"{ONT}/regression/expected.csv")
-    end = "\r\n" if expected.endswith("\r\n") else "\n"
-    tree.texts[f"{ONT}/regression/expected.csv"] = expected + f"58,answerable,q58-sample-area-processes.rq,{end}"
-    tree.after(f"{ONT}/regression/run.py", r'^    \+ \[os\.path\.join\(HERE, "\.\.", "lane", n\) for n in \("vocabulary\.ttl", "lanes\.ttl"\)\] \\\n',
-               f'    + [os.path.join(HERE, "..", "{MODULE}", n) for n in ("vocabulary.ttl", "sample-areas.ttl")] \\\n')
-    return f"{ONT}/regression/"
-
-
-def shape_list(tree, date):
-    """The module's shapes in the test that runs every module's shapes over the whole graph."""
-    tree.after(f"{ONT}/validation/test_all_module_shapes.py", r'"lane/shapes\.ttl",', f' "{MODULE}/shapes.ttl",')
-    return f"{ONT}/validation/test_all_module_shapes.py"
-
-
-def questions(tree, date):
-    """The new question, numbered after the last, in a section of its own."""
-    path = f"{ONT}/competency-questions.md"
-    text = tree.read(path)
-    tree.texts[path] = text.rstrip("\n") + (f"\n\n## XIV. The made-up sample areas (added {date})\nThe question of the made-up "
-                                             f"`{MODULE}` module, which `release/onboard_example.py` adds as an example.\n58. {QUESTION}\n")
-    return path
-
-
-def modules_guide(tree, date):
-    """A row in the table of what each package is built from, and a section with an example from the release."""
-    path = f"{ONT}/MODULES.md"
-    tree.after(path, r"^\| `lane` \|.*\n",
-               f"| `{MODULE}` | A made-up example of a new module | `{MODULE}/vocabulary.ttl`, `{MODULE}/sample-areas.ttl` | `{MODULE}/shapes.ttl` |\n")
-    section = (f"### {MODULE}: a made-up example of a new module\n\nThree made-up areas are a code list, and each covers one process. "
-               f"`release/onboard_example.py` adds the module as an example of onboarding. Here the area is the subject: "
-               f"`coversProcess` points from the area to core.\n\n<!-- module: {MODULE} -->\n```turtle parse\n"
-               f"@prefix proc: <https://w3id.org/mpc/ontology/process/> .\n@prefix {PREFIX}: <{NAMESPACE}> .\n"
-               f"@prefix area: <{NAMESPACE}area/> .\n\narea:north-yard {PREFIX}:coversProcess proc:CM-1-2-1 .\n"
-               f"area:south-yard {PREFIX}:coversProcess proc:CM-1-2-2 .\n```\n\n")
-    tree.after(path, r"^### lane: .*\n(?:.*\n)*?(?=^### )", section)
-    return path
-
-
-def pages(tree, date):
-    """The module's folder in the list of READMEs that get an HTML page."""
-    tree.after("scripts/build_docs_html.py", r'^MODULE_READMES = \["kpi", "lane",', f' "{MODULE}",')
-    return "scripts/build_docs_html.py"
-
-
-PLACES = (module_folder, approval_file, release_builder, changelog, check_script, projection_lists, projection_config,
-          regression, shape_list, questions, modules_guide, pages)
+def module(date):
+    """The made-up module as release/register_module.py registers it: one function per place there."""
+    return register_module.Module(
+        name=MODULE, version=VERSION, prefix=PREFIX, title="Sample Area Module",
+        description="Three made-up areas as a code list, and the process each covers. An example of onboarding a module.",
+        approver="the ontology owner", approval=(APPROVAL, APPROVAL_WORDS),
+        parts=[f"{MODULE}/vocabulary.ttl", f"{MODULE}/sample-areas.ttl"], shapes=[f"{MODULE}/shapes.ttl"],
+        depends_on=["core"], decisions=[APPROVAL],
+        files={"README.md": README, "vocabulary.ttl": VOCABULARY, "shapes.ttl": SHAPES, "sample-areas.csv": TABLE,
+               "build_sample_areas.py": BUILDER, "test_sample_areas.py": TEST},
+        builder="build_sample_areas.py", test="test_sample_areas.py",
+        changelog=(f"# {MODULE} changelog\n\n## {VERSION} ({date})\n\nThe module's first release, a major. Approved by the "
+                   f"ontology owner ({APPROVAL}). It holds three made-up areas as a code list and the process each covers. "
+                   "It requires the newest core.\n\n### Known gaps\n\nNone.\n"),
+        question=QUESTION, question_heading="The made-up sample areas",
+        question_intro=f"The question of the made-up `{MODULE}` module, which `release/onboard_example.py` adds as an example.",
+        query_name="sample-area-processes", query=QUERY,
+        regression_files=["vocabulary.ttl", "sample-areas.ttl"], purpose="A made-up example of a new module",
+        modules_section=(f"### {MODULE}: a made-up example of a new module\n\nThree made-up areas are a code list, and each "
+                         "covers one process. `release/onboard_example.py` adds the module as an example of onboarding. Here "
+                         "the area is the subject: `coversProcess` points from the area to core.\n\n"
+                         f"<!-- module: {MODULE} -->\n```turtle parse\n"
+                         f"@prefix proc: <https://w3id.org/mpc/ontology/process/> .\n@prefix {PREFIX}: <{NAMESPACE}> .\n"
+                         f"@prefix area: <{NAMESPACE}area/> .\n\narea:north-yard {PREFIX}:coversProcess proc:CM-1-2-1 .\n"
+                         f"area:south-yard {PREFIX}:coversProcess proc:CM-1-2-2 .\n```\n\n"),
+        approval_text=(f"# Approval of {MODULE} {VERSION}\n\n{date}. The ontology owner: \"{APPROVAL_WORDS}\"\n\n"
+                       "The ontology owner owns the module until they name a module owner.\n"))
 
 
 def onboard(root=ROOT, date=None, write=False, say=print):
     """Registers the module in every place, or lists the places. Raises Refused with nothing changed."""
     date = date or datetime.date.today().isoformat()
-    if os.path.exists(os.path.join(root, ONT, MODULE)) or os.path.exists(os.path.join(root, ONT, "releases", MODULE)):
-        raise Refused(f"this release holds the module {MODULE} already; nothing was changed")
-    tree = Tree(root)
-    done = [place(tree, date) for place in PLACES]
-    if write:
-        tree.save()
+    done = register_module.register(module(date), root, date, write=write)
     for path in done:
         say(f"{'registered in' if write else 'would register in'} {path}")
     return done

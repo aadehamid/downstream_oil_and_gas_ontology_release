@@ -275,6 +275,11 @@ def build(root, release=None):
     areas = _business_areas(release, processes)
     modules = [{"id": m, "label": m} for m in sorted(release.versions)]
     sources = _sources(release)
+    # The classes and properties a new module's reference table may name (kpi_store/change/new_module.py).
+    from kpi_store.change import new_module
+    held = new_module.Release(root, graphs=release.graphs)
+    classes = _sorted(new_module.offered_classes(held))
+    properties = _sorted(new_module.offered_properties(held, classes))
     lists = {
         "business-areas": areas,
         "processes": processes,
@@ -292,6 +297,8 @@ def build(root, release=None):
         "system-sources": _system_sources(release, sources),
         "table-sources": _table_sources(release, sources),
         "modules": modules,
+        "classes": classes,
+        "properties": properties,
         "areas-and-modules": [{"id": a["id"], "label": "Business area: " + a["label"]} for a in areas]
                              + [{"id": "module:" + m["id"], "label": "Module: " + m["label"]} for m in modules],
     }

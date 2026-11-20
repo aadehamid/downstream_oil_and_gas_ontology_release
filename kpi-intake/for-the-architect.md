@@ -29,6 +29,7 @@ The ontology has no place for a KPI's domain yet, and holds no list of domains. 
 | P | Process map request | a business area, process, step or role that the process map lacks |
 | T | Term change | a change to a measure the ontology already holds |
 | R | Reference item | a new system or a new table in a module that the ontology already holds |
+| N | New module | a new module of one of two patterns: a vocabulary or a reference table |
 
 ## What each question feeds
 
@@ -147,6 +148,23 @@ The ontology has no place for a KPI's domain yet, and holds no list of domains. 
 | R7 | Which other documents does the description of the system rest on? | Optional if R2 is "a system that a document names: an application, an office tool or a working document" | More `dcterms:source` links. |
 | R8 | Which system's table does the table copy? | Required if R2 is "a table in databricks that copies a table of a system (a replica)" | `dp:copiesSystem`. The table is a replica: `dp:layer` is `layer:replica`. |
 | R9 | Which document records the table? | Required if R2 is "a table in databricks that copies a table of a system (a replica)" | `dcterms:source`. |
+
+### New module
+
+| No. | Question | Rule | Feeds |
+|---|---|---|---|
+| N1 | What is the new module called? | Required | The module's title, `dcterms:title` of its package, and its short key. |
+| N2 | What does the module cover? Say it in one or two sentences. | Required | `dcterms:description` of the package, and the definition of a vocabulary's concept scheme. |
+| N3 | Which pattern does the module follow? | Required | The module's pattern: release/module_patterns.py builds and checks each one. |
+| N4 | Which terms does the vocabulary hold? Name each one. | Required if N3 is "a vocabulary: terms with a definition, other names and a place in a hierarchy" | `skos:prefLabel` of each term (the KGCL line `create node`). The term's short key is made from its name. |
+| N5 | For each term, what does it mean? Say it in one or two sentences, without repeating its name. | Required if N3 is "a vocabulary: terms with a definition, other names and a place in a hierarchy" | `skos:definition` (the KGCL line `add definition`). |
+| N6 | For each term, which other names or short forms do people use? Put a semicolon between two names. | Optional if N3 is "a vocabulary: terms with a definition, other names and a place in a hierarchy" | `skos:altLabel`, one for each name (the KGCL line `create exact synonym`). |
+| N7 | For each term, which term of this list is it a kind of? Leave it empty for a term at the top. | Optional if N3 is "a vocabulary: terms with a definition, other names and a place in a hierarchy" | `skos:broader` (the KGCL line `create edge ... skos:broader ...`), and `skos:topConceptOf` for a term at the top. |
+| N8 | Which class of the ontology are the items of? | Required if N3 is "a reference table: items of a class the ontology holds, each with values of properties the ontology holds" | `rdf:type` of each item (the KGCL line `create edge ... rdf:type ...`). |
+| N9 | Which properties does each item have? Pick them in the order of the table's columns. | Optional if N3 is "a reference table: items of a class the ontology holds, each with values of properties the ontology holds" | One value of each property for each item: a KGCL line for a definition, an other name and a link to an item, and a row of facts.csv for a text or a value. |
+| N10 | Which items does the table hold? Name each one. | Required if N3 is "a reference table: items of a class the ontology holds, each with values of properties the ontology holds" | The name of each item (the KGCL line `create node`). The item's short key is made from its name. |
+| N11 | For each item, what are its values of the properties of N9? Write them in the order of N9, with a vertical bar (\|) between two values. | Optional if N3 is "a reference table: items of a class the ontology holds, each with values of properties the ontology holds" | The item's value of each property of N9. |
+| N12 | Which documents describe the module's content? Name each one with its date. | Required | `dcterms:bibliographicCitation` of each term or item, in words. |
 
 ## The facts one new KPI needs, and the questions that supply them
 

@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "properties": {
     "format": {"const": 1, "description": "The version of this file format."},
-    "form": {"enum": ["kpi-intake", "domain-activation", "process-map-request", "term-change", "reference-item"], "description": "Which of the five forms the file holds."},
+    "form": {"enum": ["kpi-intake", "domain-activation", "process-map-request", "term-change", "reference-item", "new-module"], "description": "Which of the six forms the file holds."},
     "catalogue_version": {"type": "string", "description": "The version of catalogue.toml the form was built from."},
     "kpi_name": {"type": "string", "description": "The answer to question 2.1, repeated so that a person can tell files apart. For the other forms, the answer to their first question; for a term change, the name of the measure it changes."},
     "request": {
