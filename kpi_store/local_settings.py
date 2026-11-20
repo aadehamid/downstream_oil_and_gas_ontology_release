@@ -9,7 +9,8 @@ The file's path comes from --stores, or from the environment variable KPI_STORE_
 is the example to copy. A password is held as a Secret, whose text form is ***, so no message can print it.
 
 Six commands read this file first: the runner, the setup check, the Fuseki and Neo4j loads, the copy to
-Enterprise and the sync check. The cut tool and the questions do not read it. It is not the same file as
+Enterprise and the sync check. The propose command reads its [ai] table, and only with --ai. The cut tool and the
+questions do not read it. It is not the same file as
 kpi_store.toml, which describes the Databricks environment, travels to the volume and holds no password
 (kpi_store.settings). No command copies or uploads this file. This module only reads: it opens no connection
 and writes nothing.
