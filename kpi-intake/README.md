@@ -2,7 +2,7 @@
 
 Start here when the business wants a new KPI in the KPI Store. The pack holds the form that collects what the ontology needs for one KPI, a check that says whether a filled form is complete, and two filled examples.
 
-The pack does not change the ontology. A complete, signed KPI form goes to the Architect, who adds the KPI by hand with the release steps of [`HOW-TO-UPDATE.md`](../HOW-TO-UPDATE.md). A complete, signed term change, for a measure the ontology already holds, goes through two commands, propose and apply, and nobody edits a file: "The term change" below says how. A complete, signed reference item, for a new system or a new table, goes through the same two commands: "The reference item" below says how. Commands for a new KPI are planned for a later step.
+The pack does not change the ontology. A complete, signed KPI form goes through two commands, propose and apply, and nobody edits a file: "What happens after" below says how. A complete, signed term change, for a measure the ontology already holds, goes through the same two commands: "The term change" below says how. A complete, signed reference item, for a new system or a new table, goes through them too: "The reference item" below says how.
 
 ## What is in this folder
 
@@ -150,7 +150,7 @@ Checks against the ontology
 Sign-off
 ...
 Result: the intake is complete and signed.
-This check changes nothing in the ontology. The Architect applies a complete intake by hand, with HOW-TO-UPDATE.md.
+This check changes nothing in the ontology. The Architect turns a complete KPI intake into a proposal with python -m kpi_store.propose <this file>, as HOW-TO-UPDATE.md says.
 ```
 
 A workbook is checked the same way:
@@ -165,7 +165,7 @@ KPI intake check: R&M Margin per Barrel
 Kind of measure: operational metric (decided by 4.6, test 5).
 ...
 Result: the intake is complete and signed.
-This check changes nothing in the ontology. The Architect applies a complete intake by hand, with HOW-TO-UPDATE.md.
+This check changes nothing in the ontology. The Architect turns a complete KPI intake into a proposal with python -m kpi_store.propose <this file>, as HOW-TO-UPDATE.md says.
 ```
 
 Add `--report` to also write the report beside the file, under the same name with `.check.txt` in place of `.json`. The report of a workbook also says "workbook" and names the form: `rm-margin-per-barrel.xlsx` gives `rm-margin-per-barrel.kpi-intake.workbook.check.txt`. So an answers file and a workbook of one KPI, and two forms of one workbook, never share a report. The Architect keeps that report with the file in `3-checked`.
@@ -274,9 +274,10 @@ Check a reference item as any other form: `python -m kpi_store.intake check <the
 For a KPI form:
 
 1. The Architect reads [`for-the-architect.md`](for-the-architect.md), which says what each answer feeds.
-2. The Architect adds the KPI to the `kpi` module's tables and follows "The release steps" in [`HOW-TO-UPDATE.md`](../HOW-TO-UPDATE.md). A KPI with a value stream step, a new view or a new source document also needs a release of `value-stream`, `data-product` or `integration`.
-3. The Architect rebuilds this pack, so that the lists offer the new KPI.
-4. Keep the filled form. It holds the signers' names and the answers that the ontology has no place for.
+2. The Architect turns the form into a proposal with `python -m kpi_store.propose <the file>` and applies it with `python -m kpi_store.apply <the proposal folder>`, with the steps of "Add a KPI with the KPI intake form" in [`HOW-TO-UPDATE.md`](../HOW-TO-UPDATE.md). The proposal holds what the `kpi` module records: the KPI's name, definition, other names and links as KGCL lines in `change.kgcl`, and the text facts that KGCL cannot write, such as how it is worked out, in `facts.csv`. The apply releases `kpi` and rebuilds this pack, so that the lists offer the new KPI.
+3. The proposal leaves out the answers that feed another module: what the KPI counts and leaves out (2.3, 2.4), the value stream steps (6.3 to 6.5), the data product and the view (6.6, 7.1 to 7.9) and the market series (6.7). Its `summary.txt` names each one it leaves out. They need a release of `population`, `value-stream`, `data-product` or `market-data`, by hand with "The release steps".
+4. The propose command refuses a form whose roles in 6.1 are not planning personas, whose 3.5 names more than one document or one that 3.5 does not offer and `kpi/measure-sources.csv` does not hold, or whose name or other names a measure has already. When the document of 3.5 has no row in `kpi/measure-sources.csv` yet, the apply adds one, with the document's title in the ontology.
+5. Keep the filled form. It holds the signers' names and the answers that the ontology has no place for.
 
 Keep your organization's filled forms in the shared folder, as "The shared folder" above says. A client's filled form does not belong in the release folder.
 

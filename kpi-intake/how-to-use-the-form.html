@@ -426,11 +426,11 @@ KPI-intake is ready</pre>
     <pre class="out" data-snippet="text expect">KPI intake check: Crack Spreads Pricing
 ...
 Result: the intake is complete and signed.
-This check changes nothing in the ontology. The Architect applies a complete intake by hand, with HOW-TO-UPDATE.md.
+This check changes nothing in the ontology. The Architect turns a complete KPI intake into a proposal with python -m kpi_store.propose &lt;this file&gt;, as HOW-TO-UPDATE.md says.
 The report is also in crack-spreads-pricing.check.txt, beside the file.</pre>
     <p>For a file in the shared folder, name it where it is:</p>
     <pre data-snippet="powershell run=shared-drive os=windows status-only">python -m kpi_store.intake check "S:/Commercial Planning/Shared/KPI-intake/2-ready-for-check/crack-spreads-pricing.kpi-intake.json" --report</pre>
-    <p>The check changes nothing in the ontology. Add a complete KPI by hand, with the steps of <span class="file">HOW-TO-UPDATE.md</span> in the release.</p>
+    <p>The check changes nothing in the ontology. The Architect turns a complete KPI into a proposal and applies it, with the steps of "Add a KPI with the KPI intake form" in <span class="file">HOW-TO-UPDATE.md</span> in the release.</p>
 
     <h3>When the check says the pick lists are older than the release</h3>
     <p>A module of the ontology was released after the form was built. Rebuild the form and copy it to the shared folder again:</p>

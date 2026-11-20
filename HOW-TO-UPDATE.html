@@ -164,6 +164,7 @@ figure.pic figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
 <li class="l2"><a href="#the-release-steps">The release steps</a></li>
 <li class="l2"><a href="#change-a-measure-with-the-term-change-form">Change a measure with the term-change form</a></li>
 <li class="l2"><a href="#add-a-system-or-a-table-with-the-reference-item-form">Add a system or a table with the reference-item form</a></li>
+<li class="l2"><a href="#add-a-kpi-with-the-kpi-intake-form">Add a KPI with the KPI intake form</a></li>
 <li class="l2"><a href="#change-a-concept-s-definition">Change a concept's definition</a></li>
 <li class="l2"><a href="#add-a-concept-or-a-property">Add a concept or a property</a></li>
 <li class="l3"><a href="#a-new-role-or-a-new-system">A new role or a new system</a></li>
@@ -203,7 +204,7 @@ figure.pic figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
 <p>Each section is a list of steps. Do them in order. The document test runs every command of this guide, except where a section says otherwise.</p>
 <p>If your copy includes <code>viewer/index.html</code>, that page shows the ontology as you received it. Changing a package does not refresh the page.</p>
 <h2 id="the-words-this-guide-uses">The words this guide uses<a class="hl" href="#the-words-this-guide-uses" aria-label="Link to this section">#</a></h2>
-<div class="tblwrap"><table><thead><tr><th>Word</th><th>Meaning</th></tr></thead><tbody><tr><td>Module</td><td>One part of the ontology with its own version, such as <code>kpi</code>.</td></tr><tr><td>Package</td><td>One released version of a module: the folder <code>business_architecture/ontology/releases/</code>, then the module, then the version. A package never changes after its release. A change makes a new package.</td></tr><tr><td>Release folder</td><td>The top folder of your copy, which holds <code>README.md</code> and <code>kpi_store</code>.</td></tr><tr><td>Ontology owner</td><td>The person your organisation names to decide what the ontology means.</td></tr><tr><td>Module owner</td><td>The person the ontology owner names for one module. Until a module has an owner, the ontology owner decides for it.</td></tr><tr><td>Correction version</td><td>A version that the cut tool wrote from a cleared report. Its name carries a marker: <code>1.2.1-correction.1</code>.</td></tr><tr><td>Proposal</td><td>A folder that the propose command writes from one signed term-change or reference-item form: the changes as KGCL lines, the approval record and a summary. The apply command applies it.</td></tr><tr><td>Route</td><td>Whether a change is released as a patch, a minor or a major. "Patch, minor or major" below says which is which.</td></tr></tbody></table></div>
+<div class="tblwrap"><table><thead><tr><th>Word</th><th>Meaning</th></tr></thead><tbody><tr><td>Module</td><td>One part of the ontology with its own version, such as <code>kpi</code>.</td></tr><tr><td>Package</td><td>One released version of a module: the folder <code>business_architecture/ontology/releases/</code>, then the module, then the version. A package never changes after its release. A change makes a new package.</td></tr><tr><td>Release folder</td><td>The top folder of your copy, which holds <code>README.md</code> and <code>kpi_store</code>.</td></tr><tr><td>Ontology owner</td><td>The person your organisation names to decide what the ontology means.</td></tr><tr><td>Module owner</td><td>The person the ontology owner names for one module. Until a module has an owner, the ontology owner decides for it.</td></tr><tr><td>Correction version</td><td>A version that the cut tool wrote from a cleared report. Its name carries a marker: <code>1.2.1-correction.1</code>.</td></tr><tr><td>Proposal</td><td>A folder that the propose command writes from one signed KPI intake, term-change or reference-item form: the changes as KGCL lines, the approval record and a summary, and for a new KPI a table of the facts KGCL cannot write. The apply command applies it.</td></tr><tr><td>Route</td><td>Whether a change is released as a patch, a minor or a major. "Patch, minor or major" below says which is which.</td></tr></tbody></table></div>
 <p>The ontology owner approves every major release and every module's first release. The module owner approves minor and patch releases. The person who runs the cut approves a correction, at the cut's prompt.</p>
 <h2 id="before-you-change-anything">Before you change anything<a class="hl" href="#before-you-change-anything" aria-label="Link to this section">#</a></h2>
 <p>You need the machine that the runbook set up. The commands start in the release folder unless a step moves you. They start Python with <code>python</code>, as the runbook does.</p>
@@ -218,7 +219,7 @@ all checks passed</code></pre></li></ol>
 <p>Do not edit files while the check runs. It compares the folder at its start and its end, and a change fails the run.</p>
 <p>Keep the release folder in Git. The runbook's section "Keep the release folder in Git" has the commands and the rules: commit the release as it was unpacked, before any change, and commit only the release's files and your changes to them. Git then keeps your history, the cut tool commits and tags each correction, and the runner zips exactly the files that Git tracks. Keep the file <code>.gitattributes</code>: without it, Git for Windows checks text files out with other line ends, and the packages' hashes differ. A plain folder, one with no <code>.git</code> folder, works too; there the cut makes no commit and the runner zips every file except caches. In a Git folder, run <code>git add -A</code> before the check, because one test reads which pages Git tracks, and commit before a run that cuts.</p>
 <h2 id="choose-the-way-a-change-goes">Choose the way a change goes<a class="hl" href="#choose-the-way-a-change-goes" aria-label="Link to this section">#</a></h2>
-<div class="tblwrap"><table><thead><tr><th>What changed</th><th>The way</th><th>Section</th></tr></thead><tbody><tr><td>Databricks renamed or removed a column, a table or a view that the ontology names.</td><td>A correction, through the report and the cut.</td><td>"A correction through the loop"</td></tr><tr><td>A column's spelling differs only in case.</td><td>The same correction.</td><td>"A correction through the loop"</td></tr><tr><td>A report row says "needs a minor version": a measure link with its filter, a new object, a new table edge, or the table that a Databricks table replaces.</td><td>A minor version of the module, with the release steps.</td><td>"The release steps"</td></tr><tr><td>A measure's name, definition, other names or process links.</td><td>The term-change form, then the propose and apply commands. No file is edited by hand.</td><td>"Change a measure with the term-change form"</td></tr><tr><td>A new system that a document names, or a new table that copies a table of a system.</td><td>The reference-item form, then the propose and apply commands. No file is edited by hand.</td><td>"Add a system or a table with the reference-item form"</td></tr><tr><td>A definition's wording, with the same meaning.</td><td>A patch, with the release steps.</td><td>"Change a concept's definition"</td></tr><tr><td>A new concept, alias, property or shape.</td><td>A minor version, with the release steps.</td><td>"Add a concept or a property"</td></tr><tr><td>A new process, or a changed one.</td><td>A release of <code>core</code>, then every module.</td><td>"Change a process"</td></tr><tr><td>The same ontology in another workspace, such as production.</td><td>New settings files. The ontology does not change.</td><td>"A new environment"</td></tr><tr><td>A data area that no module covers.</td><td>A new module at 1.0.0.</td><td>"Onboard another module"</td></tr><tr><td>A term that the business no longer uses, or two terms that are one.</td><td>A major version. The term is deprecated, never deleted.</td><td>"Deprecate a term"</td></tr><tr><td>A term that is listed under the wrong kind, such as a system's kind.</td><td>A major version, when an answer under the old kind is no longer right.</td><td>"Change the kind of a term"</td></tr><tr><td>Entries of the data-product catalog that are not data products.</td><td>A proposal to the portfolio file, then a major version of <code>data-product</code>.</td><td>"Move catalog entries to another class"</td></tr><tr><td>New roles, or a new or changed RACI for a process.</td><td>A proposal to the process map, then a version of <code>organization</code>.</td><td>"Change the RACI"</td></tr><tr><td>A list of allowed values that the ontology lacks, such as the data domains.</td><td>A minor version of the module that holds the list.</td><td>"Add a controlled list to a module"</td></tr></tbody></table></div>
+<div class="tblwrap"><table><thead><tr><th>What changed</th><th>The way</th><th>Section</th></tr></thead><tbody><tr><td>Databricks renamed or removed a column, a table or a view that the ontology names.</td><td>A correction, through the report and the cut.</td><td>"A correction through the loop"</td></tr><tr><td>A column's spelling differs only in case.</td><td>The same correction.</td><td>"A correction through the loop"</td></tr><tr><td>A report row says "needs a minor version": a measure link with its filter, a new object, a new table edge, or the table that a Databricks table replaces.</td><td>A minor version of the module, with the release steps.</td><td>"The release steps"</td></tr><tr><td>A new KPI.</td><td>The KPI intake form, then the propose and apply commands. No file is edited by hand.</td><td>"Add a KPI with the KPI intake form"</td></tr><tr><td>A measure's name, definition, other names or process links.</td><td>The term-change form, then the propose and apply commands. No file is edited by hand.</td><td>"Change a measure with the term-change form"</td></tr><tr><td>A new system that a document names, or a new table that copies a table of a system.</td><td>The reference-item form, then the propose and apply commands. No file is edited by hand.</td><td>"Add a system or a table with the reference-item form"</td></tr><tr><td>A definition's wording, with the same meaning.</td><td>A patch, with the release steps.</td><td>"Change a concept's definition"</td></tr><tr><td>A new concept, alias, property or shape.</td><td>A minor version, with the release steps.</td><td>"Add a concept or a property"</td></tr><tr><td>A new process, or a changed one.</td><td>A release of <code>core</code>, then every module.</td><td>"Change a process"</td></tr><tr><td>The same ontology in another workspace, such as production.</td><td>New settings files. The ontology does not change.</td><td>"A new environment"</td></tr><tr><td>A data area that no module covers.</td><td>A new module at 1.0.0.</td><td>"Onboard another module"</td></tr><tr><td>A term that the business no longer uses, or two terms that are one.</td><td>A major version. The term is deprecated, never deleted.</td><td>"Deprecate a term"</td></tr><tr><td>A term that is listed under the wrong kind, such as a system's kind.</td><td>A major version, when an answer under the old kind is no longer right.</td><td>"Change the kind of a term"</td></tr><tr><td>Entries of the data-product catalog that are not data products.</td><td>A proposal to the portfolio file, then a major version of <code>data-product</code>.</td><td>"Move catalog entries to another class"</td></tr><tr><td>New roles, or a new or changed RACI for a process.</td><td>A proposal to the process map, then a version of <code>organization</code>.</td><td>"Change the RACI"</td></tr><tr><td>A list of allowed values that the ontology lacks, such as the data domains.</td><td>A minor version of the module that holds the list.</td><td>"Add a controlled list to a module"</td></tr></tbody></table></div>
 <h2 id="patch-minor-or-major">Patch, minor or major<a class="hl" href="#patch-minor-or-major" aria-label="Link to this section">#</a></h2>
 <p>Classify every change before you make it. Then ask the owner who approves that kind. <code>skills/ontology/references/release.md</code> holds the full rules.</p>
 <div class="tblwrap"><table><thead><tr><th>Kind</th><th>What it covers</th></tr></thead><tbody><tr><td>Major</td><td>An IRI changes or a concept is removed. A definition's meaning changes. A hierarchy change alters what a concept means. Any deprecation. A new module's first release, 1.0.0, also needs the ontology owner.</td></tr><tr><td>Minor</td><td>New concepts, aliases, references, instances or shapes that existing content already meets.</td></tr><tr><td>Patch</td><td>Typos, clearer wording with the same meaning, an added example or scope note.</td></tr><tr><td>Correction</td><td>A name in Databricks changed, and the ontology follows it. The cut tool writes it.</td></tr></tbody></table></div>
@@ -498,6 +499,93 @@ python next_version.py current system</code></pre>
 1.6.0</code></pre></li></ol>
 <ol start="7"><li>Run the full check, as in "Before you change anything", step 3. Then load the stores with the runner, as in step 11 of "The release steps".</li></ol>
 <p>A table goes the same way. Its form names the table's full name in R1 (for example <code>synapse_dev.replica_mips.mips_sample</code>), "table" in R2, the system whose table it copies in R8 and the document that records it in R9. The apply then releases the <code>data-product</code> module.</p>
+<h2 id="add-a-kpi-with-the-kpi-intake-form">Add a KPI with the KPI intake form<a class="hl" href="#add-a-kpi-with-the-kpi-intake-form" aria-label="Link to this section">#</a></h2>
+<p>A new KPI goes in through the KPI intake form and the same two commands as a term change. Nobody edits a table or a Turtle file. The form is the "KPI intake" tab of the HTML form and the KPI sheets of the workbook. <code>kpi-intake/README.md</code> says what it asks and who signs.</p>
+<p>The proposal of a new KPI holds two files of changes. <code>change.kgcl</code> holds what KGCL can say: the KPI's name, definition, other names, kind, source, roles, processes and the measures it is mistaken for. <code>facts.csv</code> holds the text facts that KGCL cannot write, one row each, with the columns measure, property and value: how it is worked out, how often it is stated, what it is compared against, why it has its kind, and the like. On kgcl-schema 0.7.0 a quoted text in a KGCL line about a link loses its quotes, so these facts have no KGCL line (KPI-DEC-0004). The apply writes both, checks both against the rebuilt module, and gives the KPI its identifier, the next free <code>KPI-</code> or <code>OPM-</code> number.</p>
+<p>The proposal holds only what the <code>kpi</code> module records. The answers that feed another module stay in the form's file, and <code>summary.txt</code> names each one: what the KPI counts and leaves out (2.3, 2.4) for <code>population</code>, the value stream steps (6.3 to 6.5) for <code>value-stream</code>, the data product and the view (6.6, 7.1 to 7.9) for <code>data-product</code>, and the market series (6.7) for <code>market-data</code>. Add those with "The release steps".</p>
+<p>The propose command refuses a form that the <code>kpi</code> module cannot take as it stands, and says why:</p>
+<ul><li>a name or an other name that a measure has already. A change to that measure goes through the term-change form;</li><li>a role in 6.1 that is not one of the four planning personas, the only roles the <code>kpi</code> module records today;</li><li>more than one document in 3.5, or a document that 3.5 does not offer and <code>kpi/measure-sources.csv</code> does not hold. A new source document needs a specialist, because its evidence tier is in the <code>integration</code> module. A document that 3.5 offers is in the ontology already, with its title and its tier: when <code>kpi/measure-sources.csv</code> has no row for it yet, the apply adds one, with that title.</li></ul>
+<p>The commands start in the release folder. Keep the filled form and the proposal in a folder beside the release folder, never inside it, as for a term change. The example uses the folder <code>new-kpi</code> beside the release folder.</p>
+<ol><li>Fill in the form, and save it to that folder. The example starts from the shipped example Crack Spreads Pricing and gives it a made-up name, Sample Spread Margin, a definition and an other name of its own, so it is a new measure. It also leaves out the example's answer to 3.6, which is about the measure the example copies. The Data Owner, the Domain Owner and the Architect sign it.
+<p>The document test writes the form's answers file with this block. If you saved the file from the form, skip it.</p>
+<pre><code class="lang-python">import json
+from pathlib import Path
+
+folder = Path("../new-kpi")
+folder.mkdir(exist_ok=True)
+form = json.loads(Path("kpi-intake/examples/crack-spreads-pricing.json").read_text(encoding="utf-8"))
+answers = form["answers"]
+answers["2.1"] = form["kpi_name"] = "Sample Spread Margin"
+answers["2.2"] = "A made-up market margin for this guide: a product's price less the price of the crude it is made from."
+answers["5.1"] = ["sample spread"]
+del answers["3.6"]
+form["example_of"], form["comment"] = "", ""
+form["request"] = {"number": "NK-2026-001", "date": "2026-11-19", "requester_role": "Data Owner", "invited": ""}
+form["sign_offs"] = {"data-owner": {"name": "A Data Owner", "date": "2026-11-19"},
+                     "domain-confirmation": {"name": "A Domain Owner", "date": "2026-11-19"},
+                     "architect": {"name": "An Architect", "date": "2026-11-19"}}
+path = folder / "sample-spread-margin.kpi-intake.json"
+path.write_text(json.dumps(form, indent=2) + "\n", encoding="utf-8")
+print("wrote", path.name)</code></pre>
+<pre><code class="lang-text">wrote sample-spread-margin.kpi-intake.json</code></pre></li></ol>
+<ol start="2"><li>Check the form. It must end with <code>the intake is complete and signed</code>.
+<pre><code class="lang-powershell">python -m kpi_store.intake check ../new-kpi/sample-spread-margin.kpi-intake.json</code></pre>
+<pre><code class="lang-text">KPI intake check: Sample Spread Margin
+...
+Kind of measure: market indicator (decided by 4.3, test 3).
+...
+  The name is new, and the chosen process agrees with the business area.
+...
+Result: the intake is complete and signed.
+This check changes nothing in the ontology. The Architect turns a complete KPI intake into a proposal with python -m kpi_store.propose &lt;this file&gt;, as HOW-TO-UPDATE.md says.</code></pre></li></ol>
+<ol start="3"><li>Turn the form into a proposal. The command writes the folder <code>proposals/NK-2026-001</code> beside the form, with <code>change.kgcl</code>, <code>facts.csv</code>, <code>approval.json</code> and <code>summary.txt</code>. It changes nothing in the ontology. A new KPI is always a minor.
+<pre><code class="lang-powershell">python -m kpi_store.propose ../new-kpi/sample-spread-margin.kpi-intake.json</code></pre>
+<pre><code class="lang-text">wrote the proposal ../new-kpi/proposals/NK-2026-001: 12 changes and 9 facts, route minor
+Nothing in the ontology has changed. Read each summary.txt, then apply with: python -m kpi_store.apply &lt;proposal folder&gt;</code></pre></li></ol>
+<ol start="4"><li>Read <code>summary.txt</code>. It says what the new KPI is, what it links to, its facts, the answers the proposal leaves out, and who signed.
+<pre><code class="lang-python">print(open("../new-kpi/proposals/NK-2026-001/summary.txt", encoding="utf-8").read())</code></pre>
+<pre><code class="lang-text">Proposal NK-2026-001
+...
+What it adds, as KGCL lines in change.kgcl:
+  - A measure named "Sample Spread Margin".
+  - Its definition: "A made-up market margin for this guide: a product's price less the price of the crude it is made from."
+  - The other name "sample spread".
+  - Its kind: market indicator.
+...
+What it adds, as facts in facts.csv (KGCL cannot write them):
+  - A strong candidate to become a KPI: false.
+  - The test that decided its kind: 3.
+...
+Its identifier: the apply gives it the next free OPM- number.
+
+Not in this proposal: these answers feed another module, so they stay in the form's file until a change to that module records them:
+  - 2.3, 2.4: the population module
+  - 6.3, 6.4, 6.5: the value-stream module
+  - 6.6, 7.1, 7.8: the data-product module
+  - 6.7: the market-data module
+
+The route: minor. This is a minor: the changes add content, and the old meaning still holds.
+...</code></pre></li></ol>
+<ol start="5"><li>Apply the proposal. The command works as it does for a term change: it adds the KPI's rows to the <code>kpi</code> tables in a temporary copy of the release, rebuilds the module, checks that the difference is exactly the proposal's lines and facts, releases <code>kpi</code> and every module that depends on it, rebuilds the catalog, the projection manifest and the KPI intake pack, and runs the checks. Only when every step has passed does it write the release and commit it. It keeps the proposal's lines and facts beside the approval record, as <code>approvals/NK-2026-001.kgcl</code> and <code>approvals/NK-2026-001.facts.csv</code>. If a step fails, the release is as it was. It took about 80 seconds on a Mac.
+<pre><code class="lang-powershell">python -m kpi_store.apply ../new-kpi/proposals/NK-2026-001</code></pre>
+<pre><code class="lang-text">1 proposal to apply:
+  NK-2026-001: minor, signed by Data Owner, Domain Owner, Architect
+...
+  kpi 1.3.0 -&gt; 1.4.0
+...
+... write the release
+Done. kpi is now 1.4.0 (minor), and 6 modules that depend on it took a new patch. The apply changed &lt;count&gt; files, and Git committed them.
+Run the full check before you load: bash scripts/check.sh (on Windows, in Git Bash). Then load the stores with the runner: python -m kpi_store.runner</code></pre></li></ol>
+<ol start="6"><li>See the commit, the new version and the KPI's identifier.
+<pre><code class="lang-powershell">git --no-pager log --oneline -1
+cd business_architecture/ontology/release
+python next_version.py current kpi
+cd ../kpi
+python -c "print(open('measure-identifiers.csv', encoding='utf-8').read().splitlines()[-1])"</code></pre>
+<pre><code class="lang-text">&lt;commit&gt; Apply the new KPI NK-2026-001: kpi 1.4.0
+1.4.0
+sample-spread-margin,OPM-0031</code></pre></li></ol>
+<ol start="7"><li>Run the full check, as in "Before you change anything", step 3. Then load the stores with the runner, as in step 11 of "The release steps".</li></ol>
 <h2 id="change-a-concept-s-definition">Change a concept's definition<a class="hl" href="#change-a-concept-s-definition" aria-label="Link to this section">#</a></h2>
 <p>A new wording with the same meaning is a patch. If the meaning changes, the release is a major, and the ontology owner approves it.</p>
 <ol><li>Find where the definition lives. Most sources are tables and Turtle files in the module's folder, so search there for the text. A file that starts "Built by" is generated: edit the source it names.</li><li>Edit the text in that source. Keep the citation of its source. If the new wording rests on a new source, cite it.</li><li>Follow "The release steps" from step 3. In step 5, use <code>patch</code> and the next patch version.</li></ol>
