@@ -421,6 +421,20 @@ def test_the_round_trip_refuses_a_new_node_that_states_nothing():
             pm.compare(name, before, after)
 
 
+@pytest.mark.parametrize("broken", ["settings", "map"])
+def test_propose_refuses_a_release_it_cannot_read_in_a_plain_sentence(tmp_path, broken):
+    root = scratch_release(tmp_path, git_copy=False)
+    if broken == "settings":
+        path, make = root / domains.SETTINGS, lambda: domain_form(tmp_path, {"D1": "A Made-up Domain"})
+        path.write_text(path.read_text(encoding="utf-8") + "\n[[list.domains]\n", encoding="utf-8")
+    else:
+        path, make = root / pm.MAP, lambda: pm_form(tmp_path)
+        path.write_text(json.dumps(json.loads(path.read_text(encoding="utf-8")), indent=4) + "\n", encoding="utf-8")
+    with pytest.raises(propose_cmd.ProposeRefused, match="settings.toml is not valid TOML|is not laid out as the release ships it"):
+        propose(tmp_path, make(), root)
+    assert not (tmp_path / "proposals").exists()
+
+
 def test_a_map_laid_out_otherwise_is_refused(tmp_path):
     root = tmp_path / "release"
     shutil.copytree(ROOT / pm.MAP.parent, root / pm.MAP.parent)

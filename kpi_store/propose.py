@@ -618,11 +618,17 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
             module, compatible = "kpi", "yes"
             checks = lambda changes, root: other_modules.check_changes(changes, facts, root)
         elif intake.form == DOMAIN:
-            key, facts = domain_facts(intake, root)
+            try:
+                key, facts = domain_facts(intake, root)
+            except ChangeRefused as err:   # the release's settings.toml cannot be read
+                raise ProposeRefused(str(err)) from None
             changes, module, compatible = [], "settings", "yes"
             checks = lambda changes, root: domains.check_changes(facts, root)
         elif intake.form == PROCESS_MAP:
-            key, changes, facts, notes = process_map_changes(intake, root)
+            try:
+                key, changes, facts, notes = process_map_changes(intake, root)
+            except ChangeRefused as err:   # the release's map or organization tables cannot be read
+                raise ProposeRefused(str(err)) from None
             module, compatible = "organization", "yes"
             checks = lambda changes, root: process_map.check_changes(changes, facts, root)
         elif intake.form == ITEM:
