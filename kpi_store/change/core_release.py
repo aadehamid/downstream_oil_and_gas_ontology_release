@@ -109,8 +109,11 @@ def split(changes, facts):
     level, name, description, parent and area. Refuses a line or a fact that no part takes."""
     areas, nodes = {}, {}
     for c in changes:
+        prefix, _, slug = c.subject.partition(":")
+        if prefix not in ("proc", "area") or not slug:
+            raise ChangeRefused(f"{c.subject} names neither a process nor a business area, so a process map request "
+                                "cannot add it")
         line = kgcl.write_line(c)
-        prefix = c.subject.split(":", 1)[0]
         parts = (areas if prefix == "area" else nodes).setdefault(tail(c.subject), {})
         if c.kind == "create node" and "name" not in parts:
             parts["name"] = c.text

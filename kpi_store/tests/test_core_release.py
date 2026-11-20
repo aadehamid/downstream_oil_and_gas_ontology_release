@@ -380,3 +380,12 @@ def test_two_new_processes_of_one_name_in_one_request_are_refused(tmp_path):
                "P8": AREA + "commercial", "P6": ["Quality Check, Business Analyst, accountable"]}
     with pytest.raises(propose_cmd.ProposeRefused, match='P1 names "Quality Check" twice'):
         propose(tmp_path, request(tmp_path, answers))
+
+
+def test_a_line_whose_subject_is_neither_a_process_nor_a_business_area_is_refused():
+    empty = [kgcl.Change("create node", "area:", text="X"), kgcl.Change("add definition", "area:", text="Def.")]
+    other = [kgcl.read_line(line.replace(f"proc:{SLUG} '", f"core:{SLUG} '").replace(f"to proc:{SLUG}", f"to core:{SLUG}"))
+             for line in LINES[:2]] + [kgcl.read_line(line) for line in LINES[2:4]]
+    for changes, facts in ((empty, []), (other, FACTS[:3])):
+        with pytest.raises(ChangeRefused, match="names neither a process nor a business area"):
+            cr.split(changes, facts)
