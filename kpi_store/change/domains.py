@@ -76,11 +76,15 @@ def facts_of(name, description, domains, slug):
 def _wanted(domains, facts):
     """The list of domains as the facts leave it."""
     out = [dict(d) for d in domains]
+    held, seen = {d.get("id") for d in domains}, set()
     for subject, prop, value in facts:
-        if not subject.startswith(PREFIX) or prop not in FIELDS:
+        key = subject[len(PREFIX):]
+        if not subject.startswith(PREFIX) or not key or prop not in FIELDS:
             raise ChangeRefused(f"a domain activation's fact is domain:<id>,<{', '.join(FIELDS)}>,<value>: "
                                 f"{subject},{prop},{value}")
-        key = subject[len(PREFIX):]
+        if (key, prop) in seen:
+            raise ChangeRefused(f"{subject} gets two {prop} facts")
+        seen.add((key, prop))
         entry = next((d for d in out if d.get("id") == key), None)
         if entry is None:
             entry = {"id": key}
@@ -88,11 +92,20 @@ def _wanted(domains, facts):
         if prop == "active":
             if value != "true":
                 raise ChangeRefused(f"a domain activation makes a domain active, and {subject} gets active {value}")
+            if entry.get("active") is True:
+                raise ChangeRefused(f'the domain "{entry.get("label")}" is active already, so {subject} needs no domain '
+                                    "activation")
             entry["active"] = True
         else:
             if not value or value != one_line(value):
                 raise ChangeRefused(f"the {prop} of {subject} must be one line of text, and is {value!r}")
+            if key in held and prop == "label":
+                raise ChangeRefused(f"the list holds {subject} already, and a domain activation keeps its name")
+            if entry.get(prop) == value:
+                raise ChangeRefused(f"{subject} has that {prop} already: {value!r}")
             entry[prop] = value
+    for key in sorted({k for k, _ in seen} - {k for k, p in seen if p == "active"}):
+        raise ChangeRefused(f"a domain activation makes a domain active, and {PREFIX}{key} gets no active,true fact")
     for entry in out:
         missing = [f for f in ("id", *FIELDS) if f not in entry]
         if missing:
@@ -167,19 +180,30 @@ def apply_changes(facts, root):
 
 def compare(before, after):
     """The facts that take the list of domains of settings.toml at `before` (a release folder) to the one at `after`.
-    Refuses a removed domain, a domain made inactive and a changed id."""
-    _, old = read(before)
-    _, new = read(after)
-    held = {d["id"]: d for d in old}
-    if not set(held) <= {d["id"] for d in new}:
-        raise ChangeRefused(f"a domain left {SETTINGS.as_posix()}: {sorted(set(held) - {d['id'] for d in new})}")
+    Refuses a removed domain, a domain made inactive, a changed id, a domain that is not one id, label, description
+    and active, and any change outside the list of domains."""
+    (old_text, old), (new_text, new) = read(before), read(after)
+    rest = lambda text: {**tomllib.loads(text), "list": {k: v for k, v in tomllib.loads(text).get("list", {}).items()
+                                                         if k != "domains"}}
+    if rest(old_text) != rest(new_text):
+        raise ChangeRefused(f"{SETTINGS.as_posix()} changed outside its list of domains")
+    for d in new:
+        if set(d) != {"id", *FIELDS} or not all(isinstance(d[f], str) and d[f] for f in ("id", "label", "description")) \
+                or not isinstance(d["active"], bool):
+            raise ChangeRefused(f"a domain of {SETTINGS.as_posix()} is not one id, label, description and active: {d}")
+    ids = [d["id"] for d in new]
+    if len(ids) != len(set(ids)):
+        raise ChangeRefused(f"a domain is in {SETTINGS.as_posix()} twice: {sorted({i for i in ids if ids.count(i) > 1})}")
+    held = {d.get("id"): d for d in old}
+    if not set(held) <= set(ids):
+        raise ChangeRefused(f"a domain left {SETTINGS.as_posix()}: {sorted(set(held) - set(ids))}")
     rows = []
     for d in new:
         was = held.get(d["id"], {})
         for prop in FIELDS:
-            if d.get(prop) == was.get(prop):
+            if d[prop] == was.get(prop):
                 continue
-            if prop == "active" and d.get(prop) is not True:
+            if prop == "active" and d[prop] is not True:
                 raise ChangeRefused(f"the domain {d['id']} is no longer active")
-            rows.append((PREFIX + d["id"], prop, "true" if d.get(prop) is True else str(d.get(prop))))
+            rows.append((PREFIX + d["id"], prop, "true" if d[prop] is True else d[prop]))
     return sorted(rows)

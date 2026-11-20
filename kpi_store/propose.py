@@ -332,7 +332,10 @@ def process_map_changes(intake, root):
     t = process_map.tables(root)
     known = _role_names(t)
     new = {}
-    for line in (l.strip() for l in "\n".join(rules.values(answers, "P5.detail")).splitlines()):
+    # A KGCL line writes a straight apostrophe as the typographic one and reads it back as straight, so the names
+    # and the definitions take the straight one: the facts, the ids and the lines then agree.
+    straight = lambda text: text.replace(kgcl.TYPOGRAPHIC, "'")
+    for line in (straight(l).strip() for l in "\n".join(rules.values(answers, "P5.detail")).splitlines()):
         if not line:
             continue
         name, sep, definition = (part.strip() for part in line.partition(":"))
@@ -344,9 +347,13 @@ def process_map_changes(intake, root):
         key = reference_items.slug(name)
         if not key or name.casefold() in {n.casefold() for n in new}:
             raise ProposeRefused(f'P5: "{name}" is named twice, or has no letter or digit to make its short key from')
+        other = next((n for n, (k, _) in new.items() if k == key), None)
+        if other:
+            raise ProposeRefused(f'P5: "{name}" has the short key {key}, as "{other}" has. Give each new role a name of '
+                                 "its own")
         new[name] = (key, definition)
     names = {n.casefold(): (n, key) for n, (key, _) in new.items()} | known
-    for item in rules.values(answers, "P1"):
+    for item in map(straight, rules.values(answers, "P1")):
         if item.casefold() not in names:
             raise ProposeRefused(f'P1 names "{item}", which is neither a role of the organization module nor a new role '
                                  f"of P5. A new business area, process or step {NEEDS_CORE}. A new value stream step "
@@ -359,7 +366,7 @@ def process_map_changes(intake, root):
     slug_of = process_map.slugs(root)
     nodes = process_map.processes(process_map.read_map(root)[1])
     replaced = {r["slug"]: r["replaced_by"] for r in t.rows["roles"] if r["replaced_by"]}
-    for n, line in enumerate(rules.values(answers, "P6"), 1):
+    for n, line in enumerate(map(straight, rules.values(answers, "P6")), 1):
         parts = [part.strip() for part in line.split(",")]
         if len(parts) < 3:
             raise ProposeRefused(f'P6, line {n}: "{line}" is not written as "<the process>, <the role>, <responsible, '
@@ -367,7 +374,7 @@ def process_map_changes(intake, root):
         level, role, place = parts[-1].lower(), ", ".join(parts[1:-1]), parts[0]
         if level not in process_map.LEVELS:
             raise ProposeRefused(f'P6, line {n}: "{parts[-1]}" is not one of responsible, accountable, consulted or informed')
-        found = RACI_PROCESS.match(place)
+        found = RACI_PROCESS.fullmatch(place)
         if not found or found.group(0) not in nodes or found.group(0) not in slug_of:
             raise ProposeRefused(f'P6, line {n}: "{place}" is not a process of the process map named by its number, such '
                                  f"as CM 1.1.2. A new process {NEEDS_CORE}")

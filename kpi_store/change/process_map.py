@@ -129,10 +129,11 @@ def split(changes, facts):
     for c in changes:
         line = kgcl.write_line(c)
         prefix = c.subject.split(":", 1)[0]
-        if prefix == "role" and c.kind == "create node":
-            roles.setdefault(tail(c.subject), {})["label"] = c.text
-        elif prefix == "role" and c.kind == "add definition":
-            roles.setdefault(tail(c.subject), {})["definition"] = c.text
+        part = {"create node": "label", "add definition": "definition"}.get(c.kind) if prefix == "role" else None
+        if part:
+            if part in roles.setdefault(tail(c.subject), {}):
+                raise ChangeRefused(f"{c.subject} has two {c.kind} lines")
+            roles[tail(c.subject)][part] = c.text
         elif prefix == "asg" and c.kind == "create edge" and c.predicate in EDGES:
             edges.setdefault(c.subject, {}).setdefault(c.predicate, []).append(c.target)
         else:
@@ -140,6 +141,8 @@ def split(changes, facts):
                                 f"RACI entries (orgm:forProcess, orgm:assignedRole and orgm:raciLevel of asg:<id>): {line}")
     for subject, prop, value in facts:
         if subject.startswith("role:") and prop == NOTE:
+            if tail(subject) in notes:
+                raise ChangeRefused(f"{subject} has two {NOTE} facts")
             notes[tail(subject)] = value
         elif subject.startswith("asg:") and prop == TEXT and subject not in texts:
             texts[subject] = value
@@ -273,13 +276,14 @@ def compare(name, before, after):
     source = URIRef(BASE + "source/downstream-process-map")
     kind = {"roles": ("role", URIRef("http://www.w3.org/ns/org#Role")),
             "assignments": ("asg", URIRef(PREFIXES["orgm"] + "ResponsibilityAssignment"))}[name]
-    lines, rows, made = [], [], set()
+    lines, rows, made, stated = [], [], set(), set()
     for s, p, o in added:
         subject = curie(s) or ""
         new = s not in held and subject.startswith(kind[0] + ":")
         if new and ((p, o) == (RDF.type, kind[1]) or (p, o) == (DCTERMS.source, source)):
             made.add(s)
-        elif name == "roles" and new and p == SKOS.prefLabel and isinstance(o, Literal) and o.language == "en":
+            continue
+        if name == "roles" and new and p == SKOS.prefLabel and isinstance(o, Literal) and o.language == "en":
             lines.append(kgcl.write_line(kgcl.Change("create node", subject, text=str(o))))
         elif name == "roles" and new and p == SKOS.definition and isinstance(o, Literal) and o.language == "en":
             lines.append(kgcl.write_line(kgcl.Change("add definition", subject, text=str(o))))
@@ -291,6 +295,10 @@ def compare(name, before, after):
             rows.append((subject, TEXT, str(o)))
         else:
             unsupported.append(f"+ {s} {p} {o!r}")
+            continue
+        stated.add(s)
+    for s in made - stated:
+        unsupported.append(f"{s} is new, and no line and no fact states it")
     for s in {s for s, _, _ in added if s not in held}:
         if (s, RDF.type, kind[1]) not in after or (s, DCTERMS.source, source) not in after:
             unsupported.append(f"{s} lacks its type or its source, the process map")

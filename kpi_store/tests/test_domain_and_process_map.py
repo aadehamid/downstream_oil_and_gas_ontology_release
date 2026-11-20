@@ -32,9 +32,10 @@ DOMAIN_SIGNED = {"domain-owner": {"name": "A Domain Owner", "date": "2026-11-19"
 PM_SIGNED = {"global-process-owner": {"name": "A Global Process Owner", "date": "2026-11-19"},
              "architect": {"name": "An Architect", "date": "2026-11-19"}}
 # A domain the tree holds and has not made active: the first one, so the tests hold also on a copy where the
-# guide's example has made Customer active.
-TARGET = next(d for d in domains.read(ROOT)[1] if d["active"] is False)
-SUBJECT = f"domain:{TARGET['id']}"
+# guide's example has made Customer active. A tree whose domains are all active skips the tests that need one.
+TARGET = next((d for d in domains.read(ROOT)[1] if d["active"] is False), None)
+SUBJECT = f"domain:{TARGET['id']}" if TARGET else ""
+needs_inactive = pytest.mark.skipif(TARGET is None, reason="every domain of kpi-intake/settings.toml is active")
 CUSTOMER_TEXT = "A made-up description of the domain, for the tests: the data it covers and the data it leaves to others."
 NEW_ROLE = "Sample Terminal Scheduler: A made-up role that coordinates the daily price updates of one region."
 PM_ANSWERS = {"P1": ["Sample Terminal Scheduler"], "P5": ["@new-roles"], "P5.detail": NEW_ROLE,
@@ -134,6 +135,53 @@ def test_a_domain_activation_that_does_not_fit_is_refused(name, text, message):
         domains.facts_of(name, text, HELD, slug)
 
 
+def settings_text(held):
+    return "".join(f'[[list.domains]]\nid = "{d["id"]}"\nlabel = "{d["label"]}"\ndescription = "{d["description"]}"\n'
+                   f'active = {str(d["active"]).lower()}\n\n' for d in held)
+
+
+@pytest.mark.parametrize("facts,message", [
+    ([("domain:", "label", "X"), ("domain:", "description", "Y"), ("domain:", "active", "true")], "domain:<id>"),
+    ([("domain:market-price", "active", "true")], 'the domain "Market Price" is active already'),
+    ([("domain:market-price", "description", "Changed.")], "domain:market-price gets no active,true fact"),
+    ([("domain:customer", "label", "Client"), ("domain:customer", "active", "true")], "the list holds domain:customer"),
+    ([("domain:customer", "description", "A."), ("domain:customer", "description", "B."),
+      ("domain:customer", "active", "true")], "domain:customer gets two description facts"),
+    ([("domain:customer", "description", "Old."), ("domain:customer", "active", "true")], "has that description already")])
+def test_facts_that_no_domain_activation_gives_are_refused(facts, message):
+    with pytest.raises(ChangeRefused, match=message):
+        domains.edit(settings_text(HELD), facts)
+
+
+@pytest.mark.parametrize("after", [
+    settings_text(HELD) + '[[list.domains]]\nid = "phantom"\n',
+    settings_text(HELD).replace('label = "Customer"\n', ""),
+    settings_text(HELD).replace('id = "customer"\n', ""),
+    settings_text(HELD).replace('label = "Customer"\n', 'label = "Customer"\nextra = "bad"\n'),
+    settings_text(HELD) + settings_text(HELD[:1]),
+    settings_text(HELD) + '[[list.status]]\nid = "new"\nlabel = "New"\n'])
+def test_the_round_trip_of_settings_refuses_a_change_that_no_fact_states(tmp_path, after):
+    for name, content in (("before", settings_text(HELD)), ("after", after)):
+        (tmp_path / name / "kpi-intake").mkdir(parents=True)
+        (tmp_path / name / domains.SETTINGS).write_text(content, encoding="utf-8")
+    with pytest.raises(ChangeRefused):
+        domains.compare(tmp_path / "before", tmp_path / "after")
+    (tmp_path / "after" / domains.SETTINGS).write_text(settings_text(HELD).replace("active = false", "active = true"),
+                                                      encoding="utf-8")
+    assert domains.compare(tmp_path / "before", tmp_path / "after") == [("domain:customer", "active", "true")]
+
+
+def test_the_tests_load_when_every_domain_is_active(monkeypatch):
+    import importlib.util
+    read = domains.read
+    monkeypatch.setattr(domains, "read", lambda root: (read(root)[0], [{**d, "active": True} for d in read(root)[1]]))
+    spec = importlib.util.spec_from_file_location("all_domains_active", __file__)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.TARGET is None
+
+
+@needs_inactive
 def test_the_edit_of_settings_changes_only_the_domains_lines_and_the_round_trip_gives_the_facts(tmp_path):
     text = (ROOT / domains.SETTINGS).read_text(encoding="utf-8")
     facts = [(SUBJECT, "description", 'A "quoted" text'), (SUBJECT, "active", "true"),
@@ -153,6 +201,7 @@ def test_the_edit_of_settings_changes_only_the_domains_lines_and_the_round_trip_
     assert domains.compare(tmp_path / "before", tmp_path / "after") == sorted(facts)
 
 
+@needs_inactive
 def test_a_settings_file_laid_out_otherwise_and_a_fact_of_another_form_are_refused():
     text = (ROOT / domains.SETTINGS).read_text(encoding="utf-8")
     head = f'id = "{TARGET["id"]}"\nlabel = "{TARGET["label"]}"'
@@ -170,6 +219,7 @@ def test_a_settings_file_laid_out_otherwise_and_a_fact_of_another_form_are_refus
         domains.edit(text, [("domain:new-one", "active", "true")])
 
 
+@needs_inactive
 def test_propose_turns_a_domain_activation_into_facts_and_no_kgcl_line(tmp_path):
     [folder] = propose(tmp_path, domain_form(tmp_path, number="DA-1"))
     assert folder.name == "DA-1" and (folder / "change.kgcl").read_text(encoding="utf-8") == ""
@@ -191,6 +241,7 @@ def test_propose_refuses_a_domain_that_is_active_already_and_writes_nothing(tmp_
     assert not (tmp_path / "proposals").exists()
 
 
+@needs_inactive
 def test_a_domain_activation_needs_the_domain_owner_and_the_architect(tmp_path):
     with pytest.raises(propose_cmd.ProposeRefused, match="is not complete and signed"):
         propose(tmp_path, domain_form(tmp_path, sign_offs={"architect": DOMAIN_SIGNED["architect"]}))
@@ -202,6 +253,7 @@ def test_a_domain_activation_needs_the_domain_owner_and_the_architect(tmp_path):
         proposal.read(folder)
 
 
+@needs_inactive
 @pytest.mark.skipif(shutil.which("git") is None, reason="Git is not installed")
 def test_a_domain_activation_goes_from_the_form_to_a_committed_release_and_the_kpi_form_offers_the_domain(tmp_path, no_global_git):
     root = scratch_release(tmp_path, git_copy=True)
@@ -237,6 +289,7 @@ def test_a_domain_activation_goes_from_the_form_to_a_committed_release_and_the_k
         apply_cmd.apply([folder], root, say=quiet, now=NOW)
 
 
+@needs_inactive
 def test_apply_refuses_a_domain_activation_with_other_changes_and_two_of_one_domain(tmp_path):
     [one] = propose(tmp_path, domain_form(tmp_path, number="DA-1"))
     [two] = propose(tmp_path, domain_form(tmp_path, name="again", number="DA-2"))
@@ -247,6 +300,7 @@ def test_apply_refuses_a_domain_activation_with_other_changes_and_two_of_one_dom
         apply_cmd.apply([one, request], ROOT, say=quiet)
 
 
+@needs_inactive
 def test_a_failing_step_of_a_domain_activation_leaves_the_release_as_it_was(tmp_path):
     root = scratch_release(tmp_path, git_copy=False)
     [folder] = propose(tmp_path, domain_form(tmp_path), root)
@@ -309,6 +363,11 @@ def test_propose_turns_a_process_map_request_into_kgcl_lines_and_facts(tmp_path)
     ({"P5.detail": "Sample Terminal Scheduler coordinates prices"}, "is not a new role written as"),
     ({"P5.detail": "Business Analyst: Analyses.", "P1": ["Business Analyst"]}, "holds that role already"),
     ({"P5.detail": ""}, "To settle: P5 is missing"),
+    ({"P1": ["Price-Lead", "Price Lead"], "P5.detail": "Price-Lead: Sets regional prices.\nPrice Lead: Reviews regional prices.",
+      "P6": ["CM 1.1.2, Price Lead, consulted"]}, 'P5: "Price Lead" has the short key price-lead, as "Price-Lead" has'),
+    ({"P6": ["CM 1.1.2.new, Sample Terminal Scheduler, responsible"]}, '"CM 1.1.2.new" is not a process of the process map'),
+    ({"P6": ["CM 1.1.2a, Sample Terminal Scheduler, responsible"]}, '"CM 1.1.2a" is not a process of the process map'),
+    ({"P6": ["CM 1.1.2 New Pricing Step, Sample Terminal Scheduler, responsible"]}, "is not a process of the process map"),
     ({"P6": ["CM 1.1.2.1, Business Analyst, responsible"], "P1": ["Business Analyst"], "P5": [], "P5.detail": ""},
      'has "Business Analyst" as responsible already')])
 def test_propose_refuses_a_process_map_request_it_cannot_apply_and_writes_nothing(tmp_path, answers, message):
@@ -325,10 +384,41 @@ def test_propose_refuses_a_process_map_request_it_cannot_apply_and_writes_nothin
                                                                           "Business Analyst")], "is not one for"),
     (PM_LINES[8:], PM_FACTS[3:] + [("asg:other", "orgm:sourceRoleText", "x")], "a fact is about an assignment that no line"),
     (["create edge role:x skos:broader role:y"], [], "a process map request adds roles"),
+    (PM_LINES + PM_LINES[:1], PM_FACTS, "role:sample-terminal-scheduler has two create node lines"),
+    (PM_LINES, PM_FACTS + PM_FACTS[:1], "role:sample-terminal-scheduler has two skos:editorialNote facts"),
     (PM_LINES[8:], PM_FACTS[3:] + [("role:x", "skos:note", "x")], "a process map request's fact is")])
 def test_the_lines_of_a_process_map_request_are_refused_unless_complete(lines, facts, message):
     with pytest.raises(ChangeRefused, match=message):
         pm.split([kgcl.read_line(line) for line in lines], facts)
+
+
+APOSTROPHE_ANSWERS = {"P1": ["Director's Office"], "P5.detail": "Director\u2019s Office: Runs the director\u2019s pricing desk.",
+                      "P6": ["CM 1.1.2.1, Director\u2019s Office, consulted", "CM 1.1.3, Director's Office, accountable"]}
+
+
+def test_a_role_named_with_either_apostrophe_gets_the_text_its_kgcl_line_reads_back(tmp_path):
+    [folder] = propose(tmp_path, pm_form(tmp_path, APOSTROPHE_ANSWERS, number="PM-1"))
+    changes = kgcl.read_lines((folder / "change.kgcl").read_text(encoding="utf-8"))
+    facts = proposal.read_facts((folder / "facts.csv").read_text(encoding="utf-8"), "PM-1")
+    assert [c.text for c in changes if c.kind != "create edge"] == ["Director's Office", "Runs the director's pricing desk."]
+    assert {v for _, p, v in facts if p == pm.TEXT} == {"Director's Office"}
+    tag = pm.digest("Director's Office")
+    assert {c.subject for c in changes if c.kind == "create edge"} == {
+        f"asg:CM-1-1-2-1--consulted--director-s-office--{tag}", f"asg:CM-1-1-3--accountable--director-s-office--{tag}"}
+    pm.check_changes(changes, facts, ROOT)
+
+
+def test_the_round_trip_refuses_a_new_node_that_states_nothing():
+    from rdflib.namespace import DCTERMS, RDF
+    source = URIRef(pm.BASE + "source/downstream-process-map")
+    for name, prefix, kind in (("roles", "role", URIRef("http://www.w3.org/ns/org#Role")),
+                               ("assignments", "asg", URIRef(pm.PREFIXES["orgm"] + "ResponsibilityAssignment"))):
+        before = Graph().parse(ROOT / pm.BUILT[name])
+        after = Graph() + before
+        phantom = URIRef(pm.PREFIXES[prefix] + "phantom")
+        after += [(phantom, RDF.type, kind), (phantom, DCTERMS.source, source)]
+        with pytest.raises(ChangeRefused, match=f"{phantom} is new, and no line and no fact states it"):
+            pm.compare(name, before, after)
 
 
 def test_a_map_laid_out_otherwise_is_refused(tmp_path):
@@ -414,6 +504,15 @@ def test_a_process_map_request_goes_from_the_form_to_a_committed_minor_release_o
     lists = picklists.load(root / "kpi-intake")
     assert "Sample Terminal Scheduler" in {i["label"] for i in lists["lists"]["roles"]}
     assert picklists.stale_modules(lists, root) == {}
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="Git is not installed")
+def test_a_role_named_with_an_apostrophe_goes_from_the_form_to_a_committed_release(tmp_path, no_global_git):
+    root = scratch_release(tmp_path, git_copy=True)
+    [folder] = propose(tmp_path, pm_form(tmp_path, APOSTROPHE_ANSWERS, number="PM-1"), root)
+    apply_cmd.apply([folder], root, say=quiet, now=NOW)
+    rows = list(csv.DictReader((root / pm.FOLDER / "role-register.csv").open(encoding="utf-8")))
+    assert rows[-1]["source_text"] == "Director's Office" and git(root, "status", "--porcelain") == ""
 
 
 def test_a_failing_step_of_a_process_map_request_leaves_the_release_as_it_was(tmp_path):

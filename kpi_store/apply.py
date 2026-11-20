@@ -183,13 +183,13 @@ def plan(folders, root):
         raise ChangeRefused("the proposals conflict, so none was applied: " + "; ".join(clash)
                             + ". Apply one, then make a new form for the other from the changed ontology")
     target = target_of(proposals)
-    if target == DOMAINS:
-        for p in proposals:
-            domains.check_changes(p.facts, root)
     for p in proposals:
         if approval.record_path(root, p.change).exists():
             raise ChangeRefused(f"the proposal {p.change} was applied before: "
                                 f"{approval.record_path(root, p.change).relative_to(root).as_posix()} holds its approval record")
+    if target == DOMAINS:
+        for p in proposals:
+            domains.check_changes(p.facts, root)
     route = proposal.highest(p.route for p in proposals)
     if target == DOMAINS:
         return proposals, target, route, {}
