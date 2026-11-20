@@ -318,3 +318,65 @@ def test_apply_refuses_a_core_proposal_whose_lines_do_not_fit(tmp_path):
     with pytest.raises((ChangeRefused, cut.CutFailed), match="is a process of the process map already"):
         apply_cmd.apply([folder], root, say=quiet, now=NOW)
     assert digest(root) == before
+
+
+# ---------- what the first review found ----------
+
+def _new_proc(after, slug="CM-1-1-99", provenance=("Added in core 9.9.0.",)):
+    """The triples a core builder writes for a new process, into the Graph `after`."""
+    from rdflib.namespace import DCTERMS, RDF, XSD
+    s = URIRef(PROC + slug)
+    for p, o in ((RDF.type, SKOS.Concept), (SKOS.inScheme, URIRef(cr.PREFIXES["core"][:-1])),
+                 (SKOS.prefLabel, Literal("Made-up Process", lang="en")), (SKOS.definition, Literal("Made up.", lang="en")),
+                 (SKOS.broader, URIRef(PROC + "CM-1-1")), (URIRef(cr.PREFIXES["core"] + "businessDomain"), URIRef(AREA + "commercial")),
+                 (SKOS.notation, Literal("CM 1.1.99")), (URIRef(cr.PREFIXES["core"] + "taxonomyLevel"), Literal(3, datatype=XSD.integer))):
+        after.add((s, p, o))
+    for text in provenance:
+        after.add((s, DCTERMS.provenance, text if isinstance(text, Literal) else Literal(text, lang="en")))
+    return after
+
+
+def test_the_round_trip_refuses_a_new_concept_that_no_line_makes_whole():
+    from rdflib.namespace import DCTERMS, RDF
+    before = Graph() + cr.core_graph(ROOT)[1]
+    areas, scheme = URIRef(cr.PREFIXES["core"] + "BusinessDomain"), URIRef(cr.PREFIXES["core"][:-1])
+    lines, facts = cr.compare(before, _new_proc(Graph() + before))   # a whole new process passes
+    assert len(lines) == 4 and len(facts) == 2
+
+    def ghost(subject, in_scheme):
+        s = URIRef(subject)
+        return [(s, RDF.type, SKOS.Concept), (s, SKOS.inScheme, in_scheme), (s, DCTERMS.provenance, Literal("x", lang="en"))]
+    for extra in ([(areas, SKOS.hasTopConcept, URIRef(AREA + "ghost"))], ghost(PROC + "Ghost", scheme),
+                  ghost(cr.PREFIXES["core"] + "Ghost", areas)):
+        after = Graph() + before
+        for t in extra:
+            after.add(t)
+        with pytest.raises(ChangeRefused, match="core differs in"):
+            cr.compare(before, after)
+    for provenance in (("Added in core 9.9.0.", "A second provenance."), (Literal("Added in core 9.9.0."),)):
+        with pytest.raises(ChangeRefused, match="core differs in"):
+            cr.compare(before, _new_proc(Graph() + before, provenance=provenance))
+
+
+def test_two_lines_that_name_or_define_one_new_item_twice_are_refused():
+    for second in ("create node area:x 'Y'", "add definition 'Two.' to area:x"):
+        with pytest.raises(ChangeRefused, match="a new business area takes create node and add definition"):
+            cr.split([kgcl.read_line(line) for line in ("create node area:x 'X'", "add definition 'One.' to area:x", second)], [])
+
+
+def test_a_request_that_adds_a_core_item_is_applied_in_a_run_of_its_own(tmp_path):
+    root = scratch_release(tmp_path, git_copy=False)
+    raci = {"P1": ["Business Analyst"], "P2": [], "P3": [], "P6": ["CM 1.1.1, Business Analyst, accountable"]}
+    [first] = propose(tmp_path, request(tmp_path, raci, name="raci", number="PM-8"), root)
+    [second] = propose(tmp_path, request(tmp_path, number="PM-9"), root)
+    with pytest.raises(ChangeRefused, match="A process map request that adds a process, a step or a business area is "
+                                            "applied in a run of its own"):
+        apply_cmd.plan([first, second], root)
+
+
+def test_two_new_processes_of_one_name_in_one_request_are_refused(tmp_path):
+    answers = {"P1": ["Quality Check", "Quality Check", "Blend Check"], "P2": [PROC + "CM-1-1", PROC + "CM-1-2", PROC + "CM-1-1"],
+               "P3": ["Check the made-up blends.", "Check the made-up schedules.", "Check the made-up plans."],
+               "P8": AREA + "commercial", "P6": ["Quality Check, Business Analyst, accountable"]}
+    with pytest.raises(propose_cmd.ProposeRefused, match='P1 names "Quality Check" twice'):
+        propose(tmp_path, request(tmp_path, answers))

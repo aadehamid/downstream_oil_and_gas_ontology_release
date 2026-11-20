@@ -1839,6 +1839,7 @@ The commands start in the release folder. Keep the filled form and the proposal 
    python -c "import json; print([p['label'] for p in json.load(open('kpi-intake/pick-lists.json', encoding='utf-8'))['lists']['processes'] if p['label'].startswith('CM 1.1.8 ')])"
    cd business_architecture/ontology/release
    python -c "import newest; print(newest.core_builder())"
+   cd ../../..
    ```
 
    ```text expect

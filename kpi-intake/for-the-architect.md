@@ -114,7 +114,7 @@ The ontology has no place for a KPI's domain yet, and holds no list of domains. 
 |---|---|---|---|
 | P1 | What is missing from the process map: a business area, a process, a step or a role? Name each one. | Required | `skos:prefLabel` of each new process, step and business area, which the apply command adds in a `core` release, and the name of each new role. |
 | P2 | For each, which process in the map sits above it? For a new business area or a new role, choose that instead. | Optional | `skos:broader`. A new process or step is numbered under its parent, one level below it. |
-| P3 | For each, what is its purpose? Start with one sentence that defines it. | Optional | `skos:definition`, and `skos:scopeNote` for the rest. A new role takes its definition from P5. |
+| P3 | For each, what is its purpose? Start with one sentence that defines it. | Optional | `skos:definition`, and for a new process or step `skos:scopeNote` for the rest. A new role takes its definition from P5. |
 | P4 | What are the steps of each missing process, in order? | Optional | Kept in the form's file. Each step goes in as an entry of P1 of a request of its own, once its process is in the map. |
 | P5 | Which roles work in these processes? | Optional | `org:Role` in `organization`, with `skos:prefLabel` and `skos:definition`. |
 | P6 | For each process, which role does the work, which answers for it, which is consulted, and which is informed? Write one line for each: the process's number, the role and one of responsible, accountable, consulted or informed, with a comma between them, such as "CM 1.1.2, Business Analyst, consulted". | Optional | `orgx:ResponsibilityAssignment` with `forProcess`, `assignedRole`, `raciLevel`. |

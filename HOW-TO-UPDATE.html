@@ -1122,7 +1122,8 @@ Run the full check before you load: bash scripts/check.sh (on Windows, in Git Ba
 <pre><code class="lang-powershell">git --no-pager log --oneline -1
 python -c "import json; print([p['label'] for p in json.load(open('kpi-intake/pick-lists.json', encoding='utf-8'))['lists']['processes'] if p['label'].startswith('CM 1.1.8 ')])"
 cd business_architecture/ontology/release
-python -c "import newest; print(newest.core_builder())"</code></pre>
+python -c "import newest; print(newest.core_builder())"
+cd ../../..</code></pre>
 <pre><code class="lang-text">&lt;commit&gt; Apply the process map request PM-2026-002: core 2.5.0, organization 2.3.0
 ['CM 1.1.8 Sample Blend Planning']
 build_core_2_5</code></pre></li></ol>

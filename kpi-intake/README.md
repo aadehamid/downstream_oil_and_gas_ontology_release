@@ -233,7 +233,7 @@ The process map request adds new business areas, processes and steps to `core`, 
 |---|---|
 | P1 | The name of each new business area, process, step or role |
 | P2 | For each name of P1, the process it goes under, or "It is a new business area", or "It is a new role". A name with no answer here must be a role |
-| P3 | For each new business area, process or step, its purpose. The first sentence becomes its definition, and the rest its scope note |
+| P3 | For each new business area, process or step, its purpose. For a new process or step, the first sentence becomes its definition, and the rest its scope note. A new business area takes all of it as its definition |
 | P4 | Kept in the form's file. Each step of a new process goes in with a request of its own, once the process is in the map |
 | P5 | The text field gives each new role on a line of its own, as its name, a colon and one sentence on what it does. That sentence becomes the role's definition. A new role is a position |
 | P6 | One RACI entry on each line: the process, the role and the level, with a comma between them, such as `CM 1.1.2, Business Analyst, consulted`. Name a process of the map by its number, and a new process of P1 by its name |

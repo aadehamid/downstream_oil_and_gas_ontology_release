@@ -112,9 +112,9 @@ def split(changes, facts):
         line = kgcl.write_line(c)
         prefix = c.subject.split(":", 1)[0]
         parts = (areas if prefix == "area" else nodes).setdefault(tail(c.subject), {})
-        if c.kind == "create node":
+        if c.kind == "create node" and "name" not in parts:
             parts["name"] = c.text
-        elif c.kind == "add definition":
+        elif c.kind == "add definition" and "definition" not in parts:
             parts["definition"] = c.text
         elif prefix == "proc" and c.kind == "create edge" and c.predicate in EDGES and c.target.split(":", 1)[0] == (
                 "proc" if c.predicate == "skos:broader" else "area") and c.predicate not in parts:
@@ -372,17 +372,19 @@ def compare(before, after):
     lines, rows, made = [], [], {}
     for s, p, o in added:
         subject = curie(s) or ""
-        kind = subject.split(":", 1)[0] if s not in held else ""
+        kind = subject.split(":", 1)[0] if s not in held and subject.split(":", 1)[0] in ("proc", "area") else ""
         if s == areas and p == SKOS.hasTopConcept and (curie(o) or "").startswith("area:") and o not in held:
             made.setdefault(o, set()).add("top")
         elif kind and (p, o) in ((RDF.type, SKOS.Concept), (SKOS.inScheme, scheme if kind == "proc" else areas)) \
                 or kind == "area" and (p, o) == (SKOS.topConceptOf, areas) \
-                or kind and p == DCTERMS.provenance and isinstance(o, Literal):
+                or kind and p == DCTERMS.provenance and isinstance(o, Literal) and o.language == "en" \
+                and str(p) not in made.get(s, ()):
             made.setdefault(s, set()).add(str(p) + (str(o) if p != DCTERMS.provenance else ""))
-        elif kind and p == SKOS.prefLabel and isinstance(o, Literal) and o.language == "en":
-            lines.append(kgcl.write_line(kgcl.Change("create node", subject, text=str(o))))
-        elif kind and p == SKOS.definition and isinstance(o, Literal) and o.language == "en":
-            lines.append(kgcl.write_line(kgcl.Change("add definition", subject, text=str(o))))
+        elif kind and p in (SKOS.prefLabel, SKOS.definition) and isinstance(o, Literal) and o.language == "en" \
+                and str(p) not in made.get(s, ()):
+            made.setdefault(s, set()).add(str(p))
+            lines.append(kgcl.write_line(kgcl.Change("create node" if p == SKOS.prefLabel else "add definition", subject,
+                                                     text=str(o))))
         elif kind == "proc" and curie(p) in EDGES and isinstance(o, URIRef) and curie(o):
             lines.append(kgcl.write_line(kgcl.Change("create edge", subject, predicate=curie(p), target=curie(o))))
         elif kind == "proc" and p == SKOS.notation and isinstance(o, Literal) and o.datatype is None and not o.language:
@@ -394,15 +396,16 @@ def compare(before, after):
             rows.append((subject, SCOPE, str(o)))
         else:
             unsupported.append(f"+ {s} {p} {o!r}")
-    for s in {s for s, _, _ in added if s not in held and s != areas}:
+    for s in {s for s, _, _ in added if s not in held and s != areas} | set(made):
         kind = (curie(s) or ":").split(":", 1)[0]
         need = {str(RDF.type) + str(SKOS.Concept), str(SKOS.inScheme) + str(scheme if kind == "proc" else areas),
-                str(DCTERMS.provenance)} | ({str(SKOS.topConceptOf) + str(areas)} if kind == "area" else set())
+                str(DCTERMS.provenance), str(SKOS.prefLabel), str(SKOS.definition)} \
+            | ({str(SKOS.topConceptOf) + str(areas)} if kind == "area" else set())
         got = made.get(s, set())
         if kind == "area" and "top" not in got:
             unsupported.append(f"{s} is not a top concept of core:BusinessDomain")
         if not need <= got:
-            unsupported.append(f"{s} lacks its type, its scheme or its provenance")
+            unsupported.append(f"{s} lacks its type, its scheme, its name, its definition or its provenance")
     if unsupported:
         raise ChangeRefused(f"core differs in {len(unsupported)} ways that no line and no fact of a process map request "
                             "states: " + "; ".join(sorted(unsupported)[:10]))

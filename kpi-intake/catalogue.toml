@@ -1432,8 +1432,8 @@ asked_of = ["global-process-owner"]
 type = "list"
 per = "P1"
 required = "optional"
-why = "The first sentence becomes the definition, and the rest the scope note."
-feeds = "`skos:definition`, and `skos:scopeNote` for the rest. A new role takes its definition from P5."
+why = "For a new process or step, the first sentence becomes the definition, and the rest the scope note. A new business area takes all of it as its definition."
+feeds = "`skos:definition`, and for a new process or step `skos:scopeNote` for the rest. A new role takes its definition from P5."
 fact = []
 
 [[question]]

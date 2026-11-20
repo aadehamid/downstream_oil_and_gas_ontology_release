@@ -10,7 +10,8 @@ reference item changes its own module, system for a system and data-product for 
 (kpi_store/change/process_map.py), and core when it adds business areas, processes or steps
 (kpi_store/change/core_release.py): core takes its next minor, by a builder written from release/build_core_template.py,
 and every other module a patch. One run applies proposals of one kind: term changes, new KPIs, reference items of
-one kind, process map requests or domain activations. Each changed module takes its own route, and every module that
+one kind, process map requests or domain activations; a process map request that adds a business area, a process
+or a step goes in a run of its own. Each changed module takes its own route, and every module that
 depends on one takes a patch, once. The command refuses, before it does anything else:
 - a proposal whose approval record lacks a signature its route needs (the Data Owner, or the Global Process Owner of
   a process map request, and the Architect; the Ontology Owner too for a major), or whose route is lower than its
@@ -105,8 +106,8 @@ CORE = "core"   # a process map request that adds a process, a step or a busines
 
 
 def _core_target(root, proposals):
-    """A run of process map requests that adds processes, steps or business areas: core at its next minor, written by
-    core_release.release, and organization too when the requests add roles or RACI entries. Its apply_changes needs
+    """A run of the one process map request that adds processes, steps or business areas: core at its next minor,
+    written by core_release.release, and organization too when the request adds roles or RACI entries. Its apply_changes needs
     the change id, the approval words and the date, which apply() gives it (_with_release)."""
     try:
         old, _ = core_release.core_graph(root)
@@ -160,7 +161,13 @@ def target_of(proposals):
     if kinds == {DOMAINS}:
         return DOMAINS
     if kinds == {"process map request"}:
-        return CORE if any(core_release.is_core(c) for p in proposals for c in p.changes) else ORGANIZATION
+        if not any(core_release.is_core(c) for p in proposals for c in p.changes):
+            return ORGANIZATION
+        if len(proposals) > 1:
+            raise ChangeRefused("A process map request that adds a process, a step or a business area is applied in a "
+                                "run of its own, so that the core release names its approval. Apply the proposals one at "
+                                "a time")
+        return CORE
     if "item" in kinds and len(kinds) > 1:
         raise ChangeRefused("these proposals change two modules: the kpi module and the module of a new reference "
                             "item. Apply them one module at a time")

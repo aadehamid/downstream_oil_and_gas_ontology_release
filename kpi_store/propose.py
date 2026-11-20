@@ -353,6 +353,9 @@ def _new_items(answers, lists, roles, slug_of, data, rows):
             continue
         if where not in processes or not where.startswith(core_release.PREFIXES["proc"]):
             raise ProposeRefused(f'P2: the place of "{name}" is not a process of the process map')
+        if any(n.casefold() == name.casefold() for n, _, _ in pending):
+            raise ProposeRefused(f'P1 names "{name}" twice as a new process. Give each new process its own name, or send '
+                                 "each in a request of its own")
         pending.append((name, where, " ".join(p for p in purpose if p)))
     chosen = "".join(rules.values(answers, "P8")[:1])
     for name, where, description in pending:
