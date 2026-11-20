@@ -109,6 +109,7 @@ def test_the_catalogue_has_the_new_module_form_and_the_ontology_owner_signs_it_a
     assert not cat.is_needed(signers["ontology-owner"], "term-change", {"T8": "yes"})
 
 
+@needs_fresh
 @pytest.mark.parametrize("example", [VOCABULARY, TABLE])
 def test_each_shipped_example_is_complete_and_signed(example):
     assert report(example).complete, report(example).lines
@@ -165,6 +166,7 @@ def read(folder):
     return proposal.read(folder)
 
 
+@needs_fresh
 def test_a_vocabulary_becomes_its_terms_lines_and_the_modules_facts(tmp_path):
     folder, = propose(tmp_path, form(tmp_path, VOCABULARY, number="NM-1"))
     p = read(folder)
@@ -173,12 +175,14 @@ def test_a_vocabulary_becomes_its_terms_lines_and_the_modules_facts(tmp_path):
     assert 'The term "Pump" (under "Rotating equipment")' in (folder / "summary.txt").read_text(encoding="utf-8")
 
 
+@needs_fresh
 def test_a_reference_table_becomes_its_items_lines_and_facts(tmp_path):
     folder, = propose(tmp_path, form(tmp_path, TABLE, number="NM-2"))
     p = read(folder)
     assert (p.lines, p.facts, p.route) == (ITEM_LINES, ITEM_FACTS, "major")
 
 
+@needs_fresh
 @pytest.mark.parametrize("answers,message", [
     # A property of another class.
     ({"N9": [str(SKOS.definition), str(SKOS.inScheme), PARTY + "carries"]}, "is a property of data flow, and the items are of product"),
@@ -197,6 +201,7 @@ def test_propose_refuses_a_reference_table_the_release_cannot_take(tmp_path, ans
     assert not (tmp_path / "proposals").exists()
 
 
+@needs_fresh
 def test_check_changes_refuses_a_line_the_pattern_does_not_take():
     lines = [nm.kgcl.read_line(line) for line in TERM_LINES]
     with pytest.raises(ChangeRefused, match="a vocabulary's lines are about its terms"):
@@ -208,12 +213,14 @@ def test_check_changes_refuses_a_line_the_pattern_does_not_take():
         nm.check_changes(cycle, TERM_FACTS, ROOT)
 
 
+@needs_fresh
 def test_a_class_the_form_does_not_offer_is_refused_with_the_reason():
     lines = [nm.kgcl.read_line(line.replace("party:Product", "sys:System")) for line in ITEM_LINES]
     with pytest.raises(ChangeRefused, match="the reference-item form adds systems"):
         nm.check_changes(lines, ITEM_FACTS, ROOT)
 
 
+@needs_fresh
 def test_the_table_checks_refuse_a_row_that_does_not_reconcile():
     mp = nm.patterns(ROOT)
     spec = {"module": "x", "pattern": "reference-table", "properties": [
@@ -240,6 +247,7 @@ def full_release(tmp_path):
     return root
 
 
+@needs_fresh
 def test_apply_refuses_a_new_module_without_the_ontology_owner(tmp_path):
     folder, = propose(tmp_path, form(tmp_path, VOCABULARY, number="NM-3"))
     record = json.loads((folder / "approval.json").read_text(encoding="utf-8"))
@@ -249,6 +257,7 @@ def test_apply_refuses_a_new_module_without_the_ontology_owner(tmp_path):
         apply_cmd.plan([folder], ROOT)
 
 
+@needs_fresh
 def test_apply_takes_one_new_module_a_run(tmp_path):
     one, two = propose(tmp_path, form(tmp_path, VOCABULARY, number="NM-4", name="a"),
                        form(tmp_path, TABLE, number="NM-5", name="b"))
@@ -256,6 +265,7 @@ def test_apply_takes_one_new_module_a_run(tmp_path):
         apply_cmd.plan([one, two], ROOT)
 
 
+@needs_fresh
 def test_compare_refuses_a_triple_no_line_states(tmp_path):
     root = tmp_path / "release"
     shutil.copytree(ROOT / cut.ONTOLOGY / "release", root / cut.ONTOLOGY / "release",

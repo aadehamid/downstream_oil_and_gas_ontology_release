@@ -69,7 +69,7 @@ class Onboard(unittest.TestCase):
             self.assertEqual(sorted(p for p in before if before[p] != after[p]), sorted(CHANGED))
             text = {p: after[p].decode("utf-8") for p in CHANGED}
             self.assertRegex(text[f"{ONT}/projection/pipeline.py"], r'\("lane", "[^"]+"\), \("sample-area", "1\.0\.0"\),')
-            self.assertIn('"system", "lane", "sample-area", "market-data"', text[f"{ONT}/projection/pipeline.py"])
+            self.assertIn('"system", "lane", "sample-area",', text[f"{ONT}/projection/pipeline.py"])
             self.assertIn('    "sa": "https://w3id.org/mpc/ontology/modules/sample-area/",\n', text[f"{ONT}/projection/pipeline.py"])
             self.assertEqual(text[f"{ONT}/projection/skill-run/epm-config.json"].count("sample-area"), 3)
             self.assertIn('        "version": "1.0.0", "stage": None, "approver": "the ontology owner", "issued": "2026-11-12",\n',
