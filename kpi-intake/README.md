@@ -195,8 +195,8 @@ Three answers send the request somewhere before the KPI can be added. The form s
 
 | The answer | Where the request goes | Who acts |
 |---|---|---|
-| The domain in 1.5 is not active, or is not in the list | **Domain activation.** Fill in the "Domain activation" form | The Domain Owner answers and signs. The Architect signs the change |
-| The business area, the process, the step or a role is not in the list (1.1, 1.2, 1.3, 6.1, 6.3) | **Process map request.** Fill in the "Process map request" form. It is smaller, and it is not a domain activation | The Global Process Owner answers and signs. The Architect signs and proposes the change to the process map |
+| The domain in 1.5 is not active, or is not in the list | **Domain activation.** Fill in the "Domain activation" form | The Domain Owner answers and signs. The Architect signs the change, then turns the form into a proposal with `python -m kpi_store.propose` and applies it with `python -m kpi_store.apply` |
+| The business area, the process, the step or a role is not in the list (1.1, 1.2, 1.3, 6.1, 6.3) | **Process map request.** Fill in the "Process map request" form. It is smaller, and it is not a domain activation | The Global Process Owner answers and signs. The Architect signs the change, then proposes and applies it with the same two commands. They add new roles and RACI entries. A new business area, process or step needs a release of `core`, which the commands cannot make, so it needs a specialist |
 | The KPI is restricted (3.7) | **Review.** Bring Privacy, Security, Compliance and Risk into the request, and record the date and the outcome in the sign-off block | The Program manager |
 
 The two smaller forms are tabs of the HTML form and sheets of the workbook. Each saves to its own answers file. "Load answers file" opens a file in the form it was saved from, whichever tab is open, and says which. It leaves out an answer under a number that form does not ask, and lists it. It refuses a file that is not an answers file, says what is wrong, and keeps the answers on the page.
@@ -212,12 +212,33 @@ Domain activation check: (no name yet)
 ...
 Result: not complete. 10 things to settle:
 ...
-This check changes nothing in the ontology. The Architect applies a complete intake by hand, with HOW-TO-UPDATE.md.
+This check changes nothing in the ontology. The Architect turns a complete domain activation into a proposal with python -m kpi_store.propose <this file>, as HOW-TO-UPDATE.md says.
 ```
 
 The blank form has eight required questions and two signatures, so the check lists ten things.
 
-When a domain activation is signed, set that domain to `active = true` in `settings.toml` and rebuild the forms. The KPI form can then go on. This step is the analyst's. The form keeps it out of the notice that the business reads, under "For the analyst".
+## The domain activation
+
+The domain activation makes a domain of `settings.toml` active, so the KPI form offers it in question 1.5. The ontology holds no list of domains, so no module of the ontology changes.
+
+The propose command reads D1 and D2 only. When D1 names a domain of the list, by its label or its id, the apply sets it to `active = true` and gives it the description of D2. When D1 names no domain of the list, the apply adds the domain at the end of the list, with the short key of D1 as its id, and makes it active. The other answers stay in the form's file. The propose command refuses a domain that is active already.
+
+Who signs: the Domain Owner, then the Architect, last. The apply then rebuilds the forms, and the KPI form can go on. `HOW-TO-UPDATE.md`, "Activate a domain with the domain activation form", has the steps, with the example `examples/customer.domain-activation.json`.
+
+## The process map request
+
+The process map request adds new roles and their RACI entries to the `organization` module. Each RACI entry names a process that the process map holds already.
+
+| No. | What the propose command reads |
+|---|---|
+| P1 | Each name must be a role: one of the organization module, or a new role of P5 |
+| P5 | The text field gives each new role on a line of its own, as its name, a colon and one sentence on what it does. That sentence becomes the role's definition. A new role is a position |
+| P6 | One RACI entry on each line: the process's number, the role and the level, with a comma between them, such as `CM 1.1.2, Business Analyst, consulted` |
+| P7 | The documents, which the note of each new role cites |
+
+The propose command refuses an answer to P2, P3 or P4, and a name in P1 that is not a role. Each of them asks for a new business area, process or step, which needs a release of `core`. The commands cannot make one, so the Architect takes that request to a specialist. It also refuses a new role that no line of P6 names, because the module holds a role only when a process names it.
+
+Who signs: the Global Process Owner, then the Architect, last. `HOW-TO-UPDATE.md`, "Add roles and RACI entries with the process map request", has the steps, with the example `examples/sample-pricing-coordinator.process-map-request.json`.
 
 ## The term change
 
@@ -339,10 +360,10 @@ label = "Value Chain Optimization Director"
 | `labels` | The label the forms and the check show for an entry, in place of the ontology's. The answers file still keeps the entry's id, and a workbook filled under the earlier label still reads |
 | `add` | An entry with an `id` and a `label`. The forms offer it, marked "new, not yet in the ontology" |
 
-After the build, [`for-the-architect.md`](for-the-architect.md) shows the list as the forms offer it. This is its line for the roles: 64 of the 65 entries are offered, one is hidden, and one is added.
+After the build, [`for-the-architect.md`](for-the-architect.md) shows each list as the forms offer it: how many entries it offers, how many it hides, and what it adds. This is its line on what the roles list hides:
 
 ```markdown excerpt=kpi-intake/for-the-architect.md
-| `roles` | 6.1 and P5 | 64 of 65 | 1 | Value Chain Optimization Director |
+- `roles` hides: Black Oil Manager.
 ```
 
 A hidden entry stays known. An answers file that already holds it still passes the check, with the note "hidden in this organization's settings". When a form names an added entry, the check tells the Architect to add it to the ontology first. The build stops when a name under `hide` or `keep_only` matches no entry, so a misspelt name cannot go unnoticed. It also stops when `add` names an entry that `hide` names, when an added entry matches more than one entry, or when two added entries share a label.

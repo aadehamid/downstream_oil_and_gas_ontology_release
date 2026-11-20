@@ -282,7 +282,7 @@ form = "domain-activation"
 name = "Domain activation"
 technical_name = "a data domain that is not active yet"
 audience = "business"
-about = "Use this form when the answer to question 1.5 of the KPI form is a domain that is not active, or \"not in the list\". A domain is a data domain, such as Customer or Market Price: a body of data with one Domain Owner. The form collects what the organization needs to make the domain active: what data it covers, who owns it, and what it serves. When the Domain Owner and the Architect have signed, the domain is set to active in settings.toml, and the KPI form can go on."
+about = "Use this form when the answer to question 1.5 of the KPI form is a domain that is not active, or \"not in the list\". A domain is a data domain, such as Customer or Market Price: a body of data with one Domain Owner. The form collects what the organization needs to make the domain active: what data it covers, who owns it, and what it serves. When the Domain Owner and the Architect have signed, the Architect turns the form into a proposal with one command and applies the proposal with another, which sets the domain to active in settings.toml. The KPI form can then go on. Nobody edits a file by hand."
 who = "The Domain Owner answers and signs. The Program manager owns the request. The Business analyst fills the form."
 done_when = "The domain has a name, a statement of the data it covers, a Domain Owner, its Data Owners and Data Stewards, the business areas it serves, at least one first KPI and a written basis with a date. The Domain Owner has signed the activation, and the Architect has signed the change."
 typical = "10"
@@ -294,7 +294,7 @@ form = "process-map-request"
 name = "Process map request"
 technical_name = "a business area, process, step or role that the process map lacks"
 audience = "business"
-about = "Use this form when a question of the KPI form ends in \"not in the list\" for the business area, the process, the step or a role. It is smaller than a domain activation and it is not one. It collects what the Architect needs to propose the change to the process map. The Architect then does the modelling and releases it."
+about = "Use this form when a question of the KPI form ends in \"not in the list\" for the business area, the process, the step or a role. It is smaller than a domain activation and it is not one. It collects what the Architect needs to change the process map. When the Global Process Owner and the Architect have signed, the Architect turns the form into a proposal with one command and applies the proposal with another. The two commands add new roles and their RACI entries for processes the map holds. A new business area, process or step needs a release of core, which the commands cannot make, so the Architect takes it to a specialist."
 who = "The Global Process Owner, or a named delegate, answers and signs. The Program manager owns the request. The Business analyst fills the form."
 done_when = "The form names what is missing, where it sits in the process map, and a document that describes it. The Global Process Owner and the Architect have signed."
 typical = "4 to 7"
@@ -1458,14 +1458,14 @@ fact = []
   label = "New roles (describe them below)"
 
   [question.detail]
-  label = "Each new role, with a one-sentence description"
+  label = "Each new role on a line of its own, written as its name, a colon and one sentence on what it does"
   type = "long_text"
   required_when = "@new-roles"
 
 [[question]]
 id = "P6"
 section = "P"
-text = "For each process, which role does the work, which answers for it, which is consulted, and which is informed? Write one line for each: the process, the role, and one of responsible, accountable, consulted or informed."
+text = "For each process, which role does the work, which answers for it, which is consulted, and which is informed? Write one line for each: the process's number, the role and one of responsible, accountable, consulted or informed, with a comma between them, such as \"CM 1.1.2, Business Analyst, consulted\"."
 asked_of = ["global-process-owner"]
 type = "list"
 rows = 12

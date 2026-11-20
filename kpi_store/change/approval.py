@@ -13,7 +13,10 @@ What it holds, and nothing else:
                     ...]}
 
 Who signs (Q4): the Data Owner signs a KPI definition, and the Architect signs the change. A major change or a new
-module also needs the Ontology Owner. read_record refuses a record that lacks a signature its route needs.
+module also needs the Ontology Owner. A domain activation needs the Domain Owner in place of the Data Owner, and a
+process map request the Global Process Owner (Q4, and the sign-off block of kpi-intake/catalogue.toml): the caller
+names that role with `owner`.
+read_record refuses a record that lacks a signature its route needs.
 
 The approval words are kept exactly as signed. The file is UTF-8 and keeps every character as it is, so words with
 no double quote and no backslash appear in the file text as signed, which is the existing rule for approvals
@@ -29,7 +32,7 @@ from . import ChangeRefused
 
 APPROVALS = Path("business_architecture") / "ontology" / "approvals"
 ROUTES = ("patch", "minor", "major")
-ROLES = ("Data Owner", "Architect", "Ontology Owner", "Domain Owner")
+ROLES = ("Data Owner", "Architect", "Ontology Owner", "Domain Owner", "Global Process Owner")
 FIELDS = ("change", "route", "new_module", "signatures")
 SIGNATURE_FIELDS = ("role", "name", "date", "words")
 # The change id names the file, so it holds no path separator: the same form as a discovery run's id (cut.RUN_ID).
@@ -37,9 +40,10 @@ CHANGE_ID = re.compile(r"[0-9A-Za-z][0-9A-Za-z._-]{0,99}")
 DATE = re.compile(r"\d{4}-\d\d-\d\d")
 
 
-def required_roles(route, new_module=False):
-    """The roles whose signatures a change on this route needs."""
-    roles = ["Data Owner", "Architect"]
+def required_roles(route, new_module=False, owner="Data Owner"):
+    """The roles whose signatures a change on this route needs. `owner` is the role that answers for the content:
+    the Data Owner, or the Domain Owner of a domain activation, or the Global Process Owner of a process map request."""
+    roles = [owner, "Architect"]
     if route == "major" or new_module:
         roles.append("Ontology Owner")
     return roles
@@ -53,8 +57,8 @@ def record_path(release_root, change_id):
     return Path(release_root) / APPROVALS / f"{change_id}.json"
 
 
-def check(record):
-    """Refuses a record that is not complete. Returns the record when it is."""
+def check(record, owner="Data Owner"):
+    """Refuses a record that is not complete. Returns the record when it is. `owner` as for required_roles."""
     if not isinstance(record, dict):
         raise ChangeRefused("the approval record is not a JSON object")
     missing = [f for f in FIELDS if f not in record]
@@ -87,7 +91,7 @@ def check(record):
         if not DATE.fullmatch(sig["date"]) or not _is_date(sig["date"]):
             raise ChangeRefused(f"signature {n}: the date {sig['date']!r} is not a date written as YYYY-MM-DD")
     signed = {sig["role"] for sig in signatures}
-    unsigned = [role for role in required_roles(record["route"], record["new_module"]) if role not in signed]
+    unsigned = [role for role in required_roles(record["route"], record["new_module"], owner) if role not in signed]
     if unsigned:
         what = "a new module" if record["new_module"] else f"a {record['route']} change"
         raise ChangeRefused(f"the change {record['change']} is not approved: {what} needs the signature of the "
@@ -103,11 +107,11 @@ def _is_date(text):
         return False
 
 
-def write_record(release_root, change_id, route, signatures, new_module=False):
+def write_record(release_root, change_id, route, signatures, new_module=False, owner="Data Owner"):
     """Checks and writes the approval record of one change, and returns its path. Refuses an incomplete record,
     and a record for a change that has one already."""
     record = check({"change": change_id, "route": route, "new_module": new_module,
-                    "signatures": list(signatures) if isinstance(signatures, tuple) else signatures})
+                    "signatures": list(signatures) if isinstance(signatures, tuple) else signatures}, owner)
     record["signatures"] = [{f: sig[f] for f in SIGNATURE_FIELDS} for sig in record["signatures"]]
     path = record_path(release_root, change_id)
     if path.exists():
@@ -118,8 +122,9 @@ def write_record(release_root, change_id, route, signatures, new_module=False):
     return path
 
 
-def read_record(path):
-    """Reads and checks one approval record. Refuses a missing, unreadable or incomplete record."""
+def read_record(path, owner="Data Owner"):
+    """Reads and checks one approval record. Refuses a missing, unreadable or incomplete record. `owner` as for
+    required_roles."""
     path = Path(path)
     try:
         text = path.read_text(encoding="utf-8")
@@ -131,7 +136,7 @@ def read_record(path):
         record = json.loads(text)
     except json.JSONDecodeError as err:
         raise ChangeRefused(f"the approval record {path} is not valid JSON (line {err.lineno})") from None
-    record = check(record)
+    record = check(record, owner)
     if path.name != f"{record['change']}.json":
         raise ChangeRefused(f"the approval record {path} is for the change {record['change']}, not for {path.stem}")
     return record

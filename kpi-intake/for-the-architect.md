@@ -4,6 +4,8 @@ This page maps the KPI intake form to the ontology. The business never sees it. 
 
 The check of a filled form changes nothing in the ontology. A complete KPI form becomes a proposal with the propose command, and the apply command adds it to the `kpi` module: [`HOW-TO-UPDATE.md`](../HOW-TO-UPDATE.md), "Add a KPI with the KPI intake form", has the steps. One proposal holds every module the form changes: `kpi` with the population, `value-stream` and `data-product`. The market series of 6.7 and the answer to 7.7 stay in the form's file, and the proposal's summary says so.
 
+A complete domain activation and a complete process map request go through the same two commands. A domain activation sets the domain to active in `settings.toml`, since the ontology holds no list of domains: "Activate a domain with the domain activation form" in `HOW-TO-UPDATE.md` has the steps. A process map request adds new roles and their RACI entries to `organization`: "Add roles and RACI entries with the process map request" has the steps. A new business area, process or step needs a release of `core`, which the commands cannot make, and the propose command says so.
+
 ## Business area and domain
 
 Two words are fixed in the intake. A business area is the function that runs a process, such as Commercial or Marketing. A domain is the data domain a KPI belongs to, such as Market Price, where the Domain Owner sits.
@@ -115,7 +117,7 @@ The ontology has no place for a KPI's domain yet, and holds no list of domains. 
 | P3 | What is the purpose of each missing process or step, in one sentence? | Optional | `skos:definition`. |
 | P4 | What are the steps of each missing process, in order? | Optional | Lower levels of the process map, `core:precedes`. |
 | P5 | Which roles work in these processes? | Optional | `org:Role` in `organization`, with `skos:prefLabel` and `skos:definition`. |
-| P6 | For each process, which role does the work, which answers for it, which is consulted, and which is informed? Write one line for each: the process, the role, and one of responsible, accountable, consulted or informed. | Optional | `orgx:ResponsibilityAssignment` with `forProcess`, `assignedRole`, `raciLevel`. |
+| P6 | For each process, which role does the work, which answers for it, which is consulted, and which is informed? Write one line for each: the process's number, the role and one of responsible, accountable, consulted or informed, with a comma between them, such as "CM 1.1.2, Business Analyst, consulted". | Optional | `orgx:ResponsibilityAssignment` with `forProcess`, `assignedRole`, `raciLevel`. |
 | P7 | Which documents describe them: a process manual, a policy, a published report? | Required | `dcterms:source` IRIs and their tiers in `authority/source-tiers.csv`. |
 
 ### Term change

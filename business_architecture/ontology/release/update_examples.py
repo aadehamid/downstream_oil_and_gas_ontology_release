@@ -349,14 +349,6 @@ def raci_pins(tree, date):
     return swap(tree, path, '(f["deprecated roles"], f["live roles"]), (3, 57))', '(f["deprecated roles"], f["live roles"]), (3, 59))')
 
 
-def raci_form_guide(tree, date):
-    """The count of roles in the intake pack's guide. The guide quotes the roles line of for-the-architect.md, which
-    the build of the pack writes, and the full check compares the two. Two more roles raise both figures by two."""
-    path = "kpi-intake/README.md"
-    swap(tree, path, "64 of the 65 entries are offered", "66 of the 67 entries are offered")
-    return swap(tree, path, "| `roles` | 6.1 and P5 | 64 of 65 | 1 |", "| `roles` | 6.1 and P5 | 66 of 67 | 1 |")
-
-
 # ---- domain-list: a made-up list of data domains in the kpi module -------------------------------------------
 
 DOMAIN_NS = "https://w3id.org/mpc/ontology/modules/kpi/"
@@ -656,7 +648,7 @@ EXAMPLES = {
         "next": "Now build: cd ../data-product, then build_data_products.py --write.",
     },
     "raci": {
-        "places": (raci_proposal, raci_source, raci_register, raci_roles, raci_pins, cut_tests, raci_form_guide,
+        "places": (raci_proposal, raci_source, raci_register, raci_roles, raci_pins, cut_tests,
                    approval("raci", "organization 2.3.0", "Approved as a minor: two roles and the RACI of CM 1.1.2.")),
         "next": "Now build: cd ../organization, then build_roles.py --write and build_assignments.py --write.",
     },

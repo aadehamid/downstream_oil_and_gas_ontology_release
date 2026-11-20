@@ -5,8 +5,13 @@ small lists, written by hand. So they do not change when a module is released. E
 except the settings file's domain ids, which the catalogue's example list holds.
 """
 import copy
+import csv
+from pathlib import Path
 
 from kpi_store.intake.answers import Intake
+
+ROOT = Path(__file__).resolve().parents[2]
+APPROVALS = ROOT / "business_architecture" / "ontology" / "approvals"
 
 X = "https://example.org/"
 AREA_SUPPLY, AREA_SALES = X + "area/supply", X + "area/sales"
@@ -88,3 +93,25 @@ def intake(change=None, remove=(), sign_offs=None, **fields):
         answers.pop(key, None)
     return Intake(form="kpi-intake", catalogue_version="1.2", kpi_name=answers.get("2.1", ""), answers=answers,
                   sign_offs=copy.deepcopy(SIGNED if sign_offs is None else sign_offs), **fields)
+
+
+def domains_as_shipped(domains, approvals=APPROVALS):
+    """The list of domains of settings.toml without what the domain activation form changed (KPI-DEC-0002, Q10
+    form 3), read from the facts the apply command keeps beside each approval record: a domain the form added is
+    left out, and one it made active is not active. The tests write the shipped list by hand, so they still hold on
+    a copy where the form has activated a domain."""
+    added, activated = set(), set()
+    for path in Path(approvals).glob("*.facts.csv"):
+        with path.open(newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                if row["measure"].startswith("domain:"):
+                    key = row["measure"].split(":", 1)[1]
+                    (added if row["property"] == "label" else activated if row["property"] == "active" else set()).add(key)
+    return [dict(d, active=False) if d["id"] in activated else d for d in domains if d["id"] not in added]
+
+
+def as_shipped(cat):
+    """The catalogue with the list of domains as shipped (domains_as_shipped)."""
+    cat = copy.copy(cat)
+    cat.settings_lists = dict(cat.settings_lists, domains=domains_as_shipped(cat.settings_lists["domains"]))
+    return cat

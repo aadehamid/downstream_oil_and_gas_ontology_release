@@ -7,9 +7,8 @@ questions the rules rightly skipped, where an answer routes the request, and wha
 ends with exit status 0 only when the intake is complete and signed, 1 when something is still to do, and 2 when
 the file cannot be read.
 
-It changes nothing in the ontology. A complete KPI intake, term change or reference item goes to the propose
-command (kpi_store/propose.py). The Architect applies a complete domain activation or process map request by hand,
-with HOW-TO-UPDATE.md.
+It changes nothing in the ontology. A complete form of any of the five goes to the propose command
+(kpi_store/propose.py), and its proposal to the apply command (kpi_store/apply.py).
 
 The derived checks compare the form with kpi-intake/pick-lists.json, which the build command writes from the
 release packages:
@@ -40,7 +39,6 @@ from kpi_store.intake import rules
 from kpi_store.intake.catalogue import ADDED_MARK, CHOICE_TYPES, FORMS, HIDDEN_MARK, SETTINGS_LISTS
 
 CLOSE = 0.88        # two names at least this alike are shown to a person as a possible match
-APPLY = "This check changes nothing in the ontology. The Architect applies a complete intake by hand, with HOW-TO-UPDATE.md."
 PROPOSE = ("This check changes nothing in the ontology. The Architect turns a complete {} into a proposal with "
            "python -m kpi_store.propose <this file>, as HOW-TO-UPDATE.md says.")
 TERM_CHANGES = ("T2", "T3", "T4", "T5", "T6", "T7")   # the questions of the term change that each ask for a change
@@ -494,10 +492,7 @@ def check(cat, data, intake, stale=None):
         report.say(f"Result: not complete. {count} {'thing' if count == 1 else 'things'} to settle:")
         for line in report.blocking:
             report.say("  - " + line)
-    if intake.form == "kpi-intake":
-        report.say(PROPOSE.format(FORMS[intake.form]))
-    else:
-        report.say(PROPOSE.format(FORMS[intake.form].lower()) if intake.form in ("term-change", "reference-item") else APPLY)
+    report.say(PROPOSE.format(FORMS[intake.form] if intake.form == "kpi-intake" else FORMS[intake.form].lower()))
     return report
 
 

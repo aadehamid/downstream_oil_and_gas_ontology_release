@@ -157,6 +157,18 @@ needs_env = ["DOC_SNIPPETS_SLOW"]
 timeout = 1800
 about = "A Git copy of its own for the update guide's new KPI: a KPI intake form, the propose command and the apply command. Set DOC_SNIPPETS_SLOW=1."
 
+[contexts.domain-activation]
+base = "release-copy"
+git = true
+needs_env = ["DOC_SNIPPETS_SLOW"]
+timeout = 1800
+about = "A Git copy of its own for the update guide's domain activation: a form, the propose command and the apply command. Set DOC_SNIPPETS_SLOW=1."
+[contexts.process-map-request]
+base = "release-copy"
+git = true
+needs_env = ["DOC_SNIPPETS_SLOW"]
+timeout = 1800
+about = "A Git copy of its own for the update guide's process map request: a form for a new role and its RACI entries, the propose command and the apply command. Set DOC_SNIPPETS_SLOW=1."
 [contexts.first-run.placeholders]
 "your Neo4j load folder" = "env:KPI_STORE_TEST_LPG_OUT"
 

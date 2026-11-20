@@ -178,7 +178,8 @@ def test_the_page_is_one_offline_file_with_lf_line_ends():
     core = data["term_names"]["core"]
     assert set(core) == {"defined", "undefined"} and all(isinstance(name, str) for names in core.values() for name in names)
     assert "Margin Management" in core["defined"] and "Process Business Renewal Request" in core["undefined"]
-    assert [d["label"] for d in data["settings_lists"]["domains"] if d["active"]] == ["Market Price", "Financial Performance"]
+    assert [d["label"] for d in made_up.domains_as_shipped(data["settings_lists"]["domains"]) if d["active"]] == [
+        "Market Price", "Financial Performance"]
 
 
 def test_the_page_shows_who_answers_why_and_an_example_for_each_question(cat, committed):

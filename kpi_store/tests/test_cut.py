@@ -38,10 +38,13 @@ as_shipped = pytest.mark.skipif(HELD != BASELINE, reason=f"this tree holds {HELD
 
 def test_the_baseline_is_this_trees_or_data_product_has_moved_on():
     """The cut tests skip on a tree that is not at their baseline. That is right after a cut or a release of
-    data-product, which moves all five modules on. It is wrong when data-product is still at the baseline and a
-    module that depends on it was released alone: the tests would then skip without a word."""
+    data-product, which moves all five modules on, and after the apply command has released a change of a signed form,
+    which keeps its approval record under approvals/. It is wrong when data-product is still at the baseline and a
+    module that depends on it was released alone by hand: the tests would then skip without a word."""
     if HELD["data-product"] != BASELINE["data-product"]:
         return
+    if any((support.ROOT / ONTOLOGY / "approvals").glob("*.json")):
+        return   # the apply command released a module of a signed form: the copy has moved on from the release on purpose
     assert HELD == BASELINE, ("a module that depends on data-product was released, so the cut tests are skipped: write this tree's "
                               "versions in CORRECTED in this file. In a copy that has moved on from the release for good, add this "
                               "test to scripts/pinned-tests.txt instead.")

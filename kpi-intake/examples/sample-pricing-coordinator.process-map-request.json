@@ -1,0 +1,21 @@
+{
+  "format": 1,
+  "form": "process-map-request",
+  "catalogue_version": "1.2",
+  "kpi_name": "Sample Pricing Coordinator",
+  "request": {"number": "PM-2026-001", "date": "2026-11-19", "requester_role": "Program manager", "invited": "Global Process Owner"},
+  "answers": {
+    "P1": ["Sample Pricing Coordinator"],
+    "P5": ["@new-roles"],
+    "P5.detail": "Sample Pricing Coordinator: A made-up role that coordinates the daily price updates of one region.",
+    "P6": ["CM 1.1.2.1, Sample Pricing Coordinator, responsible", "CM 1.1.2, Sample Pricing Coordinator, accountable"],
+    "P7": ["A made-up regional pricing procedure, 2026-11-19"]
+  },
+  "sign_offs": {
+    "global-process-owner": {"name": "Placeholder for the Global Process Owner's name", "date": "2026-11-19"},
+    "architect": {"name": "Placeholder for the Architect's name", "date": "2026-11-19"}
+  },
+  "consulted": {},
+  "example_of": "",
+  "comment": "A made-up example: the role, its RACI entries and the document are made up. The signer names are placeholders."
+}

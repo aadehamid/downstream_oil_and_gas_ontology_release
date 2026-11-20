@@ -149,6 +149,7 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   kpi_store/tests/test_reference_item.py \
   kpi_store/tests/test_new_kpi.py \
   kpi_store/tests/test_new_kpi_modules.py \
+  kpi_store/tests/test_domain_and_process_map.py \
   kpi_store/tests/test_discovery.py \
   kpi_store/tests/test_load_databricks.py \
   kpi_store/tests/test_metric_view.py \

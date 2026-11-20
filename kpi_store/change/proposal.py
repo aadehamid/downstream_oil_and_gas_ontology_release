@@ -1,15 +1,20 @@
-"""A proposal: one signed term change, new reference item or new KPI, as the files the apply command reads
-(KPI-DEC-0002, Q4, Q5, Q6, Q10 and Q13; KPI-DEC-0004, item 1).
+"""A proposal: one signed term change, new reference item, new KPI, domain activation or process map request, as the
+files the apply command reads (KPI-DEC-0002, Q4, Q5, Q6, Q10 and Q13; KPI-DEC-0004, item 1).
 
 One form gives one proposal (Q6). A proposal is one folder, named by its change id, that holds three files, and a
-fourth for a new KPI:
+fourth when some facts are ones KGCL cannot write:
 
-    change.kgcl     the KGCL lines, one per change, as kgcl.py writes them
+    change.kgcl     the KGCL lines, one per change, as kgcl.py writes them; empty for a domain activation
     approval.json   the approval record of the change, in the form approval.py checks, written from the form's
                     sign-off: each signer's role, name, date and the words the signature means
     summary.txt     the same for a person, in plain words: what changes, the route, and who signed
-    facts.csv       a new KPI only: the facts KGCL cannot write, one row each, with the columns measure, property
-                    and value (new_measures.py says which)
+    facts.csv       the facts KGCL cannot write, one row each, with the columns measure, property and value; the
+                    first column may name any item. A new KPI's (new_measures.py says which), a process map
+                    request's (process_map.py) and a domain activation's, which holds nothing else (domains.py)
+
+Who answers for the content, and so signs beside the Architect (Q4), follows from what the proposal changes: the
+Domain Owner for a domain activation, the Global Process Owner for roles and their RACI entries, and the Data Owner
+for everything else (owner_of).
 
 The route (Q5). Each kind of change suggests one: a new other name and a new process link add content, so they
 are minor, and so is a new reference item or a new KPI (its create node line and the lines about the new node); a rename, a new
@@ -19,7 +24,8 @@ be correct?" can only raise it: "no" or "not sure" makes it major. The approval 
 refuses a record whose route is lower than its changes suggest.
 
 Two proposals conflict when they touch the same field of the same measure: its name, its definition, its other
-names or its process links, or when both add the same new item (Q6). The apply command refuses conflicting
+names or its process links, when both add the same new item or the same line, or when both change the same domain
+(Q6). The apply command refuses conflicting
 proposals before it writes anything.
 
 Nothing here writes outside the folder it is given.
@@ -49,9 +55,23 @@ def highest(routes):
 
 
 def route_of(changes, compatible="yes"):
-    """The route the changes suggest, raised to major when the compatibility answer is "no" or "not sure"."""
-    route = highest(ROUTE_OF[c.kind] for c in changes)
+    """The route the changes suggest, raised to major when the compatibility answer is "no" or "not sure". A domain
+    activation has no KGCL line, and adds a choice to the forms: a minor."""
+    route = highest(ROUTE_OF[c.kind] for c in changes) if changes else "minor"
     return "major" if compatible in RAISED_BY else route
+
+
+DOMAIN = "domain:"                     # the subject of a domain activation's facts (domains.py)
+PROCESS_MAP_PREFIXES = ("role", "asg")  # the subjects of a process map request's lines (process_map.py)
+
+
+def owner_of(changes, facts=()):
+    """The role that signs for the content of these changes beside the Architect."""
+    if not changes and facts and all(s.startswith(DOMAIN) for s, _, _ in facts):
+        return "Domain Owner"
+    if any(c.subject.split(":", 1)[0] in PROCESS_MAP_PREFIXES for c in changes):
+        return "Global Process Owner"
+    return "Data Owner"
 
 
 @dataclass
@@ -66,6 +86,10 @@ class Proposal:
     @property
     def route(self):
         return self.record["route"]
+
+    @property
+    def owner(self):
+        return owner_of(self.changes, self.facts)
 
 
 def facts_text(facts):
@@ -95,7 +119,7 @@ def write(folder, changes, record, summary, facts=()):
     """Writes one proposal folder and returns it, with facts.csv when there are facts. Refuses a folder that exists,
     an incomplete record and a change that has no KGCL line."""
     folder = Path(folder)
-    record = approval.check(record)
+    record = approval.check(record, owner_of(changes, facts))
     if record["change"] != folder.name:
         raise ChangeRefused(f"the approval record is for {record['change']}, and the folder is {folder.name}")
     text = kgcl.write_lines(changes)
@@ -129,10 +153,10 @@ def read(folder):
     except (OSError, UnicodeDecodeError, ValueError) as err:
         raise ChangeRefused(f"the proposal {folder.name} cannot be read ({type(err).__name__}: {err})") from None
     changes = [kgcl.read_line(line) for line in lines]
-    if not changes:
+    if not changes and not (facts and owner_of(changes, facts) == "Domain Owner"):
         raise ChangeRefused(f"the proposal {folder.name} holds no change")
     try:
-        record = approval.check(record)
+        record = approval.check(record, owner_of(changes, facts))
     except ChangeRefused as err:
         raise ChangeRefused(f"the proposal {folder.name} is not approved: {err}") from None
     if record["change"] != folder.name:
@@ -157,11 +181,14 @@ def conflicts(proposals):
             (c.subject, "line", kgcl.write_line(c)) if c.kind == "create edge" and not c.subject.startswith("measure:")
             else (c.subject, "field", FIELD[c.kind])
             for c in proposal.changes if c.subject not in made}
+        keys |= {(s, "domain", "") for s, _, _ in proposal.facts if s.startswith(DOMAIN)}
         for key in sorted(keys):
             if key in seen and seen[key] != proposal.change:
                 subject, kind, detail = key
                 if kind == "new item":
                     out.append(f"the proposals {seen[key]} and {proposal.change} both add {subject}")
+                elif kind == "domain":
+                    out.append(f"the proposals {seen[key]} and {proposal.change} both change the domain {subject}")
                 elif kind == "line":
                     out.append(f"the proposals {seen[key]} and {proposal.change} both add the line {detail}")
                 else:
