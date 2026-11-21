@@ -3,8 +3,8 @@ KPI-DEC-0004, item 1).
 
 The patterns are release/module_patterns.py's: a vocabulary (terms with definitions, other names and a hierarchy)
 and a reference table (items of a class the ontology holds, each with one value of each of a fixed set of
-properties the ontology holds). A new class, a new property or a rule of its own needs a specialist, and the form
-says so. What each line says:
+properties the ontology holds). A new class, a new property or a rule of its own is new modelling: an AI drafts it
+under the five gates of Q19 (drafted.py), or a specialist designs it. What each line says:
 
     module:<key>,pattern,<vocabulary or reference-table>      facts.csv, the module itself
     module:<key>,title,<its name>

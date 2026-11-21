@@ -222,7 +222,7 @@ def from_signed_form(path, intake, root, signatures):
     if not record_path.is_file():
         raise ChangeRefused(f"{path.name} asks for new modelling (N3), and has no AI draft beside it. A specialist "
                             "designs it, or the AI drafts it before anyone signs: python -m kpi_store.propose "
-                            f"--ai-draft {path.as_posix()} (HOW-TO-UPDATE.md, \"Draft new modelling with AI\")")
+                            f"--ai-draft {path.as_posix()} (HOW-TO-UPDATE.md, \"Draft new modelling with AI (optional)\")")
     try:
         record = json.loads(record_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, ValueError) as err:

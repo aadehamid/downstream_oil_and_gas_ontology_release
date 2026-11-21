@@ -102,7 +102,7 @@ def report(path):
 def test_the_catalogue_has_the_new_module_form_and_the_ontology_owner_signs_it_always():
     cat = catalogue.load(ROOT / "kpi-intake")
     assert catalogue.FORMS["new-module"] == "New module"
-    assert [q["id"] for q in cat.questions_of("new-module")] == [f"N{i}" for i in range(1, 13)]
+    assert [q["id"] for q in cat.questions_of("new-module")] == [f"N{i}" for i in range(1, 14)]
     signers = {s["id"]: s for s in cat.signers("new-module")}
     assert sorted(signers) == ["architect", "data-owner", "ontology-owner"]
     assert cat.is_needed(signers["ontology-owner"], "new-module", {})
@@ -122,10 +122,14 @@ def test_a_module_without_the_ontology_owners_signature_is_not_complete(tmp_path
     assert any("Ontology Owner has not signed" in b for b in found.blocking)
 
 
-def test_new_modelling_needs_a_specialist(tmp_path):
-    found = report(form(tmp_path, VOCABULARY, {"N3": "new-modelling"}))
-    assert not found.complete
-    assert any("Needs a specialist" in line for line in found.lines)
+def test_new_modelling_asks_what_the_module_must_say_and_points_to_the_ai_draft(tmp_path):
+    found = report(form(tmp_path, VOCABULARY, {"N3": "new-modelling"}, drop=("N4", "N5", "N6", "N7")))
+    assert not found.complete   # N13 is not answered
+    assert any("New modelling: an AI draft or a specialist" in line for line in found.lines)
+    found = report(form(tmp_path, VOCABULARY, {"N3": "new-modelling", "N13": "Inspections of tanks, each on one date."},
+                        drop=("N4", "N5", "N6", "N7")))
+    assert found.complete, found.blocking
+    assert any("--ai-draft" in line for line in found.lines)
 
 
 @pytest.mark.parametrize("answers,message", [

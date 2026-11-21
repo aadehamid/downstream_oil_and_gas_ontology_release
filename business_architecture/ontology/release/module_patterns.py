@@ -6,8 +6,8 @@
     reference-table   items of a class the ontology holds already, each with one value of each of a fixed set of
                       properties the ontology holds already
 
-Neither pattern adds a class, a property or a rule of meaning: a module that needs one is a specialist's work
-(HOW-TO-UPDATE.md, "Onboard another module"). The shapes of each pattern are fixed below; the module's settings
+Neither pattern adds a class, a property or a rule of meaning: a module that needs one is drafted by an AI under
+five gates (drafted_module.py), or is a specialist's work (HOW-TO-UPDATE.md, "Onboard another module"). The shapes of each pattern are fixed below; the module's settings
 only fill them in.
 
 A module made by a pattern has five files of its own, which the apply command writes from a proposal
