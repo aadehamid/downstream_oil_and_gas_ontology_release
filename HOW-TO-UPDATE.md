@@ -947,7 +947,7 @@ An AI can read a filled form before anyone signs it, and suggest clearer answers
 
 The AI reads the answers that people wrote in words, and the form's choices of a measure or a process. It also reads the names of what the release holds, such as its measures and its processes, so that it can say "this matches the measure Unit Utilization". Its instructions are the release's own skills, the files `skills/ontology/SKILL.md` and `skills/clear-writing/SKILL.md`, so the rules are the same whichever model the client picks. You never need to open them.
 
-Each AI step leaves a record beside the form: the provider, the model and its version, who approved the provider and when, each skill file with its SHA-256, the prompt and its SHA-256, the SHA-256 of the AI's answer, and each suggestion with your choice. The proposal keeps the record in `summary.txt` and in `approval.json`, and the apply command keeps it in the release's approval record.
+Each AI step leaves a record beside the form: the provider, the model and its version, the address it called, who approved the provider and when, each skill file with its SHA-256, the SHA-256 of the prompt, the SHA-256 of the AI's answer, and each suggestion with your choice. The record keeps no text of the prompt, because the prompt holds the form's answers before anyone signed them. The prompt's SHA-256 is that of the skills' text, a blank line and the task, which is exactly what the by-hand prompt file holds. The proposal keeps the record in `summary.txt` and in `approval.json`, and the apply command keeps it in the release's approval record.
 
 ### Choose the provider
 
@@ -1099,7 +1099,7 @@ The example asks for suggestions on a term change of the measure Unit Utilizatio
    AI suggestions: Genie Code was asked on <date>, with the provider approved by An IT Approver on 2026-11-20.
      - T2, accepted (the signed form holds it): "Process Unit Utilization". Why: The release writes the names of its measures with capital initials and US spelling, as the measure Unit Utilization shows.
      - T4, rejected: ["unit capacity utilization"]. Why: An other name works best when it is the words people say in full, so a search finds it.
-     The whole record, with the prompt and the fingerprints, is in approval.json under "ai".
+     The whole record, with its fingerprints, is in approval.json under "ai".
    ...
    ```
 

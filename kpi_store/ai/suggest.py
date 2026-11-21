@@ -17,8 +17,10 @@ the answers file. So the suggestions come before anyone signs:
 4. The person accepts or rejects each suggestion at the terminal, or in a choices file ({"T3": "yes", "T2": "no"}).
    Each accepted suggestion replaces its answer in the form's file. Nothing else in the file changes.
 5. The command writes the record of the AI step beside the form, as <form>.ai.json: the provider, the assistant,
-   the model and its version, the IT approval, the skill files and their SHA-256, the prompt and its SHA-256, the
-   SHA-256 of the AI's answer, and every suggestion with whether the person accepted it (Q20).
+   the model and its version, the IT approval, the skill files and their SHA-256, the SHA-256 of the prompt, the
+   SHA-256 of the AI's answer, the endpoint it called, and every suggestion with whether the person accepted it (Q20).
+   The record keeps no prompt text, since the prompt holds the form's answers before signing: prompt_sha256 is the
+   SHA-256 of the system prompt, a blank line and the task, the exact text of the by-hand prompt file.
 6. The signers read the form as it now stands and sign it. Then the plain propose command checks the form as it
    checks every form. It finds the record beside the form, and keeps it in the proposal's approval.json and in
    summary.txt, adding to each suggestion whether the signed form still holds it. The apply command keeps the same
@@ -33,6 +35,7 @@ Without --ai, and with no record beside the form, the propose command is exactly
 import datetime as dt
 import hashlib
 import json
+import os
 import re
 from pathlib import Path
 
@@ -69,12 +72,12 @@ def instructions(root):
     """The system prompt, the release's skill files one after the other, and [{path, sha256}] of each file."""
     texts, hashes = [], []
     for name in SKILLS:
-        try:
-            text = (Path(root) / name).read_text(encoding="utf-8")
+        try:   # bytes, so that the fingerprint is the file's own whatever its line ends
+            raw = (Path(root) / name).read_bytes()
+            texts.append(raw.decode("utf-8"))
         except (OSError, UnicodeDecodeError):
             raise AIRefused(f"the release has no readable {name}, the skill the AI follows") from None
-        texts.append(text)
-        hashes.append({"path": name, "sha256": sha256(text)})
+        hashes.append({"path": name, "sha256": hashlib.sha256(raw).hexdigest()})
     return "\n\n".join(texts), hashes
 
 
@@ -109,7 +112,8 @@ def _names(form, lists, terms):
         if name == "terms":
             entries = sorted({t["names"][0] for t in terms if t.get("names")})
         elif name == "measures":
-            entries = [f'{m["label"]} ({m["notation"]}): {m.get("definition", "")}' for m in lists.get("measures", [])]
+            entries = [f'{m["label"]} ({m["notation"]}): {m.get("definition", "")}' for m in lists.get("measures", [])
+                       if not m.get("hidden")]
         else:
             entries = [i["label"] for i in lists.get(name, []) if not i.get("hidden")]
         lines += ["", f"{LIST_TITLES[name]}:"] + [f"- {e}" for e in entries]
@@ -185,16 +189,16 @@ def parse(text, asked, lists):
         if not ok:
             what = "a list of texts" if kind == LIST_TYPE else "a text that is not empty"
             raise AIRefused(f"{where}, for {q}, must suggest {what}")
-        if new == now:
-            raise AIRefused(f"{where}, for {q}, suggests the answer the form holds already")
-        if not isinstance(item["reason"], str) or not item["reason"].strip():
-            raise AIRefused(f"{where}, for {q}, gives no reason")
         answer = new
-        if kind == CHOICE_TYPE:
+        if kind == CHOICE_TYPE:   # the entry's own name, so that a change of case alone is no change
             found = _choices(lists, source).get(new.casefold())
             if not found:
                 raise AIRefused(f"{where}, for {q}, names \"{new}\", which is not an entry of the list {source}")
             new, answer = found
+        if new == now:
+            raise AIRefused(f"{where}, for {q}, suggests the answer the form holds already")
+        if not isinstance(item["reason"], str) or not item["reason"].strip():
+            raise AIRefused(f"{where}, for {q}, gives no reason")
         out.append({"question": q, "current": now, "suggested": new, "reason": item["reason"].strip(), "answer": answer})
     return out
 
@@ -237,10 +241,11 @@ def choose(found, asked, choices_file=None, ask=input, say=print):
     return out
 
 
-def _settings(stores):
+def _settings(stores, root, environ):
+    """[ai] of the local settings file, refused when the file is inside the release folder the command was given."""
     from kpi_store import local_settings
     try:
-        return local_settings.load(local_settings.locate(stores)).ai
+        return local_settings.load(local_settings.locate(stores, environ), environ=environ, release_root=root).ai
     except local_settings.LocalSettingsError as err:
         raise AIRefused(f"the local settings that name the AI provider cannot be read: {err}") from None
 
@@ -252,7 +257,7 @@ def run(form_path, release_root=".", stores=None, answer_file=None, choices_file
     from kpi_store.intake import answers, catalogue, picklists
     root = Path(release_root).resolve()
     path = Path(form_path)
-    ai = providers.ready(ai if ai is not None else _settings(stores))
+    ai = providers.ready(ai if ai is not None else _settings(stores, root, environ))
     if path.suffix.lower() != ".json":
         raise AIRefused(f"{path.name} is not a form saved as JSON. --ai takes the answers file the HTML form saves, "
                         "so that the accepted suggestions can go back into it")
@@ -289,7 +294,8 @@ def run(form_path, release_root=".", stores=None, answer_file=None, choices_file
         return None
     if ai.provider == "by-hand":
         try:
-            text, version = Path(answer_file).read_text(encoding="utf-8"), ""
+            raw = Path(answer_file).read_bytes()
+            text, version, endpoint, output = raw.decode("utf-8"), "", "", hashlib.sha256(raw).hexdigest()
         except (OSError, UnicodeDecodeError) as err:
             raise AIRefused(f"the answer file {answer_file} cannot be read ({type(err).__name__})") from None
         say(f"read the answer of {ai.assistant} from {Path(answer_file).as_posix()}")
@@ -297,25 +303,32 @@ def run(form_path, release_root=".", stores=None, answer_file=None, choices_file
         say(f"asked {ai.provider} (model {ai.model}) for suggestions on {path.name}")
         kwargs = {"opener": opener} if opener else {}
         reply = providers.ask(ai, system, user, environ, **kwargs)
-        text, version = reply.text, reply.model_version
+        text, version, endpoint, output = reply.text, reply.model_version, reply.endpoint, sha256(reply.text)
     found = parse(text, asked, data["lists"])
     say(f"the AI suggested {len(found)} change{'s' if len(found) != 1 else ''}")
     accepted = choose(found, asked, choices_file, ask, say) if found else []
     record = {"format": 1, "form": intake.form, "provider": ai.provider, "assistant": ai.assistant,
-              "model": ai.model, "model_version": version, "approved_by": ai.approved_by, "approved_on": ai.approved_on,
-              "asked_on": today or dt.date.today().isoformat(), "skills": skills, "prompt": user,
-              "prompt_sha256": sha256(prompt), "output_sha256": sha256(text),
+              "model": ai.model, "model_version": version, "endpoint": endpoint, "approved_by": ai.approved_by,
+              "approved_on": ai.approved_on, "asked_on": today or dt.date.today().isoformat(), "skills": skills,
+              "prompt_sha256": sha256(prompt), "output_sha256": output,
               "suggestions": [dict(s, accepted=a) for s, a in zip(found, accepted)]}
     approval.check_ai(record, step=True)
-    if any(accepted):
-        raw = json.loads(path.read_text(encoding="utf-8"))
-        for s, a in zip(found, accepted):
-            if a:
-                raw["answers"][s["question"]] = s["answer"]
-        with path.open("w", encoding="utf-8", newline="\n") as f:
-            f.write(json.dumps(raw, ensure_ascii=False, indent=2) + "\n")
-    with record_path.open("w", encoding="utf-8", newline="\n") as f:
+    # The record first: a form that took an AI answer always has its record beside it.
+    with record_path.open("x", encoding="utf-8", newline="\n") as f:
         f.write(json.dumps(record, ensure_ascii=False, indent=2) + "\n")
+    if any(accepted):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            for s, a in zip(found, accepted):
+                if a:
+                    data["answers"][s["question"]] = s["answer"]
+            new = path.with_name(path.name + ".new")   # written whole, then put in the form's place
+            with new.open("w", encoding="utf-8", newline="\n") as f:
+                f.write(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+            os.replace(new, path)
+        except OSError:
+            record_path.unlink(missing_ok=True)
+            raise
     took = sum(accepted)
     say(f"accepted {took} of {len(found)} suggestion{'s' if len(found) != 1 else ''}" +
         (f"; wrote {'it' if took == 1 else 'them'} into {path.name}" if took else "; the form is as it was"))
@@ -363,5 +376,5 @@ def summary_lines(record):
             out.append(f"  - {s['question']}, accepted ({kept}): {_shown(s['suggested'])}. Why: {s['reason']}")
         else:
             out.append(f"  - {s['question']}, rejected: {_shown(s['suggested'])}. Why: {s['reason']}")
-    out.append('  The whole record, with the prompt and the fingerprints, is in approval.json under "ai".')
+    out.append('  The whole record, with its fingerprints, is in approval.json under "ai".')
     return out

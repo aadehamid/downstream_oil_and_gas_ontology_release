@@ -6,8 +6,8 @@ plain sentence, unless the provider is set, approved and complete.
 
     databricks   a model served in the client's Databricks workspace, the default choice (Q18): the serving
                  endpoint `model`, at <host>/serving-endpoints/<model>/invocations. The host and the token come
-                 from the Databricks configuration profile `profile`, or the token from the environment variable
-                 `key_env` and the address from `url`.
+                 from the Databricks configuration profile `profile` (no profile takes anything from [DEFAULT]),
+                 or the token from the environment variable `key_env` and the address from `url`.
     anthropic    the Anthropic Messages API, with the API key in the environment variable `key_env`.
     openai       OpenAI chat completions, with the API key in the environment variable `key_env`.
     by-hand      no call. The command writes the prompt to a file. The person gives it to an assistant, such as
@@ -43,6 +43,7 @@ the same call.
 """
 import configparser
 import datetime as dt
+import http.client
 import json
 import os
 import re
@@ -72,6 +73,31 @@ SETTINGS_SECTION = 'HOW-TO-UPDATE.md, "Use AI to suggest answers (optional)"'
 class Reply:
     text: str             # the model's answer, as it gave it
     model_version: str    # the model the reply names, or "" when it names none
+    endpoint: str = ""    # the address called: scheme, host, port and path, with no query and no user name
+
+
+def check_url(url, what="[ai] url"):
+    """The parts of an address the command may call: http or https, a host, a port that is a number, and no user
+    name or password, which messages and records would show. Refuses any other address."""
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise AIRefused(f"{what} is not an http or https address with a host")
+    if parts.username is not None or parts.password is not None:
+        raise AIRefused(f"{what} must not hold a user name or a password")
+    try:
+        parts.port
+    except ValueError:
+        raise AIRefused(f"{what} has a port that is not a number from 0 to 65535") from None
+    return parts
+
+
+def where(parts):
+    """The host and port that messages name."""
+    return parts.hostname + (f":{parts.port}" if parts.port else "")
+
+
+def endpoint_of(parts):
+    return f"{parts.scheme}://{where(parts)}{parts.path}"
 
 
 def ready(ai):
@@ -101,13 +127,16 @@ def ready(ai):
         if bool(ai.profile) == bool(ai.key_env):
             raise AIRefused("[ai] needs exactly one of profile, the Databricks configuration profile, and key_env, the "
                             "environment variable that holds a Databricks token")
+        if ai.profile and ai.url:
+            raise AIRefused("[ai] url goes with key_env, not with profile: with a profile, the address comes from the "
+                            "profile's host, so that its token goes only there")
         if ai.key_env and not ai.url:
             raise AIRefused("[ai] url must give the endpoint's address when the token comes from key_env, such as "
                             "https://<your workspace>/serving-endpoints/<the endpoint>/invocations")
     elif not ai.key_env:
         raise AIRefused("[ai] key_env must name the environment variable that holds the API key")
-    if ai.url and urllib.parse.urlsplit(ai.url).scheme not in ("http", "https"):
-        raise AIRefused("[ai] url must be an http or https address")
+    if ai.url:
+        check_url(ai.url)
     return ai
 
 
@@ -119,12 +148,20 @@ def _is_date(text):
         return False
 
 
+def _clean(value, what):
+    """A key or a token as it goes into a header. One with a line break or a NUL is refused, and never shown."""
+    value = value.strip()
+    if any(c in value for c in "\r\n\x00"):
+        raise AIRefused(f"{what} holds a line break or a NUL, so it cannot be sent. Set it again with the key alone")
+    return value
+
+
 def _secret(ai, environ):
     value = environ.get(ai.key_env, "")
     if not value.strip():
         raise AIRefused(f"[ai] key_env names {ai.key_env}, which is not set. Set it in this terminal, then run the "
                         "command again")
-    return value.strip()
+    return _clean(value, f"the environment variable {ai.key_env}")
 
 
 def _databricks_target(ai, environ, run):
@@ -132,21 +169,23 @@ def _databricks_target(ai, environ, run):
     if ai.key_env:
         return ai.url, _secret(ai, environ)
     path = Path(environ.get("DATABRICKS_CONFIG_FILE") or Path.home() / ".databrickscfg")
-    parser = configparser.ConfigParser(interpolation=None)
+    # In .databrickscfg, [DEFAULT] is a profile like any other, so no profile takes a host or a token from it.
+    parser = configparser.ConfigParser(interpolation=None, default_section="")
     try:
         parser.read_string(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, configparser.Error) as err:
         raise AIRefused(f"the Databricks configuration file {path} cannot be read ({type(err).__name__}). Sign in "
                         f"with: databricks auth login --profile {ai.profile}") from None
-    section = parser.defaults() if ai.profile == "DEFAULT" else (parser[ai.profile] if parser.has_section(ai.profile) else None)
+    section = parser[ai.profile] if parser.has_section(ai.profile) else None
     host = (section or {}).get("host", "").strip().rstrip("/")
     if not host:
         raise AIRefused(f"the Databricks configuration file {path} has no profile {ai.profile} with a host. Sign in "
                         f"with: databricks auth login --profile {ai.profile}")
-    url = ai.url or f"{host}/serving-endpoints/{ai.model}/invocations"
+    url = f"{host}/serving-endpoints/{ai.model}/invocations"
+    check_url(url, f"the host of the profile {ai.profile} in {path.name}")
     token = (section or {}).get("token", "").strip()
     if token:
-        return url, token
+        return url, _clean(token, f"the token of the profile {ai.profile}")
     cli = shutil.which("databricks", path=environ.get("PATH"))
     if not cli:
         raise AIRefused(f"the profile {ai.profile} holds no token, and the databricks command is not on PATH to get "
@@ -160,7 +199,7 @@ def _databricks_target(ai, environ, run):
     if not token:
         raise AIRefused(f"databricks auth token gave no token for the profile {ai.profile}. Sign in again with: "
                         f"databricks auth login --profile {ai.profile}")
-    return url, token
+    return url, _clean(token, f"the token databricks auth token gave for the profile {ai.profile}")
 
 
 def request(ai, system, user, environ=None, run=subprocess.run):
@@ -217,9 +256,10 @@ def ask(ai, system, user, environ=None, opener=urllib.request.urlopen, run=subpr
     """Asks the provider once and returns its Reply. Refuses, in a plain sentence, when the call fails, times out or
     gives no answer."""
     url, headers, body = request(ai, system, user, environ, run)
+    parts = check_url(url)
+    host = where(parts)
     call = urllib.request.Request(url, data=json.dumps(body, ensure_ascii=False).encode("utf-8"), headers=headers,
                                   method="POST")
-    host = urllib.parse.urlsplit(url).netloc
     try:
         with opener(call, timeout=ai.timeout_seconds) as response:
             raw = response.read()
@@ -231,10 +271,13 @@ def ask(ai, system, user, environ=None, opener=urllib.request.urlopen, run=subpr
         if isinstance(err.reason, (TimeoutError, socket.timeout)):
             raise AIRefused(f"the AI provider at {host} gave no answer within {ai.timeout_seconds} seconds") from None
         raise AIRefused(f"the AI provider at {host} cannot be reached ({err.reason})") from None
+    except http.client.HTTPException as err:
+        raise AIRefused(f"the AI provider at {host} sent a reply that broke off ({type(err).__name__})") from None
     except OSError as err:
         raise AIRefused(f"the AI provider at {host} cannot be reached ({type(err).__name__})") from None
     try:
         reply = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, ValueError):
         raise AIRefused(f"the AI provider at {host} sent a reply that is not JSON") from None
-    return _text_of(ai.provider, reply)
+    found = _text_of(ai.provider, reply)
+    return Reply(found.text, found.model_version, endpoint_of(parts))

@@ -10,6 +10,7 @@ import datetime as dt
 import hashlib
 import http.server
 import json
+import os
 import shutil
 import socket
 import subprocess
@@ -88,10 +89,11 @@ class Stub:
                     time.sleep(stub.delay)
                 status, reply = stub.replies.get(self.path, (404, {"error": "no such path"}))
                 data = reply.encode() if isinstance(reply, str) else json.dumps(reply).encode()
+                short = status == "short"   # a reply that promises more bytes than it sends, then closes
                 try:
-                    self.send_response(status)
+                    self.send_response(200 if short else status)
                     self.send_header("Content-Type", "application/json")
-                    self.send_header("Content-Length", str(len(data)))
+                    self.send_header("Content-Length", str(len(data) + 100 if short else len(data)))
                     self.end_headers()
                     self.wfile.write(data)
                 except (BrokenPipeError, ConnectionResetError):
@@ -184,7 +186,8 @@ def test_databricks_serving_gets_the_skill_as_system_prompt_and_a_bearer_token_f
     stub.replies["/serving-endpoints/kpi-chat/invocations"] = (200, chat_reply('{"suggestions": []}'))
     ai = ls.AI("databricks", model="kpi-chat", profile="kpi", **APPROVED)
     reply = providers.ask(ai, "THE SKILL", "THE TASK", environ={"DATABRICKS_CONFIG_FILE": str(cfg)})
-    assert reply == providers.Reply('{"suggestions": []}', "the-served-model-2026-11-01")
+    assert reply == providers.Reply('{"suggestions": []}', "the-served-model-2026-11-01",
+                                    f"{stub.url}/serving-endpoints/kpi-chat/invocations")
     [sent] = stub.requests
     assert sent["path"] == "/serving-endpoints/kpi-chat/invocations"
     assert sent["headers"]["authorization"] == "Bearer dapi-sample-token"
@@ -219,7 +222,7 @@ def test_the_anthropic_messages_api_gets_its_documented_headers_and_the_skill_as
     stub.replies["/v1/messages"] = (200, messages_reply("the answer"))
     ai = ls.AI("anthropic", model="claude-sample", key_env="SAMPLE_ANTHROPIC_KEY", url=stub.url + "/v1/messages", **APPROVED)
     reply = providers.ask(ai, "THE SKILL", "THE TASK", environ={"SAMPLE_ANTHROPIC_KEY": "sk-ant-sample"})
-    assert reply == providers.Reply("the answer", "claude-sample-2026-10-01")
+    assert reply == providers.Reply("the answer", "claude-sample-2026-10-01", f"{stub.url}/v1/messages")
     [sent] = stub.requests
     assert sent["path"] == "/v1/messages"
     assert sent["headers"]["authorization"] == "Bearer sk-ant-sample"
@@ -236,7 +239,7 @@ def test_openai_chat_completions_gets_a_bearer_key_and_a_system_message(stub):
     stub.replies["/v1/chat/completions"] = (200, chat_reply("the answer", model="gpt-sample-2026"))
     ai = ls.AI("openai", model="gpt-sample", key_env="SAMPLE_OPENAI_KEY", url=stub.url + "/v1/chat/completions", **APPROVED)
     assert providers.ask(ai, "THE SKILL", "THE TASK", environ={"SAMPLE_OPENAI_KEY": "sk-sample"}) == \
-        providers.Reply("the answer", "gpt-sample-2026")
+        providers.Reply("the answer", "gpt-sample-2026", f"{stub.url}/v1/chat/completions")
     [sent] = stub.requests
     assert sent["headers"]["authorization"] == "Bearer sk-sample"
     assert sent["body"] == {"model": "gpt-sample", "messages": [{"role": "system", "content": "THE SKILL"},
@@ -289,7 +292,7 @@ def test_the_system_prompt_is_the_release_s_skills_read_at_run_time(tmp_path, st
     assert sent["body"]["system"] == [{"type": "text", "text": skills_text()}]
     user = sent["body"]["messages"][0]["content"]
     saved = json.loads(record.read_text(encoding="utf-8"))
-    assert saved["prompt"] == user
+    assert "prompt" not in saved
     assert saved["skills"] == [{"path": name, "sha256": hashlib.sha256((ROOT / name).read_bytes()).hexdigest()}
                                for name in suggest.SKILLS]
     assert saved["prompt_sha256"] == hashlib.sha256((skills_text() + "\n\n" + user).encode()).hexdigest()
@@ -519,3 +522,190 @@ def test_apply_keeps_the_ai_record_in_the_release_s_approval_record(tmp_path, no
     kept = approval.read_record(approval.record_path(root, folder.name))
     assert kept["ai"] == json.loads((folder / "approval.json").read_text(encoding="utf-8"))["ai"]
     assert git(root, "status", "--porcelain") == ""
+
+
+# ---------- the first review's findings ----------
+
+def _record(tmp_path, name="unit-utilization"):
+    """A form and the complete record of its by-hand AI step, both written to tmp_path."""
+    path = form(tmp_path, name=name)
+    answer = tmp_path / f"{name}.answer.json"
+    answer.write_text(SAMPLE_TEXT, encoding="utf-8")
+    record = suggest.run(path, ROOT, ai=by_hand(), answer_file=answer, choices_file=choices(tmp_path), say=quiet)
+    return path, record
+
+
+def test_the_record_keeps_the_prompt_s_fingerprint_and_not_its_text(tmp_path):
+    path = form(tmp_path)
+    suggest.run(path, ROOT, ai=by_hand(), say=quiet)
+    prompt = suggest.beside(path, suggest.PROMPT_SUFFIX).read_bytes()
+    answer = tmp_path / "answer.json"
+    answer.write_text(SAMPLE_TEXT, encoding="utf-8")
+    record = suggest.run(path, ROOT, ai=by_hand(), answer_file=answer, choices_file=choices(tmp_path), say=quiet)
+    saved = json.loads(record.read_text(encoding="utf-8"))
+    assert "prompt" not in saved and "prompt" not in approval.AI_FIELDS
+    system, _ = suggest.instructions(ROOT)
+    assert prompt.decode("utf-8").startswith(system + "\n\n# The task\n")
+    assert saved["prompt_sha256"] == hashlib.sha256(prompt).hexdigest()
+    sign(path)
+    [folder] = propose_cmd.propose([path], tmp_path / "proposals", ROOT, now=NOW, say=quiet)
+    assert "prompt" not in json.loads((folder / "approval.json").read_text(encoding="utf-8"))["ai"]
+    assert "the prompt and" not in (folder / "summary.txt").read_text(encoding="utf-8")
+
+
+def test_a_named_databricks_profile_inherits_nothing_from_default(tmp_path, stub, monkeypatch):
+    cfg = tmp_path / "databrickscfg"
+    cfg.write_text(f"[DEFAULT]\nhost = {stub.url}\ntoken = dapi-dev-token\n\n[prod]\nhost = {stub.url}\n"
+                   "auth_type = databricks-cli\n\n[nohost]\nauth_type = databricks-cli\n", encoding="utf-8")
+    stub.replies["/serving-endpoints/kpi-chat/invocations"] = (200, chat_reply("text"))
+    monkeypatch.setattr(providers.shutil, "which", lambda name, path=None: "/opt/databricks")
+    run = lambda args, **k: subprocess.CompletedProcess(args, 0, json.dumps({"access_token": "prod-oauth"}), "")
+    environ = {"DATABRICKS_CONFIG_FILE": str(cfg)}
+    providers.ask(ls.AI("databricks", model="kpi-chat", profile="prod", **APPROVED), "S", "U", environ=environ, run=run)
+    assert stub.requests[-1]["headers"]["authorization"] == "Bearer prod-oauth"
+    with pytest.raises(AIRefused, match="has no profile nohost with a host"):
+        providers.ask(ls.AI("databricks", model="kpi-chat", profile="nohost", **APPROVED), "S", "U", environ=environ, run=run)
+    providers.ask(ls.AI("databricks", model="kpi-chat", profile="DEFAULT", **APPROVED), "S", "U", environ=environ, run=run)
+    assert stub.requests[-1]["headers"]["authorization"] == "Bearer dapi-dev-token"
+
+
+def test_a_broken_reply_or_a_secret_with_a_line_break_is_refused_without_a_traceback(stub):
+    stub.replies["/v1/chat/completions"] = ("short", chat_reply("text"))
+    ai = ls.AI("openai", model="m", key_env="K", url=stub.url + "/v1/chat/completions", **APPROVED)
+    with pytest.raises(AIRefused, match="sent a reply that broke off"):
+        providers.ask(ai, "S", "U", environ={"K": "k"})
+    for value in ("sk-live-secret\nextra", "sk-live-secret\rextra", "sk-live\x00secret"):
+        with pytest.raises(AIRefused) as err:
+            providers.ask(ai, "S", "U", environ={"K": value})
+        assert "K holds a line break or a NUL" in str(err.value) and "secret" not in str(err.value)
+
+
+def test_the_address_is_checked_and_messages_show_no_user_name_or_password(tmp_path):
+    cfg = tmp_path / "databrickscfg"
+    cfg.write_text("[kpi]\nhost = adb-123.azuredatabricks.net\ntoken = dapi-x\n", encoding="utf-8")
+    with pytest.raises(AIRefused, match="is not an http or https address"):
+        providers.ask(ls.AI("databricks", model="kpi-chat", profile="kpi", **APPROVED), "S", "U",
+                      environ={"DATABRICKS_CONFIG_FILE": str(cfg)})
+    cfg.write_text("[kpi]\nhost = file:///etc\ntoken = dapi-x\n", encoding="utf-8")
+    with pytest.raises(AIRefused, match="is not an http or https address"):
+        providers.ask(ls.AI("databricks", model="kpi-chat", profile="kpi", **APPROVED), "S", "U",
+                      environ={"DATABRICKS_CONFIG_FILE": str(cfg)})
+    for url in ("https://user:secret@127.0.0.1:1/v1", "http://127.0.0.1:badport/v1", "https:///v1"):
+        with pytest.raises(AIRefused) as err:
+            providers.ready(ls.AI("openai", model="m", key_env="K", url=url, **APPROVED))
+        assert "secret" not in str(err.value) and "[ai] url" in str(err.value)
+    closed = socket.socket()
+    closed.bind(("127.0.0.1", 0))
+    port = closed.getsockname()[1]
+    closed.close()
+    with pytest.raises(AIRefused, match=f"^the AI provider at 127.0.0.1:{port} cannot be reached"):
+        providers.ask(ls.AI("openai", model="m", key_env="K", url=f"http://127.0.0.1:{port}/x?q=1", **APPROVED), "S", "U",
+                      environ={"K": "k"})
+
+
+def test_the_record_names_the_endpoint_called_and_a_profile_takes_no_url(tmp_path, stub):
+    path = form(tmp_path)
+    stub.replies["/v1/messages?x=1"] = (200, messages_reply(SAMPLE_TEXT))
+    ai = ls.AI("anthropic", model="claude-sample", key_env="K", url=stub.url + "/v1/messages?x=1", **APPROVED)
+    record = suggest.run(path, ROOT, ai=ai, choices_file=choices(tmp_path), environ={"K": "k"}, say=quiet)
+    assert json.loads(record.read_text(encoding="utf-8"))["endpoint"] == stub.url + "/v1/messages"
+    other = tmp_path / "other"
+    other.mkdir()
+    _, by_hand_record = _record(other)
+    assert json.loads(by_hand_record.read_text(encoding="utf-8"))["endpoint"] == ""
+    with pytest.raises(AIRefused, match="url goes with key_env, not with profile"):
+        providers.ready(ls.AI("databricks", model="kpi-chat", profile="DEFAULT", url="https://other.example.com/x", **APPROVED))
+
+
+def test_the_settings_file_is_refused_inside_the_release_named_and_read_from_the_given_environment(tmp_path):
+    release = tmp_path / "release"
+    release.mkdir()
+    inside = settings(release, '[ai]\nprovider = "by-hand"\nassistant = "Genie Code"\napproved_by = "A"\napproved_on = "2026-11-18"\n')
+    with pytest.raises(AIRefused, match="inside the release folder"):
+        suggest.run(form(tmp_path), release, stores=str(inside), say=quiet)
+    outside = settings(tmp_path, '[ai]\nprovider = "off"\n')
+    with pytest.raises(AIRefused, match="AI is off"):
+        suggest.run(form(tmp_path, name="other"), ROOT, environ={ls.ENV_VAR: str(outside)}, say=quiet)
+
+
+@pytest.mark.parametrize("change", [
+    {"format": True}, {"provider": "off"}, {"provider": ""}, {"approved_by": ""}, {"approved_on": "not-a-date"},
+    {"asked_on": ""}, {"form": ""}, {"assistant": ""}, {"skills": [{"path": "", "sha256": "0" * 64}]},
+])
+def test_an_incomplete_ai_record_is_refused(tmp_path, change):
+    _, record = _record(tmp_path)
+    saved = json.loads(record.read_text(encoding="utf-8"))
+    with pytest.raises(approval.ChangeRefused):
+        approval.check_ai(dict(saved, **change), step=True)
+
+
+@pytest.mark.parametrize("change", [{"question": ["T2"]}, {"question": ""}, {"reason": 3}, {"current": {"a": 1}},
+                                    {"suggested": [1]}, {"answer": None}])
+def test_a_suggestion_of_the_wrong_shape_stops_the_proposal_in_a_plain_sentence(tmp_path, change):
+    path, record = _record(tmp_path)
+    saved = json.loads(record.read_text(encoding="utf-8"))
+    saved["suggestions"][0].update(change)
+    record.write_text(json.dumps(saved), encoding="utf-8")
+    sign(path)
+    with pytest.raises(propose_cmd.ProposeRefused, match="is not complete"):
+        propose_cmd.propose([path], tmp_path / "proposals", ROOT, now=NOW, say=quiet)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="a folder's write permission works another way on Windows")
+def test_a_record_that_cannot_be_written_leaves_the_form_as_it_was(tmp_path):
+    folder = tmp_path / "locked"
+    folder.mkdir()
+    path = form(folder)
+    answer = tmp_path / "answer.json"
+    answer.write_text(SAMPLE_TEXT, encoding="utf-8")
+    given = choices(tmp_path)
+    before = path.read_bytes()
+    folder.chmod(0o555)
+    try:
+        with pytest.raises(OSError):
+            suggest.run(path, ROOT, ai=by_hand(), answer_file=answer, choices_file=given, say=quiet)
+        assert path.read_bytes() == before
+    finally:
+        folder.chmod(0o755)
+
+
+def test_a_choice_that_differs_only_in_case_is_no_change(tmp_path):
+    path = form(tmp_path)
+    given = tmp_path / "answer.json"
+    given.write_text(json.dumps({"suggestions": [{"question": "T1", "current": "Unit Utilization",
+                                                  "suggested": "unit utilization", "reason": "r"}]}), encoding="utf-8")
+    with pytest.raises(AIRefused, match="suggests the answer the form holds already"):
+        suggest.run(path, ROOT, ai=by_hand(), answer_file=given, say=quiet)
+
+
+def test_a_hidden_measure_is_not_offered_in_the_prompt():
+    lists = {"measures": [{"label": "Shown Measure", "notation": "shown", "definition": "d", "id": "x:1"},
+                          {"label": "Hidden Measure", "notation": "hidden", "definition": "d", "id": "x:2", "hidden": True}],
+             "processes": []}
+    text = "\n".join(suggest._names("term-change", lists, []))
+    assert "Shown Measure" in text and "Hidden Measure" not in text
+
+
+def test_the_fingerprints_are_of_the_files_bytes(tmp_path):
+    root = tmp_path / "release"
+    for name in suggest.SKILLS:
+        (root / name).parent.mkdir(parents=True)
+        (root / name).write_bytes(b"---\r\nname: x\r\n---\r\nA rule.\r\n")
+    system, hashes = suggest.instructions(root)
+    assert [h["sha256"] for h in hashes] == [hashlib.sha256((root / n).read_bytes()).hexdigest() for n in suggest.SKILLS]
+    assert "\r\n" in system
+    path = form(tmp_path)
+    answer = tmp_path / "answer.json"
+    answer.write_bytes(SAMPLE_TEXT.replace("\n", "\r\n").encode())
+    record = suggest.run(path, ROOT, ai=by_hand(), answer_file=answer, choices_file=choices(tmp_path), say=quiet)
+    assert json.loads(record.read_text(encoding="utf-8"))["output_sha256"] == hashlib.sha256(answer.read_bytes()).hexdigest()
+
+
+def test_a_record_for_another_kind_of_form_stops_the_proposal(tmp_path):
+    path, record = _record(tmp_path)
+    saved = json.loads(record.read_text(encoding="utf-8"))
+    record.write_text(json.dumps(dict(saved, form="kpi-intake")), encoding="utf-8")
+    sign(path)
+    with pytest.raises(propose_cmd.ProposeRefused, match="is for a kpi-intake form, and unit-utilization.term-change.json "
+                                                         "is a term-change form"):
+        propose_cmd.propose([path], tmp_path / "proposals", ROOT, now=NOW, say=quiet)
