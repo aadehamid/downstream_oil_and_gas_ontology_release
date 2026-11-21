@@ -1,0 +1,6 @@
+{"suggestions": [
+  {"question": "T2", "current": "process unit utilisation", "suggested": "Process Unit Utilization",
+   "reason": "The release writes the names of its measures with capital initials and US spelling, as the measure Unit Utilization shows."},
+  {"question": "T4", "current": ["unit cap util"], "suggested": ["unit capacity utilization"],
+   "reason": "An other name works best when it is the words people say in full, so a search finds it."}
+]}
