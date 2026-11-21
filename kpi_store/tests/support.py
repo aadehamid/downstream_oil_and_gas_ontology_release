@@ -78,6 +78,7 @@ class FakeWorkspace:
         self.rewrites = 0        # how often a CREATE OR REPLACE ... AS SELECT ran
         self.corrupt_staging = False
         self.corrupt_promote = False   # alter a row as the staging table replaces the main table
+        self.comments = {}       # {table, lower case: {"": the table's comment, column: its comment}}
 
     def writes(self):
         return [s for s in self.statements if not s.lstrip().upper().startswith(("SELECT", "DESCRIBE"))]
@@ -156,6 +157,19 @@ class FakeWorkspace:
         m = re.match(r"SELECT marker FROM ([\w.]+) WHERE store = '(\w+)'$", s)
         if m:
             return [{"marker": r["marker"]} for r in self.store[m.group(1).lower()] if r["store"] == m.group(2)]
+        if re.match(r"(COMMENT ON TABLE|ALTER TABLE) [\w.]+ ", s):
+            # The comment as Databricks reads it: sqlglot's Databricks dialect parses the literal, escapes and all.
+            import sqlglot
+            tree = sqlglot.parse_one(statement, read="databricks")
+            table = ".".join(p for p in (tree.this.catalog, tree.this.db, tree.this.name) if p).lower()
+            if table not in self.store:
+                raise AssertionError(f"a comment on a table that does not exist: {table}")
+            held = self.comments.setdefault(table, {})
+            if isinstance(tree, sqlglot.exp.Comment):
+                held[""] = tree.expression.this
+            else:
+                held.update({a.this.name: a.args["comment"].this for a in tree.args["actions"]})
+            return []
         raise AssertionError(f"the fake workspace does not know this statement: {s[:200]}")
 
 

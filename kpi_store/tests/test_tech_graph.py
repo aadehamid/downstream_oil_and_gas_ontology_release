@@ -598,6 +598,10 @@ def test_the_delta_load_writes_the_triple_table_and_its_marker_in_the_tech_graph
     written = [s for s in workspace.writes() if not s.startswith("CREATE SCHEMA")]
     assert written and all("idp_sbx.tech_graph." in s for s in written)
     assert sorted(workspace.store) == ["idp_sbx.tech_graph.tech_graph_markers", "idp_sbx.tech_graph.tech_graph_triples"]
+    # Each table and each of its columns carries its comment.
+    assert workspace.comments == {
+        "idp_sbx.tech_graph.tech_graph_triples": {"": tg.TRIPLES_COMMENT, **lb.TRIPLE_COLUMNS},
+        "idp_sbx.tech_graph.tech_graph_markers": {"": tg.MARKERS_COMMENT, **lb.MARKER_COLUMNS}}
 
     # A second run on the same files writes nothing.
     before = len(workspace.writes())

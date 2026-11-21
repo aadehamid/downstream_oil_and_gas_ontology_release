@@ -28,8 +28,8 @@ Where it sits in the run. This module has no command of its own; other steps cal
   fuseki, neo4j, enterprise  each loads the fetched file after the ontology (load_jena, load_neo4j)
   sync                     asks each store's status function
 
-What the loads write: in Databricks, two tables in <write_catalog>.<tech_graph_schema>, and a staging table there
-for the length of the load; in Fuseki, the graph file's named graphs; in Neo4j, the nodes labelled Tech, their
+What the loads write: in Databricks, two tables in <write_catalog>.<tech_graph_schema>, with a comment on each table
+and each column, and a staging table there for the length of the load; in Fuseki, the graph file's named graphs; in Neo4j, the nodes labelled Tech, their
 relationships and one TechGraphMarker node. A relationship may end at one of the ontology's Resource nodes (a
 design or a measure). The loads create, change and delete no Resource node, no relationship between two Resource
 nodes, none of the ontology's triples or graphs, and no file of a release package.
@@ -577,6 +577,14 @@ def status_jena(query_url, graph_files, release_root=None, rdfstore=None):
 
 # ---- Databricks ------------------------------------------------------------------------------------
 
+# The comments on the two Delta tables of the technical graph; their columns' comments are the load's
+# (kpi_store.load_databricks.TRIPLE_COLUMNS and MARKER_COLUMNS).
+TRIPLES_COMMENT = ("The technical graph of one environment as RDF quads, one row per quad: what is built on the data "
+                   "platform, in the terms of the technical-graph module. tech_graph_markers says which graph files it "
+                   "holds.")
+MARKERS_COMMENT = "Which graph files the technical graph table was loaded from"
+
+
 def delta_tables(settings):
     """(triple table, marker table) of the technical graph, in the tech_graph schema."""
     schema = f"{settings.write_catalog}.{settings.tech_graph_schema}"
@@ -649,7 +657,8 @@ def load_delta(gate, settings, graph_files, release_root=None, now=None, rdfstor
         """Replaces the marker row. The JSON travels as base64, so no character of it can end the SQL string."""
         text = "decode(unbase64('" + _b64(json.dumps(want, sort_keys=True)) + "'), 'UTF-8')"
         gate.run(f"CREATE TABLE IF NOT EXISTS {markers} (store STRING, marker STRING) USING DELTA "
-                 "COMMENT 'Which graph files the technical graph table was loaded from'")
+                 f"COMMENT {lb.sql_string(MARKERS_COMMENT)}")
+        lb.write_comments(gate, markers, MARKERS_COMMENT, lb.MARKER_COLUMNS)
         gate.run(f"DELETE FROM {markers} WHERE store = '{DELTA_STORE}'")
         gate.run(f"INSERT INTO {markers} (store, marker) SELECT '{DELTA_STORE}', {text}")
 
@@ -659,11 +668,13 @@ def load_delta(gate, settings, graph_files, release_root=None, now=None, rdfstor
         held = read_delta(gate, settings) or {}
         if all(held.get(k) == v for k, v in stable.items()):
             return {**result, "status": "current", "marker": held}
+        lb.write_comments(gate, table, TRIPLES_COMMENT, lb.TRIPLE_COLUMNS)   # a run stopped before its marker
         mark()
         return {**result, "status": "marked", "marker": want}
     passed, comparison = rs.roundtrip(store, dataset)
     if not passed:
         return {**result, "status": "main-mismatch" if comparison.get("published") else "staging-mismatch", "comparison": comparison}
+    lb.write_comments(gate, table, TRIPLES_COMMENT, lb.TRIPLE_COLUMNS)   # the replace kept none
     mark()
     return {**result, "status": "loaded", "marker": want}
 

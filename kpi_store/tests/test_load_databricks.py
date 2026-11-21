@@ -49,6 +49,8 @@ def test_the_gate_passes_reads_inside_the_read_catalogs_and_the_system_schemas(s
     "INSERT INTO idp_sbx.TECH_GRAPH.nodes (a) SELECT decode(unbase64('YQ=='), 'UTF-8')",
     "DELETE FROM idp_sbx.kpi_store.epm_store_markers WHERE store = 'databricks'",
     "DROP TABLE IF EXISTS idp_sbx.kpi_store.epm_triples__staging_ab12",
+    "COMMENT ON TABLE idp_sbx.kpi_store.epm_triples IS 'The release as RDF quads'",
+    "ALTER TABLE idp_sbx.tech_graph.tech_graph_triples ALTER COLUMN subject COMMENT 'The quad\\'s subject'",
 ])
 def test_the_gate_passes_writes_inside_the_two_schemas(statement):
     g, sent = gate()
@@ -86,6 +88,18 @@ def test_the_gate_passes_writes_inside_the_two_schemas(statement):
     # A WITH clause that takes a real table's name does not make another catalog's table of that name a CTE.
     ("WITH t AS (SELECT * FROM idp_sbx.s.t) SELECT * FROM t JOIN other_catalog.s.t USING (id)", "a read outside .*: other_catalog.s.t"),
     ("SELECT 1; DROP TABLE idp_sbx.kpi_store.epm_triples", "one statement at a time"),
+    # A comment goes only on a table of the KPI Store's own, and an ALTER may only write column comments.
+    ("COMMENT ON TABLE idp_sbx.gold_commercial_core.some_fact IS 'x'", "a write outside"),
+    ("ALTER TABLE idp_sbx.gold_commercial_core.some_fact ALTER COLUMN Amount COMMENT 'x'", "a write outside"),
+    ("COMMENT ON TABLE epm_triples IS 'x'", "a write outside"),
+    ("COMMENT ON SCHEMA idp_sbx.kpi_store IS 'x'", "not a statement the KPI Store runs"),
+    ("COMMENT ON COLUMN idp_sbx.kpi_store.epm_triples.subject IS 'x'", "not a statement the KPI Store runs"),
+    ("ALTER TABLE idp_sbx.kpi_store.epm_triples DROP COLUMN subject", "not a statement the KPI Store runs"),
+    ("ALTER TABLE idp_sbx.kpi_store.epm_triples ALTER COLUMN subject TYPE INT", "not a statement the KPI Store runs"),
+    ("ALTER TABLE idp_sbx.kpi_store.epm_triples RENAME TO idp_sbx.kpi_store.other", "not a statement the KPI Store runs"),
+    ("ALTER TABLE idp_sbx.kpi_store.epm_triples SET TBLPROPERTIES ('a' = 'b')", "not a statement the KPI Store runs"),
+    ("ALTER TABLE idp_sbx.kpi_store.epm_triples ALTER COLUMN subject COMMENT 'x', ALTER COLUMN object COMMENT 'y'",
+     "not a statement the KPI Store runs|cannot be parsed"),
 ])
 def test_the_gate_refuses_everything_else_and_sends_nothing(statement, message):
     g, sent = gate()
@@ -143,6 +157,33 @@ def test_a_load_goes_through_staging_and_marks_the_table(tmp_path):
     graphs = {r["graph"] for r in workspace.store[TRIPLES]}
     assert DP in graphs and DP + "/shapes" in graphs and None not in graphs
     assert any(r["object_kind"] == "literal" and r["subject"].startswith("_:") for r in workspace.store[TRIPLES])
+
+
+def test_a_load_comments_each_table_and_each_column(tmp_path):
+    root, workspace = support.small_release(tmp_path), support.FakeWorkspace()
+    assert load(workspace, root)["status"] == "loaded"
+    assert workspace.comments == {TRIPLES: {"": ld.TRIPLES_COMMENT, **ld.TRIPLE_COLUMNS},
+                                  MARKERS: {"": ld.MARKERS_COMMENT, **ld.MARKER_COLUMNS}}
+    assert tuple(ld.TRIPLE_COLUMNS) == RDFSTORE.COLUMNS   # every column of the rdf-store skill's row format, in order
+    # A lost marker is written again, and the comments with it.
+    workspace.store[MARKERS], workspace.comments = [], {}
+    assert load(workspace, root)["status"] == "marked" and workspace.comments[TRIPLES][""] == ld.TRIPLES_COMMENT
+
+
+@pytest.mark.parametrize("text, read", [
+    ("The quad's subject", "The quad's subject"),
+    ("A path such as C:\\temp\\x and a \\' pair", "A path such as C:\\temp\\x and a \\' pair"),
+    ("Two\nlines\tand  spaces", "Two lines and spaces"),
+    ("It ends with a backslash \\", "It ends with a backslash \\"),
+])
+def test_a_comment_reads_back_as_its_text_whatever_quotes_or_backslashes_it_holds(text, read):
+    import sqlglot
+    for statement in ld.comment_statements("idp_sbx.kpi_store.epm_triples", text, {"subject": text}):
+        g, sent = gate()
+        g.run(statement)   # the Gate passes it
+        tree = sqlglot.parse_one(statement, read="databricks")
+        literal = tree.expression if isinstance(tree, sqlglot.exp.Comment) else tree.args["actions"][0].args["comment"]
+        assert literal.this == read and sent == [statement]
 
 
 def test_a_second_load_changes_nothing(tmp_path):

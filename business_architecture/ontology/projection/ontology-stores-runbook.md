@@ -46,8 +46,8 @@ A node that another writer made with all the marks of one row counts as the KPI 
 
 | Where | What the run writes there |
 |---|---|
-| Databricks, schema `idp_sbx.kpi_store` | The schema and the volume `releases`, when they are missing. In the volume: the zip, a copy of `kpi_store.toml`, and one `reports` folder per run. The tables `epm_triples` and `epm_store_markers`. |
-| Databricks, schema `idp_sbx.tech_graph` | The schema, when it is missing. The tables `tech_graph_triples` and `tech_graph_markers`. |
+| Databricks, schema `idp_sbx.kpi_store` | The schema and the volume `releases`, when they are missing. In the volume: the zip, a copy of `kpi_store.toml`, and one `reports` folder per run. The tables `epm_triples` and `epm_store_markers`, with a comment on each table and each column. |
+| Databricks, schema `idp_sbx.tech_graph` | The schema, when it is missing. The tables `tech_graph_triples` and `tech_graph_markers`, with a comment on each table and each column. |
 | Databricks, the workspace | One notebook, `kpi_store_load`, in the folder that your local settings name. One job run per runner run, named `KPI Store load` and the run's ID. |
 | Your Windows machine | The folder `%USERPROFILE%\kpi-store-local`: each run's files, the Fuseki dataset and the Neo4j load's working files. |
 | The local Neo4j | The database that your local settings name. **The load empties it first.** It stops, and changes nothing, when the database is the Enterprise database, or holds nodes but no marker of an earlier KPI Store load. |
