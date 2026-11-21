@@ -9,13 +9,18 @@ The file's path comes from --stores, or from the environment variable KPI_STORE_
 is the example to copy. A password is held as a Secret, whose text form is ***, so no message can print it.
 
 Six commands read this file first: the runner, the setup check, the Fuseki and Neo4j loads, the copy to
-Enterprise and the sync check. The cut tool and the questions do not read it. It is not the same file as
+Enterprise and the sync check. The propose command reads its [ai] table, and only with --ai. The cut tool and the
+questions do not read it. It is not the same file as
 kpi_store.toml, which describes the Databricks environment, travels to the volume and holds no password
 (kpi_store.settings). No command copies or uploads this file. This module only reads: it opens no connection
 and writes nothing.
 
 Each table of the file is optional, so a machine that runs only one command needs only that command's tables. A
 command asks for a part with LocalSettings.need, which stops with the name of the missing table.
+
+The [ai] table names the AI provider that the propose command may ask for suggestions (KPI-DEC-0002, Q16 to Q18), and
+records the client's IT approval of it. It holds no key: an API key stays in an environment variable that the table
+names, and a Databricks token comes from a Databricks configuration profile. kpi_store/ai/providers.py makes the call.
 """
 import os
 import re
@@ -39,7 +44,10 @@ LAYOUT = {
               "enterprise": {"uri": str, "username": str, "password": str, "password_env": str, "database": str}},
     "projection": {"robot_jar": str, "out": str},
     "tools": {"bash": str},
+    "ai": {"provider": str, "model": str, "url": str, "key_env": str, "profile": str, "assistant": str,
+           "approved_by": str, "approved_on": str, "timeout_seconds": int},
 }
+AI_PROVIDERS = ("off", "databricks", "anthropic", "openai", "by-hand")
 # The keys a table may leave out. Every other key of a table that is present is required.
 # The serverless environment version the notebook run asks for when the settings name none. Version 2 has Python
 # 3.11, and the rehearsal workspace gave it to the test runs, which named none (measured on 2026-11-14). A workspace's own default can be older: the first real run
@@ -47,7 +55,8 @@ LAYOUT = {
 ENVIRONMENT_VERSION = "2"
 OPTIONAL = {("databricks", "cli"), ("databricks", "timeout_minutes"), ("databricks", "environment_version"), ("fuseki", "data_folder"), ("fuseki", "java"),
             ("neo4j.local", "password"), ("neo4j.local", "password_env"), ("neo4j.local", "plugins_folder"),
-            ("neo4j.enterprise", "password"), ("neo4j.enterprise", "password_env"), ("tools", "bash")}
+            ("neo4j.enterprise", "password"), ("neo4j.enterprise", "password_env"), ("tools", "bash")} | \
+    {("ai", key) for key in LAYOUT["ai"] if key != "provider"}
 
 
 class LocalSettingsError(Exception):
@@ -130,6 +139,23 @@ class Databricks:
 
 
 @dataclass(frozen=True)
+class AI:
+    """The AI provider, from [ai]. No key is kept here: key_env names the environment variable that holds it."""
+    provider: str             # one of AI_PROVIDERS; "off" when the table is missing
+    model: str = ""           # databricks: the serving endpoint's name; anthropic and openai: the model's name
+    url: str = ""             # the address of the call, when it is not the provider's usual one
+    key_env: str = ""         # the environment variable that holds the API key or the Databricks token
+    profile: str = ""         # databricks: the Databricks configuration profile that gives the host and the token
+    assistant: str = ""       # by-hand: the assistant the person gives the prompt to, such as Genie Code
+    approved_by: str = ""     # who approved the provider for the client's IT
+    approved_on: str = ""     # the date of that approval, YYYY-MM-DD
+    timeout_seconds: int = 120
+
+
+AI_OFF = AI("off")
+
+
+@dataclass(frozen=True)
 class LocalSettings:
     """The whole file. A part is None when its table is missing; ask for a part a step needs with need()."""
     path: Path
@@ -142,6 +168,7 @@ class LocalSettings:
     robot_jar: Path | None
     projection_out: Path | None
     bash: Path | None
+    ai: AI = AI_OFF
 
     def need(self, name):
         """The value of one part, or LocalSettingsError naming the table a step cannot run without."""
@@ -176,6 +203,9 @@ def _check_layout(doc, layout, where=""):
     for key, value in doc.items():
         name = f"{where}{key}"
         if key not in layout:
+            if where == "ai." and any(word in key.lower() for word in ("key", "token", "secret", "password")):
+                raise LocalSettingsError(f"[ai] {key} is not a setting: the file holds no key or token. Put the key in an "
+                                         "environment variable, and name the variable with key_env")
             raise LocalSettingsError(f"unknown {'key' if where else 'table'} {name!r}")
         kind = layout[key]
         if isinstance(kind, dict):
@@ -264,6 +294,13 @@ def parse(data, path, environ=None, release_root=ROOT):
             raise LocalSettingsError("[fuseki] url must be a dataset URL such as http://127.0.0.1:3030/ds")
     if projection is not None:
         _required(projection, "projection", LAYOUT["projection"])
+    ai = doc.get("ai")
+    if ai is not None:
+        _required(ai, "ai", LAYOUT["ai"])
+        if ai["provider"] not in AI_PROVIDERS:
+            raise LocalSettingsError("[ai] provider must be " + ", ".join(f'"{p}"' for p in AI_PROVIDERS))
+        if ai.get("timeout_seconds", 120) < 1:
+            raise LocalSettingsError("[ai] timeout_seconds must be 1 or more")
     neo4j = doc.get("neo4j", {})
     found = LocalSettings(
         path=path,
@@ -280,7 +317,8 @@ def parse(data, path, environ=None, release_root=ROOT):
         neo4j_enterprise=_neo4j(neo4j["enterprise"], "neo4j.enterprise", environ, base) if "enterprise" in neo4j else None,
         robot_jar=_path(projection["robot_jar"], base) if projection else None,
         projection_out=_path(projection["out"], base) if projection else None,
-        bash=_path(doc["tools"]["bash"], base) if doc.get("tools", {}).get("bash") else None)
+        bash=_path(doc["tools"]["bash"], base) if doc.get("tools", {}).get("bash") else None,
+        ai=AI(**{k: (v.strip() if isinstance(v, str) else v) for k, v in ai.items()}) if ai else AI_OFF)
     return check_outside(found, release_root)
 
 

@@ -6,7 +6,8 @@ fourth when some facts are ones KGCL cannot write:
 
     change.kgcl     the KGCL lines, one per change, as kgcl.py writes them; empty for a domain activation
     approval.json   the approval record of the change, in the form approval.py checks, written from the form's
-                    sign-off: each signer's role, name, date and the words the signature means
+                    sign-off: each signer's role, name, date and the words the signature means, and the record
+                    of the form's AI step when it had one (kpi_store/ai/suggest.py)
     summary.txt     the same for a person, in plain words: what changes, the route, and who signed
     facts.csv       the facts KGCL cannot write, one row each, with the columns measure, property and value; the
                     first column may name any item. A new KPI's (new_measures.py says which), a process map
