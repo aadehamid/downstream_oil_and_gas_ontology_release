@@ -65,18 +65,20 @@ git = true
 about = "A copy of the release in a new Git repository with one commit. For a quick command that uses Git."
 timeout = 600
 
+# A context that ends with the whole check gives a block an hour. The doc test runs about eighteen whole
+# checks at once, one in each such context, and on a 24-core laptop one of them ran past 30 minutes.
 [contexts.slow]
 base = "release-copy"
 git = true
 needs_env = ["DOC_SNIPPETS_SLOW"]
-timeout = 1800
+timeout = 3600
 about = "The same copy, for commands that take minutes, such as the whole check. Set DOC_SNIPPETS_SLOW=1."
 
 [contexts.new-module]
 base = "release-copy"
 git = true
 needs_env = ["DOC_SNIPPETS_SLOW"]
-timeout = 1800
+timeout = 3600
 about = "A Git copy of its own for the made-up module of the update guide, which ends with the whole check. Set DOC_SNIPPETS_SLOW=1."
 
 [contexts.stores]
@@ -133,59 +135,59 @@ KPI_STORE_LOCAL = "env:KPI_STORE_TEST_LOCAL_SETTINGS"
 base = "release-copy"
 git = true
 needs_env = ["DOC_SNIPPETS_SLOW"]
-timeout = 1800
+timeout = 3600
 about = "A Git copy of its own for the update guide's cut of the made-up report, which ends with the whole check. Set DOC_SNIPPETS_SLOW=1."
 
 [contexts.term-change]
 base = "release-copy"
 git = true
 needs_env = ["DOC_SNIPPETS_SLOW"]
-timeout = 1800
+timeout = 3600
 about = "A Git copy of its own for the update guide's term change: a form, the propose command and the apply command. Set DOC_SNIPPETS_SLOW=1."
 
 [contexts.reference-item]
 base = "release-copy"
 git = true
 needs_env = ["DOC_SNIPPETS_SLOW"]
-timeout = 1800
+timeout = 3600
 about = "A Git copy of its own for the update guide's reference item: a form for a new system, the propose command and the apply command. Set DOC_SNIPPETS_SLOW=1."
 
 [contexts.new-kpi]
 base = "release-copy"
 git = true
 needs_env = ["DOC_SNIPPETS_SLOW"]
-timeout = 1800
+timeout = 3600
 about = "A Git copy of its own for the update guide's new KPI: a KPI intake form, the propose command and the apply command. Set DOC_SNIPPETS_SLOW=1."
 
 [contexts.domain-activation]
 base = "release-copy"
 git = true
 needs_env = ["DOC_SNIPPETS_SLOW"]
-timeout = 1800
+timeout = 3600
 about = "A Git copy of its own for the update guide's domain activation: a form, the propose command and the apply command. Set DOC_SNIPPETS_SLOW=1."
 [contexts.process-map-request]
 base = "release-copy"
 git = true
 needs_env = ["DOC_SNIPPETS_SLOW"]
-timeout = 1800
+timeout = 3600
 about = "A Git copy of its own for the update guide's process map request: a form for a new role and its RACI entries, the propose command and the apply command. Set DOC_SNIPPETS_SLOW=1."
 [contexts.new-process]
 base = "release-copy"
 git = true
 needs_env = ["DOC_SNIPPETS_SLOW"]
-timeout = 1800
+timeout = 3600
 about = "A Git copy of its own for the update guide's new process: a process map request, the propose command and the apply command, which releases core and every module. Set DOC_SNIPPETS_SLOW=1."
 [contexts.new-vocabulary]
 base = "release-copy"
 git = true
 needs_env = ["DOC_SNIPPETS_SLOW"]
-timeout = 1800
+timeout = 3600
 about = "A Git copy of its own for the update guide's new vocabulary: a new-module form, the propose command and the apply command, which releases the module at 1.0.0. Set DOC_SNIPPETS_SLOW=1."
 [contexts.new-reference-table]
 base = "release-copy"
 git = true
 needs_env = ["DOC_SNIPPETS_SLOW"]
-timeout = 1800
+timeout = 3600
 about = "A Git copy of its own for the update guide's new reference table: a new-module form, the propose command and the apply command, which releases the module at 1.0.0. Set DOC_SNIPPETS_SLOW=1."
 [contexts.first-run.placeholders]
 "your Neo4j load folder" = "env:KPI_STORE_TEST_LPG_OUT"
