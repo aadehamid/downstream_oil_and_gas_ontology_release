@@ -177,7 +177,7 @@ figure.pic figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
 <h2 id="run-the-projection">Run the projection<a class="hl" href="#run-the-projection" aria-label="Link to this section">#</a></h2>
 <p>On the client platform one command runs the projection and every load: the runner, <code>python -m kpi_store.runner</code>. Its <code>neo4j</code> step calls <code>kpi_store/load_neo4j.py</code>, which runs the driver on this folder's inputs against the local Neo4j, and its <code>enterprise</code> step copies the checked graph to the named database. <code>ontology-stores-runbook.md</code> in this folder gives every step, from the setup of the machine to the sync check, and says what each step of the runner does.</p>
 <p>Two commands of this folder need no database. Run them from this folder after any input or shape changes.</p>
-<ol><li>Check the rules, validate, and compare the manifest with a fresh build. It fails unless the manifest is current. To write a new manifest, run <code>python pipeline.py build</code>.
+<ol><li>Check the rules, validate, and compare the manifest and the Neo4j specification with a fresh build. It fails unless both are current and the specification conforms to its schema. To write them again, run <code>python pipeline.py build</code>.
 <pre><code class="lang-powershell">cd business_architecture/ontology/projection
 python pipeline.py build --verify</code></pre>
 <pre><code class="lang-text">Step 1 passed; loadable.nt &lt;count&gt; triples, inferred.nt 2

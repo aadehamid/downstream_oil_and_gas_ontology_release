@@ -53,10 +53,13 @@ def test_the_baseline_is_this_trees_or_data_product_has_moved_on():
 
 
 def release_copy(tmp_path):
-    """A release folder that holds what a cut reads and writes: the ontology folder, release.json and the
-    stand-alone check's exception list."""
+    """A release folder that holds what a cut reads and writes: the ontology folder, release.json, the
+    stand-alone check's exception list, and the ontology-to-lpg skill's scripts, with which the projection's Neo4j
+    specification maps the shapes."""
     root = tmp_path / "release"
     shutil.copytree(support.ROOT / ONTOLOGY, root / ONTOLOGY, ignore=shutil.ignore_patterns("__pycache__"))
+    lpg = Path("skills") / "ontology-to-lpg" / "scripts"
+    shutil.copytree(support.ROOT / lpg, root / lpg, ignore=shutil.ignore_patterns("__pycache__", "test_*.py"))
     shutil.copy2(support.ROOT / "release.json", root / "release.json")
     (root / "scripts").mkdir()
     shutil.copy2(support.ROOT / cut.EXCEPTIONS, root / cut.EXCEPTIONS)

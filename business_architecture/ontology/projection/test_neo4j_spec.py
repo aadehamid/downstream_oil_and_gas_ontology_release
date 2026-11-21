@@ -78,6 +78,10 @@ class Document(unittest.TestCase):
                       doc["extensions"]["custom"]["left_out"])
         self.assertNotIn("kpi_measureCode", doc["nodes"]["kpi_MeasureDefinition"]["properties"])
 
+    def test_a_name_splits_at_its_first_separator(self):
+        self.assertEqual(ns.iri_of("sampletankinspections_Tank_Farm", {"sampletankinspections": "urn:a/"}, "_"),
+                         "urn:a/Tank_Farm")
+
     def test_the_schema_check_finds_a_broken_document(self):
         for change, expected in ((lambda d: d.pop("id"), "'id' is a required property"),
                                  (lambda d: d["nodes"]["kpi_MeasureDefinition"]["properties"]["kpi_measureCode"]

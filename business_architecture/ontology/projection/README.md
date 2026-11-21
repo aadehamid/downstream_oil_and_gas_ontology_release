@@ -50,7 +50,7 @@ On the client platform one command runs the projection and every load: the runne
 
 Two commands of this folder need no database. Run them from this folder after any input or shape changes.
 
-1. Check the rules, validate, and compare the manifest with a fresh build. It fails unless the manifest is current. To write a new manifest, run `python pipeline.py build`.
+1. Check the rules, validate, and compare the manifest and the Neo4j specification with a fresh build. It fails unless both are current and the specification conforms to its schema. To write them again, run `python pipeline.py build`.
 
    ```powershell run=release-copy
    cd business_architecture/ontology/projection

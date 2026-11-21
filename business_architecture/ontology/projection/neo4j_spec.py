@@ -76,6 +76,13 @@ def _about(data, iri):
     return out
 
 
+def iri_of(name, prefixes, sep):
+    """The IRI a graph name stands for: the prefix's namespace and the local name. No prefix holds the separator (the
+    load refuses one that does, and so does a new module's settings), so the name splits at its first separator."""
+    prefix, _, local = name.partition(sep)
+    return prefixes[prefix] + local
+
+
 def _graph_key():
     return {"type": "STRING", "description": "The version IRI of the release the element was loaded from "
                                              "(the module tag the load writes)."}
@@ -94,8 +101,7 @@ def document(data, shapes):
             nodes.setdefault(target, {})
 
     def iri(name):
-        prefix, _, local = name.partition(sep)
-        return cfg.prefixes[prefix] + local
+        return iri_of(name, cfg.prefixes, sep)
 
     def prop(key, typed):
         out = {"type": f"LIST<{typed.base}>" if typed.listed else typed.base}

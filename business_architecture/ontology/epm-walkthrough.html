@@ -863,8 +863,8 @@ OPM-0030 Lost Margin from Turnarounds operational-metric</code></pre>
     <div class="panel">
       <h3 data-ss-id="pipeline-py-and-run-local-sh"><code>pipeline.py</code></h3>
       <ol>
-        <li><code>pipeline.py build</code>: check the projection rules, validate, write the manifest.</li>
-        <li><code>pipeline.py build --verify</code>: fail unless the manifest matches a fresh build. <code>scripts/check.sh</code> runs it.</li>
+        <li><code>pipeline.py build</code>: check the projection rules, validate, write the manifest and the Neo4j specification, <code>neo4j-spec.json</code>.</li>
+        <li><code>pipeline.py build --verify</code>: fail unless the manifest and the specification match a fresh build and the specification conforms to its schema. <code>scripts/check.sh</code> runs it.</li>
         <li><code>pipeline.py record --run &lt;driver out&gt;</code>: after a driver run on these inputs, take its <code>inferred.nt</code> and a summary of its report into the projection folder, then rewrite the manifest.</li>
       </ol>
       <p>The last recorded load, on a Neo4j 2025.06.2 with n10s 2025.06.1: 4,237 nodes and 22,312 relationships from 37,233 triples and 2 inferred, with 806 constraints checked in the graph (<code>scripts/epm_facts.py projection</code>).</p>
