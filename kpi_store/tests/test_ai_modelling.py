@@ -684,6 +684,16 @@ def test_qc2_1_a_type_or_sameas_side_effect_through_a_release_property_is_still_
     assert any("rdf:type" in line for line in lines) and any("owl:sameAs" in line for line in lines), lines
 
 
+def test_qc3_3_a_type_or_sameas_side_effect_onto_a_draft_term_is_still_refused():
+    """The object of each side effect is a term of the draft, so only the link-back rule's own guard refuses them."""
+    more = MADE_UP + f"sys:hostedOn rdfs:range {P}:TankInspection .\nsys:onlyOne a owl:ObjectProperty, owl:FunctionalProperty .\n"
+    passed, lines = _gate_2_with(more, "ex:inspection-1 sys:hostedOn system:aps-planning-db .\n"
+                                       "ex:k sys:onlyOne system:aps . ex:k sys:onlyOne ex:other .\n")
+    assert not passed
+    assert any(f"rdf:type {P}:TankInspection" in line for line in lines), lines
+    assert any("owl:sameAs ex:other" in line for line in lines), lines
+
+
 def test_qc2_1_an_example_linked_to_core_and_system_terms_makes_no_false_refusal():
     # core's functional properties, with one value each, as core's own sequences use them
     passed, lines = _gate_2_with("", "ex:sequence-1 core:earlierProcess proc:CM-1-1-4 ;\n"
@@ -693,7 +703,7 @@ def test_qc2_1_an_example_linked_to_core_and_system_terms_makes_no_false_refusal
 
 @pytest.mark.parametrize("more,message", [
     (f'\n{P}:TankInspection rdf:type "http://www.w3.org/2002/07/owl#Class" .\n', "types"),
-    ("", "exactly one rdfs:domain and exactly one rdfs:range, each a named class"),   # refused on 2459afd already
+    ("", 'rdfs:range "http://www.w3.org/2001/XMLSchema#date" is not taken'),   # the schema check, not the one-range one
 ])
 def test_qc2_2_a_literal_is_no_type_and_no_datatype(more, message):
     model = sample()["model"] + more
@@ -707,3 +717,36 @@ def test_qc2_3_problems_needs_the_required_modules():
     dm = drafted.pattern(ROOT)
     import inspect
     assert inspect.signature(dm.problems).parameters["data"].default is inspect.Parameter.empty
+
+
+# ---------- the third quick check's findings ----------
+
+@pytest.mark.parametrize("more_data,more_pass", [
+    ("sys:hosts a owl:ObjectProperty .\n", "system:aps-planning-db sys:hosts ex:inspection-1 .\n"),
+    ("", "system:aps-planning-db sys:System ex:inspection-1 .\n"),
+])
+def test_qc3_1_gate_2_refuses_a_triple_about_a_release_term_that_the_draft_asserts(more_data, more_pass):
+    passed, lines = _gate_2_with(more_data, more_pass)
+    assert not passed and any("would change the release term system:aps-planning-db" in line for line in lines), lines
+
+
+def test_qc3_1_an_asserted_reflexive_sameas_is_no_change_because_the_release_closure_holds_it():
+    """Not a defect: the reasoner gives every term x owl:sameAs x, so the release's closure already holds it."""
+    passed, lines = _gate_2_with("", "system:aps-planning-db owl:sameAs system:aps-planning-db .\n")
+    assert passed, lines
+
+
+def test_qc3_2_a_link_back_needs_a_property_the_release_declares():
+    passed, lines = _gate_2_with("", "ex:p owl:inverseOf sys:System .\nex:inspection-1 ex:p system:aps-planning-db .\n")
+    assert not passed and any("sys:System ex:inspection-1" in line for line in lines), lines
+
+
+@pytest.mark.parametrize("more_pass", ["system:aps-planning-db sys:hosts ex:inspection-1 .\n",
+                                       "ex:p owl:inverseOf sys:System .\nex:inspection-1 ex:p system:aps-planning-db .\n"])
+def test_qc3_the_whole_command_refuses_the_reviews_inputs(more_pass):
+    examples = dict(sample()["examples"], **{"pass": sample()["examples"]["pass"] + more_pass})
+    try:
+        found = gates_of(sample(examples=examples))
+    except ChangeRefused:
+        return   # the form checks refuse it
+    assert not found[2]["passed"], found[2]

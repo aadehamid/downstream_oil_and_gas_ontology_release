@@ -421,7 +421,8 @@ def problems(draft, known, data):
             else:
                 ok_object = o_ in properties or o_ in required_properties
             if not ok_subject or not ok_object:
-                out.append(f"{MODEL}: {curie(spec, s_)} {curie(spec, p_)} {curie(spec, o_)} is not taken. {what}")
+                shown = curie(spec, o_) if isinstance(o_, URIRef) else o_.n3()
+                out.append(f"{MODEL}: {curie(spec, s_)} {curie(spec, p_)} {shown} is not taken. {what}")
     for p in draft.of_kind("property"):
         c = curie(spec, p)
         domains, ranges = list(model.objects(p, URIRef(RDFS + "domain"))), list(model.objects(p, URIRef(RDFS + "range")))
@@ -650,14 +651,25 @@ def _closure(graph):
     return graph
 
 
-def _link_back(triple, own):
-    """True for a link from a release term back into the draft through a property of the release, such as the
+def _release_properties(before, own):
+    """The properties the required modules declare: typed as a property, or named in an owl:inverseOf, in their
+    closure. Never a standard term, never a term of the draft."""
+    from rdflib import URIRef
+    kinds = ("ObjectProperty", "DatatypeProperty", "SymmetricProperty", "FunctionalProperty", "InverseFunctionalProperty",
+             "TransitiveProperty")
+    found = {p for k in [RDF + "Property"] + [OWL + k for k in kinds] for p in before.subjects(URIRef(RDF + "type"), URIRef(k))}
+    found |= {p for s, _, o in before.triples((None, URIRef(OWL + "inverseOf"), None)) for p in (s, o)}
+    return {p for p in found if isinstance(p, URIRef) and not _standard(p) and not str(p).startswith(own)}
+
+
+def _link_back(triple, own, release_properties):
+    """True for a link from a release term back into the draft through a property the release declares, such as the
     inverse of a property an example uses, or a symmetric one: the release's own axioms make it, and it says nothing
-    new of the release term itself. Never rdf:type, owl:sameAs or another standard term, and never a module property."""
+    new of the release term itself. Never rdf:type, owl:sameAs or another standard term, and never a module property.
+    gate_2 applies it to inferred triples only."""
     from rdflib import URIRef
     _, p, o = triple
-    return isinstance(p, URIRef) and not _standard(p) and not str(p).startswith(own) and \
-        isinstance(o, URIRef) and str(o).startswith(own)
+    return p in release_properties and not _standard(p) and isinstance(o, URIRef) and str(o).startswith(own)
 
 
 def gate_2(draft, data):
@@ -671,9 +683,12 @@ def gate_2(draft, data):
     lines = [f"the OWL 2 RL reasoner (owlrl) finds a contradiction: {e}" for e in errors[:5]]
     before = _closure(_joined(data))
     own = (namespace(draft.spec), examples_namespace(draft.spec))
+    asserted = set(draft.model) | set(draft.passing)   # the exemptions are for what the reasoner infers, never for these
+    properties = _release_properties(before, own)
     changed = sorted((t for t in g if isinstance(t[0], URIRef) and not str(t[0]).startswith(own)
                       and not _standard(t[0]) and t[1] != ERRNS.error and t not in before
-                      and not _link_back(t, own) and not (str(t[1]) == OWL + "sameAs" and t[0] == t[2])), key=str)
+                      and not (t not in asserted and (_link_back(t, own, properties)
+                                                      or (str(t[1]) == OWL + "sameAs" and t[0] == t[2])))), key=str)
     for s, p, o in changed[:5]:
         lines.append(f"the draft would change the release term {curie(draft.spec, s)}: the reasoner then finds "
                      f"{curie(draft.spec, s)} {curie(draft.spec, p)} {curie(draft.spec, o)}, which the release alone does "
