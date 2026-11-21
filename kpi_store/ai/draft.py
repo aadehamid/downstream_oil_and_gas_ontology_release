@@ -73,7 +73,7 @@ def providers_of(drafter, reviewer):
         if not ai.family:
             raise AIRefused(f'[{table}] family must name the model\'s family, such as "claude", "gpt" or "llama": the '
                             "reviewer of a draft must be of another family than the drafter")
-    if drafter.family.casefold() == reviewer.family.casefold():
+    if drafter.family.strip().casefold() == reviewer.family.strip().casefold():
         raise AIRefused(f'[ai] and [ai_reviewer] are both of the family "{drafter.family}". Gate 3 needs a second model '
                         "from another family: name a reviewer of another family in [ai_reviewer]")
     return drafter, reviewer
@@ -331,6 +331,12 @@ def run(form_path, release_root=".", stores=None, answer_file=None, review_file=
             raise AIRefused(f"a file of {folder.name} changed after the AI drafted it. Delete {record_path.name} and the "
                             "folder, and ask again")
         spec = record["module"]
+        if record["drafter"]["family"].strip().casefold() == reviewer.family.strip().casefold():
+            raise AIRefused(f'the draft was made by a model of the family "{record["drafter"]["family"]}", and '
+                            "[ai_reviewer] names the same family. Gate 3 needs a reviewer of another family")
+        if {g["gate"] for g in record["gates"] if g["passed"]} != {1, 2, 4}:
+            raise AIRefused(f"{record_path.name} does not show gates 1, 2 and 4 passed, so the draft goes to no reviewer. "
+                            f"Delete it and the folder {folder.name}, and ask again")
     else:
         if review_file:
             raise AIRefused("--review-answer comes after the draft: run the command first without it")

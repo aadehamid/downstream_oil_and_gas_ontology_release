@@ -65,8 +65,23 @@ MODEL, SHAPES, QUESTIONS, EXAMPLES, SUMMARY = "model.ttl", "shapes.ttl", "questi
 FILES = (MODEL, SHAPES, QUESTIONS, EXAMPLES, SUMMARY)
 LOCAL = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,79}")
 ID = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,19}")
-# A query must stay inside the graph it is given: SERVICE calls another endpoint, and FROM or LOAD reads a document.
-NETWORK = re.compile(r"\b(SERVICE|FROM|LOAD)\b", re.I)
+# The terms of SHACL Core a drafted shape may use (SHACL, W3C Recommendation of 2017-07-20, sections 2 to 4). Nothing
+# of SHACL-AF or SHACL-SPARQL, such as sh:rule or sh:sparql, which run code; and no sh:deactivated, which would hide a
+# shape from gate 1.
+SHACL_CORE = {SH + t for t in (
+    "NodeShape", "PropertyShape", "targetClass", "targetNode", "targetSubjectsOf", "targetObjectsOf", "property", "path",
+    "inversePath", "alternativePath", "zeroOrMorePath", "oneOrMorePath", "zeroOrOnePath", "class", "datatype", "nodeKind",
+    "IRI", "Literal", "BlankNode", "BlankNodeOrIRI", "BlankNodeOrLiteral", "IRIOrLiteral", "minCount", "maxCount",
+    "minExclusive", "minInclusive", "maxExclusive", "maxInclusive", "minLength", "maxLength", "pattern", "flags",
+    "languageIn", "uniqueLang", "equals", "disjoint", "lessThan", "lessThanOrEquals", "not", "and", "or", "xone", "node",
+    "qualifiedValueShape", "qualifiedMinCount", "qualifiedMaxCount", "qualifiedValueShapesDisjoint", "closed",
+    "ignoredProperties", "hasValue", "in", "message", "severity", "Violation", "Warning", "Info", "name",
+    "description", "order")}
+SHAPE_PREDICATES = {RDF + "type", RDF + "first", RDF + "rest", RDFS + "label", RDFS + "comment"}
+# OWL forms a draft may not state: each one can change what a term of the release means without naming it as a subject.
+OWL_REFUSED = {OWL + t for t in ("sameAs", "equivalentClass", "equivalentProperty", "differentFrom", "AllDisjointClasses",
+                                 "AllDisjointProperties", "AllDifferent", "Axiom", "NegativePropertyAssertion",
+                                 "propertyDisjointWith", "inverseOf", "propertyChainAxiom", "hasKey")}
 KINDS = {OWL + "Class": "class", OWL + "ObjectProperty": "property", OWL + "DatatypeProperty": "property",
          OWL + "NamedIndividual": "individual"}
 TARGETS = ("targetClass", "targetNode", "targetSubjectsOf", "targetObjectsOf")
@@ -157,7 +172,7 @@ class Draft:
     def label(self, term):
         from rdflib import URIRef
         for p in (RDFS + "label", SKOS + "prefLabel"):
-            for o in self.model.objects(URIRef(term), URIRef(p)):
+            for o in sorted(self.model.objects(URIRef(term), URIRef(p)), key=str):
                 return str(o)
         return curie(self.spec, term)
 
@@ -217,9 +232,14 @@ def closure(depends_on, ontology=ONTOLOGY):
         if m in out:
             continue
         out.add(m)
-        manifest = os.path.join(ontology, "releases", m, newest.newest_version(m, ontology), "manifest.json")
-        with open(manifest, encoding="utf-8") as f:
-            todo += list(json.load(f).get("depends_on") or {})
+        if not isinstance(m, str) or not re.fullmatch(r"[a-z][a-z0-9-]*", m):
+            raise DraftError(f"depends_on names {m!r}, which is not a module's name")
+        try:
+            manifest = os.path.join(ontology, "releases", m, newest.newest_version(m, ontology), "manifest.json")
+            with open(manifest, encoding="utf-8") as f:
+                todo += list(json.load(f).get("depends_on") or {})
+        except (OSError, ValueError) as err:
+            raise DraftError(f"depends_on names {m}, which the release holds no package of ({type(err).__name__})") from None
     return sorted(out)
 
 
@@ -238,6 +258,50 @@ def context(spec, ontology=ONTOLOGY):
 
 
 # ---- the form of the draft: the ontology skill's Step 3 gate --------------------------------------------
+
+def parsed_query(spec, text):
+    """The query translated by rdflib's parser, which reads \\u escapes first, or DraftError. Refuses any form but SELECT
+    and ASK, a dataset clause (FROM, FROM NAMED) and SERVICE anywhere, so a question asks only the graph it is given."""
+    from rdflib.plugins.sparql.algebra import translateQuery
+    from rdflib.plugins.sparql.parser import parseQuery
+    try:
+        tree = parseQuery(text)
+        query = translateQuery(tree, initNs=prefixes(spec))
+    except Exception as err:   # pyparsing and rdflib raise several kinds
+        raise DraftError(f"the query cannot be read ({type(err).__name__}: {str(err)[:120]})") from None
+    if query.algebra.name not in ("SelectQuery", "AskQuery"):
+        raise DraftError("the query must be a SELECT or ASK query")
+    names = {c.name for c in _walk(tree)}
+    if "ServiceGraphPattern" in names or "DatasetClause" in names:
+        raise DraftError("the query uses SERVICE, FROM or FROM NAMED. A competency question asks the graph it is given, "
+                         "and nothing else")
+    return query
+
+
+def _walk(x):
+    from rdflib.plugins.sparql.parserutils import CompValue
+    if isinstance(x, CompValue):
+        yield x
+    if isinstance(x, dict):
+        for v in x.values():
+            yield from _walk(v)
+    elif isinstance(x, (list, tuple, set)) or type(x).__name__ == "ParseResults":
+        for v in x:
+            yield from _walk(v)
+
+
+def _iris(x):
+    from rdflib import URIRef
+    from rdflib.plugins.sparql.parserutils import CompValue
+    if isinstance(x, URIRef):
+        yield x
+    elif isinstance(x, (CompValue, dict)):
+        for v in x.values():
+            yield from _iris(v)
+    elif isinstance(x, (list, tuple, set)) or type(x).__name__ == "ParseResults":
+        for v in x:
+            yield from _iris(v)
+
 
 def _standard(iri):
     return any(str(iri).startswith(ns) for ns in STANDARD.values())
@@ -262,12 +326,18 @@ def problems(draft, known):
         elif not LOCAL.fullmatch(local):
             out.append(f"{MODEL}: {curie(spec, t)} must have a name of letters, digits, hyphens and underscores, "
                        "starting with a letter")
-        if not {str(k) for k in model.objects(t, URIRef(RDF + "type"))} & set(KINDS):
+        kinds = {str(k) for k in model.objects(t, URIRef(RDF + "type"))} & set(KINDS)
+        if not kinds:
             out.append(f"{MODEL}: {curie(spec, t)} is not typed as a class, an object property, a datatype property or "
                        "a named individual")
+        elif len(kinds) > 1:
+            out.append(f"{MODEL}: {curie(spec, t)} is typed as more than one kind of term. Each term is of one kind only")
     for t in sorted(shape_terms):
         if not str(t).startswith(shp):
             out.append(f"{SHAPES}: {t} is not a shape of the module's shapes namespace {shp}")
+        elif (t, URIRef(RDF + "type"), URIRef(SH + "NodeShape")) not in shapes:
+            out.append(f"{SHAPES}: {curie(spec, t)} must be a node shape: a URI of shp: typed sh:NodeShape. A property "
+                       "shape is a blank node reached from a node shape by sh:property")
     for g, name, roots in ((model, MODEL, named), (shapes, SHAPES, shape_terms)):
         reached, todo = set(), list(roots)
         while todo:
@@ -278,14 +348,21 @@ def problems(draft, known):
                     todo.append(o)
         if any(isinstance(s, BNode) and s not in reached for s in g.subjects()):
             out.append(f"{name} holds a blank node that no term of the module reaches")
-    for t in draft.of_kind("class") + draft.of_kind("property"):
+    for t in draft.of_kind("class") + draft.of_kind("property") + draft.of_kind("individual"):
         c = curie(spec, t)
         for p, what in ((RDFS + "label", "label"), (SKOS + "definition", "definition")):
             values = list(model.objects(t, URIRef(p)))
             if len(values) != 1 or not isinstance(values[0], Literal) or values[0].language != "en" or not str(values[0]).strip():
                 out.append(f"{MODEL}: {c} must have exactly one English {what} (rdfs:label or skos:definition with @en)")
+        if t in draft.of_kind("individual"):
+            continue
         if not list(model.objects(t, URIRef(DCTERMS + "bibliographicCitation"))):
             out.append(f"{MODEL}: {c} cites no source (dcterms:bibliographicCitation)")
+    for s_, p_, o_ in model:
+        for term in (p_, o_):
+            if str(term) in OWL_REFUSED:
+                out.append(f"{MODEL} uses {curie(spec, term)}. A draft may not state it, because it can change what a "
+                           "term of the release means; such modelling needs a specialist")
     for p in draft.of_kind("property"):
         c = curie(spec, p)
         domains, ranges = list(model.objects(p, URIRef(RDFS + "domain"))), list(model.objects(p, URIRef(RDFS + "range")))
@@ -299,8 +376,9 @@ def problems(draft, known):
         elif (p, URIRef(RDF + "type"), URIRef(OWL + "DatatypeProperty")) in model and \
                 not (str(ranges[0]).startswith(XSD) or str(ranges[0]) in LITERAL_RANGES):
             out.append(f"{MODEL}: {c} is a datatype property, so its range is a datatype, not {curie(spec, ranges[0])}")
+        attached = {ps for ns_ in draft.node_shapes() for ps in shapes.objects(ns_, URIRef(SH + "property"))}
         counted = any((ps, URIRef(SH + k), None) in shapes for ps in shapes.subjects(URIRef(SH + "path"), p)
-                      for k in ("minCount", "maxCount"))
+                      if ps in attached for k in ("minCount", "maxCount"))
         if not counted:
             out.append(f"{SHAPES}: no shape gives the cardinality of {c} (a property shape with sh:path {c} and "
                        "sh:minCount or sh:maxCount)")
@@ -320,16 +398,31 @@ def problems(draft, known):
                 elif not _standard(term) and str(term) not in known:
                     out.append(f"{name} names {curie(spec, term)}, which neither the draft nor a module it requires "
                                "defines")
+    nodes = set(draft.node_shapes())
     for s, p, o in shapes:
-        if str(p) == SH + "target" or str(p) == SH + "sparql":
-            out.append(f"{SHAPES}: {curie(spec, s)} uses {curie(spec, p)}. A drafted shape uses only the core "
-                       "constraints of SHACL, with sh:targetClass, sh:targetNode, sh:targetSubjectsOf or "
-                       "sh:targetObjectsOf")
-        elif str(p) in (SH + t for t in TARGETS) and not str(o).startswith(ns):
+        for term in (p, o):
+            if str(term).startswith(SH) and str(term) not in SHACL_CORE:
+                out.append(f"{SHAPES} uses {curie(spec, term)}, which is not a term of SHACL Core that the drafted "
+                           "pattern takes. A drafted shape uses only SHACL Core constraints, with no rule, no SPARQL "
+                           "and no sh:deactivated")
+        if not str(p).startswith(SH) and str(p) not in SHAPE_PREDICATES:
+            out.append(f"{SHAPES} uses {curie(spec, p)}, which a shape does not take")
+        if str(p) in (SH + t for t in TARGETS) and s not in nodes:
+            out.append(f"{SHAPES}: {curie(spec, s)} has a target, so it must be a URI of shp: typed sh:NodeShape")
+        if str(p) == SH + "property" and s not in nodes:
+            out.append(f"{SHAPES}: a property shape is nested under {curie(spec, s)}. Only a node shape of shp: holds "
+                       "property shapes, so each rule belongs to one node shape")
+        if str(p) == SH + "property" and (not isinstance(o, BNode) or len(set(shapes.subjects(p, o))) > 1):
+            out.append(f"{SHAPES}: the property shape {curie(spec, o)} of {curie(spec, s)} must be a blank node that one "
+                       "node shape holds")
+        if str(p) in (SH + t for t in TARGETS) and not str(o).startswith(ns):
             out.append(f"{SHAPES}: {curie(spec, s)} targets {curie(spec, o)}, which is not a term of the module. A "
                        "drafted shape says nothing of the release's own terms")
     for g, name in [(draft.passing, "the passing examples")] + \
             [(add, f"the failing example {f['id']}") for f, add, _ in draft.failing]:
+        if any(isinstance(s, BNode) for s in g.subjects()):
+            out.append(f"{EXAMPLES}: {name} give a triple to a blank node. Example data names each thing with a name of "
+                       f"the examples namespace {ex} (ex:)")
         for s in set(g.subjects()):
             if isinstance(s, URIRef) and not str(s).startswith(ex):
                 out.append(f"{EXAMPLES}: {name} give a triple to {curie(spec, s)}. Example data uses names of the "
@@ -346,10 +439,12 @@ def problems(draft, known):
         if not isinstance(q["question"], str) or not q["question"].strip() or not isinstance(q["sparql"], str):
             out.append(f"{QUESTIONS}, {q['id']}: the question must be words, and sparql a query")
             continue
-        if NETWORK.search(q["sparql"]):
-            out.append(f"{QUESTIONS}, {q['id']}: the query uses SERVICE, FROM or LOAD. A competency question asks the "
-                       "graph it is given, and nothing else")
-        if namespace(spec) not in q["sparql"] and f"{spec['prefix']}:" not in q["sparql"]:
+        try:
+            query = parsed_query(spec, q["sparql"])
+        except DraftError as err:
+            out.append(f"{QUESTIONS}, {q['id']}: {err}")
+            continue
+        if not any(str(i).startswith(ns) for i in _iris(query.algebra)):
             out.append(f"{QUESTIONS}, {q['id']}: the query names no term of the module")
         expected = q["expected"]
         if not (expected is True or (isinstance(expected, list) and expected and all(
@@ -394,10 +489,9 @@ def _value(term):
 def answers(draft, data):
     """{question id: (the answer it gave, the answer it expects)}, each as JSON-ready values."""
     out = {}
-    initns = prefixes(draft.spec)
     for q in draft.questions:
         try:
-            result = data.query(q["sparql"], initNs=initns)
+            result = data.query(parsed_query(draft.spec, q["sparql"]))
         except Exception as err:   # a query rdflib cannot parse or run
             out[q["id"]] = (f"the query fails ({type(err).__name__}: {str(err)[:120]})", q["expected"])
             continue
@@ -425,12 +519,13 @@ def _report_shapes(report, shapes):
     return sources, results
 
 
-def _validate(data, shapes, focus=None):
-    """(conforms, report) of the shapes over the data, for the focus nodes only when `focus` names them."""
+def _validate(data, shapes, focus=None, advanced=False):
+    """(conforms, report) of the shapes over the data, for the focus nodes only when `focus` names them. The draft's
+    shapes run without SHACL's advanced features; only the release's own shapes, which a person reviewed, use them."""
     from pyshacl import validate
     # pyshacl adds triples of its own to the shapes graph it is given, so it gets a copy.
     more = {"focus_nodes": focus} if focus is not None else {}
-    conforms, report, _ = validate(data, shacl_graph=_joined(shapes), advanced=True, allow_warnings=True, **more)
+    conforms, report, _ = validate(data, shacl_graph=_joined(shapes), advanced=advanced, allow_warnings=True, **more)
     return conforms, report
 
 
@@ -459,7 +554,7 @@ def gate_1(draft, data, release_shapes):
         # so a shape about the links between other modules may fail on them. The apply runs the whole-graph gate.
         own = (namespace(spec), examples_namespace(spec))
         focus = sorted({s for g in (draft.model, draft.passing) for s in g.subjects() if str(s).startswith(own)})
-        _, report = _validate(base, release_shapes, focus)
+        _, report = _validate(base, release_shapes, focus, advanced=True)
         _, results = _report_shapes(report, release_shapes)
         mine = [(f, m) for f, m in results if str(f).startswith(own)]
         if mine:

@@ -114,16 +114,50 @@ def from_answer(text, spec, root, release=None):
     for t in draft.of_kind("class") + draft.of_kind("property"):
         if not list(draft.model.objects(t, cite)):
             draft.model.add((t, cite, Literal(spec["citation"], lang="en")))
-    # The modules the module requires: those whose newest package gives a type to a name the draft uses.
+    files = dm.canonical(dm.Draft(spec, dict(texts, **{dm.MODEL: dm.model_text(spec, draft.model)})))
+    depends, kept = derived(spec, files, release, dm)
+    spec = dict(spec, depends_on=depends, prefixes=kept)
+    try:
+        files = dm.canonical(dm.Draft(spec, files))
+        changes_of(spec, files, root)   # a name or a text a KGCL line cannot carry is refused now, before anyone signs
+    except dm.DraftError as err:
+        raise ChangeRefused(f"the AI's draft cannot be read: {err}") from None
+    return spec, files
+
+
+def derived(spec, files, release, dm):
+    """(depends_on, prefixes) that a draft's canonical files give: the modules whose newest package gives a type to a
+    name the draft uses, and the release's prefixes that the files use."""
+    from rdflib import URIRef
+    offered = release_prefixes(release)
+    try:
+        draft = dm.Draft(dict(spec, prefixes=offered), files)
+    except dm.DraftError as err:
+        raise ChangeRefused(f"the draft cannot be read: {err}") from None
     used = {str(x) for g in [draft.model, draft.shapes, draft.passing] + [a for _, a, _ in draft.failing]
             for triple in g for x in triple if isinstance(x, URIRef)}
     depends = sorted({m for iri in used if iri.startswith(new_module.BASE) and not iri.startswith(dm.namespace(spec))
                       for m in release.defined_in(iri)})
-    every = "\n".join(texts.values())
-    kept = {p: ns for p, ns in offered.items() if f"{p}:" in every or ns in every}
-    spec = dict(spec, depends_on=depends, prefixes=kept)
-    draft = dm.Draft(spec, dict(texts, **{dm.MODEL: dm.model_text(spec, draft.model)}))
-    return spec, dm.canonical(draft)
+    every = "\n".join(files[name] for name in sorted(files))
+    return depends, {p: ns for p, ns in offered.items() if f"{p}:" in every or ns in every}
+
+
+def check_settings(spec, files, root, release=None):
+    """Refuses module settings that are not those the release and the draft's files give: the key, prefix, title,
+    description and documents checked as for any new module, and depends_on and prefixes worked out again."""
+    release = release or new_module.Release(root)
+    fresh = new_module.module_settings(spec["module"], DRAFTED, spec["title"], spec["description"], spec["citation"],
+                                       root, release)
+    if fresh["prefix"] != spec["prefix"]:
+        raise ChangeRefused(f"the record of the AI draft gives the prefix {spec['prefix']!r}, and the module's name "
+                            f"gives {fresh['prefix']!r}")
+    depends, kept = derived(spec, files, release, pattern(root))
+    if spec["depends_on"] != depends:
+        raise ChangeRefused(f"the record of the AI draft gives depends_on {spec['depends_on']}, and the draft's files "
+                            f"give {depends}")
+    if spec["prefixes"] != kept:
+        raise ChangeRefused("the record of the AI draft gives prefixes that are not those of the release the draft's "
+                            "files use")
 
 
 def gates(spec, files, root):
@@ -172,7 +206,7 @@ def changes_of(spec, files, root):
             if not s:
                 raise ChangeRefused(f"{t} has no short name that a KGCL line can write")
             out.append(Change("create node", s, text=draft.label(t)))
-            for d in draft.model.objects(t, URIRef(dm.SKOS + "definition")):
+            for d in sorted(draft.model.objects(t, URIRef(dm.SKOS + "definition")), key=str):
                 out.append(Change("add definition", s, text=str(d)))
             for p, name in ((dm.RDFS + "subClassOf", "rdfs:subClassOf"), (dm.RDFS + "domain", "rdfs:domain"),
                             (dm.RDFS + "range", "rdfs:range")):
@@ -205,6 +239,8 @@ def check_record(record, files, answers=None):
     failed = _failed(record["gates"])
     if failed:
         raise ChangeRefused("the AI draft did not pass every gate: " + " | ".join(failed))
+    if record["reviewer"]["verdict"] != "PASS" or not {1, 2, 3, 4} <= {g["gate"] for g in record["gates"]}:
+        raise ChangeRefused("the AI draft needs gates 1 to 4 passed and the reviewer's PASS")
     if parts(files) != record["parts"]:
         raise ChangeRefused("the draft's files are not those the AI drafted and the reviewer read: a file changed after "
                             "the AI step. Delete the draft and its record, and ask again")
@@ -235,6 +271,7 @@ def from_signed_form(path, intake, root, signatures):
         if fresh[k] != spec[k]:
             raise ChangeRefused(f"the record of the AI draft gives the module's {k} as {spec[k]!r}, and the form now gives "
                                 f"{fresh[k]!r}. Delete the draft and its record, and ask again")
+    check_settings(spec, files, root)
     now = gates(spec, files, root)
     failed = _failed(now)
     if failed:
@@ -266,6 +303,7 @@ def check_proposal(p, root):
     spec = record["module"]
     if facts_of(spec) != [tuple(f) for f in p.facts]:
         raise ChangeRefused(f"the proposal {p.change}: its facts are not those of the drafted module {spec['module']}")
+    check_settings(spec, files, root)
     failed = _failed(gates(spec, files, root))
     if failed:
         raise ChangeRefused(f"the proposal {p.change} no longer passes against this release: " + " | ".join(failed))

@@ -186,6 +186,8 @@ def check_draft(draft, signed):
             fail(f"gives the {who} a field of the wrong type")
         if value["provider"] not in AI_PROVIDERS or not text(value["family"]) or not text(value["approved_by"]):
             fail(f"must name the {who}'s provider, its model family and who approved it")
+        if value["family"] != value["family"].strip():
+            fail(f"gives the {who}'s family with spaces around it")
         for f in ("approved_on", "asked_on"):
             if not DATE.fullmatch(value[f]) or not _is_date(value[f]):
                 fail(f"gives the {who} a {f} that is not a date written as YYYY-MM-DD")
@@ -207,7 +209,9 @@ def check_draft(draft, signed):
     if not isinstance(module, dict) or tuple(sorted(module)) != tuple(sorted(DRAFT_MODULE_FIELDS)) or \
             module["pattern"] != "drafted" or not all(text(module[f]) for f in ("module", "prefix", "title", "description",
                                                                                  "citation")) or \
-            not isinstance(module["depends_on"], list) or not isinstance(module["prefixes"], dict):
+            not isinstance(module["depends_on"], list) or not all(text(m) for m in module["depends_on"]) or \
+            len(set(module["depends_on"])) != len(module["depends_on"]) or not isinstance(module["prefixes"], dict) or \
+            not all(text(k) and text(v) for k, v in module["prefixes"].items()):
         fail("must give the module's settings as exactly " + ", ".join(DRAFT_MODULE_FIELDS) + ", of the drafted pattern")
     if not isinstance(draft["form_sha256"], str) or not SHA256.fullmatch(draft["form_sha256"]):
         fail("must give the SHA-256 of the form's answers")
@@ -219,7 +223,7 @@ def check_draft(draft, signed):
                 isinstance(f, dict) and set(f) == {"gate", "finding"} and text(f["gate"]) and text(f["finding"])
                 for f in reviewer["findings"]):
             fail("must give the reviewer's verdict, PASS or HOLD, and each finding as gate and finding, in words")
-        if reviewer["family"].casefold() == draft["drafter"]["family"].casefold():
+        if reviewer["family"].strip().casefold() == draft["drafter"]["family"].strip().casefold():
             fail("names a reviewer of the drafter's own model family; gate 3 needs another family")
     if not isinstance(draft["parts"], list) or not draft["parts"] or not all(
             isinstance(p, dict) and set(p) == {"path", "sha256"} and text(p["path"]) and isinstance(p["sha256"], str)

@@ -172,7 +172,7 @@ def test_gate_4_fails_when_the_summary_leaves_out_a_new_term():
     ({"shapes": sample()["shapes"].replace(f"sh:path {P}:inspectionDate ; sh:minCount 1 ; sh:maxCount 1 ;",
                                            f"sh:path {P}:inspectionDate ;")}, "no shape gives the cardinality"),
     ({"questions": [dict(sample()["questions"][0], sparql="SELECT * WHERE { SERVICE <http://example.org/s> { ?s ?p ?o } "
-                         f"?s a {P}:TankInspection }}")]}, "uses SERVICE, FROM or LOAD"),
+                         f"?s a {P}:TankInspection }}")]}, "uses SERVICE, FROM or FROM NAMED"),
     ({"examples": dict(sample()["examples"], pass_=None) and {"pass": sample()["examples"]["pass"] +
       'system:aps-planning-db rdfs:comment "changed"@en .\n', "fail": sample()["examples"]["fail"]}},
      "Example data uses names of the examples namespace"),
@@ -422,3 +422,101 @@ def test_the_settings_name_the_reviewer_in_ai_reviewer_and_refuse_a_key_there(tm
     assert (found.ai.family, found.ai_reviewer.provider, found.ai_reviewer.family) == ("claude", "openai", "gpt")
     with pytest.raises(ls.LocalSettingsError, match=r"\[ai_reviewer\] api_key is not a setting"):
         ls.load(settings(tmp_path, text + 'api_key = "x"\n'), environ={}, release_root=ROOT)
+
+
+# ---------- the first review's findings ----------
+
+R1 = [
+    # 1: a SHACL rule, or any term outside SHACL Core, in the shapes
+    ({"shapes": sample()["shapes"].replace(
+        "sh:targetClass sample_tank_inspections:TankInspection ;",
+        "sh:targetClass sample_tank_inspections:TankInspection ;\n"
+        "    sh:rule [ a sh:TripleRule ; sh:subject sys:System ; sh:predicate rdfs:comment ; sh:object \"x\" ] ;")},
+     "not a term of SHACL Core"),
+    # 2: a SERVICE written with an escape, and a module term in a comment only
+    ({"questions": [dict(sample()["questions"][0], sparql=
+        "SELECT ?i WHERE { S\\u0045RVICE <http://127.0.0.1:9/sparql> { ?s ?p ?o } ?i a sample_tank_inspections:TankInspection }")]},
+     "SERVICE"),
+    ({"questions": [dict(sample()["questions"][0], sparql="# sample_tank_inspections:TankInspection\nASK { ?s ?p ?o }",
+                         expected=True)]}, "names no term of the module"),
+    ({"questions": [dict(sample()["questions"][0], sparql=
+        "CONSTRUCT { ?i ?p ?o } WHERE { ?i a sample_tank_inspections:TankInspection ; ?p ?o }")]}, "SELECT or ASK"),
+    # 3 and 5: a shape not typed sh:NodeShape, an orphan property shape, a nested one, a deactivated one
+    ({"shapes": sample()["shapes"] + "\nshp:Hidden sh:targetClass sample_tank_inspections:TankInspection ;\n"
+      "    sh:property [ sh:path sample_tank_inspections:recordedIn ; sh:maxCount 1 ] .\n"}, "typed sh:NodeShape"),
+    ({"shapes": sample()["shapes"].replace(
+        "sh:path sample_tank_inspections:recordedIn ; sh:minCount 1 ; sh:maxCount 1 ;", "sh:path sample_tank_inspections:recordedIn ;")
+      + "\nshp:Orphan a sh:PropertyShape ; sh:path sample_tank_inspections:recordedIn ; sh:minCount 1 .\n"},
+     "sh:PropertyShape|blank node reached"),
+    ({"shapes": sample()["shapes"].replace(
+        "sh:message \"An inspection has exactly one date.\" ]",
+        "sh:message \"An inspection has exactly one date.\" ;\n"
+        "                  sh:property [ sh:path sample_tank_inspections:inspectionDate ; sh:minCount 1 ] ]")},
+     "nested"),
+    ({"shapes": sample()["shapes"].replace("sh:targetClass", "sh:deactivated true ;\n    sh:targetClass")}, "sh:deactivated"),
+    # 4: sameAs to a term of the release
+    ({"model": sample()["model"] + "\nsample_tank_inspections:Alias a owl:NamedIndividual ; rdfs:label \"alias\"@en ;\n"
+      "    skos:definition \"An alias.\"@en ; owl:sameAs system:aps-planning-db .\n"}, "owl:sameAs"),
+    # 6: an example with a blank-node subject
+    ({"examples": {"pass": sample()["examples"]["pass"] + "[] a sys:System .\n", "fail": sample()["examples"]["fail"]}},
+     "blank node"),
+    # 9: a term of two kinds, and an individual with two labels
+    ({"model": sample()["model"] + "\nsample_tank_inspections:TankA a owl:NamedIndividual ;\n"
+      "    rdfs:label \"Tank A\"@en, \"Primary tank\"@en ; skos:definition \"A made-up tank.\"@en .\n"}, "exactly one English label"),
+    ({"model": sample()["model"].replace("sample_tank_inspections:TankInspection a owl:Class ;",
+                                         "sample_tank_inspections:TankInspection a owl:Class, owl:NamedIndividual ;")},
+     "one kind"),
+]
+
+
+@pytest.mark.parametrize("change,message", R1)
+def test_round_1_the_pattern_refuses_what_the_review_found(change, message):
+    with pytest.raises(ChangeRefused, match=message):
+        gates_of(sample(**change))
+
+
+def test_round_1_a_query_may_name_a_variable_from():
+    q = dict(sample()["questions"][0], sparql="SELECT ?inspection ?from WHERE { ?inspection a sample_tank_inspections:TankInspection ;"
+             " sample_tank_inspections:recordedIn system:aps-planning-db ; sample_tank_inspections:inspectionDate ?from }")
+    assert gates_of(sample(questions=[q]))[1]["passed"]
+
+
+def test_round_1_a_definition_kgcl_cannot_carry_is_refused_before_anyone_signs(tmp_path):
+    bad = sample(model=sample()["model"].replace("The date on which the inspection took place.", "Line one.\\nLine two."))
+    path = form(tmp_path)
+    with pytest.raises(AIRefused):
+        run(path, answer_file=answer_file(tmp_path, bad))
+    assert not path.with_name(path.stem + drafted.RECORD_SUFFIX).exists()
+
+
+@pytest.mark.parametrize("change,message", [
+    (lambda r: r["draft"]["module"].update(prefix="aaa"), "prefix"),
+    (lambda r: r["draft"]["module"].update(depends_on=["kpi", "system"]), "depends_on"),
+    (lambda r: r["draft"]["module"]["prefixes"].update(evil="https://attacker.example/"), "prefixes"),
+    (lambda r: r["draft"]["module"].update(depends_on=["no-such-module"]), "depends_on|no-such-module"),
+    (lambda r: r["draft"]["module"].update(depends_on=[123]), "depends_on"),
+    (lambda r: r["draft"]["reviewer"].update(family="claude "), "family"),
+])
+def test_round_1_apply_refuses_tampered_module_settings_and_families(tmp_path, change, message):
+    folder = _proposal(tmp_path)
+    _edit(folder, change)
+    with pytest.raises(ChangeRefused, match=message):
+        apply_cmd.plan([folder], ROOT)
+
+
+def test_round_1_a_resumed_draft_checks_the_families_and_gates_before_the_review(tmp_path):
+    path = form(tmp_path)
+    run(path, answer_file=SAMPLE_DRAFT)
+    prompt = path.with_name(path.stem + draft.REVIEW_PROMPT)
+    prompt.unlink()
+    swapped = ls.AI("by-hand", assistant="Another", family="claude", **APPROVED)
+    with pytest.raises(AIRefused, match="family"):
+        run(path, drafter=ls.AI("by-hand", assistant="Genie Code", family="gpt", **APPROVED), reviewer=swapped)
+    assert not prompt.exists()
+    record_path = path.with_name(path.stem + drafted.RECORD_SUFFIX)
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    record["gates"] = []
+    record_path.write_text(json.dumps(record), encoding="utf-8")
+    with pytest.raises(AIRefused, match="gate"):
+        run(path)
+    assert not prompt.exists()
