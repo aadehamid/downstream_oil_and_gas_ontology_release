@@ -47,6 +47,12 @@ proposal's lines and facts, writes its package at 1.0.0, rebuilds the catalog, t
 pack and the pages, runs the competency questions, the module's tests and the whole-graph shapes gate, and then
 writes and commits the release. It needs the Data Owner's, the Ontology Owner's and the Architect's signatures.
 
+A new module that an AI drafted (kpi_store/change/drafted.py) goes the same way, with two more steps. Before anything
+else, the plan checks that its approval record shows all five gates of KPI-DEC-0002, Q19 passed, that the draft's
+files are those the record fingerprints, and that gates 1, 2 and 4 still pass against this release. The run then writes
+the module's folder from the drafted pattern (release/drafted_module.py), and checks that the built folder holds
+exactly the proposal's draft.
+
 A domain activation changes no module: the ontology holds no list of domains. Its run writes the approval record and
 the facts, makes the domain active in kpi-intake/settings.toml (kpi_store/change/domains.py), checks that the list
 differs by exactly the facts, rebuilds the KPI intake pack and verifies it, so the KPI form offers the domain, and

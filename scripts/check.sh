@@ -38,7 +38,10 @@ run_tests() {  # unittest exits 0 on zero tests; a test command must have run at
 # temporary environment that uv makes for this script, which is deleted afterwards, so they change no Python of yours.
 # kgcl-schema is the official KGCL parser. Only kpi_store/tests/test_change.py uses it, to check each line that
 # kpi_store/change writes; the release reads and writes KGCL without it.
-with_deps() { uv run -q --no-project --with pytest==9.2.0 --with pytest-xdist==3.8.0 --with rdflib==7.6.0 --with pyshacl==0.40.2 --with openpyxl==3.1.5 --with jsonschema==4.26.0 --with markdown-it-py==4.3.0 --with pyyaml==6.0.3 --with sqlglot==30.31.0 --with pyoxigraph==0.5.13 --with neo4j==6.4.1 --with kgcl-schema==0.7.0 --with pip==26.3 "$@"; }
+# owlrl is the OWL 2 RL reasoner of gate 2 of an AI-drafted module (business_architecture/ontology/release/
+# drafted_module.py). pyshacl 0.40.2 requires owlrl >=7.6.2,<8 and so brings it anyway; the pin names the one version
+# the gate was tested with.
+with_deps() { uv run -q --no-project --with pytest==9.2.0 --with pytest-xdist==3.8.0 --with rdflib==7.6.0 --with pyshacl==0.40.2 --with owlrl==7.6.2 --with openpyxl==3.1.5 --with jsonschema==4.26.0 --with markdown-it-py==4.3.0 --with pyyaml==6.0.3 --with sqlglot==30.31.0 --with pyoxigraph==0.5.13 --with neo4j==6.4.1 --with kgcl-schema==0.7.0 --with pip==26.3 "$@"; }
 
 # Snapshot the tree, so a check that writes a file is caught.
 snapshot() {
@@ -153,6 +156,7 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   kpi_store/tests/test_core_release.py \
   kpi_store/tests/test_new_module.py \
   kpi_store/tests/test_ai_option.py \
+  kpi_store/tests/test_ai_modelling.py \
   kpi_store/tests/test_discovery.py \
   kpi_store/tests/test_load_databricks.py \
   kpi_store/tests/test_metric_view.py \

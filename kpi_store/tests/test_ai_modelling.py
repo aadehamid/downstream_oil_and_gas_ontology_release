@@ -1,0 +1,424 @@
+"""AI-drafted modelling under the five gates of KPI-DEC-0002, Q19 (Q17(a), Q20 and Q26).
+
+The drafter and the reviewer work by hand, with the release's made-up sample answers (kpi_store/ai/sample-draft.json
+and sample-review.json), or through the stub HTTP server of test_ai_option.py, which speaks the providers' documented
+request and reply. No test reaches a real service. Forms and proposals go to temporary folders; the release tree is
+only read, except by the one apply test, which runs on a scratch copy.
+
+Each gate has a test that it passes on the sample and a test that it refuses what it must refuse:
+    gate 1   a competency question with another answer, a failing example that breaks nothing, a node shape with
+             no failing example, and passing examples that break a shape
+    gate 2   an example that is in two disjoint classes: the reasoner finds the contradiction
+    gate 3   a reviewer of the drafter's family, a reviewer with no family, and a HOLD, which propose then refuses
+    gate 4   a summary that leaves out a new term
+    gate 5   the propose and apply commands without the Ontology Owner's signature or with a route below major
+"""
+import copy
+import hashlib
+import json
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+from kpi_store import apply as apply_cmd, local_settings as ls, propose as propose_cmd
+from kpi_store.ai import AIRefused, draft, providers
+from kpi_store.change import ChangeRefused, approval, drafted, proposal
+from kpi_store.intake import check
+from kpi_store.tests import support
+from kpi_store.tests.test_ai_option import Stub, no_proxy, quiet, settings  # noqa: F401
+from kpi_store.tests.test_new_module import full_release
+from kpi_store.tests.test_propose_apply import NOW, git, no_global_git  # noqa: F401
+
+ROOT = support.ROOT
+SAMPLE_DRAFT = ROOT / "kpi_store" / "ai" / "sample-draft.json"
+SAMPLE_REVIEW = ROOT / "kpi_store" / "ai" / "sample-review.json"
+P = "sample_tank_inspections"
+APPROVED = {"approved_by": "An IT Approver", "approved_on": "2026-11-20"}
+DRAFTER = ls.AI("by-hand", assistant="Genie Code", family="claude", **APPROVED)
+REVIEWER = ls.AI("by-hand", assistant="A second assistant", family="gpt", **APPROVED)
+SIGNED = {"data-owner": {"name": "A Data Owner", "date": "2026-11-20"},
+          "ontology-owner": {"name": "An Ontology Owner", "date": "2026-11-20"},
+          "architect": {"name": "An Architect", "date": "2026-11-20"}}
+ANSWERS = {"N1": "Sample Tank Inspections", "N2": "The made-up inspections of the storage tanks of a made-up terminal.",
+           "N3": "new-modelling", "N12": ["A made-up tank inspection procedure, 2026-11-20"],
+           "N13": "An inspection checks one storage tank on one date, and one system that the ontology lists holds its "
+                  "record. For example, the inspection of 2 November 2026 is recorded in the APS planning database."}
+
+
+def form(folder, answers=None, sign_offs=None):
+    data = {"format": 1, "form": "new-module", "catalogue_version": "1.2", "kpi_name": "Sample Tank Inspections",
+            "request": {"number": "NM-2026-003", "date": "2026-11-20", "requester_role": "Data Owner", "invited": ""},
+            "answers": {**ANSWERS, **(answers or {})}, "sign_offs": sign_offs or {}, "consulted": {},
+            "example_of": "", "comment": ""}
+    path = Path(folder) / "sample-tank-inspections.new-module.json"
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8", newline="\n")
+    return path
+
+
+def sign(path, sign_offs=SIGNED):
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["sign_offs"] = sign_offs
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8", newline="\n")
+
+
+def sample(**changes):
+    """The sample draft answer, with some of its parts replaced."""
+    data = json.loads(SAMPLE_DRAFT.read_text(encoding="utf-8"))
+    data.update(changes)
+    return data
+
+
+def answer_file(folder, data, name="draft-answer.json"):
+    path = Path(folder) / name
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    return path
+
+
+def run(path, **kw):
+    kw = {"drafter": DRAFTER, "reviewer": REVIEWER, "today": "2026-11-20", "say": quiet, **kw}
+    return draft.run(path, ROOT, **kw)
+
+
+def drafted_form(folder, review=SAMPLE_REVIEW, data=None):
+    """A form with its draft and its review done, by hand, from the sample answers."""
+    path = form(folder)
+    run(path, answer_file=answer_file(folder, data) if data else SAMPLE_DRAFT)
+    run(path, review_file=review)
+    return path
+
+
+def gates_of(data):
+    spec = drafted.spec_of_form(ANSWERS, ROOT)
+    spec, files = drafted.from_answer(json.dumps(data), spec, ROOT)
+    return {g["gate"]: g for g in drafted.gates(spec, files, ROOT)}
+
+
+# ---------- the pattern's checks and gates 1, 2 and 4 ----------
+
+def test_the_sample_draft_passes_gates_1_2_and_4():
+    found = gates_of(sample())
+    assert [g["passed"] for g in found.values()] == [True, True, True], found
+    assert "CQ1: gives the answer it expects" in found[1]["results"]
+    assert any("F1: breaks shp:TankInspection" in r for r in found[1]["results"])
+
+
+def test_gate_1_fails_on_a_question_whose_answer_is_not_the_one_it_expects():
+    q = sample()["questions"]
+    q[0]["expected"] = [["ex:inspection-1", "2026-11-03"]]
+    found = gates_of(sample(questions=q))
+    assert not found[1]["passed"]
+    assert any(r.startswith("CQ1: expects") for r in found[1]["results"])
+
+
+def test_gate_1_fails_on_a_failing_example_that_breaks_nothing():
+    e = sample()["examples"]
+    e["fail"][1] = dict(e["fail"][1], add=f"ex:inspection-1 {P}:recordedIn system:aps .", remove=
+                        f"ex:inspection-1 {P}:recordedIn system:aps-planning-db .")
+    found = gates_of(sample(examples=e))
+    assert not found[1]["passed"]
+    assert any("F2: should break shp:TankInspection" in r for r in found[1]["results"])
+
+
+def test_gate_1_fails_when_a_node_shape_has_no_failing_example():
+    shapes = sample()["shapes"] + f"\nshp:Other a sh:NodeShape ; sh:targetClass {P}:TankInspection ;\n" \
+        f"    sh:property [ sh:path {P}:inspectionDate ; sh:maxCount 1 ] .\n"
+    summary = sample()["summary"] + [{"term": "shp:Other", "meaning": "A second rule.", "example": "One date."}]
+    found = gates_of(sample(shapes=shapes, summary=summary))
+    assert not found[1]["passed"]
+    assert "no failing example breaks shp:Other, so nothing shows that its rules hold" in found[1]["results"]
+
+
+def test_gate_1_fails_when_the_passing_examples_break_a_shape():
+    e = sample()["examples"]
+    e["pass"] += f'ex:inspection-2 a {P}:TankInspection ; {P}:recordedIn system:aps-planning-db .\n'
+    found = gates_of(sample(examples=e))
+    assert not found[1]["passed"]
+    assert any(r.startswith("the passing examples break the draft's shapes") for r in found[1]["results"])
+
+
+def test_gate_1_fails_when_an_example_breaks_a_shape_of_a_required_module():
+    e = sample()["examples"]
+    e["pass"] += "ex:a-new-system a sys:System .\n"
+    found = gates_of(sample(examples=e))
+    assert not found[1]["passed"]
+    assert any("break a shape of a module the module requires" in r for r in found[1]["results"])
+
+
+def test_gate_2_the_reasoner_finds_a_thing_in_two_disjoint_classes():
+    e = sample()["examples"]
+    e["pass"] = e["pass"].replace(f"a {P}:TankInspection ;", f"a {P}:TankInspection, sys:System ;")
+    found = gates_of(sample(examples=e))
+    assert not found[2]["passed"]
+    assert any("Disjoint classes" in r and "inspection-1" in r for r in found[2]["results"]), found[2]
+
+
+def test_gate_4_fails_when_the_summary_leaves_out_a_new_term():
+    found = gates_of(sample(summary=sample()["summary"][:-1]))
+    assert not found[4]["passed"]
+    assert "shp:TankInspection has no entry that says in words what it means, with an example" in found[4]["results"]
+
+
+@pytest.mark.parametrize("change,message", [
+    ({"model": sample()["model"] + '\nsys:System rdfs:comment "changed"@en .\n'}, "is not a term of the module's namespace"),
+    ({"model": sample()["model"].replace(f"    rdfs:domain {P}:TankInspection ;\n    rdfs:range xsd:date .",
+                                         "    rdfs:range xsd:date .")}, "must have exactly one rdfs:domain"),
+    ({"model": sample()["model"].replace("rdfs:range sys:System", "rdfs:range sys:NoSuchClass")},
+     "names sys:NoSuchClass, which neither the draft nor a module it requires defines"),
+    ({"shapes": sample()["shapes"].replace(f"sh:targetClass {P}:TankInspection", "sh:targetClass sys:System")},
+     "targets sys:System, which is not a term of the module"),
+    ({"shapes": sample()["shapes"].replace(f"sh:path {P}:inspectionDate ; sh:minCount 1 ; sh:maxCount 1 ;",
+                                           f"sh:path {P}:inspectionDate ;")}, "no shape gives the cardinality"),
+    ({"questions": [dict(sample()["questions"][0], sparql="SELECT * WHERE { SERVICE <http://example.org/s> { ?s ?p ?o } "
+                         f"?s a {P}:TankInspection }}")]}, "uses SERVICE, FROM or LOAD"),
+    ({"examples": dict(sample()["examples"], pass_=None) and {"pass": sample()["examples"]["pass"] +
+      'system:aps-planning-db rdfs:comment "changed"@en .\n', "fail": sample()["examples"]["fail"]}},
+     "Example data uses names of the examples namespace"),
+])
+def test_the_pattern_refuses_a_draft_that_does_not_have_its_form(change, message):
+    with pytest.raises(ChangeRefused, match=message):
+        gates_of(sample(**change))
+
+
+def test_an_answer_of_another_form_is_refused_whole():
+    spec = drafted.spec_of_form(ANSWERS, ROOT)
+    with pytest.raises(ChangeRefused, match="exactly model, shapes, questions, examples and summary"):
+        drafted.from_answer(json.dumps({"model": ""}), spec, ROOT)
+    with pytest.raises(ChangeRefused, match="not JSON"):
+        drafted.from_answer("here is your module", spec, ROOT)
+
+
+def test_each_class_and_property_gets_the_forms_documents_as_its_citation():
+    spec = drafted.spec_of_form(ANSWERS, ROOT)
+    spec, files = drafted.from_answer(SAMPLE_DRAFT.read_text(encoding="utf-8"), spec, ROOT)
+    assert files["model.ttl"].count('dcterms:bibliographicCitation "A made-up tank inspection procedure, 2026-11-20"@en') == 3
+    assert spec["depends_on"] == ["system"]
+
+
+# ---------- the AI steps, by hand ----------
+
+def test_by_hand_the_command_writes_each_prompt_and_stops(tmp_path):
+    path = form(tmp_path)
+    assert run(path) is None
+    prompt = path.with_name(path.stem + draft.DRAFT_PROMPT)
+    text = prompt.read_text(encoding="utf-8")
+    for name in draft.DRAFT_SKILLS:
+        assert (ROOT / name).read_text(encoding="utf-8") in text
+    assert ANSWERS["N13"] in text and "sys:System (class)" in text
+    assert not path.with_name(path.stem + drafted.RECORD_SUFFIX).exists()
+    assert run(path, answer_file=SAMPLE_DRAFT) is None
+    review = path.with_name(path.stem + draft.REVIEW_PROMPT).read_text(encoding="utf-8")
+    for name in draft.REVIEW_SKILLS:
+        assert (ROOT / name).read_text(encoding="utf-8") in review
+    assert "## model.ttl" in review and "Gate 2, the reasoner finds the model consistent: passed" in review
+    record_path = run(path, review_file=SAMPLE_REVIEW)
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    approval.check_draft(record, signed=False)
+    assert [g["gate"] for g in record["gates"]] == [1, 2, 3, 4] and all(g["passed"] for g in record["gates"])
+    # Q20: the fingerprints of the prompts and the answers, and no prompt text.
+    assert record["drafter"]["prompt_sha256"] == hashlib.sha256(prompt.read_bytes()).hexdigest()
+    assert record["drafter"]["output_sha256"] == hashlib.sha256(SAMPLE_DRAFT.read_bytes()).hexdigest()
+    assert record["reviewer"]["output_sha256"] == hashlib.sha256(SAMPLE_REVIEW.read_bytes()).hexdigest()
+    assert record["drafter"]["skills"][0] == {"path": "skills/ontology/SKILL.md", "sha256": hashlib.sha256(
+        (ROOT / "skills/ontology/SKILL.md").read_bytes()).hexdigest()}
+    assert ANSWERS["N13"] not in record_path.read_text(encoding="utf-8")
+    assert json.loads(path.read_text(encoding="utf-8"))["answers"] == ANSWERS   # the AI changes no answer
+    summary = path.with_name(path.stem + draft.SIGNERS_SUMMARY).read_text(encoding="utf-8")
+    assert 'The class "tank inspection"' in summary and "The reviewer's verdict: PASS." in summary
+
+
+def test_a_draft_that_fails_a_gate_keeps_nothing(tmp_path):
+    path = form(tmp_path)
+    bad = sample(summary=sample()["summary"][:-1])
+    with pytest.raises(AIRefused, match="did not pass gate 4"):
+        run(path, answer_file=answer_file(tmp_path, bad))
+    assert not path.with_name(path.stem + drafted.RECORD_SUFFIX).exists()
+    assert not path.with_name(path.stem + drafted.FOLDER_SUFFIX).exists()
+
+
+@pytest.mark.parametrize("reviewer,message", [
+    (ls.AI("by-hand", assistant="Another", family="Claude", **APPROVED), 'both of the family "claude"'),
+    (ls.AI("by-hand", assistant="Another", **APPROVED), r"\[ai_reviewer\] family must name"),
+    (ls.AI("off"), r"\[ai_reviewer\] provider is"),
+])
+def test_gate_3_needs_a_reviewer_of_another_family(tmp_path, reviewer, message):
+    with pytest.raises(AIRefused, match=message):
+        run(form(tmp_path), reviewer=reviewer)
+
+
+def test_a_signed_form_and_a_form_of_another_pattern_are_refused(tmp_path):
+    with pytest.raises(AIRefused, match="signed already"):
+        run(form(tmp_path, sign_offs=SIGNED))
+    with pytest.raises(AIRefused, match="new modelling"):
+        run(form(tmp_path, {"N3": "vocabulary"}))
+
+
+def test_a_hold_is_recorded_and_the_propose_command_refuses_the_form(tmp_path):
+    hold = answer_file(tmp_path, {"verdict": "HOLD", "findings": [
+        {"gate": "Step 3", "finding": "The definition of tank inspection names no tank."}]}, "hold.json")
+    path = drafted_form(tmp_path, review=hold)
+    record = json.loads(path.with_name(path.stem + drafted.RECORD_SUFFIX).read_text(encoding="utf-8"))
+    assert record["reviewer"]["verdict"] == "HOLD"
+    assert [g["passed"] for g in record["gates"] if g["gate"] == 3] == [False]
+    sign(path)
+    with pytest.raises(propose_cmd.ProposeRefused, match="gate 3"):
+        propose_cmd.propose([path], release_root=ROOT, now=NOW, say=quiet)
+
+
+def test_a_review_answer_of_another_form_is_refused(tmp_path):
+    path = form(tmp_path)
+    run(path, answer_file=SAMPLE_DRAFT)
+    for bad, message in (({"verdict": "OK", "findings": []}, "is not of the form"),
+                         ({"verdict": "HOLD", "findings": []}, "HOLD with no finding")):
+        with pytest.raises(AIRefused, match=message):
+            run(path, review_file=answer_file(tmp_path, bad, "review.json"))
+
+
+# ---------- the AI steps, through the providers (a stub server) ----------
+
+def test_the_drafter_and_the_reviewer_are_called_with_their_skills(tmp_path, monkeypatch):
+    no_proxy(monkeypatch)
+    stub = Stub()
+    try:
+        stub.replies["/v1/messages"] = (200, {"model": "claude-made-up-1", "stop_reason": "end_turn",
+                                              "content": [{"type": "text", "text": SAMPLE_DRAFT.read_text(encoding="utf-8")}]})
+        stub.replies["/v1/chat/completions"] = (200, {"model": "gpt-made-up-2", "choices": [
+            {"finish_reason": "stop", "message": {"content": SAMPLE_REVIEW.read_text(encoding="utf-8")}}]})
+        d = ls.AI("anthropic", model="claude-made-up", key_env="DRAFT_KEY", url=stub.url + "/v1/messages", family="claude",
+                  **APPROVED)
+        r = ls.AI("openai", model="gpt-made-up", key_env="REVIEW_KEY", url=stub.url + "/v1/chat/completions",
+                  family="gpt", **APPROVED)
+        path = form(tmp_path)
+        record_path = run(path, drafter=d, reviewer=r, environ={"DRAFT_KEY": "k1", "REVIEW_KEY": "k2"})
+    finally:
+        stub.close()
+    first, second = stub.requests
+    skills = lambda names: "\n\n".join((ROOT / n).read_bytes().decode("utf-8") for n in names)
+    assert first["body"]["system"] == [{"type": "text", "text": skills(draft.DRAFT_SKILLS)}]
+    assert first["body"]["max_tokens"] == draft.MAX_TOKENS
+    assert first["headers"]["authorization"] == "Bearer k1"
+    assert second["body"]["messages"][0] == {"role": "system", "content": skills(draft.REVIEW_SKILLS)}
+    assert second["headers"]["authorization"] == "Bearer k2"
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    assert (record["drafter"]["model_version"], record["reviewer"]["model_version"]) == ("claude-made-up-1", "gpt-made-up-2")
+    assert record["drafter"]["endpoint"] == stub.url + "/v1/messages"
+    assert "k1" not in record_path.read_text(encoding="utf-8") and "k2" not in record_path.read_text(encoding="utf-8")
+
+
+# ---------- the check, the propose command and gate 5 ----------
+
+def test_the_check_takes_new_modelling_and_needs_n13(tmp_path):
+    found = check.run(form(tmp_path, sign_offs=SIGNED), ROOT / "kpi-intake")
+    assert found.complete, found.lines
+    assert any("--ai-draft" in line for line in found.lines)
+    found = check.run(form(tmp_path, {"N13": ""}, sign_offs=SIGNED), ROOT / "kpi-intake")
+    assert not found.complete
+
+
+def test_a_signed_form_without_a_draft_is_refused(tmp_path):
+    path = form(tmp_path, sign_offs=SIGNED)
+    with pytest.raises(propose_cmd.ProposeRefused, match="no AI draft beside it"):
+        propose_cmd.propose([path], release_root=ROOT, now=NOW, say=quiet)
+
+
+def test_the_proposal_holds_the_draft_and_every_gate(tmp_path):
+    path = drafted_form(tmp_path)
+    sign(path)
+    folder, = propose_cmd.propose([path], release_root=ROOT, now=NOW, say=quiet)
+    record = json.loads((folder / "approval.json").read_text(encoding="utf-8"))
+    assert record["route"] == "major" and record["new_module"] is True
+    assert [(g["gate"], g["passed"]) for g in record["draft"]["gates"]] == [(n, True) for n in range(1, 6)]
+    assert sorted(p.name for p in (folder / "draft").iterdir()) == sorted(drafted.pattern(ROOT).FILES)
+    lines = (folder / "change.kgcl").read_text(encoding="utf-8").splitlines()
+    assert f"create node {P}:TankInspection 'tank inspection'" in lines
+    assert f"create edge {P}:recordedIn rdfs:range sys:System" in lines
+    p = proposal.read(folder)
+    assert apply_cmd.plan([folder], ROOT)[1] == apply_cmd.NEW_MODULE   # the apply's checks pass before it writes
+    assert "Gate 5, the Ontology Owner signs, and the release is 1.0.0: passed." in (folder / "summary.txt").read_text(encoding="utf-8")
+    assert p.facts[0] == ("module:sample-tank-inspections", "pattern", "drafted")
+
+
+def test_propose_refuses_a_form_whose_answers_or_draft_changed_after_the_ai_step(tmp_path):
+    path = drafted_form(tmp_path)
+    sign(path)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["answers"]["N2"] = "Something the AI did not read."
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(propose_cmd.ProposeRefused, match="answers changed after the AI drafted"):
+        propose_cmd.propose([path], release_root=ROOT, now=NOW, say=quiet)
+    data["answers"]["N2"] = ANSWERS["N2"]
+    path.write_text(json.dumps(data), encoding="utf-8")
+    model = path.with_name(path.stem + drafted.FOLDER_SUFFIX) / "model.ttl"
+    model.write_text(model.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    with pytest.raises(propose_cmd.ProposeRefused, match="not those the AI drafted"):
+        propose_cmd.propose([path], release_root=ROOT, now=NOW, say=quiet)
+
+
+def _proposal(tmp_path):
+    path = drafted_form(tmp_path)
+    sign(path)
+    folder, = propose_cmd.propose([path], release_root=ROOT, out=tmp_path / "proposals", now=NOW, say=quiet)
+    return folder
+
+
+def _edit(folder, change):
+    record = json.loads((folder / "approval.json").read_text(encoding="utf-8"))
+    change(record)
+    (folder / "approval.json").write_text(json.dumps(record), encoding="utf-8")
+
+
+@pytest.mark.parametrize("change,message", [
+    (lambda r: r.update(signatures=[s for s in r["signatures"] if s["role"] != "Ontology Owner"]),
+     "needs the signature of the Ontology Owner"),
+    (lambda r: r["draft"]["reviewer"].update(verdict="HOLD"), "every gate from 1 to 5 passed"),
+    (lambda r: r["draft"].update(gates=[g for g in r["draft"]["gates"] if g["gate"] != 5]), "every gate from 1 to 5"),
+    (lambda r: r["draft"]["reviewer"].update(family="Claude"), "of the drafter's own model family"),
+    (lambda r: r.update(route="minor"), "a new module's first release is a major"),
+])
+def test_apply_refuses_a_proposal_whose_gates_do_not_all_pass(tmp_path, change, message):
+    folder = _proposal(tmp_path)
+    _edit(folder, change)
+    with pytest.raises(ChangeRefused, match=message):
+        apply_cmd.plan([folder], ROOT)
+
+
+def test_apply_refuses_a_proposal_whose_draft_files_changed(tmp_path):
+    folder = _proposal(tmp_path)
+    shapes = folder / "draft" / "shapes.ttl"
+    shapes.write_text(shapes.read_text(encoding="utf-8").replace("sh:minCount 1", "sh:minCount 0"), encoding="utf-8")
+    with pytest.raises(ChangeRefused, match="not those the AI drafted"):
+        apply_cmd.plan([folder], ROOT)
+
+
+# ---------- the apply ----------
+
+def test_apply_releases_the_drafted_module_at_1_0_0(tmp_path, no_global_git):
+    folder = _proposal(tmp_path)
+    root = full_release(tmp_path)
+    apply_cmd.apply([folder], root, say=quiet, now=NOW)
+    module = root / "business_architecture" / "ontology" / "sample-tank-inspections"
+    assert sorted(p.name for p in module.iterdir() if p.name != "__pycache__") == sorted(
+        drafted.pattern(ROOT).FILES + ("README.md", "README.html", "build_sample_tank_inspections.py",
+                                       "test_sample_tank_inspections.py"))
+    done = subprocess.run([sys.executable, "build_sample_tank_inspections.py", "--verify"], cwd=module,
+                          capture_output=True, text=True)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "gate 2, the reasoner finds the model consistent: passed" in done.stdout
+    kept = json.loads((root / "business_architecture/ontology/approvals/NM-2026-003.json").read_text(encoding="utf-8"))
+    assert kept["draft"] == json.loads((folder / "approval.json").read_text(encoding="utf-8"))["draft"]
+    assert (root / "business_architecture/ontology/releases/sample-tank-inspections/1.0.0/sample-tank-inspections.ttl").is_file()
+    assert "Apply the new module NM-2026-003: sample-tank-inspections 1.0.0" in git(root, "log", "--oneline", "-1")
+
+
+# ---------- the settings ----------
+
+def test_the_settings_name_the_reviewer_in_ai_reviewer_and_refuse_a_key_there(tmp_path):
+    text = ('[ai]\nprovider = "by-hand"\nassistant = "Genie Code"\nfamily = "claude"\napproved_by = "An IT Approver"\n'
+            'approved_on = "2026-11-20"\n\n[ai_reviewer]\nprovider = "openai"\nmodel = "gpt-made-up"\nkey_env = "REVIEW_KEY"\n'
+            'family = "gpt"\napproved_by = "An IT Approver"\napproved_on = "2026-11-20"\n')
+    found = ls.load(settings(tmp_path, text), environ={}, release_root=ROOT)
+    assert (found.ai.family, found.ai_reviewer.provider, found.ai_reviewer.family) == ("claude", "openai", "gpt")
+    with pytest.raises(ls.LocalSettingsError, match=r"\[ai_reviewer\] api_key is not a setting"):
+        ls.load(settings(tmp_path, text + 'api_key = "x"\n'), environ={}, release_root=ROOT)
