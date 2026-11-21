@@ -828,7 +828,7 @@ function partsProblem(held) {
 function fileProblem(data) {
   if (!isObject(data)) return "it is not a JSON object";
   if (data.format !== 1) return 'its "format" is not 1';
-  if (!FORMS.includes(data.form)) return 'its "form" names none of the five forms';
+  if (!FORMS.includes(data.form)) return 'its "form" names none of the six forms';
   return partsProblem(data);
 }
 function saveDraft() {
@@ -1245,13 +1245,14 @@ function goToSignoff() { $("signoff").scrollIntoView(); $("signoff").querySelect
 // A signature is needed for every KPI, or only when the check finds a conflict. A smaller form needs each of its
 // own, except one that only an answer calls for: the Ontology Owner signs a term change only when it is major.
 function isNeeded(signer, form, answers) {
+  if ((signer.always_on || []).includes(form)) return true;   // the Ontology Owner signs every new module
   if (signer.when === "answer") return signer.answers.some((a) => values(answers || {}, signer.answer_of).includes(a));
   return signer.when === "always" || form !== FORMS[0];
 }
 // What a signature means on this form: a domain activation and a term change may give a signer its own words.
 function meaningOf(signer, form) {
   const own = { "domain-activation": signer.activation_meaning, "term-change": signer.change_meaning,
-    "reference-item": signer.item_meaning }[form];
+    "reference-item": signer.item_meaning, "new-module": signer.module_meaning }[form];
   return own || signer.meaning;
 }
 function left(count) { return count ? `${count} required ${count === 1 ? "answer" : "answers"} left` : "Required answers complete"; }

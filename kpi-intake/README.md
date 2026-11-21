@@ -2,7 +2,7 @@
 
 Start here when the business wants a new KPI in the KPI Store. The pack holds the form that collects what the ontology needs for one KPI, a check that says whether a filled form is complete, and two filled examples.
 
-The pack does not change the ontology. A complete, signed KPI form goes through two commands, propose and apply, and nobody edits a file: "What happens after" below says how. A complete, signed term change, for a measure the ontology already holds, goes through the same two commands: "The term change" below says how. A complete, signed reference item, for a new system or a new table, goes through them too: "The reference item" below says how.
+The pack does not change the ontology. A complete, signed KPI form goes through two commands, propose and apply, and nobody edits a file: "What happens after" below says how. A complete, signed term change, for a measure the ontology already holds, goes through the same two commands: "The term change" below says how. A complete, signed reference item, for a new system or a new table, goes through them too: "The reference item" below says how. So does a complete, signed new module, a vocabulary or a reference table: "The new module" below says how.
 
 ## What is in this folder
 
@@ -293,6 +293,33 @@ The check also refuses an item that does not fit the ontology: a name or an othe
 Who signs: the Data Owner, then the Architect, last. A new item is always a minor, so the Ontology Owner does not sign.
 
 Check a reference item as any other form: `python -m kpi_store.intake check <the file>`. Then the Architect turns it into a proposal and applies it, with the steps of "Add a system or a table with the reference-item form" in [`HOW-TO-UPDATE.md`](../HOW-TO-UPDATE.md).
+
+## The new module
+
+The sixth form asks for a new module of one of two patterns. It is the "New module" tab of the HTML form and the "New module" sheet of the workbook, and it saves to its own answers file, `<module>.new-module.json`. A vocabulary holds terms, each with a definition, other names and at most one broader term. A reference table holds items of a class the ontology holds already, each with one value of each of a few properties the ontology holds already.
+
+| No. | Question | Rule |
+|---|---|---|
+| N1 | What is the new module called? (its short key is made from the name) | Required |
+| N2 | What does the module cover? | Required |
+| N3 | Which pattern does the module follow? (a vocabulary, a reference table, or something else) | Required |
+| N4 | Which terms does the vocabulary hold? | Required for a vocabulary |
+| N5 | For each term, what does it mean? | Required for a vocabulary |
+| N6 | For each term, which other names do people use? (a semicolon between two) | Optional, for a vocabulary |
+| N7 | For each term, which term of this list is it a kind of? (empty for a term at the top) | Optional, for a vocabulary |
+| N8 | Which class of the ontology are the items of? (the classes whose items the ontology holds outside `ref-mpc`) | Required for a reference table |
+| N9 | Which properties does each item have? (the properties of those classes, and a few that any item may have) | Optional, for a reference table |
+| N10 | Which items does the table hold? | Required for a reference table |
+| N11 | For each item, what are its values of the properties of N9? (in the order of N9, a vertical bar between two) | Optional, for a reference table |
+| N12 | Which documents describe the module's content? | Required |
+
+"Something else" in N3 routes the form to "needs a specialist": a new class, a new property or a rule of its own changes what the ontology can say, and someone has to design it. The classes of N8 leave out those whose items come through another form (measures, systems, processes and roles), from the process authority (the data-product catalog and the value streams), and those that describe records kept outside the ontology. `ref-mpc` is left out because company-specific instances live there only.
+
+The check refuses a name whose short key a module has already, starts with a digit or is a prefix the ontology keeps for itself (such as `term` or `skos`); a vocabulary whose terms do not reconcile (a term under a term the list does not name, two terms with one short key, a chain of broader terms that comes back to where it started, an other name given twice or that is the term's own name); and an item that lacks a value of a property of N9, or whose short key another item has. The propose command checks the rest against the release: a prefix another module binds, a property of another class, a value that names no item, a value of the wrong kind, and every shape of the release, so a rule of the class, such as "a product is in the product list", stops a proposal that breaks it.
+
+Who signs: the Data Owner, the Ontology Owner and the Architect, last. A new module's first release is 1.0.0, a major, so the Ontology Owner always signs it.
+
+Check a new module as any other form: `python -m kpi_store.intake check <the file>`. Then the Architect turns it into a proposal and applies it, with the steps of "Add a module with the new-module form" in [`HOW-TO-UPDATE.md`](../HOW-TO-UPDATE.md). The `examples/` folder holds one example of each pattern: `sample-equipment-terms.new-module.json` and `sample-products.new-module.json`.
 
 ## What happens after
 

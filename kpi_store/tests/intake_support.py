@@ -61,6 +61,9 @@ def lists():
         "system-sources": [{"id": SOURCE, "label": "Stock manual, 2026 edition", "tier": "industry"}],
         "table-sources": [{"id": SOURCE, "label": "Stock manual, 2026 edition", "tier": "industry"}],
         "modules": [{"id": "core", "label": "core"}, {"id": "kpi", "label": "kpi"}],
+        "classes": [{"id": X + "Stock", "label": "stock (x:Stock)", "module": "kpi"}],
+        "properties": [{"id": "http://www.w3.org/2004/02/skos/core#definition", "label": "definition (skos:definition)",
+                        "kind": "text", "datatype": "", "range": "", "domain": ""}],
         "areas-and-modules": [{"id": a["id"], "label": "Business area: " + a["label"]} for a in areas],
     }
 

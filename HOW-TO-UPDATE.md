@@ -16,7 +16,7 @@ If your copy includes `viewer/index.html`, that page shows the ontology as you r
 | Ontology owner | The person your organisation names to decide what the ontology means. |
 | Module owner | The person the ontology owner names for one module. Until a module has an owner, the ontology owner decides for it. |
 | Correction version | A version that the cut tool wrote from a cleared report. Its name carries a marker: `1.2.1-correction.1`. |
-| Proposal | A folder that the propose command writes from one signed KPI intake, term-change or reference-item form: the changes as KGCL lines, the approval record and a summary, and for a new KPI a table of the facts KGCL cannot write. The apply command applies it. |
+| Proposal | A folder that the propose command writes from one signed form of the KPI intake pack, such as a KPI intake, term-change, reference-item or new-module form: the changes as KGCL lines, the approval record and a summary, and for a new KPI a table of the facts KGCL cannot write. The apply command applies it. |
 | Route | Whether a change is released as a patch, a minor or a major. "Patch, minor or major" below says which is which. |
 
 The ontology owner approves every major release and every module's first release. The module owner approves minor and patch releases. The person who runs the cut approves a correction, at the cut's prompt.
@@ -66,7 +66,8 @@ Keep the release folder in Git. The runbook's section "Keep the release folder i
 | A new business area, process or step. | The process map request form, then the propose and apply commands. The apply releases `core` and every module. No file is edited by hand. | "Add a process, a step or a business area with the process map request" |
 | A process renamed, moved, described anew or removed. | A release of `core` that a specialist writes, then every module. | "Change a process" |
 | The same ontology in another workspace, such as production. | New settings files. The ontology does not change. | "A new environment" |
-| A data area that no module covers. | A new module at 1.0.0. | "Onboard another module" |
+| A data area that no module covers, whose content is a list of terms or a list of items of a class the ontology holds. | The new-module form, then the propose and apply commands. The apply releases the module at 1.0.0. No file is edited by hand. | "Add a module with the new-module form" |
+| A data area that needs a new class, a new property or a rule of its own. | A new module at 1.0.0 that a specialist writes. | "Onboard another module" |
 | A term that the business no longer uses, or two terms that are one. | A major version. The term is deprecated, never deleted. | "Deprecate a term" |
 | A term that is listed under the wrong kind, such as a system's kind. | A major version, when an answer under the old kind is no longer right. | "Change the kind of a term" |
 | Entries of the data-product catalog that are not data products. | A proposal to the portfolio file, then a major version of `data-product`. | "Move catalog entries to another class" |
@@ -1929,9 +1930,219 @@ The first run in a new environment is a first run. Follow the runbook from "Run 
 
 **A correction changes the ontology for every environment.** Accept a rename only when the name changed everywhere. When it differs in one environment only, decide the row as `environment setting`.
 
+## Add a module with the new-module form
+
+A new module goes in through the new-module form and the same two commands as a term change. Nobody writes a table, a builder, a shape or a Turtle file by hand. The form is the "New module" tab of the HTML form and the "New module" sheet of the workbook. `kpi-intake/README.md`, "The new module", says what it asks and who signs.
+
+The form makes a module of one of two patterns:
+
+- a vocabulary: terms, each with a definition, other names and at most one broader term of the same vocabulary. The module holds them as a SKOS concept scheme of its own.
+- a reference table: items of a class that the ontology holds already, such as products, each with one value of each of a few properties that the ontology holds already. The form offers the classes whose items the ontology holds outside `ref-mpc`, and the properties of those classes.
+
+A module that needs a new class, a new property or a rule of its own needs a specialist: the form says so, and "Onboard another module" below is the specialist's path.
+
+The proposal holds each term or item as KGCL lines in `change.kgcl`: its name, its definition, its other names, its broader term, its class and its links to other items. `facts.csv` holds the module itself (its pattern, title, description and documents) and each text or value of an item that KGCL cannot write. The propose command builds the module in memory and runs every shape of the release over it, so a class's own rules, such as "a product is in the product list", stop a proposal that breaks them.
+
+A new module's first release is 1.0.0, a major. So the Data Owner, the Ontology Owner and the Architect sign the form, and the apply command refuses a proposal without the Ontology Owner's signature. The apply works on a temporary copy of the release. It writes the module's folder from its pattern (`business_architecture/ontology/release/module_patterns.py`): the table, a builder, the shapes, a test file and a README. It registers the module in every place that "Register the module in every place" lists, with the functions of `business_architecture/ontology/release/register_module.py`. It builds the module, checks that the module holds exactly the proposal's lines and facts, and releases it at 1.0.0. It then rebuilds the catalog, the projection manifest, the competency questions, the KPI intake pack and the pages, and runs the module's tests and the whole-graph shapes gate. Only when every step has passed does it write the release and commit it.
+
+**Run the examples below in a copy of the release, never in the folder you load the stores from.** Each adds a made-up module to the ontology. The commands start in the top folder of the copy. Keep the filled form and the proposal in a folder beside it, never inside it.
+
+### A vocabulary
+
+1. Fill in the form, and save it to the folder `new-vocabulary` beside the release folder. The example is the shipped example `kpi-intake/examples/sample-equipment-terms.new-module.json`. It asks for a made-up vocabulary, Sample Equipment Terms, of five terms: two at the top, and three under them. The Data Owner, the Ontology Owner and the Architect sign it.
+
+   The document test copies the example to the folder with this block. If you saved the file from the form, skip it.
+
+   ```python run=new-vocabulary
+   import shutil
+   from pathlib import Path
+
+   folder = Path("../new-vocabulary")
+   folder.mkdir(exist_ok=True)
+   path = shutil.copy("kpi-intake/examples/sample-equipment-terms.new-module.json", folder)
+   print("copied", Path(path).name)
+   ```
+
+   ```text expect
+   copied sample-equipment-terms.new-module.json
+   ```
+
+2. Check the form. It must end with `the intake is complete and signed`. The check also refuses a vocabulary that does not reconcile, such as a term under a term that the list does not name.
+
+   ```powershell run=new-vocabulary
+   python -m kpi_store.intake check ../new-vocabulary/sample-equipment-terms.new-module.json
+   ```
+
+   ```text expect
+   New module check: Sample Equipment Terms
+   ...
+   Result: the intake is complete and signed.
+   This check changes nothing in the ontology. The Architect turns a complete new module into a proposal with python -m kpi_store.propose <this file>, as HOW-TO-UPDATE.md says.
+   ```
+
+3. Turn the form into a proposal. The command writes the folder `proposals/NM-2026-001` beside the form. It changes nothing in the ontology. It took about 20 seconds on a Mac, because it runs every shape of the release over the module.
+
+   ```powershell run=new-vocabulary
+   python -m kpi_store.propose ../new-vocabulary/sample-equipment-terms.new-module.json
+   ```
+
+   ```text expect
+   wrote the proposal ../new-vocabulary/proposals/NM-2026-001: 18 changes and 4 facts, route major
+   Nothing in the ontology has changed. Read each summary.txt, then apply with: python -m kpi_store.apply <proposal folder>
+   ```
+
+4. Read `summary.txt`. It names the module, each term and where it sits, the route and who signed.
+
+   ```python run=new-vocabulary
+   print(open("../new-vocabulary/proposals/NM-2026-001/summary.txt", encoding="utf-8").read())
+   ```
+
+   ```text expect
+   Proposal NM-2026-001
+   ...
+   What it adds:
+     - A vocabulary of 5 terms, as a SKOS concept scheme.
+     - The term "Rotating equipment" (a top term): "Made-up equipment whose main part turns while it works."
+     - The term "Pump" (under "Rotating equipment"): "Made-up rotating equipment that moves a liquid through a pipe."
+   ...
+   The route: major. This is a major: a new module's first release is 1.0.0, and the Ontology Owner approves it.
+   ...
+   ```
+
+5. Apply the proposal. It took about three minutes on a Mac.
+
+   ```powershell run=new-vocabulary
+   python -m kpi_store.apply ../new-vocabulary/proposals/NM-2026-001
+   ```
+
+   ```text expect
+   1 proposal to apply:
+     NM-2026-001: major, signed by Data Owner, Ontology Owner, Architect
+   ...
+     sample-equipment-terms: a new module at 1.0.0
+   ...
+   ... write the release
+   Done. sample-equipment-terms 1.0.0 is a new module (major). The apply changed <count> files, and Git committed them.
+   Run the full check before you load: bash scripts/check.sh (on Windows, in Git Bash). Then load the stores with the runner: python -m kpi_store.runner
+   ```
+
+6. See the commit, the new version and the module's own check of its build.
+
+   ```powershell run=new-vocabulary
+   git --no-pager log --oneline -1
+   cd business_architecture/ontology/release
+   python next_version.py current sample-equipment-terms
+   cd ../sample-equipment-terms
+   python build_sample_equipment_terms.py --verify
+   ```
+
+   ```text expect
+   <commit> Apply the new module NM-2026-001: sample-equipment-terms 1.0.0
+   1.0.0
+   terms 5; top terms 2
+   terms.ttl is current
+   ```
+
+7. Run the full check, as in "Before you change anything", step 3. Then load the stores with the runner, as in step 11 of "The release steps". The projection takes every module in its package list, so the new module goes into every store with the others.
+
+### A reference table
+
+A reference table names a class in N8, picks properties in N9, and gives each item one value of each property in N11, in the order of N9, with a vertical bar (`|`) between two values. A value that links to another item names that item as the ontology holds it: here `product`, the last part of the IRI of the party module's product list.
+
+1. Fill in the form, and save it to the folder `new-reference-table` beside the release folder. The example is the shipped example `kpi-intake/examples/sample-products.new-module.json`. It asks for a made-up module, Sample Products, of two made-up products of the class Product of the `party` module. Each has a definition, the product list it is in and a PIDX product family. The Data Owner, the Ontology Owner and the Architect sign it.
+
+   The document test copies the example to the folder with this block. If you saved the file from the form, skip it.
+
+   ```python run=new-reference-table
+   import shutil
+   from pathlib import Path
+
+   folder = Path("../new-reference-table")
+   folder.mkdir(exist_ok=True)
+   path = shutil.copy("kpi-intake/examples/sample-products.new-module.json", folder)
+   print("copied", Path(path).name)
+   ```
+
+   ```text expect
+   copied sample-products.new-module.json
+   ```
+
+2. Check the form. It must end with `the intake is complete and signed`. The check also refuses an item that lacks a value of a property that N9 picks.
+
+   ```powershell run=new-reference-table
+   python -m kpi_store.intake check ../new-reference-table/sample-products.new-module.json
+   ```
+
+   ```text expect
+   New module check: Sample Products
+   ...
+   Result: the intake is complete and signed.
+   This check changes nothing in the ontology. The Architect turns a complete new module into a proposal with python -m kpi_store.propose <this file>, as HOW-TO-UPDATE.md says.
+   ```
+
+3. Turn the form into a proposal. The command refuses a property of another class, a value that names no item of the ontology, a value of the wrong kind, and a rule of the class that the items break. It writes the folder `proposals/NM-2026-002` beside the form.
+
+   ```powershell run=new-reference-table
+   python -m kpi_store.propose ../new-reference-table/sample-products.new-module.json
+   ```
+
+   ```text expect
+   wrote the proposal ../new-reference-table/proposals/NM-2026-002: 8 changes and 9 facts, route major
+   Nothing in the ontology has changed. Read each summary.txt, then apply with: python -m kpi_store.apply <proposal folder>
+   ```
+
+4. Read `summary.txt`. It names the class, each item and its values, and the modules the new module requires.
+
+   ```python run=new-reference-table
+   print(open("../new-reference-table/proposals/NM-2026-002/summary.txt", encoding="utf-8").read())
+   ```
+
+   ```text expect
+   Proposal NM-2026-002
+   ...
+   What it adds:
+     - A reference table of 2 items of the class party:Product, which the party module defines. Each item has a name and one value of: definition (skos:definition), list it is in (skos:inScheme), PIDX product family (party:pidxProductFamily).
+   ...
+     - It requires the newest party.
+   ...
+   ```
+
+5. Apply the proposal. It took about three minutes on a Mac.
+
+   ```powershell run=new-reference-table
+   python -m kpi_store.apply ../new-reference-table/proposals/NM-2026-002
+   ```
+
+   ```text expect
+   1 proposal to apply:
+     NM-2026-002: major, signed by Data Owner, Ontology Owner, Architect
+   ...
+     sample-products: a new module at 1.0.0
+   ...
+   ... write the release
+   Done. sample-products 1.0.0 is a new module (major). The apply changed <count> files, and Git committed them.
+   Run the full check before you load: bash scripts/check.sh (on Windows, in Git Bash). Then load the stores with the runner: python -m kpi_store.runner
+   ```
+
+6. See the commit and the module's own check of its build.
+
+   ```powershell run=new-reference-table
+   git --no-pager log --oneline -1
+   cd business_architecture/ontology/sample-products
+   python build_sample_products.py --verify
+   ```
+
+   ```text expect
+   <commit> Apply the new module NM-2026-002: sample-products 1.0.0
+   items 2; properties 3
+   items.ttl is current
+   ```
+
+7. Run the full check, as in "Before you change anything", step 3. Then load the stores with the runner, as in step 11 of "The release steps".
+
 ## Onboard another module
 
-A module is one part of the ontology with its own version, such as `kpi`. Add a module when a new data area brings terms that no module owns. This section says how to decide, where to register the module, and how its tables join the discovery comparison. It ends with a made-up example that you can run.
+A module is one part of the ontology with its own version, such as `kpi`. Add a module when a new data area brings terms that no module owns. A vocabulary or a reference table goes through the new-module form ("Add a module with the new-module form" above). This section is the specialist's path, for a module that the form's patterns do not cover: one with a new class, a new property or a rule of its own. It says how to decide, where to register the module, and how its tables join the discovery comparison. It ends with a made-up example that you can run.
 
 `skills/ontology/references/new-module.md` holds the full method and its gates. Read it before you start a real module.
 

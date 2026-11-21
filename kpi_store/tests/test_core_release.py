@@ -244,7 +244,10 @@ def test_a_new_process_goes_from_the_form_to_a_core_release_and_a_step_under_it_
     assert git(root, "log", "-1", "--format=%s").strip().startswith(f"Apply the process map request PM-9: core {new}, organization ")
     assert set(git(root, "show", "--name-only", "--no-renames", "--format=", "HEAD").split()) == set(files)
     after = _versions(root)
-    assert after["core"] == new and all(after[m] != held[m] for m in after)   # every module took a new version
+    # Every module that depends on core took a new version. A vocabulary that the new-module form made requires no
+    # module, so it keeps its version.
+    order = cut._run("list", ["dependents.py", "core"], root / cut.ONTOLOGY / "release").split()
+    assert after["core"] == new and all(after[m] != held[m] for m in order)
     release = root / cr.RELEASE
     assert (release / f"{builder}.py").is_file() and cut._run("verify", [f"{builder}.py", "--verify"], release)
     assert (root / cr.CHANGELOGS / f"CHANGELOG-{new}.md").read_text(encoding="utf-8").count("Sample Terminal Planning") == 1

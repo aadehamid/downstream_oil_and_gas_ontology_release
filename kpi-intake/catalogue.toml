@@ -64,6 +64,20 @@ label = "A role"
 id = "data-product"
 label = "A data product of the data-product catalog"
 
+# The patterns of the new-module form (KPI-DEC-0002, Q10 form 6 and Q11). The form makes the first two; the third routes
+# to "needs a specialist", with the reason in its route's notice.
+[[choices.module-patterns]]
+id = "vocabulary"
+label = "A vocabulary: terms with a definition, other names and a place in a hierarchy"
+
+[[choices.module-patterns]]
+id = "reference-table"
+label = "A reference table: items of a class the ontology holds, each with values of properties the ontology holds"
+
+[[choices.module-patterns]]
+id = "new-modelling"
+label = "Something else: a new class, a new property or a rule of its own"
+
 [[choices.environment]]
 id = "sandbox"
 label = "Sandbox"
@@ -129,8 +143,9 @@ role = "data-owner"
 meaning = "The KPI's definition in this form is right: its name, its meaning, what it counts and what it leaves out."
 change_meaning = "The measure's name, definition, other names and process links are right as this form changes them."
 item_meaning = "The new item is right as this form describes it: its name, what it is and what it links to."
-required = "Every KPI, every term change and every reference item"
-forms = ["kpi-intake", "term-change", "reference-item"]
+module_meaning = "The new module's content is right as this form describes it: each term or item, its name and its values."
+required = "Every KPI, every term change, every reference item and every new module"
+forms = ["kpi-intake", "term-change", "reference-item", "new-module"]
 when = "always"
 
 [[sign_off.signer]]
@@ -163,8 +178,10 @@ when = "always"
 id = "ontology-owner"
 role = "ontology-owner"
 meaning = "This change alters what the measure means, and I approve it as a major change."
-required = "Only when the change is major: the answer to T8 is \"no\" or \"not sure\""
-forms = ["term-change"]
+module_meaning = "The ontology needs this module, no module owns its area already, and I approve its first release, 1.0.0, as a major change."
+required = "On a term change, only when the change is major: the answer to T8 is \"no\" or \"not sure\". Always on a new module form"
+forms = ["term-change", "new-module"]
+always_on = ["new-module"]
 when = "answer"
 answer_of = "T8"
 answers = ["no", "not-sure"]
@@ -173,8 +190,8 @@ answers = ["no", "not-sure"]
 id = "architect"
 role = "architect"
 meaning = "The form is complete, and I approve the change to the ontology."
-required = "Every KPI, every term change and every reference item, last"
-forms = ["kpi-intake", "domain-activation", "process-map-request", "term-change", "reference-item"]
+required = "Every form, last"
+forms = ["kpi-intake", "domain-activation", "process-map-request", "term-change", "reference-item", "new-module"]
 when = "always"
 
 [[sign_off.consulted]]
@@ -323,6 +340,18 @@ who = "The Data Owner answers and signs. Digital IT names a table's system and i
 done_when = "The form names one new item of a kind the form adds, with every answer its kind needs. The Data Owner and the Architect have signed."
 typical = "4 to 7"
 minutes = "10"
+
+[[section]]
+id = "N"
+form = "new-module"
+name = "New module"
+technical_name = "a new module of one of two patterns: a vocabulary or a reference table"
+audience = "business"
+about = "Use this form when a data area brings terms or items that no module of the ontology holds. The form makes a module of one of two patterns. A vocabulary is a list of terms, each with a definition, other names and at most one broader term. A reference table is a list of items of a class the ontology holds already, such as brands, each with one value of each of a few properties the ontology holds already. A new class, a new property or a rule of its own needs a specialist, and the form says so. When the Data Owner, the Ontology Owner and the Architect have signed, the Architect turns the form into a proposal with one command and applies the proposal with another. The apply writes the module's folder, registers the module in every place the release lists its modules and releases it at 1.0.0. Nobody edits a file of the ontology by hand."
+who = "The Data Owner answers and signs. The Ontology Owner approves the new module, because a module's first release is a major. The Architect checks the form and signs last. The Business analyst fills the form."
+done_when = "The form names the module, says what it covers and which documents describe it, picks a pattern the form makes, and gives every term or item what its pattern needs. The Data Owner, the Ontology Owner and the Architect have signed."
+typical = "8 to 10"
+minutes = "30"
 
 # ---- The kind of measure ---------------------------------------------------------------------------------------
 # Section 4 asks up to five tests in order. The first answer below that matches decides the kind.
@@ -1748,6 +1777,171 @@ ask_when = [{ question = "R2", is = "table" }]
 help = "The list holds the documents that record the module's tables. A document that is not in the list needs a specialist first."
 why = "Every table of the ontology is recorded by a document that a reader can check."
 feeds = "`dcterms:source`."
+fact = []
+
+# ---- New module ------------------------------------------------------------------------------------------------
+# The propose command turns a complete, signed new-module form into KGCL lines and facts (kpi_store/propose.py and
+# kpi_store/change/new_module.py). N4 to N7 are asked for a vocabulary, N8 to N11 for a reference table.
+
+[[question]]
+id = "N1"
+section = "N"
+text = "What is the new module called?"
+asked_of = ["data-owner"]
+type = "text"
+required = "required"
+help = "The module's short key is made from the name: its letters and digits in lower case, with hyphens. It names the module's folder and package."
+why = "The name is how people find the module. No two modules have the same name."
+feeds = "The module's title, `dcterms:title` of its package, and its short key."
+fact = []
+
+[[question]]
+id = "N2"
+section = "N"
+text = "What does the module cover? Say it in one or two sentences."
+asked_of = ["data-owner"]
+type = "long_text"
+required = "required"
+why = "The description says which data area the module owns, so that nobody adds a second module for it."
+feeds = "`dcterms:description` of the package, and the definition of a vocabulary's concept scheme."
+fact = []
+
+[[question]]
+id = "N3"
+section = "N"
+text = "Which pattern does the module follow?"
+asked_of = ["data-owner"]
+type = "choice"
+source = "choices:module-patterns"
+required = "required"
+why = "The pattern decides what the form asks next and what the module may hold."
+feeds = "The module's pattern: release/module_patterns.py builds and checks each one."
+fact = []
+
+  [[question.route]]
+  when = "new-modelling"
+  outcome = "needs-specialist"
+  notice = "A new class, a new property or a rule of its own changes what the ontology can say, and someone has to design it. The form makes a vocabulary or a reference table only, so this module needs a specialist."
+
+[[question]]
+id = "N4"
+section = "N"
+text = "Which terms does the vocabulary hold? Name each one."
+asked_of = ["data-owner"]
+type = "list"
+rows = 12
+required = "required"
+ask_when = [{ question = "N3", is = "vocabulary" }]
+why = "Each term is one meaning that people use, with one name."
+feeds = "`skos:prefLabel` of each term (the KGCL line `create node`). The term's short key is made from its name."
+fact = []
+
+[[question]]
+id = "N5"
+section = "N"
+text = "For each term, what does it mean? Say it in one or two sentences, without repeating its name."
+asked_of = ["data-owner"]
+type = "list"
+per = "N4"
+required = "required"
+ask_when = [{ question = "N3", is = "vocabulary" }]
+why = "The definition tells people what the term means, so that they do not mistake it for another."
+feeds = "`skos:definition` (the KGCL line `add definition`)."
+fact = []
+
+[[question]]
+id = "N6"
+section = "N"
+text = "For each term, which other names or short forms do people use? Put a semicolon between two names."
+asked_of = ["data-owner"]
+type = "list"
+per = "N4"
+required = "optional"
+ask_when = [{ question = "N3", is = "vocabulary" }]
+why = "A person who searches with their own word then finds the term."
+feeds = "`skos:altLabel`, one for each name (the KGCL line `create exact synonym`)."
+fact = []
+
+[[question]]
+id = "N7"
+section = "N"
+text = "For each term, which term of this list is it a kind of? Leave it empty for a term at the top."
+asked_of = ["data-owner"]
+type = "list"
+per = "N4"
+required = "optional"
+ask_when = [{ question = "N3", is = "vocabulary" }]
+help = "Write the broader term's name as N4 names it. A term is under at most one term, and no term is under itself."
+why = "The hierarchy lets a question about a broader term find the narrower ones too."
+feeds = "`skos:broader` (the KGCL line `create edge ... skos:broader ...`), and `skos:topConceptOf` for a term at the top."
+fact = []
+
+[[question]]
+id = "N8"
+section = "N"
+text = "Which class of the ontology are the items of?"
+asked_of = ["data-owner"]
+type = "choice"
+source = "classes"
+required = "required"
+ask_when = [{ question = "N3", is = "reference-table" }]
+help = "The list holds the classes whose items the ontology holds already. A class that is not in the list needs a specialist."
+why = "Every item is of a class the ontology defines, and that class's rules apply to it."
+feeds = "`rdf:type` of each item (the KGCL line `create edge ... rdf:type ...`)."
+fact = []
+
+[[question]]
+id = "N9"
+section = "N"
+text = "Which properties does each item have? Pick them in the order of the table's columns."
+asked_of = ["data-owner"]
+type = "multi_choice"
+source = "properties"
+rows = 6
+required = "optional"
+ask_when = [{ question = "N3", is = "reference-table" }]
+help = "Each item gets one value of each property. The propose command refuses a property of another class, and a class's rule that the properties leave unmet."
+why = "A reference table has a fixed set of columns, and each is a property the ontology holds."
+feeds = "One value of each property for each item: a KGCL line for a definition, an other name and a link to an item, and a row of facts.csv for a text or a value."
+fact = []
+
+[[question]]
+id = "N10"
+section = "N"
+text = "Which items does the table hold? Name each one."
+asked_of = ["data-owner"]
+type = "list"
+rows = 12
+required = "required"
+ask_when = [{ question = "N3", is = "reference-table" }]
+why = "Each item is one row of the table, with one name."
+feeds = "The name of each item (the KGCL line `create node`). The item's short key is made from its name."
+fact = []
+
+[[question]]
+id = "N11"
+section = "N"
+text = "For each item, what are its values of the properties of N9? Write them in the order of N9, with a vertical bar (|) between two values."
+asked_of = ["data-owner"]
+type = "list"
+per = "N10"
+required = "optional"
+ask_when = [{ question = "N3", is = "reference-table" }]
+help = "For a property that links to another item, write that item's name as the ontology holds it, or the last part of its IRI. Write a date as YYYY-MM-DD."
+why = "Each value is one cell of the table."
+feeds = "The item's value of each property of N9."
+fact = []
+
+[[question]]
+id = "N12"
+section = "N"
+text = "Which documents describe the module's content? Name each one with its date."
+asked_of = ["data-owner"]
+type = "list"
+rows = 4
+required = "required"
+why = "Every fact the ontology holds cites a written source."
+feeds = "A vocabulary: `dcterms:bibliographicCitation` of its concept scheme and of each term, in words. A reference table: the module's README and the `source` fact beside its approval record, because the shapes of some classes, such as `mkt:Benchmark`, allow no citation on an item."
 fact = []
 
 # ---- The explainer (what-we-will-ask-you.md and the "What we will ask you" view of the HTML form) ---------------

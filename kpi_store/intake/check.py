@@ -7,7 +7,7 @@ questions the rules rightly skipped, where an answer routes the request, and wha
 ends with exit status 0 only when the intake is complete and signed, 1 when something is still to do, and 2 when
 the file cannot be read.
 
-It changes nothing in the ontology. A complete form of any of the five goes to the propose command
+It changes nothing in the ontology. A complete form of any of the six goes to the propose command
 (kpi_store/propose.py), and its proposal to the apply command (kpi_store/apply.py).
 
 The derived checks compare the form with kpi-intake/pick-lists.json, which the build command writes from the
@@ -24,6 +24,10 @@ release packages:
 A term change is also checked against the measure it names: it asks for at least one change, a new name or
 definition differs from the one the measure has, an other name to add is not one already, and an other name to
 remove is one the measure has.
+
+A new module is checked for what the form can tell without the release: a short key that no module has, texts a
+KGCL line can hold, a vocabulary whose terms reconcile, and one value of each property for each item of a reference
+table. The propose command checks the values and every shape of the release.
 
 A reference item is checked against the lists too: a kind that needs a specialist routes the form there, the name
 and the other names are texts a KGCL line can hold and that no system of the ontology has, and a table's name is a
@@ -393,6 +397,73 @@ def _reference_item(lists, terms, intake, report):
     report.say()
 
 
+def _new_module(lists, intake, report):
+    """The checks of a new module against the lists, without the release: the name gives a short key that no module
+    has, that starts with a letter and that is no prefix the ontology keeps for itself; each text fits a KGCL line; a
+    vocabulary's terms, other names and broader terms reconcile; and each item of a reference table has a short key of
+    its own and one value, not empty, for each property. The propose command checks the rest against the release:
+    the prefix, each value, and every shape."""
+    from kpi_store.change import ChangeRefused
+    from kpi_store.change import new_module
+    from kpi_store.change.kgcl import text_problem
+    answers = intake.answers
+    pattern = "".join(rules.values(answers, "N3")[:1])
+    if pattern not in (new_module.VOCABULARY, new_module.REFERENCE_TABLE):
+        return
+    name = "".join(rules.values(answers, "N1")[:1])
+    lines = []
+    texts = [("N1", name), ("N2", "".join(rules.values(answers, "N2")[:1]))] + [("N12", t) for t in rules.values(answers, "N12")]
+    asked = ("N4", "N5", "N6", "N7") if pattern == new_module.VOCABULARY else ("N10", "N11")
+    texts += [(q, t) for q in asked for t in rules.values(answers, q)]
+    for key, text in texts:
+        problem = text and text_problem(text)
+        if problem:
+            lines.append(f'{key}: "{_short(text)}": {problem}')
+    module = new_module.module_key(name)
+    if name and not module:
+        lines.append(f'N1: "{_short(name)}" has no letter or digit to make the module\'s short key from')
+    elif module in {m["id"] for m in lists["modules"]}:
+        lines.append(f'N1: the ontology has a module with the short key "{module}" already. Give the module a name of its own')
+    elif len(module) > new_module.NAME_LIMIT:
+        lines.append(f'N1: the short key "{module}" is longer than {new_module.NAME_LIMIT} characters. Give the module a shorter name')
+    elif not new_module.MODULE_KEY.fullmatch(module):
+        lines.append(f'N1: the short key "{module}" must start with a letter. Give the module a name that starts with a letter')
+    elif module.replace("-", "_") in new_module.RESERVED_PREFIXES:
+        lines.append(f'N1: "{module}" is a prefix the ontology keeps for itself. Give the module another name')
+    if not lines and pattern == new_module.VOCABULARY:
+        try:
+            new_module.from_form(answers, None)
+        except ChangeRefused as err:
+            lines.append(str(err))
+    if pattern == new_module.REFERENCE_TABLE:
+        props = len(rules.real_values(answers, "N9"))
+        values = rules.positions(answers, "N11")
+        keys = {}
+        for i, item in enumerate(rules.positions(answers, "N10")):
+            cells = [c for c in values[i].split("|")] if i < len(values) and values[i].strip() else []
+            if item and len(cells) != props:
+                lines.append(f'N11: "{_short(item)}" has {len(cells)} value{"s" if len(cells) != 1 else ""}, and N9 picks '
+                             f'{props}. Write one value for each property, with a vertical bar (|) between them')
+            elif item and any(not c.strip() for c in cells):
+                lines.append(f'N11: "{_short(item)}" has an empty value. Write one value for each property')
+            key = new_module.slug(item)
+            if item and not key:
+                lines.append(f'N10: "{_short(item)}" has no letter or digit to make the item\'s short key from')
+            elif key in keys:
+                lines.append(f'N10: "{_short(item)}" has the same short key, {key}, as "{_short(keys[key])}". '
+                             "Give each item a name of its own")
+            elif key:
+                keys[key] = item
+    report.say("Checks of the new module")
+    for line in lines:
+        report.say("  " + line + ".")
+        report.block(line)
+    if not lines:
+        report.say("  The new module fits the form's patterns. The propose command checks its values and every shape "
+                   "of the release.")
+    report.say()
+
+
 def _sign_off(cat, intake, report, consult, conflict):
     report.say("Sign-off")
     for signer in cat.signers(intake.form):
@@ -484,6 +555,8 @@ def check(cat, data, intake, stale=None):
         _term_change(lists, intake, report)
     if intake.form == "reference-item":
         _reference_item(lists, terms, intake, report)
+    if intake.form == "new-module":
+        _new_module(lists, intake, report)
     _sign_off(cat, intake, report, consult, conflict)
     if report.complete:
         report.say("Result: the intake is complete and signed.")

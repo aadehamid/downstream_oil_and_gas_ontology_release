@@ -1,5 +1,5 @@
-"""The propose command: turns signed KPI intake, term-change, reference-item, domain activation and process map request
-forms into proposals, and changes nothing in the ontology.
+"""The propose command: turns signed KPI intake, term-change, reference-item, domain activation, process map request
+and new-module forms into proposals, and changes nothing in the ontology.
 
     python -m kpi_store.propose <answers file> [<answers file> ...] [--out <folder>] [--release <folder>]
 
@@ -19,6 +19,11 @@ HTML form as JSON or filled in the workbook. For each file the command:
    (kpi_store/change/proposal.py); a new item, a new KPI, a domain activation and a process map request are a minor;
 4. writes one proposal folder: change.kgcl, approval.json (written from the form's sign-off) and summary.txt, and
    facts.csv, the facts KGCL cannot write (KPI-DEC-0004, item 1), when there are some.
+
+A new-module form asks for a module of one of two patterns, a vocabulary or a reference table
+(kpi_store/change/new_module.py): its proposal holds the terms or items as KGCL lines, and the module itself and the
+values KGCL cannot write as facts. propose builds the module in memory and runs every shape of the release over it.
+Its route is major: a module's first release is 1.0.0, and the Ontology Owner signs it.
 
 A domain activation makes a domain of settings.toml active, or adds it: the ontology holds no list of domains, so
 its proposal holds facts and no KGCL line. A process map request adds new business areas, processes and steps to core
@@ -50,18 +55,20 @@ import re
 import sys
 from pathlib import Path
 
-from kpi_store.change import (ChangeRefused, approval, core_release, domains, kgcl, kpi_tables, new_measures, other_modules,
-                              process_map, proposal, reference_items)
+from kpi_store.change import (ChangeRefused, approval, core_release, domains, kgcl, kpi_tables, new_measures, new_module,
+                              other_modules, process_map, proposal, reference_items)
 from kpi_store.change.kgcl import Change
 
 FORM, ITEM, KPI, DOMAIN, PROCESS_MAP = "term-change", "reference-item", "kpi-intake", "domain-activation", "process-map-request"
-FORMS = (FORM, ITEM, DOMAIN, PROCESS_MAP)
+NEW_MODULE = "new-module"
+FORMS = (FORM, ITEM, DOMAIN, PROCESS_MAP, NEW_MODULE)
 SIGNERS = {"data-owner": "Data Owner", "ontology-owner": "Ontology Owner", "architect": "Architect",
            "domain-confirmation": "Domain Owner", "domain-owner": "Domain Owner",
            "global-process-owner": "Global Process Owner"}
 ROUTE_WHY = {"patch": "a patch: the changes correct or reword, and the old meaning still holds",
              "minor": "a minor: the changes add content, and the old meaning still holds",
              "major": "a major: the form says a report or an answer that used the old meaning may now be wrong"}
+NEW_MODULE_WHY = "a major: a new module's first release is 1.0.0, and the Ontology Owner approves it"
 
 class ProposeRefused(Exception):
     """A file is not a complete, signed KPI intake, term change or reference item, or the proposals cannot be
@@ -76,7 +83,7 @@ def _pack(root, pack):
 
 def read_form(path, cat, data, root, stale_check=True):
     """The intake of one answers file, refused unless it is a complete and signed form of the pack. A workbook gives
-    the form of whichever of its Term change, Reference item, Domain activation and Process map request sheets is
+    the form of whichever of its Term change, Reference item, Domain activation, Process map request and New module sheets is
     filled, and its KPI form when none is."""
     from kpi_store.intake import answers, check, picklists
     path = Path(path)
@@ -93,7 +100,7 @@ def read_form(path, cat, data, root, stale_check=True):
         raise ProposeRefused(f"{path.name} cannot be read: {err}") from None
     if workbook and not filled:
         raise ProposeRefused(f"{path.name}: the workbook holds no filled form: its KPI form, Term change, Reference item, "
-                             "Domain activation and Process map request sheets are empty")
+                             "Domain activation, Process map request and New module sheets are empty")
     if len(filled) > 1:
         names = " and ".join(cat_form(i.form) for i in filled)
         raise ProposeRefused(f"{path.name}: the workbook holds a {names}. One form gives one proposal: fill one of those "
@@ -548,6 +555,24 @@ def process_map_summary(change_id, source, changes, facts, notes, lines, route, 
     return "\n".join(text)
 
 
+def new_module_summary(change_id, source, key, spec, rows, lines, facts, route, record):
+    """summary.txt of a new module: the module and what it holds, in plain words."""
+    text = [f"Proposal {change_id}", "", f"From the form: {source}",
+            f'The new module: "{spec["title"]}" ({key}), of the {spec["pattern"]} pattern, at {new_module.VERSION}', "",
+            f'What it covers: "{spec["description"]}"', f'The documents it rests on: "{spec["citation"]}"', "",
+            "What it adds:"] + new_module.summary_lines(spec, rows)
+    text += ["", "The apply command writes the module's folder (its table, builder, shapes, test and README), registers the "
+             "module in every place the release lists its modules, releases it at 1.0.0, and rebuilds the catalog, the "
+             "projection manifest, the competency questions, the KPI intake pack and the pages."]
+    text += ["", f"The route: {route}. This is {NEW_MODULE_WHY}.", "", "Who signed:"]
+    text += [f"  - {s['role']}, on {s['date']}" for s in record["signatures"]]
+    text += ["", f"The KGCL lines, in {proposal.CHANGE_FILE}:"] + [f"  {line}" for line in lines]
+    text += ["", f"The facts, in {proposal.FACTS_FILE}:"] + [f"  {row}" for row in proposal.facts_text(facts).splitlines()]
+    text += ["", "Nothing in the ontology has changed yet. To apply this proposal, run in the release folder:",
+             "  python -m kpi_store.apply <the path of this folder>", ""]
+    return "\n".join(text)
+
+
 RELATIONSHIP_WORDS = {"informs": "as an input", "benchmarks": "as a benchmark", "measures-performance": "as a result it tracks"}
 FACT_WORDS = {"pop:includes": 'What it counts: "{}"', "pop:excludes": 'What it leaves out: "{}"',
               "pop:populationEvidence": 'Where its population is written down: "{}"',
@@ -732,6 +757,14 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
                 raise ProposeRefused(str(err)) from None
             module, compatible = "organization", "yes"
             checks = lambda changes, root: check_process_map(changes, facts, root)
+        elif intake.form == NEW_MODULE:
+            try:
+                key, changes, facts, notes = new_module.from_form(intake.answers, root)
+            except ChangeRefused as err:
+                raise ProposeRefused(f"{path.name}: {err}") from None
+            module, compatible = "new", "yes"
+            checked = {}
+            checks = lambda changes, root: checked.update(result=new_module.check_changes(changes, facts, root))
         elif intake.form == ITEM:
             key, changes = item_changes(intake, data["lists"])
             module, checks, compatible = "new item's", reference_items.check_changes, "yes"
@@ -742,12 +775,13 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
         try:
             checks(changes, root)
         except ChangeRefused as err:
-            where = f"the {module} module" if module != "settings" else domains.SETTINGS.as_posix()
+            where = {"settings": domains.SETTINGS.as_posix(), "new": "the release"}.get(module, f"the {module} module")
             raise ProposeRefused(f"{path.name} asks for a change {where} cannot take: {err}") from None
-        route = proposal.route_of(changes, compatible)
+        route = "major" if intake.form == NEW_MODULE else proposal.route_of(changes, compatible)
         change = _change_id(out, root, intake.request.get("number", "").strip(), key, today, taken)
         taken.add(change.lower())   # case does not count: on Windows and macOS TC-1 and tc-1 are one folder
-        record = {"change": change, "route": route, "new_module": False, "signatures": signatures(cat, intake)}
+        record = {"change": change, "route": route, "new_module": intake.form == NEW_MODULE,
+                  "signatures": signatures(cat, intake)}
         try:
             approval.check(record, proposal.owner_of(changes, facts))
         except ChangeRefused as err:
@@ -759,6 +793,8 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
             text = domain_summary(change, path.name, facts, route, record, root)
         elif intake.form == PROCESS_MAP:
             text = process_map_summary(change, path.name, changes, facts, notes, lines, route, record, data["lists"])
+        elif intake.form == NEW_MODULE:
+            text = new_module_summary(change, path.name, key, *checked["result"], lines, facts, route, record)
         elif intake.form == ITEM:
             text = item_summary(change, path.name, key, changes, lines, route, record, data["lists"])
         else:

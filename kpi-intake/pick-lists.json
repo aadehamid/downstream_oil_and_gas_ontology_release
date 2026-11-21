@@ -119,6 +119,68 @@
     "label": "Refining"
    }
   ],
+  "classes": [
+   {
+    "id": "https://w3id.org/mpc/ontology/modules/market-data/Benchmark",
+    "label": "benchmark price (mkt:Benchmark)",
+    "module": "market-data"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/modules/market-data/BenchmarkSeries",
+    "label": "benchmark series (mkt:BenchmarkSeries)",
+    "module": "market-data"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/modules/party/CustomerSourcing",
+    "label": "customer sourcing (party:CustomerSourcing)",
+    "module": "party"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/modules/party/CustomerSystem",
+    "label": "customer system (party:CustomerSystem)",
+    "module": "party"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/modules/party/DataFlow",
+    "label": "data flow (party:DataFlow)",
+    "module": "party"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/modules/party/LineOfBusiness",
+    "label": "line of business (party:LineOfBusiness)",
+    "module": "party"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/modules/market-data/MarketPrice",
+    "label": "market price (mkt:MarketPrice)",
+    "module": "market-data"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/modules/lane/OfficeLane",
+    "label": "office lane (lane:OfficeLane)",
+    "module": "lane"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/modules/party/Product",
+    "label": "product (party:Product)",
+    "module": "party"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/modules/market-data/SeriesEnumeration",
+    "label": "series enumeration (mkt:SeriesEnumeration)",
+    "module": "market-data"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/modules/market-data/Leg",
+    "label": "series leg (mkt:Leg)",
+    "module": "market-data"
+   },
+   {
+    "id": "https://w3id.org/mpc/ontology/modules/party/SystemAttribute",
+    "label": "system attribute (party:SystemAttribute)",
+    "module": "party"
+   }
+  ],
   "data-product-kinds": [
    {
     "id": "https://w3id.org/mpc/ontology/modules/data-product/kind/derived",
@@ -7701,6 +7763,296 @@
     "label": "Supply Chain Mgmt.",
     "level": 1,
     "parent": "https://w3id.org/mpc/ontology/process/L0-enabling-functions"
+   }
+  ],
+  "properties": [
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/party/SystemAttribute",
+    "id": "https://w3id.org/mpc/ontology/modules/party/attributeCategory",
+    "kind": "item",
+    "label": "attribute category (party:attributeCategory)",
+    "range": "http://www.w3.org/2004/02/skos/core#Concept"
+   },
+   {
+    "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+    "domain": "https://w3id.org/mpc/ontology/modules/market-data/Leg",
+    "id": "https://w3id.org/mpc/ontology/modules/market-data/barrels",
+    "kind": "typed",
+    "label": "barrels (mkt:barrels)",
+    "range": ""
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/market-data/Leg",
+    "id": "https://w3id.org/mpc/ontology/modules/market-data/benchmark",
+    "kind": "item",
+    "label": "benchmark (mkt:benchmark)",
+    "range": "https://w3id.org/mpc/ontology/modules/market-data/Benchmark"
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/market-data/Benchmark",
+    "id": "https://w3id.org/mpc/ontology/modules/market-data/benchmarkKind",
+    "kind": "item",
+    "label": "benchmark kind (mkt:benchmarkKind)",
+    "range": "http://www.w3.org/2004/02/skos/core#Concept"
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/market-data/BenchmarkSeries",
+    "id": "https://w3id.org/mpc/ontology/modules/market-data/blendOf",
+    "kind": "item",
+    "label": "blend of (mkt:blendOf)",
+    "range": "https://w3id.org/mpc/ontology/modules/market-data/BenchmarkSeries"
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/party/DataFlow",
+    "id": "https://w3id.org/mpc/ontology/modules/party/carries",
+    "kind": "text",
+    "label": "carries (party:carries)",
+    "range": ""
+   },
+   {
+    "datatype": "http://www.w3.org/2001/XMLSchema#string",
+    "domain": "",
+    "id": "http://www.w3.org/2004/02/skos/core#notation",
+    "kind": "typed",
+    "label": "code (skos:notation)",
+    "range": ""
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/party/CustomerSystem",
+    "id": "https://w3id.org/mpc/ontology/modules/party/customerRole",
+    "kind": "text",
+    "label": "customer role (party:customerRole)",
+    "range": ""
+   },
+   {
+    "datatype": "http://www.w3.org/2001/XMLSchema#date",
+    "domain": "",
+    "id": "http://purl.org/dc/terms/date",
+    "kind": "typed",
+    "label": "date (dcterms:date)",
+    "range": ""
+   },
+   {
+    "datatype": "",
+    "domain": "",
+    "id": "http://www.w3.org/2004/02/skos/core#definition",
+    "kind": "text",
+    "label": "definition (skos:definition)",
+    "range": ""
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/party/SystemAttribute",
+    "id": "https://w3id.org/mpc/ontology/modules/party/describes",
+    "kind": "item",
+    "label": "describes (party:describes)",
+    "range": "http://www.w3.org/2002/07/owl#Class"
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/market-data/SeriesEnumeration",
+    "id": "https://w3id.org/mpc/ontology/modules/market-data/enumerates",
+    "kind": "item",
+    "label": "enumerates (mkt:enumerates)",
+    "range": "https://w3id.org/mpc/ontology/modules/kpi/MeasureDefinition"
+   },
+   {
+    "datatype": "http://www.w3.org/2001/XMLSchema#boolean",
+    "domain": "https://w3id.org/mpc/ontology/modules/market-data/BenchmarkSeries",
+    "id": "https://w3id.org/mpc/ontology/modules/market-data/excludesRINCost",
+    "kind": "typed",
+    "label": "excludes RIN cost (mkt:excludesRINCost)",
+    "range": ""
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/party/CustomerSystem",
+    "id": "https://w3id.org/mpc/ontology/modules/party/feeds",
+    "kind": "item",
+    "label": "feeds (party:feeds)",
+    "range": "https://w3id.org/mpc/ontology/modules/party/CustomerSystem"
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/party/DataFlow",
+    "id": "https://w3id.org/mpc/ontology/modules/party/fromSystem",
+    "kind": "item",
+    "label": "from system (party:fromSystem)",
+    "range": "https://w3id.org/mpc/ontology/modules/party/CustomerSystem"
+   },
+   {
+    "datatype": "http://www.w3.org/2001/XMLSchema#string",
+    "domain": "https://w3id.org/mpc/ontology/modules/market-data/SeriesEnumeration",
+    "id": "https://w3id.org/mpc/ontology/modules/market-data/groupColumn",
+    "kind": "typed",
+    "label": "group column (mkt:groupColumn)",
+    "range": ""
+   },
+   {
+    "datatype": "http://www.w3.org/2001/XMLSchema#string",
+    "domain": "https://w3id.org/mpc/ontology/modules/market-data/SeriesEnumeration",
+    "id": "https://w3id.org/mpc/ontology/modules/market-data/idColumn",
+    "kind": "typed",
+    "label": "identifier column (mkt:idColumn)",
+    "range": ""
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/party/CustomerSystem",
+    "id": "https://w3id.org/mpc/ontology/modules/party/implements",
+    "kind": "item",
+    "label": "implements (party:implements)",
+    "range": "http://www.w3.org/2002/07/owl#Class"
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/party/SystemAttribute",
+    "id": "https://w3id.org/mpc/ontology/modules/party/inSystem",
+    "kind": "item",
+    "label": "in system (party:inSystem)",
+    "range": "https://w3id.org/mpc/ontology/modules/party/CustomerSystem"
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/market-data/BenchmarkSeries",
+    "id": "https://w3id.org/mpc/ontology/modules/market-data/leg",
+    "kind": "item",
+    "label": "leg (mkt:leg)",
+    "range": "https://w3id.org/mpc/ontology/modules/market-data/Leg"
+   },
+   {
+    "datatype": "http://www.w3.org/2001/XMLSchema#boolean",
+    "domain": "https://w3id.org/mpc/ontology/modules/market-data/BenchmarkSeries",
+    "id": "https://w3id.org/mpc/ontology/modules/market-data/legsUnstated",
+    "kind": "typed",
+    "label": "legs unstated (mkt:legsUnstated)",
+    "range": ""
+   },
+   {
+    "datatype": "",
+    "domain": "",
+    "id": "http://www.w3.org/2004/02/skos/core#inScheme",
+    "kind": "item",
+    "label": "list it is in (skos:inScheme)",
+    "range": "http://www.w3.org/2004/02/skos/core#ConceptScheme"
+   },
+   {
+    "datatype": "http://www.w3.org/2001/XMLSchema#string",
+    "domain": "https://w3id.org/mpc/ontology/modules/market-data/SeriesEnumeration",
+    "id": "https://w3id.org/mpc/ontology/modules/market-data/nameColumn",
+    "kind": "typed",
+    "label": "name column (mkt:nameColumn)",
+    "range": ""
+   },
+   {
+    "datatype": "",
+    "domain": "",
+    "id": "http://www.w3.org/2004/02/skos/core#altLabel",
+    "kind": "text",
+    "label": "other name (skos:altLabel)",
+    "range": ""
+   },
+   {
+    "datatype": "http://www.w3.org/2001/XMLSchema#string",
+    "domain": "https://w3id.org/mpc/ontology/modules/party/Product",
+    "id": "https://w3id.org/mpc/ontology/modules/party/pidxProductFamily",
+    "kind": "typed",
+    "label": "PIDX product family (party:pidxProductFamily)",
+    "range": ""
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/market-data/SeriesEnumeration",
+    "id": "https://w3id.org/mpc/ontology/modules/market-data/rowFilter",
+    "kind": "text",
+    "label": "row filter (mkt:rowFilter)",
+    "range": ""
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/market-data/BenchmarkSeries",
+    "id": "https://w3id.org/mpc/ontology/modules/market-data/seriesOf",
+    "kind": "item",
+    "label": "series of (mkt:seriesOf)",
+    "range": "https://w3id.org/mpc/ontology/modules/kpi/MeasureDefinition"
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/party/SystemAttribute",
+    "id": "https://w3id.org/mpc/ontology/modules/party/sharedAttribute",
+    "kind": "item",
+    "label": "shared attribute (party:sharedAttribute)",
+    "range": "http://www.w3.org/2004/02/skos/core#Concept"
+   },
+   {
+    "datatype": "",
+    "domain": "",
+    "id": "http://purl.org/dc/terms/source",
+    "kind": "item",
+    "label": "source document (dcterms:source)",
+    "range": "http://purl.org/dc/terms/BibliographicResource"
+   },
+   {
+    "datatype": "http://www.w3.org/2001/XMLSchema#string",
+    "domain": "https://w3id.org/mpc/ontology/modules/market-data/SeriesEnumeration",
+    "id": "https://w3id.org/mpc/ontology/modules/market-data/sourceView",
+    "kind": "typed",
+    "label": "source view (mkt:sourceView)",
+    "range": ""
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/party/CustomerSourcing",
+    "id": "https://w3id.org/mpc/ontology/modules/party/sourcedConcept",
+    "kind": "item",
+    "label": "sourced concept (party:sourcedConcept)",
+    "range": "http://www.w3.org/2004/02/skos/core#Concept"
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/party/CustomerSourcing",
+    "id": "https://w3id.org/mpc/ontology/modules/party/sourcingKind",
+    "kind": "item",
+    "label": "sourcing kind (party:sourcingKind)",
+    "range": "http://www.w3.org/2004/02/skos/core#Concept"
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/party/CustomerSourcing",
+    "id": "https://w3id.org/mpc/ontology/modules/party/sourcingSystem",
+    "kind": "item",
+    "label": "sourcing system (party:sourcingSystem)",
+    "range": "https://w3id.org/mpc/ontology/modules/party/CustomerSystem"
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/party/CustomerSystem",
+    "id": "https://w3id.org/mpc/ontology/modules/party/systemOfRecordFor",
+    "kind": "item",
+    "label": "system of record for (party:systemOfRecordFor)",
+    "range": "http://www.w3.org/2002/07/owl#Class"
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/party/CustomerSystem",
+    "id": "https://w3id.org/mpc/ontology/modules/party/systemTier",
+    "kind": "item",
+    "label": "system tier (party:systemTier)",
+    "range": "http://www.w3.org/2004/02/skos/core#Concept"
+   },
+   {
+    "datatype": "",
+    "domain": "https://w3id.org/mpc/ontology/modules/party/DataFlow",
+    "id": "https://w3id.org/mpc/ontology/modules/party/toSystem",
+    "kind": "item",
+    "label": "to system (party:toSystem)",
+    "range": "https://w3id.org/mpc/ontology/modules/party/CustomerSystem"
    }
   ],
   "roles": [

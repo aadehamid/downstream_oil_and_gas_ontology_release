@@ -57,7 +57,7 @@ def test_the_pick_lists_hold_the_counts_of_this_release(committed):
         "business-areas": 7, "processes": 707, "measures": 41, "roles": 64, "value-stream-steps": 58,
         "measure-relationships": 3, "data-products": 49, "platform-tables": 33, "layers": 4, "data-product-kinds": 2,
         "systems": 49, "sources": 106, "modules": 13, "areas-and-modules": 20, "system-kinds": 3, "system-sources": 25,
-        "table-sources": 1}
+        "table-sources": 1, "classes": 12, "properties": 36}
     by_level = {}
     for process in lists["processes"]:
         by_level[process["level"]] = by_level.get(process["level"], 0) + 1
@@ -170,9 +170,9 @@ def test_the_page_is_one_offline_file_with_lf_line_ends():
     assert "fetch(" not in text and "XMLHttpRequest" not in text
     assert "<pre" not in text                               # the document check would read a <pre> as a command
     data = json.loads(text.split('<script id="intake-data" type="application/json">')[1].split("</script>")[0])
-    assert list(data["forms"]) == ["kpi-intake", "domain-activation", "process-map-request", "term-change", "reference-item"]
+    assert list(data["forms"]) == ["kpi-intake", "domain-activation", "process-map-request", "term-change", "reference-item", "new-module"]
     assert data["release"] == "KPI Store 1.1" and data["catalogue_version"] == "1.2"
-    assert len(data["questions"]) == 91 and data["lists"]["processes"]
+    assert len(data["questions"]) == 103 and data["lists"]["processes"]
     assert data["guide"] == "how-to-use-the-form.html" and (PACK / data["guide"]).is_file()     # the guide, beside the form
     # The names of the other modules' terms, and whether each has a definition, with no definition text.
     core = data["term_names"]["core"]
@@ -215,7 +215,7 @@ def test_the_workbook_has_a_sheet_per_section_dropdowns_and_a_hidden_lists_sheet
     wb = load_workbook(PACK / build.FORM_XLSX)
     assert wb.sheetnames == ["Start", "1 The business area", "2 What the KPI means", "3 The facts about it", "4 Where it belongs",
                              "5 Other names for it", "6 What it connects to", "7 Where the data lives", "Sign-off",
-                             "Domain activation", "Process map request", "Term change", "Reference item", "Roles", "lists"]
+                             "Domain activation", "Process map request", "Term change", "Reference item", "New module", "Roles", "lists"]
     assert wb["lists"].sheet_state == "hidden" and wb["Start"].sheet_state == "visible"
     ws = wb["1 The business area"]
     header = next(row for row in ws.iter_rows(values_only=True) if row[0] == "No.")

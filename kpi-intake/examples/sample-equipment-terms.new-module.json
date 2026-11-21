@@ -1,0 +1,29 @@
+{
+  "format": 1,
+  "form": "new-module",
+  "catalogue_version": "1.2",
+  "kpi_name": "Sample Equipment Terms",
+  "request": {"number": "NM-2026-001", "date": "2026-11-20", "requester_role": "Program manager", "invited": "Data Owner, Ontology Owner"},
+  "answers": {
+    "N1": "Sample Equipment Terms",
+    "N2": "The made-up terms that the maintenance planners of a made-up refinery use for its equipment.",
+    "N3": "vocabulary",
+    "N4": ["Rotating equipment", "Pump", "Compressor", "Static equipment", "Heat exchanger"],
+    "N5": ["Made-up equipment whose main part turns while it works.",
+           "Made-up rotating equipment that moves a liquid through a pipe.",
+           "Made-up rotating equipment that raises the pressure of a gas.",
+           "Made-up equipment that has no main part that moves while it works.",
+           "Made-up static equipment that moves heat from one fluid to another."],
+    "N6": ["", "pump unit", "gas compressor", "fixed equipment", "exchanger; HX"],
+    "N7": ["", "Rotating equipment", "Rotating equipment", "", "Static equipment"],
+    "N12": ["A made-up equipment glossary, 2026-11-20"]
+  },
+  "sign_offs": {
+    "data-owner": {"name": "Placeholder for the Data Owner's name", "date": "2026-11-20"},
+    "ontology-owner": {"name": "Placeholder for the Ontology Owner's name", "date": "2026-11-20"},
+    "architect": {"name": "Placeholder for the Architect's name", "date": "2026-11-20"}
+  },
+  "consulted": {},
+  "example_of": "",
+  "comment": "A made-up example: the module, its terms, their definitions and the document are made up. The signer names are placeholders."
+}
