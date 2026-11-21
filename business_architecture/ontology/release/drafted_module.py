@@ -327,10 +327,10 @@ def _standard(iri):
     return any(str(iri).startswith(ns) for ns in STANDARD.values())
 
 
-def problems(draft, known, data=None):
+def problems(draft, known, data):
     """Each way the draft does not have the form the pattern needs, as a sentence; empty when it has. `known` is the
     set of IRIs that the modules the module requires hold as subjects, and `data` their packages, joined."""
-    from rdflib import BNode, Graph, Literal, URIRef
+    from rdflib import BNode, Literal, URIRef
     spec, model, shapes = draft.spec, draft.model, draft.shapes
     ns, shp, ex = namespace(spec), shapes_namespace(spec), examples_namespace(spec)
     out = []
@@ -380,7 +380,6 @@ def problems(draft, known, data=None):
             out.append(f"{MODEL}: {c} cites no source (dcterms:bibliographicCitation)")
     individuals = set(draft.of_kind("individual"))
     classes, properties = set(draft.of_kind("class")), set(draft.of_kind("property"))
-    data = data if data is not None else Graph()
     required_classes = {c for k in (OWL + "Class", RDFS + "Class") for c in data.subjects(URIRef(RDF + "type"), URIRef(k))
                         if isinstance(c, URIRef) and not _standard(c)}
     required_properties = {c for k in (OWL + "ObjectProperty", OWL + "DatatypeProperty", RDF + "Property")
@@ -402,7 +401,9 @@ def problems(draft, known, data=None):
                        "citations, domains, ranges, rdfs:subClassOf, rdfs:subPropertyOf and owl:disjointWith; other "
                        "modelling needs a specialist")
         elif str(p_) == RDF + "type":
-            if s_ in individuals:
+            if not isinstance(o_, URIRef):
+                fits = False
+            elif s_ in individuals:
                 fits = str(o_) == OWL + "NamedIndividual" or o_ in classes or o_ in required_classes
             else:
                 fits = str(o_) in KINDS
@@ -414,7 +415,7 @@ def problems(draft, known, data=None):
             subjects, objects, what = SCHEMA[str(p_)]
             ok_subject = s_ in (classes if subjects == "class" else properties)
             if str(p_) == RDFS + "range" and (s_, URIRef(RDF + "type"), URIRef(OWL + "DatatypeProperty")) in model:
-                ok_object = str(o_).startswith(XSD) or str(o_) == RDF + "langString"
+                ok_object = isinstance(o_, URIRef) and (str(o_).startswith(XSD) or str(o_) == RDF + "langString")
             elif objects == "class":
                 ok_object = o_ in classes or o_ in required_classes
             else:
@@ -649,6 +650,16 @@ def _closure(graph):
     return graph
 
 
+def _link_back(triple, own):
+    """True for a link from a release term back into the draft through a property of the release, such as the
+    inverse of a property an example uses, or a symmetric one: the release's own axioms make it, and it says nothing
+    new of the release term itself. Never rdf:type, owl:sameAs or another standard term, and never a module property."""
+    from rdflib import URIRef
+    _, p, o = triple
+    return isinstance(p, URIRef) and not _standard(p) and not str(p).startswith(own) and \
+        isinstance(o, URIRef) and str(o).startswith(own)
+
+
 def gate_2(draft, data):
     """(passed, the lines). The OWL 2 RL closure of the model, the passing examples and the required modules must be
     consistent, and must hold no triple about a term of the release that the closure of the required modules alone
@@ -661,7 +672,8 @@ def gate_2(draft, data):
     before = _closure(_joined(data))
     own = (namespace(draft.spec), examples_namespace(draft.spec))
     changed = sorted((t for t in g if isinstance(t[0], URIRef) and not str(t[0]).startswith(own)
-                      and not _standard(t[0]) and t[1] != ERRNS.error and t not in before), key=str)
+                      and not _standard(t[0]) and t[1] != ERRNS.error and t not in before
+                      and not _link_back(t, own) and not (str(t[1]) == OWL + "sameAs" and t[0] == t[2])), key=str)
     for s, p, o in changed[:5]:
         lines.append(f"the draft would change the release term {curie(draft.spec, s)}: the reasoner then finds "
                      f"{curie(draft.spec, s)} {curie(draft.spec, p)} {curie(draft.spec, o)}, which the release alone does "

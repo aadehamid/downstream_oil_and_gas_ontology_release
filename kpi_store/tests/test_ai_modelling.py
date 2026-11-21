@@ -558,20 +558,6 @@ def test_round_2_a_question_may_name_a_module_term_in_a_property_path(sparql, ex
     assert found[1]["passed"], found[1]["results"]
 
 
-def test_round_2_a_resumed_draft_with_a_failed_gate_entry_goes_to_no_reviewer(tmp_path):
-    path = form(tmp_path)
-    run(path, answer_file=SAMPLE_DRAFT)
-    prompt = path.with_name(path.stem + draft.REVIEW_PROMPT)
-    prompt.unlink()
-    record_path = path.with_name(path.stem + drafted.RECORD_SUFFIX)
-    record = json.loads(record_path.read_text(encoding="utf-8"))
-    record["gates"].append(dict(record["gates"][0], passed=False))
-    record_path.write_text(json.dumps(record), encoding="utf-8")
-    with pytest.raises(AIRefused):
-        run(path)
-    assert not prompt.exists()
-
-
 # ---------- the quick check's findings ----------
 
 QC_HEAD = f"""{P}:{{n}} a owl:Class ; rdfs:label "{{n}}"@en ; skos:definition "A helper."@en ;
@@ -623,8 +609,8 @@ def test_qc_a_gate_2_refuses_a_model_that_changes_a_release_term(name):
     (f"\n{P}:Alias a owl:Class ; rdfs:label \"Alias\"@en ; skos:definition \"A.\"@en ; rdfs:subClassOf owl:FunctionalProperty .\n",
      "rdfs:subClassOf"),
     (f"\n{P}:recordedIn rdfs:subPropertyOf owl:sameAs .\n", "rdfs:subPropertyOf"),
-    (f"\n{P}:Spoof a owl:NamedIndividual, sys:NoSuchClass ; rdfs:label \"S\"@en ; skos:definition \"S.\"@en .\n",
-     "sys:NoSuchClass"),
+    (f"\n{P}:Spoof a owl:NamedIndividual, system:aps-planning-db ; rdfs:label \"S\"@en ; skos:definition \"S.\"@en .\n",
+     "types"),
     (f"\n{P}:TankInspection a sys:System .\n", "types"),
     (f"\n{P}:TankInspection rdfs:domain sys:System .\n", "rdfs:domain"),
     (f"\n{P}:recordedIn rdfs:subPropertyOf {P}:TankInspection .\n", "rdfs:subPropertyOf"),
@@ -641,16 +627,83 @@ def test_qc_c_a_defined_term_that_is_no_property_is_refused_as_a_predicate():
                         f"\n{P}:TankInspection {P}:TankInspection system:aps-planning-db .\n"))
 
 
-def test_qc_d_the_resume_guard_itself_refuses_a_failed_gate_entry(tmp_path):
+@pytest.mark.parametrize("spoil", ["extra", "failed"])
+def test_qc_d_the_resume_guard_itself_refuses_a_failed_gate_entry(tmp_path, spoil):
     path = form(tmp_path)
     run(path, answer_file=SAMPLE_DRAFT)
     prompt = path.with_name(path.stem + draft.REVIEW_PROMPT)
     prompt.unlink()
     record_path = path.with_name(path.stem + drafted.RECORD_SUFFIX)
     record = json.loads(record_path.read_text(encoding="utf-8"))
-    record["gates"].append({"gate": 5, "name": "a failed entry", "passed": False, "results": ["not signed"]})
+    if spoil == "extra":   # a gate list that is not 1, 2 and 4
+        record["gates"].append({"gate": 5, "name": "an extra entry", "passed": True, "results": ["not signed"]})
+    else:                  # gates 1, 2 and 4, one of them failed
+        record["gates"][0]["passed"] = False
     approval.check_draft(record, signed=False)   # the record passes the field checks, so the guard is what refuses
     record_path.write_text(json.dumps(record), encoding="utf-8")
     with pytest.raises(AIRefused, match="does not show gates 1, 2 and 4 passed"):
         run(path)
     assert not prompt.exists()
+
+
+# ---------- the second quick check's findings ----------
+
+def _gate_2_with(more_data, more_pass):
+    """Gate 2 on the sample draft, with made-up axioms added to the required modules and triples to its examples."""
+    from rdflib import Graph
+    dm = drafted.pattern(ROOT)
+    spec = drafted.spec_of_form(ANSWERS, ROOT)
+    spec, files = drafted.from_answer(SAMPLE_DRAFT.read_text(encoding="utf-8"), spec, ROOT)
+    examples = json.loads(files[dm.EXAMPLES])
+    examples["pass"] += more_pass
+    draft_ = dm.Draft(dict(spec, prefixes=dict(spec["prefixes"], core="https://w3id.org/mpc/ontology/core/",
+                                                 proc="https://w3id.org/mpc/ontology/process/")),
+                      dict(files, **{dm.EXAMPLES: json.dumps(examples)}))
+    data, _ = dm.context(spec, str(ROOT / "business_architecture" / "ontology"))
+    data += Graph().parse(data=dm.header(draft_.spec) + more_data, format="turtle")
+    return dm.gate_2(draft_, data)
+
+
+MADE_UP = """sys:hostedOn a owl:ObjectProperty ; owl:inverseOf sys:hosts .
+sys:hosts a owl:ObjectProperty .
+sys:relatedTo a owl:ObjectProperty, owl:SymmetricProperty .
+"""
+
+
+def test_qc2_1_a_link_back_from_the_release_through_its_own_inverse_or_symmetric_property_is_allowed():
+    passed, lines = _gate_2_with(MADE_UP, "ex:inspection-1 sys:hostedOn system:aps-planning-db ;\n"
+                                          "    sys:relatedTo system:aps .\n")
+    assert passed, lines
+
+
+def test_qc2_1_a_type_or_sameas_side_effect_through_a_release_property_is_still_refused():
+    more = MADE_UP + "sys:hostedOn rdfs:range sys:Systems .\nsys:onlyOne a owl:ObjectProperty, owl:FunctionalProperty .\n"
+    passed, lines = _gate_2_with(more, "ex:inspection-1 sys:hostedOn system:aps-planning-db .\n"
+                                       "ex:k sys:onlyOne system:aps . ex:k sys:onlyOne system:aps-planning-db .\n")
+    assert not passed
+    assert any("rdf:type" in line for line in lines) and any("owl:sameAs" in line for line in lines), lines
+
+
+def test_qc2_1_an_example_linked_to_core_and_system_terms_makes_no_false_refusal():
+    # core's functional properties, with one value each, as core's own sequences use them
+    passed, lines = _gate_2_with("", "ex:sequence-1 core:earlierProcess proc:CM-1-1-4 ;\n"
+                                     "    core:laterProcess proc:CM-1-1-3-7-9 .\n")
+    assert passed, lines
+
+
+@pytest.mark.parametrize("more,message", [
+    (f'\n{P}:TankInspection rdf:type "http://www.w3.org/2002/07/owl#Class" .\n', "types"),
+    ("", "exactly one rdfs:domain and exactly one rdfs:range, each a named class"),   # refused on 2459afd already
+])
+def test_qc2_2_a_literal_is_no_type_and_no_datatype(more, message):
+    model = sample()["model"] + more
+    if not more:   # the datatype property's one range, written as a literal
+        model = model.replace("rdfs:range xsd:date", '"rdfs:range "http://www.w3.org/2001/XMLSchema#date"'[1:])
+    with pytest.raises(ChangeRefused, match=message):
+        gates_of(sample(model=model))
+
+
+def test_qc2_3_problems_needs_the_required_modules():
+    dm = drafted.pattern(ROOT)
+    import inspect
+    assert inspect.signature(dm.problems).parameters["data"].default is inspect.Parameter.empty
