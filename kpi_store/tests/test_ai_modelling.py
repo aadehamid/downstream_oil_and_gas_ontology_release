@@ -570,3 +570,87 @@ def test_round_2_a_resumed_draft_with_a_failed_gate_entry_goes_to_no_reviewer(tm
     with pytest.raises(AIRefused):
         run(path)
     assert not prompt.exists()
+
+
+# ---------- the quick check's findings ----------
+
+QC_HEAD = f"""{P}:{{n}} a owl:Class ; rdfs:label "{{n}}"@en ; skos:definition "A helper."@en ;
+    dcterms:bibliographicCitation "Ref" """
+QC = {
+    "subPropertyOf owl:sameAs": f"""
+{P}:Alias a owl:Class ; rdfs:label "Alias"@en ; skos:definition "Helper class."@en ; dcterms:bibliographicCitation "Ref" .
+{P}:aliasOf a owl:ObjectProperty ; rdfs:label "alias of"@en ; skos:definition "Alias link."@en ;
+    dcterms:bibliographicCitation "Ref" ; rdfs:domain {P}:Alias ; rdfs:range {P}:Alias ; rdfs:subPropertyOf owl:sameAs .
+{P}:Spoof a owl:NamedIndividual ; rdfs:label "Spoof"@en ; skos:definition "Spoof."@en ; rdfs:comment "altered"@en ;
+    {P}:aliasOf system:aps-planning-db .
+""",
+    "subClassOf owl:FunctionalProperty": f"""
+{P}:FuncProp a owl:Class ; rdfs:label "FuncProp"@en ; skos:definition "Marker."@en ; dcterms:bibliographicCitation "Ref" ;
+    rdfs:subClassOf owl:FunctionalProperty .
+{P}:LinkNode a owl:Class ; rdfs:label "LinkNode"@en ; skos:definition "Node."@en ; dcterms:bibliographicCitation "Ref" .
+{P}:link a owl:ObjectProperty, {P}:FuncProp ; rdfs:label "link"@en ; skos:definition "Links nodes."@en ;
+    dcterms:bibliographicCitation "Ref" ; rdfs:domain {P}:LinkNode ; rdfs:range {P}:LinkNode .
+{P}:Bridge a owl:NamedIndividual ; rdfs:label "Bridge"@en ; skos:definition "Bridge."@en ; rdfs:comment "altered"@en ;
+    {P}:link {P}:Bridge ; {P}:link system:aps-planning-db .
+""",
+    "range retypes a release item": f"""
+{P}:Tag a owl:Class ; rdfs:label "Tag"@en ; skos:definition "Marker."@en ; dcterms:bibliographicCitation "Ref" .
+{P}:tags a owl:ObjectProperty ; rdfs:label "tags"@en ; skos:definition "Tags a resource."@en ;
+    dcterms:bibliographicCitation "Ref" ; rdfs:domain {P}:Tag ; rdfs:range {P}:Tag .
+{P}:Tagger a owl:NamedIndividual ; rdfs:label "Tagger"@en ; skos:definition "Tagger."@en ;
+    {P}:tags system:aps-planning-db .
+"""}
+
+
+@pytest.mark.parametrize("name", sorted(QC))
+def test_qc_a_gate_2_refuses_a_model_that_changes_a_release_term(name):
+    """A: the reasoner's rule by meaning, run on gate 2 alone, with no check of the form before it."""
+    dm = drafted.pattern(ROOT)
+    spec = dict(drafted.spec_of_form(ANSWERS, ROOT), depends_on=["system"],
+                prefixes={"sys": "https://w3id.org/mpc/ontology/modules/system/",
+                          "system": "https://w3id.org/mpc/ontology/modules/system/system/"})
+    data = sample(model=sample()["model"] + QC[name])
+    texts = {dm.MODEL: data["model"], dm.SHAPES: data["shapes"], dm.QUESTIONS: json.dumps(data["questions"]),
+             dm.EXAMPLES: json.dumps(data["examples"]), dm.SUMMARY: json.dumps(data["summary"])}
+    draft_ = dm.Draft(spec, texts)
+    context_data, _ = dm.context(spec, str(ROOT / "business_architecture" / "ontology"))
+    passed, lines = dm.gate_2(draft_, context_data)
+    assert not passed
+    assert any("system:aps-planning-db" in line and "would change" in line for line in lines), lines
+
+
+@pytest.mark.parametrize("more,message", [
+    (f"\n{P}:Alias a owl:Class ; rdfs:label \"Alias\"@en ; skos:definition \"A.\"@en ; rdfs:subClassOf owl:FunctionalProperty .\n",
+     "rdfs:subClassOf"),
+    (f"\n{P}:recordedIn rdfs:subPropertyOf owl:sameAs .\n", "rdfs:subPropertyOf"),
+    (f"\n{P}:Spoof a owl:NamedIndividual, sys:NoSuchClass ; rdfs:label \"S\"@en ; skos:definition \"S.\"@en .\n",
+     "sys:NoSuchClass"),
+    (f"\n{P}:TankInspection a sys:System .\n", "types"),
+    (f"\n{P}:TankInspection rdfs:domain sys:System .\n", "rdfs:domain"),
+    (f"\n{P}:recordedIn rdfs:subPropertyOf {P}:TankInspection .\n", "rdfs:subPropertyOf"),
+    (f"\n{P}:TankInspection owl:disjointWith owl:Thing .\n", "owl:disjointWith"),
+])
+def test_qc_b_schema_triples_take_a_module_subject_and_a_module_or_required_object(more, message):
+    with pytest.raises(ChangeRefused, match=message):
+        gates_of(sample(model=sample()["model"] + more))
+
+
+def test_qc_c_a_defined_term_that_is_no_property_is_refused_as_a_predicate():
+    with pytest.raises(ChangeRefused, match="not a property"):
+        gates_of(sample(model=sample()["model"] +
+                        f"\n{P}:TankInspection {P}:TankInspection system:aps-planning-db .\n"))
+
+
+def test_qc_d_the_resume_guard_itself_refuses_a_failed_gate_entry(tmp_path):
+    path = form(tmp_path)
+    run(path, answer_file=SAMPLE_DRAFT)
+    prompt = path.with_name(path.stem + draft.REVIEW_PROMPT)
+    prompt.unlink()
+    record_path = path.with_name(path.stem + drafted.RECORD_SUFFIX)
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    record["gates"].append({"gate": 5, "name": "a failed entry", "passed": False, "results": ["not signed"]})
+    approval.check_draft(record, signed=False)   # the record passes the field checks, so the guard is what refuses
+    record_path.write_text(json.dumps(record), encoding="utf-8")
+    with pytest.raises(AIRefused, match="does not show gates 1, 2 and 4 passed"):
+        run(path)
+    assert not prompt.exists()

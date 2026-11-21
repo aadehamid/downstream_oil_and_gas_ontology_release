@@ -29,7 +29,8 @@ The gates that code runs (gates()):
              modules the module requires; the passing examples meet the draft's shapes and the required modules'
              shapes; each failing example breaks the node shape it names; and every node shape is broken by one
     gate 2   the OWL 2 RL reasoner of owlrl finds the model, the passing examples and the required modules
-             consistent: it reports no contradiction, such as one thing in two disjoint classes
+             consistent: it reports no contradiction, such as one thing in two disjoint classes; and its closure of them holds no
+             triple about a term of the release that its closure of the required modules alone does not hold
     gate 4   the summary gives each class, property and node shape a meaning and an example, in words
 
 Gate 3 (a second model, of another family, reviews the draft) and gate 5 (the Ontology Owner signs, and the release
@@ -82,6 +83,15 @@ SHAPE_PREDICATES = {RDF + "type", RDF + "first", RDF + "rest", RDFS + "label", R
 # The predicates a drafted model may use, and nothing else: names, definitions and notes, the citation, domains,
 # ranges, the class and property hierarchy, and disjointness. The module's own properties may also be used, on its own
 # individuals. A drafted model holds no blank node: every thing has a name, and its cardinalities live in the shapes.
+# Each schema predicate: the kind of module term its subject is, the kind of term its object is (of the module or of a
+# module it requires, never a standard term), and the rule in words. A datatype property's range is the one exception:
+# an XSD datatype or rdf:langString.
+SCHEMA = {RDFS + "subClassOf": ("class", "class", "A module class may be under a class of the module or of a module it requires."),
+          OWL + "disjointWith": ("class", "class", "A module class may be disjoint with a class of the module or of a module it requires."),
+          RDFS + "subPropertyOf": ("property", "property", "A module property may be under a property of the module or of a module it requires."),
+          RDFS + "domain": ("property", "class", "A module property's domain is a class of the module or of a module it requires."),
+          RDFS + "range": ("property", "class", "A module property's range is a class of the module or of a module it requires, "
+                                                 "or for a datatype property an XSD datatype or rdf:langString.")}
 MODEL_PREDICATES = {RDF + "type", RDFS + "label", RDFS + "comment", SKOS + "definition", SKOS + "altLabel",
                     SKOS + "scopeNote", SKOS + "example", DCTERMS + "bibliographicCitation", DCTERMS + "source",
                     RDFS + "domain", RDFS + "range", RDFS + "subClassOf", RDFS + "subPropertyOf", OWL + "disjointWith"}
@@ -317,10 +327,10 @@ def _standard(iri):
     return any(str(iri).startswith(ns) for ns in STANDARD.values())
 
 
-def problems(draft, known):
+def problems(draft, known, data=None):
     """Each way the draft does not have the form the pattern needs, as a sentence; empty when it has. `known` is the
-    set of IRIs that the modules the module requires hold as subjects."""
-    from rdflib import BNode, Literal, URIRef
+    set of IRIs that the modules the module requires hold as subjects, and `data` their packages, joined."""
+    from rdflib import BNode, Graph, Literal, URIRef
     spec, model, shapes = draft.spec, draft.model, draft.shapes
     ns, shp, ex = namespace(spec), shapes_namespace(spec), examples_namespace(spec)
     out = []
@@ -369,12 +379,20 @@ def problems(draft, known):
         if not list(model.objects(t, URIRef(DCTERMS + "bibliographicCitation"))):
             out.append(f"{MODEL}: {c} cites no source (dcterms:bibliographicCitation)")
     individuals = set(draft.of_kind("individual"))
+    classes, properties = set(draft.of_kind("class")), set(draft.of_kind("property"))
+    data = data if data is not None else Graph()
+    required_classes = {c for k in (OWL + "Class", RDFS + "Class") for c in data.subjects(URIRef(RDF + "type"), URIRef(k))
+                        if isinstance(c, URIRef) and not _standard(c)}
+    required_properties = {c for k in (OWL + "ObjectProperty", OWL + "DatatypeProperty", RDF + "Property")
+                           for c in data.subjects(URIRef(RDF + "type"), URIRef(k)) if isinstance(c, URIRef) and not _standard(c)}
     for s_, p_, o_ in model:
         if isinstance(s_, BNode) or isinstance(o_, BNode):
             out.append(f"{MODEL} holds a blank node. A drafted model names every thing it states, and its cardinalities "
                        "live in the shapes; other OWL constructs need a specialist")
-        elif str(p_).startswith(ns) and str(p_) not in {str(t) for t in draft.of_kind("property")}:
+        elif str(p_).startswith(ns) and p_ not in named:
             pass   # a name the draft does not define: the check of the names below says so
+        elif str(p_).startswith(ns) and p_ not in properties:
+            out.append(f"{MODEL} uses {curie(spec, p_)} as a predicate, and it is not a property of the draft")
         elif str(p_).startswith(ns):
             if s_ not in individuals:
                 out.append(f"{MODEL} uses the property {curie(spec, p_)} on {curie(spec, s_)}: a draft uses its own "
@@ -383,9 +401,26 @@ def problems(draft, known):
             out.append(f"{MODEL} uses {curie(spec, p_)}, which a drafted model does not take. It takes names, definitions, "
                        "citations, domains, ranges, rdfs:subClassOf, rdfs:subPropertyOf and owl:disjointWith; other "
                        "modelling needs a specialist")
-        elif str(p_) == RDF + "type" and str(o_) not in KINDS and _standard(o_):
-            out.append(f"{MODEL} types {curie(spec, s_)} as {curie(spec, o_)}, which a drafted model does not take. A term "
-                       "is a class, an object property, a datatype property or a named individual")
+        elif str(p_) == RDF + "type":
+            if s_ in individuals:
+                fits = str(o_) == OWL + "NamedIndividual" or o_ in classes or o_ in required_classes
+            else:
+                fits = str(o_) in KINDS
+            if not fits:
+                out.append(f"{MODEL} types {curie(spec, s_)} as {curie(spec, o_)}, which a drafted model does not take. "
+                           "A class or a property takes only its kind; an individual takes owl:NamedIndividual and a "
+                           "class of the module or of a module it requires")
+        elif str(p_) in SCHEMA:
+            subjects, objects, what = SCHEMA[str(p_)]
+            ok_subject = s_ in (classes if subjects == "class" else properties)
+            if str(p_) == RDFS + "range" and (s_, URIRef(RDF + "type"), URIRef(OWL + "DatatypeProperty")) in model:
+                ok_object = str(o_).startswith(XSD) or str(o_) == RDF + "langString"
+            elif objects == "class":
+                ok_object = o_ in classes or o_ in required_classes
+            else:
+                ok_object = o_ in properties or o_ in required_properties
+            if not ok_subject or not ok_object:
+                out.append(f"{MODEL}: {curie(spec, s_)} {curie(spec, p_)} {curie(spec, o_)} is not taken. {what}")
     for p in draft.of_kind("property"):
         c = curie(spec, p)
         domains, ranges = list(model.objects(p, URIRef(RDFS + "domain"))), list(model.objects(p, URIRef(RDFS + "range")))
@@ -608,17 +643,33 @@ def gate_1(draft, data, release_shapes):
     return ok, lines
 
 
-def gate_2(draft, data):
-    """(consistent, the lines): the OWL 2 RL closure of the model, the passing examples and the required modules."""
+def _closure(graph):
     import owlrl
+    owlrl.DeductiveClosure(owlrl.OWLRL_Semantics, axiomatic_triples=False, datatype_axioms=False).expand(graph)
+    return graph
+
+
+def gate_2(draft, data):
+    """(passed, the lines). The OWL 2 RL closure of the model, the passing examples and the required modules must be
+    consistent, and must hold no triple about a term of the release that the closure of the required modules alone
+    does not hold: a draft adds terms of its own, and changes what no term of the release means, by any route."""
     from owlrl.Namespaces import ERRNS
-    g = _joined(data, draft.model, draft.passing)
-    owlrl.DeductiveClosure(owlrl.OWLRL_Semantics, axiomatic_triples=False, datatype_axioms=False).expand(g)
+    from rdflib import URIRef
+    g = _closure(_joined(data, draft.model, draft.passing))
     errors = sorted(str(o) for o in g.objects(None, ERRNS.error))
-    if not errors:
-        return True, ["the OWL 2 RL reasoner (owlrl) finds the model, the passing examples and the modules the module "
-                      "requires consistent"]
-    return False, [f"the OWL 2 RL reasoner (owlrl) finds a contradiction: {e}" for e in errors[:5]]
+    lines = [f"the OWL 2 RL reasoner (owlrl) finds a contradiction: {e}" for e in errors[:5]]
+    before = _closure(_joined(data))
+    own = (namespace(draft.spec), examples_namespace(draft.spec))
+    changed = sorted((t for t in g if isinstance(t[0], URIRef) and not str(t[0]).startswith(own)
+                      and not _standard(t[0]) and t[1] != ERRNS.error and t not in before), key=str)
+    for s, p, o in changed[:5]:
+        lines.append(f"the draft would change the release term {curie(draft.spec, s)}: the reasoner then finds "
+                     f"{curie(draft.spec, s)} {curie(draft.spec, p)} {curie(draft.spec, o)}, which the release alone does "
+                     "not say")
+    if lines:
+        return False, lines
+    return True, ["the OWL 2 RL reasoner (owlrl) finds the model, the passing examples and the modules the module "
+                  "requires consistent, and the draft changes no term of the release"]
 
 
 def gate_4(draft):
@@ -658,7 +709,7 @@ def gates(draft, ontology=ONTOLOGY):
     """[{gate, name, passed, results}] of gates 1, 2 and 4, run against the newest packages of the required modules.
     Raises DraftError when the draft does not have the form the pattern needs."""
     data, release_shapes = context(draft.spec, ontology)
-    found = problems(draft, {str(s) for s in data.subjects()} | {str(s) for s in release_shapes.subjects()})
+    found = problems(draft, {str(s) for s in data.subjects()} | {str(s) for s in release_shapes.subjects()}, data)
     if found:
         raise DraftError("the draft does not have the form the pattern needs:\n  " + "\n  ".join(found))
     out = []
