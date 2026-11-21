@@ -122,6 +122,7 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   business_architecture/ontology/projection/skill-run/test_skill_run.py \
   business_architecture/ontology/projection/test_empty_stores.py \
   business_architecture/ontology/projection/test_logical_models.py \
+  business_architecture/ontology/projection/test_neo4j_spec.py \
   business_architecture/ontology/projection/test_pipeline.py \
   business_architecture/ontology/projection/test_subgraph.py \
   business_architecture/ontology/projection/test_sync_stores.py \

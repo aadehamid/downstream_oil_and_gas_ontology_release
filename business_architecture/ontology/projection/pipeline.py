@@ -3,8 +3,8 @@
 The one loader is the ontology-to-lpg skill's run_projection.py (skill-run/README.md). What stays here runs in CI and
 needs no database:
 
-    python3 pipeline.py build                    # check the rules, validate, write projection-manifest.json
-    python3 pipeline.py build --verify           # fail unless the manifest matches a fresh build
+    python3 pipeline.py build                    # check the rules, validate, write projection-manifest.json and neo4j-spec.json
+    python3 pipeline.py build --verify           # fail unless both match a fresh build and the document fits its schema
     python3 pipeline.py record --run <output folder>   # after a driver run on these inputs: take its inferred.nt and a summary
                                                  # of its report into this folder, then rewrite the manifest
 
@@ -20,8 +20,9 @@ Where the KPI Store uses this file:
   shape files that belong to no package.
 - sync_stores.py reads the manifest's input_fingerprint: it is one of the three facts a store's marker must match.
 
-build reads the packages' Turtle, the shape files and inferred.nt. It writes projection-manifest.json and no other
-file, and with --verify it writes nothing. record also writes inferred.nt and projection-report.json. Neither opens
+build reads the packages' Turtle, the shape files and inferred.nt. It writes projection-manifest.json and the Neo4j
+specification document neo4j-spec.json (neo4j_spec.py), and no other file; with --verify it writes nothing and also
+checks the document against the specification's 1.1.0 JSON Schema. record also writes inferred.nt and projection-report.json. Neither opens
 a database.
 """
 import argparse
@@ -333,14 +334,25 @@ def main():
     if args.cmd == "build":
         loadable, inferred, manifest = build()
         print(f"Step 1 passed; loadable.nt {loadable.count(chr(10))} triples, inferred.nt {inferred.count(chr(10))}")
+        import neo4j_spec   # imported here: it imports this module
+        spec = neo4j_spec.text()
         if args.verify:
             if not os.path.exists(MANIFEST) or open(MANIFEST, encoding="utf-8").read() != manifest:
                 sys.exit("projection-manifest.json is not current: run pipeline.py build")
             print("projection-manifest.json is current")
+            if not os.path.exists(neo4j_spec.SPEC) or open(neo4j_spec.SPEC, encoding="utf-8").read() != spec:
+                sys.exit("neo4j-spec.json is not current: run pipeline.py build")
+            problems = neo4j_spec.schema_problems(json.loads(spec))
+            if problems:
+                sys.exit("neo4j-spec.json breaks the specification's 1.1.0 schema:\n  " + "\n  ".join(problems))
+            print("neo4j-spec.json is current and conforms to the specification's 1.1.0 schema")
         else:
             with open(MANIFEST, "w", encoding="utf-8", newline="\n") as f:
                 f.write(manifest)
             print("wrote projection-manifest.json")
+            with open(neo4j_spec.SPEC, "w", encoding="utf-8", newline="\n") as f:
+                f.write(spec)
+            print("wrote neo4j-spec.json")
     else:
         record(os.path.expanduser(args.run))
 
