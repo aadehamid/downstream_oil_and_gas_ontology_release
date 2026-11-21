@@ -37,6 +37,7 @@ Ontology Owner's signature beside the Data Owner's and the Architect's.
 """
 import ast
 import importlib.util
+import json
 import re
 from pathlib import Path
 
@@ -80,6 +81,26 @@ NAME_LIMIT = 40   # the module's key names a folder, a package and a prefix
 MODULE_KEY = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")   # a Turtle prefix starts with a letter
 # The prefixes a new module's files bind beside its own: its terms or items, and its shapes.
 RESERVED_PREFIXES = {"term", "item", "sh", "shp"} | set(STANDARD_PREFIXES)
+# The projection's run configuration, whose separator the Neo4j load writes between a prefix and a local name.
+RUN_CONFIG = Path("projection") / "skill-run" / "epm-run.json"
+N10S_SEPARATOR = "__"   # what n10s writes when the run configuration names no separator
+
+
+def prefix_of(key):
+    """The prefix a module's key gives: the key with its hyphens dropped, so crack-spreads gives crackspreads. An
+    underscore in place of each hyphen would be refused by the Neo4j load, which names a term as the prefix, the
+    separator and the local name, and so refuses a prefix that holds the separator (the ontology-to-lpg skill's
+    build.check_prefixes)."""
+    return key.replace("-", "")
+
+
+def _separator(root):
+    """The separator the projection's run configuration names, as the Neo4j load reads it."""
+    path = Path(root) / cut.ONTOLOGY / RUN_CONFIG
+    try:
+        return json.loads(path.read_text(encoding="utf-8")).get("separator") or N10S_SEPARATOR
+    except (OSError, ValueError):
+        raise ChangeRefused(f"{path} cannot be read: this release cannot make a new module") from None
 
 
 # ---- the release's own pattern code ------------------------------------------------------------------
@@ -438,7 +459,11 @@ def module_settings(key, pattern, title, description, citation, root, release):
     if key in _modules_table(root) or (root / cut.ONTOLOGY / key).exists() or \
             (root / cut.ONTOLOGY / "releases" / key).exists():
         raise ChangeRefused(f"the release holds a module or a folder named {key} already. Give the module another name")
-    prefix = key.replace("-", "_")
+    prefix = prefix_of(key)
+    sep = _separator(root)
+    if sep in prefix or N10S_SEPARATOR in prefix:
+        raise ChangeRefused(f"the prefix {prefix} that the module's name gives holds {sep!r} or two underscores, which "
+                            "the Neo4j load writes between a prefix and a name. Give the module another name")
     spec = {"module": key, "pattern": pattern, "prefix": prefix, "title": title, "description": description,
             "citation": citation}
     for text in spec["title"], spec["description"], spec["citation"]:

@@ -35,7 +35,7 @@ from kpi_store.tests.test_propose_apply import NOW, git, no_global_git  # noqa: 
 ROOT = support.ROOT
 SAMPLE_DRAFT = ROOT / "kpi_store" / "ai" / "sample-draft.json"
 SAMPLE_REVIEW = ROOT / "kpi_store" / "ai" / "sample-review.json"
-P = "sample_tank_inspections"
+P = "sampletankinspections"
 APPROVED = {"approved_by": "An IT Approver", "approved_on": "2026-11-20"}
 DRAFTER = ls.AI("by-hand", assistant="Genie Code", family="claude", **APPROVED)
 REVIEWER = ls.AI("by-hand", assistant="A second assistant", family="gpt", **APPROVED)
@@ -429,42 +429,42 @@ def test_the_settings_name_the_reviewer_in_ai_reviewer_and_refuse_a_key_there(tm
 R1 = [
     # 1: a SHACL rule, or any term outside SHACL Core, in the shapes
     ({"shapes": sample()["shapes"].replace(
-        "sh:targetClass sample_tank_inspections:TankInspection ;",
-        "sh:targetClass sample_tank_inspections:TankInspection ;\n"
+        "sh:targetClass sampletankinspections:TankInspection ;",
+        "sh:targetClass sampletankinspections:TankInspection ;\n"
         "    sh:rule [ a sh:TripleRule ; sh:subject sys:System ; sh:predicate rdfs:comment ; sh:object \"x\" ] ;")},
      "not a term of SHACL Core"),
     # 2: a SERVICE written with an escape, and a module term in a comment only
     ({"questions": [dict(sample()["questions"][0], sparql=
-        "SELECT ?i WHERE { S\\u0045RVICE <http://127.0.0.1:9/sparql> { ?s ?p ?o } ?i a sample_tank_inspections:TankInspection }")]},
+        "SELECT ?i WHERE { S\\u0045RVICE <http://127.0.0.1:9/sparql> { ?s ?p ?o } ?i a sampletankinspections:TankInspection }")]},
      "SERVICE"),
-    ({"questions": [dict(sample()["questions"][0], sparql="# sample_tank_inspections:TankInspection\nASK { ?s ?p ?o }",
+    ({"questions": [dict(sample()["questions"][0], sparql="# sampletankinspections:TankInspection\nASK { ?s ?p ?o }",
                          expected=True)]}, "names no term of the module"),
     ({"questions": [dict(sample()["questions"][0], sparql=
-        "CONSTRUCT { ?i ?p ?o } WHERE { ?i a sample_tank_inspections:TankInspection ; ?p ?o }")]}, "SELECT or ASK"),
+        "CONSTRUCT { ?i ?p ?o } WHERE { ?i a sampletankinspections:TankInspection ; ?p ?o }")]}, "SELECT or ASK"),
     # 3 and 5: a shape not typed sh:NodeShape, an orphan property shape, a nested one, a deactivated one
-    ({"shapes": sample()["shapes"] + "\nshp:Hidden sh:targetClass sample_tank_inspections:TankInspection ;\n"
-      "    sh:property [ sh:path sample_tank_inspections:recordedIn ; sh:maxCount 1 ] .\n"}, "typed sh:NodeShape"),
+    ({"shapes": sample()["shapes"] + "\nshp:Hidden sh:targetClass sampletankinspections:TankInspection ;\n"
+      "    sh:property [ sh:path sampletankinspections:recordedIn ; sh:maxCount 1 ] .\n"}, "typed sh:NodeShape"),
     ({"shapes": sample()["shapes"].replace(
-        "sh:path sample_tank_inspections:recordedIn ; sh:minCount 1 ; sh:maxCount 1 ;", "sh:path sample_tank_inspections:recordedIn ;")
-      + "\nshp:Orphan a sh:PropertyShape ; sh:path sample_tank_inspections:recordedIn ; sh:minCount 1 .\n"},
+        "sh:path sampletankinspections:recordedIn ; sh:minCount 1 ; sh:maxCount 1 ;", "sh:path sampletankinspections:recordedIn ;")
+      + "\nshp:Orphan a sh:PropertyShape ; sh:path sampletankinspections:recordedIn ; sh:minCount 1 .\n"},
      "sh:PropertyShape|blank node reached"),
     ({"shapes": sample()["shapes"].replace(
         "sh:message \"An inspection has exactly one date.\" ]",
         "sh:message \"An inspection has exactly one date.\" ;\n"
-        "                  sh:property [ sh:path sample_tank_inspections:inspectionDate ; sh:minCount 1 ] ]")},
+        "                  sh:property [ sh:path sampletankinspections:inspectionDate ; sh:minCount 1 ] ]")},
      "nested"),
     ({"shapes": sample()["shapes"].replace("sh:targetClass", "sh:deactivated true ;\n    sh:targetClass")}, "sh:deactivated"),
     # 4: sameAs to a term of the release
-    ({"model": sample()["model"] + "\nsample_tank_inspections:Alias a owl:NamedIndividual ; rdfs:label \"alias\"@en ;\n"
+    ({"model": sample()["model"] + "\nsampletankinspections:Alias a owl:NamedIndividual ; rdfs:label \"alias\"@en ;\n"
       "    skos:definition \"An alias.\"@en ; owl:sameAs system:aps-planning-db .\n"}, "owl:sameAs"),
     # 6: an example with a blank-node subject
     ({"examples": {"pass": sample()["examples"]["pass"] + "[] a sys:System .\n", "fail": sample()["examples"]["fail"]}},
      "blank node"),
     # 9: a term of two kinds, and an individual with two labels
-    ({"model": sample()["model"] + "\nsample_tank_inspections:TankA a owl:NamedIndividual ;\n"
+    ({"model": sample()["model"] + "\nsampletankinspections:TankA a owl:NamedIndividual ;\n"
       "    rdfs:label \"Tank A\"@en, \"Primary tank\"@en ; skos:definition \"A made-up tank.\"@en .\n"}, "exactly one English label"),
-    ({"model": sample()["model"].replace("sample_tank_inspections:TankInspection a owl:Class ;",
-                                         "sample_tank_inspections:TankInspection a owl:Class, owl:NamedIndividual ;")},
+    ({"model": sample()["model"].replace("sampletankinspections:TankInspection a owl:Class ;",
+                                         "sampletankinspections:TankInspection a owl:Class, owl:NamedIndividual ;")},
      "one kind"),
 ]
 
@@ -476,8 +476,8 @@ def test_round_1_the_pattern_refuses_what_the_review_found(change, message):
 
 
 def test_round_1_a_query_may_name_a_variable_from():
-    q = dict(sample()["questions"][0], sparql="SELECT ?inspection ?from WHERE { ?inspection a sample_tank_inspections:TankInspection ;"
-             " sample_tank_inspections:recordedIn system:aps-planning-db ; sample_tank_inspections:inspectionDate ?from }")
+    q = dict(sample()["questions"][0], sparql="SELECT ?inspection ?from WHERE { ?inspection a sampletankinspections:TankInspection ;"
+             " sampletankinspections:recordedIn system:aps-planning-db ; sampletankinspections:inspectionDate ?from }")
     assert gates_of(sample(questions=[q]))[1]["passed"]
 
 
@@ -524,7 +524,7 @@ def test_round_1_a_resumed_draft_checks_the_families_and_gates_before_the_review
 
 # ---------- the second review's findings ----------
 
-SEE = "\nsample_tank_inspections:TankInspection rdfs:seeAlso [\n    {} ] .\n"
+SEE = "\nsampletankinspections:TankInspection rdfs:seeAlso [\n    {} ] .\n"
 R2 = [
     # 4 and 6: blank nodes and terms outside the model's allowlist
     (SEE.format("owl:unionOf ( sys:System ) ;\n    rdfs:subClassOf [ a owl:Restriction ; owl:onProperty rdfs:comment ; "
@@ -534,9 +534,9 @@ R2 = [
     (SEE.format("owl:sourceIndividual system:aps-planning-db ; owl:assertionProperty rdfs:comment ; "
                 "owl:targetValue \"blocked\"@en"), "blank node"),
     (SEE.format("a sys:System"), "blank node"),
-    ("\nsample_tank_inspections:TankInspection rdfs:seeAlso sys:System .\n", "rdfs:seeAlso"),
-    ("\nsample_tank_inspections:recordedIn a owl:FunctionalProperty .\n", "owl:FunctionalProperty"),
-    ("\nsample_tank_inspections:TankInspection sample_tank_inspections:recordedIn system:aps-planning-db .\n",
+    ("\nsampletankinspections:TankInspection rdfs:seeAlso sys:System .\n", "rdfs:seeAlso"),
+    ("\nsampletankinspections:recordedIn a owl:FunctionalProperty .\n", "owl:FunctionalProperty"),
+    ("\nsampletankinspections:TankInspection sampletankinspections:recordedIn system:aps-planning-db .\n",
      "only on the module's own individuals"),
 ]
 
@@ -548,9 +548,9 @@ def test_round_2_the_model_takes_only_its_allowlist(more, message):
 
 
 @pytest.mark.parametrize("sparql,expected", [
-    ("SELECT ?s ?i WHERE { ?s ^sample_tank_inspections:recordedIn ?i }", [["system:aps-planning-db", "ex:inspection-1"]]),
-    ("SELECT ?i ?l WHERE { ?i sample_tank_inspections:recordedIn/skos:prefLabel ?l }", [["ex:inspection-1", "APS Planning DB"]]),
-    ("SELECT ?i ?d WHERE { ?i sample_tank_inspections:inspectionDate+ ?d }", [["ex:inspection-1", "2026-11-02"]]),
+    ("SELECT ?s ?i WHERE { ?s ^sampletankinspections:recordedIn ?i }", [["system:aps-planning-db", "ex:inspection-1"]]),
+    ("SELECT ?i ?l WHERE { ?i sampletankinspections:recordedIn/skos:prefLabel ?l }", [["ex:inspection-1", "APS Planning DB"]]),
+    ("SELECT ?i ?d WHERE { ?i sampletankinspections:inspectionDate+ ?d }", [["ex:inspection-1", "2026-11-02"]]),
 ])
 def test_round_2_a_question_may_name_a_module_term_in_a_property_path(sparql, expected):
     q = dict(sample()["questions"][0], sparql=sparql, expected=expected)

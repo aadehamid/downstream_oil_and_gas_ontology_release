@@ -343,6 +343,35 @@ def test_split_refuses_a_module_whose_prefix_is_taken_or_reserved(lines, facts, 
         nm.split([nm.kgcl.read_line(line) for line in lines], renamed(facts, key, title), ROOT)
 
 
+def test_a_hyphenated_module_name_gives_a_prefix_the_neo4j_load_accepts():
+    """The prefix is the key with its hyphens dropped. The Neo4j load refuses a prefix that holds its separator, so
+    the old form, an underscore for each hyphen, would make a release the load refuses."""
+    import importlib.util
+    scripts = ROOT / "skills" / "ontology-to-lpg" / "scripts"
+    sys.path.insert(0, str(scripts))
+    try:
+        spec = importlib.util.spec_from_file_location("kpi_store_test_lpg_build", scripts / "build.py")
+        build = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(build)
+    finally:
+        sys.path.remove(str(scripts))
+    sep = nm._separator(ROOT)
+    assert sep == json.loads((ROOT / cut.ONTOLOGY / nm.RUN_CONFIG).read_text(encoding="utf-8"))["separator"] == "_"
+    release = sorted(nm._taken_prefixes(ROOT))
+    for key in ("sample-tank-inspections", "crack-spreads", "tier-a"):
+        assert nm.prefix_of(key) == key.replace("-", "")
+        build.check_prefixes(release + [nm.prefix_of(key)], sep)   # no Refusal
+        with pytest.raises(build.Refusal):
+            build.check_prefixes(release + [key.replace("-", "_")], sep)
+
+
+@needs_fresh
+def test_split_refuses_a_prefix_that_holds_the_load_s_separator(monkeypatch):
+    monkeypatch.setattr(nm, "_separator", lambda root: "er")   # a separator that the prefix "termsofx" holds
+    with pytest.raises(ChangeRefused, match="the prefix termsofx that the module's name gives holds 'er' or two underscores"):
+        nm.split([nm.kgcl.read_line(line) for line in TERM_LINES], renamed(TERM_FACTS, "terms-of-x", "Terms of X"), ROOT)
+
+
 @needs_fresh
 def test_registering_refuses_a_prefix_the_release_binds_already():
     spec, rows = nm.split([nm.kgcl.read_line(line) for line in TERM_LINES], TERM_FACTS, ROOT)
@@ -509,7 +538,7 @@ def test_a_table_row_with_too_few_or_too_many_cells_is_refused_in_words(tmp_path
 def test_a_title_with_quotes_gives_builder_and_test_files_that_parse(title):
     import ast
     mp = nm.patterns(ROOT)
-    spec = {"module": "tier-a", "pattern": "vocabulary", "prefix": "tier_a", "title": title, "description": "D.",
+    spec = {"module": "tier-a", "pattern": "vocabulary", "prefix": "tiera", "title": title, "description": "D.",
             "citation": "C."}
     for text in (mp.builder_text(spec, "NM-8"), mp.test_text(spec, [{"term_id": "a", "name": "A"}])):
         assert title in ast.get_docstring(ast.parse(text))

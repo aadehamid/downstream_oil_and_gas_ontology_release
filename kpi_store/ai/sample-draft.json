@@ -1,11 +1,11 @@
 {
-  "model": "sample_tank_inspections:TankInspection a owl:Class ;\n    rdfs:label \"tank inspection\"@en ;\n    skos:definition \"A made-up check of the condition of one storage tank on one date, whose record a system holds.\"@en ;\n    owl:disjointWith sys:System .\n\nsample_tank_inspections:inspectionDate a owl:DatatypeProperty ;\n    rdfs:label \"inspection date\"@en ;\n    skos:definition \"The date on which the inspection took place.\"@en ;\n    rdfs:domain sample_tank_inspections:TankInspection ;\n    rdfs:range xsd:date .\n\nsample_tank_inspections:recordedIn a owl:ObjectProperty ;\n    rdfs:label \"recorded in\"@en ;\n    skos:definition \"The system that holds the record of the inspection.\"@en ;\n    rdfs:domain sample_tank_inspections:TankInspection ;\n    rdfs:range sys:System .\n",
-  "shapes": "shp:TankInspection a sh:NodeShape ;\n    sh:targetClass sample_tank_inspections:TankInspection ;\n    sh:property [ sh:path sample_tank_inspections:inspectionDate ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:date ;\n                  sh:message \"An inspection has exactly one date.\" ] ;\n    sh:property [ sh:path sample_tank_inspections:recordedIn ; sh:minCount 1 ; sh:maxCount 1 ; sh:class sys:System ;\n                  sh:message \"An inspection is recorded in exactly one system of the system module.\" ] .\n",
+  "model": "sampletankinspections:TankInspection a owl:Class ;\n    rdfs:label \"tank inspection\"@en ;\n    skos:definition \"A made-up check of the condition of one storage tank on one date, whose record a system holds.\"@en ;\n    owl:disjointWith sys:System .\n\nsampletankinspections:inspectionDate a owl:DatatypeProperty ;\n    rdfs:label \"inspection date\"@en ;\n    skos:definition \"The date on which the inspection took place.\"@en ;\n    rdfs:domain sampletankinspections:TankInspection ;\n    rdfs:range xsd:date .\n\nsampletankinspections:recordedIn a owl:ObjectProperty ;\n    rdfs:label \"recorded in\"@en ;\n    skos:definition \"The system that holds the record of the inspection.\"@en ;\n    rdfs:domain sampletankinspections:TankInspection ;\n    rdfs:range sys:System .\n",
+  "shapes": "shp:TankInspection a sh:NodeShape ;\n    sh:targetClass sampletankinspections:TankInspection ;\n    sh:property [ sh:path sampletankinspections:inspectionDate ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:date ;\n                  sh:message \"An inspection has exactly one date.\" ] ;\n    sh:property [ sh:path sampletankinspections:recordedIn ; sh:minCount 1 ; sh:maxCount 1 ; sh:class sys:System ;\n                  sh:message \"An inspection is recorded in exactly one system of the system module.\" ] .\n",
   "questions": [
     {
       "id": "CQ1",
       "question": "Which inspections does a system hold the record of, and on which date did each take place?",
-      "sparql": "SELECT ?inspection ?date WHERE { ?inspection a sample_tank_inspections:TankInspection ; sample_tank_inspections:recordedIn system:aps-planning-db ; sample_tank_inspections:inspectionDate ?date }",
+      "sparql": "SELECT ?inspection ?date WHERE { ?inspection a sampletankinspections:TankInspection ; sampletankinspections:recordedIn system:aps-planning-db ; sampletankinspections:inspectionDate ?date }",
       "expected": [
         [
           "ex:inspection-1",
@@ -15,37 +15,37 @@
     }
   ],
   "examples": {
-    "pass": "ex:inspection-1 a sample_tank_inspections:TankInspection ;\n    sample_tank_inspections:inspectionDate \"2026-11-02\"^^xsd:date ;\n    sample_tank_inspections:recordedIn system:aps-planning-db .\n",
+    "pass": "ex:inspection-1 a sampletankinspections:TankInspection ;\n    sampletankinspections:inspectionDate \"2026-11-02\"^^xsd:date ;\n    sampletankinspections:recordedIn system:aps-planning-db .\n",
     "fail": [
       {
         "id": "F1",
         "breaks": "an inspection without a date",
         "shape": "shp:TankInspection",
         "add": "",
-        "remove": "ex:inspection-1 sample_tank_inspections:inspectionDate \"2026-11-02\"^^xsd:date ."
+        "remove": "ex:inspection-1 sampletankinspections:inspectionDate \"2026-11-02\"^^xsd:date ."
       },
       {
         "id": "F2",
         "breaks": "an inspection recorded in something that is not a system",
         "shape": "shp:TankInspection",
-        "add": "ex:inspection-1 sample_tank_inspections:recordedIn ex:a-paper-note .",
-        "remove": "ex:inspection-1 sample_tank_inspections:recordedIn system:aps-planning-db ."
+        "add": "ex:inspection-1 sampletankinspections:recordedIn ex:a-paper-note .",
+        "remove": "ex:inspection-1 sampletankinspections:recordedIn system:aps-planning-db ."
       }
     ]
   },
   "summary": [
     {
-      "term": "sample_tank_inspections:TankInspection",
+      "term": "sampletankinspections:TankInspection",
       "meaning": "One check of one storage tank's condition on one date. It is never a system itself.",
       "example": "The check of a made-up tank on 2 November 2026, recorded in the APS planning database."
     },
     {
-      "term": "sample_tank_inspections:inspectionDate",
+      "term": "sampletankinspections:inspectionDate",
       "meaning": "The day the check took place.",
       "example": "2026-11-02."
     },
     {
-      "term": "sample_tank_inspections:recordedIn",
+      "term": "sampletankinspections:recordedIn",
       "meaning": "The system that keeps the record of the check. It must be a system the ontology lists.",
       "example": "The APS planning database."
     },

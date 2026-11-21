@@ -431,7 +431,7 @@ def _new_module(lists, intake, report):
         lines.append(f'N1: the short key "{module}" is longer than {new_module.NAME_LIMIT} characters. Give the module a shorter name')
     elif not new_module.MODULE_KEY.fullmatch(module):
         lines.append(f'N1: the short key "{module}" must start with a letter. Give the module a name that starts with a letter')
-    elif module.replace("-", "_") in new_module.RESERVED_PREFIXES:
+    elif new_module.prefix_of(module) in new_module.RESERVED_PREFIXES:
         lines.append(f'N1: "{module}" is a prefix the ontology keeps for itself. Give the module another name')
     if not lines and pattern == new_module.VOCABULARY:
         try:
