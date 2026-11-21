@@ -32,6 +32,7 @@ the command again with --ai-answer <that file>; steps 3 to 6 are then the same.
 
 Without --ai, and with no record beside the form, the propose command is exactly as it was.
 """
+import contextlib
 import datetime as dt
 import hashlib
 import json
@@ -241,6 +242,21 @@ def choose(found, asked, choices_file=None, ask=input, say=print):
     return out
 
 
+def _write_whole(path, text):
+    """Writes the text to <name>.tmp, then puts that file in the place of <name>, so that no part of a file ever has
+    the real name. Refuses when <name>.tmp exists already, and removes only the .tmp file it wrote."""
+    tmp = path.with_name(path.name + ".tmp")
+    if tmp.exists() or tmp.is_symlink():
+        raise FileExistsError(f"{tmp.name} is in the way: move it, then run the command again")
+    try:
+        tmp.write_text(text, encoding="utf-8", newline="\n")
+        os.replace(tmp, path)
+    except OSError:
+        with contextlib.suppress(OSError):
+            tmp.unlink()
+        raise
+
+
 def _settings(stores, root, environ):
     """[ai] of the local settings file, refused when the file is inside the release folder the command was given."""
     from kpi_store import local_settings
@@ -313,28 +329,19 @@ def run(form_path, release_root=".", stores=None, answer_file=None, choices_file
               "prompt_sha256": sha256(prompt), "output_sha256": output,
               "suggestions": [dict(s, accepted=a) for s, a in zip(found, accepted)]}
     approval.check_ai(record, step=True)
-    # The record first: a form that took an AI answer always has its record beside it. A write that fails leaves
-    # neither a part of the record nor a new form behind.
-    with record_path.open("x", encoding="utf-8", newline="\n") as f:
-        try:
-            f.write(json.dumps(record, ensure_ascii=False, indent=2) + "\n")
-        except OSError:
-            f.close()
-            record_path.unlink(missing_ok=True)
-            raise
+    # The record first, then the form, each written whole (_write_whole). If the form cannot be written, the record
+    # goes too, so a record is beside a form only when the form holds what the record says.
+    _write_whole(record_path, json.dumps(record, ensure_ascii=False, indent=2) + "\n")
     if any(accepted):
-        new = path.with_name(path.name + ".new")   # written whole, then put in the form's place
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             for s, a in zip(found, accepted):
                 if a:
                     data["answers"][s["question"]] = s["answer"]
-            with new.open("w", encoding="utf-8", newline="\n") as f:
-                f.write(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
-            os.replace(new, path)
+            _write_whole(path, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
         except OSError:
-            new.unlink(missing_ok=True)
-            record_path.unlink(missing_ok=True)
+            with contextlib.suppress(OSError):
+                record_path.unlink()
             raise
     took = sum(accepted)
     say(f"accepted {took} of {len(found)} suggestion{'s' if len(found) != 1 else ''}" +

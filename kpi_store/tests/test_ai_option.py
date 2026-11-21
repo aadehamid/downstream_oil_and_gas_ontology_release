@@ -738,32 +738,50 @@ def test_an_address_that_cannot_be_read_is_refused_in_a_plain_sentence():
             providers.ready(ls.AI("openai", model="m", key_env="K", url=url, **APPROVED))
 
 
-def test_a_failed_write_leaves_neither_a_new_form_nor_a_part_record(tmp_path, monkeypatch):
-    path = form(tmp_path)
+def _failing(monkeypatch, step, which):
+    """Makes one step of writing one file fail: `step` is "write" or "replace", and `which` is "record" or "form"."""
+    ending = suggest.RECORD_SUFFIX if which == "record" else ".term-change.json"
+    hit = lambda p: Path(p).name.removesuffix(".tmp").endswith(ending)
+    if step == "write":
+        real = Path.write_text
+
+        def write_text(self, *args, **kwargs):
+            if self.name.endswith(".tmp") and hit(self):
+                self.open("w").close()   # the disk took the file's name, then filled up
+                raise OSError(28, "No space left on device")
+            return real(self, *args, **kwargs)
+        monkeypatch.setattr(Path, "write_text", write_text)
+    else:
+        real = os.replace
+
+        def replace(src, dst):
+            if hit(dst):
+                raise PermissionError("the file is open in another program")
+            return real(src, dst)
+        monkeypatch.setattr(suggest.os, "replace", replace)
+
+
+@pytest.mark.parametrize("step, which", [("replace", "record"), ("replace", "form"), ("write", "record"),
+                                         ("write", "form"), ("directory", "form")])
+def test_a_failed_write_leaves_the_form_as_it_was_and_no_record(tmp_path, monkeypatch, step, which):
+    folder = tmp_path / "forms"
+    folder.mkdir()
+    path = form(folder)
     answer = tmp_path / "answer.json"
     answer.write_text(SAMPLE_TEXT, encoding="utf-8")
     given = choices(tmp_path)
     before = path.read_bytes()
-
-    def no_replace(src, dst):
-        raise PermissionError("the form is open in another program")
-    monkeypatch.setattr(suggest.os, "replace", no_replace)
+    kept = []
+    if step == "directory":   # a folder in the way of the form's .tmp file, which the command must leave alone
+        (folder / (path.name + ".tmp")).mkdir()
+        kept = [path.name + ".tmp"]
+    else:
+        _failing(monkeypatch, step, which)
     with pytest.raises(OSError):
         suggest.run(path, ROOT, ai=by_hand(), answer_file=answer, choices_file=given, say=quiet)
-    assert sorted(p.name for p in tmp_path.iterdir()) == ["answer.json", "choices.json", path.name]
-    assert path.read_bytes() == before
     monkeypatch.undo()
-
-    real = json.dumps
-
-    def full_disk(value, *args, **kwargs):
-        if isinstance(value, dict) and "prompt_sha256" in value:
-            raise OSError(28, "No space left on device")
-        return real(value, *args, **kwargs)
-    monkeypatch.setattr(suggest.json, "dumps", full_disk)
-    with pytest.raises(OSError):
-        suggest.run(path, ROOT, ai=by_hand(), answer_file=answer, choices_file=given, say=quiet)
-    assert sorted(p.name for p in tmp_path.iterdir()) == ["answer.json", "choices.json", path.name]
+    assert path.read_bytes() == before
+    assert sorted(p.name for p in folder.iterdir()) == sorted([path.name] + kept)
 
 
 def test_a_cli_token_that_is_not_text_or_is_blank_is_no_token(tmp_path, stub, monkeypatch):
