@@ -21,6 +21,7 @@ class and property has one English label, one English definition and a citation;
 range and a shape that gives its cardinality; every term is in the module's namespace, so a draft changes nothing the
 release holds; every other name it uses is a standard one or a term of a module it requires; every shape targets a
 term of the module only; example data names only things of its own; and no query can reach a network.
+model.ttl and shapes.ttl each take an allowlist: MODEL_PREDICATES and no blank node, and SHACL_CORE.
 
 The gates that code runs (gates()):
 
@@ -78,10 +79,12 @@ SHACL_CORE = {SH + t for t in (
     "ignoredProperties", "hasValue", "in", "message", "severity", "Violation", "Warning", "Info", "name",
     "description", "order")}
 SHAPE_PREDICATES = {RDF + "type", RDF + "first", RDF + "rest", RDFS + "label", RDFS + "comment"}
-# OWL forms a draft may not state: each one can change what a term of the release means without naming it as a subject.
-OWL_REFUSED = {OWL + t for t in ("sameAs", "equivalentClass", "equivalentProperty", "differentFrom", "AllDisjointClasses",
-                                 "AllDisjointProperties", "AllDifferent", "Axiom", "NegativePropertyAssertion",
-                                 "propertyDisjointWith", "inverseOf", "propertyChainAxiom", "hasKey")}
+# The predicates a drafted model may use, and nothing else: names, definitions and notes, the citation, domains,
+# ranges, the class and property hierarchy, and disjointness. The module's own properties may also be used, on its own
+# individuals. A drafted model holds no blank node: every thing has a name, and its cardinalities live in the shapes.
+MODEL_PREDICATES = {RDF + "type", RDFS + "label", RDFS + "comment", SKOS + "definition", SKOS + "altLabel",
+                    SKOS + "scopeNote", SKOS + "example", DCTERMS + "bibliographicCitation", DCTERMS + "source",
+                    RDFS + "domain", RDFS + "range", RDFS + "subClassOf", RDFS + "subPropertyOf", OWL + "disjointWith"}
 KINDS = {OWL + "Class": "class", OWL + "ObjectProperty": "property", OWL + "DatatypeProperty": "property",
          OWL + "NamedIndividual": "individual"}
 TARGETS = ("targetClass", "targetNode", "targetSubjectsOf", "targetObjectsOf")
@@ -293,8 +296,15 @@ def _walk(x):
 def _iris(x):
     from rdflib import URIRef
     from rdflib.plugins.sparql.parserutils import CompValue
+    from rdflib.paths import AlternativePath, InvPath, MulPath, NegatedPath, SequencePath
     if isinstance(x, URIRef):
         yield x
+    elif isinstance(x, InvPath):          # ^p
+        yield from _iris(x.arg)
+    elif isinstance(x, MulPath):          # p+, p*, p?
+        yield from _iris(x.path)
+    elif isinstance(x, (SequencePath, AlternativePath, NegatedPath)):   # p/q, p|q, !p
+        yield from _iris(x.args)
     elif isinstance(x, (CompValue, dict)):
         for v in x.values():
             yield from _iris(v)
@@ -358,11 +368,24 @@ def problems(draft, known):
             continue
         if not list(model.objects(t, URIRef(DCTERMS + "bibliographicCitation"))):
             out.append(f"{MODEL}: {c} cites no source (dcterms:bibliographicCitation)")
+    individuals = set(draft.of_kind("individual"))
     for s_, p_, o_ in model:
-        for term in (p_, o_):
-            if str(term) in OWL_REFUSED:
-                out.append(f"{MODEL} uses {curie(spec, term)}. A draft may not state it, because it can change what a "
-                           "term of the release means; such modelling needs a specialist")
+        if isinstance(s_, BNode) or isinstance(o_, BNode):
+            out.append(f"{MODEL} holds a blank node. A drafted model names every thing it states, and its cardinalities "
+                       "live in the shapes; other OWL constructs need a specialist")
+        elif str(p_).startswith(ns) and str(p_) not in {str(t) for t in draft.of_kind("property")}:
+            pass   # a name the draft does not define: the check of the names below says so
+        elif str(p_).startswith(ns):
+            if s_ not in individuals:
+                out.append(f"{MODEL} uses the property {curie(spec, p_)} on {curie(spec, s_)}: a draft uses its own "
+                           "properties only on the module's own individuals")
+        elif str(p_) not in MODEL_PREDICATES:
+            out.append(f"{MODEL} uses {curie(spec, p_)}, which a drafted model does not take. It takes names, definitions, "
+                       "citations, domains, ranges, rdfs:subClassOf, rdfs:subPropertyOf and owl:disjointWith; other "
+                       "modelling needs a specialist")
+        elif str(p_) == RDF + "type" and str(o_) not in KINDS and _standard(o_):
+            out.append(f"{MODEL} types {curie(spec, s_)} as {curie(spec, o_)}, which a drafted model does not take. A term "
+                       "is a class, an object property, a datatype property or a named individual")
     for p in draft.of_kind("property"):
         c = curie(spec, p)
         domains, ranges = list(model.objects(p, URIRef(RDFS + "domain"))), list(model.objects(p, URIRef(RDFS + "range")))

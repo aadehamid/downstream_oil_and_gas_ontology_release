@@ -334,7 +334,7 @@ def run(form_path, release_root=".", stores=None, answer_file=None, review_file=
         if record["drafter"]["family"].strip().casefold() == reviewer.family.strip().casefold():
             raise AIRefused(f'the draft was made by a model of the family "{record["drafter"]["family"]}", and '
                             "[ai_reviewer] names the same family. Gate 3 needs a reviewer of another family")
-        if {g["gate"] for g in record["gates"] if g["passed"]} != {1, 2, 4}:
+        if not all(g["passed"] for g in record["gates"]) or sorted(g["gate"] for g in record["gates"]) != [1, 2, 4]:
             raise AIRefused(f"{record_path.name} does not show gates 1, 2 and 4 passed, so the draft goes to no reviewer. "
                             f"Delete it and the folder {folder.name}, and ask again")
     else:

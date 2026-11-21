@@ -520,3 +520,53 @@ def test_round_1_a_resumed_draft_checks_the_families_and_gates_before_the_review
     with pytest.raises(AIRefused, match="gate"):
         run(path)
     assert not prompt.exists()
+
+
+# ---------- the second review's findings ----------
+
+SEE = "\nsample_tank_inspections:TankInspection rdfs:seeAlso [\n    {} ] .\n"
+R2 = [
+    # 4 and 6: blank nodes and terms outside the model's allowlist
+    (SEE.format("owl:unionOf ( sys:System ) ;\n    rdfs:subClassOf [ a owl:Restriction ; owl:onProperty rdfs:comment ; "
+                "owl:hasValue \"altered\"@en ]"), "blank node"),
+    (SEE.format("owl:oneOf ( system:aps-planning-db ) ;\n    rdfs:subClassOf [ a owl:Restriction ; owl:onProperty "
+                "rdfs:comment ; owl:hasValue \"altered\"@en ]"), "blank node"),
+    (SEE.format("owl:sourceIndividual system:aps-planning-db ; owl:assertionProperty rdfs:comment ; "
+                "owl:targetValue \"blocked\"@en"), "blank node"),
+    (SEE.format("a sys:System"), "blank node"),
+    ("\nsample_tank_inspections:TankInspection rdfs:seeAlso sys:System .\n", "rdfs:seeAlso"),
+    ("\nsample_tank_inspections:recordedIn a owl:FunctionalProperty .\n", "owl:FunctionalProperty"),
+    ("\nsample_tank_inspections:TankInspection sample_tank_inspections:recordedIn system:aps-planning-db .\n",
+     "only on the module's own individuals"),
+]
+
+
+@pytest.mark.parametrize("more,message", R2)
+def test_round_2_the_model_takes_only_its_allowlist(more, message):
+    with pytest.raises(ChangeRefused, match=message):
+        gates_of(sample(model=sample()["model"] + more))
+
+
+@pytest.mark.parametrize("sparql,expected", [
+    ("SELECT ?s ?i WHERE { ?s ^sample_tank_inspections:recordedIn ?i }", [["system:aps-planning-db", "ex:inspection-1"]]),
+    ("SELECT ?i ?l WHERE { ?i sample_tank_inspections:recordedIn/skos:prefLabel ?l }", [["ex:inspection-1", "APS Planning DB"]]),
+    ("SELECT ?i ?d WHERE { ?i sample_tank_inspections:inspectionDate+ ?d }", [["ex:inspection-1", "2026-11-02"]]),
+])
+def test_round_2_a_question_may_name_a_module_term_in_a_property_path(sparql, expected):
+    q = dict(sample()["questions"][0], sparql=sparql, expected=expected)
+    found = gates_of(sample(questions=[q]))
+    assert found[1]["passed"], found[1]["results"]
+
+
+def test_round_2_a_resumed_draft_with_a_failed_gate_entry_goes_to_no_reviewer(tmp_path):
+    path = form(tmp_path)
+    run(path, answer_file=SAMPLE_DRAFT)
+    prompt = path.with_name(path.stem + draft.REVIEW_PROMPT)
+    prompt.unlink()
+    record_path = path.with_name(path.stem + drafted.RECORD_SUFFIX)
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    record["gates"].append(dict(record["gates"][0], passed=False))
+    record_path.write_text(json.dumps(record), encoding="utf-8")
+    with pytest.raises(AIRefused):
+        run(path)
+    assert not prompt.exists()
