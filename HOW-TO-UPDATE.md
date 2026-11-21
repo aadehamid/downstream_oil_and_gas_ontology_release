@@ -2103,7 +2103,7 @@ The form makes a module of one of two patterns:
 - a vocabulary: terms, each with a definition, other names and at most one broader term of the same vocabulary. The module holds them as a SKOS concept scheme of its own.
 - a reference table: items of a class that the ontology holds already, such as products, each with one value of each of a few properties that the ontology holds already. The form offers the classes whose items the ontology holds outside `ref-mpc`, and the properties of those classes.
 
-A module that needs a new class, a new property or a rule of its own needs a specialist: the form says so, and "Onboard another module" below is the specialist's path.
+A module that needs a new class, a new property or a rule of its own is new modelling. An AI can draft it under five extra gates, as "Draft new modelling with AI (optional)" below says. Without AI, it needs a specialist, and "Onboard another module" below is the specialist's path.
 
 The proposal holds each term or item as KGCL lines in `change.kgcl`: its name, its definition, its other names, its broader term, its class and its links to other items. `facts.csv` holds the module itself (its pattern, title, description and documents) and each text or value of an item that KGCL cannot write. The propose command builds the module in memory and runs every shape of the release over it, so a class's own rules, such as "a product is in the product list", stop a proposal that breaks them.
 
@@ -2304,9 +2304,248 @@ A reference table names a class in N8, picks properties in N9, and gives each it
 
 7. Run the full check, as in "Before you change anything", step 3. Then load the stores with the runner, as in step 11 of "The release steps".
 
+## Draft new modelling with AI (optional)
+
+Some modules need something the new-module form cannot make by itself: a new class, a new property or a rule of its own. This is called new modelling. In the form, N3 is then "Something else", and N13 asks you to say in your own words what the module must let people say. An AI then drafts the module, and a second AI checks the draft. Nobody writes a file of the ontology by hand.
+
+The draft is only a proposal. The AI applies nothing. It must pass five gates before the apply command takes it:
+
+| Gate | What must be true | Who checks it |
+|---|---|---|
+| 1 | Every competency question gives the answer the AI said it would give. Competency questions are SPARQL queries that the new module must be able to answer. The example data that should pass meets every rule, and each example that should fail breaks the rule it names. | The command |
+| 2 | A reasoner finds the new module, its examples and the modules it rests on consistent: no thing is, for example, in two classes that exclude each other. The reasoner is owlrl, the OWL 2 RL reasoner that comes with pyshacl. | The command |
+| 3 | A second AI, of another model family, reviews the draft against the ontology skill's rules and answers PASS or HOLD. A HOLD stops the proposal. | The second AI |
+| 4 | A summary says in plain words what each new class, property and rule means, with an example. | The command |
+| 5 | The Ontology Owner signs. The module's first release is 1.0.0, a major. | The Ontology Owner, and the command |
+
+The command also refuses a draft that changes anything the release holds already. A draft adds terms of its own only. It may use the release's classes and properties, but it cannot change them.
+
+The AI steps come before anyone signs, so that each signer reads the draft first. The propose command and the apply command then run gates 1, 2 and 4 again, and check that the form and the draft are as the AI steps saw them.
+
+The AI steps leave a record beside the form. For the drafter and the reviewer each, it names the provider, the model's family, the model and its version, the address called, who approved the provider and when, each skill file with its SHA-256, the SHA-256 of the prompt and the SHA-256 of the answer. It also holds the SHA-256 of each file of the draft and of the form's answers, the reviewer's verdict and findings, and the result of each gate. It keeps no text of the prompt. The proposal keeps the record in `approval.json`, under `"draft"`, and the apply command keeps it in the release's approval record.
+
+**Run the example below in a copy of the release, never in the folder you load the stores from.** It adds a made-up module to the ontology. The commands start in the top folder of the copy. Keep the form and the AI's files in a folder beside it. The example uses the folder `ai-modelling`.
+
+### Choose the two AI providers
+
+The drafter goes in the `[ai]` table of your local settings file, as in "Use AI to suggest answers (optional)", "Choose the provider". The reviewer goes in a second table, `[ai_reviewer]`, with the same keys. `kpi_store/stores.example.toml` shows both tables, switched off. The client's IT approves each provider once. Each table also names its model's family in `family`, such as `"claude"`, `"gpt"` or `"llama"`. The command refuses two tables of the same family, because gate 3 needs a second opinion from another kind of model.
+
+The by-hand provider works for both. The command then writes each prompt to a file. You give the file to an assistant, such as Genie Code, and save its answer to a file. Use two assistants that run models of two families.
+
+### The steps
+
+1. Fill in the new-module form and save it, but do not sign it. In N3, choose "Something else: a new class, a new property or a rule of its own". In N13, say what the module must let people say, with one example. Add the `[ai]` and `[ai_reviewer]` tables to your local settings file.
+
+   The example asks for a made-up module, Sample Tank Inspections: an inspection checks one storage tank on one date, and one system of the ontology holds its record. The document test writes the form and a settings file with only the two tables, with this block. If you saved the form from the HTML form, skip it, and name your own settings file in the commands below.
+
+   ```python run=ai-modelling
+   import json
+   from pathlib import Path
+
+   folder = Path("../ai-modelling")
+   folder.mkdir(exist_ok=True)
+   answers = {"N1": "Sample Tank Inspections",
+              "N2": "The made-up inspections of the storage tanks of a made-up terminal.",
+              "N3": "new-modelling", "N12": ["A made-up tank inspection procedure, 2026-11-20"],
+              "N13": "An inspection checks one storage tank on one date, and one system that the ontology lists "
+                     "holds its record. For example, the inspection of 2 November 2026 is recorded in the APS "
+                     "planning database."}
+   form = {"format": 1, "form": "new-module", "catalogue_version": "1.2", "kpi_name": "Sample Tank Inspections",
+           "request": {"number": "NM-2026-003", "date": "2026-11-20", "requester_role": "Data Owner", "invited": ""},
+           "answers": answers, "sign_offs": {}, "consulted": {}, "example_of": "", "comment": ""}
+   (folder / "sample-tank-inspections.new-module.json").write_text(json.dumps(form, indent=2) + "\n", encoding="utf-8")
+   settings = ['[ai]', 'provider = "by-hand"', 'assistant = "Genie Code"', 'family = "claude"',
+               'approved_by = "An IT Approver"', 'approved_on = "2026-11-20"', '',
+               '[ai_reviewer]', 'provider = "by-hand"', 'assistant = "A second assistant"', 'family = "gpt"',
+               'approved_by = "An IT Approver"', 'approved_on = "2026-11-20"']
+   (folder / "kpi-store-local.toml").write_text("\n".join(settings) + "\n", encoding="utf-8")
+   print("wrote the form and the settings")
+   ```
+
+   ```text expect
+   wrote the form and the settings
+   ```
+
+   You are done when the form is saved with N3 and N13 answered and no signature, and the settings file holds both tables.
+
+2. Ask the AI to draft the module. With the by-hand provider, the command writes the drafter's prompt to a file and stops. It refuses a form that anyone has signed.
+
+   ```powershell run=ai-modelling
+   python -m kpi_store.propose --ai-draft ../ai-modelling/sample-tank-inspections.new-module.json --stores ../ai-modelling/kpi-store-local.toml
+   ```
+
+   ```text expect
+   wrote the prompt for the AI: ../ai-modelling/sample-tank-inspections.new-module.draft-prompt.txt
+   Give that file to Genie Code. Save its answer, the JSON it writes, in a file such as ../ai-modelling/sample-tank-inspections.new-module.draft-answer.json. Then run this command again with --ai-answer <that file>.
+   ```
+
+   You are done when the folder holds `sample-tank-inspections.new-module.draft-prompt.txt`.
+
+3. Give the prompt file to the drafter's assistant. Save its answer, the JSON it writes, as `sample-tank-inspections.new-module.draft-answer.json` in the same folder.
+
+   The document test copies the release's sample draft, which is made up, with this block.
+
+   ```powershell run=ai-modelling status-only
+   python -c "import shutil; shutil.copy('kpi_store/ai/sample-draft.json', '../ai-modelling/sample-tank-inspections.new-module.draft-answer.json')"
+   ```
+
+   You are done when the answer file is in the folder.
+
+4. Run the command again with the draft. It checks the draft strictly and runs gates 1, 2 and 4. If one fails, it says why and keeps nothing: ask the AI again, and give it those lines. If all pass, it writes the draft's files to the folder `sample-tank-inspections.new-module.draft` and the record of the draft beside them. Then it writes the reviewer's prompt and stops.
+
+   ```powershell run=ai-modelling
+   python -m kpi_store.propose --ai-draft ../ai-modelling/sample-tank-inspections.new-module.json --stores ../ai-modelling/kpi-store-local.toml --ai-answer ../ai-modelling/sample-tank-inspections.new-module.draft-answer.json
+   ```
+
+   ```text expect
+   read the draft of Genie Code from ../ai-modelling/sample-tank-inspections.new-module.draft-answer.json
+   gate 1, competency questions and examples: passed
+   gate 2, the reasoner finds the model consistent: passed
+   gate 4, a plain-words summary for the signers: passed
+   wrote the draft: ../ai-modelling/sample-tank-inspections.new-module.draft, and its record: ../ai-modelling/sample-tank-inspections.new-module.draft.json
+   wrote the prompt for the AI: ../ai-modelling/sample-tank-inspections.new-module.review-prompt.txt
+   Give that file to A second assistant. Save its answer, the JSON it writes, in a file such as ../ai-modelling/sample-tank-inspections.new-module.review-answer.json. Then run this command again with --review-answer <that file>.
+   ```
+
+   You are done when the command says that gates 1, 2 and 4 passed and the folder holds `sample-tank-inspections.new-module.review-prompt.txt`.
+
+5. Give the review prompt to the reviewer's assistant, of the other model family. Save its answer as `sample-tank-inspections.new-module.review-answer.json` in the same folder.
+
+   The document test copies the release's sample review, which is made up, with this block.
+
+   ```powershell run=ai-modelling status-only
+   python -c "import shutil; shutil.copy('kpi_store/ai/sample-review.json', '../ai-modelling/sample-tank-inspections.new-module.review-answer.json')"
+   ```
+
+   You are done when the answer file is in the folder.
+
+6. Run the command again with the review. The review becomes gate 3. The command writes the summary that the signers read, `sample-tank-inspections.new-module.draft-summary.txt`.
+
+   ```powershell run=ai-modelling
+   python -m kpi_store.propose --ai-draft ../ai-modelling/sample-tank-inspections.new-module.json --stores ../ai-modelling/kpi-store-local.toml --review-answer ../ai-modelling/sample-tank-inspections.new-module.review-answer.json
+   ```
+
+   ```text expect
+   read the review of A second assistant from ../ai-modelling/sample-tank-inspections.new-module.review-answer.json
+   gate 3, a second model of another family reviewed the draft: passed (PASS)
+   ...
+   wrote the record of the review: ../ai-modelling/sample-tank-inspections.new-module.draft.json
+   wrote the summary for the signers: ../ai-modelling/sample-tank-inspections.new-module.draft-summary.txt
+   Next: the signers read the summary and sign the form: the Data Owner, the Ontology Owner and the Architect. Then turn it into a proposal with: python -m kpi_store.propose ../ai-modelling/sample-tank-inspections.new-module.json
+   ```
+
+   If the reviewer answers HOLD, the command lists its findings and the propose command will refuse the form. Change the form as the findings say, delete the record and the draft folder, and start again at step 2.
+
+   With the `databricks`, `anthropic` or `openai` provider, the command asks each AI itself, so steps 2 to 6 are one run with no prompt files and no `--ai-answer` or `--review-answer`.
+
+   You are done when the command says gate 3 passed and the folder holds the summary.
+
+7. The signers read the summary, then load the form in the HTML form ("Load answers file"), sign and save it. The Data Owner, the Ontology Owner and the Architect sign. By signing, they accept the draft as a whole. Do not change any answer now: the propose command refuses a form whose answers changed after the AI drafted the module.
+
+   ```python run=ai-modelling
+   print(open("../ai-modelling/sample-tank-inspections.new-module.draft-summary.txt", encoding="utf-8").read())
+   ```
+
+   ```text expect
+   The AI draft of the new module "Sample Tank Inspections" (sample-tank-inspections)
+   ...
+   What the new things mean, as the AI wrote it for the signers:
+     - The class "tank inspection" (sample_tank_inspections:TankInspection): One check of one storage tank's condition on one date. It is never a system itself.
+       For example: The check of a made-up tank on 2 November 2026, recorded in the APS planning database.
+   ...
+   The gates (KPI-DEC-0002, Q19):
+     - Gate 1, competency questions and examples: passed.
+   ...
+     - Gate 2, the reasoner finds the model consistent: passed.
+   ...
+     - Gate 3, a second model of another family reviewed the draft: passed.
+   ...
+     - Gate 4, a plain-words summary for the signers: passed.
+   ...
+   The reviewer's verdict: PASS.
+   ...
+   When you sign the form, you accept this draft whole. Gate 5: the Ontology Owner signs, and the module's first release is 1.0.0, a major.
+   ```
+
+   The document test signs the form with this block.
+
+   ```python run=ai-modelling
+   import json
+   from pathlib import Path
+
+   path = Path("../ai-modelling/sample-tank-inspections.new-module.json")
+   form = json.loads(path.read_text(encoding="utf-8"))
+   form["sign_offs"] = {"data-owner": {"name": "A Data Owner", "date": "2026-11-20"},
+                        "ontology-owner": {"name": "An Ontology Owner", "date": "2026-11-20"},
+                        "architect": {"name": "An Architect", "date": "2026-11-20"}}
+   path.write_text(json.dumps(form, indent=2) + "\n", encoding="utf-8")
+   print("signed by", ", ".join(sorted(form["sign_offs"])))
+   ```
+
+   ```text expect
+   signed by architect, data-owner, ontology-owner
+   ```
+
+   You are done when the three signers have signed the form.
+
+8. Turn the signed form into a proposal. The command runs gates 1, 2 and 4 again against the release as it is now, and adds gate 5 from the Ontology Owner's signature. It changes nothing in the ontology.
+
+   ```powershell run=ai-modelling
+   python -m kpi_store.propose ../ai-modelling/sample-tank-inspections.new-module.json
+   ```
+
+   ```text expect
+   wrote the proposal ../ai-modelling/proposals/NM-2026-003: 10 changes and 4 facts, route major
+   Nothing in the ontology has changed. Read each summary.txt, then apply with: python -m kpi_store.apply <proposal folder>
+   ```
+
+   You are done when the command has written the folder `proposals/NM-2026-003`. Its `summary.txt` lists every gate as passed, and its `approval.json` holds the record of the draft under `"draft"`.
+
+9. Apply the proposal. The apply checks every gate again before it writes anything. It then works as for any new module: it writes the module's folder from the draft, with a builder, a test file and a README, registers the module, releases it at 1.0.0, and runs every check. It took about four minutes on a Mac.
+
+   ```powershell run=ai-modelling
+   python -m kpi_store.apply ../ai-modelling/proposals/NM-2026-003
+   ```
+
+   ```text expect
+   1 proposal to apply:
+     NM-2026-003: major, signed by Data Owner, Ontology Owner, Architect
+   ...
+     sample-tank-inspections: a new module at 1.0.0
+   ...
+   ... write the sample-tank-inspections module's folder from its AI draft and register it in every place
+   ...
+   ... run every module's shapes over the whole graph
+   ...
+   ... write the release
+   Done. sample-tank-inspections 1.0.0 is a new module (major). The apply changed <count> files, and Git committed them.
+   Run the full check before you load: bash scripts/check.sh (on Windows, in Git Bash). Then load the stores with the runner: python -m kpi_store.runner
+   ```
+
+   You are done when the command ends with `Done. sample-tank-inspections 1.0.0 is a new module (major).`
+
+10. See the commit and the module's own check. Its builder runs gates 1, 2 and 4 again each time the full check runs.
+
+    ```powershell run=ai-modelling
+    git --no-pager log --oneline -1
+    cd business_architecture/ontology/sample-tank-inspections
+    python build_sample_tank_inspections.py --verify
+    ```
+
+    ```text expect
+    <commit> Apply the new module NM-2026-003: sample-tank-inspections 1.0.0
+    classes 1; properties 2; node shapes 1; questions 1; failing examples 2
+    gate 1, competency questions and examples: passed
+    gate 2, the reasoner finds the model consistent: passed
+    gate 4, a plain-words summary for the signers: passed
+    model.ttl and shapes.ttl are current
+    ```
+
+    You are done when the builder says `model.ttl and shapes.ttl are current`. Then run the full check, as in "Before you change anything", step 3, and load the stores with the runner, as in step 11 of "The release steps".
+
 ## Onboard another module
 
-A module is one part of the ontology with its own version, such as `kpi`. Add a module when a new data area brings terms that no module owns. A vocabulary or a reference table goes through the new-module form ("Add a module with the new-module form" above). This section is the specialist's path, for a module that the form's patterns do not cover: one with a new class, a new property or a rule of its own. It says how to decide, where to register the module, and how its tables join the discovery comparison. It ends with a made-up example that you can run.
+A module is one part of the ontology with its own version, such as `kpi`. Add a module when a new data area brings terms that no module owns. A vocabulary or a reference table goes through the new-module form ("Add a module with the new-module form" above). This section is the specialist's path, for a module that the form's patterns do not cover and that no AI drafts: one with a new class, a new property or a rule of its own. It says how to decide, where to register the module, and how its tables join the discovery comparison. It ends with a made-up example that you can run.
 
 `skills/ontology/references/new-module.md` holds the full method and its gates. Read it before you start a real module.
 

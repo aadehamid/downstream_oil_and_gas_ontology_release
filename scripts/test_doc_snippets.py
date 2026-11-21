@@ -1394,7 +1394,8 @@ def test_the_contexts_that_run_everywhere_need_no_variable_and_the_others_name_t
         "scratch-schemas": ("KPI_STORE_TEST_LOCAL_SETTINGS",),
         "windows-account": ("DOC_SNIPPETS_WINDOWS_ACCOUNT",),
         "shared-drive": ("DOC_SNIPPETS_SHARED_DRIVE",),
-        "ai-suggestions": ()}
+        "ai-suggestions": (),
+        "ai-modelling": ("DOC_SNIPPETS_SLOW",)}
     assert [name for name, c in contexts.items() if c.home == "real"] == ["databricks-free", "first-run", "scratch-schemas",
                                                                           "windows-account"]
     # The runbook's commands read KPI_STORE_LOCAL. Only its own context may give that variable to a block. The
