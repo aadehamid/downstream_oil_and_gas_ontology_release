@@ -79,21 +79,27 @@ class Reply:
 def check_url(url, what="[ai] url"):
     """The parts of an address the command may call: http or https, a host, a port that is a number, and no user
     name or password, which messages and records would show. Refuses any other address."""
-    parts = urllib.parse.urlsplit(url)
+    try:
+        parts = urllib.parse.urlsplit(url)
+    except ValueError:   # an unmatched bracket, or a character no host name may hold
+        raise AIRefused(f"{what} is not an http or https address with a host") from None
     if parts.scheme not in ("http", "https") or not parts.hostname:
         raise AIRefused(f"{what} is not an http or https address with a host")
     if parts.username is not None or parts.password is not None:
         raise AIRefused(f"{what} must not hold a user name or a password")
     try:
-        parts.port
+        port = parts.port
     except ValueError:
-        raise AIRefused(f"{what} has a port that is not a number from 0 to 65535") from None
+        port = 0
+    if port == 0:
+        raise AIRefused(f"{what} has a port that is not a number from 1 to 65535")
     return parts
 
 
 def where(parts):
     """The host and port that messages name."""
-    return parts.hostname + (f":{parts.port}" if parts.port else "")
+    host = f"[{parts.hostname}]" if ":" in parts.hostname else parts.hostname   # an IPv6 address keeps its brackets
+    return host + (f":{parts.port}" if parts.port is not None else "")
 
 
 def endpoint_of(parts):
@@ -196,6 +202,7 @@ def _databricks_target(ai, environ, run):
         token = json.loads(done.stdout).get("access_token", "") if done.returncode == 0 else ""
     except (OSError, subprocess.TimeoutExpired, ValueError, AttributeError):
         token = ""
+    token = token.strip() if isinstance(token, str) else ""
     if not token:
         raise AIRefused(f"databricks auth token gave no token for the profile {ai.profile}. Sign in again with: "
                         f"databricks auth login --profile {ai.profile}")

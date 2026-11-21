@@ -313,20 +313,27 @@ def run(form_path, release_root=".", stores=None, answer_file=None, choices_file
               "prompt_sha256": sha256(prompt), "output_sha256": output,
               "suggestions": [dict(s, accepted=a) for s, a in zip(found, accepted)]}
     approval.check_ai(record, step=True)
-    # The record first: a form that took an AI answer always has its record beside it.
+    # The record first: a form that took an AI answer always has its record beside it. A write that fails leaves
+    # neither a part of the record nor a new form behind.
     with record_path.open("x", encoding="utf-8", newline="\n") as f:
-        f.write(json.dumps(record, ensure_ascii=False, indent=2) + "\n")
+        try:
+            f.write(json.dumps(record, ensure_ascii=False, indent=2) + "\n")
+        except OSError:
+            f.close()
+            record_path.unlink(missing_ok=True)
+            raise
     if any(accepted):
+        new = path.with_name(path.name + ".new")   # written whole, then put in the form's place
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             for s, a in zip(found, accepted):
                 if a:
                     data["answers"][s["question"]] = s["answer"]
-            new = path.with_name(path.name + ".new")   # written whole, then put in the form's place
             with new.open("w", encoding="utf-8", newline="\n") as f:
                 f.write(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
             os.replace(new, path)
         except OSError:
+            new.unlink(missing_ok=True)
             record_path.unlink(missing_ok=True)
             raise
     took = sum(accepted)

@@ -58,7 +58,7 @@ def sign(path, sign_offs=SIGNED):
 
 
 def skills_text():
-    return "\n\n".join((ROOT / name).read_text(encoding="utf-8") for name in suggest.SKILLS)
+    return "\n\n".join((ROOT / name).read_bytes().decode("utf-8") for name in suggest.SKILLS)
 
 
 def settings(folder, text):
@@ -112,9 +112,7 @@ class Stub:
 
 @pytest.fixture
 def stub(monkeypatch):
-    for name in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "ALL_PROXY", "all_proxy"):
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
+    no_proxy(monkeypatch)
     s = Stub()
     yield s
     s.close()
@@ -315,7 +313,7 @@ def test_the_by_hand_round_trip_writes_the_prompt_reads_the_answer_and_keeps_onl
     prompt = tmp_path / "unit-utilization.term-change.ai-prompt.txt"
     assert said[0] == f"wrote the prompt for the AI: {prompt.as_posix()}"
     assert said[1].startswith("Give that file to Genie Code. Save its answer")
-    assert prompt.read_text(encoding="utf-8").startswith(skills_text() + "\n\n# The task\n")
+    assert prompt.read_bytes().decode("utf-8").startswith(skills_text() + "\n\n# The task\n")
     assert not (tmp_path / "unit-utilization.term-change.ai.json").exists()
     answer = tmp_path / "answer.json"
     answer.write_text("```json\n" + SAMPLE_TEXT + "```\n", encoding="utf-8")   # as a chat often wraps it
@@ -580,7 +578,14 @@ def test_a_broken_reply_or_a_secret_with_a_line_break_is_refused_without_a_trace
         assert "K holds a line break or a NUL" in str(err.value) and "secret" not in str(err.value)
 
 
-def test_the_address_is_checked_and_messages_show_no_user_name_or_password(tmp_path):
+def no_proxy(monkeypatch):
+    for name in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "ALL_PROXY", "all_proxy"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
+
+
+def test_the_address_is_checked_and_messages_show_no_user_name_or_password(tmp_path, monkeypatch):
+    no_proxy(monkeypatch)
     cfg = tmp_path / "databrickscfg"
     cfg.write_text("[kpi]\nhost = adb-123.azuredatabricks.net\ntoken = dapi-x\n", encoding="utf-8")
     with pytest.raises(AIRefused, match="is not an http or https address"):
@@ -694,11 +699,17 @@ def test_the_fingerprints_are_of_the_files_bytes(tmp_path):
     system, hashes = suggest.instructions(root)
     assert [h["sha256"] for h in hashes] == [hashlib.sha256((root / n).read_bytes()).hexdigest() for n in suggest.SKILLS]
     assert "\r\n" in system
+    shutil.copytree(ROOT / "kpi-intake", root / "kpi-intake")
     path = form(tmp_path)
+    suggest.run(path, root, ai=by_hand(), say=quiet)
+    prompt = suggest.beside(path, suggest.PROMPT_SUFFIX).read_bytes()
+    assert prompt.startswith(system.encode("utf-8") + b"\n\n# The task\n") and b"\r\n" in prompt
     answer = tmp_path / "answer.json"
     answer.write_bytes(SAMPLE_TEXT.replace("\n", "\r\n").encode())
-    record = suggest.run(path, ROOT, ai=by_hand(), answer_file=answer, choices_file=choices(tmp_path), say=quiet)
-    assert json.loads(record.read_text(encoding="utf-8"))["output_sha256"] == hashlib.sha256(answer.read_bytes()).hexdigest()
+    record = suggest.run(path, root, ai=by_hand(), answer_file=answer, choices_file=choices(tmp_path), say=quiet)
+    saved = json.loads(record.read_text(encoding="utf-8"))
+    assert saved["output_sha256"] == hashlib.sha256(answer.read_bytes()).hexdigest()
+    assert saved["prompt_sha256"] == hashlib.sha256(prompt).hexdigest()
 
 
 def test_a_record_for_another_kind_of_form_stops_the_proposal(tmp_path):
@@ -709,3 +720,59 @@ def test_a_record_for_another_kind_of_form_stops_the_proposal(tmp_path):
     with pytest.raises(propose_cmd.ProposeRefused, match="is for a kpi-intake form, and unit-utilization.term-change.json "
                                                          "is a term-change form"):
         propose_cmd.propose([path], tmp_path / "proposals", ROOT, now=NOW, say=quiet)
+
+
+# ---------- the second review's findings ----------
+
+def test_an_ipv6_host_keeps_its_brackets_and_port_0_is_refused():
+    parts = providers.check_url("http://[::1]:8080/v1/chat/completions")
+    assert providers.where(parts) == "[::1]:8080"
+    assert providers.endpoint_of(parts) == "http://[::1]:8080/v1/chat/completions"
+    with pytest.raises(AIRefused, match="has a port that is not a number from 1 to 65535"):
+        providers.check_url("http://127.0.0.1:0/v1")
+
+
+def test_an_address_that_cannot_be_read_is_refused_in_a_plain_sentence():
+    for url in ("https://[your-workspace/serving-endpoints/kpi-chat/invocations", "http://[::1/x"):
+        with pytest.raises(AIRefused, match="is not an http or https address with a host"):
+            providers.ready(ls.AI("openai", model="m", key_env="K", url=url, **APPROVED))
+
+
+def test_a_failed_write_leaves_neither_a_new_form_nor_a_part_record(tmp_path, monkeypatch):
+    path = form(tmp_path)
+    answer = tmp_path / "answer.json"
+    answer.write_text(SAMPLE_TEXT, encoding="utf-8")
+    given = choices(tmp_path)
+    before = path.read_bytes()
+
+    def no_replace(src, dst):
+        raise PermissionError("the form is open in another program")
+    monkeypatch.setattr(suggest.os, "replace", no_replace)
+    with pytest.raises(OSError):
+        suggest.run(path, ROOT, ai=by_hand(), answer_file=answer, choices_file=given, say=quiet)
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["answer.json", "choices.json", path.name]
+    assert path.read_bytes() == before
+    monkeypatch.undo()
+
+    real = json.dumps
+
+    def full_disk(value, *args, **kwargs):
+        if isinstance(value, dict) and "prompt_sha256" in value:
+            raise OSError(28, "No space left on device")
+        return real(value, *args, **kwargs)
+    monkeypatch.setattr(suggest.json, "dumps", full_disk)
+    with pytest.raises(OSError):
+        suggest.run(path, ROOT, ai=by_hand(), answer_file=answer, choices_file=given, say=quiet)
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["answer.json", "choices.json", path.name]
+
+
+def test_a_cli_token_that_is_not_text_or_is_blank_is_no_token(tmp_path, stub, monkeypatch):
+    cfg = tmp_path / "databrickscfg"
+    cfg.write_text(f"[prod]\nhost = {stub.url}\nauth_type = databricks-cli\n", encoding="utf-8")
+    monkeypatch.setattr(providers.shutil, "which", lambda name, path=None: "/opt/databricks")
+    ai = ls.AI("databricks", model="kpi-chat", profile="prod", **APPROVED)
+    for token in (123, "   ", None, ["t"]):
+        run = lambda args, token=token, **k: subprocess.CompletedProcess(args, 0, json.dumps({"access_token": token}), "")
+        with pytest.raises(AIRefused, match="databricks auth token gave no token for the profile prod"):
+            providers.ask(ai, "S", "U", environ={"DATABRICKS_CONFIG_FILE": str(cfg)}, run=run)
+    assert stub.requests == []
