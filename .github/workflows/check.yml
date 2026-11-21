@@ -32,7 +32,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     # The test run alone took 26 to 61 minutes on Ubuntu, and the Windows job 60 to 71 minutes, as the forms
     # added tests that each build and apply a release. 75 minutes cancelled one Ubuntu run whose checks all passed.
-    timeout-minutes: 120
+    # The AI drafting tests took Ubuntu from 1 h 49 min to past 120 minutes, which cancelled both runs, so it gets
+    # the stores job's 180.
+    timeout-minutes: 180
     defaults:
       run:
         shell: bash
@@ -92,7 +94,7 @@ jobs:
     name: check (no links, no py)
     runs-on: windows-2025
     # This job took 43 to 63 minutes on recent runs, and 60 minutes once cancelled a run, so it gets the same limit.
-    timeout-minutes: 120
+    timeout-minutes: 180
     defaults:
       run:
         shell: bash
