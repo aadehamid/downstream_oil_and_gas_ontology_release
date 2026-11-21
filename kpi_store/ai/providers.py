@@ -38,8 +38,8 @@ message, and takes back one text. The request formats follow each provider's own
                  choices[0].message.content, and it names its `model`.
 
 A key or a token is never written to a file, never printed and never put in a message. The standard library makes
-every call. Nothing here is specific to suggestions, so the AI-drafted modelling of KPI-DEC-0002, Q17(a), can use
-the same call.
+every call. Nothing here is specific to suggestions: the AI-drafted modelling of KPI-DEC-0002, Q17(a) (kpi_store/ai/draft.py)
+makes the same call, with a higher max_tokens, for the drafter and for the reviewer.
 """
 import configparser
 import datetime as dt
@@ -209,19 +209,19 @@ def _databricks_target(ai, environ, run):
     return url, _clean(token, f"the token databricks auth token gave for the profile {ai.profile}")
 
 
-def request(ai, system, user, environ=None, run=subprocess.run):
+def request(ai, system, user, environ=None, run=subprocess.run, max_tokens=MAX_TOKENS):
     """The call the provider gets: (URL, headers, body). The body's system prompt is `system` exactly, and its one
-    user message is `user`."""
+    user message is `user`. `max_tokens` caps the answer's length where the provider takes a cap."""
     environ = os.environ if environ is None else environ
     ready(ai)
     json_type = {"Content-Type": "application/json"}
     if ai.provider == "databricks":
         url, token = _databricks_target(ai, environ, run)
         body = {"messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-                "max_tokens": MAX_TOKENS}
+                "max_tokens": max_tokens}
         return url, {**json_type, "Authorization": f"Bearer {token}"}, body
     if ai.provider == "anthropic":
-        body = {"model": ai.model, "max_tokens": MAX_TOKENS, "system": [{"type": "text", "text": system}],
+        body = {"model": ai.model, "max_tokens": max_tokens, "system": [{"type": "text", "text": system}],
                 "messages": [{"role": "user", "content": user}]}
         return (ai.url or ANTHROPIC_URL, {**json_type, "Authorization": f"Bearer {_secret(ai, environ)}",
                                           "anthropic-version": ANTHROPIC_VERSION}, body)
@@ -231,14 +231,14 @@ def request(ai, system, user, environ=None, run=subprocess.run):
     raise AIRefused(f'the provider "{ai.provider}" makes no call: the command writes the prompt to a file instead')
 
 
-def _text_of(provider, reply):
+def _text_of(provider, reply, max_tokens=MAX_TOKENS):
     """The reply's text and the model it names, or AIRefused when the reply holds no whole answer."""
     if not isinstance(reply, dict):
         raise AIRefused("the AI provider's reply is not a JSON object")
     model = reply.get("model") if isinstance(reply.get("model"), str) else ""
     if provider == "anthropic":
         if reply.get("stop_reason") == "max_tokens":
-            raise AIRefused(f"the AI's answer was cut off at {MAX_TOKENS} tokens, so it cannot be used")
+            raise AIRefused(f"the AI's answer was cut off at {max_tokens} tokens, so it cannot be used")
         blocks = reply.get("content")
         texts = [b.get("text") for b in blocks if isinstance(b, dict) and b.get("type") == "text"] if isinstance(blocks, list) else []
     else:
@@ -259,10 +259,10 @@ def _text_of(provider, reply):
     return Reply("".join(texts), model)
 
 
-def ask(ai, system, user, environ=None, opener=urllib.request.urlopen, run=subprocess.run):
+def ask(ai, system, user, environ=None, opener=urllib.request.urlopen, run=subprocess.run, max_tokens=MAX_TOKENS):
     """Asks the provider once and returns its Reply. Refuses, in a plain sentence, when the call fails, times out or
     gives no answer."""
-    url, headers, body = request(ai, system, user, environ, run)
+    url, headers, body = request(ai, system, user, environ, run, max_tokens)
     parts = check_url(url)
     host = where(parts)
     call = urllib.request.Request(url, data=json.dumps(body, ensure_ascii=False).encode("utf-8"), headers=headers,
@@ -286,5 +286,5 @@ def ask(ai, system, user, environ=None, opener=urllib.request.urlopen, run=subpr
         reply = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, ValueError):
         raise AIRefused(f"the AI provider at {host} sent a reply that is not JSON") from None
-    found = _text_of(ai.provider, reply)
+    found = _text_of(ai.provider, reply, max_tokens)
     return Reply(found.text, found.model_version, endpoint_of(parts))

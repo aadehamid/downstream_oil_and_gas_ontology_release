@@ -69,10 +69,10 @@ def beside(form_path, suffix):
     return path.with_name(path.stem + suffix)
 
 
-def instructions(root):
+def instructions(root, names=SKILLS):
     """The system prompt, the release's skill files one after the other, and [{path, sha256}] of each file."""
     texts, hashes = [], []
-    for name in SKILLS:
+    for name in names:
         try:   # bytes, so that the fingerprint is the file's own whatever its line ends
             raw = (Path(root) / name).read_bytes()
             texts.append(raw.decode("utf-8"))
