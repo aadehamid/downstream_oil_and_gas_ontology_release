@@ -74,7 +74,7 @@ The Databricks table is not loaded from here. The runner's `notebook` step loads
 `pipeline.py build` writes the document with the manifest, so it changes only when a package changes. `pipeline.py build --verify` fails unless it equals a fresh build and conforms to the schema. The node, relationship and property types come from the shapes, by the mapping of the `ontology-to-lpg` skill's `graph-type` and `data-model` commands. To read one node of the document:
 
 ```powershell run=release-copy
-python -c "import json; n = json.load(open('business_architecture/ontology/projection/neo4j-spec.json', encoding='utf-8'))['nodes']['kpi_MeasureDefinition']; print(n['labels']['identifier'], n['reference'])"
+python -c "import json; n = json.load(open('neo4j-spec.json', encoding='utf-8'))['nodes']['kpi_MeasureDefinition']; print(n['labels']['identifier'], n['reference'])"
 ```
 
 ```text expect
