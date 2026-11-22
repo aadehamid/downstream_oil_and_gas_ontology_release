@@ -162,8 +162,14 @@ figure.pic figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
 <li class="l2"><a href="#3-make-an-everyday-change-with-a-form">3. Make an everyday change with a form</a></li>
 <li class="l2"><a href="#4-add-a-module">4. Add a module</a></li>
 <li class="l2"><a href="#5-let-an-ai-help">5. Let an AI help</a></li>
-<li class="l2"><a href="#6-check-the-release-and-recover-from-a-failure">6. Check the release and recover from a failure</a></li>
+<li class="l3"><a href="#suggestions-for-a-form">Suggestions for a form</a></li>
+<li class="l3"><a href="#a-draft-of-new-modelling">A draft of new modelling</a></li>
+<li class="l2"><a href="#6-check-the-release-and-recover">6. Check the release and recover</a></li>
+<li class="l3"><a href="#after-every-change">After every change</a></li>
+<li class="l3"><a href="#when-a-run-fails">When a run fails</a></li>
 <li class="l2"><a href="#7-replace-what-a-store-holds-or-reset-every-store">7. Replace what a store holds, or reset every store</a></li>
+<li class="l3"><a href="#replace-what-neo4j-enterprise-holds">Replace what Neo4j Enterprise holds</a></li>
+<li class="l3"><a href="#empty-every-store-and-load-it-again">Empty every store and load it again</a></li>
 <li class="l2"><a href="#8-upgrade-the-tools-from-a-newer-release">8. Upgrade the tools from a newer release</a></li>
 <li class="l2"><a href="#9-refresh-what-people-use">9. Refresh what people use</a></li>
         </ul>
@@ -172,38 +178,44 @@ figure.pic figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
     <article>
 <p>This handout is for the people who run the KPI Store after handover: the Data Owners, the Domain Owners, the Ontology Owner, the Architect and the platform team. You do not need to have built an ontology. You type the commands that this handout shows, and you read what they print. You never edit an ontology file by hand: the commands write every change, and they refuse a change they cannot check.</p>
 <p>It takes you from the release zip to loaded and checked stores, and then through every kind of change: a change form, a new module, a change an AI helps to write, a check and a recovery, a replace or a reset, an upgrade of the tools, and the refresh of what people use. Each step ends with <strong>You are done when</strong>. Do not go on to the next step until that is true.</p>
-<p>Every command and every printed line in this handout is quoted from the release's two detailed guides, the stores runbook and <code>HOW-TO-UPDATE.md</code>, where the release's own tests run it and compare what it prints. When this handout and a detailed guide seem to differ, the detailed guide is right: tell the release's team.</p>
+<p>The release's own tests check every command and printed line in this handout. Most are quoted from the release's detailed guides, the stores runbook, <code>HOW-TO-UPDATE.md</code> and <code>kpi-intake/README.md</code>, where the tests run them. The rest run in this handout itself. The tests cannot open a browser, so the Databricks sign-in is the one command they parse and do not run. When this handout and a detailed guide seem to differ, the detailed guide is right: tell the release's team.</p>
 <p><strong>Warning: a replace or a reset deletes data in the stores.</strong> Get written authorization for the exact environment first, stop every other writer, and make sure the data can be loaded again.</p>
 <h2 id="what-is-inside-the-release">What is inside the release<a class="hl" href="#what-is-inside-the-release" aria-label="Link to this section">#</a></h2>
-<div class="tblwrap"><table><thead><tr><th>Part</th><th>What it is</th><th>Do you open it?</th></tr></thead><tbody><tr><td>The commands, in <code>kpi_store/</code></td><td>Everything you run: the setup check, the runner, the change commands, the upgrade</td><td>No. You run them</td></tr><tr><td>The ontology, in <code>business_architecture/ontology/</code></td><td>The modules, their packages and their checks</td><td>No. The commands change it</td></tr><tr><td>The KPI intake pack, in <code>kpi-intake/</code></td><td>The change forms, as an HTML page and an Excel workbook</td><td>Yes. You fill the forms</td></tr><tr><td>The skills, in <code>skills/</code></td><td>The rules that the commands and the AI follow when they model, check and write</td><td>No. The commands and the AI read them</td></tr><tr><td>The stores runbook, <code>business_architecture/ontology/projection/ontology-stores-runbook.md</code></td><td>Every detail of setting up, loading and recovering</td><td>When a step here sends you there</td></tr><tr><td><code>HOW-TO-UPDATE.md</code></td><td>Every detail of each kind of change</td><td>When a step here sends you there</td></tr></tbody></table></div>
+<div class="tblwrap"><table><thead><tr><th>Part</th><th>What it is</th><th>Do you open it?</th></tr></thead><tbody><tr><td>The commands, in <code>kpi_store/</code></td><td>Everything you run: the setup check, the runner, the change commands, the upgrade</td><td>No. You run them</td></tr><tr><td>The ontology, in <code>business_architecture/ontology/</code></td><td>The modules, their packages and their checks</td><td>No. The commands change it</td></tr><tr><td>The KPI intake pack, in <code>kpi-intake/</code></td><td>The change forms, as an HTML page and an Excel workbook, and <code>kpi-intake/README.md</code>, which says what each form asks</td><td>Yes. You fill the forms</td></tr><tr><td>The skills, in <code>skills/</code></td><td>The rules that the commands and the AI follow when they model, check and write</td><td>No. The commands and the AI read them</td></tr><tr><td>The stores runbook, <code>business_architecture/ontology/projection/ontology-stores-runbook.md</code></td><td>Every detail of setting up, loading and recovering</td><td>When a step here sends you there</td></tr><tr><td><code>HOW-TO-UPDATE.md</code></td><td>Every detail of each kind of change</td><td>When a step here sends you there</td></tr></tbody></table></div>
 <h2 id="the-conventions">The conventions<a class="hl" href="#the-conventions" aria-label="Link to this section">#</a></h2>
-<ul><li>The commands run on Windows, in PowerShell, unless a step says Git Bash.</li><li>Start every command in the release folder, <code>%USERPROFILE%\kpi-store-1.1</code>, unless a step says otherwise.</li><li>Write your own value where a command shows text in angle brackets, such as <code>&lt;your workspace URL&gt;</code>.</li><li>Keep passwords, settings files and filled forms outside the release folder. The release folder is zipped and uploaded.</li></ul>
+<ul><li>The commands run on Windows, in PowerShell, unless a step says Git Bash.</li><li>Start every command in the release folder, <code>%USERPROFILE%\kpi-store-1.1</code>, unless a step says otherwise.</li><li>Write your own value where a command shows text in angle brackets, such as <code>&lt;your workspace URL&gt;</code>.</li><li>The commands of sections 3 to 5 and 8 show the file names of the detailed guides' made-up examples, such as <code>../new-kpi/sample-spread-margin.kpi-intake.json</code>. Write the path of your own file in their place.</li><li>Keep passwords, settings files and filled forms outside the release folder. The release folder is zipped and uploaded.</li></ul>
 <h2 id="1-set-up-the-machine-once">1. Set up the machine, once<a class="hl" href="#1-set-up-the-machine-once" aria-label="Link to this section">#</a></h2>
-<ol><li>Get the access the runbook's "What you need" lists: the Databricks workspace and its SQL warehouse, the Neo4j Enterprise database, a local Neo4j you may empty, and the network.
+<ol><li>Get the access that the runbook's "What you need" lists: the Databricks workspace and its SQL warehouse, the Neo4j Enterprise database, a local Neo4j you may empty, and the network.
 <p>You are done when every owner has answered.</p></li></ol>
-<ol start="2"><li>Install the programs: Python, Git for Windows, Java and the Databricks command line, as the runbook's "Install the programs" says. Without administrator rights, follow "Install the programs without administrator rights" instead.
+<ol start="2"><li>Install Python, Git for Windows, Java and the Databricks command line, as the runbook's "Install the programs" says. Its last step installs the Databricks command line with this command:
 <pre><code class="lang-cmd">winget install Databricks.DatabricksCLI</code></pre>
-<p>You are done when a new PowerShell window finds <code>python</code>, <code>git</code>, <code>java</code> and <code>databricks</code>.</p></li></ol>
-<ol start="3"><li>Unpack the release zip to <code>%USERPROFILE%\kpi-store-1.1</code>, as the runbook's "Unpack the release" says. Then put the folder in Git. Write your own name and address in the two <code>git config</code> lines.
+<p>Without administrator rights, follow the runbook's "Install the programs without administrator rights" instead. It unpacks Git, Java and the Databricks command line into your local folder, and the settings file of step 7 names them.</p>
+<p>You are done when every installer has finished, or the three folders are unpacked. The setup check of step 9 proves each program.</p></li></ol>
+<ol start="3"><li>Read the runbook's "What Windows itself needs". For most points you do nothing. Three matter later: run the full check in Git Bash, not in PowerShell; keep the file <code>.gitattributes</code> of the release; and keep your local folder private to your account.
+<p>You are done when you have read it.</p></li></ol>
+<ol start="4"><li>Unpack the release zip to <code>%USERPROFILE%\kpi-store-1.1</code>, as the runbook's "Unpack the release" says. Open a new PowerShell window and go to the release folder:
+<pre><code class="lang-powershell">cd $HOME\kpi-store-1.1</code></pre>
+<p>Then put the folder in Git, as the runbook's "Keep the release folder in Git" says. Write your own name and address in the two <code>git config</code> lines.</p>
 <pre><code class="lang-powershell">git init
 git config user.name "KPI Store operator"
 git config user.email "kpi-store-operator@example.invalid"
 git add -A
 git commit -m "KPI Store 1.1 as shipped"</code></pre>
 <p>You are done when the commit is made. The upgrade of section 8 starts from this commit.</p></li></ol>
-<ol start="4"><li>Make the local folder and fetch the three files the runbook's "Make the local folder and fetch three files" names. Then install the Python packages at the versions the release was tested with.
+<ol start="5"><li>Make the local folder and fetch the three files that the runbook's "Make the local folder and fetch three files" names. Then install the Python packages at the versions the release was tested with:
 <pre><code class="lang-powershell">python -m pip install rdflib==7.6.0 pyshacl==0.40.2 owlrl==7.6.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 openpyxl==3.1.5 uv</code></pre>
-<p>You are done when the last line starts with <code>Successfully installed</code>.</p></li></ol>
-<ol start="5"><li>Set up the local Neo4j, as the runbook's "Set up the local Neo4j" says.
+<p>You are done when it ends without an error. A machine that holds the packages already says <code>Requirement already satisfied</code>.</p></li></ol>
+<ol start="6"><li>Set up the local Neo4j, as the runbook's "Set up the local Neo4j" says.
 <p>You are done when its database runs with the APOC and n10s plugins.</p></li></ol>
-<ol start="6"><li>Write the two settings files, as the runbook's "Write the two settings files" says, and tell every command where the local one is. Then close PowerShell and open it again.
+<ol start="7"><li>Write the two settings files, as the runbook's "Write the two settings files" says. Then tell every command where the local one is:
 <pre><code class="lang-powershell">setx KPI_STORE_LOCAL "$HOME\kpi-store-local\stores.toml"</code></pre>
-<p>You are done when it answers <code>SUCCESS: Specified value was saved.</code></p></li></ol>
-<ol start="7"><li>Sign in to Databricks. Your browser opens the sign-in page.
+<p>It answers <code>SUCCESS: Specified value was saved.</code> The setting reaches new windows only, so close PowerShell, open it again, and go to the release folder as in step 4.</p>
+<p>You are done when you work in a new PowerShell window, in the release folder.</p></li></ol>
+<ol start="8"><li>Sign in to Databricks. Your browser opens the sign-in page.
 <pre><code class="lang-powershell">databricks auth login --host &lt;your workspace URL&gt; --profile DEFAULT</code></pre>
+<p>Without administrator rights, <code>databricks</code> is not on your <code>PATH</code>: start it with its path, <code>$HOME\kpi-store-local\databricks-cli\databricks.exe</code>, in place of the word <code>databricks</code>.</p>
 <p>You are done when the terminal says that the profile <code>DEFAULT</code> was saved.</p></li></ol>
-<ol start="8"><li>Run the setup check from the release folder. It only reads.
-<pre><code class="lang-powershell">cd $HOME\kpi-store-1.1</code></pre>
+<ol start="9"><li>Run the setup check. It only reads.
 <pre><code class="lang-powershell">python -m kpi_store.setup_check</code></pre>
 <p>You are done when its last line reads:</p>
 <pre><code class="lang-text">15 of 15 checks passed</code></pre>
@@ -216,14 +228,14 @@ git commit -m "KPI Store 1.1 as shipped"</code></pre>
 <ol start="2"><li>Start the first run. It took about 40 minutes on the Windows laptop of the first real run.
 <pre><code class="lang-powershell">python -m kpi_store.runner</code></pre>
 <p>You are done when it stops with a line that starts <code>report: STOPPED</code>. That is the result you want here.</p></li></ol>
-<ol start="3"><li>Clear the report in Excel, as the runbook's "Clear the report" says: open <code>discovery-report.to-clear.csv</code> in <code>%USERPROFILE%\kpi-store-local\runs\pending</code>, keep each decision the runbook's table tells you to accept, and write your role or initials in <code>decided_by</code>. Save it as "CSV UTF-8".
+<ol start="3"><li>Clear the report in Excel, as the runbook's "Clear the report" says: open <code>discovery-report.to-clear.csv</code> in <code>%USERPROFILE%\kpi-store-local\runs\pending</code>, keep each decision that the runbook's table tells you to accept, and write your role or initials in <code>decided_by</code>. Save it as "CSV UTF-8".
 <p>You are done when every row that blocks the load has a decision and your role.</p></li></ol>
-<ol start="4"><li>Run the same command again. It shows the cut's plan and asks you to type two answers. The runbook's "The second run: the cut and the loads" says what to type. It takes about 40 minutes.
+<ol start="4"><li>Run the same command again. It shows the cut's plan and asks you to type two answers: the runbook's "The second run: the cut and the loads" says what to type. It takes about 40 minutes.
 <pre><code class="lang-powershell">python -m kpi_store.runner</code></pre>
 <p>You are done when its last line reads <code>every step passed</code>.</p></li></ol>
-<ol start="5"><li>Check the four stores. The sync check only reads.
+<ol start="5"><li>Check the stores. The sync check only reads.
 <pre><code class="lang-powershell">python -m kpi_store.sync_check</code></pre>
-<p>You are done when every line reads <code>current</code>:</p>
+<p>You are done when every line reads <code>current</code>, as these first lines do:</p>
 <pre><code class="lang-text">databricks      current     &lt;why&gt;
 jena            current     &lt;why&gt;
 neo4j           current     &lt;why&gt;
@@ -231,112 +243,156 @@ enterprise      current     &lt;why&gt;</code></pre></li></ol>
 <h2 id="3-make-an-everyday-change-with-a-form">3. Make an everyday change with a form<a class="hl" href="#3-make-an-everyday-change-with-a-form" aria-label="Link to this section">#</a></h2>
 <p>Every everyday change goes the same way: someone fills a form, the signers sign it, you check it, a command turns it into a proposal, and a second command applies the proposal and releases the changed modules. Nobody edits a table or a Turtle file. If a step fails, the release is as it was.</p>
 <p>The forms are in the KPI intake pack: <code>kpi-intake/kpi-intake-form.html</code>, which works offline in a browser, and the same form as <code>kpi-intake/kpi-intake-form.xlsx</code>. <code>kpi-intake/how-to-use-the-form.html</code> says how to fill and save one. Keep the filled form, and the proposal the command writes beside it, in a folder beside the release folder, never inside it.</p>
-<div class="tblwrap"><table><thead><tr><th>The change</th><th>The form</th><th>Its section in <code>HOW-TO-UPDATE.md</code></th></tr></thead><tbody><tr><td>A new KPI</td><td>KPI intake</td><td>"Add a KPI with the KPI intake form"</td></tr><tr><td>A changed measure</td><td>Term change</td><td>"Change a measure with the term-change form"</td></tr><tr><td>A new system or table</td><td>Reference item</td><td>"Add a system or a table with the reference-item form"</td></tr><tr><td>A domain the ontology should use</td><td>Domain activation</td><td>"Activate a domain with the domain activation form"</td></tr><tr><td>Roles, RACI entries or a new process</td><td>Process map request</td><td>"Add roles and RACI entries with the process map request"</td></tr><tr><td>A new vocabulary or reference table</td><td>New module</td><td>Section 4 below</td></tr></tbody></table></div>
-<p>The steps below add a KPI. The other forms take the same four commands. The file and folder names in the commands are those of <code>HOW-TO-UPDATE.md</code>'s example, the made-up KPI Sample Spread Margin, saved in a folder <code>new-kpi</code> beside the release folder. Write the path of your own form in their place, and the proposal folder that the propose command prints.</p>
+<div class="tblwrap"><table><thead><tr><th>The change</th><th>The form</th><th>Its section in <code>HOW-TO-UPDATE.md</code></th></tr></thead><tbody><tr><td>A new KPI</td><td>KPI intake</td><td>"Add a KPI with the KPI intake form"</td></tr><tr><td>A changed measure</td><td>Term change</td><td>"Change a measure with the term-change form"</td></tr><tr><td>A new system or table</td><td>Reference item</td><td>"Add a system or a table with the reference-item form"</td></tr><tr><td>A domain the ontology should use</td><td>Domain activation</td><td>"Activate a domain with the domain activation form"</td></tr><tr><td>Roles or RACI entries</td><td>Process map request</td><td>"Add roles and RACI entries with the process map request"</td></tr><tr><td>A new process, step or business area</td><td>Process map request</td><td>"Add a process, a step or a business area with the process map request"</td></tr><tr><td>A new vocabulary or reference table</td><td>New module</td><td>Section 4 below</td></tr></tbody></table></div>
+<p>The steps below add a KPI, from the guide's example Sample Spread Margin, saved in a folder <code>new-kpi</code> beside the release folder. The other forms take the same four commands.</p>
 <ol><li>Check the filled form. The check changes nothing.
 <pre><code class="lang-powershell">python -m kpi_store.intake check ../new-kpi/sample-spread-margin.kpi-intake.json</code></pre>
 <p>You are done when it ends with:</p>
 <pre><code class="lang-text">Result: the intake is complete and signed.</code></pre></li></ol>
-<ol start="2"><li>Turn the form into a proposal. It writes a folder under <code>proposals</code>, beside the form, and changes nothing in the ontology.
+<ol start="2"><li>Turn the form into a proposal. It changes nothing in the ontology. It writes a proposal folder in a folder <code>proposals</code> beside the form, and names it:
 <pre><code class="lang-powershell">python -m kpi_store.propose ../new-kpi/sample-spread-margin.kpi-intake.json</code></pre>
 <pre><code class="lang-text">wrote the proposal ../new-kpi/proposals/NK-2026-001: 19 changes and 17 facts, route minor
 Nothing in the ontology has changed. Read each summary.txt, then apply with: python -m kpi_store.apply &lt;proposal folder&gt;</code></pre>
-<p>You are done when the folder <code>proposals/NK-2026-001</code> exists.</p></li></ol>
-<ol start="3"><li>Read the proposal's <code>summary.txt</code>, and have the Architect read it too. Open it in Notepad, or print it with the line below. It says what the change adds, which modules it reaches, the route, who signed, and what the Architect must still do outside the form.
-<pre><code class="lang-python">print(open("../new-kpi/proposals/NK-2026-001/summary.txt", encoding="utf-8").read())</code></pre>
+<p>You are done when it has named the proposal folder it wrote. Your proposal has its own number.</p></li></ol>
+<ol start="3"><li>Open the proposal's <code>summary.txt</code> in Notepad, and have the Architect read it too. It says what the change adds, which modules it reaches, the route, who signed, and what the Architect must still do outside the form.
 <p>You are done when the summary says what the form asked for.</p></li></ol>
-<ol start="4"><li>Apply the proposal. It works in a temporary copy, rebuilds and checks each changed module, releases it, and writes and commits the release only when every step has passed.
+<ol start="4"><li>Apply the proposal, with the folder that step 2 named. The command works in a temporary copy, rebuilds and checks each changed module, releases it, and writes and commits the release only when every step has passed.
 <pre><code class="lang-powershell">python -m kpi_store.apply ../new-kpi/proposals/NK-2026-001</code></pre>
-<p>You are done when it ends with these lines:</p>
+<p>You are done when it ends with a line that starts <code>Done.</code>, which names each changed module and its new version, and the line after it. For the example they read:</p>
 <pre><code class="lang-text">Done. kpi is now 1.4.0, data-product 1.3.0 and value-stream 1.3.0 (minor), and 4 modules that depend on them took a new patch. The apply changed &lt;count&gt; files, and Git committed them.
 Run the full check before you load: bash scripts/check.sh (on Windows, in Git Bash). Then load the stores with the runner: python -m kpi_store.runner</code></pre></li></ol>
 <ol start="5"><li>See the commit.
 <pre><code class="lang-powershell">git --no-pager log --oneline -1</code></pre>
-<p>You are done when it names the proposal.</p></li></ol>
-<ol start="6"><li>Run the full check, as section 6 says, then load the stores with the runner, as in section 2, step 4.
-<p>You are done when the sync check reads <code>current</code> on every line.</p></li></ol>
+<p>You are done when it names your proposal.</p></li></ol>
+<ol start="6"><li>Check the release and load the stores, as section 6, "After every change", says.
+<p>You are done when that part is done.</p></li></ol>
 <h2 id="4-add-a-module">4. Add a module<a class="hl" href="#4-add-a-module" aria-label="Link to this section">#</a></h2>
-<p>A new module goes in through the "New module" tab of the form and the same commands. It is a vocabulary, a list of terms with their definitions, or a reference table, items of a class the ontology holds already. A new module's first release is 1.0.0, a major, so the Data Owner, the Ontology Owner and the Architect sign the form. <code>HOW-TO-UPDATE.md</code>, "Add a module with the new-module form", has both kinds. The names in the commands are those of its example, the made-up vocabulary Sample Equipment Terms: write your own form's path and proposal folder in their place.</p>
+<p>A new module goes in through the "New module" tab of the form and the same commands. It is a vocabulary, a list of terms with their definitions, or a reference table, items of a class the ontology holds already. A new module's first release is 1.0.0, a major, so the Data Owner, the Ontology Owner and the Architect sign the form. <code>HOW-TO-UPDATE.md</code>, "Add a module with the new-module form", has both kinds. The commands below are those of its example, the made-up vocabulary Sample Equipment Terms.</p>
 <ol><li>Check the form.
 <pre><code class="lang-powershell">python -m kpi_store.intake check ../new-vocabulary/sample-equipment-terms.new-module.json</code></pre>
 <p>You are done when it ends with <code>Result: the intake is complete and signed.</code></p></li></ol>
 <ol start="2"><li>Turn it into a proposal.
 <pre><code class="lang-powershell">python -m kpi_store.propose ../new-vocabulary/sample-equipment-terms.new-module.json</code></pre>
-<pre><code class="lang-text">wrote the proposal ../new-vocabulary/proposals/NM-2026-001: 18 changes and 4 facts, route major</code></pre>
-<p>You are done when its <code>summary.txt</code> names the module and each term.</p></li></ol>
-<ol start="3"><li>Apply it. It writes the module's folder, registers the module in every place the release lists its modules, builds it, and releases it at 1.0.0. It took about three minutes on a Mac.
+<p>You are done when it has named the proposal folder it wrote, and its <code>summary.txt</code> names the module and each term.</p></li></ol>
+<ol start="3"><li>Apply it, with that folder. The command writes the module's folder, registers the module in every place the release lists its modules, builds it, and releases it at 1.0.0. It took about three minutes on a Mac.
 <pre><code class="lang-powershell">python -m kpi_store.apply ../new-vocabulary/proposals/NM-2026-001</code></pre>
-<p>You are done when it ends with:</p>
+<p>You are done when it ends with a line that starts <code>Done.</code> and names your module, as the example's does:</p>
 <pre><code class="lang-text">Done. sample-equipment-terms 1.0.0 is a new module (major). The apply changed &lt;count&gt; files, and Git committed them.</code></pre></li></ol>
-<ol start="4"><li>Run the full check and load the stores, as in section 3, step 6.
-<p>You are done when the sync check reads <code>current</code> on every line.</p></li></ol>
+<ol start="4"><li>Check the release and load the stores, as section 6, "After every change", says.
+<p>You are done when that part is done.</p></li></ol>
 <h2 id="5-let-an-ai-help">5. Let an AI help<a class="hl" href="#5-let-an-ai-help" aria-label="Link to this section">#</a></h2>
-<p>An AI can help in two ways. The names in the commands are those of <code>HOW-TO-UPDATE.md</code>'s two made-up examples: write your own form's path and your own local settings file in their place. In both, the commands check what the AI writes, people decide and sign, and nothing reaches the ontology until the apply's checks pass. Name the AI in the local settings file, as <code>HOW-TO-UPDATE.md</code>, "Choose the provider", says: usually a model served in your Databricks workspace, approved by your IT. The steps below use the <code>by-hand</code> provider, with which the command writes a prompt file, you give it to an assistant such as Genie Code, and you save its answer. With another provider, the command asks the model itself.</p>
-<p><strong>Suggestions for a form.</strong> The AI suggests answers to a form before anyone signs it. <code>HOW-TO-UPDATE.md</code>, "Use AI to suggest answers (optional)", has the whole example.</p>
-<ol><li>Ask for suggestions. The command writes the prompt to a file and stops.
+<p>An AI can help in two ways. In both, the commands check what the AI writes, people decide and sign, and nothing reaches the ontology until the apply's checks pass.</p>
+<p>The AI is named in your local settings file, as <code>HOW-TO-UPDATE.md</code> says in "Choose the provider" for suggestions and in "Choose the two AI providers" for new modelling: usually a model served in your Databricks workspace, approved by your IT. With such a model, the command asks the model itself. The steps below show the <code>by-hand</code> provider instead, as the guide's examples do: the command writes a prompt file, you give it to an assistant such as Genie Code, and you save its answer to a file. With a served model, leave out the steps that hand over a prompt or an answer.</p>
+<p>The guide's examples name a settings file of their own with <code>--stores</code>. Your commands find your settings file through <code>KPI_STORE_LOCAL</code>, so leave out <code>--stores</code> and the file after it.</p>
+<h3 id="suggestions-for-a-form">Suggestions for a form<a class="hl" href="#suggestions-for-a-form" aria-label="Link to this section">#</a></h3>
+<p>The AI suggests answers to a form before anyone signs it. <code>HOW-TO-UPDATE.md</code>, "Use AI to suggest answers (optional)", has the whole example.</p>
+<ol><li>Ask for suggestions. With the <code>by-hand</code> provider, the command writes the prompt to a file and stops.
 <pre><code class="lang-powershell">python -m kpi_store.propose --ai ../ai-suggestions/unit-utilization.term-change.json --stores ../ai-suggestions/kpi-store-local.toml</code></pre>
 <p>You are done when it names the prompt file it wrote.</p></li></ol>
-<ol start="2"><li>Give the prompt file to the assistant, and save its answer beside the form. Then run the command again with the answer. It shows each suggestion and asks you to accept it or not.
+<ol start="2"><li>Give the prompt file to the assistant, and save its answer beside the form, as the command says. Then run the command again with the answer. It shows each suggestion and asks you to accept it or not.
 <pre><code class="lang-powershell">python -m kpi_store.propose --ai ../ai-suggestions/unit-utilization.term-change.json --stores ../ai-suggestions/kpi-store-local.toml --ai-answer ../ai-suggestions/unit-utilization.term-change.ai-answer.json</code></pre>
 <p>You are done when the form holds the answers you accepted. The signers then sign it, and it goes on as in section 3.</p></li></ol>
-<p><strong>A draft of new modelling.</strong> A module that needs a class, a property or a rule of its own is new modelling. One AI drafts it, a second AI of another family reviews it, and five gates check it. <code>HOW-TO-UPDATE.md</code>, "Draft new modelling with AI (optional)", has every step, with the prompt files and the two answers.</p>
-<ol><li>Ask the AI to draft the module from the unsigned new-module form.
+<h3 id="a-draft-of-new-modelling">A draft of new modelling<a class="hl" href="#a-draft-of-new-modelling" aria-label="Link to this section">#</a></h3>
+<p>A module that needs a class, a property or a rule of its own is new modelling. One AI drafts it, a second AI of another model family reviews it, and five gates check it. <code>HOW-TO-UPDATE.md</code>, "Draft new modelling with AI (optional)", has every step. Start from a new-module form that asks for new modelling, filled and not signed.</p>
+<ol><li>Ask the AI to draft the module. With the <code>by-hand</code> provider, the command writes the drafter's prompt to a file and stops.
 <pre><code class="lang-powershell">python -m kpi_store.propose --ai-draft ../ai-modelling/sample-tank-inspections.new-module.json --stores ../ai-modelling/kpi-store-local.toml</code></pre>
-<p>You are done when the guide's steps 2 to 7 are done: the draft passed its gates, the reviewer said PASS, and the three signers signed the form.</p></li></ol>
-<ol start="2"><li>Turn the signed form into a proposal, and apply it.
+<p>You are done when it names the prompt file it wrote.</p></li></ol>
+<ol start="2"><li>Give the prompt file to the drafter's assistant, save its answer as the command says, and run the command again with the draft. It checks the draft with gates 1, 2 and 4, then writes the reviewer's prompt and stops.
+<pre><code class="lang-powershell">python -m kpi_store.propose --ai-draft ../ai-modelling/sample-tank-inspections.new-module.json --stores ../ai-modelling/kpi-store-local.toml --ai-answer ../ai-modelling/sample-tank-inspections.new-module.draft-answer.json</code></pre>
+<p>You are done when it says that gates 1, 2 and 4 passed and names the reviewer's prompt file. If a gate fails, it says why and keeps nothing: ask the AI again, and give it those lines.</p></li></ol>
+<ol start="3"><li>Give the reviewer's prompt to the reviewer's assistant, of the other model family, save its answer as the command says, and run the command again with the review. The review is gate 3. The command writes the summary that the signers read.
+<pre><code class="lang-powershell">python -m kpi_store.propose --ai-draft ../ai-modelling/sample-tank-inspections.new-module.json --stores ../ai-modelling/kpi-store-local.toml --review-answer ../ai-modelling/sample-tank-inspections.new-module.review-answer.json</code></pre>
+<p>You are done when it says gate 3 passed and names the summary for the signers. If the reviewer answers HOLD, do what the guide's step 6 says.</p></li></ol>
+<ol start="4"><li>The Data Owner, the Ontology Owner and the Architect read the summary, then load the form in the HTML form ("Load answers file"), sign and save it. Do not change any answer now: the next command refuses a form whose answers changed after the AI drafted the module.
+<p>You are done when all three have signed.</p></li></ol>
+<ol start="5"><li>Turn the signed form into a proposal. Then apply it, with the proposal folder the first command names.
 <pre><code class="lang-powershell">python -m kpi_store.propose ../ai-modelling/sample-tank-inspections.new-module.json</code></pre>
 <pre><code class="lang-powershell">python -m kpi_store.apply ../ai-modelling/proposals/NM-2026-003</code></pre>
-<p>You are done when the apply ends with:</p>
+<p>You are done when the apply ends with a line that starts <code>Done.</code> and names your module, as the example's does:</p>
 <pre><code class="lang-text">Done. sample-tank-inspections 1.0.0 is a new module (major). The apply changed &lt;count&gt; files, and Git committed them.</code></pre></li></ol>
-<ol start="3"><li>Run the full check and load the stores, as in section 3, step 6.</li></ol>
-<h2 id="6-check-the-release-and-recover-from-a-failure">6. Check the release and recover from a failure<a class="hl" href="#6-check-the-release-and-recover-from-a-failure" aria-label="Link to this section">#</a></h2>
-<ol><li>Run the full check after every change, before you load. Open Git Bash in the release folder: in File Explorer, right-click the folder and choose "Open Git Bash here". It took 21 minutes on a Windows machine with 4 cores.
+<ol start="6"><li>Check the release and load the stores, as section 6, "After every change", says.
+<p>You are done when that part is done.</p></li></ol>
+<h2 id="6-check-the-release-and-recover">6. Check the release and recover<a class="hl" href="#6-check-the-release-and-recover" aria-label="Link to this section">#</a></h2>
+<h3 id="after-every-change">After every change<a class="hl" href="#after-every-change" aria-label="Link to this section">#</a></h3>
+<p>Do these three steps after every change of sections 3 to 5, 7, 8 and 9, in this order.</p>
+<ol><li>Run the full check. Open Git Bash in the release folder: in File Explorer, right-click the folder and choose "Open Git Bash here". It took 21 minutes on a Windows machine with 4 cores.
 <pre><code class="lang-bash">bash scripts/check.sh</code></pre>
 <p>You are done when its last line reads <code>all checks passed</code>. A line that starts <code>FAIL a store request</code> comes from a test that fails a write on purpose, and is expected.</p></li></ol>
-<ol start="2"><li>See which store is behind, at any time. The sync check only reads.
+<ol start="2"><li>Load the stores. Go back to PowerShell, in the release folder.
+<pre><code class="lang-powershell">python -m kpi_store.runner</code></pre>
+<p>You are done when its last line reads <code>every step passed</code>. If it stops on a line that starts <code>report: STOPPED</code>, the workspace differs from the release: clear the report and run again, as in section 2, steps 3 and 4.</p></li></ol>
+<ol start="3"><li>Check the stores.
 <pre><code class="lang-powershell">python -m kpi_store.sync_check</code></pre>
-<p>You are done when you know which lines do not read <code>current</code>. The runbook's "The sync check" says what each status means.</p></li></ol>
-<ol start="3"><li>When a run stops on a step, read the line it names, fix what it says, and run again from that step. The runbook's "When a step fails" lists each step's failures and fixes. For example, to start again at the Fuseki load:
+<p>You are done when every line reads <code>current</code>.</p></li></ol>
+<h3 id="when-a-run-fails">When a run fails<a class="hl" href="#when-a-run-fails" aria-label="Link to this section">#</a></h3>
+<p>Use these steps only when a run stops on a step.</p>
+<ol><li>Read the line the run stopped on, and fix what it says. The runbook's "When a step fails" lists each step's failures and fixes.
+<p>You are done when you have done what the line says.</p></li></ol>
+<ol start="2"><li>Run again from the step that failed, such as <code>fuseki</code>:
 <pre><code class="lang-powershell">python -m kpi_store.runner --from fuseki</code></pre>
 <p>You are done when the run's last line reads <code>every step passed</code>.</p></li></ol>
-<ol start="4"><li>If the check step fails because of the machine, such as a file another program holds open, and not because of the release, report it and leave the step out of the run:
+<ol start="3"><li>If the step <code>check</code> fails because of the machine, such as a file that another program holds open, and not because of the release, report it, and leave the step out of the run:
 <pre><code class="lang-powershell">python -m kpi_store.runner --skip check</code></pre>
 <p>You are done when the last line names the step that was left out. A run with a step left out never says <code>every step passed</code>.</p></li></ol>
 <h2 id="7-replace-what-a-store-holds-or-reset-every-store">7. Replace what a store holds, or reset every store<a class="hl" href="#7-replace-what-a-store-holds-or-reset-every-store" aria-label="Link to this section">#</a></h2>
-<p><strong>These commands delete data.</strong> Have the written authorization ready before you start.</p>
-<ol><li>Replace what Neo4j Enterprise holds, when the runbook's "Replace what Enterprise holds: one case" applies.
+<p><strong>These commands delete data.</strong> Have the written authorization ready before you start. The two parts below are separate: do only the one you are authorized for.</p>
+<h3 id="replace-what-neo4j-enterprise-holds">Replace what Neo4j Enterprise holds<a class="hl" href="#replace-what-neo4j-enterprise-holds" aria-label="Link to this section">#</a></h3>
+<ol><li>Replace it, when the runbook's "Replace what Enterprise holds: one case" applies. The command loads Enterprise again and runs the sync check.
 <pre><code class="lang-powershell">python -m kpi_store.runner --from enterprise --replace-enterprise</code></pre>
-<p>You are done when the sync check reads <code>current</code> for <code>enterprise</code>.</p></li></ol>
-<ol start="2"><li>To empty every store and load it again, first see what the reset would delete. It deletes nothing.
+<p>You are done when the run's last line reads <code>every step passed</code>, and its sync check reads <code>current</code> for <code>enterprise</code>.</p></li></ol>
+<h3 id="empty-every-store-and-load-it-again">Empty every store and load it again<a class="hl" href="#empty-every-store-and-load-it-again" aria-label="Link to this section">#</a></h3>
+<ol><li>See what the reset would delete. It deletes nothing.
 <pre><code class="lang-powershell">python -m kpi_store.runner --reset --dry-run</code></pre>
 <p>You are done when the person who authorized the reset has read the list.</p></li></ol>
-<ol start="3"><li>Run the reset. It asks you to type the word <code>reset</code>.
+<ol start="2"><li>Run the reset. It asks you to type the word <code>reset</code>.
 <pre><code class="lang-powershell">python -m kpi_store.runner --reset</code></pre>
-<p>You are done when the sync check reads <code>unmarked</code> for each store that was emptied.</p></li></ol>
-<ol start="4"><li>Load every store again, as in section 2, step 4.
+<p>You are done when it has emptied each store it lists.</p></li></ol>
+<ol start="3"><li>Check the stores.
+<pre><code class="lang-powershell">python -m kpi_store.sync_check</code></pre>
+<p>You are done when each store that was emptied reads <code>unmarked</code>, as the first line does here:</p>
+<pre><code class="lang-text">databricks      unmarked    &lt;why&gt;</code></pre></li></ol>
+<ol start="4"><li>Load every store again and check them, as section 6, "After every change", steps 2 and 3, say.
 <p>You are done when the sync check reads <code>current</code> on every line.</p></li></ol>
 <h2 id="8-upgrade-the-tools-from-a-newer-release">8. Upgrade the tools from a newer release<a class="hl" href="#8-upgrade-the-tools-from-a-newer-release" aria-label="Link to this section">#</a></h2>
 <p>Your copy is the master of the ontology. A newer release from the release's team brings new tools: the commands, the scripts, the skills and the guides. The upgrade takes them into your copy and keeps every change you applied. It runs the full check on the merged copy, and changes your folder only when that passes. <code>HOW-TO-UPDATE.md</code>, "Upgrade the tools from a newer release", says how it decides which files are tools.</p>
-<ol><li>Save the new zip beside the release folder. The commands name it <code>kpi-store-newer.zip</code>, as the guide's example does: write the name of the zip you received. Commit every change in the release folder first: the upgrade refuses a copy with changes that are not committed. Then see what the upgrade would do. The plan changes nothing.
+<ol><li>Save the new zip beside the release folder. The commands below name it <code>kpi-store-newer.zip</code>, as the guide's example does: write the name of the zip you received.
+<p>You are done when the zip is beside the release folder.</p></li></ol>
+<ol start="2"><li>Make sure every change in the release folder is committed: the upgrade refuses a copy with changes that are not committed. The change commands commit their own changes. A file you changed by hand, as in section 9, you commit as section 9 shows.
+<p>You are done when the upgrade's plan, in step 3, does not refuse the copy.</p></li></ol>
+<ol start="3"><li>See what the upgrade would do. The plan changes nothing.
 <pre><code class="lang-powershell">python -m kpi_store.upgrade --from ../kpi-store-newer.zip --plan</code></pre>
 <p>You are done when the zip's SHA-256 in the first line equals the one the release's team sent you, and you have read the plan.</p></li></ol>
-<ol start="2"><li>Upgrade. It takes about 20 minutes, most of it the full check.
+<ol start="4"><li>Upgrade. It takes about 20 minutes, most of it the full check.
 <pre><code class="lang-powershell">python -m kpi_store.upgrade --from ../kpi-store-newer.zip</code></pre>
 <p>You are done when it ends with a line that starts <code>Upgraded to the tools of</code>. When it stops instead, your folder is as it was: send its message, and the files or the log it names, to the release's team.</p></li></ol>
-<ol start="3"><li>Load the stores with the runner, as in section 2, step 4.
+<ol start="5"><li>Run the setup check again, because a newer release may name newer versions of the programs and packages. If it fails, do what its <code>fix:</code> lines say.
+<pre><code class="lang-powershell">python -m kpi_store.setup_check</code></pre>
+<p>You are done when its last line reads <code>15 of 15 checks passed</code>.</p></li></ol>
+<ol start="6"><li>Load the stores and check them, as section 6, "After every change", steps 2 and 3, say.
 <p>You are done when the sync check reads <code>current</code> on every line.</p></li></ol>
 <h2 id="9-refresh-what-people-use">9. Refresh what people use<a class="hl" href="#9-refresh-what-people-use" aria-label="Link to this section">#</a></h2>
-<p>The commands of sections 3 to 5 rebuild what they change: the KPI intake pack's lists and the release's pages. After a change, people still need the new copies.</p>
-<ol><li>Rebuild the KPI intake pack, when you have changed <code>kpi-intake/settings.toml</code>, for example to add a domain or a role title.
+<p>The change commands of sections 3 to 5 rebuild what they change, including the KPI intake pack's forms and the release's pages, and commit it. After a change, people still need the new forms. When the Architect changes the form's own settings, <code>kpi-intake/settings.toml</code>, the pack needs a rebuild and a commit by hand. The steps below show both.</p>
+<ol><li>When you have changed <code>kpi-intake/settings.toml</code>, as <code>kpi-intake/README.md</code>, "Change the form", says, rebuild the pack.
+<p>The document test changes the settings with this block. You changed yours in Notepad, so skip it.</p>
+<pre><code class="lang-python">from pathlib import Path
+
+path = Path("kpi-intake/settings.toml")
+path.write_text(path.read_text(encoding="utf-8") + "\n# A change by the Architect.\n", encoding="utf-8", newline="\n")
+print("changed", path)</code></pre>
+<pre><code class="lang-text">changed kpi-intake/settings.toml</code></pre>
 <pre><code class="lang-powershell">python -m kpi_store.intake build</code></pre>
-<p>Then copy the new forms into the team's shared folder with the <code>folders</code> command, as <code>kpi-intake/README.md</code>, "The shared folder", shows. It replaces the forms and the guide in <code>the-form</code>, and changes nothing in the folders that hold people's answers.</p>
+<p>You are done when it ends without an error.</p></li></ol>
+<ol start="2"><li>Commit what you changed by hand, with a message that says what it was.
+<pre><code class="lang-powershell">git add -A
+git commit -q -m "Change the KPI intake pack's settings"</code></pre>
+<pre><code class="lang-powershell">git --no-pager log --oneline -1</code></pre>
+<pre><code class="lang-text">&lt;commit&gt; Change the KPI intake pack's settings</code></pre>
+<p>You are done when the log names your commit.</p></li></ol>
+<ol start="3"><li>After any change of sections 3 to 5 or 9, give people the new forms. Copy them into the team's shared folder with the <code>folders</code> command, as <code>kpi-intake/README.md</code>, "The shared folder", shows, with the place of your shared folder in place of its <code>.</code>. It replaces the forms and the guide in <code>the-form</code>, and changes nothing in the folders that hold people's answers.
 <p>You are done when the <code>folders</code> command ends with:</p>
 <pre><code class="lang-text">KPI-intake is ready</code></pre></li></ol>
-<ol start="2"><li>Rebuild the release's pages after you have changed a guide.
-<pre><code class="lang-powershell">python scripts/build_docs_html.py</code></pre>
-<p>You are done when the full check passes: it fails when a page differs from a fresh build.</p></li></ol>
-<ol start="3"><li>Load the stores, as in section 2, step 4, so that Databricks, the two Neo4j databases and Fuseki hold the new release.
-<p>You are done when the sync check reads <code>current</code> on every line.</p></li></ol>
+<ol start="4"><li>Check the release and load the stores, as section 6, "After every change", says.
+<p>You are done when that part is done.</p></li></ol>
       <p class="end">Generated from <code>HANDOUT.md</code> by <code>scripts/build_docs_html.py</code>. Start with the <a href="business_architecture/ontology/epm-ontology-guide.html">ontology guide</a>.</p>
     </article>
   </div>

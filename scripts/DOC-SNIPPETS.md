@@ -294,10 +294,12 @@ When a block shows the content of a file of the release, name the file. The path
 folder. `file=` is for the whole file and `excerpt=` for some lines of it. The block fails when the file changes
 and the document does not.
 
-An excerpt's lines may stand indented in the file, as a block inside a list item does. The check takes off the
-spaces that all of them share before it compares, so a guide can quote a command of another guide's numbered step
-as it reads there. A block that quotes a command which another document runs and checks is how one document shows
-that command without running it a second time.
+An excerpt of a Markdown file may also quote the lines of one of its blocks as that block's document reads them. A
+block inside a list item stands indented in its file, and the check reads its body without the fence's indent, so
+a guide can quote a command of another guide's numbered step as it reads there. Only a fence's indent comes off:
+the lines of a code file, and prose that only stands indented, match where they stand. A block that quotes a
+command which another document runs and checks is how one document shows that command without running it a second
+time.
 
 ````markdown nested
 ```csv file=skills/ontology/templates/regression-expected.csv
