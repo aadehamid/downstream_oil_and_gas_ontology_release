@@ -21,8 +21,9 @@ checks the zip, unpacks it and calls run here with a function that runs one SQL 
 run compares the ontology with the workspace, writes the report, and calls load only when no row blocks. The
 technical graph's load (kpi_store.tech_graph) and the sync check use the same Gate and the helpers here.
 
-What it writes: the tables epm_triples and epm_store_markers in the write schema, a staging table there for the
-length of the load, and the report files in the volume. It creates the two KPI Store schemas and the volume when
+What it writes: the tables epm_triples and epm_store_markers in the write schema, with a comment on each table and
+each column (comment_statements), a staging table there for the length of the load, and the report files in the
+volume. It creates the two KPI Store schemas and the volume when
 they are missing. Its table writes all go to those two schemas, also when the write catalog is one of the read
 catalogs. It has no command: it runs inside the notebook.
 """
@@ -103,8 +104,8 @@ class Gate:
         def name_of(table):
             return ".".join(p for p in (table.catalog, table.db, table.name) if p).lower()
 
-        # The writes that pass: create a table or a schema, insert, delete, drop a table, and the CREATE VOLUME
-        # above. A statement that drops a schema, or creates a view or a function, is refused.
+        # The writes that pass: create a table or a schema, insert, delete, drop a table, the CREATE VOLUME above,
+        # and the comments below. A statement that drops a schema, or creates a view or a function, is refused.
         target = None
         if isinstance(tree, (exp.Create, exp.Insert, exp.Delete, exp.Drop)):
             kind = (tree.args.get("kind") or "TABLE").upper()
@@ -122,6 +123,21 @@ class Gate:
             written = name_of(target)
             schema = written if kind == "SCHEMA" else written.rsplit(".", 1)[0]
             if written.count(".") != (1 if kind == "SCHEMA" else 2) or not self._may_write(schema):
+                raise GateRefusal(f"refused: a write outside the KPI Store's schemas: {written}")
+        # The comments the load writes on its own tables (comment_statements): COMMENT ON TABLE, and ALTER TABLE
+        # with ALTER COLUMN ... COMMENT and nothing else. Any other ALTER, and a comment on anything but a table, is
+        # refused.
+        elif isinstance(tree, (exp.Comment, exp.Alter)):
+            kind = str(tree.args.get("kind") or "").upper()
+            actions = tree.args.get("actions") or [] if isinstance(tree, exp.Alter) else []
+            only_comments = all(isinstance(a, exp.AlterColumn)
+                                and {k for k, v in a.args.items() if v not in (None, False)} == {"this", "comment"}
+                                for a in actions)
+            if kind != "TABLE" or not isinstance(tree.this, exp.Table) or (isinstance(tree, exp.Alter) and not (actions and only_comments)):
+                raise GateRefusal(f"refused: {type(tree).__name__} {kind} is not a statement the KPI Store runs")
+            target = tree.this
+            written = name_of(target)
+            if written.count(".") != 2 or not self._may_write(written.rsplit(".", 1)[0]):
                 raise GateRefusal(f"refused: a write outside the KPI Store's schemas: {written}")
         # The only reads: SELECT and DESCRIBE. Every other kind of statement is refused, an UPDATE or a MERGE too.
         elif not isinstance(tree, (exp.Select, exp.Describe)):
@@ -230,6 +246,51 @@ def _literal(text):
     return "decode(unbase64('" + base64.b64encode(text.encode("utf-8")).decode("ascii") + "'), 'UTF-8')"
 
 
+# ---- the comments on the tables ----------------------------------------------------------------
+
+# The comments the load writes on the tables it creates, so that Unity Catalog, Genie and a person see what each
+# table and column holds. The tables hold the release as rows of the rdf-store skill's format (rdfstore.COLUMNS), so
+# their columns mean what that format says. A replace by CREATE ... AS SELECT keeps no comment, and Databricks takes
+# no column list beside AS SELECT, so the comments are written after the table is created.
+TRIPLES_COMMENT = ("The KPI Store release as RDF quads, one row per quad: each newest package's content, shapes "
+                   "and catalog, each in a named graph of its own. epm_store_markers says which release it holds.")
+TRIPLE_COLUMNS = {
+    "subject": "The quad's subject: an IRI, or a blank node written _: followed by its label.",
+    "predicate": "The quad's predicate, an IRI.",
+    "object": "The quad's object: an IRI, a blank node or the text of a literal. object_kind says which.",
+    "object_kind": "What object holds: iri, bnode or literal.",
+    "datatype": "The datatype IRI of a literal without a language tag. NULL for an IRI, a blank node or a literal "
+                "with a language tag.",
+    "lang": "The language tag of a literal, such as en. NULL otherwise.",
+    "graph": "The IRI of the named graph the quad belongs to.",
+}
+MARKERS_COMMENT = "Which release each KPI Store table was loaded from"
+MARKER_COLUMNS = {
+    "store": "The store the row describes.",
+    "marker": "JSON: what the table was loaded from, its row count and hash, and when the row was written.",
+}
+
+
+def sql_string(text):
+    """Text as a SQL string literal for a comment. Databricks reads a backslash in a literal as an escape (the
+    STRING type page of its SQL reference, "Literals"), so a backslash and a quote are each escaped with one; a line
+    end or a tab becomes a space. The statement goes to spark.sql, so no notebook widget reads a $ in it."""
+    return "'" + " ".join(str(text).split()).replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+
+def comment_statements(table, table_comment, columns):
+    """The statements that write a comment on the table and on each of its columns: COMMENT ON TABLE, then one
+    ALTER TABLE ... ALTER COLUMN ... COMMENT per column, which every Databricks Runtime with Delta reads."""
+    return [f"COMMENT ON TABLE {table} IS {sql_string(table_comment)}"] + [
+        f"ALTER TABLE {table} ALTER COLUMN {column} COMMENT {sql_string(text)}" for column, text in columns.items()]
+
+
+def write_comments(gate, table, table_comment, columns):
+    """Writes the comments of comment_statements through the Gate."""
+    for statement in comment_statements(table, table_comment, columns):
+        gate.run(statement)
+
+
 def _own_tables(gate, settings):
     """The names of the tables in the write schema, in lower case. Asked first, so a table that is not there yet
     is seen as missing and never read."""
@@ -255,7 +316,8 @@ def _write_marker(gate, settings, marker):
     passed. The row is deleted and then inserted, in two statements: a run stopped between them leaves the store
     with no marker row, and a later run writes it again."""
     gate.run(f"CREATE TABLE IF NOT EXISTS {settings.markers_table} (store STRING, marker STRING) USING DELTA "
-             "COMMENT 'Which release each KPI Store table was loaded from'")
+             f"COMMENT {sql_string(MARKERS_COMMENT)}")
+    write_comments(gate, settings.markers_table, MARKERS_COMMENT, MARKER_COLUMNS)
     gate.run(f"DELETE FROM {settings.markers_table} WHERE store = '{STORE}'")
     gate.run(f"INSERT INTO {settings.markers_table} (store, marker) SELECT '{STORE}', {_literal(json.dumps(marker, sort_keys=True))}")
 
@@ -264,8 +326,8 @@ def load(gate, settings, release_root, commit, now=None, rdfstore=None, batch=BA
     """Loads the release into epm_triples and marks it. Returns a dict whose "status" is one of:
 
     current           the table and its marker already hold this release; nothing was written
-    marked            the table already held this release; only the marker was written
-    loaded            the table was replaced through the staging check, read back, and marked
+    marked            the table already held this release; only the comments and the marker were written
+    loaded            the table was replaced through the staging check, read back, commented and marked
     staging-mismatch  the staging table's hash differed; the main table is untouched (see "comparison")
     main-mismatch     the main table's hash differed after the replace; no marker was written
 
@@ -294,6 +356,7 @@ def load(gate, settings, release_root, commit, now=None, rdfstore=None, batch=BA
         held = read_marker(gate, settings) or {}
         if all(held.get(k) == v for k, v in stable.items()):
             return {**result, "status": "current", "marker": held}
+        write_comments(gate, settings.triples_table, TRIPLES_COMMENT, TRIPLE_COLUMNS)   # a run stopped before its marker
         _write_marker(gate, settings, marker)
         return {**result, "status": "marked", "marker": marker}
 
@@ -302,6 +365,7 @@ def load(gate, settings, release_root, commit, now=None, rdfstore=None, batch=BA
     passed, comparison = rdfstore.roundtrip(store, dataset)
     if not passed:
         return {**result, "status": "main-mismatch" if comparison.get("published") else "staging-mismatch", "comparison": comparison}
+    write_comments(gate, settings.triples_table, TRIPLES_COMMENT, TRIPLE_COLUMNS)   # the replace kept none
     _write_marker(gate, settings, marker)
     if comparison.get("staging_not_dropped"):   # the load passed; a person drops the table the round trip could not
         result["staging_not_dropped"] = comparison["staging_not_dropped"]

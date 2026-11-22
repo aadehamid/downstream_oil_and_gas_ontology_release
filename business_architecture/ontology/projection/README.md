@@ -21,7 +21,10 @@ Each module package has three graphs: `<module>.ttl` (the content), `shapes.ttl`
 
 | File | What it is |
 |---|---|
-| `pipeline.py` | What runs with no database, in CI: `build` checks the rules, validates and writes the manifest; `build --verify` fails unless the manifest is current; `record --run <driver out>` takes a driver run's `inferred.nt` and a summary of its report into this folder. It also holds the input lists the driver reads |
+| `pipeline.py` | What runs with no database, in CI: `build` checks the rules, validates and writes the manifest and `neo4j-spec.json`; `build --verify` fails unless both are current and the specification conforms to its schema; `record --run <driver out>` takes a driver run's `inferred.nt` and a summary of its report into this folder. It also holds the input lists the driver reads |
+| `neo4j-spec.json` | The graph the load builds, as a Neo4j Ontology Graph Specification 1.1.0 document: "The Neo4j specification" below |
+| `neo4j_spec.py` | Writes `neo4j-spec.json` for `pipeline.py build` and checks it against the schema. `test_neo4j_spec.py` holds its offline tests |
+| `neo4j-spec-schema-1.1.0.json` | The specification's 1.1.0 JSON Schema, kept here so the check runs offline |
 | `inferred.nt` | The reasoner's inferences about the domain, from the last driver run |
 | `projection-manifest.json` | Input and shape hashes, triple counts, the input fingerprint, the pinned versions, the listed release gaps (none since `integration` 2.0.0, the decision of 2026-10-23) |
 | `projection-report.json` | A summary of the last load's report, for the fingerprint it names. The full report stays in the driver's output folder |
@@ -47,7 +50,7 @@ On the client platform one command runs the projection and every load: the runne
 
 Two commands of this folder need no database. Run them from this folder after any input or shape changes.
 
-1. Check the rules, validate, and compare the manifest with a fresh build. It fails unless the manifest is current. To write a new manifest, run `python pipeline.py build`.
+1. Check the rules, validate, and compare the manifest and the Neo4j specification with a fresh build. It fails unless both are current and the specification conforms to its schema. To write them again, run `python pipeline.py build`.
 
    ```powershell run=release-copy
    cd business_architecture/ontology/projection
@@ -57,11 +60,36 @@ Two commands of this folder need no database. Run them from this folder after an
    ```text expect
    Step 1 passed; loadable.nt <count> triples, inferred.nt 2
    projection-manifest.json is current
+   neo4j-spec.json is current and conforms to the specification's 1.1.0 schema
    ```
 
 2. After a Neo4j load, take the load's result into this folder: `inferred.nt`, a summary of its report, and the manifest. The runbook's section "Record the load's report in the release folder" runs the command, `python pipeline.py record`, on a real load. It refuses a load that read other inputs than this tree's, or whose report did not pass.
 
 The Databricks table is not loaded from here. The runner's `notebook` step loads `epm_triples` with the `rdf-store` skill's `rdfstore.py` and writes the table's marker row in `epm_store_markers`.
+
+## The Neo4j specification
+
+`neo4j-spec.json` describes the graph the local Neo4j load builds from the release, in the format of Neo4j's Ontology Graph Specification, version 1.1.0. Each node label, relationship type and property key is the name the load gives the term: the prefix, one underscore, the local name, as in `kpi_MeasureDefinition`. Each carries the term's `skos:definition` as its description (its `rdfs:comment` when it has none), its `skos:altLabel` values as its aliases, and its IRI as its reference. Every label also implies the label `Resource`, whose `uri` n10s keeps unique. A question agent reads from it what a label means, not only that it exists.
+
+`pipeline.py build` writes the document with the manifest, so it changes only when a package changes. `pipeline.py build --verify` fails unless it equals a fresh build and conforms to the schema. The node, relationship and property types come from the shapes, by the mapping of the `ontology-to-lpg` skill's `graph-type` and `data-model` commands. To read one node of the document:
+
+```powershell run=release-copy
+python -c "import json; n = json.load(open('neo4j-spec.json', encoding='utf-8'))['nodes']['kpi_MeasureDefinition']; print(n['labels']['identifier'], n['reference'])"
+```
+
+```text expect
+kpi_MeasureDefinition https://w3id.org/mpc/ontology/modules/kpi/MeasureDefinition
+```
+
+The schema is `neo4j-spec-schema-1.1.0.json`, an unchanged copy of `https://neo4j.com/docs/ontology-graph-spec/1.1.0/schema.json` (version 1.1.0 of the specification; the server dated the file 2026-10-29). It was fetched on 2026-11-21, and its SHA-256 is `c8fc0021c86b944a3090e7c5e084409970274fdabea79c8b715976fc09da78eb`. The specification's own pages are at `https://neo4j.com/docs/ontology-graph-spec/`. `test_neo4j_spec.py` checks the copy's hash.
+
+The document is an export. The Turtle stays the master copy, and the document cannot carry all of it:
+
+- **No RDF or OWL meaning.** A reference is text, not identity. The document states no class hierarchy and no inference rule, so nothing can be inferred from it.
+- **The shapes are not enforced.** `must_exist` marks a property whose shape gives `sh:minCount` 1 or more. Neo4j holds no such constraint: n10s checks the shapes during the load. The one database constraint is the unique `uri` of `Resource`.
+- **Some shapes have no form in the document.** These are left out: a value list (`sh:in`, `sh:hasValue`), a node kind, a pattern, a range or a length, a closed shape, `sh:disjoint`, a count other than 0 or 1, the counts of a relationship, a datatype with no Neo4j type in the mapping (such as `xsd:dateTime`), a path other than one predicate, and a property shape that names no datatype and no class. So a link whose shape gives only `sh:nodeKind sh:IRI` is not in the document. `extensions.custom.left_out` lists each one.
+- **Standard terms have no description.** The release does not hold the definitions of SKOS, PROV, W3C ORG or Dublin Core terms, so those keep only their reference.
+- **What the release's Turtle does not hold is not described.** The `n4sch_` schema nodes of the ontology import, the `ModuleRelease` records, the `LogicalModel` and `Tech` subgraphs and the store markers are left out.
 
 ## Check the stores
 

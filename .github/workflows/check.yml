@@ -531,14 +531,17 @@ jobs:
           if ((Get-Location).Path -ne "$folder\kpi-store-1.1") { exit 1 }
 
       # ---- both parts: the first run, the cleared report, the second run ----
-      # Part run gives no option, as the runbook's "The first run" and "The second run" do. Part reset adds
-      # --skip check, the runbook's own fallback, so that it reaches the reset inside the time limit.
-      - name: which options the runs of this part take
+      # Part run's second run gives no option, as the runbook's "The second run" does, so the runner's check step runs
+      # the whole check on the copy the cut corrected. Its first run, and both runs of part reset, add --skip check,
+      # the runbook's own fallback: the first run's check reads the release as shipped, which the check jobs above
+      # prove already, and each whole check took this job close to two hours on Windows (4 h 21 min for the job on
+      # 2026-11-22, of a 5 h limit).
+      - name: which options the runs after the first take in this part
         run: echo "RUN_OPTIONS=${{ matrix.part == 'reset' && '--skip check' || '' }}" >> "$GITHUB_ENV"
       - name: the first run, which must stop on the report with exit code 3
         run: |
           code=0
-          python -m kpi_store.runner $RUN_OPTIONS | tee "$LOCAL/first-run.log" || code=$?
+          python -m kpi_store.runner --skip check | tee "$LOCAL/first-run.log" || code=$?
           echo "exit code $code"
           [ "$code" -eq 3 ]
           grep -q "^report: STOPPED" "$LOCAL/first-run.log"

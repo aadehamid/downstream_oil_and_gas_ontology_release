@@ -302,7 +302,7 @@ The versions in the commands are those of the release as you received it. Read t
 
    The lines that say "Now run" are `start`'s own. `cascade` has already run that command for each module. `cascade` verifies each package against a fresh build before it finishes the module. If it stops halfway, fix what it names and run it again. It keeps its plan in `release\cascade-in-progress.json` until it ends, so the next run leaves a finished module alone and builds what is missing. If it names a folder that is not a whole package, delete that folder first. A build that failed midway leaves such a folder.
 
-7. Rebuild the catalog, then the projection manifest, then run the competency questions.
+7. Rebuild the catalog, then the projection manifest and the Neo4j specification, then run the competency questions.
 
    ```powershell run=slow
    python build_catalog.py --write
@@ -2611,7 +2611,7 @@ The cut tool applies corrections to the tables in `data-product/pricing/` only. 
 1. Run the module's builder with `--write`, from the module's folder.
 2. Write the package: `python build_module.py <module> --write`, from `business_architecture/ontology/release`.
 3. Rebuild the catalog: `python build_catalog.py --write`, from the same folder.
-4. Rebuild the projection manifest: `python pipeline.py build`, from `business_architecture/ontology/projection`.
+4. Rebuild the projection manifest and the Neo4j specification: `python pipeline.py build`, from `business_architecture/ontology/projection`.
 5. Run the competency questions: `python run.py`, from `business_architecture/ontology/regression`.
 6. Rebuild the KPI intake pack: `python -m kpi_store.intake build`, from the top folder. Its lists name the release's modules.
 7. Rebuild the pages: `python scripts/build_docs_html.py`, from the top folder.
@@ -2709,6 +2709,7 @@ The commands start in the top folder of the copy.
    ```text expect
    ...
    wrote projection-manifest.json
+   wrote neo4j-spec.json
    ```
 
 6. Run the competency questions. The count is one higher than before: the module's question is number 58.
@@ -2772,6 +2773,7 @@ Each model is two files in `business_architecture\ontology\logical-model\models`
    ```powershell run=release-copy status-only
    cd business_architecture/ontology/logical-model
    python build_logical_model.py --export models/customer-logical-model.erstudio.ttl --links models/customer-logical-model.links.csv --model customer-logical-model --title "Customer logical model" --out models --verify
+   cd ../../..
    ```
 
 3. In `release/build_module.py`, add the model's two graph files to the `graphs` list of the `logical-model` entry: the `.erstudio.ttl` file and the `.layer.ttl` file that the builder wrote.
@@ -2788,9 +2790,25 @@ A build can also read a model's files from a folder outside your copy. Point `--
 |---|---|---|
 | The catalog, `releases/catalog.ttl` | `python build_catalog.py --write`, in `release` | After any package is written. |
 | The regression | `python run.py`, in `regression` | After any change. A new question goes in `regression/expected.csv`, with its query in `regression/queries`. |
-| The projection manifest | `python pipeline.py build`, in `projection` | After any package is written. The check fails until you run it. |
+| The projection manifest and the Neo4j specification | `python pipeline.py build`, in `projection` | After any package is written. The check fails until you run it. |
 
 Step 7 of "The release steps" runs all three.
+
+`pipeline.py build` writes two files: the manifest, `projection-manifest.json`, and the Neo4j specification, `neo4j-spec.json`. The specification describes the graph that the Neo4j load builds: each node label, relationship type and property key, with the term's definition, its other names and its IRI. It follows version 1.1.0 of Neo4j's Ontology Graph Specification. Nobody edits it by hand. The projection's `README.md`, "The Neo4j specification", says what it holds and what it cannot carry.
+
+To check that both files are current, and that the specification conforms to Neo4j's published schema, run the build with `--verify`. It changes nothing.
+
+```powershell run=release-copy
+cd business_architecture/ontology/projection
+python pipeline.py build --verify
+cd ../../..
+```
+
+```text expect
+Step 1 passed; loadable.nt <count> triples, inferred.nt 2
+projection-manifest.json is current
+neo4j-spec.json is current and conforms to the specification's 1.1.0 schema
+```
 
 ## Keep every store in step
 
@@ -2802,6 +2820,18 @@ Your packages are the master copy. Each store is a copy that falls behind when y
 4. To load every store again from nothing, for example to show the load, follow the runbook's "Empty every store and load again".
 
 A release is done only when every line of the sync check reads `current`.
+
+The Databricks load writes a comment on each table it creates and on each column of those tables: `epm_triples` and `epm_store_markers`, and the technical graph's `tech_graph_triples` and `tech_graph_markers`. Unity Catalog shows the comments, so Genie and a person who opens a table see what each column holds. A table that the load replaces gets its comments again. To see the statements for the marker table, with no workspace:
+
+```powershell run=release-copy
+python -c "from kpi_store import load_databricks as ld; print(*ld.comment_statements('idp_sbx.kpi_store.epm_store_markers', ld.MARKERS_COMMENT, ld.MARKER_COLUMNS), sep=chr(10))"
+```
+
+```text expect
+COMMENT ON TABLE idp_sbx.kpi_store.epm_store_markers IS 'Which release each KPI Store table was loaded from'
+ALTER TABLE idp_sbx.kpi_store.epm_store_markers ALTER COLUMN store COMMENT 'The store the row describes.'
+ALTER TABLE idp_sbx.kpi_store.epm_store_markers ALTER COLUMN marker COMMENT 'JSON: what the table was loaded from, its row count and hash, and when the row was written.'
+```
 
 ## The optional check against this release
 

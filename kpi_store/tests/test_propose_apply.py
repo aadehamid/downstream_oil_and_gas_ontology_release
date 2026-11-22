@@ -339,9 +339,13 @@ def test_the_next_version_for_each_route():
 
 # ---------- apply, end to end, on a scratch copy of the release ----------
 
+LPG_SCRIPTS = Path("skills") / "ontology-to-lpg" / "scripts"
+
+
 def scratch_release(tmp_path, git_copy):
     """A copy of what a change reads and writes: the ontology folder, the process authority that the kpi module's
-    tests read, release.json, the stand-alone exceptions, the KPI intake pack and the kpi_store code. With git_copy,
+    tests read, release.json, the stand-alone exceptions, the KPI intake pack, the kpi_store code and the
+    ontology-to-lpg skill's scripts. With git_copy,
     a Git repository with the copy as its one commit."""
     root = tmp_path / "release"
     shutil.copytree(ROOT / ONTOLOGY, root / ONTOLOGY, ignore=shutil.ignore_patterns("__pycache__"))
@@ -353,6 +357,8 @@ def scratch_release(tmp_path, git_copy):
     shutil.copy2(ROOT / cut.EXCEPTIONS, root / cut.EXCEPTIONS)
     shutil.copytree(ROOT / "kpi-intake", root / "kpi-intake")
     shutil.copytree(ROOT / "kpi_store", root / "kpi_store", ignore=shutil.ignore_patterns("__pycache__", "tests"))
+    # The projection's Neo4j specification maps the shapes with the ontology-to-lpg skill's scripts.
+    shutil.copytree(ROOT / LPG_SCRIPTS, root / LPG_SCRIPTS, ignore=shutil.ignore_patterns("__pycache__", "test_*.py"))
     if git_copy:
         git(root, "init", "-q", "-b", "work")
         git(root, "config", "user.name", "Sample Runner")
