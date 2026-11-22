@@ -55,9 +55,11 @@ def _skill_build():
 
 
 def _text(data, term, predicate):
-    """The term's one value for the predicate, preferring English and then no language tag, or None."""
-    values = sorted((o for o in data.objects(term, predicate)),
-                    key=lambda o: (getattr(o, "language", None) not in ("en", None), getattr(o, "language", None) or "", str(o)))
+    """The term's one value for the predicate, preferring English, then no language tag, then any other, or None.
+    A value that is only white space is no value."""
+    rank = {"en": 0, None: 1}
+    values = sorted((o for o in data.objects(term, predicate) if str(o).strip()),
+                    key=lambda o: (rank.get(getattr(o, "language", None), 2), getattr(o, "language", None) or "", str(o)))
     return " ".join(str(values[0]).split()) if values else None
 
 

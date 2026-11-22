@@ -82,6 +82,20 @@ class Document(unittest.TestCase):
         self.assertEqual(ns.iri_of("sampletankinspections_Tank_Farm", {"sampletankinspections": "urn:a/"}, "_"),
                          "urn:a/Tank_Farm")
 
+    def test_english_wins_over_no_tag_and_white_space_is_no_value(self):
+        """Review round 1: an untagged value sorted ahead of the English one, and a blank value won over both."""
+        from rdflib import Literal, URIRef
+        from rdflib.namespace import SKOS
+        g, term = Graph(), URIRef("https://example.org/t")
+        for value in (Literal("Untagged text"), Literal("English text", lang="en"), Literal("   "),
+                      Literal("Texte", lang="fr")):
+            g.add((term, SKOS.definition, value))
+        self.assertEqual(ns._text(g, term, SKOS.definition), "English text")
+        g.remove((term, SKOS.definition, Literal("English text", lang="en")))
+        self.assertEqual(ns._text(g, term, SKOS.definition), "Untagged text")
+        g.remove((term, SKOS.definition, Literal("Untagged text")))
+        self.assertEqual(ns._text(g, term, SKOS.definition), "Texte")
+
     def test_the_schema_check_finds_a_broken_document(self):
         for change, expected in ((lambda d: d.pop("id"), "'id' is a required property"),
                                  (lambda d: d["nodes"]["kpi_MeasureDefinition"]["properties"]["kpi_measureCode"]
