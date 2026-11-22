@@ -16,6 +16,8 @@ skills/**
 # The guides to the tools, and Git's two files.
 HOW-TO-UPDATE.md
 HOW-TO-UPDATE.html
+HANDOUT.md
+HANDOUT.html
 KNOWN-OPEN-ITEMS.md
 business_architecture/ontology/projection/ontology-stores-runbook.md
 business_architecture/ontology/projection/ontology-stores-runbook.html

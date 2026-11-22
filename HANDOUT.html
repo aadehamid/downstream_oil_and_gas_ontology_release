@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="scripts/build_docs_html.py">
+<title>Running and changing your ontology</title>
+<style>
+/* Style: framed-sheet (tasteskill app sheet), screen "report", the same tokens as the stores runbook and the
+   ontology guide so the documents read as one set. Face: the frame tinted blue-grey, the accent teal on
+   links and the current contents entry. Generated from Markdown by scripts/build_docs_html.py: change the
+   Markdown or the template, never a generated page. */
+:root {
+  --ground: #f1f4f6;  --surface: #ffffff;  --raised: #f4f6f8;  --active: #ebedee;
+  --border: #e3e6e9;  --rule: #eef0f2;     --control: #cdced1;
+  --text: #131416;    --muted: #5d5f60;    --faint: #66686a;
+  --accent: #1b6c80;  --accent-soft: #e5f0f3;
+  --notice-bg: #fffbeb; --notice-line: #fde68a; --notice-ink: #92400e;
+  --code-bg: #f4f6f8;
+  --radius-card: 8px; --radius-control: 6px; --radius-sheet: 16px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --fs-title: 24px; --fs-section: 19px; --fs-sub: 16px; --fs-body: 15.5px; --fs-small: 12.5px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0b0c0d; --surface: #141516; --raised: #1b1c1e; --active: #242628;
+    --border: #2a2c2f; --rule: #222426; --control: #44474b;
+    --text: #f2f3f3; --muted: #b4b6b8; --faint: #9a9c9e;
+    --accent: #5fb3c7; --accent-soft: #15292e;
+    --notice-bg: #261d0c; --notice-line: #3b2e14; --notice-ink: #f2cf94;
+    --code-bg: #1b1c1e;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--ground); color: var(--text); font: var(--fs-body)/1.65 var(--font); }
+.bar { height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 20px; border-bottom: 1px solid var(--border); background: var(--ground); position: sticky; top: 0; z-index: 3; }
+.bar .name { font-weight: 600; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar .scope { color: var(--muted); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar nav { margin-left: auto; display: flex; gap: 16px; }
+.bar nav a { color: var(--muted); font-size: 13.5px; text-decoration: none; white-space: nowrap; }
+.bar nav a:hover { color: var(--text); }
+
+.sheet { max-width: 1136px; margin: 24px auto 40px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sheet); padding: 32px 24px 56px; }
+.head { max-width: 1088px; margin: 0 auto; }
+h1 { font-size: var(--fs-title); font-weight: 600; margin: 0; line-height: 1.25; letter-spacing: -.01em; }
+.lead { color: var(--text); font-size: 16px; margin: 8px 0 0; max-width: 76ch; }
+.from-line { color: var(--muted); font-size: var(--fs-small); margin: 8px 0 0; max-width: 100ch; }
+.notice { margin: 18px 0 0; background: var(--notice-bg); border: 1px solid var(--notice-line); color: var(--notice-ink); border-radius: var(--radius-control); padding: 8px 12px; font-size: 13px; max-width: 1088px; }
+.notice code { background: transparent; color: inherit; }
+
+/* contents rail and the text: 248 + 32 + 808 = 1088 */
+.layout { max-width: 1088px; margin: 28px auto 0; display: grid; grid-template-columns: 248px minmax(0, 1fr); gap: 32px; align-items: start; }
+.toc { position: sticky; top: 72px; max-height: calc(100vh - 96px); overflow-y: auto; font-size: 13.5px; padding-right: 4px; }
+.toc p { margin: 0 0 8px; font-weight: 600; font-size: 13.5px; }
+.toc ul { list-style: none; margin: 0; padding: 0; }
+.toc li a { display: block; color: var(--muted); text-decoration: none; padding: 4px 8px; border-radius: var(--radius-control); line-height: 1.4; }
+.toc li.l3 a { padding-left: 20px; font-size: 13px; }
+.toc li a:hover { color: var(--text); background: var(--raised); }
+.toc li a.on { color: var(--text); background: var(--accent-soft); }
+article { min-width: 0; }
+
+h2, h3, h4, h5, h6 { scroll-margin-top: 64px; line-height: 1.35; position: relative; }
+h2 { font-size: var(--fs-section); font-weight: 600; margin: 44px 0 8px; }
+article > h2:first-child, section.src:first-child > h2 { margin-top: 0; }
+h3 { font-size: var(--fs-sub); font-weight: 600; margin: 32px 0 6px; }
+h4, h5, h6 { font-size: 15px; font-weight: 600; margin: 24px 0 4px; }
+.hl { margin-left: 8px; color: var(--faint); text-decoration: none; font-weight: 400; opacity: 0; }
+h2:hover .hl, h3:hover .hl, h4:hover .hl, .hl:focus { opacity: 1; }
+section.src { padding-top: 8px; }
+section.src + section.src { margin-top: 56px; padding-top: 28px; border-top: 1px solid var(--border); }
+.from { color: var(--muted); font-size: var(--fs-small); margin: 0 0 14px; }
+p, li { max-width: 76ch; }
+p { margin: 10px 0; }
+ul, ol { padding-left: 24px; margin: 10px 0; }
+li { margin: 5px 0; }
+li > ul, li > ol { margin: 4px 0; }
+a { color: var(--accent); overflow-wrap: anywhere; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+strong { font-weight: 600; }
+code { font: 13.5px var(--mono); background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+pre { position: relative; background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 14px 16px; overflow-x: auto; margin: 12px 0 16px; max-width: 100%; }
+pre code { background: none; padding: 0; font-size: 13px; line-height: 1.6; white-space: pre; overflow-wrap: normal; }
+.copy { position: absolute; top: 8px; right: 8px; font: 12px var(--font); background: var(--surface); color: var(--muted); border: 1px solid var(--border); border-radius: var(--radius-control); padding: 3px 8px; cursor: pointer; }
+.copy:hover { color: var(--text); }
+.tblwrap { overflow-x: auto; margin: 14px 0 12px; border: 1px solid var(--border); border-radius: var(--radius-card); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+th.num, td.num { text-align: right; }
+th { text-align: left; font-weight: 600; font-size: 13px; color: var(--muted); padding: 9px 12px; border-bottom: 1px solid var(--border); background: var(--raised); vertical-align: bottom; }
+td { padding: 10px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+td p { margin: 0; }
+tr:last-child td { border-bottom: 0; }
+td code, th code { font-size: 12.5px; }
+td:first-child code { white-space: nowrap; overflow-wrap: normal; }
+blockquote { margin: 12px 0; padding: 4px 0 4px 16px; border-left: 3px solid var(--control); color: var(--text); }
+blockquote p { margin: 6px 0; }
+del { color: var(--muted); }
+section.rec { padding-top: 8px; }
+section.rec + section.rec { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border); }
+table.index td:first-child { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.toc li.l3 a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+figure.pic { margin: 16px 0 20px; }
+figure.pic img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: var(--radius-card); background: #ffffff; }
+figure.pic figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
+.end { color: var(--muted); font-size: var(--fs-small); margin-top: 48px; border-top: 1px solid var(--rule); padding-top: 14px; }
+
+@media (max-width: 960px) {
+  .sheet { margin: 0; border-radius: 0; border-width: 0; padding: 20px 16px 40px; }
+  .layout { grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 20px; }
+  .toc { position: static; max-height: none; border: 1px solid var(--border); border-radius: var(--radius-card); padding: 4px 8px; }
+  .toc details summary { cursor: pointer; font-weight: 600; padding: 8px 4px; list-style-position: inside; }
+  .toc ul { padding-bottom: 8px; }
+  .toc details > p { display: none; }
+}
+@media (min-width: 961px) {
+  .toc details > summary { display: none; }
+}
+@media (max-width: 640px) {
+  pre { padding-top: 40px; }
+  /* The records index stacks on a phone: number and decision on one line, status and date under it. */
+  table.index thead { display: none; }
+  table.index tr { display: grid; grid-template-columns: 52px minmax(0, 1fr); border-bottom: 1px solid var(--rule); padding: 8px 0; }
+  table.index td { border: 0; padding: 0 10px; }
+  table.index td:nth-child(3), table.index td:nth-child(4) { grid-column: 2; color: var(--muted); font-size: 13px; text-align: left; white-space: normal; }
+  table.index td:first-child { grid-row: span 3; }
+  .bar .scope { display: none; }
+  .bar nav { gap: 12px; flex: none; }
+  /* A file name in a table's first column wraps on a phone, so the text beside it keeps its width. */
+  td:first-child { min-width: 9em; }
+  td:first-child code { white-space: normal; overflow-wrap: anywhere; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body id="top">
+<header class="bar">
+  <span class="name">Running and changing your ontology</span>
+  <span class="scope">This release</span>
+  <nav aria-label="Documents">
+    <a href="business_architecture/ontology/epm-ontology-guide.html">Ontology guide</a>
+    <a href="#top">Top</a>
+  </nav>
+</header>
+<div class="sheet">
+  <div class="head">
+    <h1>Running and changing your ontology</h1>
+    <p class="lead">The handout: from the release zip to loaded stores, and every kind of change, step by step.</p>
+    <p class="from-line">Built from <code>HANDOUT.md</code>.</p>
+  </div>
+  <p class="notice">This page is generated from the Markdown beside it, which is the master copy. A change goes into the Markdown first; then <code>python3 scripts/build_docs_html.py</code> rebuilds this page.</p>
+  <div class="layout">
+    <nav class="toc" aria-label="Contents">
+      <details open>
+        <summary>Contents</summary>
+        <p>Contents</p>
+        <ul>
+<li class="l2"><a href="#what-is-inside-the-release">What is inside the release</a></li>
+<li class="l2"><a href="#the-conventions">The conventions</a></li>
+<li class="l2"><a href="#1-set-up-the-machine-once">1. Set up the machine, once</a></li>
+<li class="l2"><a href="#2-load-the-stores-for-the-first-time">2. Load the stores for the first time</a></li>
+<li class="l2"><a href="#3-make-an-everyday-change-with-a-form">3. Make an everyday change with a form</a></li>
+<li class="l2"><a href="#4-add-a-module">4. Add a module</a></li>
+<li class="l2"><a href="#5-let-an-ai-help">5. Let an AI help</a></li>
+<li class="l2"><a href="#6-check-the-release-and-recover-from-a-failure">6. Check the release and recover from a failure</a></li>
+<li class="l2"><a href="#7-replace-what-a-store-holds-or-reset-every-store">7. Replace what a store holds, or reset every store</a></li>
+<li class="l2"><a href="#8-upgrade-the-tools-from-a-newer-release">8. Upgrade the tools from a newer release</a></li>
+<li class="l2"><a href="#9-refresh-what-people-use">9. Refresh what people use</a></li>
+        </ul>
+      </details>
+    </nav>
+    <article>
+<p>This handout is for the people who run the KPI Store after handover: the Data Owners, the Domain Owners, the Ontology Owner, the Architect and the platform team. You do not need to have built an ontology. You type the commands that this handout shows, and you read what they print. You never edit an ontology file by hand: the commands write every change, and they refuse a change they cannot check.</p>
+<p>It takes you from the release zip to loaded and checked stores, and then through every kind of change: a change form, a new module, a change an AI helps to write, a check and a recovery, a replace or a reset, an upgrade of the tools, and the refresh of what people use. Each step ends with <strong>You are done when</strong>. Do not go on to the next step until that is true.</p>
+<p>Every command and every printed line in this handout is quoted from the release's two detailed guides, the stores runbook and <code>HOW-TO-UPDATE.md</code>, where the release's own tests run it and compare what it prints. When this handout and a detailed guide seem to differ, the detailed guide is right: tell the release's team.</p>
+<p><strong>Warning: a replace or a reset deletes data in the stores.</strong> Get written authorization for the exact environment first, stop every other writer, and make sure the data can be loaded again.</p>
+<h2 id="what-is-inside-the-release">What is inside the release<a class="hl" href="#what-is-inside-the-release" aria-label="Link to this section">#</a></h2>
+<div class="tblwrap"><table><thead><tr><th>Part</th><th>What it is</th><th>Do you open it?</th></tr></thead><tbody><tr><td>The commands, in <code>kpi_store/</code></td><td>Everything you run: the setup check, the runner, the change commands, the upgrade</td><td>No. You run them</td></tr><tr><td>The ontology, in <code>business_architecture/ontology/</code></td><td>The modules, their packages and their checks</td><td>No. The commands change it</td></tr><tr><td>The KPI intake pack, in <code>kpi-intake/</code></td><td>The change forms, as an HTML page and an Excel workbook</td><td>Yes. You fill the forms</td></tr><tr><td>The skills, in <code>skills/</code></td><td>The rules that the commands and the AI follow when they model, check and write</td><td>No. The commands and the AI read them</td></tr><tr><td>The stores runbook, <code>business_architecture/ontology/projection/ontology-stores-runbook.md</code></td><td>Every detail of setting up, loading and recovering</td><td>When a step here sends you there</td></tr><tr><td><code>HOW-TO-UPDATE.md</code></td><td>Every detail of each kind of change</td><td>When a step here sends you there</td></tr></tbody></table></div>
+<h2 id="the-conventions">The conventions<a class="hl" href="#the-conventions" aria-label="Link to this section">#</a></h2>
+<ul><li>The commands run on Windows, in PowerShell, unless a step says Git Bash.</li><li>Start every command in the release folder, <code>%USERPROFILE%\kpi-store-1.1</code>, unless a step says otherwise.</li><li>Write your own value where a command shows text in angle brackets, such as <code>&lt;your workspace URL&gt;</code>.</li><li>Keep passwords, settings files and filled forms outside the release folder. The release folder is zipped and uploaded.</li></ul>
+<h2 id="1-set-up-the-machine-once">1. Set up the machine, once<a class="hl" href="#1-set-up-the-machine-once" aria-label="Link to this section">#</a></h2>
+<ol><li>Get the access the runbook's "What you need" lists: the Databricks workspace and its SQL warehouse, the Neo4j Enterprise database, a local Neo4j you may empty, and the network.
+<p>You are done when every owner has answered.</p></li></ol>
+<ol start="2"><li>Install the programs: Python, Git for Windows, Java and the Databricks command line, as the runbook's "Install the programs" says. Without administrator rights, follow "Install the programs without administrator rights" instead.
+<pre><code class="lang-cmd">winget install Databricks.DatabricksCLI</code></pre>
+<p>You are done when a new PowerShell window finds <code>python</code>, <code>git</code>, <code>java</code> and <code>databricks</code>.</p></li></ol>
+<ol start="3"><li>Unpack the release zip to <code>%USERPROFILE%\kpi-store-1.1</code>, as the runbook's "Unpack the release" says. Then put the folder in Git. Write your own name and address in the two <code>git config</code> lines.
+<pre><code class="lang-powershell">git init
+git config user.name "KPI Store operator"
+git config user.email "kpi-store-operator@example.invalid"
+git add -A
+git commit -m "KPI Store 1.1 as shipped"</code></pre>
+<p>You are done when the commit is made. The upgrade of section 8 starts from this commit.</p></li></ol>
+<ol start="4"><li>Make the local folder and fetch the three files the runbook's "Make the local folder and fetch three files" names. Then install the Python packages at the versions the release was tested with.
+<pre><code class="lang-powershell">python -m pip install rdflib==7.6.0 pyshacl==0.40.2 owlrl==7.6.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 openpyxl==3.1.5 uv</code></pre>
+<p>You are done when the last line starts with <code>Successfully installed</code>.</p></li></ol>
+<ol start="5"><li>Set up the local Neo4j, as the runbook's "Set up the local Neo4j" says.
+<p>You are done when its database runs with the APOC and n10s plugins.</p></li></ol>
+<ol start="6"><li>Write the two settings files, as the runbook's "Write the two settings files" says, and tell every command where the local one is. Then close PowerShell and open it again.
+<pre><code class="lang-powershell">setx KPI_STORE_LOCAL "$HOME\kpi-store-local\stores.toml"</code></pre>
+<p>You are done when it answers <code>SUCCESS: Specified value was saved.</code></p></li></ol>
+<ol start="7"><li>Sign in to Databricks. Your browser opens the sign-in page.
+<pre><code class="lang-powershell">databricks auth login --host &lt;your workspace URL&gt; --profile DEFAULT</code></pre>
+<p>You are done when the terminal says that the profile <code>DEFAULT</code> was saved.</p></li></ol>
+<ol start="8"><li>Run the setup check from the release folder. It only reads.
+<pre><code class="lang-powershell">cd $HOME\kpi-store-1.1</code></pre>
+<pre><code class="lang-powershell">python -m kpi_store.setup_check</code></pre>
+<p>You are done when its last line reads:</p>
+<pre><code class="lang-text">15 of 15 checks passed</code></pre>
+<p>A line that starts with <code>FAIL</code> names its fix. Do it, then run the setup check again.</p></li></ol>
+<h2 id="2-load-the-stores-for-the-first-time">2. Load the stores for the first time<a class="hl" href="#2-load-the-stores-for-the-first-time" aria-label="Link to this section">#</a></h2>
+<p>The first run compares the release with your workspace and stops on a report. You decide each row of the report. The second run then corrects the release and loads every store.</p>
+<ol><li>See what the run will do. It runs nothing.
+<pre><code class="lang-powershell">python -m kpi_store.runner --dry-run</code></pre>
+<p>You are done when it lists the steps, from <code>cut</code> to <code>summary</code>.</p></li></ol>
+<ol start="2"><li>Start the first run. It took about 40 minutes on the Windows laptop of the first real run.
+<pre><code class="lang-powershell">python -m kpi_store.runner</code></pre>
+<p>You are done when it stops with a line that starts <code>report: STOPPED</code>. That is the result you want here.</p></li></ol>
+<ol start="3"><li>Clear the report in Excel, as the runbook's "Clear the report" says: open <code>discovery-report.to-clear.csv</code> in <code>%USERPROFILE%\kpi-store-local\runs\pending</code>, keep each decision the runbook's table tells you to accept, and write your role or initials in <code>decided_by</code>. Save it as "CSV UTF-8".
+<p>You are done when every row that blocks the load has a decision and your role.</p></li></ol>
+<ol start="4"><li>Run the same command again. It shows the cut's plan and asks you to type two answers. The runbook's "The second run: the cut and the loads" says what to type. It takes about 40 minutes.
+<pre><code class="lang-powershell">python -m kpi_store.runner</code></pre>
+<p>You are done when its last line reads <code>every step passed</code>.</p></li></ol>
+<ol start="5"><li>Check the four stores. The sync check only reads.
+<pre><code class="lang-powershell">python -m kpi_store.sync_check</code></pre>
+<p>You are done when every line reads <code>current</code>:</p>
+<pre><code class="lang-text">databricks      current     &lt;why&gt;
+jena            current     &lt;why&gt;
+neo4j           current     &lt;why&gt;
+enterprise      current     &lt;why&gt;</code></pre></li></ol>
+<h2 id="3-make-an-everyday-change-with-a-form">3. Make an everyday change with a form<a class="hl" href="#3-make-an-everyday-change-with-a-form" aria-label="Link to this section">#</a></h2>
+<p>Every everyday change goes the same way: someone fills a form, the signers sign it, you check it, a command turns it into a proposal, and a second command applies the proposal and releases the changed modules. Nobody edits a table or a Turtle file. If a step fails, the release is as it was.</p>
+<p>The forms are in the KPI intake pack: <code>kpi-intake/kpi-intake-form.html</code>, which works offline in a browser, and the same form as <code>kpi-intake/kpi-intake-form.xlsx</code>. <code>kpi-intake/how-to-use-the-form.html</code> says how to fill and save one. Keep the filled form, and the proposal the command writes beside it, in a folder beside the release folder, never inside it.</p>
+<div class="tblwrap"><table><thead><tr><th>The change</th><th>The form</th><th>Its section in <code>HOW-TO-UPDATE.md</code></th></tr></thead><tbody><tr><td>A new KPI</td><td>KPI intake</td><td>"Add a KPI with the KPI intake form"</td></tr><tr><td>A changed measure</td><td>Term change</td><td>"Change a measure with the term-change form"</td></tr><tr><td>A new system or table</td><td>Reference item</td><td>"Add a system or a table with the reference-item form"</td></tr><tr><td>A domain the ontology should use</td><td>Domain activation</td><td>"Activate a domain with the domain activation form"</td></tr><tr><td>Roles, RACI entries or a new process</td><td>Process map request</td><td>"Add roles and RACI entries with the process map request"</td></tr><tr><td>A new vocabulary or reference table</td><td>New module</td><td>Section 4 below</td></tr></tbody></table></div>
+<p>The steps below add a KPI. The other forms take the same four commands, with their own file and proposal names.</p>
+<ol><li>Check the filled form. The check changes nothing.
+<pre><code class="lang-powershell">python -m kpi_store.intake check ../new-kpi/sample-spread-margin.kpi-intake.json</code></pre>
+<p>You are done when it ends with:</p>
+<pre><code class="lang-text">Result: the intake is complete and signed.</code></pre></li></ol>
+<ol start="2"><li>Turn the form into a proposal. It writes a folder under <code>proposals</code>, beside the form, and changes nothing in the ontology.
+<pre><code class="lang-powershell">python -m kpi_store.propose ../new-kpi/sample-spread-margin.kpi-intake.json</code></pre>
+<pre><code class="lang-text">wrote the proposal ../new-kpi/proposals/NK-2026-001: 19 changes and 17 facts, route minor
+Nothing in the ontology has changed. Read each summary.txt, then apply with: python -m kpi_store.apply &lt;proposal folder&gt;</code></pre>
+<p>You are done when the folder <code>proposals/NK-2026-001</code> exists.</p></li></ol>
+<ol start="3"><li>Read the proposal's <code>summary.txt</code>, and have the Architect read it too. Open it in Notepad, or print it with the line below. It says what the change adds, which modules it reaches, the route, who signed, and what the Architect must still do outside the form.
+<pre><code class="lang-python">print(open("../new-kpi/proposals/NK-2026-001/summary.txt", encoding="utf-8").read())</code></pre>
+<p>You are done when the summary says what the form asked for.</p></li></ol>
+<ol start="4"><li>Apply the proposal. It works in a temporary copy, rebuilds and checks each changed module, releases it, and writes and commits the release only when every step has passed.
+<pre><code class="lang-powershell">python -m kpi_store.apply ../new-kpi/proposals/NK-2026-001</code></pre>
+<p>You are done when it ends with these lines:</p>
+<pre><code class="lang-text">Done. kpi is now 1.4.0, data-product 1.3.0 and value-stream 1.3.0 (minor), and 4 modules that depend on them took a new patch. The apply changed &lt;count&gt; files, and Git committed them.
+Run the full check before you load: bash scripts/check.sh (on Windows, in Git Bash). Then load the stores with the runner: python -m kpi_store.runner</code></pre></li></ol>
+<ol start="5"><li>See the commit.
+<pre><code class="lang-powershell">git --no-pager log --oneline -1</code></pre>
+<p>You are done when it names the proposal.</p></li></ol>
+<ol start="6"><li>Run the full check, as section 6 says, then load the stores with the runner, as in section 2, step 4.
+<p>You are done when the sync check reads <code>current</code> on every line.</p></li></ol>
+<h2 id="4-add-a-module">4. Add a module<a class="hl" href="#4-add-a-module" aria-label="Link to this section">#</a></h2>
+<p>A new module goes in through the "New module" tab of the form and the same commands. It is a vocabulary, a list of terms with their definitions, or a reference table, items of a class the ontology holds already. A new module's first release is 1.0.0, a major, so the Data Owner, the Ontology Owner and the Architect sign the form. <code>HOW-TO-UPDATE.md</code>, "Add a module with the new-module form", has both kinds.</p>
+<ol><li>Check the form.
+<pre><code class="lang-powershell">python -m kpi_store.intake check ../new-vocabulary/sample-equipment-terms.new-module.json</code></pre>
+<p>You are done when it ends with <code>Result: the intake is complete and signed.</code></p></li></ol>
+<ol start="2"><li>Turn it into a proposal.
+<pre><code class="lang-powershell">python -m kpi_store.propose ../new-vocabulary/sample-equipment-terms.new-module.json</code></pre>
+<pre><code class="lang-text">wrote the proposal ../new-vocabulary/proposals/NM-2026-001: 18 changes and 4 facts, route major</code></pre>
+<p>You are done when its <code>summary.txt</code> names the module and each term.</p></li></ol>
+<ol start="3"><li>Apply it. It writes the module's folder, registers the module in every place the release lists its modules, builds it, and releases it at 1.0.0. It took about three minutes on a Mac.
+<pre><code class="lang-powershell">python -m kpi_store.apply ../new-vocabulary/proposals/NM-2026-001</code></pre>
+<p>You are done when it ends with:</p>
+<pre><code class="lang-text">Done. sample-equipment-terms 1.0.0 is a new module (major). The apply changed &lt;count&gt; files, and Git committed them.</code></pre></li></ol>
+<ol start="4"><li>Run the full check and load the stores, as in section 3, step 6.
+<p>You are done when the sync check reads <code>current</code> on every line.</p></li></ol>
+<h2 id="5-let-an-ai-help">5. Let an AI help<a class="hl" href="#5-let-an-ai-help" aria-label="Link to this section">#</a></h2>
+<p>An AI can help in two ways. In both, the commands check what the AI writes, people decide and sign, and nothing reaches the ontology until the apply's checks pass. Name the AI in the local settings file, as <code>HOW-TO-UPDATE.md</code>, "Choose the provider", says: usually a model served in your Databricks workspace, approved by your IT. The steps below use the <code>by-hand</code> provider, with which the command writes a prompt file, you give it to an assistant such as Genie Code, and you save its answer. With another provider, the command asks the model itself.</p>
+<p><strong>Suggestions for a form.</strong> The AI suggests answers to a form before anyone signs it. <code>HOW-TO-UPDATE.md</code>, "Use AI to suggest answers (optional)", has the whole example.</p>
+<ol><li>Ask for suggestions. The command writes the prompt to a file and stops.
+<pre><code class="lang-powershell">python -m kpi_store.propose --ai ../ai-suggestions/unit-utilization.term-change.json --stores ../ai-suggestions/kpi-store-local.toml</code></pre>
+<p>You are done when it names the prompt file it wrote.</p></li></ol>
+<ol start="2"><li>Give the prompt file to the assistant, and save its answer beside the form. Then run the command again with the answer. It shows each suggestion and asks you to accept it or not.
+<pre><code class="lang-powershell">python -m kpi_store.propose --ai ../ai-suggestions/unit-utilization.term-change.json --stores ../ai-suggestions/kpi-store-local.toml --ai-answer ../ai-suggestions/unit-utilization.term-change.ai-answer.json</code></pre>
+<p>You are done when the form holds the answers you accepted. The signers then sign it, and it goes on as in section 3.</p></li></ol>
+<p><strong>A draft of new modelling.</strong> A module that needs a class, a property or a rule of its own is new modelling. One AI drafts it, a second AI of another family reviews it, and five gates check it. <code>HOW-TO-UPDATE.md</code>, "Draft new modelling with AI (optional)", has every step, with the prompt files and the two answers.</p>
+<ol><li>Ask the AI to draft the module from the unsigned new-module form.
+<pre><code class="lang-powershell">python -m kpi_store.propose --ai-draft ../ai-modelling/sample-tank-inspections.new-module.json --stores ../ai-modelling/kpi-store-local.toml</code></pre>
+<p>You are done when the guide's steps 2 to 7 are done: the draft passed its gates, the reviewer said PASS, and the three signers signed the form.</p></li></ol>
+<ol start="2"><li>Turn the signed form into a proposal, and apply it.
+<pre><code class="lang-powershell">python -m kpi_store.propose ../ai-modelling/sample-tank-inspections.new-module.json</code></pre>
+<pre><code class="lang-powershell">python -m kpi_store.apply ../ai-modelling/proposals/NM-2026-003</code></pre>
+<p>You are done when the apply ends with:</p>
+<pre><code class="lang-text">Done. sample-tank-inspections 1.0.0 is a new module (major). The apply changed &lt;count&gt; files, and Git committed them.</code></pre></li></ol>
+<ol start="3"><li>Run the full check and load the stores, as in section 3, step 6.</li></ol>
+<h2 id="6-check-the-release-and-recover-from-a-failure">6. Check the release and recover from a failure<a class="hl" href="#6-check-the-release-and-recover-from-a-failure" aria-label="Link to this section">#</a></h2>
+<ol><li>Run the full check after every change, before you load. Open Git Bash in the release folder: in File Explorer, right-click the folder and choose "Open Git Bash here". It took 21 minutes on a Windows machine with 4 cores.
+<pre><code class="lang-bash">bash scripts/check.sh</code></pre>
+<p>You are done when its last line reads <code>all checks passed</code>. A line that starts <code>FAIL a store request</code> comes from a test that fails a write on purpose, and is expected.</p></li></ol>
+<ol start="2"><li>See which store is behind, at any time. The sync check only reads.
+<pre><code class="lang-powershell">python -m kpi_store.sync_check</code></pre>
+<p>You are done when you know which lines do not read <code>current</code>. The runbook's "The sync check" says what each status means.</p></li></ol>
+<ol start="3"><li>When a run stops on a step, read the line it names, fix what it says, and run again from that step. The runbook's "When a step fails" lists each step's failures and fixes. For example, to start again at the Fuseki load:
+<pre><code class="lang-powershell">python -m kpi_store.runner --from fuseki</code></pre>
+<p>You are done when the run's last line reads <code>every step passed</code>.</p></li></ol>
+<ol start="4"><li>If the check step fails because of the machine, such as a file another program holds open, and not because of the release, report it and leave the step out of the run:
+<pre><code class="lang-powershell">python -m kpi_store.runner --skip check</code></pre>
+<p>You are done when the last line names the step that was left out. A run with a step left out never says <code>every step passed</code>.</p></li></ol>
+<h2 id="7-replace-what-a-store-holds-or-reset-every-store">7. Replace what a store holds, or reset every store<a class="hl" href="#7-replace-what-a-store-holds-or-reset-every-store" aria-label="Link to this section">#</a></h2>
+<p><strong>These commands delete data.</strong> Have the written authorization ready before you start.</p>
+<ol><li>Replace what Neo4j Enterprise holds, when the runbook's "Replace what Enterprise holds: one case" applies.
+<pre><code class="lang-powershell">python -m kpi_store.runner --from enterprise --replace-enterprise</code></pre>
+<p>You are done when the sync check reads <code>current</code> for <code>enterprise</code>.</p></li></ol>
+<ol start="2"><li>To empty every store and load it again, first see what the reset would delete. It deletes nothing.
+<pre><code class="lang-powershell">python -m kpi_store.runner --reset --dry-run</code></pre>
+<p>You are done when the person who authorized the reset has read the list.</p></li></ol>
+<ol start="3"><li>Run the reset. It asks you to type the word <code>reset</code>.
+<pre><code class="lang-powershell">python -m kpi_store.runner --reset</code></pre>
+<p>You are done when the sync check reads <code>unmarked</code> for each store that was emptied.</p></li></ol>
+<ol start="4"><li>Load every store again, as in section 2, step 4.
+<p>You are done when the sync check reads <code>current</code> on every line.</p></li></ol>
+<h2 id="8-upgrade-the-tools-from-a-newer-release">8. Upgrade the tools from a newer release<a class="hl" href="#8-upgrade-the-tools-from-a-newer-release" aria-label="Link to this section">#</a></h2>
+<p>Your copy is the master of the ontology. A newer release from the release's team brings new tools: the commands, the scripts, the skills and the guides. The upgrade takes them into your copy and keeps every change you applied. It runs the full check on the merged copy, and changes your folder only when that passes. <code>HOW-TO-UPDATE.md</code>, "Upgrade the tools from a newer release", says how it decides which files are tools.</p>
+<ol><li>Save the new zip beside the release folder. Commit every change in the release folder first: the upgrade refuses a copy with changes that are not committed. Then see what the upgrade would do. The plan changes nothing.
+<pre><code class="lang-powershell">python -m kpi_store.upgrade --from ../kpi-store-newer.zip --plan</code></pre>
+<p>You are done when the zip's SHA-256 in the first line equals the one the release's team sent you, and you have read the plan.</p></li></ol>
+<ol start="2"><li>Upgrade. It takes about 20 minutes, most of it the full check.
+<pre><code class="lang-powershell">python -m kpi_store.upgrade --from ../kpi-store-newer.zip</code></pre>
+<p>You are done when it ends with a line that starts <code>Upgraded to the tools of</code>. When it stops instead, your folder is as it was: send its message, and the files or the log it names, to the release's team.</p></li></ol>
+<ol start="3"><li>Load the stores with the runner, as in section 2, step 4.
+<p>You are done when the sync check reads <code>current</code> on every line.</p></li></ol>
+<h2 id="9-refresh-what-people-use">9. Refresh what people use<a class="hl" href="#9-refresh-what-people-use" aria-label="Link to this section">#</a></h2>
+<p>The commands of sections 3 to 5 rebuild what they change: the KPI intake pack's lists and the release's pages. After a change, people still need the new copies.</p>
+<ol><li>Rebuild the KPI intake pack, when you have changed <code>kpi-intake/settings.toml</code>, for example to add a domain or a role title.
+<pre><code class="lang-powershell">python -m kpi_store.intake build</code></pre>
+<p>Then copy the new forms into the team's shared folder with the <code>folders</code> command, as <code>kpi-intake/README.md</code>, "The shared folder", shows. It replaces the forms and the guide in <code>the-form</code>, and changes nothing in the folders that hold people's answers.</p>
+<p>You are done when the <code>folders</code> command ends with:</p>
+<pre><code class="lang-text">KPI-intake is ready</code></pre></li></ol>
+<ol start="2"><li>Rebuild the release's pages after you have changed a guide.
+<pre><code class="lang-powershell">python scripts/build_docs_html.py</code></pre>
+<p>You are done when the full check passes: it fails when a page differs from a fresh build.</p></li></ol>
+<ol start="3"><li>Load the stores, as in section 2, step 4, so that Databricks, the two Neo4j databases and Fuseki hold the new release.
+<p>You are done when the sync check reads <code>current</code> on every line.</p></li></ol>
+      <p class="end">Generated from <code>HANDOUT.md</code> by <code>scripts/build_docs_html.py</code>. Start with the <a href="business_architecture/ontology/epm-ontology-guide.html">ontology guide</a>.</p>
+    </article>
+  </div>
+</div>
+<script>
+(function () {
+  if (navigator.clipboard) {
+    document.querySelectorAll("pre").forEach(function (pre) {
+      var b = document.createElement("button");
+      b.className = "copy"; b.type = "button"; b.textContent = "Copy";
+      b.addEventListener("click", function () {
+        navigator.clipboard.writeText(pre.querySelector("code").innerText).then(function () {
+          b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1500);
+        });
+      });
+      pre.appendChild(b);
+    });
+  }
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute("href").slice(1)] = a; });
+  var heads = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); })
+    .filter(Boolean);
+  if (!("IntersectionObserver" in window) || !heads.length) return;
+  var current = null;
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) {
+        if (current) current.classList.remove("on");
+        current = byId[e.target.id];
+        if (current) current.classList.add("on");
+      }
+    });
+  }, { rootMargin: "-60px 0px -75% 0px" });
+  heads.forEach(function (h) { io.observe(h); });
+  if (window.matchMedia("(max-width: 960px)").matches) {
+    var d = document.querySelector(".toc details");
+    if (d) d.removeAttribute("open");
+  }
+})();
+</script>
+</body>
+</html>

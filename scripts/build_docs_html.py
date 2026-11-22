@@ -588,6 +588,8 @@ def pages():
     specs = all_pages()
     if os.path.exists(os.path.join(ROOT, "HOW-TO-UPDATE.md")):
         specs = specs + [single("HOW-TO-UPDATE.md", "How to change what you received: a definition, a concept, a process or a module.", "This release")]
+    if os.path.exists(os.path.join(ROOT, "HANDOUT.md")):
+        specs = specs + [single("HANDOUT.md", "The handout: from the release zip to loaded stores, and every kind of change, step by step.", "This release")]
     return [s for s in specs if all(os.path.exists(os.path.join(ROOT, rel)) for rel in s["sources"] + ([s["intro"]] if "intro" in s else []))]
 
 
