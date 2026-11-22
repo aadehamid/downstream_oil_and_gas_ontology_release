@@ -652,6 +652,24 @@ def test_a_kpi_form_follows_only_the_proposals_that_add_what_it_names(tmp_path):
     assert not said[order + 3].startswith("  python")
 
 
+@needs_inactive
+def test_a_new_domain_that_shares_a_modules_key_is_still_followed(tmp_path):
+    root = release_with_reference(tmp_path)
+    assert "party" in {m["id"] for m in picklists.load(root / "kpi-intake")["lists"]["modules"]}
+    assert "party" not in {d["id"] for d in domains.read(root)[1]}
+    activation = domain_form(tmp_path, {"D1": "Party"}, number="DA-T1")
+    kpi = waiting_kpi(tmp_path, domain="@not-in-list", detail="Party")
+    folders = propose_cmd.propose([activation, kpi], tmp_path / "proposals", root, now=NOW, say=quiet)
+    assert proposal.read(folders[1]).record["after"] == ["DA-T1"]
+
+
+@needs_inactive
+def test_a_kpi_form_that_waits_is_not_checked_against_another_pack(tmp_path):
+    with pytest.raises(propose_cmd.ProposeRefused, match="checked against the release's own KPI intake pack"):
+        propose_cmd.propose([domain_form(tmp_path, number="DA-T1"), waiting_kpi(tmp_path, domain=TARGET["id"])],
+                            tmp_path / "proposals", ROOT, pack=ROOT / "kpi-intake", now=NOW, say=quiet)
+
+
 def test_a_file_that_cannot_be_read_is_refused_before_a_kpi_form_that_waits(tmp_path):
     with pytest.raises(propose_cmd.ProposeRefused, match="missing.domain-activation.json is not a file"):
         propose_cmd.propose([waiting_kpi(tmp_path, process=TEST_PROCESS), tmp_path / "missing.domain-activation.json"],
