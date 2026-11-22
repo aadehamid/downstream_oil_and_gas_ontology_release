@@ -2450,7 +2450,7 @@ The by-hand provider works for both. The command then writes each prompt to a fi
    The AI draft of the new module "Sample Tank Inspections" (sample-tank-inspections)
    ...
    What the new things mean, as the AI wrote it for the signers:
-     - The class "tank inspection" (sample_tank_inspections:TankInspection): One check of one storage tank's condition on one date. It is never a system itself.
+     - The class "tank inspection" (sampletankinspections:TankInspection): One check of one storage tank's condition on one date. It is never a system itself.
        For example: The check of a made-up tank on 2 November 2026, recorded in the APS planning database.
    ...
    The gates (KPI-DEC-0002, Q19):
