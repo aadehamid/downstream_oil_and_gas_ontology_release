@@ -7,6 +7,7 @@ rehearsal runs.
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -137,6 +138,7 @@ def test_a_failed_check_is_refused_and_nothing_changes(tmp_path):
         up.upgrade(copy, new, say=lambda *_: None, check=FAIL)
     log = Path(str(err.value).split("its output is in ")[1].split(". Send")[0])
     assert log.read_text(encoding="utf-8").startswith("1 failed")
+    shutil.rmtree(log.parent)
     assert state(copy) == before
     assert read(copy, "kpi_store/tool.py") == "A = 1\n"
 
