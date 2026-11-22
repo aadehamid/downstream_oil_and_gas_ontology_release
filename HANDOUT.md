@@ -4,7 +4,7 @@ This handout is for the people who run the KPI Store after handover: the Data Ow
 
 It takes you from the release zip to loaded and checked stores, and then through every kind of change: a change form, a new module, a change an AI helps to write, a check and a recovery, a replace or a reset, an upgrade of the tools, and the refresh of what people use. Each step ends with **You are done when**. Do not go on to the next step until that is true.
 
-The release's own tests check every block of commands and every block of printed lines in this handout. A word or a line written inside a sentence is not checked. Most blocks are quoted from the release's detailed guides, the stores runbook, `HOW-TO-UPDATE.md` and `kpi-intake/README.md`, where the tests run them. The rest run in this handout itself. The tests cannot open a browser, so they do not run the two forms of the Databricks sign-in. When this handout and a detailed guide seem to differ, the detailed guide is right: tell the release's team.
+The release's own tests check every block of commands and every block of printed lines in this handout. A word or a line written inside a sentence is not checked. Most blocks are quoted from the release's two detailed guides, the stores runbook and `HOW-TO-UPDATE.md`, where the tests run them. The rest run in this handout itself. The tests cannot open a browser, so they do not run the two forms of the Databricks sign-in. When this handout and a detailed guide seem to differ, the detailed guide is right: tell the release's team.
 
 **Warning: a replace or a reset deletes data in the stores.** Get written authorization for the exact environment first, stop every other writer, and make sure the data can be loaded again.
 
@@ -21,7 +21,7 @@ The release's own tests check every block of commands and every block of printed
 
 ## The conventions
 
-- The commands run on Windows, in PowerShell, unless a step says Git Bash.
+- The commands run on Windows, in PowerShell, unless a step says Git Bash. On a machine set up without administrator rights, run every `git` command in Git Bash, as section 1, step 2 says.
 - Start every command in the release folder, `%USERPROFILE%\kpi-store-1.1`, unless a step says otherwise.
 - Write your own value where a command shows text in angle brackets, such as `<your workspace URL>`.
 - The commands of sections 3 to 5 and 8 show the file names of the detailed guides' made-up examples, such as `../new-kpi/sample-spread-margin.kpi-intake.json`. Write the path of your own file in their place.
@@ -41,7 +41,7 @@ The release's own tests check every block of commands and every block of printed
 
    Without administrator rights, follow the runbook's "Install the programs without administrator rights" instead. Python installs without them. Git, Java and the Databricks command line are only unpacked into your local folder, and the settings file of step 7 names them for the commands. They are then not on your `PATH`, so two things change:
 
-   - Run every `git` command of this handout in Git Bash, not in PowerShell. Start Git Bash by double-clicking `git-bash.exe` in `%USERPROFILE%\kpi-store-local\PortableGit`, and go to the release folder in it with `cd ~/kpi-store-1.1`. Open the full check's Git Bash the same way.
+   - Run every `git` command of this handout in Git Bash, not in PowerShell. Start Git Bash by double-clicking `git-bash.exe` in `%USERPROFILE%\kpi-store-local\PortableGit`, and go to the release folder in it with `cd "$USERPROFILE/kpi-store-1.1"`. Open the full check's Git Bash the same way.
    - Start the Databricks sign-in of step 8 by its path, as step 8 shows.
 
    You are done when every installer has finished, or Python is installed and the three folders are unpacked. The setup check of step 9 proves each program.
@@ -311,7 +311,7 @@ A module that needs a class, a property or a rule of its own is new modelling. O
    python -m kpi_store.propose --ai-draft ../ai-modelling/sample-tank-inspections.new-module.json --stores ../ai-modelling/kpi-store-local.toml
    ```
 
-   With `by-hand`, you are done when it names the prompt file it wrote. With served models, the command asks the drafter and then the reviewer in one run, as steps 2 and 3 describe: you are done when it says that gates 1 to 4 passed and names the summary for the signers. Then skip steps 2 and 3, and go to step 4. What steps 2 and 3 say about a failed gate and a HOLD holds for that run too.
+   With `by-hand`, you are done when it names the prompt file it wrote. With served models, the command asks the drafter and then the reviewer in one run, as steps 2 and 3 describe: you are done when it says that gates 1 to 4 passed and names the summary for the signers. Then skip steps 2 and 3, and go to step 4. If a gate fails, the run says why and keeps nothing: run this step again, and if the same gate fails again, change the form as the reason says. If the reviewer answers HOLD, do what the guide's step 6 says.
 
 2. Give the prompt file to the drafter's assistant, save its answer as the command says, and run the command again with the draft. It checks the draft with gates 1, 2 and 4, then writes the reviewer's prompt and stops.
 
@@ -359,7 +359,7 @@ A module that needs a class, a property or a rule of its own is new modelling. O
 
 Do these steps, in this order, after a change of sections 3 to 5 or 9. Sections 7 and 8 send you here to start at step 2, because what they do needs no full check of its own: start there.
 
-1. Run the full check. Open Git Bash in the release folder: in File Explorer, right-click the folder and choose "Open Git Bash here". It took 21 minutes on a Windows machine with 4 cores.
+1. Run the full check. Open Git Bash in the release folder: in File Explorer, right-click the folder and choose "Open Git Bash here". On a machine set up without administrator rights, open it as section 1, step 2 says. It took 21 minutes on a Windows machine with 4 cores.
 
    ```bash excerpt=HOW-TO-UPDATE.md
    bash scripts/check.sh
@@ -527,7 +527,7 @@ The change commands of sections 3 to 5 rebuild what they change, including the K
 
 1. Change `kpi-intake/settings.toml` in Notepad, as `kpi-intake/README.md`, "Change the form", says.
 
-   The release's test makes a change of its own with the block below. Do not run it: your change in Notepad takes its place.
+   **For the release's test only.** The two blocks below make a change of the test's own, as your edit in Notepad does, and show what the test prints. Do not run them.
 
    ```python run=release-git
    from pathlib import Path
