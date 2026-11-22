@@ -1,0 +1,23 @@
+# The tool files of this release, which python -m kpi_store.upgrade takes into a copy from this release.
+# One pattern a line: ** matches any number of folders, * any part of one name, and ! takes paths out again.
+# The last pattern that matches a path decides. Every path no pattern includes is content, which stays the copy's own.
+
+# The commands, the scripts, the skills and the CI.
+kpi_store/**
+scripts/**
+skills/**
+.github/**
+**/*.py
+
+# The copy's own lists, which its changes write: the tests it pins and the stand-alone exceptions of its versions.
+!scripts/pinned-tests.txt
+!scripts/standalone-exceptions.txt
+
+# The guides to the tools, and Git's two files.
+HOW-TO-UPDATE.md
+HOW-TO-UPDATE.html
+KNOWN-OPEN-ITEMS.md
+business_architecture/ontology/projection/ontology-stores-runbook.md
+business_architecture/ontology/projection/ontology-stores-runbook.html
+.gitattributes
+.gitignore
