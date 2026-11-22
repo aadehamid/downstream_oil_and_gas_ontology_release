@@ -593,16 +593,14 @@ def test_an_entry_listed_twice_is_not_a_case_twin(tmp_path):
 
 
 def test_a_new_file_in_a_folder_that_differs_only_in_case_is_refused(tmp_path):
+    # The new release's ontology folder is Business_architecture; the copy's is business_architecture. The new
+    # release holds one spelling only, so the test runs on a file system that ignores case too.
     copy = shipped(tmp_path)
     new = release(tmp_path / "new", "1.3")
-    (new / "kpi_store").rename(new / "tmp-move")
-    (new / "tmp-move").rename(new / "KPI_STORE")
-    # The release's tool list must stay where the command looks for it.
-    (new / "kpi_store").mkdir(exist_ok=True)
-    if (new / "KPI_STORE").samefile(new / "kpi_store"):
-        pytest.skip("this file system holds one folder for both names")
-    (new / "kpi_store" / "upgrade-paths.txt").write_text(PATHS + "KPI_STORE/**\n", encoding="utf-8")
-    with pytest.raises(up.UpgradeRefused, match="differs only in the case of its letters from kpi_store"):
+    (new / "business_architecture").rename(new / "tmp-move")
+    (new / "tmp-move").rename(new / "Business_architecture")
+    with pytest.raises(up.UpgradeRefused, match=r"Business_architecture/\S+ differs only in the case of its letters "
+                                                r"from business_architecture, and"):
         up.upgrade(copy, new, say=lambda *_: None, check=PASS)
 
 

@@ -154,8 +154,8 @@ def _unpack(zip_path, into):
 
 
 def case_twins(paths):
-    """{name: the other spellings} for every name, of a whole path or of a folder on its way, that has another
-    spelling among these paths differing only in the case of its letters. Paths are read as zipfile unpacks them:
+    """{name: every spelling of its group, itself included, sorted} for every name, of a whole path or of a folder
+    on its way, that has another spelling among these paths differing only in the case of its letters. Paths are read as zipfile unpacks them:
     "./" and doubled slashes are left out, so "./kpi_store//A.py" is "kpi_store/A.py"."""
     spellings = {}
     for path in paths:
@@ -333,11 +333,11 @@ def plan(root, new_root):
             if path in old and old[path][1] == blob:
                 continue
             parts = PurePosixPath(path).parts
-            clash = next((twins["/".join(parts[:end])] for end in range(1, len(parts) + 1)
-                          if "/".join(parts[:end]) in twins), None)
-            if path not in old and clash:
+            prefixes = ["/".join(parts[:end]) for end in range(1, len(parts) + 1)]
+            clashing = next((name for name in prefixes if name in twins), None)
+            if path not in old and clashing:
                 raise UpgradeRefused(f"the new release's {path} differs only in the case of its letters from "
-                                     f"{', '.join(n for n in clash if n != path)}, and Windows and macOS hold one "
+                                     f"{', '.join(n for n in twins[clashing] if n != clashing)}, and Windows and macOS hold one "
                                      "file or folder for both")
             the_plan.entries[path] = (old.get(path, ("100644",))[0], blob, new[path])
             if path not in old:
