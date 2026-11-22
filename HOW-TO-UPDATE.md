@@ -2848,8 +2848,10 @@ The upgrade needs the release folder in Git, as the runbook's "Keep the release 
    The document test makes a newer release from this copy with this block: the same files, a newer name in `release.json` and one changed tool file. You received your zip from the release's team, so skip it.
 
    ```python run=upgrade
-   import json, re, shutil, subprocess, zipfile
+   import json, re, shutil, subprocess, sys, zipfile
    from pathlib import Path
+
+   sys.path.insert(0, ".")   # the release folder, for its kpi_store package
    from kpi_store import runner
 
    newer = Path("../newer-release")

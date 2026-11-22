@@ -1633,8 +1633,10 @@ ALTER TABLE idp_sbx.kpi_store.epm_store_markers ALTER COLUMN marker COMMENT 'JSO
 <p>The upgrade needs the release folder in Git, as the runbook's "Keep the release folder in Git" says, with every change committed. A copy you never changed can be replaced by the new zip instead, as the runbook's "Replace the release with a newer zip" says.</p>
 <ol><li>Save the new release's zip beside your release folder. Compare its SHA-256 with the one the release's team sent you. The upgrade command prints it in its first line.
 <p>The document test makes a newer release from this copy with this block: the same files, a newer name in <code>release.json</code> and one changed tool file. You received your zip from the release's team, so skip it.</p>
-<pre><code class="lang-python">import json, re, shutil, subprocess, zipfile
+<pre><code class="lang-python">import json, re, shutil, subprocess, sys, zipfile
 from pathlib import Path
+
+sys.path.insert(0, ".")   # the release folder, for its kpi_store package
 from kpi_store import runner
 
 newer = Path("../newer-release")
