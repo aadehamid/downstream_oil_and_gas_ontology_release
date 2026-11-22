@@ -134,11 +134,8 @@ def _unpack(zip_path, into):
                 members.append(info)
             if not any(not m.is_dir() for m in members):
                 raise UpgradeRefused(f"{zip_path} holds no file")
-            # On Windows and macOS one entry would overwrite the other as it is unpacked, so the plan never sees both.
-            spellings = {}
-            for m in members:
-                spellings.setdefault(m.filename.rstrip("/").casefold(), []).append(m.filename)
-            twins = sorted(sorted(names) for names in spellings.values() if len(names) > 1)
+            # On Windows and macOS one entry would land on the other as it is unpacked, so the plan never sees both.
+            twins = sorted(set(case_twins(m.filename for m in members).values()))
             if twins:
                 raise UpgradeRefused(f"the zip holds names that differ only in the case of their letters: "
                                      f"{', '.join(twins[0])}, and Windows and macOS hold one file for both")
@@ -154,6 +151,19 @@ def _unpack(zip_path, into):
     if len(entries) == 1 and entries[0].is_dir() and not (Path(into) / RELEASE_FILE).exists():
         return entries[0]
     return Path(into)
+
+
+def case_twins(paths):
+    """{name: the other spellings} for every name, of a whole path or of a folder on its way, that has another
+    spelling among these paths differing only in the case of its letters. Paths are read as zipfile unpacks them:
+    "./" and doubled slashes are left out, so "./kpi_store//A.py" is "kpi_store/A.py"."""
+    spellings = {}
+    for path in paths:
+        parts = PurePosixPath(path).parts
+        for end in range(1, len(parts) + 1):
+            name = "/".join(parts[:end])
+            spellings.setdefault(name.casefold(), set()).add(name)
+    return {name: tuple(sorted(names)) for names in spellings.values() if len(names) > 1 for name in names}
 
 
 def _release_name(text, where):
@@ -315,19 +325,20 @@ def plan(root, new_root):
                              f"{' and more' if len(crlf) > 5 else ''}. Give the zip as the release's team sent it")
     old, now = _tree(root, base), _tree(root, head)
     ids = dict(zip(sorted(new), _blobs(root, [str(new[p].resolve()) for p in sorted(new)], write=False)))
-    spellings = {}
-    for path in set(old) | set(now) | set(new):
-        spellings.setdefault(path.casefold(), set()).add(path)
+    twins = case_twins(set(old) | set(now) | set(new))
     for path in sorted(set(old) | set(new)):
         tool = is_tool(path, patterns)
         if path in new and (tool or (path not in old and path not in now)):
             blob = ids[path]
             if path in old and old[path][1] == blob:
                 continue
-            others = sorted(spellings[path.casefold()] - {path})
-            if path not in old and others:
+            parts = PurePosixPath(path).parts
+            clash = next((twins["/".join(parts[:end])] for end in range(1, len(parts) + 1)
+                          if "/".join(parts[:end]) in twins), None)
+            if path not in old and clash:
                 raise UpgradeRefused(f"the new release's {path} differs only in the case of its letters from "
-                                     f"{', '.join(others)}, and Windows and macOS hold one file for both")
+                                     f"{', '.join(n for n in clash if n != path)}, and Windows and macOS hold one "
+                                     "file or folder for both")
             the_plan.entries[path] = (old.get(path, ("100644",))[0], blob, new[path])
             if path not in old:
                 the_plan.added.append(path)

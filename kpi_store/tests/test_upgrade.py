@@ -10,6 +10,7 @@ import os
 import shutil
 import subprocess
 import sys
+import warnings
 import zipfile
 from pathlib import Path
 
@@ -449,6 +450,10 @@ def damaged_lzma(path):
     (lambda path: damaged_lzma(path), r"cannot be read as a zip \(LZMAError"),
     (lambda path: zip_of(path, [("kpi_store/a.py", "x = 1\n"), ("kpi_store/A.py", "x = 2\n")]),
      "differ only in the case of their letters: kpi_store/A.py, kpi_store/a.py"),
+    (lambda path: zip_of(path, [("kpi_store/a.py", "x = 1\n"), ("./kpi_store//A.py", "x = 2\n")]),
+     "differ only in the case of their letters: kpi_store/A.py, kpi_store/a.py"),
+    (lambda path: zip_of(path, [("kpi_store/a.py", "x = 1\n"), ("KPI_STORE/b.py", "x = 2\n")]),
+     "differ only in the case of their letters: KPI_STORE, kpi_store"),
 ])
 def test_a_zip_that_is_not_a_release_is_refused_plainly(tmp_path, make, says):
     copy = shipped(tmp_path)
@@ -570,3 +575,39 @@ def test_an_output_error_is_not_reported_as_an_unreadable_zip(tmp_path):
         raise BrokenPipeError
     with pytest.raises(BrokenPipeError):
         up.upgrade(copy, archive, say=broken, check=PASS)
+
+
+def test_an_entry_listed_twice_is_not_a_case_twin(tmp_path):
+    copy = shipped(tmp_path)
+    new = release(tmp_path / "new", "1.3", {"kpi_store/tool.py": "A = 2\n"})
+    archive = tmp_path / "twice.zip"
+    with zipfile.ZipFile(archive, "w") as z, warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)   # zipfile warns of the name it is asked to write twice
+        z.writestr("kpi_store/", "")
+        z.writestr("kpi_store/", "")
+        for path in sorted(new.rglob("*")):
+            if path.is_file():
+                z.write(path, path.relative_to(new).as_posix())
+    up.upgrade(copy, archive, say=lambda *_: None, check=PASS)
+    assert read(copy, "kpi_store/tool.py") == "A = 2\n"
+
+
+def test_a_new_file_in_a_folder_that_differs_only_in_case_is_refused(tmp_path):
+    copy = shipped(tmp_path)
+    new = release(tmp_path / "new", "1.3")
+    (new / "kpi_store").rename(new / "tmp-move")
+    (new / "tmp-move").rename(new / "KPI_STORE")
+    # The release's tool list must stay where the command looks for it.
+    (new / "kpi_store").mkdir(exist_ok=True)
+    if (new / "KPI_STORE").samefile(new / "kpi_store"):
+        pytest.skip("this file system holds one folder for both names")
+    (new / "kpi_store" / "upgrade-paths.txt").write_text(PATHS + "KPI_STORE/**\n", encoding="utf-8")
+    with pytest.raises(up.UpgradeRefused, match="differs only in the case of its letters from kpi_store"):
+        up.upgrade(copy, new, say=lambda *_: None, check=PASS)
+
+
+def test_case_twins_read_paths_as_zipfile_unpacks_them():
+    assert up.case_twins(["kpi_store/a.py", "./kpi_store//A.py", "kpi_store/a.py"]) == {
+        "kpi_store/a.py": ("kpi_store/A.py", "kpi_store/a.py"), "kpi_store/A.py": ("kpi_store/A.py", "kpi_store/a.py")}
+    assert up.case_twins(["a/x", "A/y"])["A"] == ("A", "a")
+    assert up.case_twins(["kpi_store/", "kpi_store/"]) == {}
