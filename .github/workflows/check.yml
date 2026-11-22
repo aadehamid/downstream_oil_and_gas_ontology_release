@@ -32,7 +32,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     # The test run alone took 26 to 61 minutes on Ubuntu, and the Windows job 60 to 71 minutes, as the forms
     # added tests that each build and apply a release. 75 minutes cancelled one Ubuntu run whose checks all passed.
-    timeout-minutes: 120
+    # The AI drafting tests took Ubuntu from 1 h 49 min to past 120 minutes, which cancelled both runs, so it gets
+    # 180.
+    timeout-minutes: 180
     defaults:
       run:
         shell: bash
@@ -92,7 +94,7 @@ jobs:
     name: check (no links, no py)
     runs-on: windows-2025
     # This job took 43 to 63 minutes on recent runs, and 60 minutes once cancelled a run, so it gets the same limit.
-    timeout-minutes: 120
+    timeout-minutes: 180
     defaults:
       run:
         shell: bash
@@ -209,7 +211,8 @@ jobs:
   #   run    the setup check with all 15 checks, the first run, which stops on the report, the cleared report, the
   #          second run with its two typed answers, and the sync check. No step is left out, so the check script runs
   #          inside each run, 35 to 65 minutes each on this runner. The part took 1 h 46 min and 1 h 52 min, and on a slow
-  #          day it was cancelled at 2 h in its second run, so it gets 3 h.
+  #          day it was cancelled at 2 h in its second run, so it gets 3 h. On 2026-11-22 its first run took 1 h 46 min
+  #          (62 minutes the run before) and 3 h cancelled it in the second run, so it gets 5 h, under GitHub's 6.
   #   reset  the document test for the blocks that need this job's Neo4j server or a Windows account. Then the same
   #          chain with --skip check, which the runbook gives for a machine where the check step cannot run, and on the
   #          loaded stores: the reset with the typed word, a sync check that must read unmarked, the load again,
@@ -223,7 +226,7 @@ jobs:
       matrix:
         part: [run, reset]
     runs-on: windows-2025
-    timeout-minutes: 180
+    timeout-minutes: 300
     defaults:
       run:
         shell: bash
@@ -528,14 +531,17 @@ jobs:
           if ((Get-Location).Path -ne "$folder\kpi-store-1.1") { exit 1 }
 
       # ---- both parts: the first run, the cleared report, the second run ----
-      # Part run gives no option, as the runbook's "The first run" and "The second run" do. Part reset adds
-      # --skip check, the runbook's own fallback, so that it reaches the reset inside the time limit.
-      - name: which options the runs of this part take
+      # Part run's second run gives no option, as the runbook's "The second run" does, so the runner's check step runs
+      # the whole check on the copy the cut corrected. Its first run, and both runs of part reset, add --skip check,
+      # the runbook's own fallback: the first run's check reads the release as shipped, which the check jobs above
+      # prove already, and each whole check took this job close to two hours on Windows (4 h 21 min for the job on
+      # 2026-11-22, of a 5 h limit).
+      - name: which options the runs after the first take in this part
         run: echo "RUN_OPTIONS=${{ matrix.part == 'reset' && '--skip check' || '' }}" >> "$GITHUB_ENV"
       - name: the first run, which must stop on the report with exit code 3
         run: |
           code=0
-          python -m kpi_store.runner $RUN_OPTIONS | tee "$LOCAL/first-run.log" || code=$?
+          python -m kpi_store.runner --skip check | tee "$LOCAL/first-run.log" || code=$?
           echo "exit code $code"
           [ "$code" -eq 3 ]
           grep -q "^report: STOPPED" "$LOCAL/first-run.log"
