@@ -408,6 +408,7 @@ def test_apply_releases_the_drafted_module_at_1_0_0(tmp_path, no_global_git):
     assert "gate 2, the reasoner finds the model consistent: passed" in done.stdout
     # The proposal's name is the form's request number, or that number with -2 when a copy holds it already.
     change = folder.name
+    assert change == "NM-2026-003" or (change.startswith("NM-2026-003-") and change[12:].isdigit()), change
     kept = json.loads((root / f"business_architecture/ontology/approvals/{change}.json").read_text(encoding="utf-8"))
     assert kept["draft"] == json.loads((folder / "approval.json").read_text(encoding="utf-8"))["draft"]
     assert (root / "business_architecture/ontology/releases/sample-tank-inspections/1.0.0/sample-tank-inspections.ttl").is_file()
