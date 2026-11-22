@@ -180,6 +180,7 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   kpi_store/tests/test_intake_check.py \
   kpi_store/tests/test_intake_build.py \
   kpi_store/tests/test_reset.py \
+  kpi_store/tests/test_upgrade.py \
   scripts/test_check_script.py \
   scripts/test_check_standalone.py \
   scripts/test_pre_push_hook.py \
