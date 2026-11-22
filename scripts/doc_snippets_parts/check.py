@@ -30,6 +30,12 @@ RELEASE_STRICT = ("the documents' examples describe another release than this on
                   "gives {now}. Bring the examples up to date with this release, then run: " + REFRESH)
 
 
+def _dedent(lines):
+    """The lines with the leading spaces that every line holding text shares taken off."""
+    width = min((len(line) - len(line.lstrip(" ")) for line in lines if line.strip()), default=0)
+    return [line[width:] for line in lines]
+
+
 @dataclass
 class Result:
     failures: list = field(default_factory=list)
@@ -256,7 +262,10 @@ class Checker:
         shown = normalise(block.body)
         if not shown:
             return self._fail(block, "the excerpt is empty")
-        if not any(real[i:i + len(shown)] == shown for i in range(len(real) - len(shown) + 1)):
+        # A block in a list stands indented in its file, and its body is read without that indent, so each window of
+        # the file is compared with the indent its lines share taken off.
+        shown = _dedent(shown)
+        if not any(_dedent(real[i:i + len(shown)]) == shown for i in range(len(real) - len(shown) + 1)):
             best = max(real, key=lambda line: difflib.SequenceMatcher(None, line, shown[0]).ratio(), default="")
             return self._fail(block, f"the lines are not in {block.value}, in this order and next to each other",
                               f"the block starts: {shown[0]}\nthe closest line: {best}")

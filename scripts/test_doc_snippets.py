@@ -771,6 +771,14 @@ def test_a_file_block_must_equal_the_file(tmp_path):
     assert outside.failures == ["guide.md:1: `../registry.toml` must be a path inside the release"]
 
 
+def test_an_excerpt_matches_lines_that_stand_indented_in_the_file(tmp_path):
+    # A block inside a list item: the file holds it indented, as the block's own document does.
+    files = {"steps.txt": "1. Run it.\n\n   python -m tool --plan\n     --yes\n"}
+    assert check(tmp_path, fence("powershell excerpt=steps.txt", "python -m tool --plan", "  --yes"), files=files).failures == []
+    result = check(tmp_path, fence("powershell excerpt=steps.txt", "python -m tool --plan", "--yes"), files=files)
+    assert "the lines are not in steps.txt" in result.failures[0]
+
+
 def test_an_excerpt_block_must_be_lines_of_the_file_next_to_each_other(tmp_path):
     files = {"code.py": "def one():\n    return 1\n\n\ndef two():\n    return 2\n"}
     assert check(tmp_path, fence("python excerpt=code.py", "def two():", "    return 2"), files=files).failures == []
