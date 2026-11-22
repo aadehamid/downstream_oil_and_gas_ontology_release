@@ -15,8 +15,8 @@ the new release, and that your copy does not have, is added, because a new tool 
 
 How it works, with Git, which the runbook asks you to keep the release folder in:
 1. The base is what your copy's tools were last taken from: the newest tag named kpi-store-<version>-tools in your
-   copy's history, which this command makes, or else the first commit, "KPI Store <version> as shipped", which the
-   runbook's "Keep the release folder in Git" makes.
+   copy's history, which this command makes, or else the copy's first commit, the release as it was unpacked, which
+   the runbook's "Keep the release folder in Git" makes. The release's name comes from its release.json.
 2. On top of the base it commits the new release's tool files and its new content files. The commit is not on any
    branch yet, and no file of your folder changes.
 3. In a temporary copy of your folder, outside it, Git merges that commit into your work. A tool file you never
@@ -50,7 +50,6 @@ from kpi_store import cut, runner, setup_check
 
 PATHS_FILE = Path("kpi_store") / "upgrade-paths.txt"
 RELEASE_FILE = "release.json"
-SHIPPED = re.compile(r"(KPI Store \d+(?:\.\d+)*) as shipped")
 RELEASE_NAME = re.compile(r"KPI Store (\d+(?:\.\d+)*)")
 TAGS = "kpi-store-*-tools"
 
@@ -176,13 +175,9 @@ def _base(root):
     if len(roots) != 1:
         raise UpgradeRefused("this copy's history has more than one first commit, so the upgrade cannot tell which "
                              "release it started from")
-    subject = _out(root, "log", "-1", "--format=%s", roots[0]).strip()
-    match = SHIPPED.fullmatch(subject)
-    if not match:
-        raise UpgradeRefused(f"this copy's first commit is \"{subject}\", not \"KPI Store <version> as shipped\" as the "
-                             "runbook's \"Keep the release folder in Git\" makes it, so the upgrade cannot tell which "
-                             "files came from the release")
-    return roots[0], match.group(1), "the first commit"
+    shown = _git(root, "show", f"{roots[0]}:{RELEASE_FILE}")
+    release = _release_name(shown.stdout if shown.returncode == 0 else "", f"the {RELEASE_FILE} of this copy's first commit")
+    return roots[0], release, "the first commit"
 
 
 def _tree(root, commit):

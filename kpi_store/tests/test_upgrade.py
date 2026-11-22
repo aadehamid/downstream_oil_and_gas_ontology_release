@@ -231,14 +231,24 @@ def test_uncommitted_changes_are_refused(tmp_path):
         up.upgrade(copy, release(tmp_path / "new", "1.3"), say=lambda *_: None, check=PASS)
 
 
-def test_a_first_commit_that_is_not_as_shipped_is_refused(tmp_path):
-    copy = release(tmp_path / "copy", "1.2")
+def test_a_first_commit_that_names_no_release_is_refused(tmp_path):
+    copy = release(tmp_path / "copy", "1.2", {"release.json": "{}"})
     git(copy, "init", "-q")
     git(copy, "config", "user.name", "x")
     git(copy, "config", "user.email", "x@example.invalid")
     git(copy, "add", "-A")
-    git(copy, "commit", "-q", "-m", "first")
-    with pytest.raises(up.UpgradeRefused, match='first commit is "first", not "KPI Store <version> as shipped"'):
+    git(copy, "commit", "-q", "-m", "The release as received")
+    with pytest.raises(up.UpgradeRefused, match="the release.json of this copy's first commit does not name a release"):
+        up.upgrade(copy, release(tmp_path / "new", "1.3"), say=lambda *_: None, check=PASS)
+
+
+def test_two_first_commits_are_refused(tmp_path):
+    copy = shipped(tmp_path)
+    git(copy, "checkout", "-q", "--orphan", "other")
+    commit(copy, {"kpi_store/other.py": "x = 1\n"}, "Another start")
+    git(copy, "checkout", "-q", "master" if "master" in git(copy, "branch") else "main")
+    git(copy, "merge", "-q", "--allow-unrelated-histories", "-m", "join", "other")
+    with pytest.raises(up.UpgradeRefused, match="more than one first commit"):
         up.upgrade(copy, release(tmp_path / "new", "1.3"), say=lambda *_: None, check=PASS)
 
 
