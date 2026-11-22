@@ -207,6 +207,7 @@ figure.pic figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
 <li class="l2"><a href="#add-a-logical-model">Add a logical model</a></li>
 <li class="l2"><a href="#keep-the-catalog-the-regression-and-the-projection-current">Keep the catalog, the regression and the projection current</a></li>
 <li class="l2"><a href="#keep-every-store-in-step">Keep every store in step</a></li>
+<li class="l2"><a href="#upgrade-the-tools-from-a-newer-release">Upgrade the tools from a newer release</a></li>
 <li class="l2"><a href="#the-optional-check-against-this-release">The optional check against this release</a></li>
 <li class="l2"><a href="#the-namespace">The namespace</a></li>
 <li class="l2"><a href="#what-you-can-ignore">What you can ignore</a></li>
@@ -1694,6 +1695,54 @@ neo4j-spec.json is current and conforms to the specification's 1.1.0 schema</cod
 <pre><code class="lang-text">COMMENT ON TABLE idp_sbx.kpi_store.epm_store_markers IS 'Which release each KPI Store table was loaded from'
 ALTER TABLE idp_sbx.kpi_store.epm_store_markers ALTER COLUMN store COMMENT 'The store the row describes.'
 ALTER TABLE idp_sbx.kpi_store.epm_store_markers ALTER COLUMN marker COMMENT 'JSON: what the table was loaded from, its row count and hash, and when the row was written.'</code></pre>
+<h2 id="upgrade-the-tools-from-a-newer-release">Upgrade the tools from a newer release<a class="hl" href="#upgrade-the-tools-from-a-newer-release" aria-label="Link to this section">#</a></h2>
+<p>Your copy is the master of the ontology: every change you apply stays in it. A newer release brings new tools: the commands, the scripts, the skills and the guides. The upgrade command takes those into your copy and keeps every content file as you made it, such as the tables, the Turtle files, the packages and the records.</p>
+<ul><li><strong>Which files are tools.</strong> The new release lists them in <code>kpi_store/upgrade-paths.txt</code>. Every other file is content. A content file that the new release changes keeps your version. A content file that is new in the new release is added.</li><li><strong>A tool file your changes edited gets both changes.</strong> The apply command edits some tool files, such as the tables in <code>business_architecture/ontology/release/build_module.py</code> that list the modules. Git merges the new release's changes with yours, line by line. When both changed the same lines, the upgrade stops, names the files and changes nothing.</li><li><strong>Nothing changes until the check passes.</strong> The command merges in a temporary copy, outside your folder, and runs the full check there. Only when the merge and the check pass does your folder move to the merged commit. It then tags the commit the new tools came from, <code>kpi-store-&lt;version&gt;-tools</code>, and the next upgrade starts from that tag.</li></ul>
+<p>The upgrade needs the release folder in Git, as the runbook's "Keep the release folder in Git" says, with every change committed. A copy you never changed can be replaced by the new zip instead, as the runbook's "Replace the release with a newer zip" says.</p>
+<ol><li>Save the new release's zip beside your release folder. Compare its SHA-256 with the one the release's team sent you. The upgrade command prints it in its first line.
+<p>The document test makes a newer release from this copy with this block: the same files, a newer name in <code>release.json</code> and one changed tool file. You received your zip from the release's team, so skip it.</p>
+<pre><code class="lang-python">import json, re, shutil, subprocess, sys, zipfile
+from pathlib import Path
+
+sys.path.insert(0, ".")   # the release folder, for its kpi_store package
+from kpi_store import runner
+
+newer = Path("../newer-release")
+shutil.rmtree(newer, ignore_errors=True)
+subprocess.run(["git", "archive", "--format=zip", "-o", "../head.zip", "HEAD"], check=True)
+zipfile.ZipFile("../head.zip").extractall(newer)
+info = json.loads((newer / "release.json").read_text(encoding="utf-8"))
+parts = info["release"].split(".")
+info["release"] = ".".join(parts[:-1] + [str(int(parts[-1]) + 1)])
+(newer / "release.json").write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8", newline="\n")
+tools = newer / "kpi_store" / "upgrade-paths.txt"
+tools.write_text(tools.read_text(encoding="utf-8") + "# A newer release.\n", encoding="utf-8", newline="\n")
+runner.build_zip(newer, "../kpi-store-newer.zip")
+print("made ../kpi-store-newer.zip")</code></pre>
+<pre><code class="lang-text">made ../kpi-store-newer.zip</code></pre></li></ol>
+<ol start="2"><li>See what the upgrade would do. The plan changes nothing.
+<pre><code class="lang-powershell">python -m kpi_store.upgrade --from ../kpi-store-newer.zip --plan</code></pre>
+<pre><code class="lang-text">The zip's SHA-256 is &lt;sha-256&gt;.
+From &lt;this release&gt; (at the first commit) to the tools of &lt;the newer release&gt;.
+  1 tool files that take the new version: kpi_store/upgrade-paths.txt
+  0 tool files you changed, which get both changes
+  0 tool files the new release removes
+  0 new files added
+  1 content files the new release changes, which keep your version: release.json
+This was the plan only. Nothing was changed.</code></pre></li></ol>
+<ol start="3"><li>Upgrade. The full check runs on the merged copy, so it takes about 20 minutes.
+<pre><code class="lang-powershell">python -m kpi_store.upgrade --from ../kpi-store-newer.zip</code></pre>
+<pre><code class="lang-text">The zip's SHA-256 is &lt;sha-256&gt;.
+...
+The merge passed. The full check runs on the merged copy now; it takes about 20 minutes.
+Upgraded to the tools of &lt;the newer release&gt;. The tag &lt;tag&gt; marks them for the next upgrade.</code></pre>
+<p>When the upgrade stops, the message says why, and your folder is as it was. A message that names files changed on both sides, or a failed check, goes to the release's team with the files or the log it names.</p></li></ol>
+<ol start="4"><li>See the merge commit and the tag.
+<pre><code class="lang-powershell">git --no-pager log --oneline -1
+git tag --list "kpi-store-*-tools"</code></pre>
+<pre><code class="lang-text">&lt;commit&gt; Upgrade the tools to &lt;the newer release&gt;
+kpi-store-&lt;version&gt;-tools</code></pre></li></ol>
+<ol start="5"><li>Load the stores with the runner, as in step 11 of "The release steps".</li></ol>
 <h2 id="the-optional-check-against-this-release">The optional check against this release<a class="hl" href="#the-optional-check-against-this-release" aria-label="Link to this section">#</a></h2>
 <p><code>scripts/check-pinned.sh</code> asks a different question from <code>scripts/check.sh</code>: does your copy still equal KPI Store 1.1 as shipped? Its tests pin versions, counts, approvals and the figures in the guide. They pass on the release as shipped. After your first change some of them fail. That means only that your copy has moved on. Ignore them from then on, or edit <code>scripts/pinned-tests.txt</code> when you want your own pins.</p>
 <p>The documents that state figures or versions describe KPI Store 1.1 as shipped. They do not update themselves. Update the ones your readers use.</p>

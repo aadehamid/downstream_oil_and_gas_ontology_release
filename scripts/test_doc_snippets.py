@@ -1396,6 +1396,7 @@ def test_the_contexts_that_run_everywhere_need_no_variable_and_the_others_name_t
         "windows-account": ("DOC_SNIPPETS_WINDOWS_ACCOUNT",),
         "shared-drive": ("DOC_SNIPPETS_SHARED_DRIVE",),
         "ai-suggestions": (),
+        "upgrade": ("DOC_SNIPPETS_SLOW",),
         "ai-modelling": ("DOC_SNIPPETS_SLOW",)}
     assert [name for name, c in contexts.items() if c.home == "real"] == ["databricks-free", "first-run", "scratch-schemas",
                                                                           "windows-account"]

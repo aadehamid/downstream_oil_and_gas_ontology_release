@@ -2943,6 +2943,91 @@ ALTER TABLE idp_sbx.kpi_store.epm_store_markers ALTER COLUMN store COMMENT 'The 
 ALTER TABLE idp_sbx.kpi_store.epm_store_markers ALTER COLUMN marker COMMENT 'JSON: what the table was loaded from, its row count and hash, and when the row was written.'
 ```
 
+## Upgrade the tools from a newer release
+
+Your copy is the master of the ontology: every change you apply stays in it. A newer release brings new tools: the commands, the scripts, the skills and the guides. The upgrade command takes those into your copy and keeps every content file as you made it, such as the tables, the Turtle files, the packages and the records.
+
+- **Which files are tools.** The new release lists them in `kpi_store/upgrade-paths.txt`. Every other file is content. A content file that the new release changes keeps your version. A content file that is new in the new release is added.
+- **A tool file your changes edited gets both changes.** The apply command edits some tool files, such as the tables in `business_architecture/ontology/release/build_module.py` that list the modules. Git merges the new release's changes with yours, line by line. When both changed the same lines, the upgrade stops, names the files and changes nothing.
+- **Nothing changes until the check passes.** The command merges in a temporary copy, outside your folder, and runs the full check there. Only when the merge and the check pass does your folder move to the merged commit. It then tags the commit the new tools came from, `kpi-store-<version>-tools`, and the next upgrade starts from that tag.
+
+The upgrade needs the release folder in Git, as the runbook's "Keep the release folder in Git" says, with every change committed. A copy you never changed can be replaced by the new zip instead, as the runbook's "Replace the release with a newer zip" says.
+
+1. Save the new release's zip beside your release folder. Compare its SHA-256 with the one the release's team sent you. The upgrade command prints it in its first line.
+
+   The document test makes a newer release from this copy with this block: the same files, a newer name in `release.json` and one changed tool file. You received your zip from the release's team, so skip it.
+
+   ```python run=upgrade
+   import json, re, shutil, subprocess, sys, zipfile
+   from pathlib import Path
+
+   sys.path.insert(0, ".")   # the release folder, for its kpi_store package
+   from kpi_store import runner
+
+   newer = Path("../newer-release")
+   shutil.rmtree(newer, ignore_errors=True)
+   subprocess.run(["git", "archive", "--format=zip", "-o", "../head.zip", "HEAD"], check=True)
+   zipfile.ZipFile("../head.zip").extractall(newer)
+   info = json.loads((newer / "release.json").read_text(encoding="utf-8"))
+   parts = info["release"].split(".")
+   info["release"] = ".".join(parts[:-1] + [str(int(parts[-1]) + 1)])
+   (newer / "release.json").write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8", newline="\n")
+   tools = newer / "kpi_store" / "upgrade-paths.txt"
+   tools.write_text(tools.read_text(encoding="utf-8") + "# A newer release.\n", encoding="utf-8", newline="\n")
+   runner.build_zip(newer, "../kpi-store-newer.zip")
+   print("made ../kpi-store-newer.zip")
+   ```
+
+   ```text expect
+   made ../kpi-store-newer.zip
+   ```
+
+2. See what the upgrade would do. The plan changes nothing.
+
+   ```powershell run=upgrade
+   python -m kpi_store.upgrade --from ../kpi-store-newer.zip --plan
+   ```
+
+   ```text expect
+   The zip's SHA-256 is <sha-256>.
+   From <this release> (at the first commit) to the tools of <the newer release>.
+     1 tool files that take the new version: kpi_store/upgrade-paths.txt
+     0 tool files you changed, which get both changes
+     0 tool files the new release removes
+     0 new files added
+     1 content files the new release changes, which keep your version: release.json
+   This was the plan only. Nothing was changed.
+   ```
+
+3. Upgrade. The full check runs on the merged copy, so it takes about 20 minutes.
+
+   ```powershell run=upgrade
+   python -m kpi_store.upgrade --from ../kpi-store-newer.zip
+   ```
+
+   ```text expect
+   The zip's SHA-256 is <sha-256>.
+   ...
+   The merge passed. The full check runs on the merged copy now; it takes about 20 minutes.
+   Upgraded to the tools of <the newer release>. The tag <tag> marks them for the next upgrade.
+   ```
+
+   When the upgrade stops, the message says why, and your folder is as it was. A message that names files changed on both sides, or a failed check, goes to the release's team with the files or the log it names.
+
+4. See the merge commit and the tag.
+
+   ```powershell run=upgrade
+   git --no-pager log --oneline -1
+   git tag --list "kpi-store-*-tools"
+   ```
+
+   ```text expect
+   <commit> Upgrade the tools to <the newer release>
+   kpi-store-<version>-tools
+   ```
+
+5. Load the stores with the runner, as in step 11 of "The release steps".
+
 ## The optional check against this release
 
 `scripts/check-pinned.sh` asks a different question from `scripts/check.sh`: does your copy still equal KPI Store 1.1 as shipped? Its tests pin versions, counts, approvals and the figures in the guide. They pass on the release as shipped. After your first change some of them fail. That means only that your copy has moved on. Ignore them from then on, or edit `scripts/pinned-tests.txt` when you want your own pins.
