@@ -534,7 +534,7 @@ The change commands of sections 3 to 5 rebuild what they change, including the K
 
    path = Path("kpi-intake/settings.toml")
    path.write_text(path.read_text(encoding="utf-8") + "\n# A change by the Architect.\n", encoding="utf-8", newline="\n")
-   print("changed", path)
+   print("changed", path.as_posix())
    ```
 
    ```text expect

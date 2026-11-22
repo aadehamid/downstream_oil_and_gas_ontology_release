@@ -392,7 +392,7 @@ KPI-intake is ready</code></pre>
 
 path = Path("kpi-intake/settings.toml")
 path.write_text(path.read_text(encoding="utf-8") + "\n# A change by the Architect.\n", encoding="utf-8", newline="\n")
-print("changed", path)</code></pre>
+print("changed", path.as_posix())</code></pre>
 <pre><code class="lang-text">changed kpi-intake/settings.toml</code></pre>
 <p>You are done when the file is saved.</p></li></ol>
 <ol start="2"><li>Rebuild the pack.
