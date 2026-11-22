@@ -3,8 +3,8 @@ KPI-DEC-0004, item 1).
 
 The patterns are release/module_patterns.py's: a vocabulary (terms with definitions, other names and a hierarchy)
 and a reference table (items of a class the ontology holds, each with one value of each of a fixed set of
-properties the ontology holds). A new class, a new property or a rule of its own needs a specialist, and the form
-says so. What each line says:
+properties the ontology holds). A new class, a new property or a rule of its own is new modelling: an AI drafts it
+under the five gates of Q19 (drafted.py), or a specialist designs it. What each line says:
 
     module:<key>,pattern,<vocabulary or reference-table>      facts.csv, the module itself
     module:<key>,title,<its name>
@@ -417,30 +417,37 @@ def split(changes, facts, root, release=None):
     pattern = said["pattern"][0]
     if pattern not in (VOCABULARY, REFERENCE_TABLE):
         raise ChangeRefused(f"{pattern!r} is not a pattern of the new-module form; it needs a specialist")
-    if not MODULE_KEY.fullmatch(key) or len(key) > NAME_LIMIT:
-        raise ChangeRefused(f"the module's short key {key!r} must start with a letter and be lower-case letters and digits "
-                            f"with hyphens, at most {NAME_LIMIT} characters: give the module another name")
-    if key != module_key(said["title"][0]):
-        raise ChangeRefused(f"the module's short key {key} is not the one its title {said['title'][0]!r} gives")
-    root = Path(root)
-    if key in _modules_table(root) or (root / cut.ONTOLOGY / key).exists() or \
-            (root / cut.ONTOLOGY / "releases" / key).exists():
-        raise ChangeRefused(f"the release holds a module or a folder named {key} already. Give the module another name")
-    prefix = key.replace("-", "_")
-    spec = {"module": key, "pattern": pattern, "prefix": prefix, "title": said["title"][0],
-            "description": said["description"][0], "citation": said["source"][0]}
-    for text in spec["title"], spec["description"], spec["citation"]:
-        problem = kgcl.text_problem(text)
-        if problem:
-            raise ChangeRefused(f"{problem}: {text!r}")
     release = release or Release(root)
-    if prefix in RESERVED_PREFIXES or prefix in _taken_prefixes(root) or prefix in release.prefixes:
-        raise ChangeRefused(f"the prefix {prefix} that the module's name gives is taken. Give the module another name")
+    spec = module_settings(key, pattern, said["title"][0], said["description"][0], said["source"][0], root, release)
     if pattern == VOCABULARY:
         if "property" in said or len(facts) != len(module_facts):
             raise ChangeRefused("a vocabulary takes no property and no fact of a term: a term's facts are its lines")
         return spec, _terms(changes)
     return _reference_table(spec, changes, facts, said.get("property", []), release)
+
+
+def module_settings(key, pattern, title, description, citation, root, release):
+    """The settings every new module starts from, whatever its pattern: its key, prefix, title, description and
+    documents, checked against the release. Raises ChangeRefused for a key, a text or a prefix it cannot take."""
+    if not MODULE_KEY.fullmatch(key) or len(key) > NAME_LIMIT:
+        raise ChangeRefused(f"the module's short key {key!r} must start with a letter and be lower-case letters and digits "
+                            f"with hyphens, at most {NAME_LIMIT} characters: give the module another name")
+    if key != module_key(title):
+        raise ChangeRefused(f"the module's short key {key} is not the one its title {title!r} gives")
+    root = Path(root)
+    if key in _modules_table(root) or (root / cut.ONTOLOGY / key).exists() or \
+            (root / cut.ONTOLOGY / "releases" / key).exists():
+        raise ChangeRefused(f"the release holds a module or a folder named {key} already. Give the module another name")
+    prefix = key.replace("-", "_")
+    spec = {"module": key, "pattern": pattern, "prefix": prefix, "title": title, "description": description,
+            "citation": citation}
+    for text in spec["title"], spec["description"], spec["citation"]:
+        problem = kgcl.text_problem(text)
+        if problem:
+            raise ChangeRefused(f"{problem}: {text!r}")
+    if prefix in RESERVED_PREFIXES or prefix in _taken_prefixes(root) or prefix in release.prefixes:
+        raise ChangeRefused(f"the prefix {prefix} that the module's name gives is taken. Give the module another name")
+    return spec
 
 
 def _terms(changes):

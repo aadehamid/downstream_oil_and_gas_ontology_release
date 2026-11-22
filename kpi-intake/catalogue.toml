@@ -64,8 +64,8 @@ label = "A role"
 id = "data-product"
 label = "A data product of the data-product catalog"
 
-# The patterns of the new-module form (KPI-DEC-0002, Q10 form 6 and Q11). The form makes the first two; the third routes
-# to "needs a specialist", with the reason in its route's notice.
+# The patterns of the new-module form (KPI-DEC-0002, Q10 form 6 and Q11). The form makes the first two. The third is new
+# modelling: an AI drafts it under the five gates of Q19 (Q17(a)), or a specialist designs it.
 [[choices.module-patterns]]
 id = "vocabulary"
 label = "A vocabulary: terms with a definition, other names and a place in a hierarchy"
@@ -110,6 +110,11 @@ next = "Record the date and the outcome of their review in the sign-off block be
 title = "Needs a specialist"
 blocks = true
 next = "This form cannot add this kind of item. The Architect takes the request to a specialist, who changes the ontology with HOW-TO-UPDATE.md."
+
+[outcome.new-modelling]
+title = "New modelling: an AI draft or a specialist"
+blocks = false
+next = "Before anyone signs, the Architect asks the AI to draft the module: python -m kpi_store.propose --ai-draft <this file> (HOW-TO-UPDATE.md, \"Draft new modelling with AI (optional)\"). The signers then read the draft's summary and sign. The propose command refuses the form unless the draft passed all five gates. Without AI, a specialist designs the module."
 
 [outcome.note]
 title = "For the Architect"
@@ -345,11 +350,11 @@ minutes = "10"
 id = "N"
 form = "new-module"
 name = "New module"
-technical_name = "a new module of one of two patterns: a vocabulary or a reference table"
+technical_name = "a new module: a vocabulary, a reference table, or new modelling that an AI drafts"
 audience = "business"
-about = "Use this form when a data area brings terms or items that no module of the ontology holds. The form makes a module of one of two patterns. A vocabulary is a list of terms, each with a definition, other names and at most one broader term. A reference table is a list of items of a class the ontology holds already, such as brands, each with one value of each of a few properties the ontology holds already. A new class, a new property or a rule of its own needs a specialist, and the form says so. When the Data Owner, the Ontology Owner and the Architect have signed, the Architect turns the form into a proposal with one command and applies the proposal with another. The apply writes the module's folder, registers the module in every place the release lists its modules and releases it at 1.0.0. Nobody edits a file of the ontology by hand."
+about = "Use this form when a data area brings terms or items that no module of the ontology holds. The form makes a module of one of two patterns. A vocabulary is a list of terms, each with a definition, other names and at most one broader term. A reference table is a list of items of a class the ontology holds already, such as brands, each with one value of each of a few properties the ontology holds already. A new class, a new property or a rule of its own is new modelling: before anyone signs, an AI drafts it from N13 under five extra gates, and the signers read its plain-words summary; without AI, a specialist designs it. When the Data Owner, the Ontology Owner and the Architect have signed, the Architect turns the form into a proposal with one command and applies the proposal with another. The apply writes the module's folder, registers the module in every place the release lists its modules and releases it at 1.0.0. Nobody edits a file of the ontology by hand."
 who = "The Data Owner answers and signs. The Ontology Owner approves the new module, because a module's first release is a major. The Architect checks the form and signs last. The Business analyst fills the form."
-done_when = "The form names the module, says what it covers and which documents describe it, picks a pattern the form makes, and gives every term or item what its pattern needs. The Data Owner, the Ontology Owner and the Architect have signed."
+done_when = "The form names the module, says what it covers and which documents describe it, picks a pattern, and gives every term or item what its pattern needs, or for new modelling says in N13 what the module must let people say. The Data Owner, the Ontology Owner and the Architect have signed."
 typical = "8 to 10"
 minutes = "30"
 
@@ -1820,8 +1825,8 @@ fact = []
 
   [[question.route]]
   when = "new-modelling"
-  outcome = "needs-specialist"
-  notice = "A new class, a new property or a rule of its own changes what the ontology can say, and someone has to design it. The form makes a vocabulary or a reference table only, so this module needs a specialist."
+  outcome = "new-modelling"
+  notice = "A new class, a new property or a rule of its own changes what the ontology can say, and someone has to design it. The form makes a vocabulary or a reference table itself. For anything else, an AI drafts the module from N13 under five extra gates, or a specialist designs it."
 
 [[question]]
 id = "N4"
@@ -1942,6 +1947,19 @@ rows = 4
 required = "required"
 why = "Every fact the ontology holds cites a written source."
 feeds = "A vocabulary: `dcterms:bibliographicCitation` of its concept scheme and of each term, in words. A reference table: the module's README and the `source` fact beside its approval record, because the shapes of some classes, such as `mkt:Benchmark`, allow no citation on an item."
+fact = []
+
+[[question]]
+id = "N13"
+section = "N"
+text = "What must the module let people say? Describe the things it holds, how they relate to each other and to what the ontology holds, and the rules they follow. Give one example."
+asked_of = ["data-owner"]
+type = "long_text"
+required = "required"
+ask_when = [{ question = "N3", is = "new-modelling" }]
+help = "Write it in your own words. The AI drafts the classes, properties and rules from this answer, and the signers read its plain-words summary before they sign."
+why = "New modelling has no pattern to follow, so the draft rests on what you say here."
+feeds = "The AI draft of the module (kpi_store/ai/draft.py): its classes, properties, shapes, competency questions and examples."
 fact = []
 
 # ---- The explainer (what-we-will-ask-you.md and the "What we will ask you" view of the HTML form) ---------------

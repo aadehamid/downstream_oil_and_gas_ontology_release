@@ -29,7 +29,7 @@ The ontology has no place for a KPI's domain yet, and holds no list of domains. 
 | P | Process map request | a business area, process, step or role that the process map lacks |
 | T | Term change | a change to a measure the ontology already holds |
 | R | Reference item | a new system or a new table in a module that the ontology already holds |
-| N | New module | a new module of one of two patterns: a vocabulary or a reference table |
+| N | New module | a new module: a vocabulary, a reference table, or new modelling that an AI drafts |
 
 ## What each question feeds
 
@@ -165,6 +165,7 @@ The ontology has no place for a KPI's domain yet, and holds no list of domains. 
 | N10 | Which items does the table hold? Name each one. | Required if N3 is "a reference table: items of a class the ontology holds, each with values of properties the ontology holds" | The name of each item (the KGCL line `create node`). The item's short key is made from its name. |
 | N11 | For each item, what are its values of the properties of N9? Write them in the order of N9, with a vertical bar (\|) between two values. | Optional if N3 is "a reference table: items of a class the ontology holds, each with values of properties the ontology holds" | The item's value of each property of N9. |
 | N12 | Which documents describe the module's content? Name each one with its date. | Required | A vocabulary: `dcterms:bibliographicCitation` of its concept scheme and of each term, in words. A reference table: the module's README and the `source` fact beside its approval record, because the shapes of some classes, such as `mkt:Benchmark`, allow no citation on an item. |
+| N13 | What must the module let people say? Describe the things it holds, how they relate to each other and to what the ontology holds, and the rules they follow. Give one example. | Required if N3 is "something else: a new class, a new property or a rule of its own" | The AI draft of the module (kpi_store/ai/draft.py): its classes, properties, shapes, competency questions and examples. |
 
 ## The facts one new KPI needs, and the questions that supply them
 

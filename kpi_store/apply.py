@@ -47,6 +47,12 @@ proposal's lines and facts, writes its package at 1.0.0, rebuilds the catalog, t
 pack and the pages, runs the competency questions, the module's tests and the whole-graph shapes gate, and then
 writes and commits the release. It needs the Data Owner's, the Ontology Owner's and the Architect's signatures.
 
+A new module that an AI drafted (kpi_store/change/drafted.py) goes the same way, with two more steps. Before anything
+else, the plan checks that its approval record shows all five gates of KPI-DEC-0002, Q19 passed, that the draft's
+files are those the record fingerprints, and that gates 1, 2 and 4 still pass against this release. The run then writes
+the module's folder from the drafted pattern (release/drafted_module.py), and checks that the built folder holds
+exactly the proposal's draft.
+
 A domain activation changes no module: the ontology holds no list of domains. Its run writes the approval record and
 the facts, makes the domain active in kpi-intake/settings.toml (kpi_store/change/domains.py), checks that the list
 differs by exactly the facts, rebuilds the KPI intake pack and verifies it, so the KPI form offers the domain, and
@@ -67,8 +73,8 @@ from pathlib import Path
 
 from kpi_store import cut
 from kpi_store import ontology_view as ov
-from kpi_store.change import (ChangeRefused, approval, core_release, domains, kpi_tables, new_measures, new_module,
-                              other_modules, process_map, proposal, reference_items)
+from kpi_store.change import (ChangeRefused, approval, core_release, domains, drafted, kgcl, kpi_tables, new_measures,
+                              new_module, other_modules, process_map, proposal, reference_items)
 
 WHAT = "the apply command"
 
@@ -260,6 +266,11 @@ def plan(folders, root):
                                 "release is a major")
         if key in cut._modules(root / cut.ONTOLOGY / "release" / "build_module.py") or (root / cut.ONTOLOGY / key).exists():
             raise ChangeRefused(f"the release holds a module or a folder named {key} already")
+        if drafted.is_drafted(proposals[0].facts):   # every gate of the AI draft, checked again before anything is written
+            drafted.check_proposal(proposals[0], root)
+        elif "draft" in proposals[0].record:
+            raise ChangeRefused(f"the proposal {proposals[0].change} holds the record of an AI draft, and its facts name "
+                                "another pattern")
         return proposals, target, route, {key: (None, new_module.VERSION)}
     versions = {}
     if target == CORE:
@@ -325,7 +336,7 @@ DEPENDENT_WHY = "Takes the new version of what it requires; nothing else changes
 def _write_record(staging, p):
     """The approval record of one proposal, its change file beside it, and a new KPI's facts."""
     path = approval.write_record(staging, p.change, p.route, p.record["signatures"], p.record["new_module"], p.owner,
-                                 p.record.get("ai"))
+                                 p.record.get("ai"), p.record.get("draft"))
     if p.lines:
         with path.with_suffix(".kgcl").open("w", encoding="utf-8", newline="\n") as f:
             f.write("".join(line + "\n" for line in p.lines))
@@ -487,6 +498,19 @@ def _holds_the_proposal(key, lines, facts, proposed_lines, proposed_facts):
                             "The release is as it was.")
 
 
+def _holds_the_draft(staging, key, files, p):
+    """Raises CutFailed unless a drafted module's folder holds exactly the proposal's draft, and its KGCL lines are the
+    proposal's."""
+    try:
+        drafted.compare(staging, key, files)
+        built = drafted.read_files(staging / cut.ONTOLOGY / key, staging)
+        lines = [kgcl.write_line(c) for c in drafted.changes_of(p.record["draft"]["module"], built, staging)]
+    except ChangeRefused as err:
+        raise cut.CutFailed(f"{err}. The release is as it was.") from None
+    if lines != p.lines:
+        raise cut.CutFailed(f"the {key} module's lines are not the proposal's. The release is as it was.")
+
+
 def _apply_new_module(root, p, versions, git, say, before_step, now):
     """A run of one new module: its folder written from the proposal and registered in every place, its Turtle built
     and compared with the proposal, its first package written, then the catalog, the projection manifest, the KPI
@@ -502,14 +526,21 @@ def _apply_new_module(root, p, versions, git, say, before_step, now):
         release, folder = staging / ontology / "release", staging / ontology / key
         step("copy the release", lambda: shutil.copytree(root, staging, ignore=shutil.ignore_patterns(*cut.IGNORED)))
         step(f"write the approval record of {p.change}", lambda: _write_record(staging, p))
-        step(f"write the {key} module's folder and register it in every place",
-             lambda: new_module.write(p.changes, p.facts, staging, p.change, words, date))
-        mp = new_module.patterns(staging)
+        if drafted.is_drafted(p.facts):
+            files = drafted.read_files(p.folder / drafted.DRAFT_FOLDER, staging)
+            step(f"write the {key} module's folder from its AI draft and register it in every place",
+                 lambda: drafted.write(p, files, staging, words, date))
+            mp = drafted.pattern(staging)
+            compare = lambda: _holds_the_draft(staging, key, files, p)
+        else:
+            step(f"write the {key} module's folder and register it in every place",
+                 lambda: new_module.write(p.changes, p.facts, staging, p.change, words, date))
+            mp = new_module.patterns(staging)
+            compare = lambda: _holds_the_proposal(key, *new_module.compare(staging, key), p.lines, p.facts)
         builder = mp.builder_name(key)
         step(f"build the {key} module's Turtle", lambda: cut._run(f"build the {key} module's Turtle", [builder, "--write"], folder))
 
-        step(f"compare the {key} module with the proposal",
-             lambda: _holds_the_proposal(key, *new_module.compare(staging, key), p.lines, p.facts))
+        step(f"compare the {key} module with the proposal", compare)
         step(f"write the {key} package", lambda: cut._run(f"write the {key} package", ["build_module.py", key, "--write"], release))
         cut._outputs(staging, versions, cut._has_intake(staging), step,
                      (f"the Turtle of {builder}", [builder, "--verify"], folder))

@@ -9,6 +9,7 @@ fourth when some facts are ones KGCL cannot write:
                     sign-off: each signer's role, name, date and the words the signature means, and the record
                     of the form's AI step when it had one (kpi_store/ai/suggest.py)
     summary.txt     the same for a person, in plain words: what changes, the route, and who signed
+    draft/          only for a module an AI drafted: the five files of the draft (drafted.py)
     facts.csv       the facts KGCL cannot write, one row each, with the columns measure, property and value; the
                     first column may name any item. A new KPI's (new_measures.py says which), a process map
                     request's (process_map.py) and a domain activation's, which holds nothing else (domains.py)
@@ -116,9 +117,10 @@ def read_facts(text, name):
     return [tuple(row) for row in rows[1:]]
 
 
-def write(folder, changes, record, summary, facts=()):
+def write(folder, changes, record, summary, facts=(), extra=None):
     """Writes one proposal folder and returns it, with facts.csv when there are facts. Refuses a folder that exists,
-    an incomplete record and a change that has no KGCL line."""
+    an incomplete record and a change that has no KGCL line. `extra` gives more files by their path in the folder:
+    the files of an AI draft, under draft/ (drafted.py)."""
     folder = Path(folder)
     record = approval.check(record, owner_of(changes, facts))
     if record["change"] != folder.name:
@@ -131,7 +133,9 @@ def write(folder, changes, record, summary, facts=()):
              (SUMMARY_FILE, summary)]
     if facts:
         files.append((FACTS_FILE, facts_text(facts)))
+    files += sorted((extra or {}).items())
     for name, content in files:
+        (folder / name).parent.mkdir(parents=True, exist_ok=True)
         with (folder / name).open("w", encoding="utf-8", newline="\n") as f:
             f.write(content)
     return folder

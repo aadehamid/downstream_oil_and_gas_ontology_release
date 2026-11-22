@@ -42,11 +42,22 @@ out = "lpg-out"                                   # the Neo4j load's working fil
 [tools]
 bash = ""                                         # bash.exe of Git for Windows; empty means the usual install folders, then PATH
 
-[ai]                                              # AI suggestions for a form's answers, with propose --ai. Off until the client's IT approves a provider.
+[ai]                                              # AI for propose --ai (suggestions) and propose --ai-draft (new modelling). Off until the client's IT approves a provider.
 provider = "off"                                  # "off", "databricks" (a serving endpoint in your workspace), "anthropic", "openai" or "by-hand"
 model = ""                                        # databricks: the serving endpoint's name; anthropic or openai: the model's name
 profile = ""                                      # databricks: the Databricks configuration profile that gives the workspace and the token
 key_env = ""                                      # anthropic or openai: the environment variable that holds the API key. Never write a key in this file
 assistant = ""                                    # by-hand: the assistant you give the prompt to, such as "Genie Code"
+family = ""                                       # the model's family, such as "claude", "gpt" or "llama". An AI draft's reviewer is of another family
+approved_by = ""                                  # who approved the provider for the client's IT
+approved_on = ""                                  # the date of that approval, such as "2026-11-20"
+
+[ai_reviewer]                                     # The second AI, which reviews an AI draft of new modelling. Of another family than [ai]. Same keys as [ai].
+provider = "off"                                  # "off", "databricks" (a serving endpoint in your workspace), "anthropic", "openai" or "by-hand"
+model = ""                                        # databricks: the serving endpoint's name; anthropic or openai: the model's name
+profile = ""                                      # databricks: the Databricks configuration profile that gives the workspace and the token
+key_env = ""                                      # anthropic or openai: the environment variable that holds the API key. Never write a key in this file
+assistant = ""                                    # by-hand: the assistant you give the prompt to, such as "Genie Code"
+family = ""                                       # the model's family, such as "claude", "gpt" or "llama". An AI draft's reviewer is of another family
 approved_by = ""                                  # who approved the provider for the client's IT
 approved_on = ""                                  # the date of that approval, such as "2026-11-20"

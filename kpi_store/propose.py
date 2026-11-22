@@ -3,6 +3,7 @@ and new-module forms into proposals, and changes nothing in the ontology.
 
     python -m kpi_store.propose <answers file> [<answers file> ...] [--out <folder>] [--release <folder>]
     python -m kpi_store.propose --ai <answers file> [--stores <file>] [--ai-answer <file>] [--ai-choices <file>]
+    python -m kpi_store.propose --ai-draft <new-module form> [--stores <file>] [--ai-answer <file>] [--review-answer <file>]
 
 Each answers file is a form of the KPI intake pack (kpi-intake/README.md, "The term change", "The reference item",
 "Turning a filled KPI form into a proposal", "The domain activation" and "The process map request"), saved from the
@@ -53,6 +54,13 @@ suggestion; the accepted ones go into the form, and the record of the AI step go
 the form is signed, the plain command finds that record and keeps it in the proposal's approval.json, under "ai", and
 in summary.txt. AI is off by default, and a form with no such record gives exactly the proposal it gave before.
 
+A new-module form whose N3 is "Something else" asks for new modelling: new classes, properties or rules. With
+--ai-draft, before anyone signs, the command asks the AI provider of [ai] to draft the module and the provider of
+[ai_reviewer], of another model family, to review the draft (kpi_store/ai/draft.py says the order and the gates).
+Once the form is signed, the plain command refuses it unless the draft beside it passed every gate, and the
+proposal holds the draft's files under draft/ and the record of the draft in approval.json, under "draft"
+(kpi_store/change/drafted.py).
+
 What it reads: the answers files, the release's KPI intake pack (kpi-intake/) and the tables of the module it changes. What it
 writes: the proposal folders, and nothing else. Needs Python 3.11 or later with rdflib, and openpyxl for a workbook.
 """
@@ -62,8 +70,8 @@ import re
 import sys
 from pathlib import Path
 
-from kpi_store.change import (ChangeRefused, approval, core_release, domains, kgcl, kpi_tables, new_measures, new_module,
-                              other_modules, process_map, proposal, reference_items)
+from kpi_store.change import (ChangeRefused, approval, core_release, domains, drafted, kgcl, kpi_tables, new_measures,
+                              new_module, other_modules, process_map, proposal, reference_items)
 from kpi_store.change.kgcl import Change
 
 FORM, ITEM, KPI, DOMAIN, PROCESS_MAP = "term-change", "reference-item", "kpi-intake", "domain-activation", "process-map-request"
@@ -724,6 +732,26 @@ def _change_id(out, root, number, notation, today, taken):
     return change
 
 
+def drafted_summary(change_id, source, key, draft, files, lines, facts, route, record, root):
+    """summary.txt of a module an AI drafted: what the new things mean, the gates, and who signed."""
+    spec = draft["module"]
+    text = [f"Proposal {change_id}", "", f"From the form: {source}",
+            f'The new module: "{spec["title"]}" ({key}), of new modelling that an AI drafted, at {new_module.VERSION}', "",
+            f'What it covers: "{spec["description"]}"', f'The documents it rests on: "{spec["citation"]}"', ""]
+    text += drafted.summary_lines(spec, files, draft, root)
+    text += ["", f"The draft's files, in {drafted.DRAFT_FOLDER}/: " + ", ".join(sorted(files)) + ". The apply command "
+             "writes them as the module's folder, with a builder, a test file and a README, registers the module in every "
+             "place the release lists its modules, releases it at 1.0.0, and rebuilds the catalog, the projection "
+             "manifest, the competency questions, the KPI intake pack and the pages."]
+    text += ["", f"The route: {route}. This is {NEW_MODULE_WHY}.", "", "Who signed:"]
+    text += [f"  - {s['role']}, on {s['date']}" for s in record["signatures"]]
+    text += ["", f"The KGCL lines, in {proposal.CHANGE_FILE}:"] + [f"  {line}" for line in lines]
+    text += ["", f"The facts, in {proposal.FACTS_FILE}:"] + [f"  {row}" for row in proposal.facts_text(facts).splitlines()]
+    text += ["", "Nothing in the ontology has changed yet. To apply this proposal, run in the release folder:",
+             "  python -m kpi_store.apply <the path of this folder>", ""]
+    return "\n".join(text)
+
+
 def _with_ai(text, record):
     """summary.txt with the lines of the form's AI step before its closing lines."""
     from kpi_store.ai import suggest
@@ -754,7 +782,7 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
     for path in files:
         intake = read_form(path, cat, data, root, stale_check=pack is None)
         ai = _ai_record(path, intake)
-        facts = []
+        facts, draft, draft_files = [], None, {}
         if intake.form == KPI:
             key, changes, facts, notes = kpi_changes(cat, intake, data["lists"], root)
             module, compatible = "kpi", "yes"
@@ -773,6 +801,14 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
                 raise ProposeRefused(str(err)) from None
             module, compatible = "organization", "yes"
             checks = lambda changes, root: check_process_map(changes, facts, root)
+        elif intake.form == NEW_MODULE and new_module._one(intake.answers, "N3") == drafted.NEW_MODELLING:
+            try:
+                key, changes, facts, draft_files, draft = drafted.from_signed_form(path, intake, root,
+                                                                                    signatures(cat, intake))
+            except ChangeRefused as err:
+                raise ProposeRefused(f"{path.name}: {err}") from None
+            module, compatible = "new", "yes"
+            checks = lambda changes, root: None   # from_signed_form ran the draft's checks and gates
         elif intake.form == NEW_MODULE:
             try:
                 key, changes, facts, notes = new_module.from_form(intake.answers, root)
@@ -797,7 +833,8 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
         change = _change_id(out, root, intake.request.get("number", "").strip(), key, today, taken)
         taken.add(change.lower())   # case does not count: on Windows and macOS TC-1 and tc-1 are one folder
         record = {"change": change, "route": route, "new_module": intake.form == NEW_MODULE,
-                  "signatures": signatures(cat, intake), **({"ai": ai} if ai else {})}
+                  "signatures": signatures(cat, intake), **({"ai": ai} if ai else {}),
+                  **({"draft": draft} if draft else {})}
         try:
             approval.check(record, proposal.owner_of(changes, facts))
         except ChangeRefused as err:
@@ -809,6 +846,8 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
             text = domain_summary(change, path.name, facts, route, record, root)
         elif intake.form == PROCESS_MAP:
             text = process_map_summary(change, path.name, changes, facts, notes, lines, route, record, data["lists"])
+        elif draft:
+            text = drafted_summary(change, path.name, key, draft, draft_files, lines, facts, route, record, root)
         elif intake.form == NEW_MODULE:
             text = new_module_summary(change, path.name, key, *checked["result"], lines, facts, route, record)
         elif intake.form == ITEM:
@@ -817,10 +856,11 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
             text = summary(change, path.name, measure, changes, lines, route, compatible, record, data["lists"]["processes"])
         if ai:
             text = _with_ai(text, ai)
-        planned.append((out / change, changes, record, text, lines, facts))
+        extra = {f"{drafted.DRAFT_FOLDER}/{name}": content for name, content in draft_files.items()}
+        planned.append((out / change, changes, record, text, lines, facts, extra))
     written = []
-    for folder, changes, record, text, lines, facts in planned:
-        proposal.write(folder, changes, record, text, facts)
+    for folder, changes, record, text, lines, facts, extra in planned:
+        proposal.write(folder, changes, record, text, facts, extra)
         written.append(folder)
         counted = ([f"{len(lines)} change{'s' if len(lines) != 1 else ''}"] if lines else []) + \
             ([f"{len(facts)} fact{'s' if len(facts) != 1 else ''}"] if facts else [])
@@ -854,12 +894,32 @@ def main(argv=None):
     ap.add_argument("--ai-answer", help="with --ai and the by-hand provider: the file that holds the assistant's answer")
     ap.add_argument("--ai-choices", help='with --ai: a JSON file of yes or no for each suggestion, as {"T3": "yes"}, in '
                                          "place of typing them")
+    ap.add_argument("--ai-draft", action="store_true",
+                    help="ask the approved AI providers to draft and review a new module of new modelling, for one "
+                         "new-module form that is not signed yet; writes no proposal")
+    ap.add_argument("--review-answer", help="with --ai-draft and a by-hand reviewer: the file that holds the reviewer's answer")
     a = ap.parse_args(argv)
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
+    if a.ai_draft:
+        from kpi_store.ai import AIRefused, draft
+        if a.ai or a.ai_choices or len(a.files) != 1 or a.out:
+            print("No AI draft: --ai-draft takes one form, and no --ai, --ai-choices or --out. The form is as it was.",
+                  file=sys.stderr)
+            return 1
+        try:
+            draft.run(a.files[0], a.release, a.stores, a.ai_answer, a.review_answer)
+        except (AIRefused, OSError) as err:
+            print(f"No AI draft: {err}. The form is as it was.", file=sys.stderr)
+            return 1
+        return 0
+    if a.review_answer:
+        print("Not proposed: --review-answer goes with --ai-draft. No proposal was written.", file=sys.stderr)
+        return 1
     if not a.ai and (a.ai_answer or a.ai_choices or a.stores):
-        print("Not proposed: --stores, --ai-answer and --ai-choices go with --ai. No proposal was written.", file=sys.stderr)
+        print("Not proposed: --stores, --ai-answer and --ai-choices go with --ai or --ai-draft. No proposal was written.",
+              file=sys.stderr)
         return 1
     if a.ai:
         from kpi_store.ai import AIRefused, suggest

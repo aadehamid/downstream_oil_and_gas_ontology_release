@@ -21,6 +21,9 @@ command asks for a part with LocalSettings.need, which stops with the name of th
 The [ai] table names the AI provider that the propose command may ask for suggestions (KPI-DEC-0002, Q16 to Q18), and
 records the client's IT approval of it. It holds no key: an API key stays in an environment variable that the table
 names, and a Databricks token comes from a Databricks configuration profile. kpi_store/ai/providers.py makes the call.
+The [ai_reviewer] table has the same keys and names the second provider, which reviews an AI draft of new modelling
+(propose --ai-draft, kpi_store/ai/draft.py). `family` names each model's family, such as "claude" or "gpt", because
+the reviewer must be of another family than the drafter (KPI-DEC-0002, Q19, gate 3).
 """
 import os
 import re
@@ -45,8 +48,11 @@ LAYOUT = {
     "projection": {"robot_jar": str, "out": str},
     "tools": {"bash": str},
     "ai": {"provider": str, "model": str, "url": str, "key_env": str, "profile": str, "assistant": str,
-           "approved_by": str, "approved_on": str, "timeout_seconds": int},
+           "family": str, "approved_by": str, "approved_on": str, "timeout_seconds": int},
 }
+# The second AI provider, the reviewer of an AI draft (KPI-DEC-0002, Q19, gate 3): the same keys as [ai].
+LAYOUT["ai_reviewer"] = dict(LAYOUT["ai"])
+AI_TABLES = ("ai", "ai_reviewer")
 AI_PROVIDERS = ("off", "databricks", "anthropic", "openai", "by-hand")
 # The keys a table may leave out. Every other key of a table that is present is required.
 # The serverless environment version the notebook run asks for when the settings name none. Version 2 has Python
@@ -56,7 +62,7 @@ ENVIRONMENT_VERSION = "2"
 OPTIONAL = {("databricks", "cli"), ("databricks", "timeout_minutes"), ("databricks", "environment_version"), ("fuseki", "data_folder"), ("fuseki", "java"),
             ("neo4j.local", "password"), ("neo4j.local", "password_env"), ("neo4j.local", "plugins_folder"),
             ("neo4j.enterprise", "password"), ("neo4j.enterprise", "password_env"), ("tools", "bash")} | \
-    {("ai", key) for key in LAYOUT["ai"] if key != "provider"}
+    {(table, key) for table in AI_TABLES for key in LAYOUT[table] if key != "provider"}
 
 
 class LocalSettingsError(Exception):
@@ -147,6 +153,7 @@ class AI:
     key_env: str = ""         # the environment variable that holds the API key or the Databricks token
     profile: str = ""         # databricks: the Databricks configuration profile that gives the host and the token
     assistant: str = ""       # by-hand: the assistant the person gives the prompt to, such as Genie Code
+    family: str = ""          # the model's family, such as "claude" or "gpt": an AI draft's reviewer is of another
     approved_by: str = ""     # who approved the provider for the client's IT
     approved_on: str = ""     # the date of that approval, YYYY-MM-DD
     timeout_seconds: int = 120
@@ -169,6 +176,7 @@ class LocalSettings:
     projection_out: Path | None
     bash: Path | None
     ai: AI = AI_OFF
+    ai_reviewer: AI = AI_OFF   # the reviewer of an AI draft, from [ai_reviewer]
 
     def need(self, name):
         """The value of one part, or LocalSettingsError naming the table a step cannot run without."""
@@ -203,8 +211,8 @@ def _check_layout(doc, layout, where=""):
     for key, value in doc.items():
         name = f"{where}{key}"
         if key not in layout:
-            if where == "ai." and any(word in key.lower() for word in ("key", "token", "secret", "password")):
-                raise LocalSettingsError(f"[ai] {key} is not a setting: the file holds no key or token. Put the key in an "
+            if where in ("ai.", "ai_reviewer.") and any(word in key.lower() for word in ("key", "token", "secret", "password")):
+                raise LocalSettingsError(f"[{where[:-1]}] {key} is not a setting: the file holds no key or token. Put the key in an "
                                          "environment variable, and name the variable with key_env")
             raise LocalSettingsError(f"unknown {'key' if where else 'table'} {name!r}")
         kind = layout[key]
@@ -294,13 +302,15 @@ def parse(data, path, environ=None, release_root=ROOT):
             raise LocalSettingsError("[fuseki] url must be a dataset URL such as http://127.0.0.1:3030/ds")
     if projection is not None:
         _required(projection, "projection", LAYOUT["projection"])
-    ai = doc.get("ai")
-    if ai is not None:
-        _required(ai, "ai", LAYOUT["ai"])
-        if ai["provider"] not in AI_PROVIDERS:
-            raise LocalSettingsError("[ai] provider must be " + ", ".join(f'"{p}"' for p in AI_PROVIDERS))
-        if ai.get("timeout_seconds", 120) < 1:
-            raise LocalSettingsError("[ai] timeout_seconds must be 1 or more")
+    for table in AI_TABLES:
+        one = doc.get(table)
+        if one is not None:
+            _required(one, table, LAYOUT[table])
+            if one["provider"] not in AI_PROVIDERS:
+                raise LocalSettingsError(f"[{table}] provider must be " + ", ".join(f'"{p}"' for p in AI_PROVIDERS))
+            if one.get("timeout_seconds", 120) < 1:
+                raise LocalSettingsError(f"[{table}] timeout_seconds must be 1 or more")
+    ai, reviewer = doc.get("ai"), doc.get("ai_reviewer")
     neo4j = doc.get("neo4j", {})
     found = LocalSettings(
         path=path,
@@ -318,7 +328,8 @@ def parse(data, path, environ=None, release_root=ROOT):
         robot_jar=_path(projection["robot_jar"], base) if projection else None,
         projection_out=_path(projection["out"], base) if projection else None,
         bash=_path(doc["tools"]["bash"], base) if doc.get("tools", {}).get("bash") else None,
-        ai=AI(**{k: (v.strip() if isinstance(v, str) else v) for k, v in ai.items()}) if ai else AI_OFF)
+        ai=AI(**{k: (v.strip() if isinstance(v, str) else v) for k, v in ai.items()}) if ai else AI_OFF,
+        ai_reviewer=AI(**{k: (v.strip() if isinstance(v, str) else v) for k, v in reviewer.items()}) if reviewer else AI_OFF)
     return check_outside(found, release_root)
 
 

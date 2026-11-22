@@ -11,7 +11,8 @@ What it holds, and nothing else:
      "new_module": false,
      "signatures": [{"role": "Data Owner", "name": "<name>", "date": "2026-11-19", "words": "<the approval words>"},
                     ...],
-     "ai": {...}}                 only when the form had an AI step (check_ai says what it holds)
+     "ai": {...},                 only when the form had an AI step (check_ai says what it holds)
+     "draft": {...}}              only for a module an AI drafted (check_draft says what it holds)
 
 Who signs (Q4): the Data Owner signs a KPI definition, and the Architect signs the change. A major change or a new
 module also needs the Ontology Owner. A domain activation needs the Domain Owner in place of the Data Owner, and a
@@ -44,6 +45,15 @@ AI_FIELDS = ("format", "form", "provider", "assistant", "model", "model_version"
 AI_PROVIDERS = ("databricks", "anthropic", "openai", "by-hand")
 AI_SUGGESTION_FIELDS = ("question", "current", "suggested", "reason", "answer", "accepted")
 SHA256 = re.compile(r"[0-9a-f]{64}")
+# The record of an AI draft of new modelling (KPI-DEC-0002, Q17(a), Q19 and Q20; kpi_store/ai/draft.py and
+# kpi_store/change/drafted.py): the module's settings, the fingerprint of the form's answers it was drafted from, the
+# drafter and the reviewer, the reviewer's verdict and findings, each file of the draft with its SHA-256, and the
+# result of each gate. Like the AI step's record, it keeps no prompt text.
+DRAFT_FIELDS = ("format", "form", "module", "form_sha256", "drafter", "reviewer", "parts", "gates")
+DRAFT_STEP_FIELDS = ("provider", "assistant", "family", "model", "model_version", "endpoint", "approved_by", "approved_on",
+                     "asked_on", "skills", "prompt_sha256", "output_sha256")
+DRAFT_MODULE_FIELDS = ("module", "pattern", "prefix", "title", "description", "citation", "depends_on", "prefixes")
+VERDICTS = ("PASS", "HOLD")
 # The change id names the file, so it holds no path separator: the same form as a discovery run's id (cut.RUN_ID).
 CHANGE_ID = re.compile(r"[0-9A-Za-z][0-9A-Za-z._-]{0,99}")
 DATE = re.compile(r"\d{4}-\d\d-\d\d")
@@ -73,11 +83,15 @@ def check(record, owner="Data Owner"):
     missing = [f for f in FIELDS if f not in record]
     if missing:
         raise ChangeRefused(f"the approval record has no {', no '.join(missing)}")
-    extra = sorted(set(record) - set(FIELDS) - {"ai"})
+    extra = sorted(set(record) - set(FIELDS) - {"ai", "draft"})
     if extra:
         raise ChangeRefused(f"the approval record holds fields it should not: {', '.join(extra)}")
     if "ai" in record:
         check_ai(record["ai"])
+    if "draft" in record:
+        if record.get("new_module") is not True:
+            raise ChangeRefused("the record of an AI draft belongs to a new module only")
+        check_draft(record["draft"], signed=True)
     record_path(".", record["change"])   # the id's form
     if record["route"] not in ROUTES:
         raise ChangeRefused(f"the route {record['route']!r} is not patch, minor or major")
@@ -155,6 +169,83 @@ def check_ai(ai, step=False):
     return ai
 
 
+def check_draft(draft, signed):
+    """Refuses a record of an AI draft that lacks a field, holds one more, or holds a value of the wrong form.
+    `signed` is the record as a proposal and the approval record keep it: reviewed, with every gate from 1 to 5
+    passed. Beside a form before signing, the review and gate 3 may still be missing, and a gate may have failed."""
+    def fail(what):
+        raise ChangeRefused(f"the record of the AI draft {what}")
+
+    def text(value):
+        return isinstance(value, str) and value.strip() != ""
+
+    def step(value, fields, who):
+        if not isinstance(value, dict) or tuple(sorted(value)) != tuple(sorted(fields)):
+            fail(f"must give the {who} as exactly " + ", ".join(fields))
+        if not all(isinstance(value[f], str) for f in DRAFT_STEP_FIELDS if f != "skills"):
+            fail(f"gives the {who} a field of the wrong type")
+        if value["provider"] not in AI_PROVIDERS or not text(value["family"]) or not text(value["approved_by"]):
+            fail(f"must name the {who}'s provider, its model family and who approved it")
+        if value["family"] != value["family"].strip():
+            fail(f"gives the {who}'s family with spaces around it")
+        for f in ("approved_on", "asked_on"):
+            if not DATE.fullmatch(value[f]) or not _is_date(value[f]):
+                fail(f"gives the {who} a {f} that is not a date written as YYYY-MM-DD")
+        if value["provider"] == "by-hand" and (not text(value["assistant"]) or value["endpoint"]):
+            fail(f"of a by-hand {who} must name the assistant, and no endpoint")
+        if value["provider"] != "by-hand" and (not text(value["model"]) or not text(value["endpoint"])):
+            fail(f"must name the {who}'s model and the endpoint it called")
+        if not all(SHA256.fullmatch(value[f]) for f in ("prompt_sha256", "output_sha256")):
+            fail(f"gives the {who} a fingerprint that is not a SHA-256")
+        if not isinstance(value["skills"], list) or not value["skills"] or not all(
+                isinstance(s, dict) and set(s) == {"path", "sha256"} and text(s["path"])
+                and isinstance(s["sha256"], str) and SHA256.fullmatch(s["sha256"]) for s in value["skills"]):
+            fail(f"must name each skill file the {who} followed, with its SHA-256")
+    if not isinstance(draft, dict) or tuple(sorted(draft)) != tuple(sorted(DRAFT_FIELDS)):
+        fail("must hold exactly " + ", ".join(DRAFT_FIELDS))
+    if type(draft["format"]) is not int or draft["format"] != 1 or draft["form"] != "new-module":
+        fail("must be of format 1, for a new-module form")
+    module = draft["module"]
+    if not isinstance(module, dict) or tuple(sorted(module)) != tuple(sorted(DRAFT_MODULE_FIELDS)) or \
+            module["pattern"] != "drafted" or not all(text(module[f]) for f in ("module", "prefix", "title", "description",
+                                                                                 "citation")) or \
+            not isinstance(module["depends_on"], list) or not all(text(m) for m in module["depends_on"]) or \
+            len(set(module["depends_on"])) != len(module["depends_on"]) or not isinstance(module["prefixes"], dict) or \
+            not all(text(k) and text(v) for k, v in module["prefixes"].items()):
+        fail("must give the module's settings as exactly " + ", ".join(DRAFT_MODULE_FIELDS) + ", of the drafted pattern")
+    if not isinstance(draft["form_sha256"], str) or not SHA256.fullmatch(draft["form_sha256"]):
+        fail("must give the SHA-256 of the form's answers")
+    step(draft["drafter"], DRAFT_STEP_FIELDS, "drafter")
+    reviewer = draft["reviewer"]
+    if reviewer is not None or signed:
+        step(reviewer, DRAFT_STEP_FIELDS + ("verdict", "findings"), "reviewer")
+        if reviewer["verdict"] not in VERDICTS or not isinstance(reviewer["findings"], list) or not all(
+                isinstance(f, dict) and set(f) == {"gate", "finding"} and text(f["gate"]) and text(f["finding"])
+                for f in reviewer["findings"]):
+            fail("must give the reviewer's verdict, PASS or HOLD, and each finding as gate and finding, in words")
+        if reviewer["family"].strip().casefold() == draft["drafter"]["family"].strip().casefold():
+            fail("names a reviewer of the drafter's own model family; gate 3 needs another family")
+    if not isinstance(draft["parts"], list) or not draft["parts"] or not all(
+            isinstance(p, dict) and set(p) == {"path", "sha256"} and text(p["path"]) and isinstance(p["sha256"], str)
+            and SHA256.fullmatch(p["sha256"]) for p in draft["parts"]):
+        fail("must name each file of the draft with its SHA-256")
+    gates = draft["gates"]
+    if not isinstance(gates, list) or not all(
+            isinstance(g, dict) and set(g) == {"gate", "name", "passed", "results"} and type(g["gate"]) is int
+            and text(g["name"]) and isinstance(g["passed"], bool) and isinstance(g["results"], list)
+            and all(text(r) for r in g["results"]) for g in gates):
+        fail("must give each gate as gate, name, passed and results")
+    numbers = [g["gate"] for g in gates]
+    if len(set(numbers)) != len(numbers) or not set(numbers) <= {1, 2, 3, 4, 5}:
+        fail("gives a gate twice, or a gate that is not 1 to 5")
+    if (3 in numbers) != (reviewer is not None):
+        fail("gives gate 3 without a reviewer, or a reviewer without gate 3")
+    if signed:
+        if sorted(numbers) != [1, 2, 3, 4, 5] or not all(g["passed"] for g in gates) or reviewer["verdict"] != "PASS":
+            fail("of a proposal must show every gate from 1 to 5 passed, and the reviewer's PASS")
+    return draft
+
+
 def _is_date(text):
     try:
         dt.date.fromisoformat(text)
@@ -163,12 +254,13 @@ def _is_date(text):
         return False
 
 
-def write_record(release_root, change_id, route, signatures, new_module=False, owner="Data Owner", ai=None):
+def write_record(release_root, change_id, route, signatures, new_module=False, owner="Data Owner", ai=None, draft=None):
     """Checks and writes the approval record of one change, and returns its path. Refuses an incomplete record,
-    and a record for a change that has one already. `ai` is the record of the form's AI step, when it had one."""
+    and a record for a change that has one already. `ai` is the record of the form's AI step, when it had one, and
+    `draft` the record of a module's AI draft."""
     record = check({"change": change_id, "route": route, "new_module": new_module,
                     "signatures": list(signatures) if isinstance(signatures, tuple) else signatures,
-                    **({"ai": ai} if ai is not None else {})}, owner)
+                    **({"ai": ai} if ai is not None else {}), **({"draft": draft} if draft is not None else {})}, owner)
     record["signatures"] = [{f: sig[f] for f in SIGNATURE_FIELDS} for sig in record["signatures"]]
     path = record_path(release_root, change_id)
     if path.exists():

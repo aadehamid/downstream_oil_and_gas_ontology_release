@@ -397,6 +397,9 @@ def _reference_item(lists, terms, intake, report):
     report.say()
 
 
+NEW_MODELLING = "new-modelling"   # N3: a module that an AI drafts (kpi_store/change/drafted.py), or a specialist
+
+
 def _new_module(lists, intake, report):
     """The checks of a new module against the lists, without the release: the name gives a short key that no module
     has, that starts with a letter and that is no prefix the ontology keeps for itself; each text fits a KGCL line; a
@@ -408,12 +411,12 @@ def _new_module(lists, intake, report):
     from kpi_store.change.kgcl import text_problem
     answers = intake.answers
     pattern = "".join(rules.values(answers, "N3")[:1])
-    if pattern not in (new_module.VOCABULARY, new_module.REFERENCE_TABLE):
+    if pattern not in (new_module.VOCABULARY, new_module.REFERENCE_TABLE, NEW_MODELLING):
         return
     name = "".join(rules.values(answers, "N1")[:1])
     lines = []
     texts = [("N1", name), ("N2", "".join(rules.values(answers, "N2")[:1]))] + [("N12", t) for t in rules.values(answers, "N12")]
-    asked = ("N4", "N5", "N6", "N7") if pattern == new_module.VOCABULARY else ("N10", "N11")
+    asked = {new_module.VOCABULARY: ("N4", "N5", "N6", "N7"), new_module.REFERENCE_TABLE: ("N10", "N11")}.get(pattern, ())
     texts += [(q, t) for q in asked for t in rules.values(answers, q)]
     for key, text in texts:
         problem = text and text_problem(text)
@@ -458,7 +461,11 @@ def _new_module(lists, intake, report):
     for line in lines:
         report.say("  " + line + ".")
         report.block(line)
-    if not lines:
+    if not lines and pattern == NEW_MODELLING:
+        report.say("  The new module is new modelling. Before anyone signs, the Architect asks the AI to draft it with "
+                   "python -m kpi_store.propose --ai-draft <this file>. The propose command refuses the form unless the "
+                   "draft beside it passed all five gates.")
+    elif not lines:
         report.say("  The new module fits the form's patterns. The propose command checks its values and every shape "
                    "of the release.")
     report.say()

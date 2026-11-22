@@ -260,3 +260,10 @@ about = "A copy of the release on a Windows machine that has a stand-in for the 
 base = "release-copy"
 timeout = 600
 about = "A copy of the release for the update guide's AI suggestions: a form, the by-hand AI step with the release's made-up sample answer, and the propose command. It needs no AI service."
+
+[contexts.ai-modelling]
+base = "release-copy"
+git = true
+needs_env = ["DOC_SNIPPETS_SLOW"]
+timeout = 3600
+about = "A Git copy of its own for the update guide's AI-drafted modelling: a new-module form of new modelling, the by-hand drafter and reviewer with the release's made-up sample answers, the propose command and the apply command, which releases the module at 1.0.0. It needs no AI service. Set DOC_SNIPPETS_SLOW=1."

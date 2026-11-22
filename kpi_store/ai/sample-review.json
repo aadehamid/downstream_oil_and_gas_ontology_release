@@ -1,0 +1,4 @@
+{"verdict": "PASS", "findings": [
+  {"gate": "Step 3: one kind per term", "finding": "Tank inspection is rightly a class of its own, kept apart from the systems that record it by owl:disjointWith."},
+  {"gate": "Step 9: every property has a cardinality", "finding": "Each property has exactly one value, and the two failing examples show the rule at work."}
+]}
