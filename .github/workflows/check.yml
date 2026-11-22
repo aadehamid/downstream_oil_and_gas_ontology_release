@@ -33,7 +33,7 @@ jobs:
     # The test run alone took 26 to 61 minutes on Ubuntu, and the Windows job 60 to 71 minutes, as the forms
     # added tests that each build and apply a release. 75 minutes cancelled one Ubuntu run whose checks all passed.
     # The AI drafting tests took Ubuntu from 1 h 49 min to past 120 minutes, which cancelled both runs, so it gets
-    # the stores job's 180.
+    # 180.
     timeout-minutes: 180
     defaults:
       run:
@@ -211,7 +211,8 @@ jobs:
   #   run    the setup check with all 15 checks, the first run, which stops on the report, the cleared report, the
   #          second run with its two typed answers, and the sync check. No step is left out, so the check script runs
   #          inside each run, 35 to 65 minutes each on this runner. The part took 1 h 46 min and 1 h 52 min, and on a slow
-  #          day it was cancelled at 2 h in its second run, so it gets 3 h.
+  #          day it was cancelled at 2 h in its second run, so it gets 3 h. On 2026-11-22 its first run took 1 h 46 min
+  #          (62 minutes the run before) and 3 h cancelled it in the second run, so it gets 5 h, under GitHub's 6.
   #   reset  the document test for the blocks that need this job's Neo4j server or a Windows account. Then the same
   #          chain with --skip check, which the runbook gives for a machine where the check step cannot run, and on the
   #          loaded stores: the reset with the typed word, a sync check that must read unmarked, the load again,
@@ -225,7 +226,7 @@ jobs:
       matrix:
         part: [run, reset]
     runs-on: windows-2025
-    timeout-minutes: 180
+    timeout-minutes: 300
     defaults:
       run:
         shell: bash
