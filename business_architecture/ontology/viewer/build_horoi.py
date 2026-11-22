@@ -31,8 +31,8 @@ _spec.loader.exec_module(viewer)
 
 # The public Horoi release whose page styles this page adapts, and the commit its tag names
 # (horoi_viewer/NOTICE.txt).
-HOROI_VERSION = "0.2.0"
-HOROI_COMMIT = "e0660af0f795ebfeb6f1354a69b3b0c47ebafba6"
+HOROI_VERSION = "0.3.2"
+HOROI_COMMIT = "57212c7edf35d1ee6016284010eee8e935754f5d"
 DCTERMS = "http://purl.org/dc/terms/"
 # The word the page leaves off the front of every name it shows, a source's name and a column's name included: the
 # owner's goal for the release says that no shown name starts with it. A column's name joins the word with an

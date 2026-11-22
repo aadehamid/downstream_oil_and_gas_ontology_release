@@ -210,7 +210,11 @@ def test_a_zip_works_and_its_sha_256_is_said(tmp_path):
     assert read(copy, "kpi_store/tool.py") == "A = 2\n"
 
 
-@pytest.mark.parametrize("name", ["../outside.py", "/abs.py", "a\\b.py", "c:x.py"])
+# On Windows, zipfile reads a backslash in an entry's name as a folder separator, so "a\\b.py" lands inside.
+BACKSLASH = pytest.param("a\\b.py", marks=pytest.mark.skipif(os.sep == "\\", reason="zipfile on Windows reads \\ as /"))
+
+
+@pytest.mark.parametrize("name", ["../outside.py", "/abs.py", BACKSLASH, "c:x.py"])
 def test_a_zip_entry_outside_the_folder_is_refused(tmp_path, name):
     copy = shipped(tmp_path)
     archive = tmp_path / "bad.zip"
@@ -334,7 +338,7 @@ def test_a_new_file_that_differs_only_in_case_is_refused(tmp_path):
     new = release(tmp_path / "new", "1.3")
     # Removed first: on a file system that ignores case, writing Measures.csv would only rewrite measures.csv.
     (new / "business_architecture/ontology/kpi/measures.csv").unlink()
-    (new / "business_architecture/ontology/kpi/Measures.csv").write_text("id\nM9\n", encoding="utf-8")
+    (new / "business_architecture/ontology/kpi/Measures.csv").write_text("id\nM9\n", encoding="utf-8", newline="\n")
     before = state(copy)
     with pytest.raises(up.UpgradeRefused, match="differs only in the case of its letters"):
         up.upgrade(copy, new, say=lambda *_: None, check=PASS)
@@ -519,10 +523,10 @@ def test_a_zip_that_cannot_be_read_is_refused(tmp_path):
 def test_two_new_files_that_differ_only_in_case_are_refused(tmp_path):
     copy = shipped(tmp_path)
     new = release(tmp_path / "new", "1.3")
-    (new / "kpi_store" / "a.py").write_text("x = 1\n", encoding="utf-8")
+    (new / "kpi_store" / "a.py").write_text("x = 1\n", encoding="utf-8", newline="\n")
     if (new / "kpi_store" / "A.py").exists():
         pytest.skip("this file system holds one file for both names")
-    (new / "kpi_store" / "A.py").write_text("x = 2\n", encoding="utf-8")
+    (new / "kpi_store" / "A.py").write_text("x = 2\n", encoding="utf-8", newline="\n")
     with pytest.raises(up.UpgradeRefused, match="differs only in the case of its letters"):
         up.upgrade(copy, new, say=lambda *_: None, check=PASS)
 
