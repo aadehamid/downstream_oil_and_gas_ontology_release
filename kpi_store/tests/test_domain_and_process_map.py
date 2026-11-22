@@ -625,6 +625,31 @@ def test_a_not_in_the_list_domain_is_read_as_the_domain_its_activation_adds_or_m
     assert [f.name for f in folders] == ["DA-T1", "KPI-T1"]
 
 
+@needs_inactive
+def test_a_kpi_form_follows_only_the_proposals_that_add_what_it_names(tmp_path):
+    root = release_with_reference(tmp_path)
+    other = domain_form(tmp_path, {"D1": "Sample Domain for the Tests"}, name="other", number="DA-T2")
+    folders = propose_cmd.propose([domain_form(tmp_path, number="DA-T1"), other, waiting_kpi(tmp_path, domain=TARGET["id"])],
+                                  tmp_path / "proposals", root, now=NOW, say=quiet)
+    assert [f.name for f in folders] == ["DA-T1", "DA-T2", "KPI-T1"]
+    assert proposal.read(folders[2]).record["after"] == ["DA-T1"]
+
+
+def test_a_file_that_cannot_be_read_is_refused_before_a_kpi_form_that_waits(tmp_path):
+    with pytest.raises(propose_cmd.ProposeRefused, match="missing.domain-activation.json is not a file"):
+        propose_cmd.propose([waiting_kpi(tmp_path, process=TEST_PROCESS), tmp_path / "missing.domain-activation.json"],
+                            tmp_path / "proposals", ROOT, now=NOW, say=quiet)
+
+
+def test_a_new_role_waits_on_no_form_of_the_run(tmp_path):
+    kpi = json.loads(waiting_kpi(tmp_path).read_text(encoding="utf-8"))
+    kpi["answers"].update({"6.1": ["@not-in-list"], "6.1.detail": "Sample Role for the Tests"})
+    path = form(tmp_path, "kpi-intake", kpi["answers"], kpi["sign_offs"], "margin", "KPI-T1")
+    with pytest.raises(propose_cmd.ProposeRefused, match="margin.kpi-intake.json is not complete and signed\\. Run.*6.1 "
+                                                          "routes the request"):
+        propose_cmd.propose([blend_request(tmp_path), path], tmp_path / "proposals", ROOT, now=NOW, say=quiet)
+
+
 def test_a_kpi_form_with_another_thing_to_settle_is_refused_before_any_form_is_applied(tmp_path):
     kpi = json.loads(waiting_kpi(tmp_path, process=TEST_PROCESS).read_text(encoding="utf-8"))
     kpi["sign_offs"].pop("architect")

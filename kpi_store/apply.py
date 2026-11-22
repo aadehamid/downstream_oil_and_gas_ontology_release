@@ -258,7 +258,8 @@ def plan(folders, root):
         if missing:
             raise ChangeRefused(f"the proposal {p.change} follows {', '.join(missing)}, which this release has not "
                                 f"applied: the KPI form names what {'it adds' if len(missing) == 1 else 'they add'}. "
-                                f"Apply {', then '.join(missing)} first, each in a run of its own")
+                                f"Apply {', then '.join(missing)} first"
+                                + (", each in a run of its own" if len(missing) > 1 else ""))
     if target == DOMAINS:
         for p in proposals:
             domains.check_changes(p.facts, root)

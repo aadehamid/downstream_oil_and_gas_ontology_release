@@ -100,6 +100,9 @@ ROUTE_WHY = {"patch": "a patch: the changes correct or reword, and the old meani
 NEW_MODULE_WHY = "a major: a new module's first release is 1.0.0, and the Ontology Owner approves it"
 # The routing outcomes of the KPI form that another form settles, and that form.
 SETTLED_BY = {"domain-activation": DOMAIN, "process-map-request": PROCESS_MAP}
+# The KPI form's questions whose missing entry another form of the run can add: the business area, the process, the
+# step and the domain. A new role or value stream step still needs a specialist.
+SETTLED_QUESTIONS = ("1.1", "1.2", "1.3", "1.5")
 NOT_IN_LIST = "@not-in-list"
 
 class ProposeRefused(Exception):
@@ -146,7 +149,7 @@ def _waits_on(cat, lists, intake, report):
     routed = {}
     for question, route, _ in rules.routes(cat, lists, intake.answers, intake.form):
         outcome = cat.outcomes[route["outcome"]]
-        if outcome["blocks"]:
+        if outcome["blocks"] and question["id"] in SETTLED_QUESTIONS:
             routed[f'{question["id"]} routes the request: {outcome["title"].lower()}'] = route["outcome"]
     if not set(report.blocking) <= set(routed) or not set(routed.values()) <= set(SETTLED_BY):
         return None
@@ -829,12 +832,7 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
     except Exception as err:   # the catalogue's and the pick lists' own errors say what is wrong
         raise ProposeRefused(f"the KPI intake pack cannot be read: {err}") from None
     today = (now or dt.datetime.now(dt.timezone.utc)).strftime("%Y-%m-%d")
-    forms = set()
-    for path in files:   # the form of each file, so that a KPI form may wait on a form of the run
-        try:
-            forms.add(_read(path, cat, data).form)
-        except ProposeRefused:
-            pass   # read_form below refuses it, in the order of the files
+    forms = {_read(path, cat, data).form for path in files}   # so that a KPI form may wait on a form of the run
     read = [(path, *read_form(path, cat, data, root, stale_check=pack is None, forms=forms)) for path in files]
     planned, taken, settling = [], set(), {}
     for path, intake, waiting in read:
@@ -849,14 +847,13 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
         needed = set().union(*(w for _, _, w in waiting))
         first = [p for form in (DOMAIN, PROCESS_MAP) if form in needed for p in settling.get(form, [])]
         with tempfile.TemporaryDirectory(prefix="kpi-store-propose-") as tmp:
-            staging = _settle(Path(tmp), first, root)
-            try:
-                cat2, data2 = _pack(staging, None)
-            except Exception as err:
-                raise ProposeRefused(f"the KPI intake pack cannot be read after {_names(first)}: {err}") from None
+            staging, added = _settle(Path(tmp), first, root, _offered(cat, data))
+            cat2, data2 = _pack(staging, None)   # _settle read it after the last apply
             for path, intake, needs in waiting:
-                after = [p[0].name for form in (DOMAIN, PROCESS_MAP) if form in needs for p in settling.get(form, [])]
-                intake = _settled_form(path, intake, cat, data, cat2, data2, staging, after)
+                intake = _settled_form(path, intake, cat, data, cat2, data2, staging, [p[0].name for p in first])
+                # The proposals that add an entry the form now names, in the order they are applied.
+                used = _values(intake.answers)
+                after = [p[0].name for p, ids in zip(first, added) if ids & used]
                 planned.append(_plan(path, intake, cat2, data2, staging, out, today, taken, after))
     written = []
     for folder, changes, record, text, lines, facts, extra in planned:
@@ -875,20 +872,39 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
     return written
 
 
-def _settle(tmp, settling, root):
-    """A copy of the release, in `tmp`, with the run's domain activations and process map requests applied, each in a
-    run of its own, as the apply command will apply them. Returns its folder."""
+def _settle(tmp, settling, root, offered):
+    """A copy of the release, in `tmp`, with the domain activations and process map requests applied, each in a run of
+    its own, as the apply command will apply them. Returns its folder and, for each proposal, the ids of the entries
+    the forms offer after it that they did not offer before it: `offered` is what they offered first."""
     from kpi_store import apply as apply_cmd, cut
     staging, folders = tmp / "release", tmp / "proposals"
     shutil.copytree(root, staging, ignore=shutil.ignore_patterns(*cut.IGNORED))
+    added = []
     for folder, changes, record, text, lines, facts, extra in settling:
         copy = proposal.write(folders / folder.name, changes, record, text, facts, extra)
         try:
             apply_cmd.apply([copy], staging, say=lambda *_: None)
+            now = _offered(*_pack(staging, None))
         except (ChangeRefused, cut.CutFailed, cut.CutRefused) as err:
             raise ProposeRefused(f"{folder.name} could not be applied to a copy of the release, so the KPI forms that "
                                  f"wait on it cannot be checked: {err}") from None
-    return staging
+        except Exception as err:   # the catalogue's and the pick lists' own errors say what is wrong
+            raise ProposeRefused(f"the KPI intake pack cannot be read after {folder.name}: {err}") from None
+        added.append(now - offered)
+        offered = now
+    return staging, added
+
+
+def _offered(cat, data):
+    """The ids of every entry the forms offer: the pick lists' entries and the active domains."""
+    ids = {i["id"] for items in data["lists"].values() if isinstance(items, list)
+           for i in items if isinstance(i, dict) and "id" in i}
+    return ids | {d["id"] for d in cat.fixed_list("settings:domains") if d.get("active") is not False}
+
+
+def _values(answers):
+    """Every value an intake's answers hold."""
+    return {v for value in answers.values() for v in (value if isinstance(value, list) else [value]) if isinstance(v, str)}
 
 
 def _settled_form(path, intake, cat, data, cat2, data2, staging, after):
@@ -905,7 +921,8 @@ def _settled_form(path, intake, cat, data, cat2, data2, staging, after):
             continue
         name = _fold("".join(rules.values(answers, f'{question["id"]}.detail')[:1]))
         before = {o["id"] for o in rules.options(cat, data["lists"], question) if o.get("active") is not False}
-        new = [o for o in rules.options(cat2, data2["lists"], question, answers) if o["id"] not in before]
+        new = [o for o in rules.options(cat2, data2["lists"], question, answers)
+               if o["id"] not in before and o.get("active") is not False]
         hits = [o for o in new if name and _fold(_plain(o)) == name]
         if len(hits) != 1:
             continue   # the check below says that the entry is still missing
