@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- Adapted from Horoi 0.2.0 styles at e0660af0f795ebfeb6f1354a69b3b0c47ebafba6.
+<!-- Adapted from Horoi 0.3.2 styles at 57212c7edf35d1ee6016284010eee8e935754f5d.
 Modified for the KPI Store with new navigation, RDF rendering and relationship views.
 See NOTICE.txt and LICENSE.txt for attribution and licence terms. -->
 <html lang="en">
@@ -15,7 +15,6 @@ See NOTICE.txt and LICENSE.txt for attribution and licence terms. -->
   --sans:Inter,"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
   --gutter:28px; --side:230px; --toggle:36px; --rail:calc(var(--gutter) + var(--side) + 40px);
   --fold:240ms; --ease:cubic-bezier(.2,0,.38,.9); }
-:root[data-side="closed"] { --rail:calc(var(--gutter) + var(--toggle) + 16px); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#121212; --panel:#1A1A1A; --ink:#ECECEC; --muted:#A3A3A3; --faint:#737373; --section:#7D7D7D; --line:#2E2E2E; --accent:#FB923C; --accent-soft:#2A1D14; --blue:#60A5FA; --blue-soft:#172131; --green:#4ADE80; --green-soft:#15261B; --code:#1F1F1F; } }
 :root[data-theme="dark"] { --bg:#121212; --panel:#1A1A1A; --ink:#ECECEC; --muted:#A3A3A3; --faint:#737373; --section:#7D7D7D; --line:#2E2E2E; --accent:#FB923C; --accent-soft:#2A1D14; --blue:#60A5FA; --blue-soft:#172131; --green:#4ADE80; --green-soft:#15261B; --code:#1F1F1F; }
 :root[data-theme="light"] svg.hr-diagram {  }
@@ -35,28 +34,17 @@ code { font-family:var(--mono); font-size:.9em; }
 #theme { border:none; background:transparent; color:var(--muted); border-radius:4px; width:32px; height:28px;
   cursor:pointer; font-size:15px; line-height:1; }
 .wrap { display:grid; grid-template-columns:minmax(var(--rail),1fr) minmax(0,914px) minmax(var(--gutter),1fr);
-  padding:36px 0 80px; transition:grid-template-columns var(--fold) var(--ease); }
+  padding:36px 0 80px; }
 aside { position:sticky; top:95px; align-self:start; width:var(--side); margin-left:var(--gutter); }
-#side { position:absolute; top:0; left:0; z-index:1; display:grid; place-items:center; width:var(--toggle); height:var(--toggle); padding:0;
-  border:1px solid var(--line); border-radius:4px; background:transparent; color:var(--muted); cursor:pointer; }
-#side:hover { background:var(--accent-soft); color:var(--accent); }
-#side svg { display:block; width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.5; }
-#side .pane { fill:currentColor; stroke:none; opacity:.35; transform-box:fill-box; transform-origin:left;
-  transition:transform var(--fold) var(--ease); }
-.fold { display:flex; flex-direction:column; max-height:calc(100vh - 115px); clip-path:inset(-4px -10px -4px -10px);
-  transition:clip-path var(--fold) var(--ease), opacity var(--fold) var(--ease), visibility var(--fold); }
-aside input { flex:none; width:calc(100% - var(--toggle) - 8px); height:var(--toggle); margin:0 0 28px calc(var(--toggle) + 8px); padding:0 11px;
+.terms { display:flex; flex-direction:column; max-height:calc(100vh - 115px); }
+aside input { flex:none; width:100%; height:var(--toggle); margin:0 0 28px; padding:0 11px;
   border:1px solid var(--line); border-radius:4px; background:var(--panel); color:var(--ink); font:14.5px var(--sans); }
-.list { flex:1; min-height:0; overflow:auto; margin:0 -10px; padding:0 10px; }
+.list { flex:1; min-height:0; overflow:auto; margin:0 -10px; padding:0 10px; scrollbar-width:none; }
+.list::-webkit-scrollbar { display:none; }
 aside a { display:block; margin-left:-10px; padding:3px 10px; border-radius:4px; color:var(--muted); font:14.5px var(--sans); }
 aside a:hover { background:var(--accent-soft); color:var(--accent); text-decoration:none; }
 .group:not([hidden]) ~ .group { margin-top:24px; }
 .navh { margin:0 0 6px; font:700 13px var(--sans); letter-spacing:1.6px; text-transform:uppercase; color:var(--section); }
-:root[data-side="closed"] aside { pointer-events:none; }
-:root[data-side="closed"] #side { pointer-events:auto; }
-:root[data-side="closed"] #side .pane { transform:scaleX(0); }
-:root[data-side="closed"] .fold { clip-path:inset(-4px 100% -4px 0); opacity:0; visibility:hidden; }
-@media (prefers-reduced-motion:reduce) { .wrap, .fold, #side .pane { transition:none; } }
 main section { margin-bottom:56px; }
 h1 { font-size:44px; line-height:1.1; letter-spacing:-.8px; margin:0 0 14px; font-weight:600; }
 h2 { font-size:13px; letter-spacing:2px; text-transform:uppercase; color:var(--accent); margin:0 0 18px; }

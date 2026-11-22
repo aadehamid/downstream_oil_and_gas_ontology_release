@@ -55,8 +55,8 @@ def test_the_data_lists_each_module_from_its_own_ontology_statement(tmp_path):
     data = horoi.build_data(tmp_path)
     assert data["release"] == "KPI Store 1.1"
     assert "sourceCommit" not in data
-    assert data["horoiVersion"] == "0.2.0"
-    assert data["horoiCommit"] == "e0660af0f795ebfeb6f1354a69b3b0c47ebafba6"
+    assert data["horoiVersion"] == "0.3.2"
+    assert data["horoiCommit"] == "57212c7edf35d1ee6016284010eee8e935754f5d"
     assert data["referenceModules"] == ["alpha", "zeta"]
     assert data["moduleInfo"] == [
         {
@@ -169,12 +169,12 @@ def test_the_committed_page_holds_this_tree_and_names_no_outside_commit():
     record = json.loads((ROOT / "horoi_viewer/build.json").read_text(encoding="utf-8"))
     assert "source_commit" not in record
     assert record["release"] == "KPI Store 1.1"
-    # Horoi 0.2.0 is the public release of 2026-11-09, and this is the commit its tag v0.2.0 names.
-    assert data["horoiVersion"] == record["horoi_version"] == "0.2.0"
-    assert data["horoiCommit"] == record["horoi_commit"] == "e0660af0f795ebfeb6f1354a69b3b0c47ebafba6"
+    # Horoi 0.3.2 is the public release of 2026-11-16, and this is the commit its tag v0.3.2 names.
+    assert data["horoiVersion"] == record["horoi_version"] == "0.3.2"
+    assert data["horoiCommit"] == record["horoi_commit"] == "57212c7edf35d1ee6016284010eee8e935754f5d"
     notice = (ROOT / "horoi_viewer/NOTICE.txt").read_text(encoding="utf-8")
-    assert "version 0.2.0 (commit e0660af0f795ebfeb6f1354a69b3b0c47ebafba6, released 2026-11-09)" in notice
-    assert "Adapted from Horoi 0.2.0 styles at e0660af0f795ebfeb6f1354a69b3b0c47ebafba6." in text
+    assert "version 0.3.2 (commit 57212c7edf35d1ee6016284010eee8e935754f5d, released 2026-11-16)" in notice
+    assert "Adapted from Horoi 0.3.2 styles at 57212c7edf35d1ee6016284010eee8e935754f5d." in text
     assert "33caa8cc916e7efb767a5c2831216ff1cb11c509" not in text
 
 

@@ -405,7 +405,7 @@ def reference_load(s):
 def reference_release(s):
     page = s.open()
     same(page.locator("#release-scope").inner_text(), f"{RELEASE} · All ontology modules", "the release bar")
-    same(page.locator("#credits").inner_text(), "Adapted from Horoi 0.2.0 · Credits", "the credit in the footer")
+    same(page.locator("#credits").inner_text(), "Adapted from Horoi 0.3.2 · Credits", "the credit in the footer")
     page = s.open("#about")
     about = page.locator("#content").inner_text()
     holds(about, f"every current ontology module of {RELEASE}.", "Release and coverage")
