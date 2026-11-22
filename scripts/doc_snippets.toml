@@ -65,6 +65,10 @@ git = true
 about = "A copy of the release in a new Git repository with one commit. For a quick command that uses Git."
 timeout = 600
 
+# The handout's folders command names the reader's shared folder; the test gives it the folder that holds the copy.
+[contexts.release-git.placeholders]
+"your shared folder" = ".."
+
 # A context that ends with the whole check gives a block an hour. The doc test runs about eighteen whole
 # checks at once, one in each such context, and on a 24-core laptop one of them ran past 30 minutes.
 [contexts.slow]

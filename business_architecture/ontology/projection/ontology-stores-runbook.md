@@ -112,7 +112,7 @@ bash = "PortableGit/bin/bash.exe"
 
 Each line is already in the example file with an empty value. A path without a drive starts at the folder of `stores.toml`, which is the local folder. The `java` line serves Fuseki, ROBOT and the setup check. The `bash` line serves the check script, which the runner starts. The `cli` line serves the setup check and the runner.
 
-The sign-in command of "Sign in to Databricks" is then not on `PATH`. Start it with its path, `$HOME\kpi-store-local\databricks-cli\databricks.exe`, in place of the word `databricks`.
+The sign-in command of "Sign in to Databricks" is then not on `PATH`. Start it with its path and PowerShell's call operator, `& "$HOME\kpi-store-local\databricks-cli\databricks.exe"`, in place of the word `databricks`. Git is not on `PATH` either: run the guide's `git` commands in Git Bash, which you start by double-clicking `git-bash.exe` in `%USERPROFILE%\kpi-store-local\PortableGit`.
 
 The Windows test job runs this guide's chain this way. Its Java and its Databricks command line come from these two zips and are named in the settings. No other Java is on its `PATH`, and its folders lie in a temporary folder. It uses the Git for Windows that its machine already has, so the portable edition and the Python installer are not proven there.
 

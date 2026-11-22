@@ -4,7 +4,7 @@ This handout is for the people who run the KPI Store after handover: the Data Ow
 
 It takes you from the release zip to loaded and checked stores, and then through every kind of change: a change form, a new module, a change an AI helps to write, a check and a recovery, a replace or a reset, an upgrade of the tools, and the refresh of what people use. Each step ends with **You are done when**. Do not go on to the next step until that is true.
 
-The release's own tests check every command and printed line in this handout. Most are quoted from the release's detailed guides, the stores runbook, `HOW-TO-UPDATE.md` and `kpi-intake/README.md`, where the tests run them. The rest run in this handout itself. The tests cannot open a browser, so the Databricks sign-in is the one command they parse and do not run. When this handout and a detailed guide seem to differ, the detailed guide is right: tell the release's team.
+The release's own tests check every block of commands and every block of printed lines in this handout. A word or a line written inside a sentence is not checked. Most blocks are quoted from the release's detailed guides, the stores runbook, `HOW-TO-UPDATE.md` and `kpi-intake/README.md`, where the tests run them. The rest run in this handout itself. The tests cannot open a browser, so they do not run the two forms of the Databricks sign-in. When this handout and a detailed guide seem to differ, the detailed guide is right: tell the release's team.
 
 **Warning: a replace or a reset deletes data in the stores.** Get written authorization for the exact environment first, stop every other writer, and make sure the data can be loaded again.
 
@@ -39,9 +39,12 @@ The release's own tests check every command and printed line in this handout. Mo
    winget install Databricks.DatabricksCLI
    ```
 
-   Without administrator rights, follow the runbook's "Install the programs without administrator rights" instead. It unpacks Git, Java and the Databricks command line into your local folder, and the settings file of step 7 names them.
+   Without administrator rights, follow the runbook's "Install the programs without administrator rights" instead. Python installs without them. Git, Java and the Databricks command line are only unpacked into your local folder, and the settings file of step 7 names them for the commands. They are then not on your `PATH`, so two things change:
 
-   You are done when every installer has finished, or the three folders are unpacked. The setup check of step 9 proves each program.
+   - Run every `git` command of this handout in Git Bash, not in PowerShell. Start Git Bash by double-clicking `git-bash.exe` in `%USERPROFILE%\kpi-store-local\PortableGit`, and go to the release folder in it with `cd ~/kpi-store-1.1`. Open the full check's Git Bash the same way.
+   - Start the Databricks sign-in of step 8 by its path, as step 8 shows.
+
+   You are done when every installer has finished, or Python is installed and the three folders are unpacked. The setup check of step 9 proves each program.
 
 3. Read the runbook's "What Windows itself needs". For most points you do nothing. Three matter later: run the full check in Git Bash, not in PowerShell; keep the file `.gitattributes` of the release; and keep your local folder private to your account.
 
@@ -93,7 +96,11 @@ The release's own tests check every command and printed line in this handout. Mo
    databricks auth login --host <your workspace URL> --profile DEFAULT
    ```
 
-   Without administrator rights, `databricks` is not on your `PATH`: start it with its path, `$HOME\kpi-store-local\databricks-cli\databricks.exe`, in place of the word `databricks`.
+   Without administrator rights, `databricks` is not on your `PATH`. Start it by its path, with PowerShell's call operator `&` in front:
+
+   ```powershell skip reason="needs-browser-sign-in: opens the sign-in page of the reader's workspace"
+   & "$HOME\kpi-store-local\databricks-cli\databricks.exe" auth login --host <your workspace URL> --profile DEFAULT
+   ```
 
    You are done when the terminal says that the profile `DEFAULT` was saved.
 
@@ -284,7 +291,7 @@ The AI suggests answers to a form before anyone signs it. `HOW-TO-UPDATE.md`, "U
    python -m kpi_store.propose --ai ../ai-suggestions/unit-utilization.term-change.json --stores ../ai-suggestions/kpi-store-local.toml
    ```
 
-   You are done when it names the prompt file it wrote.
+   With `by-hand`, you are done when it names the prompt file it wrote. With a served model, the command asks the model, shows each suggestion and asks you to accept it or not: you are done when the form holds the answers you accepted. Then skip step 2: the signers sign the form, and it goes on as in section 3.
 
 2. Give the prompt file to the assistant, and save its answer beside the form, as the command says. Then run the command again with the answer. It shows each suggestion and asks you to accept it or not.
 
@@ -304,7 +311,7 @@ A module that needs a class, a property or a rule of its own is new modelling. O
    python -m kpi_store.propose --ai-draft ../ai-modelling/sample-tank-inspections.new-module.json --stores ../ai-modelling/kpi-store-local.toml
    ```
 
-   You are done when it names the prompt file it wrote.
+   With `by-hand`, you are done when it names the prompt file it wrote. With served models, the command asks the drafter and then the reviewer in one run, as steps 2 and 3 describe: you are done when it says that gates 1 to 4 passed and names the summary for the signers. Then skip steps 2 and 3, and go to step 4. What steps 2 and 3 say about a failed gate and a HOLD holds for that run too.
 
 2. Give the prompt file to the drafter's assistant, save its answer as the command says, and run the command again with the draft. It checks the draft with gates 1, 2 and 4, then writes the reviewer's prompt and stops.
 
@@ -350,7 +357,7 @@ A module that needs a class, a property or a rule of its own is new modelling. O
 
 ### After every change
 
-Do these three steps after every change of sections 3 to 5, 7, 8 and 9, in this order.
+Do these steps, in this order, after a change of sections 3 to 5 or 9. Sections 7 and 8 send you here to start at step 2, because what they do needs no full check of its own: start there.
 
 1. Run the full check. Open Git Bash in the release folder: in File Explorer, right-click the folder and choose "Open Git Bash here". It took 21 minutes on a Windows machine with 4 cores.
 
@@ -456,9 +463,18 @@ Your copy is the master of the ontology. A newer release from the release's team
 
    You are done when the zip is beside the release folder.
 
-2. Make sure every change in the release folder is committed: the upgrade refuses a copy with changes that are not committed. The change commands commit their own changes. A file you changed by hand, as in section 9, you commit as section 9 shows.
+2. Make sure every change in the release folder is committed: the upgrade refuses a copy with changes that are not committed. The change commands commit their own changes. A file you changed by hand, as in section 9, you commit as section 9 shows. Ask Git:
 
-   You are done when the upgrade's plan, in step 3, does not refuse the copy.
+   ```powershell run=release-git
+   git status
+   ```
+
+   ```text expect
+   ...
+   nothing to commit, working tree clean
+   ```
+
+   You are done when its last line reads `nothing to commit, working tree clean`.
 
 3. See what the upgrade would do. The plan changes nothing.
 
@@ -482,7 +498,7 @@ Your copy is the master of the ontology. A newer release from the release's team
    python -m kpi_store.setup_check
    ```
 
-   You are done when its last line reads `15 of 15 checks passed`.
+   You are done when its last line reads `<count> of <count> checks passed`, with the same number twice. A newer release may check more than the 15 of section 1.
 
 6. Load the stores and check them, as section 6, "After every change", steps 2 and 3, say.
 
@@ -490,11 +506,28 @@ Your copy is the master of the ontology. A newer release from the release's team
 
 ## 9. Refresh what people use
 
-The change commands of sections 3 to 5 rebuild what they change, including the KPI intake pack's forms and the release's pages, and commit it. After a change, people still need the new forms. When the Architect changes the form's own settings, `kpi-intake/settings.toml`, the pack needs a rebuild and a commit by hand. The steps below show both.
+The change commands of sections 3 to 5 rebuild what they change, including the KPI intake pack's forms and the release's pages, and commit it. People still need the new forms. When the Architect changes the forms' own settings, `kpi-intake/settings.toml`, the pack also needs a rebuild and a commit by hand. The two parts below are separate: do the one that fits.
 
-1. When you have changed `kpi-intake/settings.toml`, as `kpi-intake/README.md`, "Change the form", says, rebuild the pack.
+### After a change of sections 3 to 5: give people the new forms
 
-   The document test changes the settings with this block. You changed yours in Notepad, so skip it.
+1. Copy the new forms into the team's shared folder with the `folders` command, as `kpi-intake/README.md`, "The shared folder", says, with the path of your shared folder, such as a team drive, in place of `<your shared folder>`. The folder must exist. It replaces the forms and the guide in `the-form`, and changes nothing in the folders that hold people's answers.
+
+   ```powershell run=release-git
+   python -m kpi_store.intake folders "<your shared folder>"
+   ```
+
+   ```text expect
+   ...
+   KPI-intake is ready
+   ```
+
+   You are done when it ends with `KPI-intake is ready`.
+
+### After you change the forms' settings
+
+1. Change `kpi-intake/settings.toml` in Notepad, as `kpi-intake/README.md`, "Change the form", says.
+
+   The release's test makes a change of its own with the block below. Do not run it: your change in Notepad takes its place.
 
    ```python run=release-git
    from pathlib import Path
@@ -508,13 +541,17 @@ The change commands of sections 3 to 5 rebuild what they change, including the K
    changed kpi-intake/settings.toml
    ```
 
+   You are done when the file is saved.
+
+2. Rebuild the pack.
+
    ```powershell run=release-git status-only
    python -m kpi_store.intake build
    ```
 
    You are done when it ends without an error.
 
-2. Commit what you changed by hand, with a message that says what it was.
+3. Commit what you changed, with a message that says what it was.
 
    ```powershell run=release-git status-only
    git add -A
@@ -531,14 +568,6 @@ The change commands of sections 3 to 5 rebuild what they change, including the K
 
    You are done when the log names your commit.
 
-3. After any change of sections 3 to 5 or 9, give people the new forms. Copy them into the team's shared folder with the `folders` command, as `kpi-intake/README.md`, "The shared folder", shows, with the place of your shared folder in place of its `.`. It replaces the forms and the guide in `the-form`, and changes nothing in the folders that hold people's answers.
+4. Check the release and load the stores, as section 6, "After every change", says. Then give people the new forms, as the part above says.
 
-   You are done when the `folders` command ends with:
-
-   ```text excerpt=kpi-intake/README.md
-   KPI-intake is ready
-   ```
-
-4. Check the release and load the stores, as section 6, "After every change", says.
-
-   You are done when that part is done.
+   You are done when the `folders` command has ended with `KPI-intake is ready`.
