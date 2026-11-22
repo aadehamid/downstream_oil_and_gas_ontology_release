@@ -51,6 +51,7 @@ import subprocess
 import sys
 import tempfile
 import zipfile
+import zlib
 from pathlib import Path, PurePosixPath
 
 from kpi_store import cut, local_settings, runner, setup_check
@@ -135,7 +136,9 @@ def _unpack(zip_path, into):
             if not any(not m.is_dir() for m in members):
                 raise UpgradeRefused(f"{zip_path} holds no file")
             archive.extractall(into, members)
-    except (zipfile.BadZipFile, zipfile.LargeZipFile, OSError) as err:
+    # zipfile raises these for a damaged stream, a password, an unknown compression or a short file, besides its own.
+    except (zipfile.BadZipFile, zipfile.LargeZipFile, OSError, zlib.error, RuntimeError, NotImplementedError,
+            EOFError, ValueError) as err:
         raise UpgradeRefused(f"{zip_path} cannot be read as a zip ({type(err).__name__}: {err})") from None
     entries = list(Path(into).iterdir())
     # A zip made by hand may hold the release in one top folder; the runner's zip holds its files at the top.
@@ -303,16 +306,19 @@ def plan(root, new_root):
                              f"{' and more' if len(crlf) > 5 else ''}. Give the zip as the release's team sent it")
     old, now = _tree(root, base), _tree(root, head)
     ids = dict(zip(sorted(new), _blobs(root, [str(new[p].resolve()) for p in sorted(new)], write=False)))
-    known = {p.casefold(): p for p in set(old) | set(now)}
+    spellings = {}
+    for path in set(old) | set(now) | set(new):
+        spellings.setdefault(path.casefold(), set()).add(path)
     for path in sorted(set(old) | set(new)):
         tool = is_tool(path, patterns)
         if path in new and (tool or (path not in old and path not in now)):
             blob = ids[path]
             if path in old and old[path][1] == blob:
                 continue
-            if path not in old and known.get(path.casefold(), path) != path:
-                raise UpgradeRefused(f"the new release's {path} differs only in the case of its letters from this "
-                                     f"copy's {known[path.casefold()]}, and Windows and macOS hold one file for both")
+            others = sorted(spellings[path.casefold()] - {path})
+            if path not in old and others:
+                raise UpgradeRefused(f"the new release's {path} differs only in the case of its letters from "
+                                     f"{', '.join(others)}, and Windows and macOS hold one file for both")
             the_plan.entries[path] = (old.get(path, ("100644",))[0], blob, new[path])
             if path not in old:
                 the_plan.added.append(path)
@@ -374,7 +380,10 @@ def upgrade(release_root=".", source=None, plan_only=False, say=print, check=Non
     source = Path(source).expanduser().resolve()
     with tempfile.TemporaryDirectory(prefix="kpi-store-upgrade-") as tmp:
         if source.is_file():
-            say(f"The zip's SHA-256 is {hashlib.sha256(source.read_bytes()).hexdigest()}.")
+            try:
+                say(f"The zip's SHA-256 is {hashlib.sha256(source.read_bytes()).hexdigest()}.")
+            except OSError as err:
+                raise UpgradeRefused(f"{source} cannot be read ({type(err).__name__})") from None
             new_root = _unpack(source, Path(tmp) / "new")
         elif source.is_dir():
             new_root = source
@@ -384,7 +393,7 @@ def upgrade(release_root=".", source=None, plan_only=False, say=print, check=Non
         if version(the_plan.release) < version(the_plan.base_release):
             raise UpgradeRefused(f"the new release is {the_plan.release}, older than the tools of {the_plan.base_release} "
                                  "that this copy has")
-        if the_plan.release == the_plan.base_release:
+        if version(the_plan.release) == version(the_plan.base_release):
             say(the_plan.describe())
             say(f"This copy has the tools of {the_plan.release} already. Nothing was changed.")
             return the_plan

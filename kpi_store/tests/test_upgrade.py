@@ -421,10 +421,24 @@ def test_windows_line_ends_in_the_new_release_are_refused(tmp_path):
         up.upgrade(copy, new, say=lambda *_: None, check=PASS)
 
 
+def zip_of(path, entries, **kw):
+    with zipfile.ZipFile(path, "w", **kw) as z:
+        for name, text in entries:
+            z.writestr(name, text)
+
+
+def damaged(path):
+    zip_of(path, [("kpi_store/tool.py", "A = 2\n" * 50)], compression=zipfile.ZIP_DEFLATED)
+    data = bytearray(path.read_bytes())
+    data[30 + len("kpi_store/tool.py")] = 0x06   # the first byte of the stream: a block type DEFLATE reserves
+    path.write_bytes(bytes(data))
+
+
 @pytest.mark.parametrize("make, says", [
     (lambda path: path.write_bytes(b"not a zip"), "cannot be read as a zip"),
-    (lambda path: zipfile.ZipFile(path, "w").close(), "holds no file"),
-    (lambda path: zipfile.ZipFile(path, "w").writestr(".", "x"), "names no file"),
+    (lambda path: zip_of(path, []), "holds no file"),
+    (lambda path: zip_of(path, [(".", "x")]), "names no file"),
+    (damaged, r"cannot be read as a zip \(error"),
 ])
 def test_a_zip_that_is_not_a_release_is_refused_plainly(tmp_path, make, says):
     copy = shipped(tmp_path)
@@ -471,3 +485,51 @@ def test_a_copy_without_an_author_is_told_how_to_set_one(tmp_path):
     finally:
         os.environ.clear(); os.environ.update(old)
     assert "git config user.name" in str(err.value) and "plain folder" not in str(err.value)
+
+
+def test_a_zip_that_cannot_be_read_is_refused(tmp_path):
+    copy = shipped(tmp_path)
+    archive = tmp_path / "locked.zip"
+    zip_of(archive, [("x", "x")])
+    archive.chmod(0)
+    try:
+        if os.access(archive, os.R_OK):
+            pytest.skip("this user can read a file with no permissions")
+        with pytest.raises(up.UpgradeRefused, match="cannot be read"):
+            up.upgrade(copy, archive, say=lambda *_: None, check=PASS)
+    finally:
+        archive.chmod(0o644)
+
+
+def test_two_new_files_that_differ_only_in_case_are_refused(tmp_path):
+    copy = shipped(tmp_path)
+    new = release(tmp_path / "new", "1.3")
+    (new / "kpi_store" / "a.py").write_text("x = 1\n", encoding="utf-8")
+    if (new / "kpi_store" / "A.py").exists():
+        pytest.skip("this file system holds one file for both names")
+    (new / "kpi_store" / "A.py").write_text("x = 2\n", encoding="utf-8")
+    with pytest.raises(up.UpgradeRefused, match="differs only in the case of its letters"):
+        up.upgrade(copy, new, say=lambda *_: None, check=PASS)
+
+
+def test_the_same_version_written_another_way_changes_nothing(tmp_path):
+    copy = shipped(tmp_path, "1.3")
+    said = []
+    up.upgrade(copy, release(tmp_path / "new", "1.03", {"kpi_store/tool.py": "A = 2\n"}), say=said.append, check=FAIL)
+    assert said[-1] == "This copy has the tools of KPI Store 1.03 already. Nothing was changed."
+
+
+@pytest.mark.parametrize("step", ["worktree add", "worktree remove"])
+def test_the_worktree_is_gone_whatever_fails(tmp_path, monkeypatch, step):
+    copy = shipped(tmp_path)
+    real = up._git
+
+    def failing(root, *args, **kw):
+        done = real(root, *args, **kw)
+        if " ".join(args[:2]) == step:
+            return subprocess.CompletedProcess(args, 1, "", f"{step} failed on purpose")
+        return done
+    monkeypatch.setattr(up, "_git", failing)
+    with pytest.raises(up.UpgradeRefused):
+        up.upgrade(copy, release(tmp_path / "new", "1.3", {"kpi_store/tool.py": "A = 2\n"}), say=lambda *_: None, check=FAIL)
+    assert len(git(copy, "worktree", "list").splitlines()) == 1
