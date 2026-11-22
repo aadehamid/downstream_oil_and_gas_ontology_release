@@ -199,6 +199,8 @@ Three answers send the request somewhere before the KPI can be added. The form s
 | The business area, the process, the step or a role is not in the list (1.1, 1.2, 1.3, 6.1, 6.3) | **Process map request.** Fill in the "Process map request" form. It is smaller, and it is not a domain activation | The Global Process Owner answers and signs. The Architect signs the change, then proposes and applies it with the same two commands. They add new business areas, processes, steps, roles and RACI entries, and release `core` when the request adds to it |
 | The KPI is restricted (3.7) | **Review.** Bring Privacy, Security, Compliance and Risk into the request, and record the date and the outcome in the sign-off block | The Program manager |
 
+The KPI form does not have to wait for the domain activation or the process map request to be applied, when it waits on a domain (1.5) or on a business area, a process or a step (1.1 to 1.3). The Architect can hand the signed KPI form and the signed forms it waits on to the propose command in one run. The command applies the others first in a temporary copy of the release, reads each "Not in the list" answer as the new entry that has the name the form gives for the missing one, and checks the KPI form there. It writes one proposal for each form, and prints the order to apply them in, one run each; the apply command refuses the KPI until the others are applied. A new role (6.1) or a new value stream step (6.3) still needs a specialist. `HOW-TO-UPDATE.md`, "Propose a KPI with the forms it waits on", has the steps.
+
 The two smaller forms are tabs of the HTML form and sheets of the workbook. Each saves to its own answers file. "Load answers file" opens a file in the form it was saved from, whichever tab is open, and says which. It leaves out an answer under a number that form does not ask, and lists it. It refuses a file that is not an answers file, says what is wrong, and keeps the answers on the page.
 
 Check a workbook's sheet by naming the form:
@@ -223,7 +225,7 @@ The domain activation makes a domain of `settings.toml` active, so the KPI form 
 
 The propose command reads D1 and D2 only. When D1 names a domain of the list, by its label or its id, the apply sets it to `active = true` and gives it the description of D2. When D1 names no domain of the list, the apply adds the domain at the end of the list, with the short key of D1 as its id, and makes it active. The other answers stay in the form's file. The propose command refuses a domain that is active already.
 
-Who signs: the Domain Owner, then the Architect, last. The apply then rebuilds the forms, and the KPI form can go on. `HOW-TO-UPDATE.md`, "Activate a domain with the domain activation form", has the steps, with the example `examples/customer.domain-activation.json`.
+Who signs: the Domain Owner, then the Architect, last. The apply then rebuilds the forms, and the KPI form can go on. Or the Architect proposes the domain activation and the KPI form together, as "Where an answer routes the request" says. `HOW-TO-UPDATE.md`, "Activate a domain with the domain activation form", has the steps, with the example `examples/customer.domain-activation.json`.
 
 ## The process map request
 

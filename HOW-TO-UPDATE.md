@@ -2015,6 +2015,116 @@ The commands start in the release folder. Keep the filled form and the proposal 
 
 7. Run the full check, as in "Before you change anything", step 3. Then load the stores with the runner, as in step 11 of "The release steps".
 
+## Propose a KPI with the forms it waits on
+
+A KPI form can name a domain that is not active or not in the list (1.5), or a business area, a process or a step that the lists do not hold (1.1 to 1.3). The check then routes it to a domain activation or a process map request, and the KPI form cannot be complete on its own. A new role (6.1) or a new value stream step (6.3) still needs a specialist: the kpi module records the planning personas only, and a process map request adds no value stream step. You do not have to wait for those forms to be applied. Hand the signed forms to the propose command together, in one run.
+
+The command applies the domain activations and the process map requests first, in a temporary copy of the release, as the apply command will apply them. It then reads the KPI form against that copy. An answer of "Not in the list" takes the one new entry whose name is the name the form gives for the missing entry, in any case and without a process's number. Give the same name in both forms. It checks the KPI form there, and writes one proposal for each form. The release itself does not change. The KPI's approval record and summary name the proposals it must follow, and the command prints the order to apply them in, one run each.
+
+The commands start in the release folder. Keep the filled forms and the proposals in a folder beside the release folder, never inside it. The example uses the folder `kpi-with-forms` beside the release folder.
+
+1. Fill in the three forms, and save them to that folder. The example hands in three forms:
+   - the shipped example `kpi-intake/examples/sample-blend-planning.process-map-request.json`, which adds the made-up process Sample Blend Planning under CM 1.1 Planning & Scheduling;
+   - the shipped example `kpi-intake/examples/customer.domain-activation.json`, which activates the domain Customer;
+   - a made-up KPI, Sample Blend Margin per Barrel. It answers 1.2 with "Not in the list" and names the missing process Sample Blend Planning, and answers 1.5 with Customer.
+
+   The document test writes the three files with this block. It makes the KPI form from the shipped example `kpi-intake/examples/rm-margin-per-barrel.json`. If you saved the files from the forms, skip it.
+
+   ```python run=kpi-with-forms
+   import json
+   import shutil
+   from pathlib import Path
+
+   folder = Path("../kpi-with-forms")
+   folder.mkdir(exist_ok=True)
+   examples = Path("kpi-intake/examples")
+   shutil.copy(examples / "sample-blend-planning.process-map-request.json", folder)
+   shutil.copy(examples / "customer.domain-activation.json", folder)
+   form = json.loads((examples / "rm-margin-per-barrel.json").read_text(encoding="utf-8"))
+   form["request"]["number"] = "KPI-2026-900"
+   answers = form["answers"]
+   for key in ("1.3", "5.1"):
+       answers.pop(key, None)
+   answers.update({
+       "1.1": "https://w3id.org/mpc/ontology/modules/core/business-domain/commercial",
+       "1.2": "@not-in-list", "1.2.detail": "Sample Blend Planning",
+       "1.5": "customer",
+       "2.1": "Sample Blend Margin per Barrel",
+       "2.2": "A made-up margin per barrel of the made-up blends of one made-up region."})
+   path = folder / "sample-blend-margin.kpi-intake.json"
+   path.write_text(json.dumps(form, indent=2) + "\n", encoding="utf-8")
+   print("wrote", path.name)
+   ```
+
+   ```text expect
+   wrote sample-blend-margin.kpi-intake.json
+   ```
+
+2. Check the KPI form. On its own it is not complete: it routes the request to the two other forms, and the check ends with exit status 1.
+
+   ```powershell run=kpi-with-forms exit=1
+   python -m kpi_store.intake check ../kpi-with-forms/sample-blend-margin.kpi-intake.json
+   ```
+
+   ```text expect
+   ...
+     Process map request needed: 1.2 is "Not in the list". The ontology does not hold this process. The KPI cannot be added until the process is in the process map. Stop here and fill in the process map request.
+   ...
+     Domain activation needed: 1.5 is "Customer (not active)". This domain is not active yet. The KPI cannot be added until the domain is activated.
+   ...
+   ```
+
+3. Turn the three forms into proposals in one run. It took about three minutes on a Mac, most of it to apply the other two forms in the copy.
+
+   ```powershell run=kpi-with-forms
+   python -m kpi_store.propose ../kpi-with-forms/sample-blend-planning.process-map-request.json ../kpi-with-forms/customer.domain-activation.json ../kpi-with-forms/sample-blend-margin.kpi-intake.json
+   ```
+
+   ```text expect
+   wrote the proposal ../kpi-with-forms/proposals/PM-2026-002: 7 changes and 4 facts, route minor
+   wrote the proposal ../kpi-with-forms/proposals/DA-2026-001: 2 facts, route minor
+   wrote the proposal ../kpi-with-forms/proposals/KPI-2026-900: 14 changes and 15 facts, route minor
+   Apply these in this order, one run each, as each KPI form names what the forms before it add:
+     python -m kpi_store.apply ../kpi-with-forms/proposals/DA-2026-001
+     python -m kpi_store.apply ../kpi-with-forms/proposals/PM-2026-002
+     python -m kpi_store.apply ../kpi-with-forms/proposals/KPI-2026-900
+   Nothing in the ontology has changed. Read each summary.txt, then apply with: python -m kpi_store.apply <proposal folder>
+   ```
+
+4. Read the KPI's `summary.txt`. Its KGCL lines link the measure to the new process, CM 1.1.8, and its last lines name the proposals it follows.
+
+   ```python run=kpi-with-forms
+   print(open("../kpi-with-forms/proposals/KPI-2026-900/summary.txt", encoding="utf-8").read())
+   ```
+
+   ```text expect
+   Proposal KPI-2026-900
+   ...
+     create edge measure:sample-blend-margin-per-barrel kpi:informsProcess proc:CM-1-1-8
+   ...
+   Apply this proposal after DA-2026-001 and PM-2026-002, each in a run of its own and in that order: the KPI form names what they add, and this proposal was checked against the release as they leave it. The apply command refuses it until then.
+   ```
+
+5. Apply the proposals in that order, one run each. The apply command refuses the KPI proposal, and changes nothing, until the release holds the approval records of the proposals it follows.
+
+   ```powershell run=kpi-with-forms
+   python -m kpi_store.apply ../kpi-with-forms/proposals/DA-2026-001
+   python -m kpi_store.apply ../kpi-with-forms/proposals/PM-2026-002
+   python -m kpi_store.apply ../kpi-with-forms/proposals/KPI-2026-900
+   ```
+
+   ```text expect
+   ...
+   Done. The domain Customer is now active, and the KPI form offers it in question 1.5. The apply changed <count> files, and Git committed them.
+   ...
+   Done. core is now 2.5.0 and organization 2.3.0 (minor), and 11 modules that depend on them took a new patch. The apply changed <count> files, and Git committed them.
+   ...
+   Done. kpi is now 1.4.0 and value-stream 1.3.0 (minor), and 5 modules that depend on them took a new patch. The apply changed <count> files, and Git committed them.
+   ...
+   ```
+
+6. Run the full check, as in "Before you change anything", step 3. Then load the stores with the runner, as in step 11 of "The release steps".
+
 ## Change a process
 
 This section is for a specialist. A process that is renamed, moved, described anew or removed has no form: the process map request adds new processes only. A change to an existing process's meaning is a major.
