@@ -160,7 +160,7 @@ The forms are in the KPI intake pack: `kpi-intake/kpi-intake-form.html`, which w
 | Roles, RACI entries or a new process | Process map request | "Add roles and RACI entries with the process map request" |
 | A new vocabulary or reference table | New module | Section 4 below |
 
-The steps below add a KPI. The other forms take the same four commands, with their own file and proposal names.
+The steps below add a KPI. The other forms take the same four commands. The file and folder names in the commands are those of `HOW-TO-UPDATE.md`'s example, the made-up KPI Sample Spread Margin, saved in a folder `new-kpi` beside the release folder. Write the path of your own form in their place, and the proposal folder that the propose command prints.
 
 1. Check the filled form. The check changes nothing.
 
@@ -222,7 +222,7 @@ The steps below add a KPI. The other forms take the same four commands, with the
 
 ## 4. Add a module
 
-A new module goes in through the "New module" tab of the form and the same commands. It is a vocabulary, a list of terms with their definitions, or a reference table, items of a class the ontology holds already. A new module's first release is 1.0.0, a major, so the Data Owner, the Ontology Owner and the Architect sign the form. `HOW-TO-UPDATE.md`, "Add a module with the new-module form", has both kinds.
+A new module goes in through the "New module" tab of the form and the same commands. It is a vocabulary, a list of terms with their definitions, or a reference table, items of a class the ontology holds already. A new module's first release is 1.0.0, a major, so the Data Owner, the Ontology Owner and the Architect sign the form. `HOW-TO-UPDATE.md`, "Add a module with the new-module form", has both kinds. The names in the commands are those of its example, the made-up vocabulary Sample Equipment Terms: write your own form's path and proposal folder in their place.
 
 1. Check the form.
 
@@ -262,7 +262,7 @@ A new module goes in through the "New module" tab of the form and the same comma
 
 ## 5. Let an AI help
 
-An AI can help in two ways. In both, the commands check what the AI writes, people decide and sign, and nothing reaches the ontology until the apply's checks pass. Name the AI in the local settings file, as `HOW-TO-UPDATE.md`, "Choose the provider", says: usually a model served in your Databricks workspace, approved by your IT. The steps below use the `by-hand` provider, with which the command writes a prompt file, you give it to an assistant such as Genie Code, and you save its answer. With another provider, the command asks the model itself.
+An AI can help in two ways. The names in the commands are those of `HOW-TO-UPDATE.md`'s two made-up examples: write your own form's path and your own local settings file in their place. In both, the commands check what the AI writes, people decide and sign, and nothing reaches the ontology until the apply's checks pass. Name the AI in the local settings file, as `HOW-TO-UPDATE.md`, "Choose the provider", says: usually a model served in your Databricks workspace, approved by your IT. The steps below use the `by-hand` provider, with which the command writes a prompt file, you give it to an assistant such as Genie Code, and you save its answer. With another provider, the command asks the model itself.
 
 **Suggestions for a form.** The AI suggests answers to a form before anyone signs it. `HOW-TO-UPDATE.md`, "Use AI to suggest answers (optional)", has the whole example.
 
@@ -380,7 +380,7 @@ An AI can help in two ways. In both, the commands check what the AI writes, peop
 
 Your copy is the master of the ontology. A newer release from the release's team brings new tools: the commands, the scripts, the skills and the guides. The upgrade takes them into your copy and keeps every change you applied. It runs the full check on the merged copy, and changes your folder only when that passes. `HOW-TO-UPDATE.md`, "Upgrade the tools from a newer release", says how it decides which files are tools.
 
-1. Save the new zip beside the release folder. Commit every change in the release folder first: the upgrade refuses a copy with changes that are not committed. Then see what the upgrade would do. The plan changes nothing.
+1. Save the new zip beside the release folder. The commands name it `kpi-store-newer.zip`, as the guide's example does: write the name of the zip you received. Commit every change in the release folder first: the upgrade refuses a copy with changes that are not committed. Then see what the upgrade would do. The plan changes nothing.
 
    ```powershell excerpt=HOW-TO-UPDATE.md
    python -m kpi_store.upgrade --from ../kpi-store-newer.zip --plan
