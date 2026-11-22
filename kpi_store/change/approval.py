@@ -12,7 +12,8 @@ What it holds, and nothing else:
      "signatures": [{"role": "Data Owner", "name": "<name>", "date": "2026-11-19", "words": "<the approval words>"},
                     ...],
      "ai": {...},                 only when the form had an AI step (check_ai says what it holds)
-     "draft": {...}}              only for a module an AI drafted (check_draft says what it holds)
+     "draft": {...},              only for a module an AI drafted (check_draft says what it holds)
+     "after": ["<change id>", ...]}   only for a KPI proposed with the forms it waits on: the proposals to apply first
 
 Who signs (Q4): the Data Owner signs a KPI definition, and the Architect signs the change. A major change or a new
 module also needs the Ontology Owner. A domain activation needs the Domain Owner in place of the Data Owner, and a
@@ -83,9 +84,15 @@ def check(record, owner="Data Owner"):
     missing = [f for f in FIELDS if f not in record]
     if missing:
         raise ChangeRefused(f"the approval record has no {', no '.join(missing)}")
-    extra = sorted(set(record) - set(FIELDS) - {"ai", "draft"})
+    extra = sorted(set(record) - set(FIELDS) - {"ai", "draft", "after"})
     if extra:
         raise ChangeRefused(f"the approval record holds fields it should not: {', '.join(extra)}")
+    if "after" in record:   # the proposals of the same propose run to apply first (kpi_store/propose.py)
+        after = record["after"]
+        if not isinstance(after, list) or not after or not all(isinstance(c, str) for c in after):
+            raise ChangeRefused("the approval record's after must be a list of change ids")
+        for change in after:
+            record_path(".", change)   # the id's form
     if "ai" in record:
         check_ai(record["ai"])
     if "draft" in record:
@@ -254,13 +261,15 @@ def _is_date(text):
         return False
 
 
-def write_record(release_root, change_id, route, signatures, new_module=False, owner="Data Owner", ai=None, draft=None):
+def write_record(release_root, change_id, route, signatures, new_module=False, owner="Data Owner", ai=None, draft=None,
+                 after=None):
     """Checks and writes the approval record of one change, and returns its path. Refuses an incomplete record,
-    and a record for a change that has one already. `ai` is the record of the form's AI step, when it had one, and
-    `draft` the record of a module's AI draft."""
+    and a record for a change that has one already. `ai` is the record of the form's AI step, when it had one,
+    `draft` the record of a module's AI draft, and `after` the proposals the change was applied after."""
     record = check({"change": change_id, "route": route, "new_module": new_module,
                     "signatures": list(signatures) if isinstance(signatures, tuple) else signatures,
-                    **({"ai": ai} if ai is not None else {}), **({"draft": draft} if draft is not None else {})}, owner)
+                    **({"ai": ai} if ai is not None else {}), **({"draft": draft} if draft is not None else {}),
+                    **({"after": after} if after is not None else {})}, owner)
     record["signatures"] = [{f: sig[f] for f in SIGNATURE_FIELDS} for sig in record["signatures"]]
     path = record_path(release_root, change_id)
     if path.exists():

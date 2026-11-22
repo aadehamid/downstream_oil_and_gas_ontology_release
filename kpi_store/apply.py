@@ -253,6 +253,13 @@ def plan(folders, root):
         if approval.record_path(root, p.change).exists():
             raise ChangeRefused(f"the proposal {p.change} was applied before: "
                                 f"{approval.record_path(root, p.change).relative_to(root).as_posix()} holds its approval record")
+    for p in proposals:   # a KPI proposed with the forms it waits on follows their proposals
+        missing = [c for c in p.record.get("after", []) if not approval.record_path(root, c).exists()]
+        if missing:
+            raise ChangeRefused(f"the proposal {p.change} follows {', '.join(missing)}, which this release has not "
+                                f"applied: the KPI form names what {'it adds' if len(missing) == 1 else 'they add'}. "
+                                f"Apply {', then '.join(missing)} first"
+                                + (", each in a run of its own" if len(missing) > 1 else ""))
     if target == DOMAINS:
         for p in proposals:
             domains.check_changes(p.facts, root)
@@ -336,7 +343,7 @@ DEPENDENT_WHY = "Takes the new version of what it requires; nothing else changes
 def _write_record(staging, p):
     """The approval record of one proposal, its change file beside it, and a new KPI's facts."""
     path = approval.write_record(staging, p.change, p.route, p.record["signatures"], p.record["new_module"], p.owner,
-                                 p.record.get("ai"), p.record.get("draft"))
+                                 p.record.get("ai"), p.record.get("draft"), p.record.get("after"))
     if p.lines:
         with path.with_suffix(".kgcl").open("w", encoding="utf-8", newline="\n") as f:
             f.write("".join(line + "\n" for line in p.lines))

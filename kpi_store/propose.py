@@ -42,6 +42,17 @@ the Architect must still do outside the form.
 It checks every file before it writes any proposal, so a refused file leaves no proposal at all. One form gives
 one proposal (KPI-DEC-0002, Q6).
 
+A KPI form that names a domain that is not active or not in the list (1.5), or a business area, a process or a step
+that is not in the list (1.1 to 1.3), is routed to a domain activation or a process map request, and is not
+complete on its own. Given together with the signed forms it waits on, in one run, it is proposed too: the command
+applies those domain activations and then those process map requests, each in a run of its own, to a temporary copy
+of the release, with the apply command; reads each "Not in the list" answer as the one entry that the copy offers
+and the release did not offer, or offered as not active, whose name is the name the form gives for the missing
+entry; and checks the KPI form against that copy. The release does not change. The KPI's approval record names the
+proposals to apply before it, under "after", its summary.txt says so, and the command prints the order to apply
+them in. A new role or a new value stream step still needs a specialist: the kpi module records the planning
+personas only, and a process map request adds no value stream step.
+
 Where the proposals go: --out names the folder; without it, a folder named "proposals" beside the first answers
 file. That folder must be outside the release folder, as the filled forms are (the intake's shared folder is
 outside it too): the apply command commits the release, and refuses a release with files that are not committed.
@@ -65,9 +76,12 @@ What it reads: the answers files, the release's KPI intake pack (kpi-intake/) an
 writes: the proposal folders, and nothing else. Needs Python 3.11 or later with rdflib, and openpyxl for a workbook.
 """
 import argparse
+import dataclasses
 import datetime as dt
 import re
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 from kpi_store.change import (ChangeRefused, approval, core_release, domains, drafted, kgcl, kpi_tables, new_measures,
@@ -84,6 +98,12 @@ ROUTE_WHY = {"patch": "a patch: the changes correct or reword, and the old meani
              "minor": "a minor: the changes add content, and the old meaning still holds",
              "major": "a major: the form says a report or an answer that used the old meaning may now be wrong"}
 NEW_MODULE_WHY = "a major: a new module's first release is 1.0.0, and the Ontology Owner approves it"
+# The routing outcomes of the KPI form that another form settles, and that form.
+SETTLED_BY = {"domain-activation": DOMAIN, "process-map-request": PROCESS_MAP}
+# The KPI form's questions whose missing entry another form of the run can add: the business area, the process, the
+# step and the domain. A new role or value stream step still needs a specialist.
+SETTLED_QUESTIONS = ("1.1", "1.2", "1.3", "1.5")
+NOT_IN_LIST = "@not-in-list"
 
 class ProposeRefused(Exception):
     """A file is not a complete, signed KPI intake, term change or reference item, or the proposals cannot be
@@ -96,11 +116,49 @@ def _pack(root, pack):
     return catalogue.load(pack), picklists.load(pack)
 
 
-def read_form(path, cat, data, root, stale_check=True):
-    """The intake of one answers file, refused unless it is a complete and signed form of the pack. A workbook gives
-    the form of whichever of its Term change, Reference item, Domain activation, Process map request and New module sheets is
-    filled, and its KPI form when none is."""
-    from kpi_store.intake import answers, check, picklists
+def read_form(path, cat, data, root, stale_check=True, forms=()):
+    """The intake of one answers file, refused unless it is a complete and signed form of the pack, and the
+    routing outcomes it waits on. A workbook gives the form of whichever of its Term change, Reference item, Domain
+    activation, Process map request and New module sheets is filled, and its KPI form when none is. `forms` are the
+    forms of the run: a KPI form that only routes to forms of the run keep from being complete is not refused, and
+    gives the outcomes it waits on; any other form gives an empty set."""
+    from kpi_store.intake import check, picklists
+    intake = _read(path, cat, data)
+    stale = picklists.stale_modules(data, root) if stale_check else None
+    report = check.check(cat, data, intake, stale)
+    waiting = _waits_on(cat, data["lists"], intake, report) or set()
+    if not report.complete and not (waiting and {SETTLED_BY[o] for o in waiting} <= set(forms)):
+        _refuse_incomplete(path, intake, report)
+    return intake, waiting
+
+
+def _refuse_incomplete(path, intake, report):
+    path = Path(path)
+    things = "; ".join(report.blocking)
+    flag = f" --form {intake.form}" if path.suffix.lower() in (".xlsx", ".xlsm") else ""
+    raise ProposeRefused(f"{path.name} is not complete and signed. Run python -m kpi_store.intake check "
+                         f"{path.as_posix()}{flag} for the whole report. To settle: {things}")
+
+
+def _waits_on(cat, lists, intake, report):
+    """The routing outcomes, of those another form settles, that alone keep a KPI form from being complete; None
+    when something else keeps it too."""
+    from kpi_store.intake import rules
+    if intake.form != KPI or report.complete:
+        return None
+    routed = {}
+    for question, route, _ in rules.routes(cat, lists, intake.answers, intake.form):
+        outcome = cat.outcomes[route["outcome"]]
+        if outcome["blocks"] and question["id"] in SETTLED_QUESTIONS:
+            routed[f'{question["id"]} routes the request: {outcome["title"].lower()}'] = route["outcome"]
+    if not set(report.blocking) <= set(routed) or not set(routed.values()) <= set(SETTLED_BY):
+        return None
+    return {routed[line] for line in report.blocking}
+
+
+def _read(path, cat, data):
+    """The intake of one answers file, unchecked."""
+    from kpi_store.intake import answers
     path = Path(path)
     if not path.is_file():
         raise ProposeRefused(f"{path} is not a file")
@@ -120,15 +178,7 @@ def read_form(path, cat, data, root, stale_check=True):
         names = " and ".join(cat_form(i.form) for i in filled)
         raise ProposeRefused(f"{path.name}: the workbook holds a {names}. One form gives one proposal: fill one of those "
                              "sheets in each workbook")
-    intake = filled[0]
-    stale = picklists.stale_modules(data, root) if stale_check else None
-    report = check.check(cat, data, intake, stale)
-    if not report.complete:
-        things = "; ".join(report.blocking)
-        flag = f" --form {intake.form}" if workbook else ""
-        raise ProposeRefused(f"{path.name} is not complete and signed. Run python -m kpi_store.intake check {path.as_posix()}"
-                             f"{flag} for the whole report. To settle: {things}")
-    return intake
+    return filled[0]
 
 
 def cat_form(form):
@@ -763,7 +813,11 @@ def _with_ai(text, record):
 def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
     """Checks every answers file, then writes one proposal folder for each and returns their paths. Raises
     ProposeRefused, with no proposal written, when any file is refused. `pack` is a KPI intake pack folder other
-    than the release's own; the check then does not compare its pick lists with the release's packages."""
+    than the release's own; the check then does not compare its pick lists with the release's packages.
+
+    A KPI form that names a domain or a process the release lacks waits on the run's domain activations and process
+    map requests: they are applied first in a temporary copy of the release, and the KPI form is read and checked
+    against that copy (_settle)."""
     root = Path(release_root).resolve()
     files = [Path(f) for f in files]
     if not files:
@@ -778,86 +832,34 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
     except Exception as err:   # the catalogue's and the pick lists' own errors say what is wrong
         raise ProposeRefused(f"the KPI intake pack cannot be read: {err}") from None
     today = (now or dt.datetime.now(dt.timezone.utc)).strftime("%Y-%m-%d")
-    planned, taken = [], set()
-    for path in files:
-        intake = read_form(path, cat, data, root, stale_check=pack is None)
-        ai = _ai_record(path, intake)
-        facts, draft, draft_files = [], None, {}
-        if intake.form == KPI:
-            key, changes, facts, notes = kpi_changes(cat, intake, data["lists"], root)
-            module, compatible = "kpi", "yes"
-            checks = lambda changes, root: other_modules.check_changes(changes, facts, root)
-        elif intake.form == DOMAIN:
-            try:
-                key, facts = domain_facts(intake, root)
-            except ChangeRefused as err:   # the release's settings.toml cannot be read
-                raise ProposeRefused(str(err)) from None
-            changes, module, compatible = [], "settings", "yes"
-            checks = lambda changes, root: domains.check_changes(facts, root)
-        elif intake.form == PROCESS_MAP:
-            try:
-                key, changes, facts, notes = process_map_changes(intake, root, data["lists"])
-            except ChangeRefused as err:   # the release's map or organization tables cannot be read
-                raise ProposeRefused(str(err)) from None
-            module, compatible = "organization", "yes"
-            checks = lambda changes, root: check_process_map(changes, facts, root)
-        elif intake.form == NEW_MODULE and new_module._one(intake.answers, "N3") == drafted.NEW_MODELLING:
-            try:
-                key, changes, facts, draft_files, draft = drafted.from_signed_form(path, intake, root,
-                                                                                    signatures(cat, intake))
-            except ChangeRefused as err:
-                raise ProposeRefused(f"{path.name}: {err}") from None
-            module, compatible = "new", "yes"
-            checks = lambda changes, root: None   # from_signed_form ran the draft's checks and gates
-        elif intake.form == NEW_MODULE:
-            try:
-                key, changes, facts, notes = new_module.from_form(intake.answers, root)
-            except ChangeRefused as err:
-                raise ProposeRefused(f"{path.name}: {err}") from None
-            module, compatible = "new", "yes"
-            checked = {}
-            checks = lambda changes, root: checked.update(result=new_module.check_changes(changes, facts, root))
-        elif intake.form == ITEM:
-            key, changes = item_changes(intake, data["lists"])
-            module, checks, compatible = "new item's", reference_items.check_changes, "yes"
-        else:
-            measure, changes = changes_of(intake, data["lists"])
-            key, module, checks = measure["notation"], "kpi", kpi_tables.check_changes
-            compatible = "".join(intake.answers.get("T8", "") or "")
-        try:
-            checks(changes, root)
-        except ChangeRefused as err:
-            where = {"settings": domains.SETTINGS.as_posix(), "new": "the release"}.get(module, f"the {module} module")
-            raise ProposeRefused(f"{path.name} asks for a change {where} cannot take: {err}") from None
-        route = "major" if intake.form == NEW_MODULE else proposal.route_of(changes, compatible)
-        change = _change_id(out, root, intake.request.get("number", "").strip(), key, today, taken)
-        taken.add(change.lower())   # case does not count: on Windows and macOS TC-1 and tc-1 are one folder
-        record = {"change": change, "route": route, "new_module": intake.form == NEW_MODULE,
-                  "signatures": signatures(cat, intake), **({"ai": ai} if ai else {}),
-                  **({"draft": draft} if draft else {})}
-        try:
-            approval.check(record, proposal.owner_of(changes, facts))
-        except ChangeRefused as err:
-            raise ProposeRefused(f"{path.name}: the sign-off cannot become an approval record: {err}") from None
-        lines = [kgcl.write_line(c) for c in changes]
-        if intake.form == KPI:
-            text = kpi_summary(change, path.name, changes, facts, notes, lines, route, record, data["lists"])
-        elif intake.form == DOMAIN:
-            text = domain_summary(change, path.name, facts, route, record, root)
-        elif intake.form == PROCESS_MAP:
-            text = process_map_summary(change, path.name, changes, facts, notes, lines, route, record, data["lists"])
-        elif draft:
-            text = drafted_summary(change, path.name, key, draft, draft_files, lines, facts, route, record, root)
-        elif intake.form == NEW_MODULE:
-            text = new_module_summary(change, path.name, key, *checked["result"], lines, facts, route, record)
-        elif intake.form == ITEM:
-            text = item_summary(change, path.name, key, changes, lines, route, record, data["lists"])
-        else:
-            text = summary(change, path.name, measure, changes, lines, route, compatible, record, data["lists"]["processes"])
-        if ai:
-            text = _with_ai(text, ai)
-        extra = {f"{drafted.DRAFT_FOLDER}/{name}": content for name, content in draft_files.items()}
-        planned.append((out / change, changes, record, text, lines, facts, extra))
+    forms = {_read(path, cat, data).form for path in files}   # so that a KPI form may wait on a form of the run
+    read = [(path, *read_form(path, cat, data, root, stale_check=pack is None, forms=forms)) for path in files]
+    planned, taken, settling = [], set(), {}
+    for path, intake, waiting in read:
+        if not waiting:
+            planned.append(_plan(path, intake, cat, data, root, out, today, taken))
+            settling.setdefault(intake.form, []).append(planned[-1])
+    waiting = [(path, intake, {SETTLED_BY[o] for o in w}) for path, intake, w in read if w]
+    first, followed = [], set()
+    if waiting and pack is not None:
+        raise ProposeRefused("a KPI form that waits on other forms of the run is checked against the release's own KPI "
+                             "intake pack, and a pack was named")
+    if waiting:
+        # The forms the KPI forms wait on: the domain activations first, then the process map requests, each
+        # applied in a run of its own.
+        needed = set().union(*(w for _, _, w in waiting))
+        first = [p for form in (DOMAIN, PROCESS_MAP) if form in needed for p in settling.get(form, [])]
+        with tempfile.TemporaryDirectory(prefix="kpi-store-propose-") as tmp:
+            staging, added = _settle(Path(tmp), first, root, cat)
+            cat2, data2 = _pack(staging, None)   # _settle read it after the last apply
+            for path, intake, needs in waiting:
+                intake = _settled_form(path, intake, cat, data, cat2, data2, staging, [p[0].name for p in first])
+                # The proposals that add an entry the form now names, in the order they are applied.
+                from kpi_store.intake import rules
+                used = {(cat.by_id[q]["source"], v) for q in SETTLED_QUESTIONS for v in rules.values(intake.answers, q)}
+                after = [p[0].name for p, ids in zip(first, added) if ids & used]
+                followed.update(after)
+                planned.append(_plan(path, intake, cat2, data2, staging, out, today, taken, after))
     written = []
     for folder, changes, record, text, lines, facts, extra in planned:
         proposal.write(folder, changes, record, text, facts, extra)
@@ -866,8 +868,196 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
             ([f"{len(facts)} fact{'s' if len(facts) != 1 else ''}"] if facts else [])
         say(f"wrote the proposal {folder.as_posix()}: {' and '.join(counted)}, "
             f"route {record['route']}")
+    if followed:
+        order = [p[0] for p in first if p[0].name in followed] + written[-len(waiting):]
+        say("Apply these in this order, one run each, as each KPI form names what the forms before it add:")
+        for folder in order:
+            say(f"  python -m kpi_store.apply {folder.as_posix()}")
     say("Nothing in the ontology has changed. Read each summary.txt, then apply with: python -m kpi_store.apply <proposal folder>")
     return written
+
+
+def _settle(tmp, settling, root, cat):
+    """A copy of the release, in `tmp`, with the domain activations and process map requests applied, each in a run of
+    its own, as the apply command will apply them. Returns its folder and, for each proposal, the ids of the entries
+    the copy's forms offer after it that they did not offer before it, as (the list, the id), for the questions in
+    SETTLED_QUESTIONS (`cat` names their lists)."""
+    from kpi_store import apply as apply_cmd, cut
+    staging, folders = tmp / "release", tmp / "proposals"
+    shutil.copytree(root, staging, ignore=shutil.ignore_patterns(*cut.IGNORED))
+    try:
+        offered = _offered(cat, *_pack(staging, None))
+    except Exception as err:
+        raise ProposeRefused(f"the KPI intake pack of the release cannot be read: {err}") from None
+    added = []
+    for folder, changes, record, text, lines, facts, extra in settling:
+        copy = proposal.write(folders / folder.name, changes, record, text, facts, extra)
+        try:
+            apply_cmd.apply([copy], staging, say=lambda *_: None)
+            now = _offered(cat, *_pack(staging, None))
+        except (ChangeRefused, cut.CutFailed, cut.CutRefused) as err:
+            raise ProposeRefused(f"{folder.name} could not be applied to a copy of the release, so the KPI forms that "
+                                 f"wait on it cannot be checked: {err}") from None
+        except Exception as err:   # the catalogue's and the pick lists' own errors say what is wrong
+            raise ProposeRefused(f"the KPI intake pack cannot be read after {folder.name}: {err}") from None
+        added.append(now - offered)
+        offered = now
+    return staging, added
+
+
+def _offered(cat, now_cat, data):
+    """Each entry the forms offer for a question of SETTLED_QUESTIONS, as (its list, its id): one list's id never
+    stands for another's, such as a domain and a module that share a short key. `cat` names each question's list,
+    and `now_cat` and `data` are the pack that offers them; a domain counts only when it is active."""
+    out = set()
+    for source in {cat.by_id[q]["source"] for q in SETTLED_QUESTIONS}:
+        fixed = now_cat.fixed_list(source)
+        items = fixed if fixed is not None else data["lists"].get(source, [])
+        out |= {(source, i["id"]) for i in items if i.get("active") is not False and not i.get("hidden")}
+    return out
+
+
+def _settled_form(path, intake, cat, data, cat2, data2, staging, after):
+    """The KPI form, read against the copy of the release that the run's other proposals changed: each "not in the
+    list" answer is read as the one entry that the copy offers and the release did not offer, or offered as not
+    active, whose name is the name the form gives for the missing entry, in any case, and without a process's
+    number. Refused unless the form is then complete and signed."""
+    from kpi_store.intake import check, picklists, rules
+    from kpi_store.intake.catalogue import CHOICE_TYPES
+    answers = dict(intake.answers)
+    for question in cat2.questions_of(intake.form):
+        held = rules.positions(answers, question["id"])
+        if question["type"] not in CHOICE_TYPES or NOT_IN_LIST not in held:
+            continue
+        name = _fold("".join(rules.values(answers, f'{question["id"]}.detail')[:1]))
+        before = {o["id"] for o in rules.options(cat, data["lists"], question) if o.get("active") is not False}
+        new = [o for o in rules.options(cat2, data2["lists"], question, answers)
+               if o["id"] not in before and o.get("active") is not False]
+        hits = [o for o in new if name and _fold(_plain(o)) == name]
+        if len(hits) != 1:
+            continue   # the check below says that the entry is still missing
+        answers[question["id"]] = rules.as_answer(question, [hits[0]["id"] if v == NOT_IN_LIST else v for v in held])
+        answers.pop(f'{question["id"]}.detail', None)
+    intake = dataclasses.replace(intake, answers=answers)
+    report = check.check(cat2, data2, intake, picklists.stale_modules(data2, staging))
+    if not report.complete:
+        raise ProposeRefused(f"{Path(path).name} is not complete and signed even after {_names(after)}, read against "
+                             f"the release as {'it leaves' if len(after) == 1 else 'they leave'} it. The name the form "
+                             f"gives for a missing entry must be the name the other form gives it. To settle: "
+                             f"{'; '.join(report.blocking)}")
+    return intake
+
+
+def _fold(text):
+    """A name with its case, its spaces and its apostrophes folded, as the forms' names are compared."""
+    return " ".join(str(text).replace(kgcl.TYPOGRAPHIC, "'").casefold().split())
+
+
+def _plain(option):
+    """An option's name without the number a process's label starts with, such as CM 1.1.8."""
+    label = option["label"]
+    if option.get("level") is not None:
+        number, _, rest = label.partition(" ")
+        number2, _, rest2 = rest.partition(" ")
+        if RACI_PROCESS.fullmatch(f"{number} {number2}"):
+            return rest2
+    return label
+
+
+def _names(proposals_or_ids):
+    names = [p[0].name if isinstance(p, tuple) else p for p in proposals_or_ids]
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
+
+
+def _after_text(after):
+    one = len(after) == 1
+    return (f"\nApply this proposal after {_names(after)}{'' if one else ', each in a run of its own and in that order'}"
+            f": the KPI form names what {'it adds' if one else 'they add'}, and this proposal was checked against the "
+            f"release as {'it leaves' if one else 'they leave'} it. The apply command refuses it until then.\n")
+
+
+def _plan(path, intake, cat, data, root, out, today, taken, after=()):
+    """One proposal, planned and checked against the release at `root`, and not written: (folder, changes, record,
+    summary, lines, facts, extra). `after` names the proposals of the run that must be applied before it."""
+    ai = _ai_record(path, intake)
+    facts, draft, draft_files = [], None, {}
+    if intake.form == KPI:
+        key, changes, facts, notes = kpi_changes(cat, intake, data["lists"], root)
+        module, compatible = "kpi", "yes"
+        checks = lambda changes, root: other_modules.check_changes(changes, facts, root)
+    elif intake.form == DOMAIN:
+        try:
+            key, facts = domain_facts(intake, root)
+        except ChangeRefused as err:   # the release's settings.toml cannot be read
+            raise ProposeRefused(str(err)) from None
+        changes, module, compatible = [], "settings", "yes"
+        checks = lambda changes, root: domains.check_changes(facts, root)
+    elif intake.form == PROCESS_MAP:
+        try:
+            key, changes, facts, notes = process_map_changes(intake, root, data["lists"])
+        except ChangeRefused as err:   # the release's map or organization tables cannot be read
+            raise ProposeRefused(str(err)) from None
+        module, compatible = "organization", "yes"
+        checks = lambda changes, root: check_process_map(changes, facts, root)
+    elif intake.form == NEW_MODULE and new_module._one(intake.answers, "N3") == drafted.NEW_MODELLING:
+        try:
+            key, changes, facts, draft_files, draft = drafted.from_signed_form(path, intake, root,
+                                                                                signatures(cat, intake))
+        except ChangeRefused as err:
+            raise ProposeRefused(f"{path.name}: {err}") from None
+        module, compatible = "new", "yes"
+        checks = lambda changes, root: None   # from_signed_form ran the draft's checks and gates
+    elif intake.form == NEW_MODULE:
+        try:
+            key, changes, facts, notes = new_module.from_form(intake.answers, root)
+        except ChangeRefused as err:
+            raise ProposeRefused(f"{path.name}: {err}") from None
+        module, compatible = "new", "yes"
+        checked = {}
+        checks = lambda changes, root: checked.update(result=new_module.check_changes(changes, facts, root))
+    elif intake.form == ITEM:
+        key, changes = item_changes(intake, data["lists"])
+        module, checks, compatible = "new item's", reference_items.check_changes, "yes"
+    else:
+        measure, changes = changes_of(intake, data["lists"])
+        key, module, checks = measure["notation"], "kpi", kpi_tables.check_changes
+        compatible = "".join(intake.answers.get("T8", "") or "")
+    try:
+        checks(changes, root)
+    except ChangeRefused as err:
+        where = {"settings": domains.SETTINGS.as_posix(), "new": "the release"}.get(module, f"the {module} module")
+        raise ProposeRefused(f"{path.name} asks for a change {where} cannot take: {err}") from None
+    route = "major" if intake.form == NEW_MODULE else proposal.route_of(changes, compatible)
+    change = _change_id(out, root, intake.request.get("number", "").strip(), key, today, taken)
+    taken.add(change.lower())   # case does not count: on Windows and macOS TC-1 and tc-1 are one folder
+    record = {"change": change, "route": route, "new_module": intake.form == NEW_MODULE,
+              "signatures": signatures(cat, intake), **({"ai": ai} if ai else {}),
+              **({"draft": draft} if draft else {}), **({"after": list(after)} if after else {})}
+    try:
+        approval.check(record, proposal.owner_of(changes, facts))
+    except ChangeRefused as err:
+        raise ProposeRefused(f"{path.name}: the sign-off cannot become an approval record: {err}") from None
+    lines = [kgcl.write_line(c) for c in changes]
+    if intake.form == KPI:
+        text = kpi_summary(change, path.name, changes, facts, notes, lines, route, record, data["lists"])
+    elif intake.form == DOMAIN:
+        text = domain_summary(change, path.name, facts, route, record, root)
+    elif intake.form == PROCESS_MAP:
+        text = process_map_summary(change, path.name, changes, facts, notes, lines, route, record, data["lists"])
+    elif draft:
+        text = drafted_summary(change, path.name, key, draft, draft_files, lines, facts, route, record, root)
+    elif intake.form == NEW_MODULE:
+        text = new_module_summary(change, path.name, key, *checked["result"], lines, facts, route, record)
+    elif intake.form == ITEM:
+        text = item_summary(change, path.name, key, changes, lines, route, record, data["lists"])
+    else:
+        text = summary(change, path.name, measure, changes, lines, route, compatible, record, data["lists"]["processes"])
+    if ai:
+        text = _with_ai(text, ai)
+    extra = {f"{drafted.DRAFT_FOLDER}/{name}": content for name, content in draft_files.items()}
+    if after:
+        text += _after_text(after)
+    return out / change, changes, record, text, lines, facts, extra
 
 
 def _ai_record(path, intake):
