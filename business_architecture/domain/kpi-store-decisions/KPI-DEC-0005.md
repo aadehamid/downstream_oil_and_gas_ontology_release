@@ -28,9 +28,9 @@ The agent wrote this section. It is not the owner's words.
 - **The 114 property shapes.** They name no datatype and no class, so the Neo4j Ontology Graph Specification lists
   them under "left out". Covering them would mean changing the ontology-to-lpg skill.
 - **The name.** `release.json` says "KPI Store 1.1", and the guides and the runbook name the release folder
-  `kpi-store-1.1`. Step 10 of KPI-DEC-0002 adds an upgrade command, on its way into the release when the owner
-  answered. As the agent's reply in the answers file says, it is built to refuse a release older than the copy and
-  to change nothing for the same one.
+  `kpi-store-1.1`. Step 10 of KPI-DEC-0002 is to add an upgrade command, which was not in the release when the owner
+  answered. The agent's reply in the answers file says that the planned command will refuse a release older than the
+  copy and change nothing for the same one.
 
 ## Decision
 
