@@ -2017,9 +2017,9 @@ The commands start in the release folder. Keep the filled form and the proposal 
 
 ## Propose a KPI with the forms it waits on
 
-A KPI form can name a domain that is not active, or a process, a step, a business area or a role that the lists do not hold. The check then routes it to a domain activation or a process map request, and the KPI form cannot be complete on its own. You do not have to wait for those forms to be applied. Hand the signed forms to the propose command together, in one run.
+A KPI form can name a domain that is not active or not in the list (1.5), or a business area, a process or a step that the lists do not hold (1.1 to 1.3). The check then routes it to a domain activation or a process map request, and the KPI form cannot be complete on its own. A new role (6.1) or a new value stream step (6.3) still needs a specialist: the kpi module records the planning personas only, and a process map request adds no value stream step. You do not have to wait for those forms to be applied. Hand the signed forms to the propose command together, in one run.
 
-The command applies the domain activations and the process map requests first, in a temporary copy of the release, as the apply command will apply them. It then reads the KPI form against that copy. An answer of "Not in the list" takes the new entry whose name matches the name the form gives for it. It checks the KPI form there, and writes one proposal for each form. The release itself does not change. The KPI's summary names the proposals it must follow, and the command prints the order to apply them in, one run each.
+The command applies the domain activations and the process map requests first, in a temporary copy of the release, as the apply command will apply them. It then reads the KPI form against that copy. An answer of "Not in the list" takes the one new entry whose name is the name the form gives for the missing entry, in any case and without a process's number. Give the same name in both forms. It checks the KPI form there, and writes one proposal for each form. The release itself does not change. The KPI's approval record and summary name the proposals it must follow, and the command prints the order to apply them in, one run each.
 
 The commands start in the release folder. Keep the filled forms and the proposals in a folder beside the release folder, never inside it. The example uses the folder `kpi-with-forms` beside the release folder.
 
@@ -2084,7 +2084,7 @@ The commands start in the release folder. Keep the filled forms and the proposal
    wrote the proposal ../kpi-with-forms/proposals/PM-2026-002: 7 changes and 4 facts, route minor
    wrote the proposal ../kpi-with-forms/proposals/DA-2026-001: 2 facts, route minor
    wrote the proposal ../kpi-with-forms/proposals/KPI-2026-900: 14 changes and 15 facts, route minor
-   Apply them in this order, one run each, as the KPI form names what the others add:
+   Apply these in this order, one run each, as each KPI form names what the forms before it add:
      python -m kpi_store.apply ../kpi-with-forms/proposals/DA-2026-001
      python -m kpi_store.apply ../kpi-with-forms/proposals/PM-2026-002
      python -m kpi_store.apply ../kpi-with-forms/proposals/KPI-2026-900
@@ -2102,10 +2102,10 @@ The commands start in the release folder. Keep the filled forms and the proposal
    ...
      create edge measure:sample-blend-margin-per-barrel kpi:informsProcess proc:CM-1-1-8
    ...
-   Apply this proposal after DA-2026-001, PM-2026-002, each in a run of its own and in that order: the KPI form names what they add, and this proposal was checked against the release as they leave it.
+   Apply this proposal after DA-2026-001 and PM-2026-002, each in a run of its own and in that order: the KPI form names what they add, and this proposal was checked against the release as they leave it. The apply command refuses it until then.
    ```
 
-5. Apply the proposals in that order, one run each. A KPI proposal applied before the process map request is refused, and the release stays as it was: the newest core does not hold its process yet.
+5. Apply the proposals in that order, one run each. The apply command refuses the KPI proposal, and changes nothing, until the release holds the approval records of the proposals it follows.
 
    ```powershell run=kpi-with-forms
    python -m kpi_store.apply ../kpi-with-forms/proposals/DA-2026-001

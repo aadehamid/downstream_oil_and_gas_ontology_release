@@ -547,7 +547,7 @@ def test_a_process_map_request_needs_the_global_process_owner(tmp_path):
     assert proposal.owner_of([kgcl.read_line("create exact synonym 'x' for measure:unit-utilization")]) == "Data Owner"
 
 
-# ---------- a KPI form with the forms it waits on, in one propose run (issue #40) ----------
+# ---------- a KPI form with the forms it waits on, in one propose run ----------
 
 BLEND_EXAMPLE = EXAMPLES / "sample-blend-planning.process-map-request.json"
 KPI_EXAMPLE = EXAMPLES / "rm-margin-per-barrel.json"
@@ -602,11 +602,46 @@ def test_a_kpi_form_waits_on_the_domain_activation_of_its_run_and_follows_it(tmp
                                   tmp_path / "proposals", root, now=NOW, say=said.append)
     assert [f.name for f in folders] == ["DA-T1", "KPI-T1"]
     summary = (tmp_path / "proposals" / "KPI-T1" / "summary.txt").read_text(encoding="utf-8")
-    assert "Apply this proposal after DA-T1, each in a run of its own and in that order" in summary
-    order = said.index("Apply them in this order, one run each, as the KPI form names what the others add:")
+    assert "Apply this proposal after DA-T1: the KPI form names what it adds" in summary
+    assert proposal.read(folders[1]).record["after"] == ["DA-T1"]
+    order = said.index("Apply these in this order, one run each, as each KPI form names what the forms before it add:")
     assert said[order + 1:order + 3] == [f"  python -m kpi_store.apply {(tmp_path / 'proposals' / n).as_posix()}"
                                          for n in ("DA-T1", "KPI-T1")]
     assert digest(root) == before   # the release itself does not change
+    # The KPI cannot be applied before the domain activation: its domain would not be active.
+    with pytest.raises(ChangeRefused, match="the proposal KPI-T1 follows DA-T1, which this release has not applied"):
+        apply_cmd.apply([folders[1]], root, say=quiet, now=NOW)
+    assert digest(root) == before
+
+
+@needs_inactive
+@pytest.mark.parametrize("label", ["Sample Domain for the Tests", None])
+def test_a_not_in_the_list_domain_is_read_as_the_domain_its_activation_adds_or_makes_active(tmp_path, label):
+    root = release_with_reference(tmp_path)
+    name = label or TARGET["label"]   # a new domain, or one the list holds as not active
+    activation = domain_form(tmp_path, {"D1": name}, number="DA-T1")
+    kpi = waiting_kpi(tmp_path, domain="@not-in-list", detail=name.upper().replace("'", "\u2019"))
+    folders = propose_cmd.propose([kpi, activation], tmp_path / "proposals", root, now=NOW, say=quiet)
+    assert [f.name for f in folders] == ["DA-T1", "KPI-T1"]
+
+
+def test_a_kpi_form_with_another_thing_to_settle_is_refused_before_any_form_is_applied(tmp_path):
+    kpi = json.loads(waiting_kpi(tmp_path, process=TEST_PROCESS).read_text(encoding="utf-8"))
+    kpi["sign_offs"].pop("architect")
+    path = form(tmp_path, "kpi-intake", kpi["answers"], kpi["sign_offs"], "margin", "KPI-T1")
+    with pytest.raises(propose_cmd.ProposeRefused, match="margin.kpi-intake.json is not complete and signed\\. Run"):
+        propose_cmd.propose([blend_request(tmp_path), path], tmp_path / "proposals", ROOT, now=NOW, say=quiet)
+    assert not (tmp_path / "proposals").exists()
+
+
+@pytest.mark.parametrize("label,detail,same", [
+    ("CM 1.1.8 Sample Blend Planning", "sample  blend planning", True),
+    ("CM 1.1.8 Sample Blend Planning", "Blend Planning", False),
+    ("CM 1.1.8 Trader\u2019s Blend", "Trader's Blend", True),
+    ("Commercial", "commercial", True)])
+def test_a_missing_name_is_compared_in_any_case_and_without_the_process_number(label, detail, same):
+    option = {"label": label, **({"level": 3} if label.startswith("CM ") else {})}
+    assert (propose_cmd._fold(propose_cmd._plain(option)) == propose_cmd._fold(detail)) is same
 
 
 @needs_inactive
@@ -624,13 +659,30 @@ def test_a_kpi_form_names_the_process_its_process_map_request_adds(tmp_path):
     before = digest(root)
     lists = picklists.load(root / "kpi-intake")["lists"]
     held = {p["id"] for p in lists["processes"]}
-    folders = propose_cmd.propose([waiting_kpi(tmp_path, process=TEST_PROCESS.upper()), blend_request(tmp_path)],
-                                  tmp_path / "proposals", root, now=NOW, say=quiet)
-    assert [f.name for f in folders] == ["PM-T1", "KPI-T1"]
-    request, kpi = (proposal.read(f) for f in folders)
+    # With a domain activation too, when the tree has a domain that is not active: it comes first.
+    domain = [domain_form(tmp_path, number="DA-T1")] if TARGET else []
+    kpi_form = waiting_kpi(tmp_path, process=TEST_PROCESS.upper(), domain=TARGET["id"] if TARGET else None)
+    folders = propose_cmd.propose([kpi_form, blend_request(tmp_path), *domain], tmp_path / "proposals", root, now=NOW,
+                                  say=quiet)
+    first = ["DA-T1"] if TARGET else []
+    assert [f.name for f in folders] == ["PM-T1", *first, "KPI-T1"]
+    request, kpi = proposal.read(folders[0]), proposal.read(folders[-1])
+    assert kpi.record["after"] == [*first, "PM-T1"]
     [made] = [c.subject for c in request.changes if c.kind == "create node" and c.subject.startswith("proc:")]
     assert pm.PREFIXES["proc"] + made.split(":", 1)[1] not in held
     links = [c.target for c in kpi.changes if c.predicate == "kpi:informsProcess"]
     assert links[0] == made   # the name is read in any case, and the answer becomes the new process
-    assert "Apply this proposal after PM-T1" in (folders[1] / "summary.txt").read_text(encoding="utf-8")
+    assert f"Apply this proposal after {' and '.join([*first, 'PM-T1'])}" in (folders[-1] / "summary.txt").read_text(encoding="utf-8")
     assert digest(root) == before
+
+
+@pytest.mark.parametrize("after,ok", [(["DA-T1", "PM-T1"], True), ([], False), ("DA-T1", False), (["../DA-T1"], False)])
+def test_the_approval_record_names_the_proposals_it_follows_as_change_ids(after, ok):
+    record = {"change": "KPI-T1", "route": "minor", "new_module": False, "after": after,
+              "signatures": [{"role": r, "name": "A signer", "date": "2026-11-19", "words": "I approve."}
+                             for r in ("Data Owner", "Architect")]}
+    if ok:
+        assert approval.check(record)["after"] == after
+    else:
+        with pytest.raises(ChangeRefused):
+            approval.check(record)

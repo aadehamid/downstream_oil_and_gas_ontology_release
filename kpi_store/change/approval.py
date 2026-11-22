@@ -83,9 +83,15 @@ def check(record, owner="Data Owner"):
     missing = [f for f in FIELDS if f not in record]
     if missing:
         raise ChangeRefused(f"the approval record has no {', no '.join(missing)}")
-    extra = sorted(set(record) - set(FIELDS) - {"ai", "draft"})
+    extra = sorted(set(record) - set(FIELDS) - {"ai", "draft", "after"})
     if extra:
         raise ChangeRefused(f"the approval record holds fields it should not: {', '.join(extra)}")
+    if "after" in record:   # the proposals of the same propose run to apply first (kpi_store/propose.py)
+        after = record["after"]
+        if not isinstance(after, list) or not after or not all(isinstance(c, str) for c in after):
+            raise ChangeRefused("the approval record's after must be a list of change ids")
+        for change in after:
+            record_path(".", change)   # the id's form
     if "ai" in record:
         check_ai(record["ai"])
     if "draft" in record:

@@ -253,6 +253,12 @@ def plan(folders, root):
         if approval.record_path(root, p.change).exists():
             raise ChangeRefused(f"the proposal {p.change} was applied before: "
                                 f"{approval.record_path(root, p.change).relative_to(root).as_posix()} holds its approval record")
+    for p in proposals:   # a KPI proposed with the forms it waits on follows their proposals
+        missing = [c for c in p.record.get("after", []) if not approval.record_path(root, c).exists()]
+        if missing:
+            raise ChangeRefused(f"the proposal {p.change} follows {', '.join(missing)}, which this release has not "
+                                f"applied: the KPI form names what {'it adds' if len(missing) == 1 else 'they add'}. "
+                                f"Apply {', then '.join(missing)} first, each in a run of its own")
     if target == DOMAINS:
         for p in proposals:
             domains.check_changes(p.facts, root)
