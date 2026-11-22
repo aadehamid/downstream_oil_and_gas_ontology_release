@@ -93,12 +93,12 @@ label = "Production"
 [outcome.domain-activation]
 title = "Domain activation needed"
 blocks = true
-next = "Fill in the domain activation form. The KPI form can be completed after the domain is active in settings.toml."
+next = "Fill in the domain activation form. The KPI form can be completed after the domain is active in settings.toml, or proposed in one run with the signed domain activation."
 
 [outcome.process-map-request]
 title = "Process map request needed"
 blocks = true
-next = "Fill in the process map request for the Global Process Owner and the Architect. The KPI form can be completed after the Architect has added what is missing. This is not a domain activation."
+next = "Fill in the process map request for the Global Process Owner and the Architect. The KPI form can be completed after the Architect has added what is missing, or proposed in one run with the signed process map request. This is not a domain activation."
 
 [outcome.restricted-review]
 title = "Restricted: bring in Privacy, Security, Compliance and Risk"

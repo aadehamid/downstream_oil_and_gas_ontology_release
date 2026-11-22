@@ -177,6 +177,12 @@ git = true
 needs_env = ["DOC_SNIPPETS_SLOW"]
 timeout = 3600
 about = "A Git copy of its own for the update guide's new process: a process map request, the propose command and the apply command, which releases core and every module. Set DOC_SNIPPETS_SLOW=1."
+[contexts.kpi-with-forms]
+base = "release-copy"
+git = true
+needs_env = ["DOC_SNIPPETS_SLOW"]
+timeout = 3600
+about = "A Git copy of its own for the update guide's KPI with the forms it waits on: three forms in one propose run, and three applies. Set DOC_SNIPPETS_SLOW=1."
 [contexts.new-vocabulary]
 base = "release-copy"
 git = true

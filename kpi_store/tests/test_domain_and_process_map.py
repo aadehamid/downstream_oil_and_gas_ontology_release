@@ -545,3 +545,92 @@ def test_a_process_map_request_needs_the_global_process_owner(tmp_path):
     assert proposal.owner_of([kgcl.read_line(PM_LINES[0])]) == "Global Process Owner"
     assert proposal.owner_of([], [("domain:customer", "active", "true")]) == "Domain Owner"
     assert proposal.owner_of([kgcl.read_line("create exact synonym 'x' for measure:unit-utilization")]) == "Data Owner"
+
+
+# ---------- a KPI form with the forms it waits on, in one propose run (issue #40) ----------
+
+BLEND_EXAMPLE = EXAMPLES / "sample-blend-planning.process-map-request.json"
+KPI_EXAMPLE = EXAMPLES / "rm-margin-per-barrel.json"
+COMMERCIAL = "https://w3id.org/mpc/ontology/modules/core/business-domain/commercial"
+# Names of the tests' own, so the tests hold on a copy where the guide's examples were applied.
+TEST_PROCESS = "Sample Blend Planning for the Tests"
+
+
+def blend_request(folder, name=TEST_PROCESS):
+    """A process map request that adds a process under CM 1.1, made from the shipped example."""
+    answers = dict(json.loads(BLEND_EXAMPLE.read_text(encoding="utf-8"))["answers"],
+                   P1=[name], P6=[f"{name}, Business Analyst, accountable"])
+    return form(folder, "process-map-request", answers, PM_SIGNED, "blend", "PM-T1")
+
+
+def waiting_kpi(folder, process=None, domain=None, detail=None):
+    """A signed KPI form, made from the shipped example, that names a missing process in 1.2 and a domain in 1.5."""
+    data = json.loads(KPI_EXAMPLE.read_text(encoding="utf-8"))
+    answers = {k: v for k, v in data["answers"].items() if not k.startswith(("1.3", "5.1"))}
+    answers.update({"2.1": "Sample Margin for the Tests", "2.2": "A made-up margin per barrel, for the tests."})
+    if process:
+        answers.update({"1.1": COMMERCIAL, "1.2": "@not-in-list", "1.2.detail": process})
+    if domain:
+        answers["1.5"] = domain
+    if detail:
+        answers["1.5.detail"] = detail
+    return form(folder, "kpi-intake", answers, data["sign_offs"], "margin", "KPI-T1")
+
+
+def release_with_reference(tmp_path):
+    """A plain copy of the release, with the reference documents that a core release reads."""
+    root = scratch_release(tmp_path, git_copy=False)
+    shutil.copytree(ROOT / "business_architecture" / "reference", root / "business_architecture" / "reference")
+    return root
+
+
+def test_a_kpi_form_that_waits_on_a_form_the_run_lacks_is_refused_as_before(tmp_path):
+    kpi = waiting_kpi(tmp_path, process=TEST_PROCESS)
+    others = [domain_form(tmp_path, number="DA-T1")] if TARGET else []
+    with pytest.raises(propose_cmd.ProposeRefused, match="margin.kpi-intake.json is not complete and signed.*1.2 routes "
+                                                          "the request: process map request needed"):
+        propose_cmd.propose([*others, kpi], tmp_path / "proposals", ROOT, now=NOW, say=quiet)
+    assert not (tmp_path / "proposals").exists()
+
+
+@needs_inactive
+def test_a_kpi_form_waits_on_the_domain_activation_of_its_run_and_follows_it(tmp_path):
+    root = release_with_reference(tmp_path)
+    before = digest(root)
+    said = []
+    folders = propose_cmd.propose([waiting_kpi(tmp_path, domain=TARGET["id"]), domain_form(tmp_path, number="DA-T1")],
+                                  tmp_path / "proposals", root, now=NOW, say=said.append)
+    assert [f.name for f in folders] == ["DA-T1", "KPI-T1"]
+    summary = (tmp_path / "proposals" / "KPI-T1" / "summary.txt").read_text(encoding="utf-8")
+    assert "Apply this proposal after DA-T1, each in a run of its own and in that order" in summary
+    order = said.index("Apply them in this order, one run each, as the KPI form names what the others add:")
+    assert said[order + 1:order + 3] == [f"  python -m kpi_store.apply {(tmp_path / 'proposals' / n).as_posix()}"
+                                         for n in ("DA-T1", "KPI-T1")]
+    assert digest(root) == before   # the release itself does not change
+
+
+@needs_inactive
+def test_a_missing_name_that_no_form_of_the_run_adds_is_refused(tmp_path):
+    root = release_with_reference(tmp_path)
+    kpi = waiting_kpi(tmp_path, domain="@not-in-list", detail="A Domain No Form Adds")
+    with pytest.raises(propose_cmd.ProposeRefused, match="margin.kpi-intake.json is not complete and signed even after "
+                                                          "DA-T1.*1.5 routes the request: domain activation needed"):
+        propose_cmd.propose([domain_form(tmp_path, number="DA-T1"), kpi], tmp_path / "proposals", root, now=NOW, say=quiet)
+    assert not (tmp_path / "proposals").exists()
+
+
+def test_a_kpi_form_names_the_process_its_process_map_request_adds(tmp_path):
+    root = release_with_reference(tmp_path)
+    before = digest(root)
+    lists = picklists.load(root / "kpi-intake")["lists"]
+    held = {p["id"] for p in lists["processes"]}
+    folders = propose_cmd.propose([waiting_kpi(tmp_path, process=TEST_PROCESS.upper()), blend_request(tmp_path)],
+                                  tmp_path / "proposals", root, now=NOW, say=quiet)
+    assert [f.name for f in folders] == ["PM-T1", "KPI-T1"]
+    request, kpi = (proposal.read(f) for f in folders)
+    [made] = [c.subject for c in request.changes if c.kind == "create node" and c.subject.startswith("proc:")]
+    assert pm.PREFIXES["proc"] + made.split(":", 1)[1] not in held
+    links = [c.target for c in kpi.changes if c.predicate == "kpi:informsProcess"]
+    assert links[0] == made   # the name is read in any case, and the answer becomes the new process
+    assert "Apply this proposal after PM-T1" in (folders[1] / "summary.txt").read_text(encoding="utf-8")
+    assert digest(root) == before
