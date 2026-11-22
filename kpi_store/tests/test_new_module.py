@@ -542,3 +542,25 @@ def test_a_title_with_quotes_gives_builder_and_test_files_that_parse(title):
             "citation": "C."}
     for text in (mp.builder_text(spec, "NM-8"), mp.test_text(spec, [{"term_id": "a", "name": "A"}])):
         assert title in ast.get_docstring(ast.parse(text))
+
+
+@pytest.mark.parametrize("text, match", [
+    ("[]", "JSON object"), ("null", "JSON object"), ("{not json", "JSON object"),
+    ('{"separator": 1}', "not a non-empty string"), ('{"separator": ""}', "not a non-empty string"),
+    ('{"separator": false}', "not a non-empty string"), ('{"separator": ["_"]}', "not a non-empty string"),
+])
+def test_a_malformed_run_configuration_is_refused(tmp_path, text, match):
+    """Review round 1: a run configuration that is not an object, or whose separator is not a non-empty string, is
+    refused, never read as n10s's separator and never a crash."""
+    path = tmp_path / cut.ONTOLOGY / nm.RUN_CONFIG
+    path.parent.mkdir(parents=True)
+    path.write_text(text, encoding="utf-8")
+    with pytest.raises(ChangeRefused, match=match):
+        nm._separator(tmp_path)
+
+
+def test_a_run_configuration_without_a_separator_gives_n10s_s_own(tmp_path):
+    path = tmp_path / cut.ONTOLOGY / nm.RUN_CONFIG
+    path.parent.mkdir(parents=True)
+    path.write_text("{}", encoding="utf-8")
+    assert nm._separator(tmp_path) == nm.N10S_SEPARATOR

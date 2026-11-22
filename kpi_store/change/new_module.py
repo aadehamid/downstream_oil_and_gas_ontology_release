@@ -95,12 +95,20 @@ def prefix_of(key):
 
 
 def _separator(root):
-    """The separator the projection's run configuration names, as the Neo4j load reads it."""
+    """The separator the projection's run configuration names, as the Neo4j load reads it: n10s's own when it names
+    none, and a refusal when the file is not a JSON object or its separator is not a non-empty string."""
     path = Path(root) / cut.ONTOLOGY / RUN_CONFIG
     try:
-        return json.loads(path.read_text(encoding="utf-8")).get("separator") or N10S_SEPARATOR
+        config = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        raise ChangeRefused(f"{path} cannot be read: this release cannot make a new module") from None
+        config = None
+    if not isinstance(config, dict):
+        raise ChangeRefused(f"{path} cannot be read as a JSON object: this release cannot make a new module")
+    sep = config.get("separator", N10S_SEPARATOR)
+    if not isinstance(sep, str) or not sep:
+        raise ChangeRefused(f"{path} names the separator {sep!r}, which is not a non-empty string: this release "
+                            "cannot make a new module")
+    return sep
 
 
 # ---- the release's own pattern code ------------------------------------------------------------------
