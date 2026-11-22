@@ -536,7 +536,7 @@ jobs:
       # the runbook's own fallback: the first run's check reads the release as shipped, which the check jobs above
       # prove already, and each whole check took this job close to two hours on Windows (4 h 21 min for the job on
       # 2026-11-22, of a 5 h limit).
-      - name: which options the runs of this part take
+      - name: which options the runs after the first take in this part
         run: echo "RUN_OPTIONS=${{ matrix.part == 'reset' && '--skip check' || '' }}" >> "$GITHUB_ENV"
       - name: the first run, which must stop on the report with exit code 3
         run: |
