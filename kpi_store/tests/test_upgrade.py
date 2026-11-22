@@ -246,9 +246,10 @@ def test_a_first_commit_that_names_no_release_is_refused(tmp_path):
 
 def test_two_first_commits_are_refused(tmp_path):
     copy = shipped(tmp_path)
+    first = git(copy, "rev-parse", "--abbrev-ref", "HEAD")
     git(copy, "checkout", "-q", "--orphan", "other")
     commit(copy, {"kpi_store/other.py": "x = 1\n"}, "Another start")
-    git(copy, "checkout", "-q", "master" if "master" in git(copy, "branch") else "main")
+    git(copy, "checkout", "-q", first)
     git(copy, "merge", "-q", "--allow-unrelated-histories", "-m", "join", "other")
     with pytest.raises(up.UpgradeRefused, match="more than one first commit"):
         up.upgrade(copy, release(tmp_path / "new", "1.3"), say=lambda *_: None, check=PASS)
@@ -309,3 +310,164 @@ def test_this_releases_tool_list():
                  "business_architecture/ontology/kpi/measure-details.csv", "scripts/pinned-tests.txt",
                  "scripts/standalone-exceptions.txt", "business_architecture/ontology/releases/catalog.ttl"):
         assert not up.is_tool(path, patterns), path
+
+
+# ---------- the findings of the first review ----------
+
+def objects(copy):
+    return git(copy, "count-objects", "-v")
+
+
+def test_a_content_file_the_copy_made_at_a_path_the_new_release_adds_keeps_the_copys(tmp_path):
+    copy = shipped(tmp_path)
+    commit(copy, {"business_architecture/ontology/kpi/units.csv": "unit\nmine\n"})
+    new = release(tmp_path / "new", "1.3", {"business_architecture/ontology/kpi/units.csv": "unit\ntheirs\n",
+                                            "kpi_store/tool.py": "A = 2\n"})
+    plan = up.upgrade(copy, new, say=lambda *_: None, check=PASS)
+    assert read(copy, "business_architecture/ontology/kpi/units.csv") == "unit\nmine\n"
+    assert "business_architecture/ontology/kpi/units.csv" in plan.kept and plan.added == []
+
+
+def test_a_new_file_that_differs_only_in_case_is_refused(tmp_path):
+    copy = shipped(tmp_path)
+    new = release(tmp_path / "new", "1.3")
+    # Removed first: on a file system that ignores case, writing Measures.csv would only rewrite measures.csv.
+    (new / "business_architecture/ontology/kpi/measures.csv").unlink()
+    (new / "business_architecture/ontology/kpi/Measures.csv").write_text("id\nM9\n", encoding="utf-8")
+    before = state(copy)
+    with pytest.raises(up.UpgradeRefused, match="differs only in the case of its letters"):
+        up.upgrade(copy, new, say=lambda *_: None, check=PASS)
+    assert state(copy) == before
+
+
+def test_an_older_release_is_refused(tmp_path):
+    copy = shipped(tmp_path)
+    up.upgrade(copy, release(tmp_path / "v13", "1.3", {"kpi_store/tool.py": "A = 2\n"}), say=lambda *_: None, check=PASS)
+    before = state(copy)
+    with pytest.raises(up.UpgradeRefused, match="the new release is KPI Store 1.2, older than the tools of KPI Store 1.3"):
+        up.upgrade(copy, release(tmp_path / "v12", "1.2"), say=lambda *_: None, check=PASS)
+    assert state(copy) == before
+
+
+def test_versions_compare_as_numbers():
+    assert up.version("KPI Store 1.10") > up.version("KPI Store 1.9")
+
+
+def test_a_folder_that_moved_while_the_check_ran_is_refused(tmp_path):
+    copy = shipped(tmp_path)
+    move = [sys.executable, "-c", "import subprocess, sys; subprocess.run(['git', '-C', sys.argv[1], 'commit', '-q', "
+                                  "'--allow-empty', '-m', 'meanwhile'], check=True); print('all checks passed')", str(copy)]
+    with pytest.raises(up.UpgradeRefused, match="the folder changed while the check ran"):
+        up.upgrade(copy, release(tmp_path / "new", "1.3", {"kpi_store/tool.py": "A = 2\n"}), say=lambda *_: None, check=move)
+    assert git(copy, "log", "-1", "--format=%s") == "meanwhile"
+    assert git(copy, "tag") == "" and read(copy, "kpi_store/tool.py") == "A = 1\n"
+
+
+def test_a_tag_that_cannot_be_made_changes_nothing(tmp_path):
+    copy = shipped(tmp_path)
+    git(copy, "tag", "kpi-store-1.3-tools/note")
+    before = state(copy)
+    with pytest.raises(up.UpgradeRefused, match="git tag failed"):
+        up.upgrade(copy, release(tmp_path / "new", "1.3", {"kpi_store/tool.py": "A = 2\n"}), say=lambda *_: None, check=PASS)
+    assert state(copy) == before and read(copy, "kpi_store/tool.py") == "A = 1\n"
+
+
+def test_a_relative_release_folder_and_source_work_from_elsewhere(tmp_path, monkeypatch):
+    shipped(tmp_path)
+    release(tmp_path / "new", "1.3", {"kpi_store/tool.py": "A = 2\n"})
+    monkeypatch.chdir(tmp_path)
+    up.upgrade("copy", "new", say=lambda *_: None, check=PASS)
+    assert read(tmp_path / "copy", "kpi_store/tool.py") == "A = 2\n"
+
+
+def test_the_base_is_the_tag_of_the_highest_version(tmp_path):
+    copy = shipped(tmp_path)
+    first = git(copy, "rev-parse", "--abbrev-ref", "HEAD")
+    up.upgrade(copy, release(tmp_path / "v15", "1.5", {"kpi_store/tool.py": "A = 5\n"}), say=lambda *_: None, check=PASS)
+    git(copy, "checkout", "-q", "-b", "other", "HEAD~1")
+    up.upgrade(copy, release(tmp_path / "v13", "1.3", {"kpi_store/b.py": "B = 3\n"}), say=lambda *_: None, check=PASS)
+    up.upgrade(copy, release(tmp_path / "v14", "1.4", {"kpi_store/b.py": "B = 4\n"}), say=lambda *_: None, check=PASS)
+    git(copy, "checkout", "-q", first)
+    git(copy, "merge", "-q", "-m", "join", "other")
+    git(copy, "tag", "kpi-store-backup-tools")
+    plan = up.upgrade(copy, release(tmp_path / "v15b", "1.5"), plan_only=True, say=lambda *_: None, check=FAIL)
+    assert plan.base_from == "the tag kpi-store-1.5-tools"
+
+
+def test_the_plan_and_an_early_refusal_write_no_git_object(tmp_path):
+    copy = shipped(tmp_path)
+    before = objects(copy)
+    up.upgrade(copy, release(tmp_path / "new", "1.3", {"kpi_store/tool.py": "A = 2\n"}), plan_only=True,
+               say=lambda *_: None, check=FAIL)
+    assert objects(copy) == before
+
+
+def test_the_bash_of_the_local_settings_is_used(tmp_path, monkeypatch):
+    copy = shipped(tmp_path)
+    seen = {}
+    monkeypatch.setattr(up.local_settings, "load", lambda path, environ, release_root: type("S", (), {"bash": "/my/bash"})())
+    monkeypatch.setattr(up.setup_check, "find_bash", lambda setting=None: seen.setdefault("setting", setting) and None)
+    with pytest.raises(up.UpgradeRefused, match="bash was not found"):
+        up.upgrade(copy, release(tmp_path / "new", "1.3", {"kpi_store/tool.py": "A = 2\n"}), say=lambda *_: None,
+                   environ={"KPI_STORE_LOCAL": str(tmp_path / "stores.toml")})
+    assert seen["setting"] == "/my/bash"
+
+
+def test_windows_line_ends_in_the_new_release_are_refused(tmp_path):
+    copy = shipped(tmp_path)
+    new = release(tmp_path / "new", "1.3")
+    (new / "kpi_store" / "tool.py").write_bytes(b"A = 2\r\n")
+    with pytest.raises(up.UpgradeRefused, match=r"Windows line ends \(CRLF\): kpi_store/tool.py"):
+        up.upgrade(copy, new, say=lambda *_: None, check=PASS)
+
+
+@pytest.mark.parametrize("make, says", [
+    (lambda path: path.write_bytes(b"not a zip"), "cannot be read as a zip"),
+    (lambda path: zipfile.ZipFile(path, "w").close(), "holds no file"),
+    (lambda path: zipfile.ZipFile(path, "w").writestr(".", "x"), "names no file"),
+])
+def test_a_zip_that_is_not_a_release_is_refused_plainly(tmp_path, make, says):
+    copy = shipped(tmp_path)
+    archive = tmp_path / "bad.zip"
+    make(archive)
+    with pytest.raises(up.UpgradeRefused, match=says):
+        up.upgrade(copy, archive, say=lambda *_: None, check=PASS)
+
+
+def test_a_finder_zip_with_one_top_folder_works(tmp_path):
+    copy = shipped(tmp_path)
+    new = release(tmp_path / "new", "1.3", {"kpi_store/tool.py": "A = 2\n"})
+    archive = tmp_path / "finder.zip"
+    with zipfile.ZipFile(archive, "w") as z:
+        for path in sorted(new.rglob("*")):
+            if path.is_file():
+                z.write(path, "kpi-store-1.3/" + path.relative_to(new).as_posix())
+        z.writestr("__MACOSX/kpi-store-1.3/._release.json", "x")
+    up.upgrade(copy, archive, say=lambda *_: None, check=PASS)
+    assert read(copy, "kpi_store/tool.py") == "A = 2\n" and not (copy / FINDER_DIR).exists()
+
+
+FINDER_DIR = "__MACOSX"
+
+
+def test_a_conflict_names_a_file_with_a_space_whole(tmp_path):
+    copy = shipped(tmp_path)
+    commit(copy, {"kpi_store/my tool.py": "A = 'mine'\n"})
+    new = release(tmp_path / "new", "1.3", {"kpi_store/my tool.py": "A = 'theirs'\n"})
+    with pytest.raises(up.UpgradeRefused, match=r"same lines of kpi_store/my tool\.py\."):
+        up.upgrade(copy, new, say=lambda *_: None, check=PASS)
+
+
+def test_a_copy_without_an_author_is_told_how_to_set_one(tmp_path):
+    copy = shipped(tmp_path)
+    git(copy, "config", "--unset", "user.name")
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env.update(HOME=str(tmp_path), XDG_CONFIG_HOME=str(tmp_path), GIT_CONFIG_NOSYSTEM="1")
+    old = dict(os.environ)
+    os.environ.clear(); os.environ.update(env)
+    try:
+        with pytest.raises(up.UpgradeRefused) as err:
+            up.upgrade(copy, release(tmp_path / "new", "1.3"), say=lambda *_: None, check=PASS)
+    finally:
+        os.environ.clear(); os.environ.update(old)
+    assert "git config user.name" in str(err.value) and "plain folder" not in str(err.value)
