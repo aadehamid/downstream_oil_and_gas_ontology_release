@@ -287,7 +287,7 @@ git commit -m "KPI Store 1.1 as shipped"</code></pre>
 <p>You do not compare the checksums by hand. The setup check does it and fails on a file that differs.</p>
 <h3 id="install-the-python-packages">Install the Python packages<a class="hl" href="#install-the-python-packages" aria-label="Link to this section">#</a></h3>
 <ol><li>Open PowerShell.</li><li>Install the packages at the versions the release was tested with. The list is <code>PACKAGES</code> in <code>kpi_store/setup_check.py</code>, plus <code>uv</code>, which the check script uses.
-<pre><code class="lang-powershell">python -m pip install rdflib==7.6.0 pyshacl==0.40.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 openpyxl==3.1.5 uv</code></pre>
+<pre><code class="lang-powershell">python -m pip install rdflib==7.6.0 pyshacl==0.40.2 owlrl==7.6.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 openpyxl==3.1.5 uv</code></pre>
 <p>The last line starts with <code>Successfully installed</code> and names the packages.</p>
 <p>The check step of the run needs more packages for its tests, such as <code>pytest</code>. It does not install them into Python. On its first run it downloads them through <code>uv</code> from <code>pypi.org</code>, at the versions <code>scripts/check.sh</code> names, into <code>uv</code>'s cache folder in your user profile (<code>%LOCALAPPDATA%\uv\cache</code>), so the machine must reach <code>pypi.org</code> then.</p></li></ol>
 <ol start="3"><li>Check which Python the word <code>python</code> starts. Every command in this guide starts Python with <code>python</code>.
@@ -343,7 +343,7 @@ tables = ["*__ct", "attrep_*"]</code></pre>
 <ol start="2"><li>Run the setup check. It only reads. It changes nothing on your machine or on any server.
 <pre><code class="lang-powershell">python -m kpi_store.setup_check</code></pre>
 <pre><code class="lang-text">ok   python              Python &lt;version&gt;
-ok   packages            rdflib 7.6.0, pyshacl 0.40.2, pyoxigraph 0.5.13, neo4j 6.4.1, databricks-sdk 0.164.0, sqlglot 30.31.0, pyyaml 6.0.3, openpyxl 3.1.5
+ok   packages            rdflib 7.6.0, pyshacl 0.40.2, owlrl 7.6.2, pyoxigraph 0.5.13, neo4j 6.4.1, databricks-sdk 0.164.0, sqlglot 30.31.0, pyyaml 6.0.3, openpyxl 3.1.5
 ok   local-settings      &lt;your local settings file&gt;, outside the release folder
 ok   kpi-store-settings  &lt;your settings file with its schema and volume and SQL warehouse&gt;
 ok   java                Java &lt;version and where it is&gt;

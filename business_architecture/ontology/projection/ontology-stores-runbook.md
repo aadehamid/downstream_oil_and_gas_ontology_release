@@ -195,7 +195,7 @@ You do not compare the checksums by hand. The setup check does it and fails on a
 2. Install the packages at the versions the release was tested with. The list is `PACKAGES` in `kpi_store/setup_check.py`, plus `uv`, which the check script uses.
 
    ```powershell run=scratch os=windows status-only
-   python -m pip install rdflib==7.6.0 pyshacl==0.40.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 openpyxl==3.1.5 uv
+   python -m pip install rdflib==7.6.0 pyshacl==0.40.2 owlrl==7.6.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 openpyxl==3.1.5 uv
    ```
 
    The last line starts with `Successfully installed` and names the packages.
@@ -338,7 +338,7 @@ When the sign-in expires later, a run fails at its first Databricks step. Run th
 
    ```text expect
    ok   python              Python <version>
-   ok   packages            rdflib 7.6.0, pyshacl 0.40.2, pyoxigraph 0.5.13, neo4j 6.4.1, databricks-sdk 0.164.0, sqlglot 30.31.0, pyyaml 6.0.3, openpyxl 3.1.5
+   ok   packages            rdflib 7.6.0, pyshacl 0.40.2, owlrl 7.6.2, pyoxigraph 0.5.13, neo4j 6.4.1, databricks-sdk 0.164.0, sqlglot 30.31.0, pyyaml 6.0.3, openpyxl 3.1.5
    ok   local-settings      <your local settings file>, outside the release folder
    ok   kpi-store-settings  <your settings file with its schema and volume and SQL warehouse>
    ok   java                Java <version and where it is>

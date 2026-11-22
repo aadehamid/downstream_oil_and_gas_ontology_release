@@ -36,7 +36,7 @@ def test_python_older_than_3_11_fails(tmp_path):
 
 
 def test_a_missing_or_other_package_version_gets_the_exact_install_line(tmp_path):
-    assert sc.PACKAGES == {"rdflib": "7.6.0", "pyshacl": "0.40.2", "pyoxigraph": "0.5.13", "neo4j": "6.4.1",
+    assert sc.PACKAGES == {"rdflib": "7.6.0", "pyshacl": "0.40.2", "owlrl": "7.6.2", "pyoxigraph": "0.5.13", "neo4j": "6.4.1",
                            "databricks-sdk": "0.164.0", "sqlglot": "30.31.0", "pyyaml": "6.0.3", "openpyxl": "3.1.5"}
     assert sc.packages(context(tmp_path))[0] is True
     def installed(name):

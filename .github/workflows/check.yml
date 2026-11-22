@@ -292,7 +292,7 @@ jobs:
       - name: the packages, at the versions the setup check names, for the Python that the word python starts
         run: |
           python -c "import sys; print(sys.executable, sys.version)"
-          python -m pip install -q rdflib==7.6.0 pyshacl==0.40.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 openpyxl==3.1.5
+          python -m pip install -q rdflib==7.6.0 pyshacl==0.40.2 owlrl==7.6.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 openpyxl==3.1.5
       # No installer and no administrator rights, as the runbook's section "Install the programs without administrator
       # rights" does it: Java and the Databricks command line are unpacked from their zips into the local folder, and
       # the local settings name both. Then every Java that the runner image brings is taken off PATH for the rest of
