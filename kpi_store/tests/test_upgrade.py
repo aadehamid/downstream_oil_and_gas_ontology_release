@@ -434,11 +434,21 @@ def damaged(path):
     path.write_bytes(bytes(data))
 
 
+def damaged_lzma(path):
+    zip_of(path, [("kpi_store/tool.py", "A = 2\n" * 50)], compression=zipfile.ZIP_LZMA)
+    data = bytearray(path.read_bytes())
+    data[30 + len("kpi_store/tool.py") + 4] = 0xFF   # inside the LZMA properties after zipfile's 4-byte header
+    path.write_bytes(bytes(data))
+
+
 @pytest.mark.parametrize("make, says", [
     (lambda path: path.write_bytes(b"not a zip"), "cannot be read as a zip"),
     (lambda path: zip_of(path, []), "holds no file"),
     (lambda path: zip_of(path, [(".", "x")]), "names no file"),
     (damaged, r"cannot be read as a zip \(error"),
+    (lambda path: damaged_lzma(path), r"cannot be read as a zip \(LZMAError"),
+    (lambda path: zip_of(path, [("kpi_store/a.py", "x = 1\n"), ("kpi_store/A.py", "x = 2\n")]),
+     "differ only in the case of their letters: kpi_store/A.py, kpi_store/a.py"),
 ])
 def test_a_zip_that_is_not_a_release_is_refused_plainly(tmp_path, make, says):
     copy = shipped(tmp_path)
@@ -525,11 +535,38 @@ def test_the_worktree_is_gone_whatever_fails(tmp_path, monkeypatch, step):
     real = up._git
 
     def failing(root, *args, **kw):
-        done = real(root, *args, **kw)
         if " ".join(args[:2]) == step:
+            if step == "worktree add":   # Git registers the worktree, then the add fails
+                real(root, *args, **kw)
             return subprocess.CompletedProcess(args, 1, "", f"{step} failed on purpose")
-        return done
+        return real(root, *args, **kw)
     monkeypatch.setattr(up, "_git", failing)
     with pytest.raises(up.UpgradeRefused):
         up.upgrade(copy, release(tmp_path / "new", "1.3", {"kpi_store/tool.py": "A = 2\n"}), say=lambda *_: None, check=FAIL)
     assert len(git(copy, "worktree", "list").splitlines()) == 1
+
+
+def test_a_zip_in_a_folder_that_cannot_be_read_is_refused(tmp_path):
+    copy = shipped(tmp_path)
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    zip_of(locked / "release.zip", [("x", "x")])
+    locked.chmod(0)
+    try:
+        if os.access(locked, os.R_OK | os.X_OK):
+            pytest.skip("this user can read a folder with no permissions")
+        with pytest.raises(up.UpgradeRefused, match="cannot be read"):
+            up.upgrade(copy, locked / "release.zip", say=lambda *_: None, check=PASS)
+    finally:
+        locked.chmod(0o755)
+
+
+def test_an_output_error_is_not_reported_as_an_unreadable_zip(tmp_path):
+    copy = shipped(tmp_path)
+    archive = tmp_path / "release.zip"
+    zip_of(archive, [("x", "x")])
+
+    def broken(_):
+        raise BrokenPipeError
+    with pytest.raises(BrokenPipeError):
+        up.upgrade(copy, archive, say=broken, check=PASS)

@@ -51,7 +51,6 @@ import subprocess
 import sys
 import tempfile
 import zipfile
-import zlib
 from pathlib import Path, PurePosixPath
 
 from kpi_store import cut, local_settings, runner, setup_check
@@ -135,10 +134,20 @@ def _unpack(zip_path, into):
                 members.append(info)
             if not any(not m.is_dir() for m in members):
                 raise UpgradeRefused(f"{zip_path} holds no file")
+            # On Windows and macOS one entry would overwrite the other as it is unpacked, so the plan never sees both.
+            spellings = {}
+            for m in members:
+                spellings.setdefault(m.filename.rstrip("/").casefold(), []).append(m.filename)
+            twins = sorted(sorted(names) for names in spellings.values() if len(names) > 1)
+            if twins:
+                raise UpgradeRefused(f"the zip holds names that differ only in the case of their letters: "
+                                     f"{', '.join(twins[0])}, and Windows and macOS hold one file for both")
             archive.extractall(into, members)
-    # zipfile raises these for a damaged stream, a password, an unknown compression or a short file, besides its own.
-    except (zipfile.BadZipFile, zipfile.LargeZipFile, OSError, zlib.error, RuntimeError, NotImplementedError,
-            EOFError, ValueError) as err:
+    except UpgradeRefused:
+        raise
+    # Each kind of stream raises its own error for damage (zlib, bz2, lzma), and zipfile others for a password, an
+    # unknown compression or a short file: any of them means the zip cannot be read.
+    except Exception as err:
         raise UpgradeRefused(f"{zip_path} cannot be read as a zip ({type(err).__name__}: {err})") from None
     entries = list(Path(into).iterdir())
     # A zip made by hand may hold the release in one top folder; the runner's zip holds its files at the top.
@@ -379,13 +388,15 @@ def upgrade(release_root=".", source=None, plan_only=False, say=print, check=Non
     _ready(root)
     source = Path(source).expanduser().resolve()
     with tempfile.TemporaryDirectory(prefix="kpi-store-upgrade-") as tmp:
-        if source.is_file():
-            try:
-                say(f"The zip's SHA-256 is {hashlib.sha256(source.read_bytes()).hexdigest()}.")
-            except OSError as err:
-                raise UpgradeRefused(f"{source} cannot be read ({type(err).__name__})") from None
+        try:
+            is_file, is_dir = source.is_file(), source.is_dir()
+            digest = hashlib.sha256(source.read_bytes()).hexdigest() if is_file else None
+        except OSError as err:
+            raise UpgradeRefused(f"{source} cannot be read ({type(err).__name__})") from None
+        if is_file:
+            say(f"The zip's SHA-256 is {digest}.")
             new_root = _unpack(source, Path(tmp) / "new")
-        elif source.is_dir():
+        elif is_dir:
             new_root = source
         else:
             raise UpgradeRefused(f"{source} is neither a zip nor a folder")
