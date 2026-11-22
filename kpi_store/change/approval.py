@@ -12,7 +12,8 @@ What it holds, and nothing else:
      "signatures": [{"role": "Data Owner", "name": "<name>", "date": "2026-11-19", "words": "<the approval words>"},
                     ...],
      "ai": {...},                 only when the form had an AI step (check_ai says what it holds)
-     "draft": {...}}              only for a module an AI drafted (check_draft says what it holds)
+     "draft": {...},              only for a module an AI drafted (check_draft says what it holds)
+     "after": ["<change id>", ...]}   only for a KPI proposed with the forms it waits on: the proposals to apply first
 
 Who signs (Q4): the Data Owner signs a KPI definition, and the Architect signs the change. A major change or a new
 module also needs the Ontology Owner. A domain activation needs the Domain Owner in place of the Data Owner, and a
@@ -260,13 +261,15 @@ def _is_date(text):
         return False
 
 
-def write_record(release_root, change_id, route, signatures, new_module=False, owner="Data Owner", ai=None, draft=None):
+def write_record(release_root, change_id, route, signatures, new_module=False, owner="Data Owner", ai=None, draft=None,
+                 after=None):
     """Checks and writes the approval record of one change, and returns its path. Refuses an incomplete record,
-    and a record for a change that has one already. `ai` is the record of the form's AI step, when it had one, and
-    `draft` the record of a module's AI draft."""
+    and a record for a change that has one already. `ai` is the record of the form's AI step, when it had one,
+    `draft` the record of a module's AI draft, and `after` the proposals the change was applied after."""
     record = check({"change": change_id, "route": route, "new_module": new_module,
                     "signatures": list(signatures) if isinstance(signatures, tuple) else signatures,
-                    **({"ai": ai} if ai is not None else {}), **({"draft": draft} if draft is not None else {})}, owner)
+                    **({"ai": ai} if ai is not None else {}), **({"draft": draft} if draft is not None else {}),
+                    **({"after": after} if after is not None else {})}, owner)
     record["signatures"] = [{f: sig[f] for f in SIGNATURE_FIELDS} for sig in record["signatures"]]
     path = record_path(release_root, change_id)
     if path.exists():

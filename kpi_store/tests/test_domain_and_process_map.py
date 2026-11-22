@@ -609,9 +609,18 @@ def test_a_kpi_form_waits_on_the_domain_activation_of_its_run_and_follows_it(tmp
                                          for n in ("DA-T1", "KPI-T1")]
     assert digest(root) == before   # the release itself does not change
     # The KPI cannot be applied before the domain activation: its domain would not be active.
-    with pytest.raises(ChangeRefused, match="the proposal KPI-T1 follows DA-T1, which this release has not applied"):
+    with pytest.raises(ChangeRefused, match="the proposal KPI-T1 follows DA-T1, which this release has not applied: "
+                                             "the KPI form names what it adds. Apply DA-T1 first$"):
         apply_cmd.apply([folders[1]], root, say=quiet, now=NOW)
     assert digest(root) == before
+
+
+def test_apply_keeps_the_proposals_a_kpi_followed_in_its_approval_record(tmp_path):
+    record = {"change": "KPI-T1", "route": "minor", "new_module": False, "after": ["DA-T1"],
+              "signatures": [{"role": r, "name": "A signer", "date": "2026-11-19", "words": "I approve."}
+                             for r in ("Data Owner", "Architect")]}
+    path = approval.write_record(tmp_path, "KPI-T1", "minor", record["signatures"], after=["DA-T1"])
+    assert json.loads(path.read_text(encoding="utf-8"))["after"] == ["DA-T1"]
 
 
 @needs_inactive
@@ -629,10 +638,18 @@ def test_a_not_in_the_list_domain_is_read_as_the_domain_its_activation_adds_or_m
 def test_a_kpi_form_follows_only_the_proposals_that_add_what_it_names(tmp_path):
     root = release_with_reference(tmp_path)
     other = domain_form(tmp_path, {"D1": "Sample Domain for the Tests"}, name="other", number="DA-T2")
-    folders = propose_cmd.propose([domain_form(tmp_path, number="DA-T1"), other, waiting_kpi(tmp_path, domain=TARGET["id"])],
-                                  tmp_path / "proposals", root, now=NOW, say=quiet)
+    kpi = json.loads(waiting_kpi(tmp_path, domain=f' {TARGET["id"]} ').read_text(encoding="utf-8"))
+    # A free text that names the other domain's id does not make the KPI follow its activation.
+    kpi["answers"]["4.9"] = "sample-domain-for-the-tests"
+    path = form(tmp_path, "kpi-intake", kpi["answers"], kpi["sign_offs"], "margin", "KPI-T1")
+    said = []
+    folders = propose_cmd.propose([domain_form(tmp_path, number="DA-T1"), other, path], tmp_path / "proposals", root,
+                                  now=NOW, say=said.append)
     assert [f.name for f in folders] == ["DA-T1", "DA-T2", "KPI-T1"]
     assert proposal.read(folders[2]).record["after"] == ["DA-T1"]
+    order = said.index("Apply these in this order, one run each, as each KPI form names what the forms before it add:")
+    assert [line.rsplit("/", 1)[-1] for line in said[order + 1:order + 3]] == ["DA-T1", "KPI-T1"]
+    assert not said[order + 3].startswith("  python")
 
 
 def test_a_file_that_cannot_be_read_is_refused_before_a_kpi_form_that_waits(tmp_path):

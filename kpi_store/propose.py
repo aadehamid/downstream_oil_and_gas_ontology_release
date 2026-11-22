@@ -840,20 +840,22 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
             planned.append(_plan(path, intake, cat, data, root, out, today, taken))
             settling.setdefault(intake.form, []).append(planned[-1])
     waiting = [(path, intake, {SETTLED_BY[o] for o in w}) for path, intake, w in read if w]
-    first = []
+    first, followed = [], set()
     if waiting:
         # The forms the KPI forms wait on: the domain activations first, then the process map requests, each
         # applied in a run of its own.
         needed = set().union(*(w for _, _, w in waiting))
         first = [p for form in (DOMAIN, PROCESS_MAP) if form in needed for p in settling.get(form, [])]
         with tempfile.TemporaryDirectory(prefix="kpi-store-propose-") as tmp:
-            staging, added = _settle(Path(tmp), first, root, _offered(cat, data))
+            staging, added = _settle(Path(tmp), first, root)
             cat2, data2 = _pack(staging, None)   # _settle read it after the last apply
             for path, intake, needs in waiting:
                 intake = _settled_form(path, intake, cat, data, cat2, data2, staging, [p[0].name for p in first])
                 # The proposals that add an entry the form now names, in the order they are applied.
-                used = _values(intake.answers)
+                from kpi_store.intake import rules
+                used = {v for q in SETTLED_QUESTIONS for v in rules.values(intake.answers, q)}
                 after = [p[0].name for p, ids in zip(first, added) if ids & used]
+                followed.update(after)
                 planned.append(_plan(path, intake, cat2, data2, staging, out, today, taken, after))
     written = []
     for folder, changes, record, text, lines, facts, extra in planned:
@@ -864,7 +866,7 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
         say(f"wrote the proposal {folder.as_posix()}: {' and '.join(counted)}, "
             f"route {record['route']}")
     if waiting:
-        order = [p[0] for p in first] + written[-len(waiting):]
+        order = [p[0] for p in first if p[0].name in followed] + written[-len(waiting):]
         say("Apply these in this order, one run each, as each KPI form names what the forms before it add:")
         for folder in order:
             say(f"  python -m kpi_store.apply {folder.as_posix()}")
@@ -872,13 +874,17 @@ def propose(files, out=None, release_root=".", pack=None, now=None, say=print):
     return written
 
 
-def _settle(tmp, settling, root, offered):
+def _settle(tmp, settling, root):
     """A copy of the release, in `tmp`, with the domain activations and process map requests applied, each in a run of
     its own, as the apply command will apply them. Returns its folder and, for each proposal, the ids of the entries
-    the forms offer after it that they did not offer before it: `offered` is what they offered first."""
+    the copy's forms offer after it that they did not offer before it."""
     from kpi_store import apply as apply_cmd, cut
     staging, folders = tmp / "release", tmp / "proposals"
     shutil.copytree(root, staging, ignore=shutil.ignore_patterns(*cut.IGNORED))
+    try:
+        offered = _offered(*_pack(staging, None))
+    except Exception as err:
+        raise ProposeRefused(f"the KPI intake pack of the release cannot be read: {err}") from None
     added = []
     for folder, changes, record, text, lines, facts, extra in settling:
         copy = proposal.write(folders / folder.name, changes, record, text, facts, extra)
@@ -900,11 +906,6 @@ def _offered(cat, data):
     ids = {i["id"] for items in data["lists"].values() if isinstance(items, list)
            for i in items if isinstance(i, dict) and "id" in i}
     return ids | {d["id"] for d in cat.fixed_list("settings:domains") if d.get("active") is not False}
-
-
-def _values(answers):
-    """Every value an intake's answers hold."""
-    return {v for value in answers.values() for v in (value if isinstance(value, list) else [value]) if isinstance(v, str)}
 
 
 def _settled_form(path, intake, cat, data, cat2, data2, staging, after):
