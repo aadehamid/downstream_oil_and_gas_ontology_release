@@ -198,6 +198,7 @@ def test_one_apply_releases_every_changed_module_and_commits_once(tmp_path, no_g
     assert git(root, "log", "-1", "--format=%s").strip() == (
         f"Apply the new KPI NK-M1: kpi {now['kpi']}, data-product {now['data-product']}, value-stream {now['value-stream']}")
     assert set(git(root, "show", "--name-only", "--no-renames", "--format=", "HEAD").split()) == set(files)
+    assert said[-1].startswith("Run the full check before you load: ")  # the line the ontology-change skill reads
     assert said[-2] == (f"Done. kpi is now {now['kpi']}, data-product {now['data-product']} and value-stream "
                         f"{now['value-stream']} (minor), and {len(order) - 3} modules that depend on them took a new patch. "
                         f"The apply changed {len(files)} files, and Git committed them.")

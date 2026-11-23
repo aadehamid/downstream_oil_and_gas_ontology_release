@@ -294,6 +294,7 @@ def test_a_new_kpi_goes_from_the_form_to_a_committed_minor_release(tmp_path, no_
     new = f"{major}.{int(minor) + 1}.0"
     assert said[:3] == ["1 proposal to apply:", "  NK-1: minor, signed by Data Owner, Domain Owner, Architect", "    " + LINES[0]]
     assert f"    fact {','.join(FACTS[0])}" in said and f"  kpi {held['kpi']} -> {new}" in said
+    assert said[-1].startswith("Run the full check before you load: ")  # the line the ontology-change skill reads
     assert said[-2].startswith(f"Done. kpi is now {new} (minor)")
     assert _versions(root)["kpi"] == new and git(root, "status", "--porcelain") == ""
     assert git(root, "log", "-1", "--format=%s").strip() == f"Apply the new KPI NK-1: kpi {new}"
