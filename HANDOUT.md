@@ -22,7 +22,7 @@ The release's own tests check every block of commands and every block of printed
 ## The conventions
 
 - The commands run on Windows, in PowerShell, unless a step says Git Bash. On a machine set up without administrator rights, run every `git` command in Git Bash, as section 1, step 2 says.
-- Start every command in the release folder, `%USERPROFILE%\kpi-store-1.1`, unless a step says otherwise.
+- Start every command in the release folder, `%USERPROFILE%\kpi-store`, unless a step says otherwise. If you already have a release folder from KPI Store 1.1, such as `%USERPROFILE%\kpi-store-1.1`, keep it: wherever this handout writes `kpi-store`, write the name of your folder.
 - Write your own value where a command shows text in angle brackets, such as `<your workspace URL>`.
 - The commands of sections 3 to 5 and 8 show the file names of the detailed guides' made-up examples, such as `../new-kpi/sample-spread-margin.kpi-intake.json`. Write the path of your own file in their place.
 - Keep passwords, settings files and filled forms outside the release folder. The release folder is zipped and uploaded.
@@ -41,7 +41,7 @@ The release's own tests check every block of commands and every block of printed
 
    Without administrator rights, follow the runbook's "Install the programs without administrator rights" instead. Python installs without them. Git, Java and the Databricks command line are only unpacked into your local folder, and the settings file of step 7 names them for the commands. They are then not on your `PATH`, so two things change:
 
-   - Run every `git` command of this handout in Git Bash, not in PowerShell. Start Git Bash by double-clicking `git-bash.exe` in `%USERPROFILE%\kpi-store-local\PortableGit`, and go to the release folder in it with `cd "$USERPROFILE/kpi-store-1.1"`. Open the full check's Git Bash the same way.
+   - Run every `git` command of this handout in Git Bash, not in PowerShell. Start Git Bash by double-clicking `git-bash.exe` in `%USERPROFILE%\kpi-store-local\PortableGit`, and go to the release folder in it with `cd "$USERPROFILE/kpi-store"`. Open the full check's Git Bash the same way.
    - Start the Databricks sign-in of step 8 by its path, as step 8 shows.
 
    You are done when every installer has finished, or Python is installed and the three folders are unpacked. The setup check of step 9 proves each program.
@@ -50,10 +50,10 @@ The release's own tests check every block of commands and every block of printed
 
    You are done when you have read it.
 
-4. Unpack the release zip to `%USERPROFILE%\kpi-store-1.1`, as the runbook's "Unpack the release" says. Open a new PowerShell window and go to the release folder:
+4. Unpack the release zip to `%USERPROFILE%\kpi-store`, as the runbook's "Unpack the release" says. Open a new PowerShell window and go to the release folder:
 
    ```powershell excerpt=business_architecture/ontology/projection/ontology-stores-runbook.md
-   cd $HOME\kpi-store-1.1
+   cd $HOME\kpi-store
    ```
 
    Then put the folder in Git, as the runbook's "Keep the release folder in Git" says. Write your own name and address in the two `git config` lines.
@@ -509,6 +509,30 @@ Your copy is the master of the ontology. A newer release from the release's team
 6. Load the stores and check them, as section 6, "After every change", steps 2 and 3, say.
 
    You are done when the sync check reads `current` on every line.
+
+### Coming from KPI Store 1.1
+
+A release folder whose runner has cut a correction holds the tables that the correction changed. This release changes the columns of three of the tables a cut writes, `agents.csv`, `sources.csv` and `tables.csv` of `data-product/pricing`. When the correction changed one of them, the upgrade above refuses the folder and changes nothing, as it did on a rehearsal with the 1.1 zip and one correction. Replace the folder instead, and let this release's runner cut the correction again. This works whether or not the upgrade would refuse.
+
+1. Replace the release folder with this release's zip, as the runbook's "Replace the release with a newer zip" says. Keep the folder's name, such as `kpi-store-1.1`. Leave the local folder as it is.
+
+   You are done when `git log` in the new folder shows one commit, the release as unpacked.
+
+2. Run the setup check, as step 5 above says.
+
+   You are done when its last line reads `<count> of <count> checks passed`, with the same number twice.
+
+3. Load the stores as section 2, steps 2 to 4, says. The first run stops on a new report. Decide its rows again: the decisions of 1.1's report do not carry over.
+
+   You are done when the second run ends, with or without a stop at the Enterprise copy.
+
+4. If the second run stopped with a line that starts `enterprise: FAILED` and says `Run the runner again with --from enterprise --replace-enterprise`, Neo4j Enterprise holds a graph from 1.1 that differs from this one. That happens, for example, when the 1.1 folder held later corrections. Replace it as section 7, "Replace what Neo4j Enterprise holds", says, with its written authorization. If the second run's last line reads `every step passed`, Enterprise already held the same graph, and nothing needs replacing.
+
+   You are done when the run's last line reads `every step passed`, or the replace is done.
+
+5. Check the stores, as section 2, step 5, says.
+
+   You are done when every line reads `current`.
 
 ## 9. Refresh what people use
 

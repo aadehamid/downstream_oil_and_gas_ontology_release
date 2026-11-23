@@ -471,7 +471,7 @@ jobs:
       # shared-drive commands of the form's guide (on a stand-in drive S:), the Cypher of "How to undo" (on a
       # database of its own, made and dropped here), and the four commands of the cross-graph questions (on a
       # composite database over two made-up graphs, made and dropped here). The packages are those of
-      # scripts/check.sh. kpi-store-1.1 in the user folder is where the runbook unpacks the release.
+      # scripts/check.sh. kpi-store in the user folder is where the runbook unpacks the release.
       - name: document test, the blocks that need the Neo4j server or a Windows account
         if: matrix.part == 'reset'
         env:
@@ -481,7 +481,7 @@ jobs:
           DOC_SNIPPETS_SHARED_DRIVE: "1"
           PYTHONIOENCODING: utf-8
         run: |
-          mkdir -p "$USERPROFILE/kpi-store-1.1"
+          mkdir -p "$USERPROFILE/kpi-store"
           # The stand-in for the client's shared drive that the form's guide names: drive S: over a folder of this
           # runner, with the release's signed example where the guide's check command looks for it.
           mkdir -p "$RUNNER_TEMP/shared-drive/Commercial Planning/Shared/KPI-intake/2-ready-for-check"
@@ -521,14 +521,14 @@ jobs:
           # The runbook's two commands with the user folder in them, for a user name that holds a space. PowerShell lets no
           # script set its user folder variable, so another variable stands for it; the quoting and the expansion are the same.
           $folder = Join-Path $env:RUNNER_TEMP "Jo Smith"
-          New-Item -ItemType Directory -Force "$folder\kpi-store-1.1" | Out-Null
+          New-Item -ItemType Directory -Force "$folder\kpi-store" | Out-Null
           setx KPI_STORE_QUOTING_TEST "$folder\kpi-store-local\stores.toml" | Out-Null
           $saved = (Get-ItemProperty -Path HKCU:\Environment).KPI_STORE_QUOTING_TEST
           Remove-ItemProperty -Path HKCU:\Environment -Name KPI_STORE_QUOTING_TEST
           "with a space: $saved"
           if ($saved -ne "$folder\kpi-store-local\stores.toml") { exit 1 }
-          cd $folder\kpi-store-1.1
-          if ((Get-Location).Path -ne "$folder\kpi-store-1.1") { exit 1 }
+          cd $folder\kpi-store
+          if ((Get-Location).Path -ne "$folder\kpi-store") { exit 1 }
 
       # ---- both parts: the first run, the cleared report, the second run ----
       # Part run's second run gives no option, as the runbook's "The second run" does, so the runner's check step runs
