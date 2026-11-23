@@ -239,6 +239,7 @@ def test_a_new_process_goes_from_the_form_to_a_core_release_and_a_step_under_it_
     said = []
     files = apply_cmd.apply([folder], root, say=said.append, now=NOW)
     assert f"  core {held['core']} -> {new}" in said
+    assert said[-1].startswith("Run the full check before you load: ")  # the line the ontology-change skill reads
     assert said[-2].startswith(f"Done. core is now {new} and organization ")
     assert git(root, "status", "--porcelain") == ""
     assert git(root, "log", "-1", "--format=%s").strip().startswith(f"Apply the process map request PM-9: core {new}, organization ")

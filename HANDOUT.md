@@ -183,6 +183,8 @@ The forms are in the KPI intake pack: `kpi-intake/kpi-intake-form.html`, which w
 
 The steps below add a KPI, from the guide's example Sample Spread Margin, saved in a folder `new-kpi` beside the release folder. The other forms take the same four commands.
 
+A KPI form can wait on another form. When its answer names a domain that is not active or not in the list (1.5), or a business area, a process or a step that the lists do not hold (1.1 to 1.3), the check in step 1 ends "not complete" and names the domain activation or the process map request it needs. You do not have to wait for those forms to be applied. When they are signed, give all of them to step 2 in one run, then apply the proposals in the order it prints, one run each. `HOW-TO-UPDATE.md`, "Propose a KPI with the forms it waits on", has the steps. A new role (6.1) or a new value stream step (6.3) still needs a specialist.
+
 1. Check the filled form. The check changes nothing.
 
    ```powershell excerpt=HOW-TO-UPDATE.md
@@ -194,6 +196,8 @@ The steps below add a KPI, from the guide's example Sample Spread Margin, saved 
    ```text excerpt=HOW-TO-UPDATE.md
    Result: the intake is complete and signed.
    ```
+
+   For a KPI form that waits on other forms, as the paragraph above this step says, you are done when its check names only those forms as left to settle, and the check of each of those forms ends with the line above.
 
 2. Turn the form into a proposal. It changes nothing in the ontology. It writes a proposal folder in a folder `proposals` beside the form, and names it:
 
@@ -280,6 +284,8 @@ An AI can help in two ways. In both, the commands check what the AI writes, peop
 The AI is named in your local settings file, as `HOW-TO-UPDATE.md` says in "Choose the provider" for suggestions and in "Choose the two AI providers" for new modelling: usually a model served in your Databricks workspace, approved by your IT. With such a model, the command asks the model itself. The steps below show the `by-hand` provider instead, as the guide's examples do: the command writes a prompt file, you give it to an assistant such as Genie Code, and you save its answer to a file. With a served model, leave out the steps that hand over a prompt or an answer.
 
 The guide's examples name a settings file of their own with `--stores`. Your commands find your settings file through `KPI_STORE_LOCAL`, so leave out `--stores` and the file after it.
+
+An AI agent that works in the release folder, such as Claude Code or Codex, can also run the commands of sections 3 and 4 for you, as the skill in `skills/ontology-change/` tells it. It checks each form, shows you the plan and waits for your yes before it applies anything, and it explains a refusal in plain words. It runs the same commands, so they still decide.
 
 ### Suggestions for a form
 
