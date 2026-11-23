@@ -2945,9 +2945,10 @@ ALTER TABLE idp_sbx.kpi_store.epm_store_markers ALTER COLUMN marker COMMENT 'JSO
 
 ## Upgrade the tools from a newer release
 
-Your copy is the master of the ontology: every change you apply stays in it. A newer release brings new tools: the commands, the scripts, the skills and the guides. The upgrade command takes those into your copy and keeps every content file as you made it, such as the tables, the Turtle files, the packages and the records.
+Your copy is the master of the ontology: every change you apply stays in it. A newer release brings new tools: the commands, the scripts, the skills and the guides. The upgrade command takes those into your copy and keeps every content file you changed as you made it, such as the tables, the Turtle files, the packages and the records.
 
-- **Which files are tools.** The new release lists them in `kpi_store/upgrade-paths.txt`. Every other file is content. A content file that the new release changes keeps your version. A content file that is new in the new release is added.
+- **Which files are tools.** The new release lists them in `kpi_store/upgrade-paths.txt`. Every other file is content. A content file that the new release changes takes the new version when your copy left it as shipped, and keeps your version when your copy changed it (KPI-DEC-0006). A file that a line starting with `!` takes out of the list always keeps your version. A content file that is new in the new release is added.
+- **A table whose columns changed on both sides stops the upgrade.** When the new release changes the columns of a table (a `.csv` file) that your copy changed too, such as a source table that a correction changed, your change cannot be kept as it is. The upgrade stops, names the table and changes nothing. Make the change again in the new format: replace the release with the new zip, as the runbook's "Replace the release with a newer zip" says, then let the runner cut the correction again from a new report, and propose and apply a change from a form again from its form.
 - **A tool file your changes edited gets both changes.** The apply command edits some tool files, such as the tables in `business_architecture/ontology/release/build_module.py` that list the modules. Git merges the new release's changes with yours, line by line. When both changed the same lines, the upgrade stops, names the files and changes nothing.
 - **Nothing changes until the check passes.** The command merges in a temporary copy, outside your folder, and runs the full check there. Only when the merge and the check pass does your folder move to the merged commit. It then tags the commit the new tools came from, `kpi-store-<version>-tools`, and the next upgrade starts from that tag.
 
@@ -2995,7 +2996,8 @@ The upgrade needs the release folder in Git, as the runbook's "Keep the release 
      0 tool files you changed, which get both changes
      0 tool files the new release removes
      0 new files added
-     1 content files the new release changes, which keep your version: release.json
+     1 content files you left as shipped, which take the new version: release.json
+     0 content files the new release changes, which keep your version
    This was the plan only. Nothing was changed.
    ```
 

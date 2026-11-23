@@ -46,3 +46,4 @@ skills/ontology-to-lpg/templates/run-config.json :: home-path :: ~/tools/robot-1
 skills/ontology-to-lpg/templates/run-config.json :: home-path :: ~/.config/neo4j/local.env :: 1 :: the skill template's example env file, kept outside the repository
 skills/ontology-to-lpg/templates/run-config.json :: home-path :: ~/.config/neo4j/target.env :: 1 :: the skill template's example env file for the copy's target
 business_architecture/ontology/projection/skill-run/test_skill_run.py :: home-path :: ~/ :: 1 :: the test pins that the run configuration's two default paths start under the home folder, which the driver expands
+business_architecture/domain/kpi-store-decisions/answers/2026-11-23-kpi-store-1.2-changes.md :: reference-number :: #75 :: 1 :: the answers file records, word for word, the question the owner was asked, which named the issue

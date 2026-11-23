@@ -98,9 +98,8 @@ def test_an_upgrade_takes_new_tools_keeps_content_and_tags(tmp_path):
     assert read(copy, "business_architecture/ontology/kpi/units.csv") == "unit\nbbl\n"
     # A pattern with ! keeps the copy's pin list.
     assert read(copy, "scripts/pinned-tests.txt") == "test_a\n"
-    assert sorted(plan.kept) == ["business_architecture/ontology/kpi/measures.csv", "release.json",
-                                 "scripts/pinned-tests.txt"]
-    assert plan.renewed == ["business_architecture/ontology/kpi/measures.ttl"]
+    assert sorted(plan.kept) == ["business_architecture/ontology/kpi/measures.csv", "scripts/pinned-tests.txt"]
+    assert plan.renewed == ["business_architecture/ontology/kpi/measures.ttl", "release.json"]
     assert plan.updated == ["kpi_store/tool.py"]
     assert git(copy, "tag") == "kpi-store-1.3-tools"
     assert git(copy, "log", "-1", "--format=%s") == "Upgrade the tools to KPI Store 1.3"
@@ -183,7 +182,8 @@ def test_the_plan_says_what_would_change_and_changes_nothing(tmp_path):
     lines = said[0].splitlines()
     assert lines[0] == "From KPI Store 1.2 (at the first commit) to the tools of KPI Store 1.3."
     assert lines[1] == "  1 tool files that take the new version: kpi_store/tool.py"
-    assert lines[-1] == "  1 content files the new release changes, which keep your version: release.json"
+    assert lines[-2] == "  1 content files you left as shipped, which take the new version: release.json"
+    assert lines[-1] == "  0 content files the new release changes, which keep your version"
     assert said[-1] == "This was the plan only. Nothing was changed."
     assert state(copy) == before
 
@@ -394,7 +394,7 @@ def test_the_base_is_the_tag_of_the_highest_version(tmp_path):
     up.upgrade(copy, release(tmp_path / "v13", "1.3", {"kpi_store/b.py": "B = 3\n"}), say=lambda *_: None, check=PASS)
     up.upgrade(copy, release(tmp_path / "v14", "1.4", {"kpi_store/b.py": "B = 4\n"}), say=lambda *_: None, check=PASS)
     git(copy, "checkout", "-q", first)
-    git(copy, "merge", "-q", "-m", "join", "other")
+    git(copy, "merge", "-q", "-X", "ours", "-m", "join", "other")  # both branches took a release.json
     git(copy, "tag", "kpi-store-backup-tools")
     plan = up.upgrade(copy, release(tmp_path / "v15b", "1.5"), plan_only=True, say=lambda *_: None, check=FAIL)
     assert plan.base_from == "the tag kpi-store-1.5-tools"
@@ -625,11 +625,11 @@ def test_content_left_as_shipped_takes_the_new_version_and_the_copys_own_files_s
                                             "scripts/pinned-tests.txt": "test_a\ntest_b\n"})
     plan = up.upgrade(copy, new, say=lambda *_: None, check=PASS)
     assert read(copy, "business_architecture/ontology/kpi/measures.csv") == "id,source\nM1,s\n"
-    assert plan.renewed == ["business_architecture/ontology/kpi/measures.csv"]
-    # release.json and a `!` path stay the copy's, though the copy never changed them.
-    assert json.loads(read(copy, "release.json"))["release"] == "KPI Store 1.2"
+    assert plan.renewed == ["business_architecture/ontology/kpi/measures.csv", "release.json"]
+    # release.json takes the new release's name, as no command writes it; a `!` path stays the copy's.
+    assert json.loads(read(copy, "release.json"))["release"] == "KPI Store 1.3"
     assert read(copy, "scripts/pinned-tests.txt") == "test_a\n"
-    assert "release.json" in plan.kept and "scripts/pinned-tests.txt" in plan.kept
+    assert "release.json" in plan.renewed and "scripts/pinned-tests.txt" in plan.kept
 
 
 def test_a_table_both_changed_whose_columns_the_new_release_changes_is_refused_and_nothing_changes(tmp_path):
@@ -658,6 +658,6 @@ def test_the_plan_names_the_content_that_takes_the_new_version(tmp_path):
     new = release(tmp_path / "new", "1.3", {"business_architecture/ontology/kpi/measures.ttl": "# newer\n"})
     said = []
     up.upgrade(copy, new, plan_only=True, say=said.append)
-    assert any("1 content files you left as shipped, which take the new version: "
-               "business_architecture/ontology/kpi/measures.ttl" in line for line in said)
+    assert any("2 content files you left as shipped, which take the new version: "
+               "business_architecture/ontology/kpi/measures.ttl, release.json" in line for line in said)
     assert read(copy, "business_architecture/ontology/kpi/measures.ttl") == "# the measures\n"

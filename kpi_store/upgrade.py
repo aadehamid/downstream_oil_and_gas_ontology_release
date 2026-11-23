@@ -12,8 +12,8 @@ release's version).
 Which files are tools: the new release lists them in kpi_store/upgrade-paths.txt, one pattern a line. `**` matches
 any number of folders, `*` any part of one name, and a line that starts with `!` takes paths out again. Every
 other file is content. A content file the new release changes takes the new version when your copy left it as
-shipped, and keeps your version when your copy changed it; release.json and a path that a `!` line takes out always
-keep yours. A table (a .csv file) that both changed, whose header the new release changes, is refused: your change
+shipped, and keeps your version when your copy changed it; a path that a `!` line takes out always keeps yours. No command
+writes release.json, so a copy takes the new release's name with its tools. A table (a .csv file) that both changed, whose header the new release changes, is refused: your change
 has to be made again in the new format. A content file that is new in
 the new release, and that your copy does not have, is added, because a new tool may need it. A new file whose name
 differs only in the case of its letters from one your copy has is refused, because Windows and macOS hold one file
@@ -366,7 +366,7 @@ def plan(root, new_root):
             the_plan.removed.append(path)
         elif path in new and path in old and ids[path] != old[path][1]:
             as_shipped = now.get(path, (None, None))[1] == old[path][1]
-            if as_shipped and path != RELEASE_FILE and not is_own(path, patterns):
+            if as_shipped and not is_own(path, patterns):
                 the_plan.entries[path] = (old[path][0], ids[path], new[path])
                 the_plan.renewed.append(path)
                 continue
