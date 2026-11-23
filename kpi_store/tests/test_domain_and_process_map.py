@@ -264,6 +264,7 @@ def test_a_domain_activation_goes_from_the_form_to_a_committed_release_and_the_k
     said = []
     files = apply_cmd.apply([folder], root, say=said.append, now=NOW)
     assert "No module of the ontology changes: the ontology holds no list of domains." in said
+    assert said[-1].startswith("Run the full check: ") and said[-1].endswith("No store needs loading: the ontology has not changed.")  # the line the ontology-change skill reads
     assert said[-2].startswith(f"Done. The domain {TARGET['label']} is now active, and the KPI form offers it in question 1.5.")
     assert _versions(root) == held and git(root, "status", "--porcelain") == ""
     assert git(root, "log", "-1", "--format=%s").strip() == f"Apply the domain activation DA-1: {TARGET['label']} active"
@@ -487,6 +488,7 @@ def test_a_process_map_request_goes_from_the_form_to_a_committed_minor_release_o
     k = [int(n) for n in held["organization"].split(".")]
     new = f"{k[0]}.{k[1] + 1}.0"
     assert f"  organization {held['organization']} -> {new}" in said
+    assert said[-1].startswith("Run the full check before you load: ")  # the line the ontology-change skill reads
     assert said[-2].startswith(f"Done. organization is now {new} (minor)")
     assert _versions(root)["organization"] == new and git(root, "status", "--porcelain") == ""
     assert git(root, "log", "-1", "--format=%s").strip() == f"Apply the process map request PM-1: organization {new}"

@@ -54,7 +54,7 @@ Follow a guide for every run. This page gives no steps.
 | `business_architecture/business_process/` | The process authority: the downstream process map, the two value streams, the office lanes and the data-product portfolio, as JSON, with their tests. Their schemas are in `business_architecture/schema/` |
 | `business_architecture/reference/` | The evidence behind the definitions: MPC's public filings, the industry view, the APQC framework and vendor descriptions |
 | `business_architecture/domain/` | The business glossary, the data domains, the problem statement, the decision packages and this release's decision records (`kpi-store-decisions/`) |
-| `skills/` | Five agent skills: `ontology` (the method), `ontology-to-lpg` (the projection into a property graph), `rdf-store` (triple stores), `ontology-visualization` (the viewer playbook) and `clear-writing` |
+| `skills/` | Six agent skills: `ontology` (the method), `ontology-to-lpg` (the projection into a property graph), `rdf-store` (triple stores), `ontology-visualization` (the viewer playbook), `ontology-change` (a change with a form, through this release's own commands, as `HANDOUT.md` says) and `clear-writing` |
 | `viewer/` and `horoi_viewer/` | Two pages that show the ontology in a browser, offline |
 | `kpi-intake/` | The KPI intake pack: the form for one new KPI as a page and as a workbook, its guide, two filled examples, and the question catalogue the forms are built from. `kpi_store/intake/` holds its code |
 | `best-practices/` | The order of the build, read as six stages from a controlled vocabulary to a knowledge graph, with the reason for the order. Also a guide to the first stage, the controlled vocabulary, with a made-up example |

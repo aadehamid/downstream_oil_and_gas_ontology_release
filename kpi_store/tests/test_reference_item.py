@@ -270,6 +270,7 @@ def test_a_new_system_then_a_table_that_copies_it_go_from_the_form_to_two_commit
     steps = [line[4:] for line in said if line.startswith("... ")]
     assert steps.index("compare the system module before and after") < steps.index(f"set system to {new}") \
         < steps.index("run the system module's tests") < steps.index("write the release")
+    assert said[-1].startswith("Run the full check before you load: ")  # the line the ontology-change skill reads
     assert said[-2].startswith(f"Done. system is now {new} (minor), and {len(order) - 1} modules that depend on it took a new patch.")
     assert _versions(root)["system"] == new and git(root, "status", "--porcelain") == ""
     assert git(root, "log", "-1", "--format=%s").strip() == f"Apply the reference item RI-1: system {new}"
