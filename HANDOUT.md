@@ -183,6 +183,8 @@ The forms are in the KPI intake pack: `kpi-intake/kpi-intake-form.html`, which w
 
 The steps below add a KPI, from the guide's example Sample Spread Margin, saved in a folder `new-kpi` beside the release folder. The other forms take the same four commands.
 
+A KPI form can wait on another form. When its answer names a domain that is not active or not in the list (1.5), or a business area, a process or a step that the lists do not hold (1.1 to 1.3), the check in step 1 ends "not complete" and names the domain activation or the process map request it needs. You do not have to wait for those forms to be applied. When they are signed, give all of them to step 2 in one run, then apply the proposals in the order it prints, one run each. `HOW-TO-UPDATE.md`, "Propose a KPI with the forms it waits on", has the steps. A new role (6.1) or a new value stream step (6.3) still needs a specialist.
+
 1. Check the filled form. The check changes nothing.
 
    ```powershell excerpt=HOW-TO-UPDATE.md
@@ -194,6 +196,8 @@ The steps below add a KPI, from the guide's example Sample Spread Margin, saved 
    ```text excerpt=HOW-TO-UPDATE.md
    Result: the intake is complete and signed.
    ```
+
+   For a KPI form that waits on other forms, as the paragraph above this step says, you are done when its check names only those forms as left to settle, and the check of each of those forms ends with the line above.
 
 2. Turn the form into a proposal. It changes nothing in the ontology. It writes a proposal folder in a folder `proposals` beside the form, and names it:
 
