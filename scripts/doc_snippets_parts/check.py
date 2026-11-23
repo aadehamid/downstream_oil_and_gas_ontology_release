@@ -30,6 +30,11 @@ RELEASE_STRICT = ("the documents' examples describe another release than this on
                   "gives {now}. Bring the examples up to date with this release, then run: " + REFRESH)
 
 
+
+def _holds(lines, shown):
+    """True when these lines hold `shown`, in this order and next to each other."""
+    return any(lines[i:i + len(shown)] == shown for i in range(len(lines) - len(shown) + 1))
+
 @dataclass
 class Result:
     failures: list = field(default_factory=list)
@@ -256,11 +261,21 @@ class Checker:
         shown = normalise(block.body)
         if not shown:
             return self._fail(block, "the excerpt is empty")
-        if not any(real[i:i + len(shown)] == shown for i in range(len(real) - len(shown) + 1)):
+        if not _holds(real, shown) and not self._in_a_block(block.value, shown):
             best = max(real, key=lambda line: difflib.SequenceMatcher(None, line, shown[0]).ratio(), default="")
             return self._fail(block, f"the lines are not in {block.value}, in this order and next to each other",
                               f"the block starts: {shown[0]}\nthe closest line: {best}")
         return "checked", ""
+
+    def _in_a_block(self, path, shown):
+        """True when the target is a Markdown file and the lines are in one of its fenced blocks, as the block's own
+        document reads it: a block inside a list item stands indented in the file, and its body is read without the
+        fence's indent. Only a fence's indent comes off, so the lines of a code file or of prose never match out of
+        their place."""
+        if not path.endswith(".md"):
+            return False
+        found, _ = extract(path, (self.root / path).read_text(encoding="utf-8"))
+        return any(_holds(normalise(b.body), shown) for b in found)
 
     def _tag_usage(self, block, previous):
         error = self._only(block) or usage_problem(self.root, block.value, block.body)

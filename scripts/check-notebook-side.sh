@@ -17,7 +17,7 @@ while IFS= read -r var; do unset "$var"; done < <(compgen -e | grep '^GIT_' || t
 export PYTHONDONTWRITEBYTECODE=1 PYTHONIOENCODING=utf-8
 VERSION="${1:-3.10}"
 echo "--- the notebook's side on Python $VERSION"
-uv run -q --python "$VERSION" --no-project --with pytest==9.2.0 --with pytest-xdist==3.8.0 --with pyshacl==0.40.2 \
+uv run -q --python "$VERSION" --no-project --with pytest==9.2.0 --with pytest-xdist==3.8.0 --with pyshacl==0.40.2 --with owlrl==7.6.2 \
   --with databricks-sdk==0.164.0 --with pyoxigraph==0.5.13 --with rdflib==7.6.0 --with sqlglot==30.31.0 --with pyyaml==6.0.3 --with tomli==2.2.1 \
   python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcutdir "$ROOT" -n "${CHECK_WORKERS:-auto}" --maxprocesses=8 \
   kpi_store/tests/test_notebook.py \

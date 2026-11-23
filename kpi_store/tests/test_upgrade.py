@@ -308,7 +308,7 @@ def test_this_releases_tool_list():
     root = Path(__file__).resolve().parents[2]
     patterns = up.read_patterns((root / up.PATHS_FILE).read_text(encoding="utf-8"))
     for path in ("kpi_store/upgrade.py", "business_architecture/ontology/release/build_module.py",
-                 "business_architecture/ontology/projection/pipeline.py", "HOW-TO-UPDATE.md", "skills/ontology/SKILL.md",
+                 "business_architecture/ontology/projection/pipeline.py", "HOW-TO-UPDATE.md", "HANDOUT.md", "skills/ontology/SKILL.md",
                  "scripts/check.sh", "conftest.py"):
         assert up.is_tool(path, patterns), path
     for path in ("release.json", "business_architecture/ontology/kpi/measures.ttl", "kpi-intake/catalogue.toml",

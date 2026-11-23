@@ -194,9 +194,9 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
 # one table, the same one the cut's skills-tests row runs). A test command that found no test is a failure.
 # Inside uv run the program is python, never python3: the environment uv makes on Windows holds python.exe only, so
 # python3 there would be another Python, without the packages --with names.
-(cd skills/ontology/scripts && run_tests uv run -q --no-project --with rdflib==7.6.0 --with pyyaml==6.0.3 --with pyshacl==0.40.2 python -m unittest discover -q -p 'test_*.py')
+(cd skills/ontology/scripts && run_tests uv run -q --no-project --with rdflib==7.6.0 --with pyyaml==6.0.3 --with pyshacl==0.40.2 --with owlrl==7.6.2 python -m unittest discover -q -p 'test_*.py')
 (cd skills/ontology && run uv run -q --no-project --with pyyaml==6.0.3 python scripts/check_sssom.py templates/mappings.sssom.tsv)
-(cd skills/ontology-to-lpg/scripts && run_tests uv run -q --no-project --with rdflib==7.6.0 --with pyshacl==0.40.2 --with mcp-neo4j-data-modeling==0.8.2 python -m unittest -q test_projection test_engine_gate test_modeling test_explore test_run_projection test_release_record)
+(cd skills/ontology-to-lpg/scripts && run_tests uv run -q --no-project --with rdflib==7.6.0 --with pyshacl==0.40.2 --with owlrl==7.6.2 --with mcp-neo4j-data-modeling==0.8.2 python -m unittest -q test_projection test_engine_gate test_modeling test_explore test_run_projection test_release_record)
 (cd skills/rdf-store/scripts && run_tests uv run -q --no-project --with pyoxigraph==0.5.13 python -m unittest -q test_rdf_store)
 (cd skills && run_tests uv run -q --no-project --with markdown-it-py==4.3.0 python scripts/test_playbook_html.py)
 # The module map and the coverage counts run from the release folders.

@@ -771,6 +771,25 @@ def test_a_file_block_must_equal_the_file(tmp_path):
     assert outside.failures == ["guide.md:1: `../registry.toml` must be a path inside the release"]
 
 
+def test_an_excerpt_matches_a_block_that_stands_in_a_list_item(tmp_path):
+    # The runbook's block stands indented under its numbered step; its body, read without the fence's indent, is
+    # what an excerpt quotes.
+    runbook = "1. Run it.\n\n   ```text skip reason=\"illustration: a command\"\n   python -m tool --plan\n     --yes\n   ```\n\n2. Then wait.\n   Indented prose.\n"
+    files = {"runbook.md": runbook}
+    good = check(tmp_path, fence("text excerpt=runbook.md", "python -m tool --plan", "  --yes"), files=files)
+    assert good.failures == []
+    # The lines with another indent, prose that only stands indented, and a quote indented itself: none matches.
+    for lines in (("python -m tool --plan", "--yes"), ("Indented prose.",), ("    python -m tool --plan", "      --yes")):
+        result = check(tmp_path, fence("text excerpt=runbook.md", *lines), files=files)
+        assert "the lines are not in runbook.md" in result.failures[0], lines
+
+
+def test_an_excerpt_of_a_code_file_keeps_its_place(tmp_path):
+    files = {"code.py": "def one():\n    return 1\n"}
+    result = check(tmp_path, fence("python excerpt=code.py", "return 1"), files=files)
+    assert "the lines are not in code.py" in result.failures[0]
+
+
 def test_an_excerpt_block_must_be_lines_of_the_file_next_to_each_other(tmp_path):
     files = {"code.py": "def one():\n    return 1\n\n\ndef two():\n    return 2\n"}
     assert check(tmp_path, fence("python excerpt=code.py", "def two():", "    return 2"), files=files).failures == []

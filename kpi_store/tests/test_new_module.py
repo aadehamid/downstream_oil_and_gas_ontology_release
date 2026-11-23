@@ -303,7 +303,9 @@ def test_apply_writes_registers_and_releases_the_module(tmp_path, no_global_git,
     said = []
     files = apply_cmd.apply([folder], root, say=said.append, now=NOW)
     assert said[-2].startswith(f"Done. {key} 1.0.0 is a new module (major).")
-    assert git(root, "log", "-1", "--format=%s").strip() == f"Apply the new module NM-2026-009: {key} 1.0.0"
+    change = folder.name   # NM-2026-009, or NM-2026-009-2 in a copy that holds that number already
+    assert change == "NM-2026-009" or (change.startswith("NM-2026-009-") and change[12:].isdigit()), change
+    assert git(root, "log", "-1", "--format=%s").strip() == f"Apply the new module {change}: {key} 1.0.0"
     assert git(root, "status", "--porcelain") == ""
     ont = root / cut.ONTOLOGY
     package = Graph().parse(ont / "releases" / key / "1.0.0" / f"{key}.ttl")
@@ -311,8 +313,8 @@ def test_apply_writes_registers_and_releases_the_module(tmp_path, no_global_git,
     assert len(package) > len(Graph().parse(ont / key / output))   # the header of the package is added
     manifest = json.loads((ont / "releases" / key / "1.0.0" / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["approved_by"]["who"] == "The Ontology Owner"
-    assert manifest["approved_by"]["recorded_in"] == "approvals/NM-2026-009.json"
-    assert approval.read_record(ont / "approvals" / "NM-2026-009.json")["new_module"] is True
+    assert manifest["approved_by"]["recorded_in"] == f"approvals/{change}.json"
+    assert approval.read_record(ont / "approvals" / f"{change}.json")["new_module"] is True
     for place in ("scripts/check.sh", f"{cut.ONTOLOGY.as_posix()}/projection/pipeline.py",
                   f"{cut.ONTOLOGY.as_posix()}/MODULES.md", f"{cut.ONTOLOGY.as_posix()}/competency-questions.md"):
         assert place in files and key in (root / place).read_text(encoding="utf-8")

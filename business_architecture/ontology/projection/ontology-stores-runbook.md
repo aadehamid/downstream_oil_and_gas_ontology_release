@@ -112,7 +112,7 @@ bash = "PortableGit/bin/bash.exe"
 
 Each line is already in the example file with an empty value. A path without a drive starts at the folder of `stores.toml`, which is the local folder. The `java` line serves Fuseki, ROBOT and the setup check. The `bash` line serves the check script, which the runner starts. The `cli` line serves the setup check and the runner.
 
-The sign-in command of "Sign in to Databricks" is then not on `PATH`. Start it with its path, `$HOME\kpi-store-local\databricks-cli\databricks.exe`, in place of the word `databricks`.
+The sign-in command of "Sign in to Databricks" is then not on `PATH`. Start it with its path and PowerShell's call operator, `& "$HOME\kpi-store-local\databricks-cli\databricks.exe"`, in place of the word `databricks`. Git is not on `PATH` either: run the guide's `git` commands in Git Bash, which you start by double-clicking `git-bash.exe` in `%USERPROFILE%\kpi-store-local\PortableGit`. It opens in that folder, so first go to the release folder with `cd "$USERPROFILE/kpi-store-1.1"`.
 
 The Windows test job runs this guide's chain this way. Its Java and its Databricks command line come from these two zips and are named in the settings. No other Java is on its `PATH`, and its folders lie in a temporary folder. It uses the Git for Windows that its machine already has, so the portable edition and the Python installer are not proven there.
 
@@ -195,7 +195,7 @@ You do not compare the checksums by hand. The setup check does it and fails on a
 2. Install the packages at the versions the release was tested with. The list is `PACKAGES` in `kpi_store/setup_check.py`, plus `uv`, which the check script uses.
 
    ```powershell run=scratch os=windows status-only
-   python -m pip install rdflib==7.6.0 pyshacl==0.40.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 openpyxl==3.1.5 uv
+   python -m pip install rdflib==7.6.0 pyshacl==0.40.2 owlrl==7.6.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 openpyxl==3.1.5 uv
    ```
 
    The last line starts with `Successfully installed` and names the packages.
@@ -338,7 +338,7 @@ When the sign-in expires later, a run fails at its first Databricks step. Run th
 
    ```text expect
    ok   python              Python <version>
-   ok   packages            rdflib 7.6.0, pyshacl 0.40.2, pyoxigraph 0.5.13, neo4j 6.4.1, databricks-sdk 0.164.0, sqlglot 30.31.0, pyyaml 6.0.3, openpyxl 3.1.5
+   ok   packages            rdflib 7.6.0, pyshacl 0.40.2, owlrl 7.6.2, pyoxigraph 0.5.13, neo4j 6.4.1, databricks-sdk 0.164.0, sqlglot 30.31.0, pyyaml 6.0.3, openpyxl 3.1.5
    ok   local-settings      <your local settings file>, outside the release folder
    ok   kpi-store-settings  <your settings file with its schema and volume and SQL warehouse>
    ok   java                Java <version and where it is>

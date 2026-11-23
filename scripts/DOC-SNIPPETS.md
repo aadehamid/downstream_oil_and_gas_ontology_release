@@ -294,6 +294,13 @@ When a block shows the content of a file of the release, name the file. The path
 folder. `file=` is for the whole file and `excerpt=` for some lines of it. The block fails when the file changes
 and the document does not.
 
+An excerpt of a Markdown file may also quote the lines of one of its blocks as that block's document reads them. A
+block inside a list item stands indented in its file, and the check reads its body without the fence's indent, so
+a guide can quote a command of another guide's numbered step as it reads there. Only a fence's indent comes off:
+the lines of a code file, and prose that only stands indented, match where they stand. A block that quotes a
+command which another document runs and checks is how one document shows that command without running it a second
+time.
+
 ````markdown nested
 ```csv file=skills/ontology/templates/regression-expected.csv
 question,status,queries,waits_for
@@ -636,6 +643,7 @@ prints those four cells for every skipped block. Write the last two cells yourse
 | `business_architecture/ontology/build/r1/r1-consumer-inventory-checklist.md` | R1 Hierarchy-Consumer Inventory — Team Checklist | `Downstream Operations > Commercial & Marketing > Planning &` | `illustration` | Nothing. The block holds two texts to search for in tools outside this release. | The team that owns each tool, by hand. |
 | `business_architecture/ontology/build/r1/r1-consumer-inventory-checklist.md` | G. Attestation | `Asset class: _______________ Owner: _______________ Date: __` | `illustration` | Nothing. It is a form. | A person fills it in by hand. |
 | `business_architecture/ontology/projection/ontology-stores-runbook.md` | Sign in to Databricks | `databricks auth login --host <your workspace URL> --profile` | `needs-browser-sign-in` | The command cannot end without a person in a browser, so nothing runs it. Three things are tested in its place. The Windows test job runs `databricks auth login --help` with the same program and fails when `--host` or `--profile` is not among its options. The setup check's `databricks-auth` line passes only for a profile that is signed in, and the document test runs that check with the rehearsal workspace's profile. The Windows test job has no browser, so it signs in with a token from a secret. | A person, in a browser. |
+| `HANDOUT.md` | 1. Set up the machine, once | `& "$HOME\kpi-store-local\databricks-cli\databricks.exe" auth` | `needs-browser-sign-in` | It is the runbook's sign-in with the path of the unpacked command line, which the runbook's row above stands for. The Windows test job runs the command line from that unpacked folder, named in the settings. | A person, in a browser. |
 | `business_architecture/reference/internal/crack-spread-kpi-definition.md` | 3.2 Core formulas | `3-2-1 Ex-RVO, $/bbl` | `illustration` | It is the client's formula, quoted as text. `scripts/test_doc_snippets.py` reads it from the document and works it out (`test_the_formulas_quoted_as_text_in_the_crack_spread_definition_hold`). | Nobody runs it. The test works it out. |
 | `business_architecture/reference/internal/crack-spread-kpi-definition.md` | 3.2 Core formulas | `3-2-1 Inc-RVO, $/bbl` | `illustration` | It is the client's formula, quoted as text. `scripts/test_doc_snippets.py` reads it from the document and works it out (`test_the_formulas_quoted_as_text_in_the_crack_spread_definition_hold`). | Nobody runs it. The test works it out. |
 | `business_architecture/reference/internal/crack-spread-kpi-definition.md` | 4.4 MPC-weighted 3-2-1 | `Before 5 May 2024: (USGC × 0.40) + (Chicago × 0.40) + (LA ×` | `illustration` | It is the client's formula, quoted as text. `scripts/test_doc_snippets.py` reads it from the document and works it out (`test_the_formulas_quoted_as_text_in_the_crack_spread_definition_hold`). | Nobody runs it. The test works it out. |
