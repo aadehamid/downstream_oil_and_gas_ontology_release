@@ -8,6 +8,22 @@ The release's own tests check every block of commands and every block of printed
 
 **Warning: a replace or a reset deletes data in the stores.** Get written authorization for the exact environment first, stop every other writer, and make sure the data can be loaded again.
 
+## Start here
+
+Find your case in the table below, then follow what its row names line by line, from its first step to its last. Take the first row that fits. Two things on your machine tell you which row is yours:
+
+- the settings file `kpi_store.toml` in the folder `%USERPROFILE%\kpi-store-local`. It is there when a KPI Store release was set up on this machine;
+- the line `"release"` in `release.json`, at the top of the release folder you already have.
+
+| Your case | How you know it | Follow |
+|---|---|---|
+| No KPI Store release was set up on this machine | There is no `%USERPROFILE%\kpi-store-local\kpi_store.toml` | Section 1, then section 2. If an older release folder is there, rename it first, for example to `kpi-store-old`. |
+| A KPI Store 1.1 release was set up on this machine | `kpi_store.toml` is there, and `release.json` reads `"release": "KPI Store 1.1"` | Section 8, "Coming from KPI Store 1.1". It covers a 1.1 folder whether or not the 1.1 runner loaded the stores. |
+| A KPI Store 1.2 release was set up, and you received a newer zip | `release.json` reads `"release": "KPI Store 1.2"` or a later release | Section 8, steps 1 to 6. |
+| This release is set up and loaded, and you want to change the ontology | The sync check of section 2, step 5, reads `current` on every line | The section for your change, from 3 to 5, then section 6, "After every change", and section 9. |
+
+You are done when you know which row is yours. If none fits, or two seem to fit, ask the release's team before you run anything.
+
 ## What is inside the release
 
 | Part | What it is | Do you open it? |
@@ -512,7 +528,7 @@ Your copy is the master of the ontology. A newer release from the release's team
 
 ### Coming from KPI Store 1.1
 
-This part is for a 1.1 release folder whose only changes are the runner's cuts. A cut changes the tables of `data-product/pricing`, and this release adds a column to two of them, `agents.csv` and `tables.csv`. When a correction changed one of them, the upgrade above refuses the folder and changes nothing, as it did on a rehearsal with the 1.1 zip and one correction. Replace the folder instead, and let this release's runner cut the correction again.
+This part is for a KPI Store 1.1 release folder set up on this machine, whose only changes are the runner's cuts: one that the 1.1 runner loaded the stores from, or one it never ran in. A cut changes the tables of `data-product/pricing`, and this release adds a column to two of them, `agents.csv` and `tables.csv`. When a correction changed one of them, the upgrade above refuses the folder and changes nothing, as it did on a rehearsal with the 1.1 zip and one correction. Replace the folder instead, and let this release's runner cut the correction again.
 
 If you also changed the 1.1 folder by hand, the replace leaves those changes in the old folder only. List them before step 1, in the 1.1 folder: `git log` shows the committed ones, and `git status` the ones not committed. A folder not kept in Git has no such list: compare it with the 1.1 zip. Make each change again in the new folder with this release's forms, as sections 3 to 5 say, before step 3.
 

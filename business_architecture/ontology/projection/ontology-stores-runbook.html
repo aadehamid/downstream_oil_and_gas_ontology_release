@@ -218,7 +218,7 @@ figure.pic figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
       </details>
     </nav>
     <article>
-<p>This guide takes you from the release zip to three loaded and checked stores: Databricks, Jena Fuseki on your Windows machine, and Neo4j Enterprise. Follow it from top to bottom, one step at a time. Every command in it is run by the document test, except the ones the section "What ran where" lists.</p>
+<p>This guide takes you from the release zip to three loaded and checked stores: Databricks, Jena Fuseki on your Windows machine, and Neo4j Enterprise. Follow it from top to bottom, one step at a time. If a KPI Store release was set up on this machine before, start at the handout's "Start here" instead (<code>HANDOUT.md</code> in the release's top folder): it says which part of this guide applies. Every command in it is run by the document test, except the ones the section "What ran where" lists.</p>
 <p>One command does the work: <code>python -m kpi_store.runner</code>. You run it three times. The first run compares the ontology with the sandbox and stops on a report. You clear the report. The second run cuts a correction version and loads every store. The third run proves that nothing is left to change.</p>
 <p>For every later change, use <code>HOW-TO-UPDATE.md</code> in the release's top folder.</p>
 <h2 id="before-you-start">Before you start<a class="hl" href="#before-you-start" aria-label="Link to this section">#</a></h2>

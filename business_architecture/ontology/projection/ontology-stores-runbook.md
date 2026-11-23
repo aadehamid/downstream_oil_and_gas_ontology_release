@@ -1,6 +1,6 @@
 # KPI Store runbook: the first run on the client sandbox
 
-This guide takes you from the release zip to three loaded and checked stores: Databricks, Jena Fuseki on your Windows machine, and Neo4j Enterprise. Follow it from top to bottom, one step at a time. Every command in it is run by the document test, except the ones the section "What ran where" lists.
+This guide takes you from the release zip to three loaded and checked stores: Databricks, Jena Fuseki on your Windows machine, and Neo4j Enterprise. Follow it from top to bottom, one step at a time. If a KPI Store release was set up on this machine before, start at the handout's "Start here" instead (`HANDOUT.md` in the release's top folder): it says which part of this guide applies. Every command in it is run by the document test, except the ones the section "What ran where" lists.
 
 One command does the work: `python -m kpi_store.runner`. You run it three times. The first run compares the ontology with the sandbox and stops on a report. You clear the report. The second run cuts a correction version and loads every store. The third run proves that nothing is left to change.
 
