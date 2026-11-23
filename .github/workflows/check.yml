@@ -5,7 +5,7 @@
 #   symbolic link can be made, and no py launcher is on PATH. It gets no secret.
 # sign-in: says whether this run has the three secrets of the rehearsal Databricks workspace.
 # stores: the whole chain of the stores runbook on Windows, as a person runs it, against servers the job starts on the
-#   runner and against the rehearsal Databricks workspace. It has two parts, which run side by side.
+#   runner and against the rehearsal Databricks workspace. It has three parts, which run side by side.
 #
 # Who can start a run that gets the three Databricks secrets: a pull request from a branch of this repository, and a
 # manual run. Both need the right to write to this repository, and a person with that right could also change this
@@ -217,6 +217,10 @@ jobs:
   #          chain with --skip check, which the runbook gives for a machine where the check step cannot run, and on the
   #          loaded stores: the reset with the typed word, a sync check that must read unmarked, the load again,
   #          --replace-enterprise on a copy made incomplete, the sync check, and the reset with --yes.
+  #   from11 the move from 1.1 (KPI-DEC-0006, item 4): 1.1 as shipped, in a folder of its own, loads the stores with
+  #          its own code and runbook; then this release runs in its place, with the same local folder and settings
+  #          and --skip check. Its second run must stop at the Enterprise copy, which 1.1 filled, and the replace of
+  #          the handout's section 7 must then load it.
   # What this job does not run is in scripts/DOC-SNIPPETS.md, "Blocks the test does not run".
   stores:
     needs: sign-in
@@ -549,7 +553,7 @@ jobs:
           cd $folder\kpi-store-1.1
           if ((Get-Location).Path -ne "$folder\kpi-store-1.1") { exit 1 }
 
-      # ---- both parts: the first run, the cleared report, the second run ----
+      # ---- every part: the first run, the cleared report, the second run ----
       # Part run's second run gives no option, as the runbook's "The second run" does, so the runner's check step runs
       # the whole check on the copy the cut corrected. Its first run, and both runs of part reset, add --skip check,
       # the runbook's own fallback: the first run's check reads the release as shipped, which the check jobs above
@@ -594,7 +598,7 @@ jobs:
           python -m kpi_store.sync_check
       # ---- every part: the first run, the cleared report, the second run, of this release ----
       - name: which options the runs after the first take in this part
-        run: echo "RUN_OPTIONS=${{ matrix.part == 'run' && '' || '--skip check' }}" >> "$GITHUB_ENV"
+        run: echo "RUN_OPTIONS=${{ matrix.part != 'run' && '--skip check' || '' }}" >> "$GITHUB_ENV"
       - name: the first run, which must stop on the report with exit code 3
         run: |
           code=0
@@ -625,7 +629,16 @@ jobs:
         run: |
           git config user.name "KPI Store test job"
           git config user.email "test-job@example.invalid"
-          printf 'Change_Value_Amount\nyes\n' | python -m kpi_store.runner $RUN_OPTIONS | tee "$LOCAL/second-run.log"
+          code=0
+          printf 'Change_Value_Amount\nyes\n' | python -m kpi_store.runner $RUN_OPTIONS | tee "$LOCAL/second-run.log" || code=$?
+          echo "exit code $code"
+          if [ "${{ matrix.part }}" = from11 ]; then
+            # 1.1 filled Enterprise, so the copy refuses to replace what it holds without --replace-enterprise.
+            [ "$code" -eq 1 ]
+            grep -q "^enterprise: FAILED.*--replace" "$LOCAL/second-run.log"
+            exit 0
+          fi
+          [ "$code" -eq 0 ]
           grep -q "^enterprise: copied" "$LOCAL/second-run.log"
           if [ -z "$RUN_OPTIONS" ]; then
             grep -q "^check: all checks passed" "$LOCAL/second-run.log"
@@ -633,6 +646,12 @@ jobs:
           else
             tail -n 1 "$LOCAL/second-run.log" | grep -q "^the steps that ran passed; left out: check "
           fi
+      - name: the replace of what Enterprise holds, as the handout's section 7 has it (part from11)
+        if: matrix.part == 'from11'
+        run: |
+          python -m kpi_store.runner --from enterprise --replace-enterprise | tee "$LOCAL/replace.log"
+          grep -q "^enterprise: copied" "$LOCAL/replace.log"
+          [ "$(tail -n 1 "$LOCAL/replace.log" | tr -d '\r')" = "every step passed" ]
       - name: sync check, which must read current on every line
         run: python -m kpi_store.sync_check
 
@@ -709,7 +728,7 @@ jobs:
           grep -q -- "--profile " "$LOCAL/auth-login-help.txt" || { echo "databricks auth login has no --profile option"; exit 1; }
           echo "databricks auth login knows --host and --profile"
 
-      # ---- both parts: leave nothing behind ----
+      # ---- every part: leave nothing behind ----
       # Drops exactly the two schemas this part named and made, and deletes its one workspace folder. CASCADE is right
       # here: both schemas are this run's own. Then the sign-in file goes.
       - name: remove this part's two schemas and its folder from the rehearsal workspace
