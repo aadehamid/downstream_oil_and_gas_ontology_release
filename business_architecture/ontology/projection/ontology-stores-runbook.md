@@ -645,8 +645,9 @@ Each line names a store, then its status, then the reason.
 | `empty` | The store holds nothing. Fuseki reads `empty` when its data folder was deleted. | Run the runner again. |
 | `unreachable` | The store did not answer, or a setting is missing. The reason says which. | Start the store, or correct the setting. |
 | `not checked` | No technical graph file was fetched yet. | Run `python -m kpi_store.runner --from notebook`. |
+| `left out` | The sync check was told with `--no-tech-graph` to leave the technical graph out. | Nothing. |
 
-The command ends with exit code 0 only when every line reads `current`.
+The command ends with exit code 0 only when every line reads `current` or `left out`.
 
 ## Run it again: nothing changes
 
