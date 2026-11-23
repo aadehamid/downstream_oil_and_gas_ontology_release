@@ -221,7 +221,7 @@ jobs:
   #          its own code and runbook; then this release runs in its place, with the same local folder and settings
   #          and --skip check, with the same decisions. Each store must then read current, Enterprise included: the
   #          same decisions on the same ontology build the graph 1.1 loaded, so the copy has nothing to replace.
-  #   from11r the same move, with one decision changed: this release leaves the second-source row undecided, which 1.1
+  #   from11r the same move, with one decision changed: this release leaves one column-case row undecided, which 1.1
   #          accepted, so it builds a graph that differs from the one 1.1 copied to Enterprise. The second run must
   #          stop at Enterprise and change nothing there; the runner with --from enterprise --replace-enterprise must
   #          then replace 1.1's nodes, and each store must read current. This is the handout's "Coming from KPI
@@ -627,9 +627,10 @@ jobs:
           assert not problems and len(found) == 1, "the runbook must hold one Python block that clears the report"
           exec(compile(found[0].body, doc, "exec"))
           PY
-      # Part from11r changes one decision of the cleared report: the second-source row, which 1.1 accepted, is left
-      # without a decision. A second-source row never blocks the load, so the cut goes on with the other rows.
-      - name: leave the second-source row undecided (part from11r)
+      # Part from11r changes one decision of the cleared report: the first column-case row, which 1.1 accepted, is left
+      # without a decision. A column-case row never blocks the load, so the cut goes on with the other rows. The
+      # rehearsal workspace has no Genie space, so its report holds no second-source row to change instead.
+      - name: leave one column-case row undecided (part from11r)
         if: matrix.part == 'from11r'
         run: |
           python - <<'PY'
@@ -643,8 +644,9 @@ jobs:
           path = run_folder / "pending" / "discovery-report.to-clear.csv"
           with path.open(encoding="utf-8-sig", newline="") as f:
               rows = list(csv.DictReader(f))
-          changed = [row for row in rows if row["kind"] == "second-source" and row["decided_by"]]
-          assert changed, "the cleared report must hold a decided second-source row"
+          decided = [row for row in rows if row["kind"] == "column-case" and row["decided_by"]]
+          assert decided, "the cleared report must hold a decided column-case row"
+          changed = decided[:1]
           for row in changed:
               row["decision"], row["decided_by"] = "", ""
           with path.open("w", encoding="utf-8", newline="") as f:
