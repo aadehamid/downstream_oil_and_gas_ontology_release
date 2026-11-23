@@ -514,7 +514,7 @@ Your copy is the master of the ontology. A newer release from the release's team
 
 This part is for a 1.1 release folder whose only changes are the runner's cuts. A cut changes the tables of `data-product/pricing`, and this release adds a column to two of them, `agents.csv` and `tables.csv`. When a correction changed one of them, the upgrade above refuses the folder and changes nothing, as it did on a rehearsal with the 1.1 zip and one correction. Replace the folder instead, and let this release's runner cut the correction again.
 
-If you also changed the 1.1 folder by hand, the replace leaves those changes in the old folder only. `git log` in the old folder lists them. Make each one again in the new folder with this release's forms, as sections 3 to 5 say, before step 3.
+If you also changed the 1.1 folder by hand, the replace leaves those changes in the old folder only. List them before step 1, in the 1.1 folder: `git log` shows the committed ones, and `git status` the ones not committed. A folder not kept in Git has no such list: compare it with the 1.1 zip. Make each change again in the new folder with this release's forms, as sections 3 to 5 say, before step 3.
 
 1. Replace the release folder with this release's zip, as the runbook's "Replace the release with a newer zip" says. Keep the folder's name, such as `kpi-store-1.1`. Leave the local folder as it is.
 
