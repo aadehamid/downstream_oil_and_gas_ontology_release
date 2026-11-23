@@ -219,8 +219,9 @@ jobs:
   #          --replace-enterprise on a copy made incomplete, the sync check, and the reset with --yes.
   #   from11 the move from 1.1 (KPI-DEC-0006, item 4): 1.1 as shipped, in a folder of its own, loads the stores with
   #          its own code and runbook; then this release runs in its place, with the same local folder and settings
-  #          and --skip check. Its second run must stop at the Enterprise copy, which 1.1 filled, and the replace of
-  #          the handout's section 7 must then load it.
+  #          and --skip check, with the same decisions. Each store must then read current, Enterprise included: the
+  #          same decisions on the same ontology build the graph 1.1 loaded, so the copy has nothing to replace. A
+  #          graph that differs from what Enterprise holds is refused and then replaced in part reset.
   # What this job does not run is in scripts/DOC-SNIPPETS.md, "Blocks the test does not run".
   stores:
     needs: sign-in
@@ -632,27 +633,19 @@ jobs:
           code=0
           printf 'Change_Value_Amount\nyes\n' | python -m kpi_store.runner $RUN_OPTIONS | tee "$LOCAL/second-run.log" || code=$?
           echo "exit code $code"
-          if [ "${{ matrix.part }}" = from11 ]; then
-            # 1.1 filled Enterprise, so the copy refuses to replace what it holds without --replace-enterprise.
-            [ "$code" -eq 1 ]
-            grep -q "^enterprise: FAILED.*--replace" "$LOCAL/second-run.log"
-            exit 0
-          fi
           [ "$code" -eq 0 ]
-          grep -q "^enterprise: copied" "$LOCAL/second-run.log"
+          if [ "${{ matrix.part }}" = from11 ]; then
+            # 1.1 loaded the graph these same decisions build, so the copy finds Enterprise current.
+            grep -q "^enterprise: current" "$LOCAL/second-run.log"
+          else
+            grep -q "^enterprise: copied" "$LOCAL/second-run.log"
+          fi
           if [ -z "$RUN_OPTIONS" ]; then
             grep -q "^check: all checks passed" "$LOCAL/second-run.log"
             [ "$(tail -n 1 "$LOCAL/second-run.log" | tr -d '\r')" = "every step passed" ]
           else
             tail -n 1 "$LOCAL/second-run.log" | grep -q "^the steps that ran passed; left out: check "
           fi
-      - name: the replace of what Enterprise holds, as the handout's section 7 has it (part from11)
-        if: matrix.part == 'from11'
-        run: |
-          python -m kpi_store.runner --from enterprise --replace-enterprise | tee "$LOCAL/replace.log"
-          grep -q "^enterprise: copied" "$LOCAL/replace.log"
-          # A run that starts at a step never says every step passed: it names the steps it left out.
-          [ "$(tail -n 1 "$LOCAL/replace.log" | tr -d '\r')" = "the steps that ran passed; left out: cut, check, zip, volume, upload, notebook, report, fuseki, neo4j (not run, so not checked)" ]
       - name: sync check, which must read current on every line
         run: python -m kpi_store.sync_check
 
