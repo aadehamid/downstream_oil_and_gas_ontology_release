@@ -337,7 +337,7 @@ Run the full check before you load: bash scripts/check.sh (on Windows, in Git Ba
 <p>You are done when you have done what the line says.</p></li></ol>
 <ol start="2"><li>Run again from the step that failed, such as <code>fuseki</code>:
 <pre><code class="lang-powershell">python -m kpi_store.runner --from fuseki</code></pre>
-<p>You are done when the run's last line reads <code>every step passed</code>.</p></li></ol>
+<p>You are done when the run's last line starts <code>the steps that ran passed</code>. A run that starts at a step names the steps it left out, so it never says <code>every step passed</code>.</p></li></ol>
 <ol start="3"><li>If the step <code>check</code> fails because of the machine, such as a file that another program holds open, and not because of the release, report it, and leave the step out of the run:
 <pre><code class="lang-powershell">python -m kpi_store.runner --skip check</code></pre>
 <p>You are done when the last line names the step that was left out. A run with a step left out never says <code>every step passed</code>.</p></li></ol>
@@ -346,7 +346,7 @@ Run the full check before you load: bash scripts/check.sh (on Windows, in Git Ba
 <h3 id="replace-what-neo4j-enterprise-holds">Replace what Neo4j Enterprise holds<a class="hl" href="#replace-what-neo4j-enterprise-holds" aria-label="Link to this section">#</a></h3>
 <ol><li>Replace it, when the runbook's "Replace what Enterprise holds: one case" applies. The command loads Enterprise again and runs the sync check.
 <pre><code class="lang-powershell">python -m kpi_store.runner --from enterprise --replace-enterprise</code></pre>
-<p>You are done when the run's last line reads <code>every step passed</code>, and its sync check reads <code>current</code> for <code>enterprise</code>.</p></li></ol>
+<p>You are done when the run's last line starts <code>the steps that ran passed</code>, and its sync check reads <code>current</code> for <code>enterprise</code>.</p></li></ol>
 <h3 id="empty-every-store-and-load-it-again">Empty every store and load it again<a class="hl" href="#empty-every-store-and-load-it-again" aria-label="Link to this section">#</a></h3>
 <ol><li>See what the reset would delete. It deletes nothing.
 <pre><code class="lang-powershell">python -m kpi_store.runner --reset --dry-run</code></pre>
