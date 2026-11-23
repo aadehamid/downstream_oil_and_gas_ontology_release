@@ -29,7 +29,7 @@ The agent wrote this section. It is not the owner's words.
 ## Decision
 
 1. The handout's only home is the release. No copy goes to the training folder.
-2. A skill, `ontology-change`, drives a change from a filled form through the release's own commands. Its master is
+2. An agent skill drives a change from a filled form through the release's own commands. Its master is
    in the owner's skills repository, and the release ships a copy of its files, unchanged.
 3. Before the night run closes, the 1.2 zip gets a dry run: built, unpacked into an empty folder, checked, and run.
 4. a. The handout tells a 1.1 user how to move to 1.2: rename the old folder, unpack 1.2 under the same name, and run

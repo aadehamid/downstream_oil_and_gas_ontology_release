@@ -1,6 +1,7 @@
 # The tool files of this release, which python -m kpi_store.upgrade takes into a copy from this release.
 # One pattern a line: ** matches any number of folders, * any part of one name, and ! takes paths out again.
-# The last pattern that matches a path decides. Every path no pattern includes is content, which stays the copy's own.
+# The last pattern that matches a path decides. Every path no pattern includes is content: the copy keeps its own
+# version of a content file it changed, and takes the new version of one it left as shipped (KPI-DEC-0006).
 
 # The commands, the scripts, the skills and the CI.
 kpi_store/**

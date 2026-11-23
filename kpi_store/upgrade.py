@@ -1,4 +1,4 @@
-"""The upgrade command: brings the tools of a newer release into your copy, and keeps your ontology as it is.
+"""The upgrade command: brings the tools of a newer release into your copy, and keeps every change you made.
 
     python -m kpi_store.upgrade --from kpi-store-1.3.zip --plan    # say what would change, and change nothing
     python -m kpi_store.upgrade --from kpi-store-1.3.zip           # upgrade the tools of this release folder
@@ -387,8 +387,8 @@ def plan(root, new_root):
 
 
 def _vendor(root, the_plan):
-    """Stores the files and commits, on top of the base, the new release's tool files and new files, through a
-    temporary index. The commit is on no branch, and the folder's own index and files are not touched."""
+    """Stores the files and commits, on top of the base, the new release's tool files, its new files and the content
+    files the copy left as shipped, through a temporary index. The commit is on no branch, and the folder's own index and files are not touched."""
     files = [(p, e) for p, e in the_plan.entries.items() if e is not None]
     written = _blobs(root, [str(e[2].resolve()) for _, e in files], write=True)
     if written != [e[1] for _, e in files]:
@@ -400,7 +400,7 @@ def _vendor(root, the_plan):
         _out(root, "update-index", "-z", "--index-info", stdin="".join(line + "\0" for line in lines), env=env)
         tree = _out(root, "write-tree", env=env).strip()
     return _out(root, "commit-tree", tree, "-p", the_plan.base, "-m", f"The tools of {the_plan.release}",
-                "-m", "Made by python -m kpi_store.upgrade: the new release's tool files and new files on top of the "
+                "-m", "Made by python -m kpi_store.upgrade: the new release's tool files, new files and the content files this copy left as shipped, on top of the "
                       "tools this copy had. The merge commit after it brings them into the copy.").strip()
 
 
@@ -518,7 +518,7 @@ def _move(root, merged, commit, tag, the_plan):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m kpi_store.upgrade",
-                                 description="Bring the tools of a newer release into this copy, and keep its content.")
+                                 description="Bring the tools of a newer release into this copy, and keep every change it made.")
     ap.add_argument("--from", dest="source", required=True, help="the new release: its zip, or the unpacked folder")
     ap.add_argument("--release", default=".", help="your release folder (default: this folder)")
     ap.add_argument("--plan", action="store_true", help="say what would change, and change nothing")
