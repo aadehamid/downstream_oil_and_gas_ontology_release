@@ -220,8 +220,12 @@ jobs:
   #   from11 the move from 1.1 (KPI-DEC-0006, item 4): 1.1 as shipped, in a folder of its own, loads the stores with
   #          its own code and runbook; then this release runs in its place, with the same local folder and settings
   #          and --skip check, with the same decisions. Each store must then read current, Enterprise included: the
-  #          same decisions on the same ontology build the graph 1.1 loaded, so the copy has nothing to replace. A
-  #          graph that differs from what Enterprise holds is refused and then replaced in part reset.
+  #          same decisions on the same ontology build the graph 1.1 loaded, so the copy has nothing to replace.
+  #   from11r the same move, with one decision changed: this release leaves the second-source row undecided, which 1.1
+  #          accepted, so it builds a graph that differs from the one 1.1 copied to Enterprise. The second run must
+  #          stop at Enterprise and change nothing there; the runner with --from enterprise --replace-enterprise must
+  #          then replace 1.1's nodes, and each store must read current. This is the handout's "Coming from KPI
+  #          Store 1.1", step 4. Part reset replaces a copy of this release's own graph made incomplete.
   # What this job does not run is in scripts/DOC-SNIPPETS.md, "Blocks the test does not run".
   stores:
     needs: sign-in
@@ -229,7 +233,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        part: [run, reset, from11]
+        part: [run, reset, from11, from11r]
     runs-on: windows-2025
     timeout-minutes: 300
     defaults:
@@ -277,7 +281,7 @@ jobs:
       # records: 1.1 as shipped, from the kpi-store/1.1 branch, loads the stores first from a folder of its own; then
       # the checkout runs in its place, with the same local folder and settings.
       - name: the 1.1 release as shipped, in a folder of its own (part from11)
-        if: matrix.part == 'from11'
+        if: startsWith(matrix.part, 'from11')
         run: |
           git fetch -q --depth=1 origin kpi-store/1.1
           old="$(cygpath -m "$RUNNER_TEMP")/kpi-store-1.1-old"
@@ -371,7 +375,7 @@ jobs:
           (Path.home() / ".databrickscfg").write_text(f"[DEFAULT]\nhost = {env['HOST']}\ntoken = {env['TOKEN']}\n",
                                                       encoding="utf-8", newline="\n")
           # The environment's settings: the example file, with the rehearsal catalogs and this run's two schemas.
-          # Part from11 makes them from 1.1's example file, as the team's own settings were made.
+          # Parts from11 and from11r make them from 1.1's example file, as the team's own settings were made.
           text = Path(env.get("OLD") or ".", "kpi_store/kpi_store.example.toml").read_text(encoding="utf-8")
           for line, new in (
                   ('write_catalog = "idp_sbx"', f'write_catalog = "{env["CI_CATALOG"]}"'),
@@ -562,7 +566,7 @@ jobs:
       # 2026-11-22, of a 5 h limit).
       # ---- part from11: 1.1 loads the stores first, with its own code and its own runbook ----
       - name: 1.1, the first run, which must stop on the report with exit code 3 (part from11)
-        if: matrix.part == 'from11'
+        if: startsWith(matrix.part, 'from11')
         run: |
           cd "$OLD"
           code=0
@@ -571,7 +575,7 @@ jobs:
           [ "$code" -eq 3 ]
           grep -q "^report: STOPPED" "$LOCAL/first-run-1.1.log"
       - name: 1.1, clear the report, with 1.1's runbook block (part from11)
-        if: matrix.part == 'from11'
+        if: startsWith(matrix.part, 'from11')
         run: |
           cd "$OLD"
           python - <<'PY'
@@ -586,14 +590,14 @@ jobs:
           exec(compile(found[0].body, doc, "exec"))
           PY
       - name: 1.1, the second run, which cuts the correction and loads every store (part from11)
-        if: matrix.part == 'from11'
+        if: startsWith(matrix.part, 'from11')
         run: |
           cd "$OLD"
           printf 'Change_Value_Amount\nyes\n' | python -m kpi_store.runner --skip check | tee "$LOCAL/second-run-1.1.log"
           grep -q "^enterprise: copied" "$LOCAL/second-run-1.1.log"
           git --no-pager tag --list | grep -q correction
       - name: 1.1, sync check, which must read current on every line (part from11)
-        if: matrix.part == 'from11'
+        if: startsWith(matrix.part, 'from11')
         run: |
           cd "$OLD"
           python -m kpi_store.sync_check
@@ -623,6 +627,32 @@ jobs:
           assert not problems and len(found) == 1, "the runbook must hold one Python block that clears the report"
           exec(compile(found[0].body, doc, "exec"))
           PY
+      # Part from11r changes one decision of the cleared report: the second-source row, which 1.1 accepted, is left
+      # without a decision. A second-source row never blocks the load, so the cut goes on with the other rows.
+      - name: leave the second-source row undecided (part from11r)
+        if: matrix.part == 'from11r'
+        run: |
+          python - <<'PY'
+          import csv, os, tomllib
+          from pathlib import Path
+          settings = Path(os.environ["KPI_STORE_LOCAL"])
+          with settings.open("rb") as f:
+              run_folder = Path(tomllib.load(f)["release"]["run_folder"])
+          if not run_folder.is_absolute():
+              run_folder = settings.parent / run_folder
+          path = run_folder / "pending" / "discovery-report.to-clear.csv"
+          with path.open(encoding="utf-8-sig", newline="") as f:
+              rows = list(csv.DictReader(f))
+          changed = [row for row in rows if row["kind"] == "second-source" and row["decided_by"]]
+          assert changed, "the cleared report must hold a decided second-source row"
+          for row in changed:
+              row["decision"], row["decided_by"] = "", ""
+          with path.open("w", encoding="utf-8", newline="") as f:
+              writer = csv.DictWriter(f, fieldnames=list(rows[0]), lineterminator="\n")
+              writer.writeheader()
+              writer.writerows(rows)
+          print("undecided:", ", ".join(row["id"] for row in changed))
+          PY
       # The cut asks two things. The answers come through standard input, as a person types them. The checkout is a
       # Git copy, where the cut commits and tags what it wrote, so Git gets an author first, in this checkout only.
       # The runner has none, and the cut refuses without one, with the two commands a person then runs.
@@ -633,6 +663,12 @@ jobs:
           code=0
           printf 'Change_Value_Amount\nyes\n' | python -m kpi_store.runner $RUN_OPTIONS | tee "$LOCAL/second-run.log" || code=$?
           echo "exit code $code"
+          if [ "${{ matrix.part }}" = from11r ]; then
+            # Enterprise holds 1.1's graph, which differs from this one: the copy stops and changes nothing.
+            [ "$code" -ne 0 ]
+            grep -q "^enterprise: FAILED.*Run the runner again with --from enterprise --replace-enterprise" "$LOCAL/second-run.log"
+            exit 0
+          fi
           [ "$code" -eq 0 ]
           if [ "${{ matrix.part }}" = from11 ]; then
             # 1.1 loaded the graph these same decisions build, so the copy finds Enterprise current.
@@ -647,6 +683,18 @@ jobs:
             tail -n 1 "$LOCAL/second-run.log" | grep -q "^the steps that ran passed; left out: check "
           fi
       - name: sync check, which must read current on every line
+        if: matrix.part != 'from11r'
+        run: python -m kpi_store.sync_check
+
+      # ---- part from11r: the replace of 1.1's nodes in Enterprise ----
+      - name: the enterprise step again, with the replace allowed (part from11r)
+        if: matrix.part == 'from11r'
+        run: |
+          python -m kpi_store.runner --from enterprise --replace-enterprise | tee "$LOCAL/replaced.log"
+          grep -q "^enterprise: copied" "$LOCAL/replaced.log"
+          grep -q "^sync: all [0-9]* lines read current" "$LOCAL/replaced.log"
+      - name: sync check after the replace, which must read current on every line (part from11r)
+        if: matrix.part == 'from11r'
         run: python -m kpi_store.sync_check
 
       # ---- part reset: the reset, the load again, the replace ----
