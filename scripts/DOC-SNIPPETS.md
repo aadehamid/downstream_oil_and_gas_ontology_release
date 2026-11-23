@@ -357,7 +357,7 @@ bracket that is never closed. It does not find clauses in the wrong order or a m
 ````markdown nested
 ```toml parse
 [release]
-zip = "kpi-store-1.1.zip"
+zip = "kpi-store-1.2.zip"
 sha256 = "<64 hex>"
 ```
 

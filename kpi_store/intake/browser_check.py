@@ -117,7 +117,7 @@ def choose(page, question, value):
 def load(s):
     page = s.open()
     same(page.locator("h1").inner_text(), "KPI intake form", "the page's heading")
-    holds(page.locator("#release-line").text_content(), "KPI Store 1.1, catalogue 1.2", "the release line")
+    holds(page.locator("#release-line").text_content(), "KPI Store 1.2, catalogue 1.2", "the release line")
     same(page.locator("#tabs [role=tab]").all_inner_texts(),
          ["KPI intake", "Domain activation", "Process map request", "Term change", "Reference item", "The roles", "What we will ask you"], "the tabs")
     same(page.locator("[data-section]").count(), 7, "sections of the KPI form")

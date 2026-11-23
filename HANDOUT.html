@@ -204,7 +204,7 @@ figure.pic figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
 git config user.name "KPI Store operator"
 git config user.email "kpi-store-operator@example.invalid"
 git add -A
-git commit -m "KPI Store 1.1 as shipped"</code></pre>
+git commit -m "KPI Store 1.2 as shipped"</code></pre>
 <p>You are done when the commit is made. The upgrade of section 8 starts from this commit.</p></li></ol>
 <ol start="5"><li>Make the local folder and fetch the three files that the runbook's "Make the local folder and fetch three files" names. Then install the Python packages at the versions the release was tested with:
 <pre><code class="lang-powershell">python -m pip install rdflib==7.6.0 pyshacl==0.40.2 owlrl==7.6.2 pyoxigraph==0.5.13 neo4j==6.4.1 databricks-sdk==0.164.0 sqlglot==30.31.0 pyyaml==6.0.3 openpyxl==3.1.5 uv</code></pre>
@@ -384,7 +384,7 @@ nothing to commit, working tree clean</code></pre>
 <h3 id="coming-from-kpi-store-1-1">Coming from KPI Store 1.1<a class="hl" href="#coming-from-kpi-store-1-1" aria-label="Link to this section">#</a></h3>
 <p>This part is for a 1.1 release folder whose only changes are the runner's cuts. A cut changes the tables of <code>data-product/pricing</code>, and this release adds a column to two of them, <code>agents.csv</code> and <code>tables.csv</code>. When a correction changed one of them, the upgrade above refuses the folder and changes nothing, as it did on a rehearsal with the 1.1 zip and one correction. Replace the folder instead, and let this release's runner cut the correction again.</p>
 <p>If you also changed the 1.1 folder by hand, the replace leaves those changes in the old folder only. List them before step 1, in the 1.1 folder: <code>git log</code> shows the committed ones, and <code>git status</code> the ones not committed. A folder not kept in Git has no such list: compare it with the 1.1 zip. Make each change again in the new folder with this release's forms, as sections 3 to 5 say, before step 3.</p>
-<ol><li>Replace the release folder with this release's zip, as the runbook's "Replace the release with a newer zip" says. Keep the folder's name, such as <code>kpi-store-1.1</code>. Leave the local folder as it is.
+<ol><li>Replace the release folder with this release's zip, as the runbook's "Replace the release with a newer zip" says. Keep the folder's name, such as <code>kpi-store-1.1</code>. Leave the local folder as it is. Its settings file may still name the zip <code>kpi-store-1.1.zip</code>: the runner builds this release's zip under that name, so you can keep it.
 <p>You are done when <code>git log</code> in the new folder shows one commit, the release as unpacked.</p></li></ol>
 <ol start="2"><li>Run the setup check, as step 5 above says.
 <p>You are done when its last line reads <code>&lt;count&gt; of &lt;count&gt; checks passed</code>, with the same number twice.</p></li></ol>

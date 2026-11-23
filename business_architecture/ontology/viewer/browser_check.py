@@ -8,7 +8,7 @@ Chrome or Microsoft Edge. It downloads no browser. `--shots <folder>` also write
 For viewer/index.html and for horoi_viewer/index.html it proves, each from a fresh load of the file:
 
   1 load          the page opens from file:// with no console error and no network request
-  2 release       the release name shown is KPI Store 1.1
+  2 release       the release name shown is KPI Store 1.2
   3 modules       the module list holds the 13 modules at their versions
   4 search        search finds tg:replaces and the crude prices measure, and opens each term's page
   5 term page     the term's page shows its label, its definition and its relationships
@@ -47,7 +47,7 @@ from urllib.parse import quote
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[3]
-RELEASE = "KPI Store 1.1"
+RELEASE = "KPI Store 1.2"
 # The newest version of each module under business_architecture/ontology/releases/.
 MODULES = {
     "core": "2.4.0",

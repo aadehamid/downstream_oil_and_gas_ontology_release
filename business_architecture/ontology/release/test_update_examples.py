@@ -3,7 +3,7 @@
 The lists of files below are written by hand. HOW-TO-UPDATE.md follows each example to its end, the full check,
 in the document test's slow context.
 
-Each example changes the exact text of KPI Store 1.1 as shipped, so its tests need the module it changes at the
+Each example changes the exact text of KPI Store 1.2 as shipped, so its tests need the module it changes at the
 version of that release (BASELINE). On a tree where that module has another version, the example's tests are
 skipped, and the skip names both versions. That is right after a release of the module, and after the example was
 followed. test_each_example_fits_this_release_or_its_module_has_moved_on says when a skip or a pass would hide a
@@ -45,7 +45,7 @@ ADDED = {
     "domain-list": [f"{ONT}/kpi/data-domains.csv", f"{ONT}/kpi/build_data_domains.py", f"{ONT}/kpi/test_data_domains.py",
                     f"{ONT}/regression/queries/q58-data-domains.rq"],
 }
-# The module each example changes, at the version KPI Store 1.1 shipped. Written by hand.
+# The module each example changes, at the version KPI Store 1.2 shipped. Written by hand.
 BASELINE = {"deprecate-role": ("organization", "2.2.0"), "system-kind": ("system", "1.5.0"), "move-entry": ("data-product", "1.2.0"),
             "raci": ("organization", "2.2.0"), "domain-list": ("kpi", "1.3.0")}
 
@@ -60,7 +60,7 @@ def moved_on(name, held):
     """Why an example's tests do not apply to a tree, or "" when they do. `held` gives each module's version."""
     module, shipped = BASELINE[name]
     return "" if held[module] == shipped else (f"this tree holds {module} {held[module]}, and the example {name} changes "
-                                                f"{module} {shipped}, the version of KPI Store 1.1 as shipped")
+                                                f"{module} {shipped}, the version of KPI Store 1.2 as shipped")
 
 
 HELD = {module: next_version.current_version(module) for module, _ in BASELINE.values()}
@@ -116,7 +116,7 @@ class Rules(unittest.TestCase):
         after = dict(shipped, organization="3.0.0")
         self.assertEqual(sorted(name for name in BASELINE if moved_on(name, after)), ["deprecate-role", "raci"])
         self.assertEqual(moved_on("raci", after), "this tree holds organization 3.0.0, and the example raci changes organization "
-                                                  "2.2.0, the version of KPI Store 1.1 as shipped")
+                                                  "2.2.0, the version of KPI Store 1.2 as shipped")
         self.assertEqual(moved_on("system-kind", after), "")
 
     def test_each_example_fits_this_release_or_its_module_has_moved_on(self):
@@ -175,7 +175,7 @@ class Example:
                 with open(os.path.join(tmp, first), "w", encoding="utf-8", newline="") as f:
                     f.write("this file has moved on\n")
                 before = files(tmp)
-                with self.assertRaisesRegex(ue.Refused, "does not hold the text this example changes.*KPI Store 1.1 as shipped.*Nothing was changed"):
+                with self.assertRaisesRegex(ue.Refused, "does not hold the text this example changes.*KPI Store 1.2 as shipped.*Nothing was changed"):
                     ue.apply(self.name, root=tmp, date="2026-11-12", write=write, say=lambda line: None)
                 self.assertEqual(files(tmp), before)
 
@@ -315,7 +315,7 @@ class Refusals(unittest.TestCase):
                     ue.apply("deprecate-role", root=tmp, date="2026-11-12", write=write, say=lambda line: None)
                 self.assertTrue(str(refused.exception).startswith(
                     f"{ONT}/organization/test_roles.py does not hold the text this example changes, or holds it more than once. "
-                    "The example is made for KPI Store 1.1 as shipped, and this file has changed since. Nothing was changed."))
+                    "The example is made for KPI Store 1.2 as shipped, and this file has changed since. Nothing was changed."))
                 self.assertEqual(files(tmp), before)
 
     def test_the_line_for_the_cut_tests_is_written_once(self):

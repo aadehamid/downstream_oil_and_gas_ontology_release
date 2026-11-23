@@ -24,7 +24,7 @@ sys.path.insert(0, str(HERE.parent / "release"))
 from newest import version_key  # the one version order, which reads a correction version
 
 ONTOLOGY = Path("business_architecture/ontology")
-RELEASE = "KPI Store 1.1"
+RELEASE = "KPI Store 1.2"
 LABELS = (SKOS.prefLabel, RDFS.label, DCTERMS.title)
 PARENTS = (RDFS.subClassOf, RDFS.subPropertyOf, SKOS.broader)
 SUPPORTING_KINDS = ("Anonymous node", "Evidence", "Metadata", "Constraint")

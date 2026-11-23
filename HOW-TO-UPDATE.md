@@ -140,7 +140,7 @@ The runner calls the cut tool for you. To see what a cut does, run the tool on t
    ```
 
    ```text expect
-   Discovery run 20261111T120000Z-0a1b2c3d of KPI Store 1.1: 28 rows.
+   Discovery run 20261111T120000Z-0a1b2c3d of KPI Store 1.2: 28 rows.
    The cut applies (4):
      R001 column-case: column assessment_amount of idp_sbx.gold_commercial_core.mips_mpr_executive_summary_fact becomes Assessment_Amount (case only)
    ...
@@ -1169,7 +1169,7 @@ The next five sections each end with a worked example on made-up data. One helpe
 
 **Run an example in a copy of the release, never in the folder you load the stores from.** Use a fresh copy for each example, because two examples may change the same module.
 
-The examples are made for KPI Store 1.1 as shipped. The helper looks for the exact text it changes. In a release that has moved on, a file may no longer hold that text. The helper then stops with a line that starts `refused:`, names the file and changes nothing, with `--plan` and with `--write`. It also refuses a copy that holds the example already, and a file or a folder that is a link, a hard link included. It does not lock the copy, so let no other program change the copy while the helper runs. The steps above each example still hold for a release that has moved on. Only the example's own figures and versions are those of the release as shipped. No example is your organisation's answer. Your business says which role replaces a role, what kind a system is, what class a catalog entry has, who is responsible for a process and what the domains are.
+The examples are made for KPI Store 1.2 as shipped. The helper looks for the exact text it changes. In a release that has moved on, a file may no longer hold that text. The helper then stops with a line that starts `refused:`, names the file and changes nothing, with `--plan` and with `--write`. It also refuses a copy that holds the example already, and a file or a folder that is a link, a hard link included. It does not lock the copy, so let no other program change the copy while the helper runs. The steps above each example still hold for a release that has moved on. Only the example's own figures and versions are those of the release as shipped. No example is your organisation's answer. Your business says which role replaces a role, what kind a system is, what class a catalog entry has, who is responsible for a process and what the domains are.
 
 Five things hold in all five sections.
 
@@ -2167,7 +2167,7 @@ The new settings file has this shape. The names in angle brackets are yours to f
 
 ```toml parse
 [release]
-zip = "kpi-store-1.1.zip"
+zip = "kpi-store-1.2.zip"
 sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
 
 [databricks]
@@ -3032,9 +3032,9 @@ The upgrade needs the release folder in Git, as the runbook's "Keep the release 
 
 ## The optional check against this release
 
-`scripts/check-pinned.sh` asks a different question from `scripts/check.sh`: does your copy still equal KPI Store 1.1 as shipped? Its tests pin versions, counts, approvals and the figures in the guide. They pass on the release as shipped. After your first change some of them fail. That means only that your copy has moved on. Ignore them from then on, or edit `scripts/pinned-tests.txt` when you want your own pins.
+`scripts/check-pinned.sh` asks a different question from `scripts/check.sh`: does your copy still equal KPI Store 1.2 as shipped? Its tests pin versions, counts, approvals and the figures in the guide. They pass on the release as shipped. After your first change some of them fail. That means only that your copy has moved on. Ignore them from then on, or edit `scripts/pinned-tests.txt` when you want your own pins.
 
-The documents that state figures or versions describe KPI Store 1.1 as shipped. They do not update themselves. Update the ones your readers use.
+The documents that state figures or versions describe KPI Store 1.2 as shipped. They do not update themselves. Update the ones your readers use.
 
 ## The namespace
 

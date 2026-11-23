@@ -193,9 +193,9 @@ def test_local_package_changes_are_refused_and_a_tree_without_git_is_not_checked
 def test_the_page_names_this_release(tmp_path):
     package(tmp_path)
     data = viewer.build_data(tmp_path)
-    assert data["release"] == "KPI Store 1.1"
+    assert data["release"] == "KPI Store 1.2"
     assert "sourceCommit" not in data
-    assert viewer.build(tmp_path, tmp_path / "index.html", require_clean=False)["release"] == "KPI Store 1.1"
+    assert viewer.build(tmp_path, tmp_path / "index.html", require_clean=False)["release"] == "KPI Store 1.2"
 
 
 def assert_roundtrip(root, data=None):
@@ -280,11 +280,11 @@ def test_the_committed_page_equals_a_fresh_build():
 
 
 def test_the_committed_page_holds_this_tree_and_names_no_outside_commit():
-    # Written by hand from the release folders: technical-graph is at 1.1.0 and the page names KPI Store 1.1.
+    # Written by hand from the release folders: technical-graph is at 1.1.0 and the page names KPI Store 1.2.
     text = PAGE.read_text(encoding="utf-8")
     payload = text.split('<script id="ontology-data" type="application/json">')[1].split("</script>")[0]
     data = json.loads(payload)
-    assert data["release"] == "KPI Store 1.1"
+    assert data["release"] == "KPI Store 1.2"
     assert "sourceCommit" not in data
     assert "business_architecture/ontology/releases/technical-graph/1.1.0/technical-graph.ttl" in [i["path"] for i in data["inputs"]]
     assert not any("technical-graph/1.0.0" in i["path"] for i in data["inputs"])

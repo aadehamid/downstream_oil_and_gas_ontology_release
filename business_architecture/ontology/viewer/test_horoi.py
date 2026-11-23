@@ -53,7 +53,7 @@ def two_modules(root):
 def test_the_data_lists_each_module_from_its_own_ontology_statement(tmp_path):
     two_modules(tmp_path)
     data = horoi.build_data(tmp_path)
-    assert data["release"] == "KPI Store 1.1"
+    assert data["release"] == "KPI Store 1.2"
     assert "sourceCommit" not in data
     assert data["horoiVersion"] == "0.3.2"
     assert data["horoiCommit"] == "57212c7edf35d1ee6016284010eee8e935754f5d"
@@ -98,7 +98,7 @@ def test_the_build_writes_the_page_and_a_record_that_agree(tmp_path):
     assert b"\r" not in raw and b"/* EMBEDDED_DATA */" not in raw
     record = json.loads((out / "build.json").read_text(encoding="utf-8"))
     assert list(record) == ["release", "horoi_version", "horoi_commit", "modules", "inputs", "reference_terms", "triples_available", "index_sha256"]
-    assert record["release"] == "KPI Store 1.1"
+    assert record["release"] == "KPI Store 1.2"
     assert record["modules"] == [{"name": "alpha", "version": "2.0.0"}, {"name": "zeta", "version": "1.0.0"}]
     assert [i["path"] for i in record["inputs"]] == [
         "business_architecture/ontology/releases/alpha/2.0.0/alpha.ttl",
@@ -128,7 +128,7 @@ def test_the_check_names_each_stale_file_and_writes_nothing(tmp_path, capsys):
     assert horoi.main(["--source", str(tmp_path), "--out", str(out), "--check"]) == 0
     # A hand edit of the record alone is caught.
     record = out / "build.json"
-    record.write_text(record.read_text(encoding="utf-8").replace("KPI Store 1.1", "Another name"), encoding="utf-8")
+    record.write_text(record.read_text(encoding="utf-8").replace("KPI Store 1.2", "Another name"), encoding="utf-8")
     assert horoi.stale(tmp_path, out) == ["build.json"]
     horoi.build(tmp_path, out)
     # A newer package makes both files stale.
@@ -148,7 +148,7 @@ def test_the_committed_page_holds_this_tree_and_names_no_outside_commit():
     # Written by hand from the release folders and the notice file.
     text = (ROOT / "horoi_viewer/index.html").read_text(encoding="utf-8")
     data = embedded(text)
-    assert data["release"] == "KPI Store 1.1"
+    assert data["release"] == "KPI Store 1.2"
     assert "sourceCommit" not in data and "sourceCommit" not in text
     assert "EPM" not in text.split('<script id="ontology-data"')[0]
     assert {m["name"]: m["version"] for m in data["moduleInfo"]} == {
@@ -168,7 +168,7 @@ def test_the_committed_page_holds_this_tree_and_names_no_outside_commit():
     }
     record = json.loads((ROOT / "horoi_viewer/build.json").read_text(encoding="utf-8"))
     assert "source_commit" not in record
-    assert record["release"] == "KPI Store 1.1"
+    assert record["release"] == "KPI Store 1.2"
     # Horoi 0.3.2 is the public release of 2026-11-16, and this is the commit its tag v0.3.2 names.
     assert data["horoiVersion"] == record["horoi_version"] == "0.3.2"
     assert data["horoiCommit"] == record["horoi_commit"] == "57212c7edf35d1ee6016284010eee8e935754f5d"

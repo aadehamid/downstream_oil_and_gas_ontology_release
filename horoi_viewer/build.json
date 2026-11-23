@@ -1,5 +1,5 @@
 {
-  "release": "KPI Store 1.1",
+  "release": "KPI Store 1.2",
   "horoi_version": "0.3.2",
   "horoi_commit": "57212c7edf35d1ee6016284010eee8e935754f5d",
   "modules": [
@@ -228,5 +228,5 @@
   ],
   "reference_terms": 6567,
   "triples_available": 58154,
-  "index_sha256": "5cbbde02e2be872c98ec6d14db9254c99e4dc3ddbb45284ebdab745f11f641f1"
+  "index_sha256": "67e6fa5736e48d235fbdcc6e7b648f313bd5a119d9edd98b1e616fc8aa93b91a"
 }

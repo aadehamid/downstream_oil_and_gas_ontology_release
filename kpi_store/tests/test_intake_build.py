@@ -75,7 +75,7 @@ def test_the_pick_lists_hold_the_counts_of_this_release(committed):
         "Informs: The process uses the measure as an input.",
         "Measures performance: The process tracks the measure as a result of the business."]
     assert committed["versions"]["kpi"] == "1.3.0" and len(committed["versions"]) == 13
-    assert committed["release"] == "KPI Store 1.1"
+    assert committed["release"] == "KPI Store 1.2"
 
 
 def test_the_process_list_follows_the_business_area_and_the_chosen_process(cat, committed):
@@ -171,7 +171,7 @@ def test_the_page_is_one_offline_file_with_lf_line_ends():
     assert "<pre" not in text                               # the document check would read a <pre> as a command
     data = json.loads(text.split('<script id="intake-data" type="application/json">')[1].split("</script>")[0])
     assert list(data["forms"]) == ["kpi-intake", "domain-activation", "process-map-request", "term-change", "reference-item", "new-module"]
-    assert data["release"] == "KPI Store 1.1" and data["catalogue_version"] == "1.2"
+    assert data["release"] == "KPI Store 1.2" and data["catalogue_version"] == "1.2"
     assert len(data["questions"]) == 104 and data["lists"]["processes"]
     assert data["guide"] == "how-to-use-the-form.html" and (PACK / data["guide"]).is_file()     # the guide, beside the form
     # The names of the other modules' terms, and whether each has a definition, with no definition text.
