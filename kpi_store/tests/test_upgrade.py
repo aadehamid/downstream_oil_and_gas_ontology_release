@@ -91,15 +91,16 @@ def test_an_upgrade_takes_new_tools_keeps_content_and_tags(tmp_path):
     plan = up.upgrade(copy, new, say=said.append, check=PASS)
     assert read(copy, "kpi_store/tool.py") == "A = 2\n"
     assert read(copy, "kpi_store/new.py") == "B = 1\n"
-    # Content stays the copy's, whether the copy changed it or not; a new content file is added.
+    # Content the copy changed stays the copy's; content it left as shipped takes the new version; a new content
+    # file is added.
     assert read(copy, "business_architecture/ontology/kpi/measures.csv") == "id\nM1\nM2\n"
-    assert read(copy, "business_architecture/ontology/kpi/measures.ttl") == "# the measures\n"
+    assert read(copy, "business_architecture/ontology/kpi/measures.ttl") == "# the measures, as the release team has them\n"
     assert read(copy, "business_architecture/ontology/kpi/units.csv") == "unit\nbbl\n"
     # A pattern with ! keeps the copy's pin list.
     assert read(copy, "scripts/pinned-tests.txt") == "test_a\n"
-    assert sorted(plan.kept) == ["business_architecture/ontology/kpi/measures.csv",
-                                 "business_architecture/ontology/kpi/measures.ttl", "release.json",
+    assert sorted(plan.kept) == ["business_architecture/ontology/kpi/measures.csv", "release.json",
                                  "scripts/pinned-tests.txt"]
+    assert plan.renewed == ["business_architecture/ontology/kpi/measures.ttl"]
     assert plan.updated == ["kpi_store/tool.py"]
     assert git(copy, "tag") == "kpi-store-1.3-tools"
     assert git(copy, "log", "-1", "--format=%s") == "Upgrade the tools to KPI Store 1.3"
@@ -613,3 +614,50 @@ def test_case_twins_read_paths_as_zipfile_unpacks_them():
         "kpi_store/a.py": ("kpi_store/A.py", "kpi_store/a.py"), "kpi_store/A.py": ("kpi_store/A.py", "kpi_store/a.py")}
     assert up.case_twins(["a/x", "A/y"])["A"] == ("A", "a")
     assert up.case_twins(["kpi_store/", "kpi_store/"]) == {}
+
+
+def test_content_left_as_shipped_takes_the_new_version_and_the_copys_own_files_stay(tmp_path):
+    # A 1.1 copy that never touched the kpi tables, upgraded to a release that adds a column to them: the copy
+    # takes the new table, so the new builders read the format they expect.
+    copy = shipped(tmp_path)
+    commit(copy, {"kpi_store/tool.py": "A = 1\n# the copy's own line\n"}, "A change to a tool")
+    new = release(tmp_path / "new", "1.3", {"business_architecture/ontology/kpi/measures.csv": "id,source\nM1,s\n",
+                                            "scripts/pinned-tests.txt": "test_a\ntest_b\n"})
+    plan = up.upgrade(copy, new, say=lambda *_: None, check=PASS)
+    assert read(copy, "business_architecture/ontology/kpi/measures.csv") == "id,source\nM1,s\n"
+    assert plan.renewed == ["business_architecture/ontology/kpi/measures.csv"]
+    # release.json and a `!` path stay the copy's, though the copy never changed them.
+    assert json.loads(read(copy, "release.json"))["release"] == "KPI Store 1.2"
+    assert read(copy, "scripts/pinned-tests.txt") == "test_a\n"
+    assert "release.json" in plan.kept and "scripts/pinned-tests.txt" in plan.kept
+
+
+def test_a_table_both_changed_whose_columns_the_new_release_changes_is_refused_and_nothing_changes(tmp_path):
+    copy = shipped(tmp_path)
+    commit(copy, {"business_architecture/ontology/kpi/measures.csv": "id\nM1\nM2\n"}, "A correction")
+    before = state(copy)
+    new = release(tmp_path / "new", "1.3", {"business_architecture/ontology/kpi/measures.csv": "id,source\nM1,s\n"})
+    with pytest.raises(up.UpgradeRefused, match=r"changes the columns of business_architecture/ontology/kpi/measures\.csv"):
+        up.upgrade(copy, new, say=lambda *_: None, check=PASS)
+    assert state(copy) == before
+    with pytest.raises(up.UpgradeRefused, match="Replace the release with a newer zip"):
+        up.plan(copy, new)
+
+
+def test_a_table_both_changed_with_the_same_columns_keeps_the_copys(tmp_path):
+    copy = shipped(tmp_path)
+    commit(copy, {"business_architecture/ontology/kpi/measures.csv": "id\nM1\nM2\n"}, "A correction")
+    new = release(tmp_path / "new", "1.3", {"business_architecture/ontology/kpi/measures.csv": "id\nM1\nM9\n"})
+    plan = up.upgrade(copy, new, say=lambda *_: None, check=PASS)
+    assert read(copy, "business_architecture/ontology/kpi/measures.csv") == "id\nM1\nM2\n"
+    assert "business_architecture/ontology/kpi/measures.csv" in plan.kept
+
+
+def test_the_plan_names_the_content_that_takes_the_new_version(tmp_path):
+    copy = shipped(tmp_path)
+    new = release(tmp_path / "new", "1.3", {"business_architecture/ontology/kpi/measures.ttl": "# newer\n"})
+    said = []
+    up.upgrade(copy, new, plan_only=True, say=said.append)
+    assert any("1 content files you left as shipped, which take the new version: "
+               "business_architecture/ontology/kpi/measures.ttl" in line for line in said)
+    assert read(copy, "business_architecture/ontology/kpi/measures.ttl") == "# the measures\n"

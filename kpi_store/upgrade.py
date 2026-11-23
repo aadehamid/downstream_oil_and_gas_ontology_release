@@ -5,12 +5,16 @@
     python -m kpi_store.upgrade --from <unpacked folder> [--release <your release folder>] [--stores <settings>]
 
 Why it exists: after handover your copy is the master of the ontology's content (KPI-DEC-0002, Q2). A newer release
-brings only tools: the commands, the scripts, the skills and the guides. This command takes those into your copy and
-leaves every content file as you made it.
+brings tools: the commands, the scripts, the skills and the guides. This command takes those into your copy and
+leaves every content file you changed as you made it (KPI-DEC-0006: a content file you left as shipped takes the new
+release's version).
 
 Which files are tools: the new release lists them in kpi_store/upgrade-paths.txt, one pattern a line. `**` matches
 any number of folders, `*` any part of one name, and a line that starts with `!` takes paths out again. Every
-other file is content. A content file the new release changes keeps your version. A content file that is new in
+other file is content. A content file the new release changes takes the new version when your copy left it as
+shipped, and keeps your version when your copy changed it; release.json and a path that a `!` line takes out always
+keep yours. A table (a .csv file) that both changed, whose header the new release changes, is refused: your change
+has to be made again in the new format. A content file that is new in
 the new release, and that your copy does not have, is added, because a new tool may need it. A new file whose name
 differs only in the case of its letters from one your copy has is refused, because Windows and macOS hold one file
 for both.
@@ -20,7 +24,8 @@ How it works, with Git, which the runbook asks you to keep the release folder in
    copy's history, which this command makes, the one of the highest version, or else the copy's first commit, the release as it was unpacked, which
    the runbook's "Keep the release folder in Git" makes. The release's name comes from its release.json. A new
    release older than the base is refused, and one of the same version changes nothing.
-2. On top of the base it commits the new release's tool files and its new content files. The commit is not on any
+2. On top of the base it commits the new release's tool files, its new content files and the content files your
+   copy left as shipped. The commit is not on any
    branch yet, and no file of your folder changes.
 3. In a temporary copy of your folder, outside it, Git merges that commit into your work. A tool file you never
    changed takes the new version. A tool file your commands changed, such as the tables that list the modules,
@@ -102,6 +107,15 @@ def read_patterns(text):
         include = not line.startswith("!")
         pairs.append((include, _pattern(line.lstrip("!"))))
     return pairs
+
+
+def is_own(path, patterns):
+    """True when the last pattern that matches the path is a `!` line: the copy's own file, never replaced."""
+    own = False
+    for include, regex in patterns:
+        if regex.match(path):
+            own = not include
+    return own
 
 
 def is_tool(path, patterns):
@@ -282,11 +296,11 @@ def _blobs(root, paths, write):
 
 class Plan:
     def __init__(self, base, base_release, base_from, release, head, branch, entries=None, updated=(), merged=(),
-                 removed=(), added=(), kept=()):
+                 removed=(), added=(), kept=(), renewed=()):
         self.base, self.base_release, self.base_from, self.release = base, base_release, base_from, release
         self.head, self.branch, self.entries = head, branch, entries or {}
         self.updated, self.merged, self.removed = list(updated), list(merged), list(removed)
-        self.added, self.kept = list(added), list(kept)
+        self.added, self.kept, self.renewed = list(added), list(kept), list(renewed)
 
     def describe(self):
         def some(paths):
@@ -297,6 +311,7 @@ class Plan:
                              ("tool files you changed, which get both changes", self.merged),
                              ("tool files the new release removes", self.removed),
                              ("new files added", self.added),
+                             ("content files you left as shipped, which take the new version", self.renewed),
                              ("content files the new release changes, which keep your version", self.kept)):
             lines.append(f"  {len(paths)} {label}" + (f": {some(paths)}" if paths else ""))
         return "\n".join(lines)
@@ -349,7 +364,24 @@ def plan(root, new_root):
         elif path in old and tool:
             the_plan.entries[path] = None
             the_plan.removed.append(path)
-        elif path in new and (path in old and ids[path] != old[path][1] or path not in old):
+        elif path in new and path in old and ids[path] != old[path][1]:
+            as_shipped = now.get(path, (None, None))[1] == old[path][1]
+            if as_shipped and path != RELEASE_FILE and not is_own(path, patterns):
+                the_plan.entries[path] = (old[path][0], ids[path], new[path])
+                the_plan.renewed.append(path)
+                continue
+            if path in now and not as_shipped and path.endswith(".csv"):
+                before = _out(root, "cat-file", "blob", old[path][1]).split("\n", 1)[0]
+                after = new[path].read_text(encoding="utf-8").split("\n", 1)[0]
+                if before.strip() != after.strip():
+                    raise UpgradeRefused(
+                        f"the new release changes the columns of {path}, and this copy changed that table too, so the "
+                        "copy's change cannot be kept as it is. Make it again in the new format: replace the release "
+                        "with the new zip, as the runbook's \"Replace the release with a newer zip\" says, then let "
+                        "the runner cut a correction again from a new report, and propose and apply a change from a "
+                        "form again from its form")
+            the_plan.kept.append(path)
+        elif path in new and path not in old:
             the_plan.kept.append(path)
     return the_plan
 
