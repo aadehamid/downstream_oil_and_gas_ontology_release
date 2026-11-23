@@ -46,6 +46,7 @@ PRINTED = {
     '"Result: not complete"': ("Result: not complete", "kpi_store/intake/check.py"),
     "starts `Done.`": ("Done. ", "kpi_store/apply.py"),
     "no store needs loading": ("No store needs loading", "kpi_store/apply.py"),
+    "a line that says what to run next": ("Run the full check", "kpi_store/apply.py"),
 }
 # The double-quoted printed line in SKILL.md, which is not a section name.
 QUOTED_PRINTED = {"Result: not complete"}
@@ -150,3 +151,9 @@ def test_a_changed_phrase_in_the_skill_is_found():
     printed = {"starts `Done.`": ("Done. ", "apply.py")}
     assert missing_printed(printed, "Done when it prints a line that starts `Finished.`", {"apply.py": 'say("Done. x")'}) \
         == ["starts `Done.`"]
+
+
+def test_a_next_step_line_that_is_gone_is_found():
+    printed = {"a line that says what to run next": ("Run the full check", "apply.py")}
+    skill = "Done when each run prints a line that starts `Done.`, and after it a line that says what to run next."
+    assert missing_printed(printed, skill, {"apply.py": 'say("Done. x")\nsay("Load the stores")'}) == ["Run the full check"]
