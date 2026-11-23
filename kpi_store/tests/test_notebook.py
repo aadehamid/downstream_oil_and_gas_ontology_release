@@ -79,7 +79,7 @@ def volume(tmp_path, zip_bytes=None, sha256=None, settings=True, top_folder=""):
     folder.mkdir()
     if zip_bytes is None:
         release = support.small_release(tmp_path / "release")
-        with zipfile.ZipFile(folder / "kpi-store-1.1.zip", "w") as z:
+        with zipfile.ZipFile(folder / "kpi-store-1.2.zip", "w") as z:
             for path in sorted(release.rglob("*")):
                 if path.is_file():
                     z.write(path, top_folder + path.relative_to(release).as_posix())
@@ -88,8 +88,8 @@ def volume(tmp_path, zip_bytes=None, sha256=None, settings=True, top_folder=""):
             rdfstore = support.ROOT / "skills" / "rdf-store" / "scripts" / "rdfstore.py"
             z.write(rdfstore, top_folder + "skills/rdf-store/scripts/rdfstore.py")
     else:
-        (folder / "kpi-store-1.1.zip").write_bytes(zip_bytes)
-    digest = sha256 or hashlib.sha256((folder / "kpi-store-1.1.zip").read_bytes()).hexdigest()
+        (folder / "kpi-store-1.2.zip").write_bytes(zip_bytes)
+    digest = sha256 or hashlib.sha256((folder / "kpi-store-1.2.zip").read_bytes()).hexdigest()
     if settings:
         text = re.sub(r'(?m)^sha256 = "[0-9a-f]+"', f'sha256 = "{digest}"', support.SETTINGS_TEXT)
         (folder / "kpi_store.toml").write_text(text, encoding="utf-8", newline="\n")
@@ -122,7 +122,7 @@ def run_main(folder, workspace, **widgets):
     return notebook().main(Spark(workspace), dbutils, genie=support.FakeGenie({})), dbutils
 
 
-@pytest.mark.parametrize("top_folder", ["", "kpi-store-1.1/"])
+@pytest.mark.parametrize("top_folder", ["", "kpi-store-1.2/"])
 def test_the_notebook_loads_from_a_zip_in_the_volume_and_a_second_run_changes_nothing(tmp_path, top_folder):
     folder, workspace = volume(tmp_path, top_folder=top_folder), support.small_workspace()
     summary, dbutils = run_main(folder, workspace)
@@ -137,7 +137,7 @@ def test_the_notebook_loads_from_a_zip_in_the_volume_and_a_second_run_changes_no
     assert tech["count"] == len(workspace.store["idp_sbx.tech_graph.tech_graph_triples"]) == TECH_TRIPLES
     assert '<urn:kpi-store:tech:idp_sbx+synapse_dev:object/idp_sbx.gold_sample.sample_fact>' in (run_dir / "tech-graph.nq").read_text(encoding="utf-8")
     marker = json.loads(workspace.store["idp_sbx.kpi_store.epm_store_markers"][0]["marker"])
-    assert marker["commit"] == "KPI Store 1.1 (zip sha256 " + hashlib.sha256((folder / "kpi-store-1.1.zip").read_bytes()).hexdigest() + ")"
+    assert marker["commit"] == "KPI Store 1.1 (zip sha256 " + hashlib.sha256((folder / "kpi-store-1.2.zip").read_bytes()).hexdigest() + ")"
     assert (folder / "discovery-report.json").is_file()
     again, _ = run_main(folder, workspace, stale_after_days="")
     assert again["status"] == "current" and again["tech_graph"]["status"] == "current" and workspace.rewrites == 2
@@ -176,7 +176,7 @@ def test_check_mode_is_a_notebook_parameter(tmp_path):
     (lambda t: volume(t, settings=False), "cannot read the settings file"),
     (lambda t: volume(t, sha256="0" * 64), "the release zip's SHA-256 is"),
     (lambda t: volume(t, zip_bytes=b"PK\x03\x04 this is not a whole zip"), "the release zip cannot be opened"),
-    (lambda t: volume(t, zip_bytes=None).joinpath("kpi-store-1.1.zip").unlink() or t / "volume", "is not beside the settings file"),
+    (lambda t: volume(t, zip_bytes=None).joinpath("kpi-store-1.2.zip").unlink() or t / "volume", "is not beside the settings file"),
 ])
 def test_a_missing_settings_file_or_a_wrong_or_corrupt_zip_stops_before_any_read_or_write(tmp_path, make, message):
     folder, workspace = make(tmp_path), support.small_workspace()
@@ -187,7 +187,7 @@ def test_a_missing_settings_file_or_a_wrong_or_corrupt_zip_stops_before_any_read
 
 def test_a_zip_changed_after_the_settings_were_written_is_refused(tmp_path):
     folder, workspace = volume(tmp_path), support.small_workspace()
-    with (folder / "kpi-store-1.1.zip").open("ab") as f:
+    with (folder / "kpi-store-1.2.zip").open("ab") as f:
         f.write(b"one more byte")
     with pytest.raises(notebook().Stop, match="the release zip's SHA-256 is"):
         run_main(folder, workspace)
@@ -197,7 +197,7 @@ def test_a_zip_changed_after_the_settings_were_written_is_refused(tmp_path):
 @pytest.mark.parametrize("old, new, message", [
     ('write_schema = "kpi_store"', 'write_schema = "kpi store"', "letters, digits and _"),
     ('[genie]', '[genie]\ntoken = "x"', "unknown key 'token'"),
-    ('zip = "kpi-store-1.1.zip"', 'zip = 7', "must be a file name ending in .zip"),
+    ('zip = "kpi-store-1.2.zip"', 'zip = 7', "must be a file name ending in .zip"),
     ('[release]', '[release', "the settings file .* is wrong"),
 ])
 def test_a_wrong_settings_file_stops_before_any_read_or_write(tmp_path, old, new, message):
@@ -251,7 +251,7 @@ def test_the_unpacked_files_are_the_bytes_that_were_hashed(tmp_path, monkeypatch
 
                 @staticmethod
                 def hexdigest():
-                    (folder / "kpi-store-1.1.zip").write_bytes(other.read_bytes())
+                    (folder / "kpi-store-1.2.zip").write_bytes(other.read_bytes())
                     return real.hexdigest()
             return Digest()
 
