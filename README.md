@@ -67,7 +67,7 @@ To understand the ontology, open `business_architecture/ontology/epm-ontology-gu
 
 ## Before you run anything
 
-The loads run on a Windows machine. Set these up once. The runbook gives the steps, and the setup check tests each item and prints the fix for any that fails. Unpack the zip to `kpi-store-1.1` in your user folder and put that folder into Git before you change anything: the runbook's sections "Unpack the release" and "Keep the release folder in Git" say how, and "Replace the release with a newer zip" says how a later zip takes its place. Keep your settings, the jars and any Python virtual environment outside the release folder, because the runner zips the release folder and uploads it.
+The loads run on a Windows machine. Set these up once. The runbook gives the steps, and the setup check tests each item and prints the fix for any that fails. Unpack the zip to `kpi-store` in your user folder and put that folder into Git before you change anything: the runbook's sections "Unpack the release" and "Keep the release folder in Git" say how, and "Replace the release with a newer zip" says how a later zip takes its place. Keep your settings, the jars and any Python virtual environment outside the release folder, because the runner zips the release folder and uploads it.
 
 | What you need | Why |
 |---|---|

@@ -112,17 +112,17 @@ bash = "PortableGit/bin/bash.exe"
 
 Each line is already in the example file with an empty value. A path without a drive starts at the folder of `stores.toml`, which is the local folder. The `java` line serves Fuseki, ROBOT and the setup check. The `bash` line serves the check script, which the runner starts. The `cli` line serves the setup check and the runner.
 
-The sign-in command of "Sign in to Databricks" is then not on `PATH`. Start it with its path and PowerShell's call operator, `& "$HOME\kpi-store-local\databricks-cli\databricks.exe"`, in place of the word `databricks`. Git is not on `PATH` either: run the guide's `git` commands in Git Bash, which you start by double-clicking `git-bash.exe` in `%USERPROFILE%\kpi-store-local\PortableGit`. It opens in that folder, so first go to the release folder with `cd "$USERPROFILE/kpi-store-1.1"`.
+The sign-in command of "Sign in to Databricks" is then not on `PATH`. Start it with its path and PowerShell's call operator, `& "$HOME\kpi-store-local\databricks-cli\databricks.exe"`, in place of the word `databricks`. Git is not on `PATH` either: run the guide's `git` commands in Git Bash, which you start by double-clicking `git-bash.exe` in `%USERPROFILE%\kpi-store-local\PortableGit`. It opens in that folder, so first go to the release folder with `cd "$USERPROFILE/kpi-store"`.
 
 The Windows test job runs this guide's chain this way. Its Java and its Databricks command line come from these two zips and are named in the settings. No other Java is on its `PATH`, and its folders lie in a temporary folder. It uses the Git for Windows that its machine already has, so the portable edition and the Python installer are not proven there.
 
 ### Where the folders are
 
-Everything of this guide lies in your user folder, `C:\Users\` and your user name. An account without administrator rights may write there, and often not at the top of `C:`. This guide writes `%USERPROFILE%` for that folder. Type `%USERPROFILE%` into the address bar of File Explorer to open it. A PowerShell command writes the same folder as `$HOME\`, as in `cd $HOME\kpi-store-1.1`.
+Everything of this guide lies in your user folder, `C:\Users\` and your user name. An account without administrator rights may write there, and often not at the top of `C:`. This guide writes `%USERPROFILE%` for that folder. Type `%USERPROFILE%` into the address bar of File Explorer to open it. A PowerShell command writes the same folder as `$HOME\`, as in `cd $HOME\kpi-store`.
 
 | Folder | What it holds |
 |---|---|
-| `%USERPROFILE%\kpi-store-1.1` | The release folder: the unpacked zip, kept in Git. |
+| `%USERPROFILE%\kpi-store` | The release folder: the unpacked zip, kept in Git. |
 | `%USERPROFILE%\kpi-store-local` | The local folder: your two settings files, the downloaded jars, and everything the runs write. |
 | `%USERPROFILE%\kpi-store-venv` | A Python virtual environment, if you use one. |
 
@@ -131,8 +131,8 @@ Do not put these folders into a folder that OneDrive or another sync program cop
 ### Unpack the release
 
 1. In File Explorer, right-click `kpi-store-1.1.zip` and choose "Extract All".
-2. As the folder, type the path of your user folder and `\kpi-store-1.1`, such as `C:\Users\<your user name>\kpi-store-1.1`. Click "Extract".
-3. Check that `%USERPROFILE%\kpi-store-1.1\README.md` exists. If the files lie one folder deeper, move them up, so that `README.md` lies in `kpi-store-1.1` itself.
+2. As the folder, type the path of your user folder and `\kpi-store`, such as `C:\Users\<your user name>\kpi-store`. Click "Extract".
+3. Check that `%USERPROFILE%\kpi-store\README.md` exists. If the files lie one folder deeper, move them up, so that `README.md` lies in `kpi-store` itself.
 
 This guide calls that folder the release folder.
 
@@ -167,8 +167,8 @@ A newer zip of the release replaces the release folder. Your settings, your jars
 
 This is for a release folder that holds no change of your own. When it holds changes, such as a module or a KPI that you applied, upgrade its tools instead with `python -m kpi_store.upgrade`, as `HOW-TO-UPDATE.md`, "Upgrade the tools from a newer release", says. The upgrade keeps your changes, and a content file you never changed takes the new release's version.
 
-1. Rename the old release folder, for example to `kpi-store-1.1-old`. Its `.git` folder goes with it, and so does its history.
-2. Unpack the new zip to `%USERPROFILE%\kpi-store-1.1`, as in "Unpack the release".
+1. Rename the old release folder, for example from `kpi-store` to `kpi-store-old`. Its `.git` folder goes with it, and so does its history.
+2. Unpack the new zip under the old folder's name, such as `%USERPROFILE%\kpi-store`, as in "Unpack the release". A folder from KPI Store 1.1 is named `kpi-store-1.1`: keep that name.
 3. Run the Git commands of "Keep the release folder in Git" in the new folder.
 4. Leave the local folder, the virtual environment and `KPI_STORE_LOCAL` as they are. If the old folder held a correction that the new zip does not hold, read "The release folder" under "How to undo" first: the stores then read `behind` until you load them again.
 5. Run the setup check, then the run.
@@ -255,7 +255,7 @@ The local Neo4j checks the graph before anything goes to Enterprise. It needs tw
 
 The release has an example of each file. Copy both, then change only the lines the steps name.
 
-1. In File Explorer, copy `%USERPROFILE%\kpi-store-1.1\kpi_store\kpi_store.example.toml` to `%USERPROFILE%\kpi-store-local\kpi_store.toml`.
+1. In File Explorer, copy `%USERPROFILE%\kpi-store\kpi_store\kpi_store.example.toml` to `%USERPROFILE%\kpi-store-local\kpi_store.toml`.
 2. Open `%USERPROFILE%\kpi-store-local\kpi_store.toml` in Notepad.
 3. Set `warehouse_id` to the ID of your SQL warehouse. Change nothing else. The file already holds the sandbox's values:
 
@@ -280,7 +280,7 @@ The release has an example of each file. Copy both, then change only the lines t
    Leave the `sha256` line of zeros as it is. The runner writes the zip's real checksum into the copy it uploads.
 
 4. Save the file and close Notepad.
-5. In File Explorer, copy `%USERPROFILE%\kpi-store-1.1\kpi_store\stores.example.toml` to `%USERPROFILE%\kpi-store-local\stores.toml`.
+5. In File Explorer, copy `%USERPROFILE%\kpi-store\kpi_store\stores.example.toml` to `%USERPROFILE%\kpi-store-local\stores.toml`.
 6. Open `%USERPROFILE%\kpi-store-local\stores.toml` in Notepad and set these lines. Leave every other line as it is. The file's other paths, such as `runs` and `robot.jar`, have no drive: such a path starts at the folder of `stores.toml`, so they hold wherever your local folder is. A path that you write yourself may be a full one, with `/` in place of each backslash, and `~` at its start stands for your user folder.
 
    | Table | Line | Set it to |
@@ -327,7 +327,7 @@ When the sign-in expires later, a run fails at its first Databricks step. Run th
 1. In PowerShell, go to the release folder. Every later command in this guide starts there.
 
    ```powershell run=windows-account os=windows status-only
-   cd $HOME\kpi-store-1.1
+   cd $HOME\kpi-store
    ```
 
 2. Run the setup check. It only reads. It changes nothing on your machine or on any server.
@@ -1101,7 +1101,7 @@ To empty the stores and keep the rest, use `python -m kpi_store.runner --reset` 
 
 The cut is the only step that changed the release folder.
 
-1. Rename `%USERPROFILE%\kpi-store-1.1`, for example to `kpi-store-1.1-with-correction`.
+1. Rename `%USERPROFILE%\kpi-store`, for example to `kpi-store-with-correction`.
 2. Unpack `kpi-store-1.1.zip` again, as in "Unpack the release", and run the Git commands of "Keep the release folder in Git" there.
 
 The stores then read `behind` until you load them again from that folder.
