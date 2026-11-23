@@ -651,7 +651,8 @@ jobs:
         run: |
           python -m kpi_store.runner --from enterprise --replace-enterprise | tee "$LOCAL/replace.log"
           grep -q "^enterprise: copied" "$LOCAL/replace.log"
-          [ "$(tail -n 1 "$LOCAL/replace.log" | tr -d '\r')" = "every step passed" ]
+          # A run that starts at a step never says every step passed: it names the steps it left out.
+          [ "$(tail -n 1 "$LOCAL/replace.log" | tr -d '\r')" = "the steps that ran passed; left out: cut, check, zip, volume, upload, notebook, report, fuseki, neo4j (not run, so not checked)" ]
       - name: sync check, which must read current on every line
         run: python -m kpi_store.sync_check
 

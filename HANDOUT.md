@@ -397,7 +397,7 @@ Use these steps only when a run stops on a step.
    python -m kpi_store.runner --from fuseki
    ```
 
-   You are done when the run's last line reads `every step passed`.
+   You are done when the run's last line starts `the steps that ran passed`. A run that starts at a step names the steps it left out, so it never says `every step passed`.
 
 3. If the step `check` fails because of the machine, such as a file that another program holds open, and not because of the release, report it, and leave the step out of the run:
 
@@ -419,7 +419,7 @@ Use these steps only when a run stops on a step.
    python -m kpi_store.runner --from enterprise --replace-enterprise
    ```
 
-   You are done when the run's last line reads `every step passed`, and its sync check reads `current` for `enterprise`.
+   You are done when the run's last line starts `the steps that ran passed`, and its sync check reads `current` for `enterprise`.
 
 ### Empty every store and load it again
 
