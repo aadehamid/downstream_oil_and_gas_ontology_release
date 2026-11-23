@@ -19,7 +19,7 @@ release. Run each example in a copy of its own, because two examples may change 
 proposal and the approval. It builds and releases nothing: the guide's next commands do that. Read each function
 below as the pattern for a change of your own: one function per file.
 
-The examples are made for KPI Store 1.1 as shipped: each looks for the exact text it changes. Every change is
+The examples are made for KPI Store 1.2 as shipped: each looks for the exact text it changes. Every change is
 worked out before the first file is written. So on a release that has moved on, where a file no longer holds that
 text, `--plan` and `--write` both stop, name the file and change nothing. The command also refuses a copy that
 holds the example already, a file that is a link, and a path that leaves the copy. Exit 0 when done, 1 when refused.
@@ -43,7 +43,7 @@ def swap(tree, path, old, new):
     text = tree.read(path)
     if text.count(old) != 1:
         raise Refused(f"{path} does not hold the text this example changes, or holds it more than once. The example is made "
-                      f"for KPI Store 1.1 as shipped, and this file has changed since. Nothing was changed. The text, which "
+                      f"for KPI Store 1.2 as shipped, and this file has changed since. Nothing was changed. The text, which "
                       f"the file holds {text.count(old)} times, is: {old.strip()[:160]!r}")
     tree.texts[path] = text.replace(old, new)
     return path

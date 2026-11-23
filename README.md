@@ -1,6 +1,6 @@
-# KPI Store 1.1
+# KPI Store 1.2
 
-KPI Store 1.1 is a business ontology for downstream oil and gas, with the code that loads it into one data platform and checks each load. The platform is Databricks, then Apache Jena Fuseki on Windows, then Neo4j Enterprise. Everything here can be rebuilt and checked from this folder alone.
+KPI Store 1.2 is a business ontology for downstream oil and gas, with the code that loads it into one data platform and checks each load. The platform is Databricks, then Apache Jena Fuseki on Windows, then Neo4j Enterprise. Everything here can be rebuilt and checked from this folder alone.
 
 To run the KPI Store and change its ontology, follow [the handout](HANDOUT.md), "Running and changing your ontology". It takes you from this folder to loaded and checked stores, and through every kind of change, step by step. The release's tests check every command in it.
 

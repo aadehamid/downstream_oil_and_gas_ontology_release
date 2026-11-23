@@ -133,7 +133,7 @@ python -m kpi_store.intake check kpi-intake/examples/crack-spreads-pricing.json
 
 ```text expect
 KPI intake check: Crack Spreads Pricing
-Catalogue 1.2. Pick lists of KPI Store 1.1.
+Catalogue 1.2. Pick lists of KPI Store 1.2.
 
 1. The business area
   Answered 5 of the 6 questions that apply.

@@ -259,7 +259,7 @@ def test_a_report_of_another_release_or_another_version_is_refused(tmp_path):
     other["release"] = "Another Store 9.9"
     path = tmp_path / "other" / rep.JSON_NAME
     path.write_text(json.dumps(other), encoding="utf-8", newline="\n")
-    with pytest.raises(cut.CutRefused, match="the report is of Another Store 9.9, and this folder holds KPI Store 1.1"):
+    with pytest.raises(cut.CutRefused, match="the report is of Another Store 9.9, and this folder holds KPI Store 1.2"):
         cut.cut(path, root, ask=never, say=quiet)
     with pytest.raises(cut.CutRefused, match="the report cannot be read"):
         cut.cut(tmp_path / "absent.json", root, ask=never, say=quiet)

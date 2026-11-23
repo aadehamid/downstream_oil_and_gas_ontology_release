@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Optional. Does this tree still equal KPI Store 1.1 as it was shipped? It runs only the tests in scripts/pinned-tests.txt.
+# Optional. Does this tree still equal KPI Store 1.2 as it was shipped? It runs only the tests in scripts/pinned-tests.txt.
 # On the release as shipped they pass. After your first change some are expected to fail, which says your copy has
 # moved on and nothing more. Run scripts/check.sh to see whether your copy is valid.
 set -euo pipefail

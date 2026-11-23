@@ -11,7 +11,7 @@ For every later change, use `HOW-TO-UPDATE.md` in the release's top folder.
 ### What you need
 
 - A Windows 10 or Windows 11 machine on which you may install programs.
-- The release zip, `kpi-store-1.1.zip`.
+- The release zip, `kpi-store-1.2.zip`.
 - The address of the sandbox workspace, as your browser shows it when you open Databricks.
 - The ID of a SQL warehouse you may use in that workspace. The sync check reads through it.
 - The address of the Neo4j Enterprise server, your user name there and your password.
@@ -130,7 +130,7 @@ Do not put these folders into a folder that OneDrive or another sync program cop
 
 ### Unpack the release
 
-1. In File Explorer, right-click `kpi-store-1.1.zip` and choose "Extract All".
+1. In File Explorer, right-click `kpi-store-1.2.zip` and choose "Extract All".
 2. As the folder, type the path of your user folder and `\kpi-store`, such as `C:\Users\<your user name>\kpi-store`. Click "Extract".
 3. Check that `%USERPROFILE%\kpi-store\README.md` exists. If the files lie one folder deeper, move them up, so that `README.md` lies in `kpi-store` itself.
 
@@ -148,7 +148,7 @@ Put the release folder into Git before you change anything in it. Every later ch
    git config user.name "KPI Store operator"
    git config user.email "kpi-store-operator@example.invalid"
    git add -A
-   git commit -m "KPI Store 1.1 as shipped"
+   git commit -m "KPI Store 1.2 as shipped"
    ```
 
    The last lines name the commit and count the files.
@@ -404,9 +404,9 @@ The first run changes nothing in the ontology and loads nothing. It checks the r
    run <run ID>: cut, check, zip, volume, upload, notebook, report, fuseki, neo4j, enterprise, sync, summary
    cut: no report waits to be cut
    check: all checks passed
-   zip: kpi-store-1.1.zip: <count> files, SHA-256 <checksum>
+   zip: kpi-store-1.2.zip: <count> files, SHA-256 <checksum>
    volume: <the volume and what the step created>
-   upload: kpi-store-1.1.zip and kpi_store.toml are in <the path in the volume>
+   upload: kpi-store-1.2.zip and kpi_store.toml are in <the path in the volume>
    notebook: notebook run <number> stopped on a report: 1 row(s) block
    the notebook stopped: 1 row(s) block the load, of <count> in the report
      <row> column-renamed <catalog>.gold_commercial_core.mips_mpr_executive_summary_fact: ChangeValue -> Change_Value_Amount; recommended: accept
@@ -542,9 +542,9 @@ The second run is the same command. It finds the cleared report and hands it to 
    ...
    cut: cut the cleared report: <count> row(s) decided, <count> left undecided
    check: all checks passed
-   zip: kpi-store-1.1.zip: <count> files, SHA-256 <checksum>
+   zip: kpi-store-1.2.zip: <count> files, SHA-256 <checksum>
    volume: <the volume> is there
-   upload: kpi-store-1.1.zip and kpi_store.toml are in <the path in the volume>
+   upload: kpi-store-1.2.zip and kpi_store.toml are in <the path in the volume>
    notebook: notebook run <number> loaded: <count> triples in <catalog>.<schema>.epm_triples, hash <hash>
    report: no row blocks; Databricks marker of <time>, <count> rows; technical graph loaded in Databricks, its file fetched
    fuseki: loaded, <count> graphs, <count> triples, RDFC-1.0 hash <hash> equal in the store and the release files (<which server and where it keeps the data>); technical graph loaded, <count> triples
@@ -662,9 +662,9 @@ A second run on the same release must change nothing. It proves that the loads a
    run <run ID>: cut, check, zip, volume, upload, notebook, report, fuseki, neo4j, enterprise, sync, summary
    cut: no report waits to be cut
    check: all checks passed
-   zip: kpi-store-1.1.zip: <count> files, SHA-256 <checksum>
+   zip: kpi-store-1.2.zip: <count> files, SHA-256 <checksum>
    volume: <the volume> is there
-   upload: kpi-store-1.1.zip and kpi_store.toml are in <the path in the volume>
+   upload: kpi-store-1.2.zip and kpi_store.toml are in <the path in the volume>
    notebook: notebook run <number> current: <count> triples in <catalog>.<schema>.epm_triples, hash <hash>
    report: no row blocks; Databricks marker of <time>, <count> rows; technical graph <its status> in Databricks, its file fetched
    fuseki: current, <count> graphs, <count> triples, RDFC-1.0 hash <hash> equal in the store and the release files (<which server and where it keeps the data>); technical graph <its status>, <count> triples
@@ -733,7 +733,7 @@ python -m kpi_store.runner --only zip
 
 ```text expect
 run <run ID>: zip
-zip: kpi-store-1.1.zip: <count> files, SHA-256 <checksum>
+zip: kpi-store-1.2.zip: <count> files, SHA-256 <checksum>
 the steps that ran passed; left out: <the other steps> (not run, so not checked)
 ```
 
@@ -765,7 +765,7 @@ python -m kpi_store.runner --only upload
 
 ```text expect
 run <run ID>: upload
-upload: kpi-store-1.1.zip and kpi_store.toml are in <the path in the volume>
+upload: kpi-store-1.2.zip and kpi_store.toml are in <the path in the volume>
 the steps that ran passed; left out: <the other steps> (not run, so not checked)
 ```
 
@@ -1102,7 +1102,7 @@ To empty the stores and keep the rest, use `python -m kpi_store.runner --reset` 
 The cut is the only step that changed the release folder.
 
 1. Rename `%USERPROFILE%\kpi-store`, for example to `kpi-store-with-correction`.
-2. Unpack `kpi-store-1.1.zip` again, as in "Unpack the release", and run the Git commands of "Keep the release folder in Git" there.
+2. Unpack `kpi-store-1.2.zip` again, as in "Unpack the release", and run the Git commands of "Keep the release folder in Git" there.
 
 The stores then read `behind` until you load them again from that folder.
 

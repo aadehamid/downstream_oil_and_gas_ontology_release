@@ -63,7 +63,7 @@ The release's own tests check every block of commands and every block of printed
    git config user.name "KPI Store operator"
    git config user.email "kpi-store-operator@example.invalid"
    git add -A
-   git commit -m "KPI Store 1.1 as shipped"
+   git commit -m "KPI Store 1.2 as shipped"
    ```
 
    You are done when the commit is made. The upgrade of section 8 starts from this commit.
@@ -516,7 +516,7 @@ This part is for a 1.1 release folder whose only changes are the runner's cuts. 
 
 If you also changed the 1.1 folder by hand, the replace leaves those changes in the old folder only. List them before step 1, in the 1.1 folder: `git log` shows the committed ones, and `git status` the ones not committed. A folder not kept in Git has no such list: compare it with the 1.1 zip. Make each change again in the new folder with this release's forms, as sections 3 to 5 say, before step 3.
 
-1. Replace the release folder with this release's zip, as the runbook's "Replace the release with a newer zip" says. Keep the folder's name, such as `kpi-store-1.1`. Leave the local folder as it is.
+1. Replace the release folder with this release's zip, as the runbook's "Replace the release with a newer zip" says. Keep the folder's name, such as `kpi-store-1.1`. Leave the local folder as it is. Its settings file may still name the zip `kpi-store-1.1.zip`: the runner builds this release's zip under that name, so you can keep it.
 
    You are done when `git log` in the new folder shows one commit, the release as unpacked.
 

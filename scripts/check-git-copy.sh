@@ -30,7 +30,7 @@ git -C "$WORK/release" init -q
 git -C "$WORK/release" config user.name "KPI Store operator"
 git -C "$WORK/release" config user.email "kpi-store@example.invalid"
 git -C "$WORK/release" add -A
-git -C "$WORK/release" commit -q -m "KPI Store 1.1 as shipped"
+git -C "$WORK/release" commit -q -m "KPI Store 1.2 as shipped"
 [ -z "$(git -C "$WORK/release" status --porcelain)" ] || { echo "Git still shows a change after the first commit:"; git -C "$WORK/release" status --short | head; exit 1; }
 in_git="$(build "$WORK/release" "$WORK/git.zip")"
 echo "this tree:           $from_tree"

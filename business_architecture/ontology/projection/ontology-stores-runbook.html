@@ -223,7 +223,7 @@ figure.pic figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
 <p>For every later change, use <code>HOW-TO-UPDATE.md</code> in the release's top folder.</p>
 <h2 id="before-you-start">Before you start<a class="hl" href="#before-you-start" aria-label="Link to this section">#</a></h2>
 <h3 id="what-you-need">What you need<a class="hl" href="#what-you-need" aria-label="Link to this section">#</a></h3>
-<ul><li>A Windows 10 or Windows 11 machine on which you may install programs.</li><li>The release zip, <code>kpi-store-1.1.zip</code>.</li><li>The address of the sandbox workspace, as your browser shows it when you open Databricks.</li><li>The ID of a SQL warehouse you may use in that workspace. The sync check reads through it.</li><li>The address of the Neo4j Enterprise server, your user name there and your password.</li><li>The database <code>businessprocessarchitecturegraph</code> on that server. The copy never creates a database. If it is missing, ask the server's administrator for it before you start.</li></ul>
+<ul><li>A Windows 10 or Windows 11 machine on which you may install programs.</li><li>The release zip, <code>kpi-store-1.2.zip</code>.</li><li>The address of the sandbox workspace, as your browser shows it when you open Databricks.</li><li>The ID of a SQL warehouse you may use in that workspace. The sync check reads through it.</li><li>The address of the Neo4j Enterprise server, your user name there and your password.</li><li>The database <code>businessprocessarchitecturegraph</code> on that server. The copy never creates a database. If it is missing, ask the server's administrator for it before you start.</li></ul>
 <h3 id="the-limits">The limits<a class="hl" href="#the-limits" aria-label="Link to this section">#</a></h3>
 <p>The run keeps three limits. Code enforces each one.</p>
 <div class="tblwrap"><table><thead><tr><th>Limit</th><th>What enforces it</th></tr></thead><tbody><tr><td>The notebook writes only to <code>idp_sbx.kpi_store</code> and <code>idp_sbx.tech_graph</code>.</td><td><code>kpi_store/load_databricks.py</code>, the class <code>Gate</code>. Every SQL statement of the notebook passes <code>Gate.check</code>, which refuses a write outside the two schemas that <code>kpi_store.toml</code> names (<code>write_schemas</code> in <code>kpi_store/settings.py</code>). A refused statement is never sent. <code>kpi_store/tests/test_load_databricks.py</code> tests it.</td></tr><tr><td>The notebook reads only the catalogs in <code>kpi_store.toml</code>.</td><td>The same <code>Gate.check</code>. It refuses a read outside <code>read_catalogs</code>. It also allows three system schemas, which discovery needs: <code>system.information_schema</code>, <code>system.access</code> and <code>system.lakeflow</code>.</td></tr><tr><td>The Neo4j load writes only to <code>businessprocessarchitecturegraph</code>.</td><td><code>kpi_store/copy_enterprise.py</code>. <code>open_target</code> opens every session on that one name, and the server must confirm the name. It refuses the <code>system</code> database, a missing database and an alias. <code>check_statement</code> refuses any statement that creates, alters or drops a database, a user or a role. <code>decide</code> stops when the database holds a node that does not carry the KPI Store's marks, which the paragraph below lists. <code>kpi_store/tests/test_copy_enterprise.py</code> tests it.</td></tr></tbody></table></div>
@@ -262,7 +262,7 @@ bash = "PortableGit/bin/bash.exe"</code></pre>
 <div class="tblwrap"><table><thead><tr><th>Folder</th><th>What it holds</th></tr></thead><tbody><tr><td><code>%USERPROFILE%\kpi-store</code></td><td>The release folder: the unpacked zip, kept in Git.</td></tr><tr><td><code>%USERPROFILE%\kpi-store-local</code></td><td>The local folder: your two settings files, the downloaded jars, and everything the runs write.</td></tr><tr><td><code>%USERPROFILE%\kpi-store-venv</code></td><td>A Python virtual environment, if you use one.</td></tr></tbody></table></div>
 <p>Do not put these folders into a folder that OneDrive or another sync program copies, such as <code>Documents</code> or <code>Desktop</code>. Any other short path that you may write to works as well. Then write your paths wherever this guide writes these.</p>
 <h3 id="unpack-the-release">Unpack the release<a class="hl" href="#unpack-the-release" aria-label="Link to this section">#</a></h3>
-<ol><li>In File Explorer, right-click <code>kpi-store-1.1.zip</code> and choose "Extract All".</li><li>As the folder, type the path of your user folder and <code>\kpi-store</code>, such as <code>C:\Users\&lt;your user name&gt;\kpi-store</code>. Click "Extract".</li><li>Check that <code>%USERPROFILE%\kpi-store\README.md</code> exists. If the files lie one folder deeper, move them up, so that <code>README.md</code> lies in <code>kpi-store</code> itself.</li></ol>
+<ol><li>In File Explorer, right-click <code>kpi-store-1.2.zip</code> and choose "Extract All".</li><li>As the folder, type the path of your user folder and <code>\kpi-store</code>, such as <code>C:\Users\&lt;your user name&gt;\kpi-store</code>. Click "Extract".</li><li>Check that <code>%USERPROFILE%\kpi-store\README.md</code> exists. If the files lie one folder deeper, move them up, so that <code>README.md</code> lies in <code>kpi-store</code> itself.</li></ol>
 <p>This guide calls that folder the release folder.</p>
 <h3 id="keep-the-release-folder-in-git">Keep the release folder in Git<a class="hl" href="#keep-the-release-folder-in-git" aria-label="Link to this section">#</a></h3>
 <p>Put the release folder into Git before you change anything in it. Every later change then shows against the release as shipped, and the cut tool commits and tags each correction.</p>
@@ -271,7 +271,7 @@ bash = "PortableGit/bin/bash.exe"</code></pre>
 git config user.name "KPI Store operator"
 git config user.email "kpi-store-operator@example.invalid"
 git add -A
-git commit -m "KPI Store 1.1 as shipped"</code></pre>
+git commit -m "KPI Store 1.2 as shipped"</code></pre>
 <p>The last lines name the commit and count the files.</p></li></ol>
 <p>Three rules keep the folder and the zip right:</p>
 <ul><li><strong>The runner zips what Git tracks.</strong> In a Git folder the zip holds exactly the files that Git tracks. In a plain folder, one with no <code>.git</code> folder, it holds every file except caches. <code>scripts/check-git-copy.sh</code> proves on the release that both give the same zip, and the test job runs it on Linux and on Windows.</li><li><strong>Commit only the release's files and your changes to them.</strong> Keep a Python virtual environment outside the release folder. Do not run <code>uv init</code> there, and do not commit the project files of a tool, such as <code>pyproject.toml</code>, <code>uv.lock</code> or <code>.python-version</code>: they would travel in the zip. On the first real run such files were committed in the release folder, and the zip held 928 files where the release had 926.</li><li><strong>Commit your changes before a run that cuts.</strong> The cut refuses a Git folder that holds a change which is not committed, and names the files.</li></ul>
@@ -374,9 +374,9 @@ summary: would print the run's summary</code></pre></li></ol>
 <pre><code class="lang-text">run &lt;run ID&gt;: cut, check, zip, volume, upload, notebook, report, fuseki, neo4j, enterprise, sync, summary
 cut: no report waits to be cut
 check: all checks passed
-zip: kpi-store-1.1.zip: &lt;count&gt; files, SHA-256 &lt;checksum&gt;
+zip: kpi-store-1.2.zip: &lt;count&gt; files, SHA-256 &lt;checksum&gt;
 volume: &lt;the volume and what the step created&gt;
-upload: kpi-store-1.1.zip and kpi_store.toml are in &lt;the path in the volume&gt;
+upload: kpi-store-1.2.zip and kpi_store.toml are in &lt;the path in the volume&gt;
 notebook: notebook run &lt;number&gt; stopped on a report: 1 row(s) block
 the notebook stopped: 1 row(s) block the load, of &lt;count&gt; in the report
   &lt;row&gt; column-renamed &lt;catalog&gt;.gold_commercial_core.mips_mpr_executive_summary_fact: ChangeValue -&gt; Change_Value_Amount; recommended: accept
@@ -443,9 +443,9 @@ Versions the cut writes:
 ...
 cut: cut the cleared report: &lt;count&gt; row(s) decided, &lt;count&gt; left undecided
 check: all checks passed
-zip: kpi-store-1.1.zip: &lt;count&gt; files, SHA-256 &lt;checksum&gt;
+zip: kpi-store-1.2.zip: &lt;count&gt; files, SHA-256 &lt;checksum&gt;
 volume: &lt;the volume&gt; is there
-upload: kpi-store-1.1.zip and kpi_store.toml are in &lt;the path in the volume&gt;
+upload: kpi-store-1.2.zip and kpi_store.toml are in &lt;the path in the volume&gt;
 notebook: notebook run &lt;number&gt; loaded: &lt;count&gt; triples in &lt;catalog&gt;.&lt;schema&gt;.epm_triples, hash &lt;hash&gt;
 report: no row blocks; Databricks marker of &lt;time&gt;, &lt;count&gt; rows; technical graph loaded in Databricks, its file fetched
 fuseki: loaded, &lt;count&gt; graphs, &lt;count&gt; triples, RDFC-1.0 hash &lt;hash&gt; equal in the store and the release files (&lt;which server and where it keeps the data&gt;); technical graph loaded, &lt;count&gt; triples
@@ -500,9 +500,9 @@ tech:enterprise current     &lt;why&gt;</code></pre>
 <pre><code class="lang-text">run &lt;run ID&gt;: cut, check, zip, volume, upload, notebook, report, fuseki, neo4j, enterprise, sync, summary
 cut: no report waits to be cut
 check: all checks passed
-zip: kpi-store-1.1.zip: &lt;count&gt; files, SHA-256 &lt;checksum&gt;
+zip: kpi-store-1.2.zip: &lt;count&gt; files, SHA-256 &lt;checksum&gt;
 volume: &lt;the volume&gt; is there
-upload: kpi-store-1.1.zip and kpi_store.toml are in &lt;the path in the volume&gt;
+upload: kpi-store-1.2.zip and kpi_store.toml are in &lt;the path in the volume&gt;
 notebook: notebook run &lt;number&gt; current: &lt;count&gt; triples in &lt;catalog&gt;.&lt;schema&gt;.epm_triples, hash &lt;hash&gt;
 report: no row blocks; Databricks marker of &lt;time&gt;, &lt;count&gt; rows; technical graph &lt;its status&gt; in Databricks, its file fetched
 fuseki: current, &lt;count&gt; graphs, &lt;count&gt; triples, RDFC-1.0 hash &lt;hash&gt; equal in the store and the release files (&lt;which server and where it keeps the data&gt;); technical graph &lt;its status&gt;, &lt;count&gt; triples
@@ -538,7 +538,7 @@ the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not ch
 <p>It reads the release folder and <code>%USERPROFILE%\kpi-store-local\kpi_store.toml</code>. It writes the zip and the settings copy to the run's folder, under <code>upload</code>. It stops when a settings file in the release folder holds a password.</p>
 <pre><code class="lang-powershell">python -m kpi_store.runner --only zip</code></pre>
 <pre><code class="lang-text">run &lt;run ID&gt;: zip
-zip: kpi-store-1.1.zip: &lt;count&gt; files, SHA-256 &lt;checksum&gt;
+zip: kpi-store-1.2.zip: &lt;count&gt; files, SHA-256 &lt;checksum&gt;
 the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
 <h3 id="volume"><code>volume</code><a class="hl" href="#volume" aria-label="Link to this section">#</a></h3>
 <p>It asks Databricks, through the Databricks command line, whether the schema and the volume exist. It creates each one that is missing.</p>
@@ -552,7 +552,7 @@ the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not ch
 <p>It reads the two files of the <code>zip</code> step. It writes them to the volume and replaces the ones of the run before.</p>
 <pre><code class="lang-powershell">python -m kpi_store.runner --only upload</code></pre>
 <pre><code class="lang-text">run &lt;run ID&gt;: upload
-upload: kpi-store-1.1.zip and kpi_store.toml are in &lt;the path in the volume&gt;
+upload: kpi-store-1.2.zip and kpi_store.toml are in &lt;the path in the volume&gt;
 the steps that ran passed; left out: &lt;the other steps&gt; (not run, so not checked)</code></pre>
 <h3 id="notebook"><code>notebook</code><a class="hl" href="#notebook" aria-label="Link to this section">#</a></h3>
 <p>It imports <code>kpi_store/notebook/kpi_store_load.py</code> into the workspace folder as the notebook <code>kpi_store_load</code>. It submits the notebook as a one-time job run on serverless compute, waits for it, and reads its result.</p>
@@ -696,7 +696,7 @@ every step passed</code></pre></li></ol>
 <p>To empty the stores and keep the rest, use <code>python -m kpi_store.runner --reset</code> instead, as "Empty every store and load again" shows.</p>
 <h3 id="the-release-folder">The release folder<a class="hl" href="#the-release-folder" aria-label="Link to this section">#</a></h3>
 <p>The cut is the only step that changed the release folder.</p>
-<ol><li>Rename <code>%USERPROFILE%\kpi-store</code>, for example to <code>kpi-store-with-correction</code>.</li><li>Unpack <code>kpi-store-1.1.zip</code> again, as in "Unpack the release", and run the Git commands of "Keep the release folder in Git" there.</li></ol>
+<ol><li>Rename <code>%USERPROFILE%\kpi-store</code>, for example to <code>kpi-store-with-correction</code>.</li><li>Unpack <code>kpi-store-1.2.zip</code> again, as in "Unpack the release", and run the Git commands of "Keep the release folder in Git" there.</li></ol>
 <p>The stores then read <code>behind</code> until you load them again from that folder.</p>
 <h3 id="databricks">Databricks<a class="hl" href="#databricks" aria-label="Link to this section">#</a></h3>
 <p>Before the first run, the two schemas held no KPI Store table.</p>

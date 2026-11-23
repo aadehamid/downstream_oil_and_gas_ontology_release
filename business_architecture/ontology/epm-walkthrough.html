@@ -968,7 +968,7 @@ MATCH (:Resource)-[r]-&gt;(:Resource) RETURN count(r) AS relationships;</code></
 # zip. It never goes inside the zip. The notebook stops before any read or write when this file is missing or wrong.
 
 [release]
-zip = "kpi-store-1.1.zip"          # file name in the volume, beside this file
+zip = "kpi-store-1.2.zip"          # file name in the volume, beside this file
 sha256 = "0000000000000000000000000000000000000000000000000000000000000000"  # the zip's SHA-256; the notebook refuses a zip that differs
 
 [databricks]
@@ -1055,7 +1055,7 @@ Path("../cleared").mkdir(exist_ok=True)
 Path("../cleared/discovery-report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8", newline="\n")</code></pre>
   <p class="rise">The plan now names the change, the rows it leaves, and the versions it would write:</p>
 <pre data-snippet="powershell run=release-copy"><code>python -m kpi_store.cut --report ../cleared/discovery-report.json --plan</code></pre>
-<pre data-snippet="text expect"><code>Discovery run &lt;run id&gt; of KPI Store 1.1: 28 rows.
+<pre data-snippet="text expect"><code>Discovery run &lt;run id&gt; of KPI Store 1.2: 28 rows.
 The cut applies (1):
   R002 column-renamed: column ChangeValue of idp_sbx.gold_commercial_core.mips_mpr_executive_summary_fact becomes Change_Value_Amount  BREAKING
 ...

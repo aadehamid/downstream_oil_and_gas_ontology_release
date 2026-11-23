@@ -10,7 +10,7 @@ from kpi_store.tests import support
 def test_the_example_file_parses_to_the_values_it_shows():
     s = support.make_settings()
     assert (s.zip_name, s.write_catalog, s.write_schema, s.tech_graph_schema, s.volume) == \
-        ("kpi-store-1.1.zip", "idp_sbx", "kpi_store", "tech_graph", "releases")
+        ("kpi-store-1.2.zip", "idp_sbx", "kpi_store", "tech_graph", "releases")
     assert s.read_catalogs == ("idp_sbx", "synapse_dev")
     assert s.triples_table == "idp_sbx.kpi_store.epm_triples"
     assert s.markers_table == "idp_sbx.kpi_store.epm_store_markers"
@@ -39,7 +39,7 @@ def test_skip_rules_ignore_case_and_cover_schemas_and_tables():
 
 @pytest.mark.parametrize("change, message", [
     ({"sha256": 'sha256 = "abc"'}, "64 lower-case hexadecimal"),
-    ({"zip": 'zip = "../kpi-store-1.1.zip"'}, "file name ending in .zip"),
+    ({"zip": 'zip = "../kpi-store-1.2.zip"'}, "file name ending in .zip"),
     ({"write_catalog": 'write_catalog = "idp sbx; DROP"'}, "letters, digits and _"),
     ({"tech_graph_schema": 'tech_graph_schema = "kpi_store"'}, "must differ"),
     ({"read_catalogs": "read_catalogs = []"}, "at least one"),
@@ -77,9 +77,9 @@ def test_the_zip_must_be_beside_the_settings_and_have_the_named_checksum(tmp_pat
     s = support.make_settings(tmp_path, sha256=f'sha256 = "{good}"')
     with pytest.raises(settings.SettingsError, match="is not beside the settings file"):
         settings.check_zip(s)
-    (tmp_path / "kpi-store-1.1.zip").write_bytes(data)
+    (tmp_path / "kpi-store-1.2.zip").write_bytes(data)
     assert settings.check_zip(s) == good
-    (tmp_path / "kpi-store-1.1.zip").write_bytes(data + b"!")
+    (tmp_path / "kpi-store-1.2.zip").write_bytes(data + b"!")
     with pytest.raises(settings.SettingsError, match="SHA-256 is .*, not the"):
         settings.check_zip(s)
 

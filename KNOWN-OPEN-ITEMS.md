@@ -1,6 +1,6 @@
 # Known open items
 
-This page lists what is open in KPI Store 1.1, what has not run yet and what was left for later. Each item is yours to close or to leave in your own copy. `HOW-TO-UPDATE.md` says how to change anything here.
+This page lists what is open in KPI Store 1.2, what has not run yet and what was left for later. Each item is yours to close or to leave in your own copy. `HOW-TO-UPDATE.md` says how to change anything here.
 
 ## What has not run yet
 

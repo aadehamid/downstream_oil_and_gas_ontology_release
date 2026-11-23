@@ -186,7 +186,7 @@ def read(release_root):
 
 
 def release_name(release_root):
-    """The release's name from release.json at its root, such as "KPI Store 1.1"."""
+    """The release's name from release.json at its root, such as "KPI Store 1.2"."""
     path = Path(release_root) / "release.json"
     try:
         return str(json.loads(path.read_text(encoding="utf-8"))["release"])

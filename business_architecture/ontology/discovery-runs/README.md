@@ -24,7 +24,7 @@ python -m kpi_store.cut --report kpi_store/tests/fixtures/cut/discovery-report.j
 ```
 
 ```text expect
-Discovery run 20261111T120000Z-0a1b2c3d of KPI Store 1.1: 28 rows.
+Discovery run 20261111T120000Z-0a1b2c3d of KPI Store 1.2: 28 rows.
 The cut applies (4):
 ...
   integration 2.5.0 -> 2.5.1-correction.1

@@ -269,11 +269,11 @@ def test_the_settings_copy_gets_the_zips_checksum_and_nothing_else_changes():
 def test_the_zip_step_writes_outside_the_release_and_leaves_the_settings_file_alone(setup):
     ctx = setup.make()
     result = runner.step_zip(ctx)
-    built = setup.run_dir / "upload" / "kpi-store-1.1.zip"
+    built = setup.run_dir / "upload" / "kpi-store-1.2.zip"
     assert result["sha256"] == hashlib.sha256(built.read_bytes()).hexdigest() and result["files"] == 8
     assert f'sha256 = "{result["sha256"]}"' in (setup.run_dir / "upload" / "kpi_store.toml").read_text(encoding="utf-8")
     assert (setup.tmp / "local" / "kpi_store.toml").read_text(encoding="utf-8") == support.SETTINGS_TEXT
-    assert result["line"] == f"kpi-store-1.1.zip: 8 files, SHA-256 {result['sha256']}"
+    assert result["line"] == f"kpi-store-1.2.zip: 8 files, SHA-256 {result['sha256']}"
 
 
 # ---- check -----------------------------------------------------------------------------------------
@@ -329,10 +329,10 @@ def test_the_upload_copies_the_zip_then_the_settings(setup):
     run = Recorder()
     result = runner.step_upload(setup.make(run))
     upload = setup.run_dir / "upload"
-    assert run.calls == [[CLI, "fs", "cp", str(upload / "kpi-store-1.1.zip"), f"{VOLUME}/kpi-store-1.1.zip", "--overwrite", *PROFILE],
+    assert run.calls == [[CLI, "fs", "cp", str(upload / "kpi-store-1.2.zip"), f"{VOLUME}/kpi-store-1.2.zip", "--overwrite", *PROFILE],
                          [CLI, "fs", "cp", str(upload / "kpi_store.toml"), f"{VOLUME}/kpi_store.toml", "--overwrite", *PROFILE]]
     assert result["volume"] == "/Volumes/idp_sbx/kpi_store/releases"
-    with pytest.raises(runner.StepFailed, match=r"kpi-store-1.1.zip could not be uploaded \(Error: no such volume\)"):
+    with pytest.raises(runner.StepFailed, match=r"kpi-store-1.2.zip could not be uploaded \(Error: no such volume\)"):
         runner.step_upload(setup.make(Recorder(lambda cmd: (1, "", "Error: no such volume"))))
 
 

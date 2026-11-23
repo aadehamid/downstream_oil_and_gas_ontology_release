@@ -11,7 +11,7 @@
 # needs an id that no other question has. A question may carry `help`, one line the forms show under its answer. README.md in this folder explains each field under "Change the form".
 
 version = "1.2"
-release = "KPI Store 1.1"
+release = "KPI Store 1.2"
 
 # ---- The fixed choices -----------------------------------------------------------------------------------------
 # Short lists that are the same in every organization. A list that an organization sets for itself, such as the

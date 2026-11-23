@@ -231,7 +231,7 @@ try {
   await page.locator("#results .term-button:visible").first().click();
   assert.ok(await page.locator("#results > details[open]").count(), "Selecting a term must retain the open hierarchy");
   await page.locator("#about").click();
-  assert.equal(await page.locator("#release-pin").innerText(), "KPI Store 1.1");
+  assert.equal(await page.locator("#release-pin").innerText(), "KPI Store 1.2");
   const sources = await page.locator("#sources").textContent();
   assert.match(sources, /releases\/technical-graph\/1\.1\.0\/technical-graph\.ttl/);
   assert.doesNotMatch(sources, /technical-graph\/1\.0\.0/);
@@ -520,7 +520,7 @@ try {
       valueStreamOverviews: true,
       graph: true,
       mobile: true,
-      release: "KPI Store 1.1",
+      release: "KPI Store 1.2",
       screenshots: shots,
     }),
   );
