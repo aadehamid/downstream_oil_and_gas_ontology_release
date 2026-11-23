@@ -12,15 +12,16 @@ The release's own tests check every block of commands and every block of printed
 
 Find your case in the table below, then follow what its row names line by line, from its first step to its last. Take the first row that fits. Two things on your machine tell you which row is yours:
 
-- the settings file `kpi_store.toml` in the folder `%USERPROFILE%\kpi-store-local`. It is there when a KPI Store release was set up on this machine;
+- whether a KPI Store release was set up on this machine. Open PowerShell and run `echo $env:KPI_STORE_LOCAL`. When a release was set up, it prints the path of your local settings file, because section 1, step 7, saved that path. When none was, it prints an empty line;
 - the line `"release"` in `release.json`, at the top of the release folder you already have.
 
 | Your case | How you know it | Follow |
 |---|---|---|
-| No KPI Store release was set up on this machine | There is no `%USERPROFILE%\kpi-store-local\kpi_store.toml` | Section 1, then section 2. If an older release folder is there, rename it first, for example to `kpi-store-old`. |
-| A KPI Store 1.1 release was set up on this machine | `kpi_store.toml` is there, and `release.json` reads `"release": "KPI Store 1.1"` | Section 8, "Coming from KPI Store 1.1". It covers a 1.1 folder whether or not the 1.1 runner loaded the stores. |
-| A KPI Store 1.2 release was set up, and you received a newer zip | `release.json` reads `"release": "KPI Store 1.2"` or a later release | Section 8, steps 1 to 6. |
-| This release is set up and loaded, and you want to change the ontology | The sync check of section 2, step 5, reads `current` on every line | The section for your change, from 3 to 5, then section 6, "After every change", and section 9. |
+| No KPI Store release was set up on this machine | `echo $env:KPI_STORE_LOCAL` prints an empty line | Section 1, then section 2. If an older release folder is there, rename it first, for example to `kpi-store-old`. If the folder `%USERPROFILE%\kpi-store-local` is there, a release was set up after all: ask the release's team before you run anything. |
+| A KPI Store 1.1 release was set up on this machine | It prints a path, and `release.json` reads `"release": "KPI Store 1.1"` | Section 8, "Coming from KPI Store 1.1". It covers a 1.1 folder whether or not the 1.1 runner loaded the stores. |
+| A KPI Store 1.2 release was set up, and you received a newer zip | It prints a path, and `release.json` reads `"release": "KPI Store 1.2"` or a later release | Section 8, steps 1 to 6. |
+| This release is set up, but the stores are not loaded, or not all current | It prints a path, and the sync check of section 2, step 5, does not read `current` on every line | Section 2. |
+| This release is set up and loaded, and you want to change the ontology | The sync check of section 2, step 5, reads `current` on every line | The section for your change, from 3 to 5. Its last step sends you to section 6, "After every change". Then section 9. |
 
 You are done when you know which row is yours. If none fits, or two seem to fit, ask the release's team before you run anything.
 

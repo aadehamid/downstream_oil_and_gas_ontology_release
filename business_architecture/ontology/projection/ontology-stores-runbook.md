@@ -170,7 +170,7 @@ This is for a release folder that holds no change of your own. When it holds cha
 1. Rename the old release folder, for example from `kpi-store` to `kpi-store-old`. Its `.git` folder goes with it, and so does its history.
 2. Unpack the new zip under the old folder's name, such as `%USERPROFILE%\kpi-store`, as in "Unpack the release". A folder from KPI Store 1.1 is named `kpi-store-1.1`: keep that name.
 3. Run the Git commands of "Keep the release folder in Git" in the new folder.
-4. Leave the local folder, the virtual environment and `KPI_STORE_LOCAL` as they are. If the old folder held a correction that the new zip does not hold, read "The release folder" under "How to undo" first: the stores then read `behind` until you load them again.
+4. Leave the local folder, the virtual environment and `KPI_STORE_LOCAL` as they are. If the old folder held a correction that the new zip does not hold, read "The release folder" under "How to undo" first: the stores then read `behind` until you load them again. If the run folder in the local folder, such as `%USERPROFILE%\kpi-store-local\runs`, holds a folder `pending`, rename it to `pending-old`. It holds a report of the old release that was never cut: this release refuses a report of another release, and the next run makes a new one.
 5. Run the setup check, then the run.
 
 ### Make the local folder and fetch three files
