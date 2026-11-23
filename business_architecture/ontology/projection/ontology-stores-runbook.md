@@ -165,7 +165,7 @@ The release brings two files for Git. `.gitattributes` keeps the line ends of te
 
 A newer zip of the release replaces the release folder. Your settings, your jars and your virtual environment stay.
 
-This is for a release folder that holds no change of your own. When it holds changes, such as a module or a KPI that you applied, upgrade its tools instead with `python -m kpi_store.upgrade`, as `HOW-TO-UPDATE.md`, "Upgrade the tools from a newer release", says. The upgrade keeps your changes.
+This is for a release folder that holds no change of your own. When it holds changes, such as a module or a KPI that you applied, upgrade its tools instead with `python -m kpi_store.upgrade`, as `HOW-TO-UPDATE.md`, "Upgrade the tools from a newer release", says. The upgrade keeps your changes, and a content file you never changed takes the new release's version.
 
 1. Rename the old release folder, for example from `kpi-store` to `kpi-store-old`. Its `.git` folder goes with it, and so does its history.
 2. Unpack the new zip under the old folder's name, such as `%USERPROFILE%\kpi-store`, as in "Unpack the release". A folder from KPI Store 1.1 is named `kpi-store-1.1`: keep that name.
