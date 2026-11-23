@@ -96,10 +96,10 @@ def test_an_upgrade_takes_new_tools_keeps_content_and_tags(tmp_path):
     assert read(copy, "business_architecture/ontology/kpi/measures.csv") == "id\nM1\nM2\n"
     assert read(copy, "business_architecture/ontology/kpi/measures.ttl") == "# the measures, as the release team has them\n"
     assert read(copy, "business_architecture/ontology/kpi/units.csv") == "unit\nbbl\n"
-    # A pattern with ! keeps the copy's pin list.
-    assert read(copy, "scripts/pinned-tests.txt") == "test_a\n"
-    assert sorted(plan.kept) == ["business_architecture/ontology/kpi/measures.csv", "scripts/pinned-tests.txt"]
-    assert plan.renewed == ["business_architecture/ontology/kpi/measures.ttl", "release.json"]
+    # A path a ! line takes out of the tools is content: the copy never changed its pin list, so it takes the new one.
+    assert read(copy, "scripts/pinned-tests.txt") == "test_a\ntest_b\n"
+    assert sorted(plan.kept) == ["business_architecture/ontology/kpi/measures.csv"]
+    assert plan.renewed == ["business_architecture/ontology/kpi/measures.ttl", "release.json", "scripts/pinned-tests.txt"]
     assert plan.updated == ["kpi_store/tool.py"]
     assert git(copy, "tag") == "kpi-store-1.3-tools"
     assert git(copy, "log", "-1", "--format=%s") == "Upgrade the tools to KPI Store 1.3"
@@ -616,19 +616,20 @@ def test_case_twins_read_paths_as_zipfile_unpacks_them():
     assert up.case_twins(["kpi_store/", "kpi_store/"]) == {}
 
 
-def test_content_left_as_shipped_takes_the_new_version_and_the_copys_own_files_stay(tmp_path):
+def test_content_left_as_shipped_takes_the_new_version_and_content_the_copy_changed_stays(tmp_path):
     # A 1.1 copy that never touched the kpi tables, upgraded to a release that adds a column to them: the copy
     # takes the new table, so the new builders read the format they expect.
     copy = shipped(tmp_path)
     commit(copy, {"kpi_store/tool.py": "A = 1\n# the copy's own line\n"}, "A change to a tool")
+    commit(copy, {"scripts/pinned-tests.txt": "test_a\ntest_mine\n"}, "A pin of the copy's own")
     new = release(tmp_path / "new", "1.3", {"business_architecture/ontology/kpi/measures.csv": "id,source\nM1,s\n",
                                             "scripts/pinned-tests.txt": "test_a\ntest_b\n"})
     plan = up.upgrade(copy, new, say=lambda *_: None, check=PASS)
     assert read(copy, "business_architecture/ontology/kpi/measures.csv") == "id,source\nM1,s\n"
-    assert plan.renewed == ["business_architecture/ontology/kpi/measures.csv", "release.json"]
-    # release.json takes the new release's name, as no command writes it; a `!` path stays the copy's.
+    assert plan.renewed == ["business_architecture/ontology/kpi/measures.csv", "release.json"]  # not the pin list
+    # release.json takes the new release's name, as no command writes it; a `!` path the copy changed stays the copy's.
     assert json.loads(read(copy, "release.json"))["release"] == "KPI Store 1.3"
-    assert read(copy, "scripts/pinned-tests.txt") == "test_a\n"
+    assert read(copy, "scripts/pinned-tests.txt") == "test_a\ntest_mine\n"
     assert "release.json" in plan.renewed and "scripts/pinned-tests.txt" in plan.kept
 
 

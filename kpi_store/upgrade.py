@@ -1,4 +1,5 @@
-"""The upgrade command: brings the tools of a newer release into your copy, and keeps every change you made.
+"""The upgrade command: brings a newer release's tools into your copy, keeps the content you changed, and takes the
+new version of content you left as shipped.
 
     python -m kpi_store.upgrade --from kpi-store-1.3.zip --plan    # say what would change, and change nothing
     python -m kpi_store.upgrade --from kpi-store-1.3.zip           # upgrade the tools of this release folder
@@ -12,8 +13,8 @@ release's version).
 Which files are tools: the new release lists them in kpi_store/upgrade-paths.txt, one pattern a line. `**` matches
 any number of folders, `*` any part of one name, and a line that starts with `!` takes paths out again. Every
 other file is content. A content file the new release changes takes the new version when your copy left it as
-shipped, and keeps your version when your copy changed it; a path that a `!` line takes out always keeps yours. No command
-writes release.json, so a copy takes the new release's name with its tools. A table (a .csv file) that both changed, whose header the new release changes, is refused: your change
+shipped, and keeps your version when your copy changed it, the paths that a `!` line takes out of the tools included. No
+command writes release.json, so a copy takes the new release's name with its tools. A table (a .csv file) that both changed, whose header the new release changes, is refused: your change
 has to be made again in the new format. A content file that is new in
 the new release, and that your copy does not have, is added, because a new tool may need it. A new file whose name
 differs only in the case of its letters from one your copy has is refused, because Windows and macOS hold one file
@@ -107,15 +108,6 @@ def read_patterns(text):
         include = not line.startswith("!")
         pairs.append((include, _pattern(line.lstrip("!"))))
     return pairs
-
-
-def is_own(path, patterns):
-    """True when the last pattern that matches the path is a `!` line: the copy's own file, never replaced."""
-    own = False
-    for include, regex in patterns:
-        if regex.match(path):
-            own = not include
-    return own
 
 
 def is_tool(path, patterns):
@@ -366,7 +358,7 @@ def plan(root, new_root):
             the_plan.removed.append(path)
         elif path in new and path in old and ids[path] != old[path][1]:
             as_shipped = now.get(path, (None, None))[1] == old[path][1]
-            if as_shipped and not is_own(path, patterns):
+            if as_shipped:
                 the_plan.entries[path] = (old[path][0], ids[path], new[path])
                 the_plan.renewed.append(path)
                 continue
@@ -388,7 +380,8 @@ def plan(root, new_root):
 
 def _vendor(root, the_plan):
     """Stores the files and commits, on top of the base, the new release's tool files, its new files and the content
-    files the copy left as shipped, through a temporary index. The commit is on no branch, and the folder's own index and files are not touched."""
+    files the copy left as shipped (a content file the copy changed is not in it, so the merge keeps the copy's),
+    through a temporary index. The commit is on no branch, and the folder's own index and files are not touched."""
     files = [(p, e) for p, e in the_plan.entries.items() if e is not None]
     written = _blobs(root, [str(e[2].resolve()) for _, e in files], write=True)
     if written != [e[1] for _, e in files]:
@@ -400,7 +393,7 @@ def _vendor(root, the_plan):
         _out(root, "update-index", "-z", "--index-info", stdin="".join(line + "\0" for line in lines), env=env)
         tree = _out(root, "write-tree", env=env).strip()
     return _out(root, "commit-tree", tree, "-p", the_plan.base, "-m", f"The tools of {the_plan.release}",
-                "-m", "Made by python -m kpi_store.upgrade: the new release's tool files, new files and the content files this copy left as shipped, on top of the "
+                "-m", "Made by python -m kpi_store.upgrade: the new release's tool files, new files and the content files this copy left as shipped (not the ones it changed), on top of the "
                       "tools this copy had. The merge commit after it brings them into the copy.").strip()
 
 
@@ -518,7 +511,7 @@ def _move(root, merged, commit, tag, the_plan):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m kpi_store.upgrade",
-                                 description="Bring the tools of a newer release into this copy, and keep every change it made.")
+                                 description="Bring the tools of a newer release into this copy: content it changed stays, and content it left as shipped takes the new version.")
     ap.add_argument("--from", dest="source", required=True, help="the new release: its zip, or the unpacked folder")
     ap.add_argument("--release", default=".", help="your release folder (default: this folder)")
     ap.add_argument("--plan", action="store_true", help="say what would change, and change nothing")

@@ -457,7 +457,7 @@ Use these steps only when a run stops on a step.
 
 ## 8. Upgrade the tools from a newer release
 
-Your copy is the master of the ontology. A newer release from the release's team brings new tools: the commands, the scripts, the skills and the guides. The upgrade takes them into your copy and keeps every change you applied. It runs the full check on the merged copy, and changes your folder only when that passes. `HOW-TO-UPDATE.md`, "Upgrade the tools from a newer release", says how it decides which files are tools.
+Your copy is the master of the ontology. A newer release from the release's team brings new tools: the commands, the scripts, the skills and the guides. The upgrade takes them into your copy and keeps every change you applied; a content file you never changed takes the new release's version. It runs the full check on the merged copy, and changes your folder only when that passes. `HOW-TO-UPDATE.md`, "Upgrade the tools from a newer release", says how it decides which files are tools.
 
 1. Save the new zip beside the release folder. The commands below name it `kpi-store-newer.zip`, as the guide's example does: write the name of the zip you received.
 
