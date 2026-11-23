@@ -281,6 +281,8 @@ The AI is named in your local settings file, as `HOW-TO-UPDATE.md` says in "Choo
 
 The guide's examples name a settings file of their own with `--stores`. Your commands find your settings file through `KPI_STORE_LOCAL`, so leave out `--stores` and the file after it.
 
+An AI agent that works in the release folder, such as Claude Code or Codex, can also run the commands of sections 3 and 4 for you, as the skill in `skills/ontology-change/` tells it. It checks each form, shows you the plan and waits for your yes before it applies anything, and it explains a refusal in plain words. It runs the same commands, so they still decide.
+
 ### Suggestions for a form
 
 The AI suggests answers to a form before anyone signs it. `HOW-TO-UPDATE.md`, "Use AI to suggest answers (optional)", has the whole example.
