@@ -512,7 +512,9 @@ Your copy is the master of the ontology. A newer release from the release's team
 
 ### Coming from KPI Store 1.1
 
-A release folder whose runner has cut a correction holds the tables that the correction changed. This release changes the columns of three of the tables a cut writes, `agents.csv`, `sources.csv` and `tables.csv` of `data-product/pricing`. When the correction changed one of them, the upgrade above refuses the folder and changes nothing, as it did on a rehearsal with the 1.1 zip and one correction. Replace the folder instead, and let this release's runner cut the correction again. This works whether or not the upgrade would refuse.
+This part is for a 1.1 release folder whose only changes are the runner's cuts. A cut changes the tables of `data-product/pricing`, and this release adds a column to two of them, `agents.csv` and `tables.csv`. When a correction changed one of them, the upgrade above refuses the folder and changes nothing, as it did on a rehearsal with the 1.1 zip and one correction. Replace the folder instead, and let this release's runner cut the correction again.
+
+If you also changed the 1.1 folder by hand, the replace leaves those changes in the old folder only. `git log` in the old folder lists them. Make each one again in the new folder with this release's forms, as sections 3 to 5 say, before step 3.
 
 1. Replace the release folder with this release's zip, as the runbook's "Replace the release with a newer zip" says. Keep the folder's name, such as `kpi-store-1.1`. Leave the local folder as it is.
 
@@ -526,7 +528,7 @@ A release folder whose runner has cut a correction holds the tables that the cor
 
    You are done when the second run ends, with or without a stop at the Enterprise copy.
 
-4. If the second run stopped with a line that starts `enterprise: FAILED` and says `Run the runner again with --from enterprise --replace-enterprise`, Neo4j Enterprise holds a graph from 1.1 that differs from this one. That happens, for example, when the 1.1 folder held later corrections. Replace it as section 7, "Replace what Neo4j Enterprise holds", says, with its written authorization. If the second run's last line reads `every step passed`, Enterprise already held the same graph, and nothing needs replacing.
+4. If the second run stopped with a line that starts `enterprise: FAILED` and says `Run the runner again with --from enterprise --replace-enterprise`, Neo4j Enterprise holds a KPI Store copy that is not current with this release, such as the one 1.1 loaded. Replace it as section 7, "Replace what Neo4j Enterprise holds", says, with its written authorization. If the second run's last line reads `every step passed`, Enterprise is current: the run copied the graph, or Enterprise already held it.
 
    You are done when the run's last line reads `every step passed`, or the replace is done.
 
