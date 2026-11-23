@@ -7,6 +7,7 @@ the skill quotes is listed below with the one guide it belongs to, and must stil
 handout's section number) or a numbered step of that guide; each printed line must still be in the code that prints
 it. A name the skill quotes that is not listed fails too, so a new reference gets its guide named here.
 """
+import ast
 import re
 from pathlib import Path
 
@@ -38,15 +39,29 @@ NAMES = {
     "How an interview runs": INTAKE,
     "Where an answer routes the request": INTAKE,
 }
-# Lines the commands print that the skill reads, and the file of the code that prints each.
+# Lines the commands print that the skill reads: the phrase as the skill writes it, the text the code prints, and
+# the file of that code. The skill's phrase must be in SKILL.md, and the printed text must be in a string the code
+# holds (a comment or a docstring does not count).
 PRINTED = {
-    "Result: not complete": "kpi_store/intake/check.py",
-    "Done. ": "kpi_store/apply.py",
-    "No store needs loading": "kpi_store/apply.py",
-    "Run the full check before you load": "kpi_store/apply.py",
+    '"Result: not complete"': ("Result: not complete", "kpi_store/intake/check.py"),
+    "starts `Done.`": ("Done. ", "kpi_store/apply.py"),
+    "no store needs loading": ("No store needs loading", "kpi_store/apply.py"),
 }
-# The double-quoted printed line in SKILL.md; the others it names with backticks or in a sentence.
+# The double-quoted printed line in SKILL.md, which is not a section name.
 QUOTED_PRINTED = {"Result: not complete"}
+
+
+def strings_in(source):
+    """Every string the code holds, f-strings' text parts included, but not its docstrings or its comments."""
+    tree = ast.parse(source)
+    docstrings = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.body:
+            first = node.body[0]
+            if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant):
+                docstrings.add(id(first.value))
+    return [node.value for node in ast.walk(tree)
+            if isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in docstrings]
 
 
 def names_in(text):
@@ -76,8 +91,13 @@ def missing(names, guides):
     return sorted(name for name, guide in names.items() if name not in found[guide])
 
 
-def missing_printed(printed, sources):
-    return sorted(line for line, path in printed.items() if line not in sources[path])
+def missing_printed(printed, skill_text, sources):
+    """The skill phrases that are gone from the skill, and the printed texts that are in no string of their code."""
+    gone = [phrase for phrase in printed if phrase.casefold() not in skill_text.casefold()]
+    for phrase, (text, path) in printed.items():
+        if not any(text in s for s in strings_in(sources[path])):
+            gone.append(text)
+    return sorted(gone)
 
 
 def read(path):
@@ -92,8 +112,9 @@ def test_every_name_is_in_its_own_guide():
     assert missing(NAMES, {g: read(g) for g in (HANDOUT, GUIDE, INTAKE)}) == []
 
 
-def test_every_printed_line_is_in_its_code():
-    assert missing_printed(PRINTED, {p: read(p) for p in set(PRINTED.values())}) == []
+def test_every_printed_line_is_in_the_skill_and_in_its_code():
+    sources = {path: read(path) for _, path in PRINTED.values()}
+    assert missing_printed(PRINTED, SKILL.read_text(encoding="utf-8"), sources) == []
 
 
 def test_the_skill_quotes_names():
@@ -116,7 +137,16 @@ def test_a_numbered_step_and_a_numbered_heading_are_found():
     assert missing({"Check the release and recover": HANDOUT, "See the commit": HANDOUT}, guides) == []
 
 
-def test_an_apply_line_that_is_gone_is_found():
-    printed = {"Done. ": "apply.py", "No store needs loading": "apply.py", "Result: not complete": "check.py"}
-    sources = {"apply.py": 'say(f"Done. {key} is now active.")', "check.py": "Result: not complete"}
-    assert missing_printed(printed, sources) == ["No store needs loading"]
+def test_an_apply_line_that_is_gone_or_only_in_a_comment_is_found():
+    printed = {"starts `Done.`": ("Done. ", "apply.py"), "no store needs loading": ("No store needs loading", "apply.py")}
+    skill = "Done when it prints a line that starts `Done.`; when it said no store needs loading, the check is enough."
+    commented = 'say(f"Done. {key} is now active.")\n# No store needs loading\n'
+    assert missing_printed(printed, skill, {"apply.py": commented}) == ["No store needs loading"]
+    docstring = 'def f():\n    """No store needs loading"""\n    say(f"Done. {k}")\n'
+    assert missing_printed(printed, skill, {"apply.py": docstring}) == ["No store needs loading"]
+
+
+def test_a_changed_phrase_in_the_skill_is_found():
+    printed = {"starts `Done.`": ("Done. ", "apply.py")}
+    assert missing_printed(printed, "Done when it prints a line that starts `Finished.`", {"apply.py": 'say("Done. x")'}) \
+        == ["starts `Done.`"]
