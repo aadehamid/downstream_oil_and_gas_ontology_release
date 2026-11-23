@@ -302,6 +302,7 @@ def test_apply_writes_registers_and_releases_the_module(tmp_path, no_global_git,
                                   release_root=root, now=NOW, say=quiet)
     said = []
     files = apply_cmd.apply([folder], root, say=said.append, now=NOW)
+    assert said[-1].startswith("Run the full check before you load: ")  # the line the ontology-change skill reads
     assert said[-2].startswith(f"Done. {key} 1.0.0 is a new module (major).")
     change = folder.name   # NM-2026-009, or NM-2026-009-2 in a copy that holds that number already
     assert change == "NM-2026-009" or (change.startswith("NM-2026-009-") and change[12:].isdigit()), change

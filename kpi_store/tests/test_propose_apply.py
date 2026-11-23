@@ -429,6 +429,7 @@ def test_a_rename_a_new_other_name_and_a_process_link_go_from_the_form_to_a_comm
     steps = [line[4:] for line in said if line.startswith("... ")]
     assert steps.index("compare the kpi module before and after") < steps.index(f"set kpi to {expected['kpi']}") \
         < steps.index("rebuild the catalog") < steps.index("run the kpi module's tests") < steps.index("write the release")
+    assert said[-1].startswith("Run the full check before you load: ")  # the line the ontology-change skill reads
     assert said[-2].startswith(f"Done. kpi is now {expected['kpi']} (minor), and {len(order) - 1} modules that depend on it took a new patch.")
     # The release holds the new versions, one commit with exactly the changed files, and a clean tree.
     assert {mod: v for mod, v in _versions(root).items() if mod in expected} == expected
