@@ -23,4 +23,4 @@ Status as of 2026-11-24, 13:00 UTC.
 2. Finish Step 0: the APQC re-check, OSDU, ISO 14224 and the leads in the survey register.
 3. Bring batch B3 under Step 3's gate: add the definition review and `check_taxonomy.py` to its expected results.
 4. Extend check V2 to the Step 4 facts before any migration runs.
-5. Turn `registers/skill-gaps.csv` (13 rows) into a skills pull request, with the owner's approval.
+5. Turn `registers/skill-gaps.csv` (19 rows) into a skills pull request, with the owner's approval.
