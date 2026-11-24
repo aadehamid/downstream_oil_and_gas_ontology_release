@@ -1,6 +1,6 @@
 # Decision register, DS_Business_Process
 
-Each decision gives the question, the choice, the owner's words and where they were said. A decision counts only when it quotes Hamid. A merge alone decides nothing.
+Each decision gives the question, the choice, the owner's words and where they were said. A decision counts only when it quotes the decision owner. A merge alone decides nothing.
 
 Rounds 1 and 2 follow the grill-with-docs method: round 1 settled what nothing else depends on (Q1 to Q11 of the Phase 1 report, https://claude.ai/artifact/WLjPmXvJjDPeE4strubij4, section 8). Round 2 settles the hierarchy once the peer research is in.
 
