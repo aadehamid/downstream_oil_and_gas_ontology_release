@@ -63,10 +63,16 @@ def descendants(baseline: rdflib.Graph, local: str) -> set[str]:
     return out
 
 
-def approved_ids(baseline: rdflib.Graph, expected: list[dict]) -> set[str]:
+def approved_ids(baseline: rdflib.Graph, expected: list[dict], candidate: rdflib.Graph | None = None) -> set[str]:
     """The baseline concepts this batch may change: each named row, the descendants of each move (their level
-    changes), and each concept whose parent or child is named (its skos:broader or narrower link changes)."""
+    changes), and each concept whose parent or child is named (its skos:broader or narrower link changes).
+    With a candidate, also the new concepts the file names, found by their new label, so V3 lets them in and
+    no other new concept."""
     ids = {r["baseline_id"] for r in expected if r["baseline_id"]}
+    if candidate is not None:
+        labels = _by_label(candidate)
+        ids |= {d.local_id(str(labels[r["new_label"]])) for r in expected
+                if r["change"] == "new" and r["new_label"] in labels}
     for r in expected:
         if r["change"] == "move":
             ids |= descendants(baseline, r["baseline_id"])

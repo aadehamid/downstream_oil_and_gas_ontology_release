@@ -5,7 +5,7 @@ Status: approved by the decision owner on 2026-11-24 ("goal yes"), recorded in `
 ## The goal, in the owner's words
 
 - "Let us make this a goal." (decision owner, 2026-11-24, project chat)
-- The brief's aim, as he set it: a company-agnostic but industry-validated downstream oil and gas business process ontology, generalized from `kpi-store/1.2`, that keeps downstream specificity, preserves IDs and traceability, and cites high-quality public evidence.
+- The brief's aim, as the decision owner set it: a company-agnostic but industry-validated downstream oil and gas business process ontology, generalized from `kpi-store/1.2`, that keeps downstream specificity, preserves IDs and traceability, and cites high-quality public evidence.
 - "basiacally we should migrate over all business areas in 1.2 and expand on them in this generic release" (decision owner, 2026-11-23)
 - "Validation is very important. we must test that every chnages works this way it should. So before chnages we wotk out what the validation should be." (decision owner, 2026-11-23)
 
@@ -25,7 +25,15 @@ Each line ends **Met**, with the command or file that shows it, run against the 
 10. **The repository's checks pass.** `scripts/check.sh` exits 0 and CI is green on the final commit. The tests that need a live store also run, against throwaway Neo4j and Fuseki test servers started outside the release, and none of them is skipped. (1.2 removed its own container stores, and `scripts/check_standalone.py` keeps them out, so the test servers are never part of the release.) Databricks has no local stand-in, so its load stays an owner's step.
 11. **The loads into the stores run with no issues.** The decision owner: "the load to stores must also be tested to make sure they run. You can always delete what we have in the store when the testing is done." (2026-11-24). On fresh, throwaway Neo4j and Fuseki test servers started outside the release (a second Neo4j server stands in for Enterprise), and then on the decision owner's own stores, the migrated loaders load the release, the sync check reports every store current, the questions return their expected answers, and the reset then empties every store. The saved log shows each step's exit status 0. Exception: Databricks, which has no local stand-in; its steps are proven only by the tests and a dry run.
 12. **The runbook works as written.** The decision owner: "when i get to the target environment i am able to run thensame thing by following the runbook and no issues." (2026-11-24). In a clean container that starts with only what the runbook's prerequisites list, every command is copied from the runbook in its order, nothing is typed that the runbook does not say, and every step ends as the runbook says it should. Any step that needed a fix is fixed in the runbook, and the rehearsal is rerun from the start. The rehearsal log is saved with the release. The same exception for Databricks applies.
-13. **the decision owner has approved the release.** The release pull request into `ds-business-process/1.0` has an independent review with every finding fixed or answered, and the decision owner's approval. Every material change in it has an approved decision in the register with his recorded words. Nothing is merged without his approval.
+13. **the decision owner has approved the release.** The release pull request into `ds-business-process/1.0` has an independent review with every finding fixed or answered, and the decision owner's approval. Every material change in it has an approved decision in the register with the decision owner's recorded words. Nothing is merged without the decision owner's approval.
+
+## Notes on the done lines (2026-11-24, after the goal was approved)
+
+These notes record how the checks read two lines. They change no line; the decision owner can confirm or correct them.
+
+- Line 3 and the brief's "preserves IDs": since DSBP-DEC-0031, IDs are preserved in the migration map. Each row pairs the old IRI with one new neutral ID (`DSBP-P-000123`), and no old code stays on a concept. Check V2 tests both.
+- Line 4: a company name may appear in `skos:example`, but a company-built system may not, even there (DSBP-DEC-0006). Check V5 reads examples for the systems in the register and lets company names through.
+- Line 8: check V6 accepts a version or an issue date, because a filing or a report has a date and no version. Every other field is as the line says.
 
 ## Owner's steps after the release
 
@@ -33,10 +41,10 @@ Each line ends **Met**, with the command or file that shows it, run against the 
 
 ## Target
 
-This repository only: `aadehamid/downstream_oil_and_gas_ontology_release`, folder `ds_business_process/` on branch `ds-business-process/1.0`. Independent review runs on Mac-Studio-4 (decision of 2026-11-23).
+This repository only (the downstream oil and gas ontology release), folder `ds_business_process/` on branch `ds-business-process/1.0`. Independent review runs on Mac-Studio-4 (decision of 2026-11-23).
 
 ## How decisions are made on the way
 
 - **Grill-with-docs round 1** is Q1 to Q11 of the Phase 1 report, already answered.
-- **Round 2** runs when the peer research comes back: one question per L0 to L2 node (keep, rename, move, split or merge), including supply chain.
+- **Round 2** ran on 2026-11-24, once the peer research came back: one question per L0 to L2 node that the research put in doubt (keep, rename, move, split or merge), including supply chain. Its answers are decisions DSBP-DEC-0012 and 0016 to 0031.
 - Each later batch starts with its expected-results file, which the decision owner approves before the change is made.

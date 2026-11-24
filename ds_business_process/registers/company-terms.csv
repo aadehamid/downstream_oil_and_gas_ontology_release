@@ -8,8 +8,8 @@ ARCO,yes,company,brand marketed by MPC
 Andeavor,no,company,company acquired by MPC
 Tesoro,no,company,predecessor company
 MCTS,yes,company,MPC's crude trading subsidiary
-XPIMS,yes,system,commercial planning tool name used in MPC processes
-PPIMS,yes,system,commercial planning tool name used in MPC processes
+XPIMS,yes,system,MPC's planning models (DSBP-DEC-0006)
+PPIMS,yes,system,MPC's planning models (DSBP-DEC-0006)
 DPO,yes,system,MPC distribution planning optimizer abbreviation
 Distribution Planning Optimizer,no,system,MPC-built tool
 KittyHawk,no,system,MPC-built tool
@@ -17,3 +17,14 @@ MAGIC,yes,system,MPC-built tool
 CargoTracker,no,system,MPC-built tool
 TopDay,no,system,MPC-built tool
 VALT,yes,system,MPC-built tool
+MyMPC,yes,system,MPC customer portal
+Dealer Master,no,system,MPC internal system
+Credit Card Summary,no,system,MPC internal system
+MPR,yes,system,MPC internal price master
+MIPS,yes,system,MPC internal system
+PSR,yes,system,MPC internal system
+TRR,yes,system,MPC internal system
+TMR,yes,system,MPC internal system
+MCS,yes,system,MPC internal system
+MSMIS,yes,system,MPC internal system
+PRM,yes,system,MPC internal pricing system

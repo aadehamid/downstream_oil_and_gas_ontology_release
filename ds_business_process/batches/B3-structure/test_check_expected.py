@@ -78,10 +78,10 @@ def test_the_built_candidate_passes_the_batch_check(baseline, expected, built):
 
 def test_the_built_candidate_passes_the_release_checks(baseline, expected, built):
     g, rows = built
-    approved = ce.approved_ids(baseline, expected)
-    assert d.nothing_lost(baseline, rows) == []
+    approved = ce.approved_ids(baseline, expected, g)
+    assert d.nothing_lost(baseline, rows, g) == []
     assert d.only_approved_changed(baseline, g, rows, approved, frozenset({SKOS.notation})) == []
-    assert d.relationships_kept(baseline, g, rows, approved) == []
+    assert d.relationships_kept(baseline, g, rows) == []
     assert sorted(d.structure(g)) == ["V4: DSBP-P-%06d has no definition" % i for i in sorted(
         int(d.local_id(r["new_iri"])[-6:]) for r in rows if d.local_id(r["baseline_iri"]) in
         ("CM-1-1-3-5-3", "CM-1-1-4-6-1"))]
@@ -92,7 +92,7 @@ def test_v3_fails_when_an_unlisted_concept_moves(baseline, expected, built):
     g = copy(g)
     stray = node(rows, "CM-1-3-1")
     g.set((stray, SKOS.broader, node(rows, "CM-1-2")))
-    approved = ce.approved_ids(baseline, expected)
+    approved = ce.approved_ids(baseline, expected, g)
     assert any("CM-1-3-1" in f for f in d.only_approved_changed(baseline, g, rows, approved,
                                                                  frozenset({SKOS.notation})))
 
@@ -126,3 +126,14 @@ def test_the_batch_check_fails_when_the_exclusion_is_not_in_the_map(baseline, ex
     r = next(r for r in rows if r["baseline_iri"].endswith("L1-shared-services"))
     r["note"] = ""
     assert any("L1-shared-services needs a migration-map row" in f for f in ce.check(baseline, g, rows, expected))
+
+
+def test_v3_fails_when_a_new_concept_the_file_does_not_name_appears(baseline, expected, built):
+    g, rows = built
+    g = copy(g)
+    stray = URIRef(d.NEW_PROC + "DSBP-P-000999")
+    g.add((stray, d.CORE.taxonomyLevel, Literal(1)))
+    g.add((stray, SKOS.prefLabel, Literal("Unplanned area", lang="en")))
+    approved = ce.approved_ids(baseline, expected, g)
+    fails = d.only_approved_changed(baseline, g, rows, approved, frozenset({SKOS.notation}))
+    assert fails == ["V3: DSBP-P-000999 is a new concept but is not on the approved list"]
