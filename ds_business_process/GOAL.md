@@ -29,7 +29,7 @@ Each line ends **Met**, with the command or file that shows it, run against the 
 
 ## Notes on the done lines (2026-11-24, after the goal was approved)
 
-These notes record how the checks read two lines. They change no line; the decision owner can confirm or correct them.
+These notes record how the checks read three lines. They change no line; the decision owner can confirm or correct them.
 
 - Line 3 and the brief's "preserves IDs": since DSBP-DEC-0031, IDs are preserved in the migration map. Each row pairs the old IRI with one new neutral ID (`DSBP-P-000123`), and no old code stays on a concept. Check V2 tests both.
 - Line 4: a company name may appear in `skos:example`, but a company-built system may not, even there (DSBP-DEC-0006). Check V5 reads examples for the systems in the register and lets company names through.

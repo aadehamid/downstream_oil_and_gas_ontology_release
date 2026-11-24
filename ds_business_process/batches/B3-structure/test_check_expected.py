@@ -78,7 +78,7 @@ def test_the_built_candidate_passes_the_batch_check(baseline, expected, built):
 
 def test_the_built_candidate_passes_the_release_checks(baseline, expected, built):
     g, rows = built
-    approved = ce.approved_ids(baseline, expected, g)
+    approved = ce.approved_ids(baseline, expected, g, rows)
     assert d.nothing_lost(baseline, rows, g) == []
     assert d.only_approved_changed(baseline, g, rows, approved, frozenset({SKOS.notation})) == []
     assert d.relationships_kept(baseline, g, rows) == []
@@ -92,7 +92,7 @@ def test_v3_fails_when_an_unlisted_concept_moves(baseline, expected, built):
     g = copy(g)
     stray = node(rows, "CM-1-3-1")
     g.set((stray, SKOS.broader, node(rows, "CM-1-2")))
-    approved = ce.approved_ids(baseline, expected, g)
+    approved = ce.approved_ids(baseline, expected, g, rows)
     assert any("CM-1-3-1" in f for f in d.only_approved_changed(baseline, g, rows, approved,
                                                                  frozenset({SKOS.notation})))
 
@@ -134,6 +134,20 @@ def test_v3_fails_when_a_new_concept_the_file_does_not_name_appears(baseline, ex
     stray = URIRef(d.NEW_PROC + "DSBP-P-000999")
     g.add((stray, d.CORE.taxonomyLevel, Literal(1)))
     g.add((stray, SKOS.prefLabel, Literal("Unplanned area", lang="en")))
-    approved = ce.approved_ids(baseline, expected, g)
+    approved = ce.approved_ids(baseline, expected, g, rows)
     fails = d.only_approved_changed(baseline, g, rows, approved, frozenset({SKOS.notation}))
     assert fails == ["V3: DSBP-P-000999 is a new concept but is not on the approved list"]
+
+
+def test_a_baseline_concept_renamed_to_a_new_label_does_not_approve_itself(baseline, expected, built):
+    g, rows = built
+    g = copy(g)
+    retail = next(s for s in d.processes(g) if str(g.value(s, SKOS.prefLabel)) == "Retail")
+    g.remove((retail, None, None))
+    g.remove((None, None, retail))
+    stray = node(rows, "CM-1-3-1")
+    g.set((stray, SKOS.prefLabel, Literal("Retail", lang="en")))
+    approved = ce.approved_ids(baseline, expected, g, rows)
+    assert d.local_id(str(stray)) not in approved
+    assert any("CM-1-3-1" in f for f in d.only_approved_changed(baseline, g, rows, approved,
+                                                                 frozenset({SKOS.notation})))

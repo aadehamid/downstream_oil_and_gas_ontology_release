@@ -130,8 +130,10 @@ def baseline_untouched(releases: Path = RELEASES) -> list[str]:
 
 # V2 ---------------------------------------------------------------------------------------------------------------
 def nothing_lost(baseline: rdflib.Graph, rows: list[dict], candidate: rdflib.Graph | None = None) -> list[str]:
-    """With a candidate, also checks that each living concept is in it and each excluded one is not."""
+    """With a candidate, also checks that each living concept is a process in it (it has a level), and that an
+    excluded one appears nowhere in it, as subject or as object."""
     fails = []
+    procs_c = processes(candidate) if candidate is not None else set()
     seen: dict[str, int] = {}
     news: dict[str, int] = {}
     for r in rows:
@@ -144,15 +146,16 @@ def nothing_lost(baseline: rdflib.Graph, rows: list[dict], candidate: rdflib.Gra
                 fails.append(f"V2: {r['baseline_iri']} is {r['status']} but its new IRI {new!r} is not a "
                              f"neutral ID of the form {NEW_PROC}DSBP-P-000123 (DSBP-DEC-0031)")
             news[new] = news.get(new, 0) + 1
-            if candidate is not None and (URIRef(new), None, None) not in candidate:
+            if candidate is not None and URIRef(new) not in procs_c:
                 fails.append(f"V2: {r['baseline_iri']} is {r['status']} but its new IRI {local_id(new)} "
-                             f"is not in the candidate")
+                             f"is not a process in the candidate")
         if r["status"] == "excluded":
             if not r.get("note", "").strip():
                 fails.append(f"V2: {r['baseline_iri']} is excluded with no reason in the note column")
             if r.get("new_iri", "").strip():
                 fails.append(f"V2: {r['baseline_iri']} is excluded but still has a new IRI")
-            if candidate is not None and (URIRef(r["baseline_iri"]), None, None) in candidate:
+            old = URIRef(r["baseline_iri"])
+            if candidate is not None and ((old, None, None) in candidate or (None, None, old) in candidate):
                 fails.append(f"V2: {r['baseline_iri']} is excluded but is still in the candidate")
     for p in sorted(map(str, processes(baseline))):
         n = seen.get(p, 0)
@@ -203,9 +206,17 @@ def only_approved_changed(baseline: rdflib.Graph, candidate: rdflib.Graph, rows:
                          f"({len(before - after)} statements removed, {len(after - before)} added)")
     known = {r["new_iri"] for r in rows if r.get("new_iri")}
     for s in sorted(processes(candidate), key=str):
-        if str(s) not in known and local_id(str(s)) not in approved:
+        if str(s) in known:
+            continue
+        if not NEW_IRI.fullmatch(str(s)):
+            fails.append(f"V3: {s} is in the candidate but is neither a mapped concept nor a new neutral ID")
+        elif local_id(str(s)) not in approved:
             fails.append(f"V3: {local_id(str(s))} is a new concept but is not on the approved list")
-    return fails
+    # A property in both namespaces at once is a half-done move, which the comparison above cannot see.
+    for s, p, _ in sorted(candidate):
+        if str(p).startswith(str(CORE)) and (s, _same_predicate(p), None) in candidate:
+            fails.append(f"V3: {local_id(str(s))} carries {local_id(str(p))} in both the old and the new namespace")
+    return sorted(set(fails), key=fails.index)
 
 
 # V4 ---------------------------------------------------------------------------------------------------------------
@@ -288,15 +299,19 @@ def read_terms(path: Path = TERMS) -> list[tuple[str, re.Pattern, str]]:
 def company_neutral(candidate: rdflib.Graph, terms_path: Path = TERMS) -> list[str]:
     """Every reader-facing literal of every subject, not only of the processes. skos:example is read for
     company-built systems, which leave the reference ontology even as examples (DSBP-DEC-0006); a company name
-    may stand in an example (GOAL.md, done line 4). A commercial product is not in the register at all."""
+    may stand in an example (GOAL.md, done line 4), and in the title of a cited source, such as a peer's
+    filing. A commercial product is not in the register at all."""
     terms = read_terms(terms_path)
+    sources = set(candidate.objects(None, DCTERMS.source))
     fails = []
     for prop in TEXT_PROPS + [SKOS.example]:
         for s, o in sorted(candidate.subject_objects(prop), key=lambda x: (str(x[0]), str(x[1]))):
             if not isinstance(o, Literal):
                 continue
+            # A cited source's title is the publisher's own words: a peer's filing may name the peer (DSBP-DEC-0002).
+            citation = s in sources and prop in (DCTERMS.title, DCTERMS.description)
             for term, rx, kind in terms:
-                if prop == SKOS.example and kind == "company":
+                if kind == "company" and (prop == SKOS.example or citation):
                     continue
                 if rx.search(str(o)):
                     fails.append(f"V5: {local_id(str(s))} {prop.n3(candidate.namespace_manager)} "
@@ -310,7 +325,8 @@ def _filled(g: rdflib.Graph, s: URIRef, p: URIRef) -> bool:
 
 
 def _is_url(x) -> bool:
-    return str(x).startswith(("http://", "https://")) and not str(x).startswith(MINTED)
+    low = str(x).lower()
+    return low.startswith(("http://", "https://")) and not low.replace("http://", "https://", 1).startswith(MINTED)
 
 
 def _public(g: rdflib.Graph, src: URIRef) -> list[str]:

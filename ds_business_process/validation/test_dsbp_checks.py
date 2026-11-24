@@ -314,20 +314,27 @@ def test_cli_exits_non_zero_on_the_identity_candidate_because_of_v5(rows, candid
     assert d.main(["--candidate", str(c), "--map", str(m), "--skip", "V8"]) == 1
     out = capsys.readouterr().out
     assert "V5: FAIL" in out and "V2: pass" in out and "V3: pass" in out and "V7: pass" in out
-    # Skip the two known failures and nothing else fails: V5 (and V4's two definitions) are the only reasons.
+    # V5 alone makes it fail: with V4 skipped too it still fails, and with V5 skipped as well it passes.
+    assert d.main(["--candidate", str(c), "--map", str(m), "--skip", "V4", "V8"]) == 1
+    out = capsys.readouterr().out
+    assert [line.split(":")[0] for line in out.splitlines() if ": FAIL" in line] == ["V5"]
     assert d.main(["--candidate", str(c), "--map", str(m), "--skip", "V4", "V5", "V8"]) == 0
     capsys.readouterr()
     with pytest.raises(FileNotFoundError):
         d.main(["--candidate", str(c), "--map", str(m), "--approved", str(tmp_path / "typo.txt")])
 
 
-# Fixes from the independent review of PR #87, each shown failing on a broken copy ---------------------------------
+# Fixes from the independent review, rounds 1 and 2, each shown failing on a broken copy ---------------------------------
 def test_v2_fails_when_a_kept_concept_is_missing_from_the_candidate(baseline, rows, candidate):
     g = copy(candidate)
     gone = URIRef(rows[5]["new_iri"])
     g.remove((gone, None, None))
     assert d.nothing_lost(baseline, rows, g) == [
-        f"V2: {rows[5]['baseline_iri']} is retained but its new IRI {d.local_id(str(gone))} is not in the candidate"]
+        f"V2: {rows[5]['baseline_iri']} is retained but its new IRI {d.local_id(str(gone))} "
+        f"is not a process in the candidate"]
+    g = copy(candidate)
+    g.remove((gone, d.CORE.taxonomyLevel, None))      # still has a label, but no level: no longer a process
+    assert len(d.nothing_lost(baseline, rows, g)) == 1
 
 
 @pytest.mark.parametrize("bad", ["DSBP-P-000001/", "x/DSBP-P-000001", "DSBP-P-1"])
@@ -345,6 +352,9 @@ def test_v2_fails_when_an_excluded_concept_keeps_a_new_iri_or_stays_in_the_candi
     fails = d.nothing_lost(baseline, broken, g)
     assert any("is excluded but still has a new IRI" in f for f in fails)
     assert any("is excluded but is still in the candidate" in f for f in fails)
+    g = rdflib.Graph()
+    g.add((URIRef(d.NEW_PROC + "DSBP-P-000002"), SKOS.narrower, URIRef(broken[0]["baseline_iri"])))  # as object
+    assert any("is excluded but is still in the candidate" in f for f in d.nothing_lost(baseline, broken, g))
 
 
 def test_v3_sees_through_the_move_to_the_new_namespace(baseline, rows, candidate):
@@ -476,3 +486,73 @@ def test_read_approved_refuses_a_missing_file(tmp_path):
     assert d.read_approved(None) == set()
     with pytest.raises(FileNotFoundError):
         d.read_approved(tmp_path / "missing.txt")
+
+
+def test_cli_passes_removals_and_shapes_through(baseline, rows, candidate, tmp_path, capsys):
+    procs = d.processes(baseline)
+    s, p, o = sorted((s, p, o) for s, p, o in baseline
+                     if s in procs and o in procs and str(p).startswith(str(d.CORE)))[0]
+    m = {URIRef(r["baseline_iri"]): URIRef(r["new_iri"]) for r in rows}
+    g = copy(candidate)
+    g.remove((m[s], p, m[o]))
+    mp, c = tmp_path / "map.csv", tmp_path / "candidate.ttl"
+    with mp.open("w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=["baseline_iri", "new_iri", "status", "note"])
+        w.writeheader()
+        w.writerows(rows)
+    g.serialize(c, format="turtle")
+    only7 = ["--skip", "V1", "V2", "V3", "V4", "V5", "V6", "V8"]
+    assert d.main(["--candidate", str(c), "--map", str(mp)] + only7) == 1
+    rm = tmp_path / "removals.txt"
+    rm.write_text(f"{d.local_id(str(s))} {d.local_id(str(p))} {d.local_id(str(o))}\n", encoding="utf-8")
+    assert d.main(["--candidate", str(c), "--map", str(mp), "--removals", str(rm)] + only7) == 0
+    shapes = tmp_path / "shapes.ttl"
+    shapes.write_text("""@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+<https://example.org/s#Never> a sh:NodeShape ; sh:targetClass skos:Concept ;
+    sh:property [ sh:path skos:prefLabel ; sh:maxCount 0 ] .
+""", encoding="utf-8")
+    capsys.readouterr()
+    d.main(["--candidate", str(c), "--map", str(mp), "--shapes", str(shapes),
+            "--skip", "V1", "V2", "V3", "V5", "V6", "V7", "V8"])
+    assert "SHACL shapes do not conform" in capsys.readouterr().out
+
+
+def test_v3_refuses_a_stray_old_iri_even_when_its_code_is_approved(baseline, rows, candidate):
+    g = copy(candidate)
+    old = URIRef(rows[3]["baseline_iri"])
+    g.add((old, d.CORE.taxonomyLevel, Literal(4)))
+    g.add((URIRef(d.NEW_PROC + d.local_id(str(old))), d.CORE.taxonomyLevel, Literal(4)))   # new namespace, old code
+    fails = d.only_approved_changed(baseline, g, rows, {d.local_id(str(old))})
+    assert sum("neither a mapped concept nor a new neutral ID" in f for f in fails) == 2
+
+
+def test_v3_sees_a_property_left_in_both_namespaces(baseline, rows, candidate):
+    g = copy(candidate)
+    s = some_process(g, 5)
+    for o in list(g.objects(s, d.CORE.primaryPurpose)) or [Literal("x")]:
+        g.add((s, d.CORE.primaryPurpose, o))
+        g.add((s, d.DSBP.primaryPurpose, o))
+    assert any("in both the old and the new namespace" in f for f in d.only_approved_changed(baseline, g, rows, set()))
+
+
+def test_v5_lets_a_cited_filing_name_its_company_but_not_a_system(tmp_path):
+    terms = tmp_path / "terms.csv"
+    terms.write_text("term,case_sensitive,kind,why\nXPIMS,yes,system,test\nMPC,yes,company,test\n", encoding="utf-8")
+    s, src = URIRef(d.NEW_PROC + "DSBP-P-000001"), URIRef("https://www.sec.gov/example-10-k")
+    g = rdflib.Graph()
+    g.add((s, d.DSBP.taxonomyLevel, Literal(0)))
+    g.add((s, DCTERMS.source, src))
+    g.add((src, DCTERMS.title, Literal("MPC 2025 Form 10-K")))
+    assert d.company_neutral(g, terms) == []
+    g.add((src, DCTERMS.description, Literal("Describes XPIMS")))
+    assert len(d.company_neutral(g, terms)) == 1
+    g = rdflib.Graph()
+    g.add((URIRef(d.DSBP + "SomeClass"), DCTERMS.title, Literal("MPC terms")))   # not a cited source
+    assert len(d.company_neutral(g, terms)) == 1
+
+
+@pytest.mark.parametrize("iri", ["http://w3id.org/ds-bp/source/ref-1", "https://W3ID.ORG/ds-bp/source/ref-1"])
+def test_v6_refuses_minted_iris_in_any_scheme_or_case(baseline, rows, candidate, iri):
+    g = _sourced(candidate, URIRef(iri), FULL)
+    assert any("URL" in f for f in d.evidence(baseline, g, rows))
