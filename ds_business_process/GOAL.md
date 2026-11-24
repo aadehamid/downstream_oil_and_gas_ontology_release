@@ -1,6 +1,6 @@
 # Goal: DS_Business_Process 1.0
 
-Status: draft for Hamid's approval (2026-11-24). The done lines below take effect when he approves them in his own words, and that approval goes into `registers/decision-register.md` as DSBP-DEC-0014.
+Status: approved by Hamid on 2026-11-24 ("goal yes"), recorded in `registers/decision-register.md` as DSBP-DEC-0014.
 
 ## The goal, in the owner's words
 
