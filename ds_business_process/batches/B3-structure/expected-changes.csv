@@ -1,0 +1,24 @@
+key,baseline_id,change,new_label,new_parent,expected_level,decision,evidence,draft_definition
+,CM-1-1,rename,"Planning, Scheduling & Optimization",CM-1,2,DSBP-DEC-0016,"PBF, Phillips 66, Shell (peer-hierarchy-findings.md, L2 CM 1.1)",
+,CM-1-2,rename,Supply & Trading,CM-1,2,DSBP-DEC-0020,"6 companies; APQC 3.6, 3.7",
+,L1-midstream,rename,Midstream & Logistics,L0-downstream-operations,1,DSBP-DEC-0025,"Midstream 3 companies, Logistics 4",
+,L1-supply-chain-mgmt,rename,Procurement & Supply Chain (Goods and Services),L0-enabling-functions,1,DSBP-DEC-0012,"MPC, Valero, Chevron, Phillips 66; APQC 4.2",
+,L1-ehs-gov-reporting,rename,"Environment, Health & Safety",L0-enabling-functions,1,DSBP-DEC-0019,"MPC, HF Sinclair; APQC 13.7",
+,L1-legal-corp-comm,rename,Legal & External Affairs,L0-enabling-functions,1,DSBP-DEC-0029,APQC 12.0; Phillips 66,
+,CM-1-1-4,move,,CM-1-1,3,DSBP-DEC-0022,"PBF, Phillips 66, Shell","Its 23 descendants each move down one level (L3 to L4, L4 to L5)."
+,CM-1-3-10,move,,MS-1-2,3,DSBP-DEC-0021,"HF Sinclair, MPLX, Kinder Morgan",Its 4 children stay L4.
+,CM-1-1-4-6-1,move,,NEW:strategy,2,DSBP-DEC-0026,APQC 1.0,Its definition is still missing; one is drafted in batch B5 (evidence).
+,CM-1-1-4-6-3,move,,NEW:erm,2,DSBP-DEC-0027,APQC 11.1,
+,CM-1-4,deprecate,,CM-1,2,DSBP-DEC-0017,6+ companies put IT in corporate,Replaced by NEW:it. Kept as a deprecated concept so old links resolve.
+,L1-process-excellence-it,deprecate,,L0-enabling-functions,1,DSBP-DEC-0017,APQC 8.0 and 13.1; MPC,Replaced by NEW:it and NEW:bpe.
+,L2-refinery-performance-and-risk-coordination,deprecate,,L1-refining,2,DSBP-DEC-0027,APQC 11.1,Emptied by the move of CM-1-1-4-6-3. Replaced by NEW:erm.
+,L1-shared-services,exclude,,,,DSBP-DEC-0018,0 companies name it,Removed from the release; the migration map gives the reason.
+,CM-1-1-4-6,unchanged,,CM-1-1,3,DSBP-DEC-0026,,"Already retired in 1.2 (PTC-001); stays deprecated, now with no child."
+NEW:it,,new,Information Technology,L0-enabling-functions,1,DSBP-DEC-0017,APQC 8.0; 6+ companies,"Plan, build, run and secure the information technology that the business uses: applications, data, infrastructure and cyber security."
+NEW:bpe,,new,Business Process Excellence,L0-enabling-functions,1,DSBP-DEC-0017,APQC 13.1,"Define, measure, manage and improve the company's business processes and its business transformation."
+NEW:strategy,,new,Strategy & Business Development,L0-enabling-functions,1,DSBP-DEC-0026,APQC 1.0,"Set the company's vision and strategy, plan its portfolio, and find, assess and close new business opportunities."
+NEW:erm,,new,Enterprise Risk Management,L0-enabling-functions,1,DSBP-DEC-0027,APQC 11.1,"Identify, assess, treat, monitor and report the business risks across the company and its sites."
+NEW:lubes,,new,Lubricants & Specialties,L0-downstream-operations,1,DSBP-DEC-0030,"HF Sinclair, Calumet, ExxonMobil","Make, package, sell and deliver finished lubricants, base oils and specialty products. Left empty by a company without this business."
+NEW:petchem,,new,Petrochemicals,L0-downstream-operations,1,DSBP-DEC-0030,"ExxonMobil, Shell; Phillips 66 and Chevron through a joint venture",Make and sell chemical products from refinery and gas-processing streams. Left empty by a company without this business.
+NEW:retail,,new,Retail,CM-1-3,3,DSBP-DEC-0024,6 companies run retail,"Run fuel and convenience retail sites, and set prices and offers for consumers. Left empty by a company without retail."
+NEW:regrep,,new,Regulatory Reporting,L1-ehs-gov-reporting,2,DSBP-DEC-0019,APQC 11.2 (nearest standard); placement is an inference,"Prepare, check and file the environmental, health, safety and other reports that regulators require."

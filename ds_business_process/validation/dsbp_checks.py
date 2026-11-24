@@ -144,9 +144,11 @@ def nothing_lost(baseline: rdflib.Graph, rows: list[dict]) -> list[str]:
 
 
 # V3 ---------------------------------------------------------------------------------------------------------------
-def _statements(g: rdflib.Graph, s: URIRef, mapping: dict[str, str]) -> set[tuple]:
+def _statements(g: rdflib.Graph, s: URIRef, mapping: dict[str, str], ignore: frozenset = frozenset()) -> set[tuple]:
     out = set()
     for p, o in g.predicate_objects(s):
+        if p in ignore:
+            continue
         if isinstance(o, URIRef):
             o = URIRef(mapping.get(str(o), str(o)))
         out.add((p, o))
@@ -154,15 +156,17 @@ def _statements(g: rdflib.Graph, s: URIRef, mapping: dict[str, str]) -> set[tupl
 
 
 def only_approved_changed(baseline: rdflib.Graph, candidate: rdflib.Graph, rows: list[dict],
-                          approved: set[str]) -> list[str]:
+                          approved: set[str], ignore: frozenset = frozenset()) -> list[str]:
+    """``ignore`` names predicates that a batch changes on every concept by an approved rule, such as
+    skos:notation, which the ID batch moves to the migration map (DSBP-DEC-0031)."""
     mapping = old_to_new(rows)
     fails = []
     for r in rows:
         if r["status"] not in KEEPS_IRI:
             continue
         old, new = URIRef(r["baseline_iri"]), URIRef(r["new_iri"])
-        before = _statements(baseline, old, mapping)
-        after = _statements(candidate, new, {})
+        before = _statements(baseline, old, mapping, ignore)
+        after = _statements(candidate, new, {}, ignore)
         if before != after and not {local_id(str(old)), local_id(str(new))} & approved:
             fails.append(f"V3: {local_id(str(old))} (now {local_id(str(new))}) changed but is not on the approved list "
                          f"({len(before - after)} statements removed, {len(after - before)} added)")
