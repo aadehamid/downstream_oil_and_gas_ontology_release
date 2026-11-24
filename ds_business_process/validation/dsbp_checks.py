@@ -6,7 +6,8 @@ failure messages; an empty list means the check passed. ``main`` runs them all a
 The checks and what each proves:
 
 V1  baseline_untouched      every file listed in a KPI Store 1.2 release manifest still has its recorded SHA-256
-V2  nothing_lost            every baseline process IRI has exactly one row in the migration map, with a known status
+V2  nothing_lost            every baseline process IRI has exactly one row in the migration map, with a known status,
+                            and each living concept has its own neutral new ID (DSBP-P-000123)
 V3  only_approved_changed   a concept whose statements differ from the baseline is on the batch's approved list
 V4  structure               no cycles; one parent below the top; level = parent level + 1; unique preferred labels;
                             a definition on every concept that is not deprecated; optional SHACL shapes conform
@@ -48,7 +49,9 @@ OLD_PROC = "https://w3id.org/mpc/ontology/process/"
 CORE = rdflib.Namespace("https://w3id.org/mpc/ontology/modules/core/")
 DSBP = rdflib.Namespace("https://w3id.org/ds-bp/ontology/")
 STATUSES = {"retained", "relabeled", "modified", "deprecated", "excluded"}
-KEEPS_IRI = {"retained", "relabeled", "modified", "deprecated"}
+KEEPS_IRI = {"retained", "relabeled", "modified", "deprecated"}  # statuses whose concept lives on under a new IRI
+NEW_PROC = str(DSBP) + "process/"
+NEW_ID = re.compile(r"DSBP-P-\d{6}")  # neutral IDs that say nothing about place (DSBP-DEC-0031)
 # Literal-valued properties that carry reference-layer text a reader sees (V5).
 TEXT_PROPS = [SKOS.prefLabel, SKOS.altLabel, SKOS.definition, SKOS.scopeNote, SKOS.note,
               SKOS.editorialNote, SKOS.changeNote, DCTERMS.provenance, CORE.primaryPurpose,
@@ -116,18 +119,25 @@ def baseline_untouched(releases: Path = RELEASES) -> list[str]:
 def nothing_lost(baseline: rdflib.Graph, rows: list[dict]) -> list[str]:
     fails = []
     seen: dict[str, int] = {}
+    news: dict[str, int] = {}
     for r in rows:
         seen[r["baseline_iri"]] = seen.get(r["baseline_iri"], 0) + 1
         if r["status"] not in STATUSES:
             fails.append(f"V2: {r['baseline_iri']} has unknown status {r['status']!r}")
-        if r["status"] in KEEPS_IRI and local_id(r.get("new_iri", "")) != local_id(r["baseline_iri"]):
-            fails.append(f"V2: {r['baseline_iri']} is {r['status']} but its new IRI changes the local ID")
+        if r["status"] in KEEPS_IRI:
+            new = r.get("new_iri", "")
+            if not new.startswith(NEW_PROC) or not NEW_ID.fullmatch(local_id(new)):
+                fails.append(f"V2: {r['baseline_iri']} is {r['status']} but its new IRI {new!r} is not a "
+                             f"neutral ID of the form {NEW_PROC}DSBP-P-000123 (DSBP-DEC-0031)")
+            news[new] = news.get(new, 0) + 1
         if r["status"] == "excluded" and not r.get("note", "").strip():
             fails.append(f"V2: {r['baseline_iri']} is excluded with no reason in the note column")
     for p in sorted(map(str, processes(baseline))):
         n = seen.get(p, 0)
         if n != 1:
             fails.append(f"V2: {p} has {n} rows in the migration map; it needs exactly one")
+    fails += [f"V2: new IRI {x} is given to {n} baseline processes; each needs its own"
+              for x, n in sorted(news.items()) if n > 1]
     extra = set(seen) - set(map(str, processes(baseline)))
     fails += [f"V2: map row {x} is not a baseline process" for x in sorted(extra)]
     return fails
@@ -153,8 +163,8 @@ def only_approved_changed(baseline: rdflib.Graph, candidate: rdflib.Graph, rows:
         old, new = URIRef(r["baseline_iri"]), URIRef(r["new_iri"])
         before = _statements(baseline, old, mapping)
         after = _statements(candidate, new, {})
-        if before != after and local_id(str(old)) not in approved:
-            fails.append(f"V3: {local_id(str(old))} changed but is not on the approved list "
+        if before != after and not {local_id(str(old)), local_id(str(new))} & approved:
+            fails.append(f"V3: {local_id(str(old))} (now {local_id(str(new))}) changed but is not on the approved list "
                          f"({len(before - after)} statements removed, {len(after - before)} added)")
     return fails
 
@@ -278,7 +288,7 @@ def relationships_kept(baseline: rdflib.Graph, candidate: rdflib.Graph, rows: li
     fails = []
     for s, p, o in baseline:
         if s in procs and o in procs and str(p).startswith(str(CORE)):
-            if local_id(str(s)) in approved:
+            if {local_id(str(s)), local_id(mapping.get(str(s), ""))} & approved:
                 continue
             ns, no = URIRef(mapping.get(str(s), "")), URIRef(mapping.get(str(o), ""))
             np_ = URIRef(str(p).replace(str(CORE), str(DSBP))) if (ns, p, no) not in candidate else p

@@ -5,8 +5,8 @@
 | ID | What it proves | How the tests show it can fail |
 |---|---|---|
 | V1 | Every KPI Store 1.2 file still matches the SHA-256 hash in its manifest | One byte changed in a copy |
-| V2 | Each baseline process has exactly one row in the migration map, with a known status, and a kept concept keeps its local ID | A dropped row, a duplicate row, an unknown status, an exclusion with no reason, a changed local ID |
-| V3 | Only concepts on the batch's approved list changed | A label changed outside the list |
+| V2 | Each baseline process has exactly one row in the migration map, with a known status, and each living concept has its own neutral new ID of the form `DSBP-P-000123` (DSBP-DEC-0031) | A dropped row, a duplicate row, an unknown status, an exclusion with no reason, an old code carried over, two concepts under one new ID |
+| V3 | Only concepts on the batch's approved list changed. The list may name old codes or new IDs | A label changed outside the list |
 | V4 | No cycles; one parent below the top; each level is its parent's plus one; unique preferred labels; every live concept has a definition; SHACL shapes conform when given | A cycle, a second parent, a level jump, a duplicate label, a deleted definition |
 | V5 | No term from `../registers/company-terms.csv` appears in a label, definition or note. Only `skos:example` may name one | "XPIMS" put back into a label |
 | V6 | Every new or changed definition cites a public source with title, publisher, URL, version or issue date, and access date. The internal workbook never counts | A missing access date; the workbook given as the source |
@@ -28,7 +28,7 @@ V8 needs Java for HermiT.
 
 ## What the baseline gives today
 
-Used unchanged as its own candidate, the baseline passes V1, V2, V3, V6, V7 and V8. It fails V4 on two live concepts with no definition (CM-1-1-3-5-3 and CM-1-1-4-6-1). It fails V5 on 286 mentions of company terms, mostly XPIMS (161) and DPO (88). Those are the failures the batches are there to remove.
+Renamed to the new IDs and otherwise unchanged (the tests' identity candidate), the baseline passes V1, V2, V3, V6, V7 and V8. It fails V4 on two live concepts with no definition (CM-1-1-3-5-3 and CM-1-1-4-6-1). It fails V5 on 286 mentions of company terms, mostly XPIMS (161) and DPO (88). Those are the failures the batches are there to remove.
 
 ## Limits
 

@@ -33,8 +33,19 @@ def baseline() -> rdflib.Graph:
 
 @pytest.fixture(scope="session")
 def rows(baseline) -> list[dict]:
-    return [{"baseline_iri": str(s), "new_iri": str(s), "status": "retained", "note": ""}
-            for s in sorted(d.processes(baseline), key=str)]
+    """Every baseline process retained under a new neutral ID (DSBP-DEC-0031)."""
+    return [{"baseline_iri": str(s), "new_iri": f"{d.NEW_PROC}DSBP-P-{i:06d}", "status": "retained", "note": ""}
+            for i, s in enumerate(sorted(d.processes(baseline), key=str), start=1)]
+
+
+@pytest.fixture(scope="session")
+def candidate(baseline, rows) -> rdflib.Graph:
+    """The baseline with every process IRI replaced by its new one, and nothing else changed."""
+    m = {URIRef(r["baseline_iri"]): URIRef(r["new_iri"]) for r in rows}
+    out = rdflib.Graph()
+    for s, p, o in baseline:
+        out.add((m.get(s, s), p, m.get(o, o)))
+    return out
 
 
 def copy(g: rdflib.Graph) -> rdflib.Graph:
@@ -63,10 +74,10 @@ def test_v1_passes_on_the_real_releases():
     assert d.baseline_untouched() == []
 
 
-def test_identity_passes_v2_v3_v7(baseline, rows):
+def test_identity_passes_v2_v3_v7(baseline, rows, candidate):
     assert d.nothing_lost(baseline, rows) == []
-    assert d.only_approved_changed(baseline, baseline, rows, set()) == []
-    assert d.relationships_kept(baseline, baseline, rows, set()) == []
+    assert d.only_approved_changed(baseline, candidate, rows, set()) == []
+    assert d.relationships_kept(baseline, candidate, rows, set()) == []
 
 
 def test_identity_v4_finds_only_the_two_known_missing_definitions(baseline):
@@ -75,8 +86,8 @@ def test_identity_v4_finds_only_the_two_known_missing_definitions(baseline):
     assert sorted(fails) == sorted(f"V4: {x} has no definition" for x in ("CM-1-1-3-5-3", "CM-1-1-4-6-1"))
 
 
-def test_identity_passes_v6_because_no_definition_changed(baseline, rows):
-    assert d.evidence(baseline, baseline, rows) == []
+def test_identity_passes_v6_because_no_definition_changed(baseline, rows, candidate):
+    assert d.evidence(baseline, candidate, rows) == []
 
 
 def test_v5_is_red_on_the_baseline(baseline):
@@ -111,19 +122,24 @@ def test_v2_fails_on_a_duplicate_a_bad_status_and_an_unexplained_exclusion(basel
     assert any("excluded with no reason" in f for f in fails)
 
 
-def test_v2_fails_when_a_kept_concept_changes_its_local_id(baseline, rows):
+def test_v2_fails_when_a_kept_concept_keeps_its_old_code_or_shares_a_new_id(baseline, rows):
     broken = [dict(r) for r in rows]
-    broken[0]["new_iri"] = broken[0]["new_iri"] + "-X"
-    assert any("changes the local ID" in f for f in d.nothing_lost(baseline, broken))
+    broken[0]["new_iri"] = broken[0]["baseline_iri"]          # the old, place-shaped code carried over
+    broken[2]["new_iri"] = broken[1]["new_iri"]               # two concepts under one new ID
+    fails = d.nothing_lost(baseline, broken)
+    assert any("is not a neutral ID" in f for f in fails)
+    assert any("is given to 2 baseline processes" in f for f in fails)
 
 
-def test_v3_fails_when_a_concept_outside_the_list_changes(baseline, rows):
-    g = copy(baseline)
+def test_v3_fails_when_a_concept_outside_the_list_changes(baseline, rows, candidate):
+    g = copy(candidate)
     s = some_process(g, 5)
     g.set((s, SKOS.prefLabel, Literal("Changed without approval", lang="en")))
     fails = d.only_approved_changed(baseline, g, rows, set())
-    assert len(fails) == 1 and fails[0].startswith(f"V3: {d.local_id(str(s))} changed")
-    assert d.only_approved_changed(baseline, g, rows, {d.local_id(str(s))}) == []
+    old = next(r["baseline_iri"] for r in rows if r["new_iri"] == str(s))
+    assert len(fails) == 1 and fails[0].startswith(f"V3: {d.local_id(old)} (now {d.local_id(str(s))}) changed")
+    assert d.only_approved_changed(baseline, g, rows, {d.local_id(str(s))}) == []   # approved by new ID
+    assert d.only_approved_changed(baseline, g, rows, {d.local_id(old)}) == []      # or by old code
 
 
 def test_v4_fails_on_a_cycle(baseline):
@@ -170,8 +186,8 @@ def test_v5_fails_when_xpims_is_put_back_into_one_label(tmp_path):
     assert d.company_neutral(g, terms) == []
 
 
-def test_v6_fails_when_a_changed_definition_has_no_complete_public_source(baseline, rows):
-    g = copy(baseline)
+def test_v6_fails_when_a_changed_definition_has_no_complete_public_source(baseline, rows, candidate):
+    g = copy(candidate)
     s = some_process(g, 5)
     g.set((s, SKOS.definition, Literal("A new public definition.", lang="en")))
     g.remove((s, DCTERMS.source, None))
@@ -186,8 +202,8 @@ def test_v6_fails_when_a_changed_definition_has_no_complete_public_source(baseli
     assert len(fails) == 1 and "access date" in fails[0]
 
 
-def test_v6_refuses_the_internal_workbook_as_evidence(baseline, rows):
-    g = copy(baseline)
+def test_v6_refuses_the_internal_workbook_as_evidence(baseline, rows, candidate):
+    g = copy(candidate)
     s = some_process(g, 5)
     g.set((s, SKOS.definition, Literal("A new definition.", lang="en")))
     g.remove((s, DCTERMS.source, None))
@@ -195,15 +211,16 @@ def test_v6_refuses_the_internal_workbook_as_evidence(baseline, rows):
     assert any("internal" in f for f in d.evidence(baseline, g, rows))
 
 
-def test_v7_fails_when_one_fact_is_deleted(baseline, rows):
+def test_v7_fails_when_one_fact_is_deleted(baseline, rows, candidate):
     procs = d.processes(baseline)
     facts = [(s, p, o) for s, p, o in baseline
              if s in procs and o in procs and str(p).startswith(str(d.CORE))]
     assert facts, "the baseline should hold process-to-process statements in the core namespace"
-    g = copy(baseline)
-    g.remove(sorted(facts)[0])
+    m = {URIRef(r["baseline_iri"]): URIRef(r["new_iri"]) for r in rows}
+    s, p, o = sorted(facts)[0]
+    g = copy(candidate)
+    g.remove((m[s], p, m[o]))
     assert len(d.relationships_kept(baseline, g, rows, set())) == 1
-
 
 def test_v8_passes_a_consistent_graph_and_fails_a_contradiction():
     pytest.importorskip("owlready2")
@@ -229,12 +246,14 @@ def test_v8_runs_on_the_baseline(baseline):
     assert d.logic(baseline) == []
 
 
-def test_cli_exits_non_zero_on_the_baseline_because_of_v5(baseline, rows, tmp_path, capsys):
+def test_cli_exits_non_zero_on_the_identity_candidate_because_of_v5(rows, candidate, tmp_path, capsys):
     m = tmp_path / "map.csv"
     with m.open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=["baseline_iri", "new_iri", "status", "note"])
         w.writeheader()
         w.writerows(rows)
-    assert d.main(["--candidate", str(d.BASELINE_CORE), "--map", str(m), "--skip", "V8"]) == 1
+    c = tmp_path / "candidate.ttl"
+    candidate.serialize(c, format="turtle")
+    assert d.main(["--candidate", str(c), "--map", str(m), "--skip", "V8"]) == 1
     out = capsys.readouterr().out
-    assert "V5: FAIL" in out and "V2: pass" in out and "V7: pass" in out
+    assert "V5: FAIL" in out and "V2: pass" in out and "V3: pass" in out and "V7: pass" in out
