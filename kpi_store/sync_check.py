@@ -30,7 +30,7 @@ file the runner fetched into <run folder>/tech-graph/. Each line is the technica
 each tech: line reads "not checked", and the command does not pass: a technical graph nobody compared is not
 current. --no-tech-graph leaves the technical graph out on purpose; one line says so, and the other lines decide.
 
-This command only reads. Exit 0 when every line reads current, 1 otherwise, 2 on bad settings.
+This command only reads. Exit 0 when every line reads current or left out, 1 otherwise, 2 on bad settings.
 Needs rdflib; databricks-sdk for databricks; neo4j for the two Neo4j databases.
 """
 import argparse

@@ -1,6 +1,6 @@
 # KPI Store runbook: the first run on the client sandbox
 
-This guide takes you from the release zip to three loaded and checked stores: Databricks, Jena Fuseki on your Windows machine, and Neo4j Enterprise. Follow it from top to bottom, one step at a time. Every command in it is run by the document test, except the ones the section "What ran where" lists.
+This guide takes you from the release zip to three loaded and checked stores: Databricks, Jena Fuseki on your Windows machine, and Neo4j Enterprise. Follow it from top to bottom, one step at a time. If a KPI Store release was set up on this machine before, start at the handout's "Start here" instead (`HANDOUT.md` in the release's top folder): it says which part of this guide applies. Every command in it is run by the document test, except the ones the section "What ran where" lists.
 
 One command does the work: `python -m kpi_store.runner`. You run it three times. The first run compares the ontology with the sandbox and stops on a report. You clear the report. The second run cuts a correction version and loads every store. The third run proves that nothing is left to change.
 
@@ -170,7 +170,7 @@ This is for a release folder that holds no change of your own. When it holds cha
 1. Rename the old release folder, for example from `kpi-store` to `kpi-store-old`. Its `.git` folder goes with it, and so does its history.
 2. Unpack the new zip under the old folder's name, such as `%USERPROFILE%\kpi-store`, as in "Unpack the release". A folder from KPI Store 1.1 is named `kpi-store-1.1`: keep that name.
 3. Run the Git commands of "Keep the release folder in Git" in the new folder.
-4. Leave the local folder, the virtual environment and `KPI_STORE_LOCAL` as they are. If the old folder held a correction that the new zip does not hold, read "The release folder" under "How to undo" first: the stores then read `behind` until you load them again.
+4. Leave the local folder, the virtual environment and `KPI_STORE_LOCAL` as they are. If the old folder held a correction that the new zip does not hold, read "The release folder" under "How to undo" first: the stores then read `behind` until you load them again. If the run folder holds a folder `pending`, rename it to `pending-old-` and today's date and time, such as `pending-old-2026-11-23-1430`. The run folder is the one that `run_folder` names in your local settings file, by default `%USERPROFILE%\kpi-store-local\runs`. The folder `pending` holds a report of the old release that was never cut: this release refuses a report of another release, and the next run makes a new one.
 5. Run the setup check, then the run.
 
 ### Make the local folder and fetch three files
@@ -645,8 +645,9 @@ Each line names a store, then its status, then the reason.
 | `empty` | The store holds nothing. Fuseki reads `empty` when its data folder was deleted. | Run the runner again. |
 | `unreachable` | The store did not answer, or a setting is missing. The reason says which. | Start the store, or correct the setting. |
 | `not checked` | No technical graph file was fetched yet. | Run `python -m kpi_store.runner --from notebook`. |
+| `left out` | The sync check was told with `--no-tech-graph` to leave the technical graph out. | Nothing. |
 
-The command ends with exit code 0 only when every line reads `current`.
+The command ends with exit code 0 only when every line reads `current` or `left out`.
 
 ## Run it again: nothing changes
 

@@ -8,6 +8,23 @@ The release's own tests check every block of commands and every block of printed
 
 **Warning: a replace or a reset deletes data in the stores.** Get written authorization for the exact environment first, stop every other writer, and make sure the data can be loaded again.
 
+## Start here
+
+Find your case in the table below, then follow what its row names line by line, from its first step to its last. Take the first row that fits. Two things on your machine tell you which row is yours:
+
+- whether a KPI Store release was set up on this machine. Open PowerShell and run `echo $env:KPI_STORE_LOCAL`. When a release was set up, it prints the path of your local settings file, because section 1, step 7, saved that path. When none was, it prints an empty line;
+- the line `"release"` in `release.json`, at the top of the release folder you already have.
+
+| Your case | How you know it | Follow |
+|---|---|---|
+| No KPI Store release was set up on this machine | `echo $env:KPI_STORE_LOCAL` prints an empty line | Section 1, then section 2. If an older release folder is there, rename it first, for example to `kpi-store-old`. If the folder `%USERPROFILE%\kpi-store-local` is there, or a release was set up before with a local folder of another name, ask the release's team before you run anything. |
+| A KPI Store 1.1 release was set up on this machine | It prints a path, and `release.json` reads `"release": "KPI Store 1.1"` | Section 8, "Coming from KPI Store 1.1". It covers a 1.1 folder whether or not the 1.1 runner loaded the stores. |
+| A KPI Store 1.2 release was set up, and you received a newer zip | It prints a path, and `release.json` reads `"release": "KPI Store 1.2"` or a later release | Section 8, steps 1 to 6. |
+| This release is set up, but the stores are not loaded, or not all current | It prints a path, and the sync check of section 2, step 5, does not read `current` on every line | Do what the table in the runbook's "The sync check" says for the status of each line that does not read `current`. Where it says to run the runner again, follow section 2. If the sync check stops with an error and prints no lines: when the message names your local settings file or one of its settings, correct it as section 1, step 7, says, then run the sync check again; otherwise send the message to the release's team. |
+| This release is set up and loaded, and you want to change the ontology | The sync check of section 2, step 5, reads `current` on every line | The section for your change, from 3 to 5. Its last step sends you to section 6, "After every change". Then section 9. |
+
+You are done when you know which row is yours. If none fits, or two seem to fit, ask the release's team before you run anything.
+
 ## What is inside the release
 
 | Part | What it is | Do you open it? |
@@ -512,11 +529,11 @@ Your copy is the master of the ontology. A newer release from the release's team
 
 ### Coming from KPI Store 1.1
 
-This part is for a 1.1 release folder whose only changes are the runner's cuts. A cut changes the tables of `data-product/pricing`, and this release adds a column to two of them, `agents.csv` and `tables.csv`. When a correction changed one of them, the upgrade above refuses the folder and changes nothing, as it did on a rehearsal with the 1.1 zip and one correction. Replace the folder instead, and let this release's runner cut the correction again.
+This part is for a KPI Store 1.1 release folder set up on this machine, whose only changes are the runner's cuts: one that the 1.1 runner loaded the stores from, or one it never ran in. A cut changes the tables of `data-product/pricing`, and this release adds a column to two of them, `agents.csv` and `tables.csv`. When a correction changed one of them, the upgrade above refuses the folder and changes nothing, as it did on a rehearsal with the 1.1 zip and one correction. Replace the folder instead, and let this release's runner cut the correction again.
 
 If you also changed the 1.1 folder by hand, the replace leaves those changes in the old folder only. List them before step 1, in the 1.1 folder: `git log` shows the committed ones, and `git status` the ones not committed. A folder not kept in Git has no such list: compare it with the 1.1 zip. Make each change again in the new folder with this release's forms, as sections 3 to 5 say, before step 3.
 
-1. Replace the release folder with this release's zip, as the runbook's "Replace the release with a newer zip" says. Keep the folder's name, such as `kpi-store-1.1`. Leave the local folder as it is. Its settings file may still name the zip `kpi-store-1.1.zip`: the runner builds this release's zip under that name, so you can keep it.
+1. Replace the release folder with this release's zip, as steps 1 to 4 of the runbook's "Replace the release with a newer zip" say. Leave out its step 5, the setup check and the run: steps 2 and 3 below do them. Keep the folder's name, such as `kpi-store-1.1`. Leave the local folder as it is. Its settings file may still name the zip `kpi-store-1.1.zip`: the runner builds this release's zip under that name, so you can keep it.
 
    You are done when `git log` in the new folder shows one commit, the release as unpacked.
 
