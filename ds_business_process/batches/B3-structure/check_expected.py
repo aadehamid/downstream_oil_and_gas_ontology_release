@@ -69,13 +69,20 @@ def approved_ids(baseline: rdflib.Graph, expected: list[dict], candidate: rdflib
     changes), and each concept whose parent or child is named (its skos:broader or narrower link changes).
     With a candidate, also the new concepts the file names, found by their new label, so V3 lets them in and
     no other new concept. A node that the migration map gives to a baseline concept is never counted as new, so a
-    baseline concept relabelled with a new concept's name does not approve itself; pass ``rows`` for that."""
+    baseline concept relabelled with a new concept's name does not approve itself. Each new row approves at most one
+    node."""
     ids = {r["baseline_id"] for r in expected if r["baseline_id"]}
     if candidate is not None:
-        mapped = {URIRef(r["new_iri"]) for r in rows or [] if r.get("new_iri")}
-        wanted = {r["new_label"] for r in expected if r["change"] == "new"}
-        ids |= {d.local_id(str(s)) for s in sorted(d.processes(candidate), key=str) if s not in mapped
-                for o in candidate.objects(s, SKOS.prefLabel) if str(o) in wanted}
+        if rows is None:
+            raise ValueError("approved_ids needs the migration rows with a candidate, to tell new nodes from mapped ones")
+        mapped = {URIRef(r["new_iri"]) for r in rows if r.get("new_iri")}
+        for r in expected:
+            if r["change"] != "new":
+                continue
+            found = {s for s in d.processes(candidate) if s not in mapped
+                     for o in candidate.objects(s, SKOS.prefLabel) if str(o) == r["new_label"]}
+            if len(found) == 1:  # two nodes for one new row approve neither, so V3 names both
+                ids.add(d.local_id(str(found.pop())))
     for r in expected:
         if r["change"] == "move":
             ids |= descendants(baseline, r["baseline_id"])

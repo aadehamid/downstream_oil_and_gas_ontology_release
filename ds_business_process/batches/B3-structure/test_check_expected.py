@@ -151,3 +151,17 @@ def test_a_baseline_concept_renamed_to_a_new_label_does_not_approve_itself(basel
     assert d.local_id(str(stray)) not in approved
     assert any("CM-1-3-1" in f for f in d.only_approved_changed(baseline, g, rows, approved,
                                                                  frozenset({SKOS.notation})))
+
+
+def test_one_new_row_approves_one_node_and_rows_are_required(baseline, expected, built):
+    g, rows = built
+    g = copy(g)
+    twin = URIRef(d.NEW_PROC + "DSBP-P-000998")
+    g.add((twin, d.CORE.taxonomyLevel, Literal(3)))
+    g.add((twin, SKOS.prefLabel, Literal("Retail")))
+    approved = ce.approved_ids(baseline, expected, g, rows)
+    assert "DSBP-P-000998" not in approved
+    assert sum("is a new concept but is not on the approved list" in f
+               for f in d.only_approved_changed(baseline, g, rows, approved, frozenset({SKOS.notation}))) == 2
+    with pytest.raises(ValueError):
+        ce.approved_ids(baseline, expected, g)

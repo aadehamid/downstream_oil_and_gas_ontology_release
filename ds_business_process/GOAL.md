@@ -32,7 +32,7 @@ Each line ends **Met**, with the command or file that shows it, run against the 
 These notes record how the checks read three lines. They change no line; the decision owner can confirm or correct them.
 
 - Line 3 and the brief's "preserves IDs": since DSBP-DEC-0031, IDs are preserved in the migration map. Each row pairs the old IRI with one new neutral ID (`DSBP-P-000123`), and no old code stays on a concept. Check V2 tests both.
-- Line 4: a company name may appear in `skos:example`, but a company-built system may not, even there (DSBP-DEC-0006). Check V5 reads examples for the systems in the register and lets company names through.
+- Line 4: a company name may appear in `skos:example`, but a company-built system may not, even there (DSBP-DEC-0006). Check V5 reads examples for the systems in the register and lets company names through. It also lets a company name stand in the title or description of a cited source, such as a peer's 10-K, since that is the publisher's own wording (DSBP-DEC-0002).
 - Line 8: check V6 accepts a version or an issue date, because a filing or a report has a date and no version. Every other field is as the line says.
 
 ## Owner's steps after the release

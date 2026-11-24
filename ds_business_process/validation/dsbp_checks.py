@@ -299,8 +299,8 @@ def read_terms(path: Path = TERMS) -> list[tuple[str, re.Pattern, str]]:
 def company_neutral(candidate: rdflib.Graph, terms_path: Path = TERMS) -> list[str]:
     """Every reader-facing literal of every subject, not only of the processes. skos:example is read for
     company-built systems, which leave the reference ontology even as examples (DSBP-DEC-0006); a company name
-    may stand in an example (GOAL.md, done line 4), and in the title of a cited source, such as a peer's
-    filing. A commercial product is not in the register at all."""
+    may stand in an example (GOAL.md, done line 4), and in the title or description of a cited source, such
+    as a peer's filing. A commercial product is not in the register at all."""
     terms = read_terms(terms_path)
     sources = set(candidate.objects(None, DCTERMS.source))
     fails = []
@@ -308,7 +308,7 @@ def company_neutral(candidate: rdflib.Graph, terms_path: Path = TERMS) -> list[s
         for s, o in sorted(candidate.subject_objects(prop), key=lambda x: (str(x[0]), str(x[1]))):
             if not isinstance(o, Literal):
                 continue
-            # A cited source's title is the publisher's own words: a peer's filing may name the peer (DSBP-DEC-0002).
+            # A cited source's title or description is the publisher's own words: a peer's filing may name the peer (DSBP-DEC-0002).
             citation = s in sources and prop in (DCTERMS.title, DCTERMS.description)
             for term, rx, kind in terms:
                 if kind == "company" and (prop == SKOS.example or citation):
