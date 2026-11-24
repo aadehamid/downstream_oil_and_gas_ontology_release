@@ -1,0 +1,19 @@
+term,case_sensitive,kind,why
+MPC,yes,company,Marathon Petroleum's abbreviation
+Marathon,no,company,company name
+Marathon Petroleum,no,company,company name
+MPLX,yes,company,MPC's midstream affiliate
+Speedway,no,company,MPC's former retail brand
+ARCO,yes,company,brand marketed by MPC
+Andeavor,no,company,company acquired by MPC
+Tesoro,no,company,predecessor company
+MCTS,yes,company,MPC's crude trading subsidiary
+XPIMS,yes,system,commercial planning tool name used in MPC processes
+PPIMS,yes,system,commercial planning tool name used in MPC processes
+DPO,yes,system,MPC distribution planning optimizer abbreviation
+Distribution Planning Optimizer,no,system,MPC-built tool
+KittyHawk,no,system,MPC-built tool
+MAGIC,yes,system,MPC-built tool
+CargoTracker,no,system,MPC-built tool
+TopDay,no,system,MPC-built tool
+VALT,yes,system,MPC-built tool
