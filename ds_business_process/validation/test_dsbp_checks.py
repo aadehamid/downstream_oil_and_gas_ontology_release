@@ -1015,6 +1015,8 @@ def test_v5_exempts_a_cited_iri_only_where_it_is_cited(tmp_path):
     g = rdflib.Graph()
     g.add((s, DCTERMS.source, src))
     g.add((src, DCTERMS.title, Literal("Investors")))
+    g.add((src, RDF.type, URIRef("http://purl.org/dc/dcmitype/Text")))  # any statement about the source keeps it cited
+    g.add((src, RDFS.comment, Literal("The investor page")))
     assert d.company_neutral(g, terms, none) == []
     g.add((s, RDFS.seeAlso, src))                                 # the same IRI, used outside the citation
     assert any("the IRI" in f for f in d.company_neutral(g, terms, none))

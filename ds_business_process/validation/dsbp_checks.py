@@ -506,13 +506,12 @@ def company_neutral(candidate: rdflib.Graph, terms_path: Path = TERMS, allowed_p
     fails = []
     # IRIs, in every position. A cited source's own IRI, and an IRI given as its identifier, may name the company that
     # published it, such as a peer's filing, but never a company-built system.
-    # The exemption holds only in those places: the object of dcterms:source, the subject of the source's own record,
-    # and a URIRef given as its identifier; never for an IRI this project or its predecessor minted.
-    record = (DCTERMS.title, DCTERMS.description, DCTERMS.publisher, DCTERMS.identifier, DCTERMS.hasVersion,
-              DCTERMS.issued, DSBP.accessDate)
+    # The exemption holds only in those places: the object of dcterms:source, the subject of any statement about the
+    # source (its record, its rdf:type and the rest), and a URIRef given as its identifier; never for an IRI this
+    # project or its predecessor minted. The same IRI as the object of any other statement is not exempt.
     seen = set()
     for s, p, o in sorted(candidate, key=lambda x: (str(x[0]), str(x[1]), str(x[2]))):
-        for iri, cited in ((s, s in sources and p in record), (p, False),
+        for iri, cited in ((s, s in sources), (p, False),
                            (o, p == DCTERMS.source or (s in sources and p == DCTERMS.identifier))):
             if not isinstance(iri, URIRef):
                 continue
