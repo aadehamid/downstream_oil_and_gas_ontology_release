@@ -565,7 +565,7 @@ def test_v6_refuses_minted_iris_in_any_scheme_or_case(baseline, rows, candidate,
     assert any("URL" in f for f in d.evidence(baseline, g, rows))
 
 
-# Fixes from Gemini's round-1 review of PR #87, each shown failing on a broken copy ------------------------------------
+# Fixes from the first independent review of the generalization pull request, each shown failing on a broken copy ------------------------------------
 def test_v1_fails_when_a_whole_manifest_is_deleted(tmp_path):
     rel = tmp_path / "releases"
     shutil.copytree(d.RELEASES / "core" / "2.4.0", rel / "core" / "2.4.0")

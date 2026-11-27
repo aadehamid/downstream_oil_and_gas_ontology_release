@@ -19,8 +19,8 @@ Status as of 2026-11-24, 13:00 UTC.
 
 ## Next
 
-1. The owner reviews the drafts in `foundations/` and the local-materials packs in `research/local-review/`, and answers the open cards: Q-CQ (lock the 70 competency questions) and Q-P2 (no active consumers).
+1. Lock the 70 competency questions once each has its evidence (Q-CQ, delegated under DSBP-DEC-0040 and 0041). The owner answers Q-P2 (no active consumers), which stays his under DSBP-DEC-0040, and the vision questions.
 2. Finish Step 0: the APQC re-check, OSDU, ISO 14224 and the leads in the survey register.
 3. Bring batch B3 under Step 3's gate: add the definition review and `check_taxonomy.py` to its expected results.
 4. Extend check V2 to the Step 4 facts before any migration runs.
-5. Turn `registers/skill-gaps.csv` (19 rows) into a skills pull request, with the owner's approval.
+5. Turn `registers/skill-gaps.csv` (20 rows) into a skills pull request, each change checked with Gemini (DSBP-DEC-0042).
