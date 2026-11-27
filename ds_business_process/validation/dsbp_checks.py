@@ -142,6 +142,9 @@ def baseline_untouched(releases: Path = RELEASES, listed: dict[str, str] | None 
         except (json.JSONDecodeError, UnicodeDecodeError, AttributeError) as e:
             fails.append(f"V1: {m.relative_to(releases).as_posix()} is not a readable manifest ({type(e).__name__})")
             continue
+        if not isinstance(files, dict):
+            fails.append(f"V1: {m.relative_to(releases).as_posix()} is not a readable manifest (files is not a map)")
+            continue
         for name, want in files.items():
             f = m.parent / name
             if not f.exists():

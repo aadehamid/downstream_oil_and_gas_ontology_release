@@ -13,6 +13,7 @@ Run from the repository root:
 from __future__ import annotations
 
 import csv
+import json
 import shutil
 import subprocess
 import sys
@@ -768,11 +769,30 @@ def test_v5_catches_a_company_system_name_in_any_letter_case():
     assert len(d.company_neutral(g)) == 1
 
 
-def test_v1_reports_a_manifest_that_is_not_json(tmp_path):
+@pytest.mark.parametrize("text, why", [
+    ("{ not json", "JSONDecodeError"),
+    ("[]", "AttributeError"),
+    ('{"files": null}', "files is not a map"),
+    ('{"files": []}', "files is not a map"),
+])
+def test_v1_reports_an_unreadable_manifest_and_checks_the_rest(tmp_path, text, why):
     rel = tmp_path / "releases"
-    shutil.copytree(d.RELEASES / "core" / "2.4.0", rel / "core" / "2.4.0")
-    (rel / "core" / "2.4.0" / "manifest.json").write_text("{ not json", encoding="utf-8")
-    core_only = {k: v for k, v in d.read_manifest_list().items() if k.startswith("core/2.4.0/")}
-    fails = d.baseline_untouched(rel, core_only)
-    assert "V1: manifest core/2.4.0/manifest.json differs from its recorded hash" in fails
-    assert "V1: core/2.4.0/manifest.json is not a readable manifest (JSONDecodeError)" in fails
+    for name in ("core", "organization"):
+        src = next(p.parent for p in sorted((d.RELEASES / name).glob("*/manifest.json")))
+        shutil.copytree(src, rel / name / src.name)
+    bad = next((rel / "core").glob("*/manifest.json"))
+    bad.write_bytes(text.encode("utf-8"))
+    other = next((rel / "organization").glob("*/manifest.json")).parent
+    victim = other / next(iter(json.loads((other / "manifest.json").read_text(encoding="utf-8"))["files"]))
+    victim.write_bytes(victim.read_bytes() + b" ")
+    fails = d.baseline_untouched(rel, {})
+    assert f"V1: {bad.relative_to(rel).as_posix()} is not a readable manifest ({why})" in fails
+    assert f"V1: {victim.relative_to(rel).as_posix()} differs from its manifest hash" in fails
+
+
+def test_v1_reports_a_manifest_that_is_not_utf8(tmp_path):
+    rel = tmp_path / "releases"
+    src = next(p.parent for p in sorted((d.RELEASES / "core").glob("*/manifest.json")))
+    shutil.copytree(src, rel / "core" / src.name)
+    (rel / "core" / src.name / "manifest.json").write_bytes(b"\xff\xfe{")
+    assert any("is not a readable manifest (UnicodeDecodeError)" in f for f in d.baseline_untouched(rel, {}))
