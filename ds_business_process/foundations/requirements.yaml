@@ -39,13 +39,13 @@ competency_questions:
   - id: CQ1
     question: What are the child processes of process P, and what is its full path from the top?
     priority: must
-    rationale: Carried from 1.2 question 1; the backbone every other question uses.
+    rationale: Carried from 1.2 question 1; the backbone every other question uses. Locked by DSBP-DEC-0044.
     needs: [process hierarchy]
     status: locked
   - id: CQ2
     question: Which measures evaluate process P, and what nature and roles does each have?
     priority: must
-    rationale: Owner's direction to keep every typical measure (DSBP-DEC-0033), classified by one nature and one or more roles (DSBP-DEC-0039).
+    rationale: Owner's direction to keep every typical measure (DSBP-DEC-0033), classified by one nature and one or more roles (DSBP-DEC-0039). Locked by DSBP-DEC-0044.
     needs: [measures, process hierarchy]
     status: locked
   - id: CQ3
@@ -57,7 +57,7 @@ competency_questions:
   - id: CQ4
     question: Which system categories support process P, with which off-the-shelf products as examples?
     priority: should
-    rationale: Carried from 1.2 question 6 without company system names (DSBP-DEC-0034).
+    rationale: Carried from 1.2 question 6 without company system names (DSBP-DEC-0034). Locked by DSBP-DEC-0044.
     needs: [system categories, process hierarchy]
     status: locked
 assumptions:
