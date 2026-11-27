@@ -2,7 +2,7 @@
 
 Status: 61 questions locked on 2026-11-27 by the owner (DSBP-DEC-0044, Step 1, policy 1). Nine are held until their evidence is cited: 59, 67 and 70, which name values with no standard or companies behind them yet, and 20, 22, 41, 42, 43 and 50, which carry 1.2 assumptions. Each held question is marked *(Held)*. A held question is locked by a later decision once its evidence is in.
 
-These are the acceptance test for DS_Business_Process: if the ontology cannot answer one, the ontology is incomplete, not the question. The Step 11 regression will run each as SPARQL.
+The locked questions are the acceptance test for DS_Business_Process: if the ontology cannot answer one, the ontology is incomplete, not the question. The Step 11 regression will run each locked question as SPARQL. A held question joins the test, and may support a design choice, only once it is locked.
 
 Questions 1 to 55 carry over 1.2's 55 locked questions (`business_architecture/ontology/competency-questions.md` on `kpi-store/1.2`), with the same numbers. Where 1.2's wording named one company's systems, tools or data, the change is noted. Questions 56 to 70 are new, for an industry reference.
 
