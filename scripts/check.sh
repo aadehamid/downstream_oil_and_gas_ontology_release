@@ -97,7 +97,7 @@ CORE_BUILDER="$(cd $ONT/release && "$PYTHON" -c 'import newest; print(newest.cor
 (cd $ONT/party && run with_deps python build_party.py --verify)
 # The projection's checked, serialised inputs must match the manifest.
 (cd $ONT/projection && run with_deps python pipeline.py build --verify)
-# DS_Business_Process's release checks (V1 to V8) and their tests; V8's reasoner needs owlready2 and Java.
+# DS_Business_Process's release checks (V1 to V9) and their tests; V8's reasoner needs owlready2 and Java.
 run uv run -q --no-project --with pytest==9.2.0 --with rdflib==7.6.0 --with pyshacl==0.40.2 --with owlready2==0.51 \
   python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcutdir "$ROOT" ds_business_process/validation/test_dsbp_checks.py \
   ds_business_process/batches/B3-structure/test_check_expected.py

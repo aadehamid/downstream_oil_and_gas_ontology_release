@@ -54,18 +54,18 @@ The owner asked that every part of the ontology reuse a standard where one fits,
 | Module or area | Standards | Status |
 |---|---|---|
 | Measures and KPIs | ISO 22400-1 and -2, KPIOnto 2.0.0, API RP 754 (process safety indicators), QUDT (units), W3C Data Cube | ISO 22400-1, KPIOnto, QUDT surveyed; the rest to survey |
-| Organization, roles and RACI | W3C ORG, BPMN 2.0.2 (lanes and roles), ISO 8000-150 (data roles) | ORG surveyed; the rest to survey |
+| Organization, roles and RACI | W3C ORG, BPMN 2.0.2 (lanes and roles), ISO 8000-150 (data roles) | To survey: ORG is listed above, but its licence and version are not checked for this build |
 | Data products | DCAT 3, DPROD, Open Data Product Standard (ODPS), PROV-O | DCAT 3 and PROV-O surveyed; the rest to survey |
 | Information objects and logical model | ISA-95 (IEC 62264) Parts 1 to 3, API MPMS (measurement), PIDX downstream standards | To survey |
 | Processes | APQC PCF (cross-industry and downstream petroleum) | Crosswalk only (DSBP-DEC-0002); re-check open |
-| Supply chain and logistics | IOF Supply Chain, GS1 EPCIS and CBV 2.0 | Surveyed |
-| Assets and maintenance | IOF Maintenance, ISO 14224, POSC Caesar / ISO 15926 | ISO 14224 to survey |
+| Supply chain and logistics | IOF Supply Chain, GS1 EPCIS and CBV 2.0 | IOF Supply Chain surveyed. GS1 EPCIS and CBV to survey: the terms for reusing them are not checked |
+| Assets and maintenance | IOF Maintenance, ISO 14224, POSC Caesar / ISO 15926 | IOF Maintenance surveyed. ISO 14224 to survey. POSC Caesar to survey: it names no licence and no version |
 | Finance and trading | FIBO | Surveyed |
 | Leads from the Ontology Pipeline catalogue (2026-11-24) | SDMX (KPI), IFRS Accounting Taxonomy (finance measures), UNSPSC and GS1 GPC (products, procurement), ESCO (occupations for roles), PKO (procedures), ITIL and TOGAF (systems), NAICS and ISIC (industry scope), GS1 GLN and Wikidata (locations and parties), XKOS correspondence tables (migration map), OWL-Time (periods) | To survey; see `research/sources/talisman-catalog-comparison-2026-11-24.md` |
 
 ## Findings
 
-- No public ontology covers downstream oil and gas business processes. IOF covers general manufacturing, supply chain and maintenance concepts, and POSC Caesar covers equipment and technical data. The registry searches confirm it: no registry holds a downstream or refinery-process vocabulary.
-- No registry holds a RACI vocabulary, so the organization module keeps its own four-level code list.
+- None of the ontologies assessed so far covers downstream oil and gas business processes. IOF covers general manufacturing, supply chain and maintenance concepts, and POSC Caesar covers equipment and technical data. The registry searches have not ruled such a vocabulary out: LOV's search for "downstream" failed (HTTP 500), its "refinery" hit `holy:RefineryIndustrialProcessing` is not yet assessed, the BARTOC petroleum and oil and gas vocabularies are not yet assessed, Open Knowledge Graphs ran in degraded text-only mode, Archivo was filtered by name and IRI only, and APQC's downstream petroleum PCF and OSDU reference data are not checked. This stays an open finding until those are assessed and the failed searches are rerun.
+- The searches found no RACI vocabulary, with the same limits as above (LOV and BARTOC returned no hits; Open Knowledge Graphs was degraded; Archivo was matched by name). Until a fuller search finds one, the organization module keeps its own four-level code list.
 - Leads still to assess: on BARTOC, the Process Classification Framework, the Vocabulary of Oil and Gas, the Petroleum Abstracts E&P Thesaurus and the Supply Chain Management Terms and Glossary; on LOV, ceon-energy, ceon-process, holy and s4city (its KeyPerformanceIndicator class); on Archivo, em-kpi and the Product Supply Network Vocabulary.
 - Other sources still to survey: OSDU reference data, ISO 14224 (equipment reliability taxonomy), the Open Group's ArchiMate and the OMG's BPMN (modelling languages, not content), and the owner's resource catalog link once its full list is available.

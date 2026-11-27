@@ -6,6 +6,8 @@ These are the acceptance test for DS_Business_Process: if the ontology cannot an
 
 Questions 1 to 55 carry over 1.2's 55 locked questions (`business_architecture/ontology/competency-questions.md` on `kpi-store/1.2`), with the same numbers. Where 1.2's wording named one company's systems, tools or data, the change is noted. Questions 56 to 70 are new, for an industry reference.
 
+Before the list is locked, every list of values a question names (fields, categories, roles) needs a standard or 3 or more independent companies behind it, as any reference term does (DSBP-DEC-0002). Where a question names values without that evidence yet, it is marked *(Evidence needed)*. Questions 20, 22, 41 to 43 and 50 carry 1.2 assumptions (party-role functions, loading authorization, rules for agents), which need the same evidence before they are locked.
+
 ## I. Process structure
 1. What are the child processes of process P, and what is its full path from the top?
 2. Which processes are orphans: no parent, or no children where children are expected?
@@ -35,7 +37,7 @@ Questions 1 to 55 carry over 1.2's 55 locked questions (`business_architecture/o
 16. What is the official name, what are the aliases, and what is explicitly out?
 17. Which role owns the meaning of a concept, and which only stewards its data? *(Changed: "who" becomes "which role".)*
 18. When a definition changes, what stays the same (the identity) and what gets a new version?
-- *Done when:* "Customer" cannot be classified as a KPI, and "3-2-1 crack spread" can be classified as a market indicator.
+- *Done when:* "Customer" cannot be classified as a measure at all, and "3-2-1 crack spread" is a measure of market nature that never carries the typical-KPI role (DSBP-DEC-0038, 0039).
 
 ## VII. Party
 19. What is a party, and how is it different from a customer account?
@@ -89,10 +91,10 @@ Questions 1 to 55 carry over 1.2's 55 locked questions (`business_architecture/o
 *(Changed: 1.2 named one modelling tool's export; the questions are asked of any exported logical model.)*
 
 ## XIII. Industry reference (new)
-56. What kind is measure M (KPI candidate, operational metric, market indicator, plan-variance diagnostic, decision-support indicator, tracker or report, alert, or not a measure), and what evidence supports that kind?
+56. What is the one nature of measure M (observation, operational, financial, market, forecast, risk or data quality), what roles does it play (input, analysis, decision support, benchmark, typical KPI), and which public source anchors its nature? (DSBP-DEC-0039)
 57. Which typical measures evaluate each process area, and which areas have none?
-58. For a KPI candidate, which attributes the reference defines (formula, numerator and denominator scope, unit, time grain, dimensional grain, direction), and which a company must supply (target, owner, thresholds, authoritative system)?
-59. Is data product D foundational or derived, and from which inputs?
+58. For a measure with the typical-KPI role, which components does the reference name (by component role, such as numerator and denominator), with which unit, grain and direction, and which items are left to the company layer (governed-KPI status, target, thresholds, owner, formula version, authoritative system)? (DSBP-DEC-0039)
+59. Which inputs is data product D built from, and how does a public data-product standard (such as DPROD or ODPS) classify it? *(Evidence needed: the classes come from the standard once surveyed.)*
 60. Which generic roles exist, which occupational standard or companies support each, and which processes have no RACI yet?
 61. For a company title, which generic role does it map to? *(Answered by a company specialization, which the reference must make possible.)*
 62. Which concepts rest on a standard, which on 3 or more independent companies, and which on fewer?
@@ -100,7 +102,7 @@ Questions 1 to 55 carry over 1.2's 55 locked questions (`business_architecture/o
 64. Which 1.2 IRI became which DS_Business_Process IRI, with which status (retained, relabeled, modified, deprecated or excluded)?
 65. Which processes map to an external ontology term (IOF, APQC), and with which match?
 66. Which areas in the coverage table are complete, which are thin, and on what evidence?
-67. What must a market observation carry (commodity, specification, location or hub, marker, observation date, delivery period, publication time, source and version, status)?
+67. What must a market observation carry, and which standard or price-reporting agency methodology names each field? *(Evidence needed: 1.2's market-data module lists commodity, specification, location or hub, marker, observation date, delivery period, publication time, source and version, and status; each must be confirmed.)*
 68. Which information objects does each process produce or consume, and which standard or company names each?
 69. Which off-the-shelf products are examples of system category S, and which public page supports each?
-70. Which risks (price, basis, crack, volume, quality, logistics, credit, liquidity, operational, regulatory) does each Supply & Trading process manage?
+70. Which risk categories does each Supply & Trading process manage, and which standard or company disclosures name each category? *(Evidence needed: a draft list of price, basis, crack, volume, quality, logistics, credit, liquidity, operational and regulatory risk is to be confirmed against filings' risk-factor sections.)*

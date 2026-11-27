@@ -20,8 +20,8 @@ Reviewed 2026-11-24 against the purpose in `requirements.yaml`. Draft for the ow
 | Environment, Health & Safety, with regulatory reporting | in | DSBP-DEC-0019 | | |
 | Strategy & Business Development | in | DSBP-DEC-0026 | | |
 | Enterprise Risk Management | in | DSBP-DEC-0027 | | |
-| Shared Services | out | No company names it as a process area; companies use it for how work is delivered (DSBP-DEC-0018) | Work delivered by a shared-services centre sits under the process area it serves, such as Finance or HR; nothing depends on a Shared Services node | A standard or 3 or more companies that name shared services as a process area |
-| Renewable fuels as its own area | out | A product line, not a process area (DSBP-DEC-0023) | Renewable feedstocks and products are named inside the Commercial and Refining processes | Evidence that renewable fuels run on processes the existing areas cannot hold |
+| Shared Services | out | None of the companies in the peer research names it as a process area; two of them (PBF and Chevron) use it for how work is delivered (DSBP-DEC-0018) | Work delivered by a shared-services centre sits under the process area it serves, such as Finance or HR; nothing depends on a Shared Services node | A standard or 3 or more companies that name shared services as a process area |
+| Renewable fuels as its own area | out | Decided as a product line, not a process area (DSBP-DEC-0023). Six companies report a renewables segment; that the same Commercial and Refining processes run it is an inference, not a verified fact | Renewable feedstocks and products are named inside the Commercial and Refining processes | Evidence that renewable fuels run on processes the existing areas cannot hold |
 | Upstream (exploration and production) | out | Not downstream; the purpose names downstream only | Crude enters the reference at crude supply under Supply & Trading | A decision to extend the reference upstream |
 
 ## Companion modules (DSBP-DEC-0010)
@@ -32,6 +32,6 @@ Reviewed 2026-11-24 against the purpose in `requirements.yaml`. Draft for the ow
 | Organization: generic roles and RACI | in | CQ3; DSBP-DEC-0033 | | |
 | System categories, with off-the-shelf products as examples | in | CQ4; DSBP-DEC-0034 | | |
 | Data products, logical model, technical graph, integration, lane, market data, party, value stream | in | DSBP-DEC-0010; each gets its competency questions at its module review | | |
-| Real-organization reference module (`ref-mpc`) | out | Company instances are out of scope (policy 2) | It stays in 1.2 only; a company specialization may add its own `ref-<organization>` module later | A company specialization |
+| The predecessor's real-organization reference module | out | Company instances are out of scope (policy 2) | It stays in 1.2 only; a company specialization may add its own `ref-<organization>` module later | A company specialization |
 | Company extensions and instances | out | Policy 2; the project's safeguards | A company specialization holds them | The first company specialization |
 | Event records and measure values | out | "Define, don't record" (policy 2) | They stay in consumers' systems | None: a standing rule |
