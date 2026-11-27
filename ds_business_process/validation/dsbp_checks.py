@@ -12,17 +12,26 @@ V2  nothing_lost            every baseline process IRI has exactly one row in th
                             and its old IRI is gone; a deprecated row is owl:deprecated in the candidate and no other
                             row is; an excluded concept has no new IRI and is gone from the candidate
 V3  only_approved_changed   a concept that differs from the baseline, is excluded, or is new, is on the approved list;
-                            so is any other subject (a class, a property, the ontology header) whose statements differ
-V4  structure               no cycles; one parent below the top, and that parent is a process; one level, not negative,
-                            = parent level + 1; skos:narrower, where given, is the inverse of skos:broader; one
-                            preferred label on every concept, unique; one non-blank definition on every concept that
-                            is not deprecated; optional SHACL shapes conform
+                            so is any other subject (a class, a property, the ontology header) whose statements differ;
+                            a blank node is compared by its content and count, so a change inside one counts, and
+                            blank nodes that nothing points at are compared together
+V4  structure               no cycles; one parent below the top, and that parent is a process; one level, an integer,
+                            not negative, = parent level + 1; skos:narrower, where given, is the inverse of
+                            skos:broader; on every concept one preferred label per language, none blank, and no other
+                            concept with the same label; one non-blank definition on every concept that is not
+                            deprecated; optional SHACL shapes conform
 V5  company_neutral         no term from the company-terms register in any literal of the candidate, on any subject
-                            and any property; skos:example may name a company, never a company-built system; a
-                            phrase in the allowed-terms register (a generic meaning of the same letters) is not a hit
+                            and any property, nor in any IRI, in any letter case and split at marks and case changes;
+                            skos:example may name a company, never a company-built system; a phrase in the
+                            allowed-terms register (a generic meaning of the same letters) is not a hit; a cited
+                            source's own IRI, URL, title, description and publisher may name a company; no literal
+                            carries the predecessor's parked-tree-change codes (PTC-001), and none outside a cited
+                            source's record or an example carries a working file name (notes.md, plan.xlsx)
 V6  evidence                every new or changed definition, on any subject, cites a public source with title,
                             publisher, URL, version or issue date, and access date, none of them blank, and cites no
-                            internal source beside it
+                            internal source beside it. The access date is dsbp:accessDate, written as a date
+                            (2026-11-27): Dublin Core has no term for the day a source was read (README.md, "How a
+                            source is recorded")
 V7  relationships_kept      the baseline's process-to-process statements (core properties, skos:related) still hold,
                             unless one end is excluded or the batch lists the statement as an approved removal
 V8  logic                   the candidate, without its owl:imports, is consistent under the HermiT reasoner (needs Java
@@ -39,6 +48,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import datetime
 import hashlib
 import json
 import re
@@ -48,7 +58,7 @@ from pathlib import Path
 
 import rdflib
 from rdflib import RDF, Literal, URIRef
-from rdflib.namespace import DCTERMS, OWL, RDFS, SKOS
+from rdflib.namespace import DCTERMS, OWL, RDFS, SKOS, XSD
 
 ROOT = Path(__file__).resolve().parents[2]
 RELEASES = ROOT / "business_architecture" / "ontology" / "releases"
@@ -69,8 +79,24 @@ NEW_ID = re.compile(r"DSBP-P-\d{6}")  # neutral IDs that say nothing about place
 INTERNAL_SOURCE = re.compile(r"step3c-definition-workbook", re.IGNORECASE)
 INTERNAL_IRI = re.compile(r"^urn:", re.IGNORECASE)
 # IRIs this project or its predecessor minted: they name a source, but they are not where a reader can find it (V6).
-MINTED = ("https://w3id.org/ds-bp/", "https://w3id.org/mpc/")
+# Matched under any scheme and letter case, with or without a path, so https://w3id.org/mpc and
+# ftp://w3id.org/mpc#x are minted too.
+MINTED = re.compile(r"^[a-z][a-z0-9+.-]*://w3id\.org/(?:ds-bp|mpc)(?:[/?#]|$)", re.IGNORECASE)
+# What makes an IRI part of the ontology rather than a source it cites (V5): a statement in OWL or SKOS, a class or
+# property axiom, or a type from OWL, SKOS or RDF Schema.
+MODELING = (RDFS.subClassOf, RDFS.subPropertyOf, RDFS.domain, RDFS.range)
+MODELING_TYPES = (RDFS.Class, RDF.Property, RDFS.Datatype)
 NEW_IRI = re.compile(re.escape(NEW_PROC) + r"DSBP-P-\d{6}")
+# The predecessor's working trace, which a reader outside it cannot follow (V5): its parked-tree-change codes, which
+# are never public, and the names of its working files. A public document's file name may stand on its source record
+# and in an example; a web address is not read as a file name, so a site in .md or .py is not a hit.
+TRACE_CODE = re.compile(r"(?<![A-Za-z0-9])PTC-\d+(?:-[A-Z]+)?(?![A-Za-z0-9])", re.IGNORECASE)
+TRACE_FILE = re.compile(r"(?<![A-Za-z0-9])[A-Za-z0-9_-]+\.(?:md|xlsx|xlsm|csv|json|py|ipynb|docx|pptx)(?![A-Za-z0-9])",
+                        re.IGNORECASE)
+WEB_ADDRESS = re.compile(r"\b(?:https?|ftp)://\S+", re.IGNORECASE)
+INTEGER_TYPES = {XSD.integer, XSD.int, XSD.long, XSD.short, XSD.nonNegativeInteger, XSD.positiveInteger,
+                 XSD.unsignedInt, XSD.unsignedLong, XSD.unsignedShort}
+ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
 def load(path: Path) -> rdflib.Graph:
@@ -89,11 +115,24 @@ def processes(g: rdflib.Graph) -> set[URIRef]:
     return {s for s in g.subjects(CORE.taxonomyLevel, None)} | {s for s in g.subjects(DSBP.taxonomyLevel, None)}
 
 
+def _levels(g: rdflib.Graph, s) -> set:
+    return set(g.objects(s, CORE.taxonomyLevel)) | set(g.objects(s, DSBP.taxonomyLevel))
+
+
 def level(g: rdflib.Graph, s: URIRef) -> int | None:
-    v = g.value(s, CORE.taxonomyLevel)
-    if v is None:  # not `or`: a level-0 Literal is falsy
-        v = g.value(s, DSBP.taxonomyLevel)
-    return int(v) if v is not None else None
+    """The concept's one level, or None when it has none, more than one, or one that is not a whole number (V4
+    reports the last two), so no check reads an arbitrary one of several."""
+    values = _levels(g, s)
+    whole = {_whole(v) for v in values}
+    return whole.pop() if len(whole) == 1 and None not in whole else None
+
+
+def _whole(v) -> int | None:
+    """A level as a whole number: an integer-typed literal whose text is digits, such as 3 in Turtle. Anything else
+    (a string "3", a boolean, "3_0", a blank node) is not one."""
+    if not isinstance(v, Literal) or v.datatype not in INTEGER_TYPES or not re.fullmatch(r"[+-]?\d+", str(v)):
+        return None
+    return int(str(v))
 
 
 def read_map(path: Path) -> list[dict]:
@@ -113,7 +152,7 @@ def read_approved(path: Path | None) -> set[str]:
     if not path.exists():
         raise FileNotFoundError(f"approved list {path} does not exist")
     return {local_id(x.strip()) for x in path.read_text(encoding="utf-8").splitlines()
-            if x.strip() and not x.startswith("#")}
+            if x.strip() and not x.strip().startswith("#")}
 
 
 # V1 ---------------------------------------------------------------------------------------------------------------
@@ -209,30 +248,85 @@ def _same_predicate(p: URIRef) -> URIRef:
     return URIRef(str(p).replace(str(CORE), str(DSBP), 1)) if str(p).startswith(str(CORE)) else p
 
 
-def _statements(g: rdflib.Graph, s: URIRef, mapping: dict[str, str], ignore: frozenset = frozenset()) -> set[tuple]:
-    out = set()
+def _statements(g: rdflib.Graph, s, mapping: dict[str, str], ignore: frozenset = frozenset(),
+                _path: tuple = ()) -> set[tuple]:
+    """A subject's statements, comparable across two graphs: module IRIs move to the new namespace, mapped IRIs to
+    their new ones, and a blank-node object becomes its own statements, since its label differs between graphs.
+    Two blank nodes with the same content on one property count twice (each statement carries its count), and a
+    loop back to a blank node on the path is written as how many steps back it goes."""
+    counts: dict[tuple, int] = {}
     ignore = frozenset(map(_same_predicate, ignore))
+    path = _path + (s,)
     for p, o in g.predicate_objects(s):
         p = _same_predicate(p)
         if p in ignore:
             continue
         if isinstance(o, URIRef):
             o = _same_predicate(URIRef(mapping.get(str(o), str(o))))
-        out.add((p, o))
-    return out
+        elif isinstance(o, rdflib.BNode):
+            o = (("_:cycle", len(path) - path.index(o)) if o in path
+                 else ("_:", frozenset(_statements(g, o, mapping, ignore, path))))
+        counts[(p, o)] = counts.get((p, o), 0) + 1
+    return {(p, o) if n == 1 else (p, o, n) for (p, o), n in counts.items()}
+
+
+UNREFERENCED = URIRef("urn:dsbp:v3:blank-nodes-no-named-subject-points-at")
 
 
 def _others(g: rdflib.Graph, mapping: dict[str, str], ignore: frozenset) -> dict[URIRef, set]:
     """The statements of every named subject that is not a process, with module IRIs moved to the new namespace.
-    Statements with a blank-node object are left out: a blank node has no name to compare across two graphs."""
+    A blank node is compared through the subject that points at it. Blank nodes that nothing points at, such as an
+    owl:AllDisjointClasses axiom, are compared together, by content and count, under one placeholder subject."""
     procs = processes(g)
     out: dict[URIRef, set] = {}
     for s in set(g.subjects()):
         if not isinstance(s, URIRef) or s in procs or str(s) in mapping:
             continue
-        stmts = {(p, o) for p, o in _statements(g, s, mapping, ignore) if not isinstance(o, rdflib.BNode)}
+        stmts = _statements(g, s, mapping, ignore)
         if stmts:
             out[_same_predicate(s)] = stmts
+    # Blank nodes no named subject reaches: those nothing points at, and one node of each detached loop.
+    reached, todo = set(), [o for s in g.subjects() if isinstance(s, URIRef) for o in g.objects(s, None)
+                            if isinstance(o, rdflib.BNode)]
+    while todo:
+        b = todo.pop()
+        if b not in reached:
+            reached.add(b)
+            todo += [o for o in g.objects(b, None) if isinstance(o, rdflib.BNode)]
+    loose = sorted({x for x in g.subjects() if isinstance(x, rdflib.BNode)} - reached, key=str)
+    roots = [b for b in loose if (None, None, b) not in g]
+    covered = set(roots)
+    for b in roots:
+        todo = [b]
+        while todo:
+            x = todo.pop()
+            for o in g.objects(x, None):
+                if isinstance(o, rdflib.BNode) and o not in covered:
+                    covered.add(o)
+                    todo.append(o)
+    counts: dict = {}
+    for b in roots:
+        key = frozenset(_statements(g, b, mapping, ignore))
+        if key:
+            counts[key] = counts.get(key, 0) + 1
+    # What is left holds a loop, with any blank nodes hanging off it. Each connected group, followed both ways so no
+    # node's label decides where it starts, is read from each of its nodes, since a loop has no first node.
+    rest = set(loose) - covered
+    while rest:
+        group, todo = set(), [min(rest, key=str)]
+        while todo:
+            x = todo.pop()
+            if x in group:
+                continue
+            group.add(x)
+            todo += [o for o in g.objects(x, None) if o in rest] + [y for y in g.subjects(None, x) if y in rest]
+        rest -= group
+        stmts = frozenset(k for x in group if (k := frozenset(_statements(g, x, mapping, ignore))))
+        if stmts:
+            key = ("_:loop", stmts)
+            counts[key] = counts.get(key, 0) + 1
+    if counts:
+        out[UNREFERENCED] = {(k, n) for k, n in counts.items()}
     return out
 
 
@@ -280,9 +374,13 @@ def structure(candidate: rdflib.Graph, shapes: Path | None = None) -> list[str]:
     procs = processes(candidate)
     parents: dict[URIRef, list] = {s: list(candidate.objects(s, SKOS.broader)) for s in procs}
     for s, ps in parents.items():
-        levels = set(candidate.objects(s, CORE.taxonomyLevel)) | set(candidate.objects(s, DSBP.taxonomyLevel))
-        if len({int(x) for x in levels}) > 1:
-            fails.append(f"V4: {local_id(str(s))} has {len(levels)} different levels; it needs one")
+        levels = _levels(candidate, s)
+        bad = sorted(str(x) for x in levels if _whole(x) is None)
+        if bad:
+            fails.append(f"V4: {local_id(str(s))} has a level that is not a whole number ({', '.join(bad)})")
+        whole = {_whole(x) for x in levels} - {None}
+        if len(whole) > 1:
+            fails.append(f"V4: {local_id(str(s))} has {len(whole)} different levels; it needs one")
         lv = level(candidate, s)
         if lv is not None and lv < 0:
             fails.append(f"V4: {local_id(str(s))} has a negative level {lv}")
@@ -330,10 +428,18 @@ def structure(candidate: rdflib.Graph, shapes: Path | None = None) -> list[str]:
         prefs = list(candidate.objects(s, SKOS.prefLabel))
         if not [x for x in prefs if str(x).strip()]:
             fails.append(f"V4: {local_id(str(s))} has no preferred label")
-        elif len({getattr(x, "language", None) for x in prefs}) < len(prefs):
-            fails.append(f"V4: {local_id(str(s))} has {len(prefs)} preferred labels in one language; it needs one")
-        for lab in prefs:
-            labels.setdefault(str(lab).casefold(), []).append(local_id(str(s)))
+        elif any(not str(x).strip() for x in prefs):
+            fails.append(f"V4: {local_id(str(s))} has a blank preferred label")
+        per_language: dict = {}
+        for x in prefs:
+            per_language[getattr(x, "language", None)] = per_language.get(getattr(x, "language", None), 0) + 1
+        for lang, n in sorted(per_language.items(), key=lambda kv: str(kv[0])):
+            if n > 1:
+                fails.append(f"V4: {local_id(str(s))} has {n} preferred labels in {lang or 'no language'}; "
+                             f"it needs one")
+        # One concept's label in two languages, or the same label twice, is not a clash with another concept.
+        for lab in {str(x).strip().casefold() for x in prefs if str(x).strip()}:
+            labels.setdefault(lab, []).append(local_id(str(s)))
         deprecated = (s, OWL.deprecated, Literal(True)) in candidate
         defs = [x for x in candidate.objects(s, SKOS.definition) if str(x).strip()]
         if not deprecated and not defs:
@@ -374,24 +480,68 @@ def read_allowed(path: Path = ALLOWED) -> list[re.Pattern]:
         return [re.compile(re.escape(r["phrase"]), re.IGNORECASE) for r in csv.DictReader(fh) if r["phrase"].strip()]
 
 
+def _words(text: str) -> list[str]:
+    """An IRI's words, in lower case: split at every mark and at a change of case, so `hasXpimsId`, `xpims-run`
+    and `MPCProcess` all hold the word for the term."""
+    return [w.casefold() for w in re.findall(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|\d+", text)]
+
+
+def _iri_names(iri: str, term: str) -> bool:
+    """Whether an IRI names a register term, in any letter case: the term's words appear in a row among the IRI's
+    words, or, for a term of five letters or more, inside one of its runs of letters, as `marathon` does in
+    `marathonpetroleum.com`. A shorter term, such as MPC, must stand as a word of its own, so `rmpcx` is not a hit."""
+    want = _words(term)
+    if not want:
+        return False
+    have = _words(iri)
+    if any(have[i:i + len(want)] == want for i in range(len(have) - len(want) + 1)):
+        return True
+    flat = "".join(want)
+    return len(flat) >= 5 and any(flat in run.casefold() for run in re.findall(r"[A-Za-z0-9]+", iri))
+
+
 def company_neutral(candidate: rdflib.Graph, terms_path: Path = TERMS, allowed_path: Path = ALLOWED) -> list[str]:
     """Every literal of every subject on every property, the ontology header and module properties included.
     skos:example is read for company-built systems, which leave the reference ontology even as examples
     (DSBP-DEC-0006); a company name may stand in an example (GOAL.md, done line 4), and in the title,
-    description or publisher of a cited source, such as a peer's filing. A commercial product is not in the
+    description, publisher, URL or IRI of a cited source, such as a peer's filing. A commercial product is not in the
     register at all."""
     terms = read_terms(terms_path)
     allowed = read_allowed(allowed_path)
-    sources = set(candidate.objects(None, DCTERMS.source))
+    sources = _cited_sources(candidate)
     fails = []
+    # IRIs, in every position. A cited source's own IRI, and an IRI given as its identifier, may name the company that
+    # published it, such as a peer's filing, but never a company-built system.
+    # The exemption holds only in those places: the object of dcterms:source, the subject of any statement about the
+    # source (its record, its rdf:type and the rest), and a URIRef given as its identifier; never for an IRI this
+    # project or its predecessor minted, and never for an IRI the ontology models (_cited_sources). The same IRI as
+    # the object of any other statement is not exempt.
+    seen = set()
+    for s, p, o in sorted(candidate, key=lambda x: (str(x[0]), str(x[1]), str(x[2]))):
+        for iri, cited in ((s, s in sources), (p, False),
+                           (o, (p == DCTERMS.source and o in sources) or (s in sources and p == DCTERMS.identifier))):
+            if not isinstance(iri, URIRef):
+                continue
+            cited = cited and not MINTED.match(str(iri))
+            for term, _, kind in terms:
+                if (kind == "company" and cited) or (iri, term) in seen or not _iri_names(str(iri), term):
+                    continue
+                seen.add((iri, term))
+                fails.append(f"V5: the IRI {iri} contains {term!r}")
     for s, prop, o in sorted(candidate, key=lambda x: (str(x[0]), str(x[1]), str(x[2]))):
         if not isinstance(o, Literal):
             continue
         text = str(o)
+        citation = s in sources and prop in (DCTERMS.title, DCTERMS.description, DCTERMS.publisher, DCTERMS.identifier)
+        hit = TRACE_CODE.search(text)
+        if hit is None and not citation and prop != SKOS.example:
+            hit = TRACE_FILE.search(WEB_ADDRESS.sub(" ", text))
+        if hit:
+            fails.append(f"V5: {local_id(str(s))} {prop.n3(candidate.namespace_manager)} carries the working "
+                         f"trace {hit.group(0)!r}, which a reader outside the predecessor cannot follow")
         for rx in allowed:
             text = rx.sub(" ", text)
-        # A cited source's own words: a peer's filing may name the peer (DSBP-DEC-0002).
-        citation = s in sources and prop in (DCTERMS.title, DCTERMS.description, DCTERMS.publisher)
+        # A cited source's own words and address (citation, above): a peer's filing may name the peer (DSBP-DEC-0002).
         for term, rx, kind in terms:
             if kind == "company" and (prop == SKOS.example or citation):
                 continue
@@ -407,8 +557,32 @@ def _filled(g: rdflib.Graph, s: URIRef, p: URIRef) -> bool:
 
 
 def _is_url(x) -> bool:
-    low = str(x).lower()
-    return low.startswith(("http://", "https://")) and not low.replace("http://", "https://", 1).startswith(MINTED)
+    return str(x).lower().startswith(("http://", "https://")) and not MINTED.match(str(x))
+
+
+def _cited_sources(g: rdflib.Graph) -> set:
+    """The objects of dcterms:source that are sources and not part of the ontology (V5). A subject that cites itself
+    is not a source, and neither is an IRI that is the subject of a statement in OWL or SKOS or of a class or property
+    axiom, or that has a type from OWL, SKOS or RDF Schema: a concept, class, property or ontology header."""
+    def models(x) -> bool:
+        for p, o in g.predicate_objects(x):
+            if p in MODELING or str(p).startswith((str(OWL), str(SKOS))):
+                return True
+            if p == RDF.type and (o in MODELING_TYPES or str(o).startswith((str(OWL), str(SKOS)))):
+                return True
+        return False
+    return {o for s, o in g.subject_objects(DCTERMS.source) if o != s and not models(o)}
+
+
+def _is_date(text: str) -> bool:
+    """A real calendar date written YYYY-MM-DD: 2026-02-31 is not one."""
+    if not ISO_DATE.fullmatch(text):
+        return False
+    try:
+        datetime.date.fromisoformat(text)
+    except ValueError:
+        return False
+    return True
 
 
 def _public(g: rdflib.Graph, src: URIRef) -> list[str]:
@@ -426,8 +600,8 @@ def _public(g: rdflib.Graph, src: URIRef) -> list[str]:
         missing.append("URL")
     if not _filled(g, src, DCTERMS.hasVersion) and not _filled(g, src, DCTERMS.issued):
         missing.append("version or issue date")
-    if not _filled(g, src, DSBP.accessDate):
-        missing.append("access date")
+    if not any(_is_date(str(o).strip()) for o in g.objects(src, DSBP.accessDate)):
+        missing.append("access date (as a date, such as 2026-11-27)")
     return missing
 
 
@@ -458,7 +632,7 @@ def read_removals(path: Path | None) -> set[str]:
     if path is None:
         return set()
     return {" ".join(x.split()) for x in path.read_text(encoding="utf-8").splitlines()
-            if x.strip() and not x.startswith("#")}
+            if x.strip() and not x.strip().startswith("#")}
 
 
 def relationships_kept(baseline: rdflib.Graph, candidate: rdflib.Graph, rows: list[dict],

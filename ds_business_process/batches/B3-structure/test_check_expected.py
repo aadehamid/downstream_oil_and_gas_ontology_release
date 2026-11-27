@@ -104,10 +104,8 @@ def test_v3_fails_when_an_unlisted_concept_moves(baseline, expected, built):
     (lambda g, rows: g.remove((node(rows, "CM-1-2"), d.CORE.priorPreferredLabel, None)), "old label"),
     (lambda g, rows: g.add((URIRef(d.OLD_PROC + "CM-1-4"), SKOS.prefLabel, Literal("IT Services", lang="en"))),
      "CM-1-4 should be excluded"),
-    (lambda g, rows: g.set((node(rows, "CM-1-1-4-6"), SKOS.prefLabel, Literal("Renamed", lang="en"))),
-     "CM-1-1-4-6 is listed as unchanged but its label changed"),
-    (lambda g, rows: g.remove((node(rows, "CM-1-1-4-6"), OWL.deprecated, None)),
-     "CM-1-1-4-6 is listed as unchanged but its deprecation changed"),
+    (lambda g, rows: g.add((URIRef(d.OLD_PROC + "CM-1-1-4-6"), SKOS.prefLabel, Literal("Commercial Development", lang="en"))),
+     "CM-1-1-4-6 should be excluded"),
     (lambda g, rows: g.add((node(rows, "CM-1-3-10"), SKOS.notation, Literal("CM 1.3.10"))), "still carries a notation"),
     (lambda g, rows: g.set((node(rows, "CM-1-1-4-6-3"), d.CORE.taxonomyLevel, Literal(3))), "should be level 2"),
 ])
@@ -182,9 +180,52 @@ def test_a_relabelled_baseline_concept_cannot_stand_in_for_a_new_one(baseline, e
     assert any("new concept NEW:it" in f for f in ce.check(baseline, g, rows, expected))
 
 
-def test_the_unchanged_row_is_not_approved_for_v3(baseline, expected, built):
+# The file has no "unchanged" row now; this one, for a concept the batch does not touch, tests that kind of row.
+UNCHANGED = {"key": "", "baseline_id": "CM-1-1-3", "change": "unchanged", "new_label": "", "new_parent": "CM-1-1",
+             "expected_level": "3", "decision": "DSBP-DEC-0031", "evidence": "", "draft_definition": ""}
+
+
+def test_an_unchanged_row_is_not_approved_for_v3(baseline, expected, built):
     g, rows = built
-    assert "CM-1-1-4-6" not in ce.approved_ids(baseline, expected, g, rows)
+    assert "CM-1-1-3" not in ce.approved_ids(baseline, expected + [UNCHANGED], g, rows)
+    assert ce.check(baseline, g, rows, expected + [UNCHANGED]) == []
+
+
+@pytest.mark.parametrize("break_it, message", [
+    (lambda g, rows: g.set((node(rows, "CM-1-1-3"), SKOS.prefLabel, Literal("Renamed", lang="en"))), "its label changed"),
+    (lambda g, rows: g.set((node(rows, "CM-1-1-3"), SKOS.broader, node(rows, "CM-1-2"))), "its parent changed"),
+    (lambda g, rows: g.add((node(rows, "CM-1-1-3"), OWL.deprecated, Literal(True))), "its deprecation changed"),
+])
+def test_the_batch_check_fails_when_an_unchanged_row_changes(baseline, expected, built, break_it, message):
+    g, rows = built
+    g = copy(g)
+    break_it(g, rows)
+    assert any(f"CM-1-1-3 is listed as unchanged but {message}" in f
+               for f in ce.check(baseline, g, rows, expected + [UNCHANGED]))
+
+
+def test_map_notes_name_replacements_by_new_id_not_by_working_key(built):
+    g, rows = built
+    notes = {d.local_id(r["baseline_iri"]): r["note"] for r in rows}
+    assert not any("NEW:" in n for n in notes.values())
+    it = next(s for s in d.processes(g) if str(g.value(s, SKOS.prefLabel)) == "Information Technology")
+    assert f"{d.local_id(str(it))} (Information Technology)" in notes["L1-process-excellence-it"]
+    assert "(Strategy & Business Development)" in notes["CM-1-1-4-6"]
+
+
+def test_the_batch_check_fails_on_a_map_note_that_keeps_a_working_key(baseline, expected, built):
+    g, rows = built
+    rows = [dict(r) for r in rows]
+    next(r for r in rows if r["baseline_iri"].endswith("L1-shared-services"))["note"] += " See NEW:risk-mgmt."
+    assert any("still names the working key NEW:risk-mgmt" in f for f in ce.check(baseline, g, rows, expected))
+
+
+def test_the_retired_commercial_development_is_excluded_not_deprecated(baseline, built):
+    g, rows = built
+    status = {d.local_id(r["baseline_iri"]): r for r in rows}
+    assert status["CM-1-1-4-6"]["status"] == "excluded" and status["CM-1-1-4-6"]["new_iri"] == ""
+    old = URIRef(d.OLD_PROC + "CM-1-1-4-6")
+    assert (old, None, None) not in g and (None, None, old) not in g
 
 
 def test_moved_concepts_and_their_descendants_are_modified_in_the_map(baseline, expected, built):

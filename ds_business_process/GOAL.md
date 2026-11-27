@@ -1,6 +1,6 @@
 # Goal: DS_Business_Process 1.0
 
-Status: approved by the decision owner on 2026-11-24 ("goal yes"), recorded in `registers/decision-register.md` as DSBP-DEC-0014.
+Status: approved by the decision owner on 2026-11-24 ("goal yes"), recorded in `registers/decision-register.md` as DSBP-DEC-0014. Done lines 15 and 16 were added on 2026-11-27 by DSBP-DEC-0042.
 
 ## The goal, in the owner's words
 

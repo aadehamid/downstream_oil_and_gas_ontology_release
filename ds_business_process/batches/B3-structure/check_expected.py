@@ -14,7 +14,8 @@ new         a concept with the new label exists under the new parent at the expe
 unchanged   the concept keeps its baseline label, parent, level and deprecation (it is not on V3's approved list)
 
 And for the whole candidate (DSBP-DEC-0031): no process concept carries a skos:notation, every concept that lives
-on has an ID of the form DSBP-P-000123, and the old codes appear only in the migration map.
+on has an ID of the form DSBP-P-000123, and the old codes appear only in the migration map. No map note names a
+replacement by the file's working key (NEW:it); it gives the new ID.
 
 The release checks V1 to V8 still run as well. ``approved_ids`` gives V3 the concepts this batch may change.
 """
@@ -147,7 +148,7 @@ def check(baseline: rdflib.Graph, candidate: rdflib.Graph, rows: list[dict],
         if what == "deprecate":
             if (node, OWL.deprecated, Literal(True)) not in candidate:
                 fails.append(f"B3: {old} should be owl:deprecated")
-            for key in re.findall(r"NEW:\w+", r["draft_definition"]):
+            for key in re.findall(r"NEW:[\w-]+", r["draft_definition"]):
                 repl = new_nodes.get(key)
                 # rdflib reads a None in a triple as "anything", so a missing replacement must fail here.
                 if repl is None or (node, DCTERMS.isReplacedBy, repl) not in candidate:
@@ -164,6 +165,11 @@ def check(baseline: rdflib.Graph, candidate: rdflib.Graph, rows: list[dict],
             if ((was, OWL.deprecated, Literal(True)) in baseline) != ((node, OWL.deprecated, Literal(True)) in candidate):
                 fails.append(f"B3: {old} is listed as unchanged but its deprecation changed")
 
+    # The map is read by people and by the re-pointing of old links: it names replacements by new ID, not by key.
+    for r in rows:
+        key = re.search(r"NEW:[\w-]+", r.get("note", ""))
+        if key:
+            fails.append(f"B3: the map note of {d.local_id(r['baseline_iri'])} still names the working key {key.group(0)}")
     for s in d.processes(candidate):
         if candidate.value(s, SKOS.notation) is not None:
             fails.append(f"B3: {d.local_id(str(s))} still carries a notation; old codes live only in the map")

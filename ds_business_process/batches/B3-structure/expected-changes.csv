@@ -13,7 +13,7 @@ key,baseline_id,change,new_label,new_parent,expected_level,decision,evidence,dra
 ,L1-process-excellence-it,exclude,,,,DSBP-DEC-0017,APQC 8.0 and 13.1; MPC,"Empty in 1.2; split into NEW:it and NEW:bpe (DSBP-DEC-0017). The migration map names both replacements."
 ,L2-refinery-performance-and-risk-coordination,exclude,,,,DSBP-DEC-0027,APQC 11.1,"Emptied by the move of CM-1-1-4-6-3 and removed (DSBP-DEC-0027). Its work goes to NEW:erm; the migration map says so."
 ,L1-shared-services,exclude,,,,DSBP-DEC-0018,0 companies name it,Removed from the release; the migration map gives the reason.
-,CM-1-1-4-6,unchanged,,CM-1-1,3,DSBP-DEC-0026,,"Already retired in 1.2 (PTC-001); stays deprecated, now with no child."
+,CM-1-1-4-6,exclude,,,,DSBP-DEC-0043,"H-7; no public source names it","Retired in 1.2, where it had no meaning of its own, and emptied by this batch's move of its one child, CM-1-1-4-6-1. Excluded with a map row, not kept as deprecated (H-7, DSBP-DEC-0043). Its one step goes to NEW:strategy; the migration map says so."
 NEW:it,,new,Information Technology,L0-enabling-functions,1,DSBP-DEC-0017,APQC 8.0; 6+ companies,"Plan, build, run and secure the information technology that the business uses: applications, data, infrastructure and cyber security."
 NEW:bpe,,new,Business Process Excellence,L0-enabling-functions,1,DSBP-DEC-0017,APQC 13.1,"Define, measure, manage and improve the company's business processes and its business transformation."
 NEW:strategy,,new,Strategy & Business Development,L0-enabling-functions,1,DSBP-DEC-0026,APQC 1.0,"Set the company's vision and strategy, plan its portfolio, and find, assess and close new business opportunities."
