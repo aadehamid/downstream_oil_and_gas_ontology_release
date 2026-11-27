@@ -67,8 +67,9 @@ def descendants(baseline: rdflib.Graph, local: str) -> set[str]:
 
 def approved_ids(baseline: rdflib.Graph, expected: list[dict], candidate: rdflib.Graph | None = None,
                  rows: list[dict] | None = None) -> set[str]:
-    """The baseline concepts this batch may change: each named row, the descendants of each move (their level
-    changes), and each concept whose parent or child is named (its skos:broader or narrower link changes).
+    """The baseline concepts this batch may change: each named row, and the descendants of each move that changes
+    the moved concept's level (their levels change too). A parent is never approved for its child's move, because
+    skos:broader sits on the child.
     With a candidate, also the new concepts the file names, found by their new label, so V3 lets them in and
     no other new concept. A node that the migration map gives to a baseline concept is never counted as new, so a
     baseline concept relabelled with a new concept's name does not approve itself. Each new row approves at most one
@@ -85,16 +86,11 @@ def approved_ids(baseline: rdflib.Graph, expected: list[dict], candidate: rdflib
                      for o in candidate.objects(s, SKOS.prefLabel) if str(o) == r["new_label"]}
             if len(found) == 1:  # two nodes for one new row approve neither, so V3 names both
                 ids.add(d.local_id(str(found.pop())))
+    # A move changes its descendants' levels only when the moved concept's own level changes. Parents are not
+    # approved: skos:broader sits on the child, so a parent's own statements do not change.
     for r in expected:
-        if r["change"] == "move":
+        if r["change"] == "move" and int(r["expected_level"]) != d.level(baseline, URIRef(d.OLD_PROC + r["baseline_id"])):
             ids |= descendants(baseline, r["baseline_id"])
-        if r["new_parent"] and not r["new_parent"].startswith("NEW:"):
-            ids.add(r["new_parent"])
-    unchanged = {r["baseline_id"] for r in expected if r["change"] == "unchanged"}
-    for r in expected:
-        old_parent = baseline.value(URIRef(d.OLD_PROC + r["baseline_id"]), SKOS.broader) if r["baseline_id"] else None
-        if old_parent is not None and d.local_id(str(old_parent)) not in unchanged:
-            ids.add(d.local_id(str(old_parent)))
     return ids
 
 

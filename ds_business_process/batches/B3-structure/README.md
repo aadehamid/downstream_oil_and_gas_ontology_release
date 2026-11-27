@@ -23,10 +23,10 @@ change is made with `build_candidate.py` and checked with `check_expected.py` an
 
 ## The tests, written first
 
-`test_check_expected.py`, 13 tests:
+`test_check_expected.py`:
 - On the baseline under new IDs, with nothing else changed, the batch check fails, as it should before the change.
 - On the candidate `build_candidate.py` makes, the batch check passes, and so do V2, V3 and V7. V4 finds only the two known missing definitions, which batch B5 adds.
-- The batch check fails on candidates with one wrong change: a move not made, a rename not made, an old label not kept, a notation left behind, a wrong level, a new concept missing, and an exclusion with no reason in the map. V3 fails when an unlisted concept moves.
+- The batch check fails on candidates with one wrong change: a move not made, a rename not made, an old label not kept, a notation left behind, a wrong level, a new concept missing, and an exclusion with no reason in the map. V3 fails when an unlisted concept moves, and when an unchanged parent of a moved or renamed concept is edited; a parent is never approved for its child's change.
 
 ## Points for the decision owner when approving
 

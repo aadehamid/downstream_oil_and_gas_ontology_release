@@ -202,3 +202,20 @@ def test_new_concepts_join_their_parents_scheme(baseline, expected, built):
     g, _ = built
     for s in d.processes(g):
         assert g.value(s, SKOS.inScheme) is not None, s
+
+
+@pytest.mark.parametrize("parent", ["CM-1", "CM-1-3", "L0-downstream-operations", "L0-enabling-functions",
+                                    "L1-refining", "MS-1-2"])
+def test_v3_fails_when_an_unchanged_parent_is_edited(baseline, expected, built, parent):
+    g, rows = built
+    g = copy(g)
+    g.set((node(rows, parent), SKOS.prefLabel, Literal("Edited", lang="en")))
+    approved = ce.approved_ids(baseline, expected, g, rows)
+    assert parent not in approved
+    assert any(parent in f for f in d.only_approved_changed(baseline, g, rows, approved, frozenset({SKOS.notation})))
+
+
+def test_same_level_move_descendants_are_not_approved(baseline, expected, built):
+    g, rows = built
+    kids = ce.descendants(baseline, "CM-1-3-10")
+    assert kids and not (kids & ce.approved_ids(baseline, expected, g, rows))
