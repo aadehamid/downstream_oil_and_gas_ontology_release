@@ -137,7 +137,11 @@ def baseline_untouched(releases: Path = RELEASES, listed: dict[str, str] | None 
         elif hashlib.sha256(m.read_bytes()).hexdigest() != want:
             fails.append(f"V1: manifest {name} differs from its recorded hash")
     for m in manifests:
-        files = json.loads(m.read_text(encoding="utf-8")).get("files", {})
+        try:
+            files = json.loads(m.read_text(encoding="utf-8")).get("files", {})
+        except (json.JSONDecodeError, UnicodeDecodeError, AttributeError) as e:
+            fails.append(f"V1: {m.relative_to(releases).as_posix()} is not a readable manifest ({type(e).__name__})")
+            continue
         for name, want in files.items():
             f = m.parent / name
             if not f.exists():

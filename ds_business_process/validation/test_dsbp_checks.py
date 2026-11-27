@@ -766,3 +766,13 @@ def test_v5_catches_a_company_system_name_in_any_letter_case():
     g = rdflib.Graph()
     g.add((URIRef(d.DSBP + "x"), RDFS.label, Literal("runs in xpims")))
     assert len(d.company_neutral(g)) == 1
+
+
+def test_v1_reports_a_manifest_that_is_not_json(tmp_path):
+    rel = tmp_path / "releases"
+    shutil.copytree(d.RELEASES / "core" / "2.4.0", rel / "core" / "2.4.0")
+    (rel / "core" / "2.4.0" / "manifest.json").write_text("{ not json", encoding="utf-8")
+    core_only = {k: v for k, v in d.read_manifest_list().items() if k.startswith("core/2.4.0/")}
+    fails = d.baseline_untouched(rel, core_only)
+    assert "V1: manifest core/2.4.0/manifest.json differs from its recorded hash" in fails
+    assert "V1: core/2.4.0/manifest.json is not a readable manifest (JSONDecodeError)" in fails
