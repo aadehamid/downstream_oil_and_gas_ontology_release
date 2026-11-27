@@ -19,7 +19,7 @@ inputs:
     note: "GOAL.md, approved by the owner (DSBP-DEC-0014), and the Phase 1 report."
   competency_questions:
     status: thin
-    note: "1.2 has 55 locked questions, several naming one company's systems. They must be made company-neutral, added to for the industry, and locked again, so Step 1 cannot close."
+    note: "61 of the 70 questions in competency-questions.md are locked (DSBP-DEC-0044), so Step 1 closes on them. Nine are held until their evidence is cited (59, 67 and 70, and the 1.2 assumptions in 20, 22, 41, 42, 43 and 50); until each is locked, no design choice may rest on it and the Step 11 regression does not test it."
   representative_data:
     status: have
     note: "The hierarchy is the 1.2 core process taxonomy (707 concepts), as a seed, reshaped by round 2 decisions DSBP-DEC-0012 and 0016 to 0031. The other 11 modules of 1.2 return as overlays."
