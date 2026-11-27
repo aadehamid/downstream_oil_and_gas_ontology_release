@@ -48,6 +48,8 @@ GITHUB_OWNERS = {
     "adoptium", "apache", "cmader", "databricks", "databrickslabs", "datatreehouse", "dbpedia", "dgarijo", "jbarrasa",
     "hydra-db", "kvistgaard", "mattpocock", "monarch-initiative", "neo4j", "neo4j-contrib", "neo4j-labs", "ontodev", "rdflib",
     "stevehedden",
+    # Public standards projects that DS_Business_Process's survey register cites (Step 0).
+    "edmcouncil", "gs1", "iofoundry", "kdmg", "qudt",
 }
 
 # A colour written in digits alone (#000, #333333) looks like a reference number. It is a colour when it has a

@@ -1,0 +1,76 @@
+# Intake and requirements file for DS_Business_Process, by the ontology skill
+# (references/governance.md, "Before modelling"). Check it with:
+#   uv run --with pyyaml python3 <skill>/scripts/check_requirements.py requirements.yaml
+
+purpose: A company-agnostic reference ontology of downstream oil and gas business processes, with their typical measures, roles, data products and systems, that any downstream company can specialize.
+users: [enterprise architects, data and analytics teams, KPI and data-product owners, consultants specializing it for one company, knowledge-graph and BI systems]
+use_cases:
+  - id: UC1
+    text: Give a downstream company a complete starting process map, measure catalogue and RACI that it only has to specialize.
+  - id: UC2
+    text: Classify any downstream measure by its one nature (observation, operational, financial, market, forecast, risk or data quality) and its roles (input, analysis, decision support, benchmark, typical KPI), with a cited definition (DSBP-DEC-0039).
+  - id: UC3
+    text: Link processes to the data products, information objects and system categories they use.
+  - id: UC4
+    text: Load the reference into a graph store and answer the competency questions there.
+inputs:
+  purpose:
+    status: have
+    note: "GOAL.md, approved by the owner (DSBP-DEC-0014), and the Phase 1 report."
+  competency_questions:
+    status: thin
+    note: "1.2 has 55 locked questions, several naming one company's systems. They must be made company-neutral, added to for the industry, and locked again, so Step 1 cannot close."
+  representative_data:
+    status: have
+    note: "The hierarchy is the 1.2 core process taxonomy (707 concepts), as a seed, reshaped by round 2 decisions DSBP-DEC-0012 and 0016 to 0031. The other 11 modules of 1.2 return as overlays."
+  reusable_vocabularies:
+    status: thin
+    note: "APQC PCF 7.x is used as a crosswalk. Step 0's survey (foundations/survey-register.md) has read IOF Core, Supply Chain, Production Planning and Maintenance, FIBO, QUDT, KPIOnto and ISO 22400-1; the registry hits, OSDU, ISO 14224 and the other leads it lists are still to assess."
+  semantic_evidence:
+    status: thin
+    note: "Peer SEC filings and public materials (research/peer-hierarchy-evidence.csv), EIA definitions, and the module research under research/modules. Of the standards, DCAT 3, PROV-O and ISO 22400-1 are checked; ISO 22400-2, IEC 62264, O*NET-SOC and ISCO-08 are still to survey (foundations/survey-register.md)."
+  constraints:
+    status: have
+    note: "CC BY 4.0 with the APQC notice; placeholder namespace; no company terms in the reference layer; 1.2 stays untouched; a change merges only after two independent reviews pass and the PR reviewer says MERGE, and the final release PR is the owner's (DSBP-DEC-0040, 0041)."
+scope:
+  in: [process hierarchy, measures, roles and RACI, data products, information objects, system categories, value streams, market data, parties, lanes, logical model, technical graph, integration]
+  out: [company extensions, company instances, event records, measure values]
+competency_questions:
+  - id: CQ1
+    question: What are the child processes of process P, and what is its full path from the top?
+    priority: must
+    rationale: Carried from 1.2 question 1; the backbone every other question uses.
+    needs: [process hierarchy]
+    status: drafted
+  - id: CQ2
+    question: Which measures evaluate process P, and what nature and roles does each have?
+    priority: must
+    rationale: Owner's direction to keep every typical measure (DSBP-DEC-0033), classified by one nature and one or more roles (DSBP-DEC-0039).
+    needs: [measures, process hierarchy]
+    status: drafted
+  - id: CQ3
+    question: Which generic role is Accountable, Responsible, Consulted or Informed for process P?
+    priority: must
+    rationale: Carried from 1.2 question 3, now at the level of generic roles (DSBP-DEC-0033).
+    needs: [roles and RACI, process hierarchy]
+    status: drafted
+  - id: CQ4
+    question: Which system categories support process P, with which off-the-shelf products as examples?
+    priority: should
+    rationale: Carried from 1.2 question 6 without company system names (DSBP-DEC-0034).
+    needs: [system categories, process hierarchy]
+    status: drafted
+assumptions:
+  - id: A1
+    text: The base IRI is https://w3id.org/ds-bp/ until the owner approves hosting.
+    status: confirmed
+    record: DSBP-DEC-0003
+  - id: A2
+    text: 1.2's language, version, module-dependency and target-format policies carry over unchanged.
+    status: confirmed
+    record: DSBP-DEC-0036
+constraints:
+  - CC BY 4.0, with the APQC/IBM notice on every distribution (DSBP-DEC-0009).
+  - No company name, internal system, org unit or role title in the reference layer (check V5).
+  - Branch kpi-store/1.2 stays at ddf6b68 (check V1).
+  - A change merges only after two independent reviews pass and the PR reviewer says MERGE; the final release PR and the 1.0 release are the owner's (DSBP-DEC-0040, 0041).
