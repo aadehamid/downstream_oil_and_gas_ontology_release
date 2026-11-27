@@ -28,7 +28,9 @@ import dsbp_checks as d  # noqa: E402
 
 def migration_rows(baseline: rdflib.Graph, expected: list[dict]) -> list[dict]:
     change = {r["baseline_id"]: r for r in expected if r["baseline_id"]}
+    # Descendants change only when the moved concept's level changes; a move at the same level leaves them as they were.
     shifted = {d.OLD_PROC + x for r in expected if r["change"] == "move"
+               and int(r["expected_level"]) != d.level(baseline, URIRef(d.OLD_PROC + r["baseline_id"]))
                for x in ce.descendants(baseline, r["baseline_id"])}
     rows = []
     for i, s in enumerate(sorted(d.processes(baseline), key=str), start=1):

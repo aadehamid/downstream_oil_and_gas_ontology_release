@@ -760,3 +760,9 @@ def test_v8_reports_a_load_failure_instead_of_crashing(monkeypatch):
     g.add((URIRef("https://example.org/j"), RDF.type, OWL.Ontology))
     fails = d.logic(g)
     assert len(fails) == 1 and "could not be loaded" in fails[0]
+
+
+def test_v5_catches_a_company_system_name_in_any_letter_case():
+    g = rdflib.Graph()
+    g.add((URIRef(d.DSBP + "x"), RDFS.label, Literal("runs in xpims")))
+    assert len(d.company_neutral(g)) == 1

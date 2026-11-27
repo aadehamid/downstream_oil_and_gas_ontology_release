@@ -193,6 +193,9 @@ def test_moved_concepts_and_their_descendants_are_modified_in_the_map(baseline, 
     assert status["CM-1-1-4"] == "modified"
     assert all(status[x] in ("modified", "deprecated") for x in ce.descendants(baseline, "CM-1-1-4"))
     assert status["L1-process-excellence-it"] == "excluded"
+    # A move at the same level (CM-1-3-10 stays L3) leaves its children as they were.
+    kids = ce.descendants(baseline, "CM-1-3-10")
+    assert kids and all(status[x] in ("retained", "deprecated") for x in kids)
 
 
 def test_new_concepts_join_their_parents_scheme(baseline, expected, built):
