@@ -79,7 +79,13 @@ NEW_ID = re.compile(r"DSBP-P-\d{6}")  # neutral IDs that say nothing about place
 INTERNAL_SOURCE = re.compile(r"step3c-definition-workbook", re.IGNORECASE)
 INTERNAL_IRI = re.compile(r"^urn:", re.IGNORECASE)
 # IRIs this project or its predecessor minted: they name a source, but they are not where a reader can find it (V6).
-MINTED = ("https://w3id.org/ds-bp/", "https://w3id.org/mpc/")
+# Matched under any scheme and letter case, with or without a path, so https://w3id.org/mpc and
+# ftp://w3id.org/mpc#x are minted too.
+MINTED = re.compile(r"^[a-z][a-z0-9+.-]*://w3id\.org/(?:ds-bp|mpc)(?:[/?#]|$)", re.IGNORECASE)
+# What makes an IRI part of the ontology rather than a source it cites (V5): a statement in OWL or SKOS, a class or
+# property axiom, or a type from OWL, SKOS or RDF Schema.
+MODELING = (RDFS.subClassOf, RDFS.subPropertyOf, RDFS.domain, RDFS.range)
+MODELING_TYPES = (RDFS.Class, RDF.Property, RDFS.Datatype)
 NEW_IRI = re.compile(re.escape(NEW_PROC) + r"DSBP-P-\d{6}")
 # The predecessor's working trace, which a reader outside it cannot follow (V5): its parked-tree-change codes, which
 # are never public, and the names of its working files. A public document's file name may stand on its source record
@@ -502,20 +508,21 @@ def company_neutral(candidate: rdflib.Graph, terms_path: Path = TERMS, allowed_p
     register at all."""
     terms = read_terms(terms_path)
     allowed = read_allowed(allowed_path)
-    sources = set(candidate.objects(None, DCTERMS.source))
+    sources = _cited_sources(candidate)
     fails = []
     # IRIs, in every position. A cited source's own IRI, and an IRI given as its identifier, may name the company that
     # published it, such as a peer's filing, but never a company-built system.
     # The exemption holds only in those places: the object of dcterms:source, the subject of any statement about the
     # source (its record, its rdf:type and the rest), and a URIRef given as its identifier; never for an IRI this
-    # project or its predecessor minted. The same IRI as the object of any other statement is not exempt.
+    # project or its predecessor minted, and never for an IRI the ontology models (_cited_sources). The same IRI as
+    # the object of any other statement is not exempt.
     seen = set()
     for s, p, o in sorted(candidate, key=lambda x: (str(x[0]), str(x[1]), str(x[2]))):
         for iri, cited in ((s, s in sources), (p, False),
-                           (o, p == DCTERMS.source or (s in sources and p == DCTERMS.identifier))):
+                           (o, (p == DCTERMS.source and o in sources) or (s in sources and p == DCTERMS.identifier))):
             if not isinstance(iri, URIRef):
                 continue
-            cited = cited and not re.sub(r"^[a-z][a-z0-9+.-]*://", "https://", str(iri).lower()).startswith(MINTED)
+            cited = cited and not MINTED.match(str(iri))
             for term, _, kind in terms:
                 if (kind == "company" and cited) or (iri, term) in seen or not _iri_names(str(iri), term):
                     continue
@@ -550,8 +557,21 @@ def _filled(g: rdflib.Graph, s: URIRef, p: URIRef) -> bool:
 
 
 def _is_url(x) -> bool:
-    low = str(x).lower()
-    return low.startswith(("http://", "https://")) and not low.replace("http://", "https://", 1).startswith(MINTED)
+    return str(x).lower().startswith(("http://", "https://")) and not MINTED.match(str(x))
+
+
+def _cited_sources(g: rdflib.Graph) -> set:
+    """The objects of dcterms:source that are sources and not part of the ontology (V5). A subject that cites itself
+    is not a source, and neither is an IRI that is the subject of a statement in OWL or SKOS or of a class or property
+    axiom, or that has a type from OWL, SKOS or RDF Schema: a concept, class, property or ontology header."""
+    def models(x) -> bool:
+        for p, o in g.predicate_objects(x):
+            if p in MODELING or str(p).startswith((str(OWL), str(SKOS))):
+                return True
+            if p == RDF.type and (o in MODELING_TYPES or str(o).startswith((str(OWL), str(SKOS)))):
+                return True
+        return False
+    return {o for s, o in g.subject_objects(DCTERMS.source) if o != s and not models(o)}
 
 
 def _is_date(text: str) -> bool:

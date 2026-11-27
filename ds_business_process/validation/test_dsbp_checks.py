@@ -1026,6 +1026,45 @@ def test_v5_exempts_a_cited_iri_only_where_it_is_cited(tmp_path):
     assert any("w3id.org/mpc" in f for f in d.company_neutral(g, terms, none))
 
 
+@pytest.mark.parametrize("model", [
+    lambda g, x: g.add((x, RDF.type, SKOS.Concept)),
+    lambda g, x: g.add((x, RDF.type, OWL.Class)),
+    lambda g, x: g.add((x, RDF.type, OWL.Ontology)),
+    lambda g, x: g.add((x, RDF.type, OWL.ObjectProperty)),
+    lambda g, x: g.add((x, RDF.type, RDF.Property)),
+    lambda g, x: g.add((x, SKOS.prefLabel, Literal("Investors", lang="en"))),
+    lambda g, x: g.add((x, RDFS.subClassOf, OWL.Thing)),
+])
+def test_v5_does_not_exempt_an_iri_the_ontology_models_even_when_it_is_cited(tmp_path, model):
+    terms = tmp_path / "terms.csv"
+    terms.write_text("term,case_sensitive,kind,why\nMarathon,no,company,test\n", encoding="utf-8")
+    none = tmp_path / "none.csv"
+    s, x = URIRef(d.NEW_PROC + "DSBP-P-000001"), URIRef("https://example.org/marathon-investors")
+    g = rdflib.Graph()
+    g.add((s, DCTERMS.source, x))
+    model(g, x)
+    assert any("the IRI" in f for f in d.company_neutral(g, terms, none))
+
+
+def test_v5_does_not_count_a_self_citation_as_a_source(tmp_path):
+    terms = tmp_path / "terms.csv"
+    terms.write_text("term,case_sensitive,kind,why\nMarathon,no,company,test\n", encoding="utf-8")
+    none = tmp_path / "none.csv"
+    x = URIRef("https://example.org/marathon-unit")
+    g = rdflib.Graph()
+    g.add((x, DCTERMS.source, x))
+    g.add((x, DCTERMS.title, Literal("Marathon unit")))
+    fails = d.company_neutral(g, terms, none)
+    assert any("the IRI" in f for f in fails) and any("dcterms:title" in f for f in fails)
+
+
+@pytest.mark.parametrize("iri", ["https://w3id.org/mpc", "https://w3id.org/mpc#marathon", "HTTP://W3ID.ORG/mpc?a=1",
+                                 "ftp://w3id.org/ds-bp/x"])
+def test_v5_and_v6_read_a_minted_iri_with_or_without_a_path(iri):
+    assert d.MINTED.match(iri) and not d._is_url(iri)
+    assert not d.MINTED.match("https://w3id.org/mpcx/") and d._is_url("https://example.org/mpc")
+
+
 def test_v6_refuses_an_access_date_that_is_not_on_the_calendar(baseline, rows, candidate):
     facts = [(p, "2026-02-31" if p == d.DSBP.accessDate else o) for p, o in FULL]
     g = _sourced(candidate, URIRef("https://example.org/standard"), facts)
