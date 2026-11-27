@@ -1,19 +1,19 @@
-# Competency questions, draft
+# Competency questions
 
-Status: drafted 2026-11-24 for the owner to lock (Step 1, policy 1). Nothing here is locked yet.
+Status: 61 questions locked on 2026-11-27 by the owner (DSBP-DEC-0044, Step 1, policy 1). Nine are held until their evidence is cited: 59, 67 and 70, which name values with no standard or companies behind them yet, and 20, 22, 41, 42, 43 and 50, which carry 1.2 assumptions. Each held question is marked *(Held)*. A held question is locked by a later decision once its evidence is in.
 
 These are the acceptance test for DS_Business_Process: if the ontology cannot answer one, the ontology is incomplete, not the question. The Step 11 regression will run each as SPARQL.
 
 Questions 1 to 55 carry over 1.2's 55 locked questions (`business_architecture/ontology/competency-questions.md` on `kpi-store/1.2`), with the same numbers. Where 1.2's wording named one company's systems, tools or data, the change is noted. Questions 56 to 70 are new, for an industry reference.
 
-Before the list is locked, every list of values a question names (fields, categories, roles) needs a standard or 3 or more independent companies behind it, as any reference term does (DSBP-DEC-0002). Where a question names values without that evidence yet, it is marked *(Evidence needed)*. Questions 20, 22, 41 to 43 and 50 carry 1.2 assumptions (party-role functions, loading authorization, rules for agents), which need the same evidence before they are locked.
+Before a question is locked, every list of values a question names (fields, categories, roles) needs a standard or 3 or more independent companies behind it, as any reference term does (DSBP-DEC-0002). Where a question names values without that evidence yet, it is marked *(Evidence needed)*. Questions 20, 22, 41 to 43 and 50 carry 1.2 assumptions (party-role functions, loading authorization, rules for agents), which need the same evidence before they are locked.
 
 ## I. Process structure
 1. What are the child processes of process P, and what is its full path from the top?
 2. Which processes are orphans: no parent, or no children where children are expected?
 
-## II. Responsibility (RACI), by generic role
-3. Which generic role is Accountable, Responsible, Consulted or Informed for process P? *(Changed: "who" becomes "which generic role", DSBP-DEC-0033.)*
+## II. Responsibility (RACI), by role
+3. Which role is Accountable, Responsible, Consulted or Informed for process P? *(Changed: "who" becomes "which role", DSBP-DEC-0033. Every role in the reference is generic, so the word is left out.)*
 4. Which processes have no Accountable role?
 5. Which roles take part in process P?
 
@@ -41,9 +41,9 @@ Before the list is locked, every list of values a question names (fields, catego
 
 ## VII. Party
 19. What is a party, and how is it different from a customer account?
-20. Which roles can the same party hold at the same time (sold-to, bill-to, payer and so on)?
+20. Which roles can the same party hold at the same time (sold-to, bill-to, payer and so on)? *(Held: 1.2 assumption, DSBP-DEC-0044.)*
 21. Are those roles permanent types or dated holds? Is ship-to a role or a location?
-22. What is a loading-authorized party, and how is that different from an authorization object?
+22. What is a loading-authorized party, and how is that different from an authorization object? *(Held: 1.2 assumption, DSBP-DEC-0044.)*
 23. Where does credit sit: on the party, the account or the payer?
 24. Can the same organization be a customer in one deal and a supplier or exchange counterparty in another, without a second "Customer" class?
 25. Which concept should a customer-grained measure bind to (party, account, sold-to, payer or site), and why not the bare word "customer"?
@@ -69,9 +69,9 @@ Before the list is locked, every list of values a question names (fields, catego
 
 ## X. Publication and agents
 40. Where is the official wording published for people, and what is only a copy?
-41. What may a graph agent answer without reading a table or inventing a formula?
-42. What must that agent refuse to do?
-43. How does an analytics platform's assistant get the same definition without becoming a second ontology? *(Changed: 1.2 named one product.)*
+41. What may a graph agent answer without reading a table or inventing a formula? *(Held: 1.2 assumption, DSBP-DEC-0044.)*
+42. What must that agent refuse to do? *(Held: 1.2 assumption, DSBP-DEC-0044.)*
+43. How does an analytics platform's assistant get the same definition without becoming a second ontology? *(Changed: 1.2 named one product.)* *(Held: 1.2 assumption, DSBP-DEC-0044.)*
 44. If two sources disagree, which definition is authoritative, and how is that marked?
 
 ## XI. Technical graph
@@ -80,7 +80,7 @@ Before the list is locked, every list of values a question names (fields, catego
 47. What is affected if this table or system changes?
 48. Is it built as designed?
 49. Which role answers for it?
-50. Which agent or report answers for this measure?
+50. Which agent or report answers for this measure? *(Held: 1.2 assumption, DSBP-DEC-0044.)*
 
 ## XII. Logical models
 51. Which logical entities hold data about a party concept?
@@ -94,15 +94,15 @@ Before the list is locked, every list of values a question names (fields, catego
 56. What is the one nature of measure M (observation, operational, financial, market, forecast, risk or data quality), what roles does it play (input, analysis, decision support, benchmark, typical KPI), and which public source anchors its nature? (DSBP-DEC-0039)
 57. Which typical measures evaluate each process area, and which areas have none?
 58. For a measure with the typical-KPI role, which components does the reference name (by component role, such as numerator and denominator), with which unit, grain and direction, and which items are left to the company layer (governed-KPI status, target, thresholds, owner, formula version, authoritative system)? (DSBP-DEC-0039)
-59. Which inputs is data product D built from, and how does a public data-product standard (such as DPROD or ODPS) classify it? *(Evidence needed: the classes come from the standard once surveyed.)*
-60. Which generic roles exist, which occupational standard or companies support each, and which processes have no RACI yet?
-61. For a company title, which generic role does it map to? *(Answered by a company specialization, which the reference must make possible.)*
+59. Which inputs is data product D built from, and how does a public data-product standard (such as DPROD or ODPS) classify it? *(Evidence needed: the classes come from the standard once surveyed.)* *(Held: evidence needed, DSBP-DEC-0044.)*
+60. Which roles exist, which occupational standard or companies support each, and which processes have no RACI yet?
+61. For a company title, which role does it map to? *(Answered by a company specialization, which the reference must make possible.)*
 62. Which concepts rest on a standard, which on 3 or more independent companies, and which on fewer?
 63. Which reference terms name a company, a brand, an internal system or a company role title? *(Must return none.)*
 64. Which 1.2 IRI became which DS_Business_Process IRI, with which status (retained, relabeled, modified, deprecated or excluded)?
 65. Which processes map to an external ontology term (IOF, APQC), and with which match?
 66. Which areas in the coverage table are complete, which are thin, and on what evidence?
-67. What must a market observation carry, and which standard or price-reporting agency methodology names each field? *(Evidence needed: 1.2's market-data module lists commodity, specification, location or hub, marker, observation date, delivery period, publication time, source and version, and status; each must be confirmed.)*
+67. What must a market observation carry, and which standard or price-reporting agency methodology names each field? *(Evidence needed: 1.2's market-data module lists commodity, specification, location or hub, marker, observation date, delivery period, publication time, source and version, and status; each must be confirmed.)* *(Held: evidence needed, DSBP-DEC-0044.)*
 68. Which information objects does each process produce or consume, and which standard or company names each?
 69. Which off-the-shelf products are examples of system category S, and which public page supports each?
-70. Which risk categories does each Supply & Trading process manage, and which standard or company disclosures name each category? *(Evidence needed: a draft list of price, basis, crack, volume, quality, logistics, credit, liquidity, operational and regulatory risk is to be confirmed against filings' risk-factor sections.)*
+70. Which risk categories does each Supply & Trading process manage, and which standard or company disclosures name each category? *(Evidence needed: a draft list of price, basis, crack, volume, quality, logistics, credit, liquidity, operational and regulatory risk is to be confirmed against filings' risk-factor sections.)* *(Held: evidence needed, DSBP-DEC-0044.)*

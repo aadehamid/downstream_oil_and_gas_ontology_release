@@ -1,6 +1,6 @@
 # Batch B3: the process structure and the new IDs (expected results, for approval)
 
-Status: waiting for approval under DSBP-DEC-0040 (Claude and Gemini Neon both agree; Codex breaks a tie, DSBP-DEC-0041). Nothing in the release changes until then. Once approved, the
+Status: approved by the owner on 2026-11-27 (DSBP-DEC-0045), on the condition that the Step 3 definition review and `check_taxonomy.py` join these expected results before the script runs. Nothing in the release changes until then. The
 change is made with `build_candidate.py` and checked with `check_expected.py` and the release checks.
 
 ## What changes

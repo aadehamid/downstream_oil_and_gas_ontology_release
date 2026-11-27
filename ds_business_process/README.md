@@ -2,7 +2,7 @@
 
 A company-agnostic, industry-validated business process ontology for downstream oil and gas. It is generalized from KPI Store 1.2 (branch `kpi-store/1.2`, commit `ddf6b68`), which stays unchanged as the baseline.
 
-Status: the foundations (Steps 0, 1 and 8) are drafted, and batch B3, the first change to the process hierarchy, is built and waiting for its review. No release has been made yet. `BUILD-STATUS.md` has the detail.
+Status: the policies and competency questions (Step 1) and the scope review (Step 8) are decided, Step 0 is drafted, and batch B3, the first change to the process hierarchy, is built and approved; it runs once its Step 3 gate is added (DSBP-DEC-0045). No release has been made yet. `BUILD-STATUS.md` has the detail.
 
 - `GOAL.md`: what "done" means for release 1.0.
 - `registers/decision-register.md`: every decision, with the owner's words.
