@@ -12,17 +12,22 @@ V2  nothing_lost            every baseline process IRI has exactly one row in th
                             and its old IRI is gone; a deprecated row is owl:deprecated in the candidate and no other
                             row is; an excluded concept has no new IRI and is gone from the candidate
 V3  only_approved_changed   a concept that differs from the baseline, is excluded, or is new, is on the approved list;
-                            so is any other subject (a class, a property, the ontology header) whose statements differ
+                            so is any other subject (a class, a property, the ontology header) whose statements differ;
+                            a blank-node object is compared by its content, so a change inside one counts
 V4  structure               no cycles; one parent below the top, and that parent is a process; one level, not negative,
                             = parent level + 1; skos:narrower, where given, is the inverse of skos:broader; one
                             preferred label on every concept, unique; one non-blank definition on every concept that
                             is not deprecated; optional SHACL shapes conform
-V5  company_neutral         no term from the company-terms register in any literal of the candidate, on any subject
-                            and any property; skos:example may name a company, never a company-built system; a
-                            phrase in the allowed-terms register (a generic meaning of the same letters) is not a hit
+V5  company_neutral         no term from the company-terms register in any literal or IRI of the candidate, on any
+                            subject and any property; skos:example may name a company, never a company-built system; a
+                            phrase in the allowed-terms register (a generic meaning of the same letters) is not a hit;
+                            a cited source's own IRI, URL, title, description and publisher may name a company; and no
+                            literal carries the predecessor's working trace (a decision code such as PTC-001, or a
+                            working file name such as notes.md or plan.xlsx)
 V6  evidence                every new or changed definition, on any subject, cites a public source with title,
                             publisher, URL, version or issue date, and access date, none of them blank, and cites no
-                            internal source beside it
+                            internal source beside it. The access date is dsbp:accessDate, an xsd:date: Dublin Core
+                            has no term for the day a source was read (see README.md, "How a source is recorded")
 V7  relationships_kept      the baseline's process-to-process statements (core properties, skos:related) still hold,
                             unless one end is excluded or the batch lists the statement as an approved removal
 V8  logic                   the candidate, without its owl:imports, is consistent under the HermiT reasoner (needs Java
@@ -71,6 +76,10 @@ INTERNAL_IRI = re.compile(r"^urn:", re.IGNORECASE)
 # IRIs this project or its predecessor minted: they name a source, but they are not where a reader can find it (V6).
 MINTED = ("https://w3id.org/ds-bp/", "https://w3id.org/mpc/")
 NEW_IRI = re.compile(re.escape(NEW_PROC) + r"DSBP-P-\d{6}")
+# The predecessor's working trace, which a reader outside it cannot follow (V5): its parked-tree-change codes and the
+# names of its working files. A public document's file name lives on its source record, which V5 leaves out.
+TRACE = re.compile(r"(?<![A-Za-z0-9])(?:PTC-\d+(?:-[A-Z])?|[A-Za-z0-9_-]+\.(?:md|xlsx|xlsm|csv|json|py|ipynb|docx|pptx))"
+                   r"(?![A-Za-z0-9])")
 
 
 def load(path: Path) -> rdflib.Graph:
@@ -93,7 +102,17 @@ def level(g: rdflib.Graph, s: URIRef) -> int | None:
     v = g.value(s, CORE.taxonomyLevel)
     if v is None:  # not `or`: a level-0 Literal is falsy
         v = g.value(s, DSBP.taxonomyLevel)
-    return int(v) if v is not None else None
+    return _whole(v)
+
+
+def _whole(v) -> int | None:
+    """A level as a whole number, or None when it is missing or is not one (V4 reports the second)."""
+    if v is None:
+        return None
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
 
 
 def read_map(path: Path) -> list[dict]:
@@ -113,7 +132,7 @@ def read_approved(path: Path | None) -> set[str]:
     if not path.exists():
         raise FileNotFoundError(f"approved list {path} does not exist")
     return {local_id(x.strip()) for x in path.read_text(encoding="utf-8").splitlines()
-            if x.strip() and not x.startswith("#")}
+            if x.strip() and not x.strip().startswith("#")}
 
 
 # V1 ---------------------------------------------------------------------------------------------------------------
@@ -209,7 +228,10 @@ def _same_predicate(p: URIRef) -> URIRef:
     return URIRef(str(p).replace(str(CORE), str(DSBP), 1)) if str(p).startswith(str(CORE)) else p
 
 
-def _statements(g: rdflib.Graph, s: URIRef, mapping: dict[str, str], ignore: frozenset = frozenset()) -> set[tuple]:
+def _statements(g: rdflib.Graph, s, mapping: dict[str, str], ignore: frozenset = frozenset(),
+                _path: tuple = ()) -> set[tuple]:
+    """A subject's statements, comparable across two graphs: module IRIs move to the new namespace, mapped IRIs to
+    their new ones, and a blank-node object becomes its own statements, since its label differs between graphs."""
     out = set()
     ignore = frozenset(map(_same_predicate, ignore))
     for p, o in g.predicate_objects(s):
@@ -218,19 +240,21 @@ def _statements(g: rdflib.Graph, s: URIRef, mapping: dict[str, str], ignore: fro
             continue
         if isinstance(o, URIRef):
             o = _same_predicate(URIRef(mapping.get(str(o), str(o))))
+        elif isinstance(o, rdflib.BNode):
+            o = ("_:", frozenset(_statements(g, o, mapping, ignore, _path + (s,)))) if o not in _path else ("_:cycle",)
         out.add((p, o))
     return out
 
 
 def _others(g: rdflib.Graph, mapping: dict[str, str], ignore: frozenset) -> dict[URIRef, set]:
     """The statements of every named subject that is not a process, with module IRIs moved to the new namespace.
-    Statements with a blank-node object are left out: a blank node has no name to compare across two graphs."""
+    A blank-node subject is compared through the named subject that points at it."""
     procs = processes(g)
     out: dict[URIRef, set] = {}
     for s in set(g.subjects()):
         if not isinstance(s, URIRef) or s in procs or str(s) in mapping:
             continue
-        stmts = {(p, o) for p, o in _statements(g, s, mapping, ignore) if not isinstance(o, rdflib.BNode)}
+        stmts = _statements(g, s, mapping, ignore)
         if stmts:
             out[_same_predicate(s)] = stmts
     return out
@@ -281,7 +305,10 @@ def structure(candidate: rdflib.Graph, shapes: Path | None = None) -> list[str]:
     parents: dict[URIRef, list] = {s: list(candidate.objects(s, SKOS.broader)) for s in procs}
     for s, ps in parents.items():
         levels = set(candidate.objects(s, CORE.taxonomyLevel)) | set(candidate.objects(s, DSBP.taxonomyLevel))
-        if len({int(x) for x in levels}) > 1:
+        bad = sorted(str(x) for x in levels if _whole(x) is None)
+        if bad:
+            fails.append(f"V4: {local_id(str(s))} has a level that is not a whole number ({', '.join(bad)})")
+        if len({_whole(x) for x in levels if _whole(x) is not None}) > 1:
             fails.append(f"V4: {local_id(str(s))} has {len(levels)} different levels; it needs one")
         lv = level(candidate, s)
         if lv is not None and lv < 0:
@@ -332,8 +359,9 @@ def structure(candidate: rdflib.Graph, shapes: Path | None = None) -> list[str]:
             fails.append(f"V4: {local_id(str(s))} has no preferred label")
         elif len({getattr(x, "language", None) for x in prefs}) < len(prefs):
             fails.append(f"V4: {local_id(str(s))} has {len(prefs)} preferred labels in one language; it needs one")
-        for lab in prefs:
-            labels.setdefault(str(lab).casefold(), []).append(local_id(str(s)))
+        # One concept's label in two languages, or the same label twice, is not a clash with another concept.
+        for lab in {str(x).strip().casefold() for x in prefs if str(x).strip()}:
+            labels.setdefault(lab, []).append(local_id(str(s)))
         deprecated = (s, OWL.deprecated, Literal(True)) in candidate
         defs = [x for x in candidate.objects(s, SKOS.definition) if str(x).strip()]
         if not deprecated and not defs:
@@ -378,20 +406,32 @@ def company_neutral(candidate: rdflib.Graph, terms_path: Path = TERMS, allowed_p
     """Every literal of every subject on every property, the ontology header and module properties included.
     skos:example is read for company-built systems, which leave the reference ontology even as examples
     (DSBP-DEC-0006); a company name may stand in an example (GOAL.md, done line 4), and in the title,
-    description or publisher of a cited source, such as a peer's filing. A commercial product is not in the
+    description, publisher, URL or IRI of a cited source, such as a peer's filing. A commercial product is not in the
     register at all."""
     terms = read_terms(terms_path)
     allowed = read_allowed(allowed_path)
     sources = set(candidate.objects(None, DCTERMS.source))
+    # A cited source's own IRI and URLs may name the company that published it, such as a peer's filing.
+    cited = {str(x) for x in sources} | {str(o) for s in sources for o in candidate.objects(s, DCTERMS.identifier)}
     fails = []
+    iris = {x for t in candidate for x in t if isinstance(x, URIRef) and str(x) not in cited}
+    for iri in sorted(iris, key=str):
+        for term, rx, _ in terms:
+            if rx.search(str(iri)):
+                fails.append(f"V5: the IRI {iri} contains {term!r}")
     for s, prop, o in sorted(candidate, key=lambda x: (str(x[0]), str(x[1]), str(x[2]))):
         if not isinstance(o, Literal):
             continue
         text = str(o)
+        if not (s in sources and prop in (DCTERMS.title, DCTERMS.description, DCTERMS.publisher, DCTERMS.identifier)):
+            hit = TRACE.search(text)
+            if hit:
+                fails.append(f"V5: {local_id(str(s))} {prop.n3(candidate.namespace_manager)} carries the working "
+                             f"trace {hit.group(0)!r}, which a reader outside the predecessor cannot follow")
         for rx in allowed:
             text = rx.sub(" ", text)
-        # A cited source's own words: a peer's filing may name the peer (DSBP-DEC-0002).
-        citation = s in sources and prop in (DCTERMS.title, DCTERMS.description, DCTERMS.publisher)
+        # A cited source's own words and address: a peer's filing may name the peer (DSBP-DEC-0002).
+        citation = s in sources and prop in (DCTERMS.title, DCTERMS.description, DCTERMS.publisher, DCTERMS.identifier)
         for term, rx, kind in terms:
             if kind == "company" and (prop == SKOS.example or citation):
                 continue
@@ -458,7 +498,7 @@ def read_removals(path: Path | None) -> set[str]:
     if path is None:
         return set()
     return {" ".join(x.split()) for x in path.read_text(encoding="utf-8").splitlines()
-            if x.strip() and not x.startswith("#")}
+            if x.strip() and not x.strip().startswith("#")}
 
 
 def relationships_kept(baseline: rdflib.Graph, candidate: rdflib.Graph, rows: list[dict],

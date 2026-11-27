@@ -796,3 +796,85 @@ def test_v1_reports_a_manifest_that_is_not_utf8(tmp_path):
     shutil.copytree(src, rel / "core" / src.name)
     (rel / "core" / src.name / "manifest.json").write_bytes(b"\xff\xfe{")
     assert any("is not a readable manifest (UnicodeDecodeError)" in f for f in d.baseline_untouched(rel, {}))
+
+
+# Follow-ups from the PR #87 reviews --------------------------------------------------------------------------------
+
+
+def test_v3_sees_a_change_inside_a_blank_node_and_not_a_new_blank_label(baseline, rows, candidate):
+    s, old = URIRef(rows[0]["new_iri"]), URIRef(rows[0]["baseline_iri"])
+    note = URIRef("https://example.org/qualifiedNote")
+    b1, b2 = rdflib.BNode(), rdflib.BNode()
+    base, cand = copy(baseline), copy(candidate)
+    base.add((old, note, b1))
+    base.add((b1, RDFS.comment, Literal("same")))
+    cand.add((s, note, b2))                       # another label, the same content: no change
+    cand.add((b2, RDFS.comment, Literal("same")))
+    assert d.only_approved_changed(base, cand, rows, set()) == []
+    cand.set((b2, RDFS.comment, Literal("edited")))
+    assert any(d.local_id(str(old)) in f for f in d.only_approved_changed(base, cand, rows, set()))
+
+
+def test_v4_lets_one_concept_carry_one_label_in_two_languages(candidate):
+    base = d.structure(candidate)
+    g = copy(candidate)
+    s = some_process(g, 3)
+    g.add((s, SKOS.prefLabel, Literal(str(g.value(s, SKOS.prefLabel)), lang="fr")))
+    g.add((s, SKOS.prefLabel, Literal("  ")))
+    assert not any("is shared by" in f for f in d.structure(g))
+    assert len(d.structure(g)) == len(base)
+
+
+def test_v4_reports_a_level_that_is_not_a_whole_number(candidate):
+    g = copy(candidate)
+    s = some_process(g, 3)
+    g.set((s, d.CORE.taxonomyLevel, Literal("three")))
+    fails = d.structure(g)
+    assert any(f"{d.local_id(str(s))} has a level that is not a whole number (three)" in f for f in fails)
+
+
+def test_indented_comment_lines_are_skipped(tmp_path):
+    approved = tmp_path / "approved.txt"
+    approved.write_text("CM-1-1\n   # CM-1-2 is not approved\n", encoding="utf-8")
+    assert d.read_approved(approved) == {"CM-1-1"}
+    removals = tmp_path / "removals.txt"
+    removals.write_text("  # CM-1 related CM-2\nCM-1-1  related   CM-1-2\n", encoding="utf-8")
+    assert d.read_removals(removals) == {"CM-1-1 related CM-1-2"}
+
+
+def test_v5_reads_iris_but_lets_a_cited_source_keep_its_own(tmp_path):
+    terms = tmp_path / "terms.csv"
+    terms.write_text("term,case_sensitive,kind,why\nMarathon,no,company,test\nXPIMS,no,system,test\n",
+                     encoding="utf-8")
+    none = tmp_path / "none.csv"
+    s = URIRef(d.NEW_PROC + "DSBP-P-000001")
+    g = rdflib.Graph()
+    g.add((s, d.DSBP.taxonomyLevel, Literal(0)))
+    g.add((s, URIRef(d.DSBP + "feedsSystem"), URIRef(d.DSBP + "system/xpims-run")))
+    assert any("IRI" in f and "XPIMS" in f for f in d.company_neutral(g, terms, none))
+    g = rdflib.Graph()
+    src = URIRef("https://www.marathonpetroleum.com/Investors/")
+    g.add((s, DCTERMS.source, src))
+    g.add((src, DCTERMS.identifier, Literal("https://www.marathon.example/10-k.htm")))
+    assert d.company_neutral(g, terms, none) == []
+
+
+@pytest.mark.parametrize("text", ["Retired per PTC-001.", "See step3c-parked-tree-changes.md.",
+                                  "From the plan.xlsx sheet"])
+def test_v5_refuses_the_predecessors_working_trace(tmp_path, text):
+    terms = tmp_path / "terms.csv"
+    terms.write_text("term,case_sensitive,kind,why\nXPIMS,no,system,test\n", encoding="utf-8")
+    g = rdflib.Graph()
+    g.add((URIRef(d.NEW_PROC + "DSBP-P-000001"), DCTERMS.provenance, Literal(text, lang="en")))
+    fails = d.company_neutral(g, terms, tmp_path / "none.csv")
+    assert len(fails) == 1 and "working trace" in fails[0]
+
+
+def test_v5_lets_a_cited_source_name_its_own_file(tmp_path):
+    terms = tmp_path / "terms.csv"
+    terms.write_text("term,case_sensitive,kind,why\nXPIMS,no,system,test\n", encoding="utf-8")
+    s, src = URIRef(d.NEW_PROC + "DSBP-P-000001"), URIRef("https://www.eia.gov/petroleum/")
+    g = rdflib.Graph()
+    g.add((s, DCTERMS.source, src))
+    g.add((src, DCTERMS.title, Literal("Refinery capacity data, refcap.xlsx")))
+    assert d.company_neutral(g, terms, tmp_path / "none.csv") == []

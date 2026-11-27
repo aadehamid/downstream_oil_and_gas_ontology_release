@@ -2,7 +2,9 @@
 
 Each decision gives the question, the choice, the owner's words and where they were said. A decision counts only when it quotes the decision owner. A merge alone decides nothing.
 
-Rounds 1 and 2 follow the grill-with-docs method: round 1 settled what nothing else depends on (Q1 to Q11 of the Phase 1 report, https://claude.ai/artifact/WLjPmXvJjDPeE4strubij4, section 8). Round 2 settles the hierarchy once the peer research is in.
+Rounds 1 and 2 follow the grill-with-docs method: round 1 settled what nothing else depends on (Q1 to Q11 of the Phase 1 report, section 8, a page shared privately with the decision owner; each question and its answer is repeated in full below). Round 2 settles the hierarchy once the peer research is in.
+
+IDs are given in the order the decisions were recorded, so a decision can carry an earlier date than the one before it: DSBP-DEC-0043 was decided on 2026-11-26 and recorded after 0040 to 0042, which were decided on 2026-11-27.
 
 | ID | Question | Decision | Owner's words | Date, place |
 |---|---|---|---|---|
