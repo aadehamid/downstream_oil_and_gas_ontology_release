@@ -798,7 +798,7 @@ def test_v1_reports_a_manifest_that_is_not_utf8(tmp_path):
     assert any("is not a readable manifest (UnicodeDecodeError)" in f for f in d.baseline_untouched(rel, {}))
 
 
-# Follow-ups from the PR #87 reviews --------------------------------------------------------------------------------
+# Follow-ups from the reviews of the first release checks --------------------------------------------------------------
 
 
 def test_v3_sees_a_change_inside_a_blank_node_and_not_a_new_blank_label(baseline, rows, candidate):
