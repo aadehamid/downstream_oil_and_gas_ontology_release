@@ -1,8 +1,9 @@
 """Tests for batch B3, written before the change (validation first, DSBP-DEC-0011).
 
 * On the baseline (renamed to new IDs, nothing else changed) the batch check fails: no intended change has happened.
-* On the candidate that build_candidate.py makes, the batch check and the release checks V2 to V7 pass, except the
-  known ones: V4's two missing definitions and V5's company terms, which later batches remove.
+* On the candidate that build_candidate.py makes, the batch check and the release checks V2, V3, V4 and V7 pass,
+  except V4's two known missing definitions. V5 (company terms) and V6 (public sources on the 8 new definitions)
+  are not run here: both still fail, and batches B4 and B5 fix them.
 * The batch check fails on candidates that get exactly one change wrong.
 """
 from __future__ import annotations
@@ -101,7 +102,12 @@ def test_v3_fails_when_an_unlisted_concept_moves(baseline, expected, built):
     (lambda g, rows: g.set((node(rows, "CM-1-1-4"), SKOS.broader, node(rows, "L1-refining"))), "CM-1-1-4 should sit under"),
     (lambda g, rows: g.set((node(rows, "CM-1-2"), SKOS.prefLabel, Literal("Supply And Trading", lang="en"))), "CM-1-2 should be labelled"),
     (lambda g, rows: g.remove((node(rows, "CM-1-2"), d.CORE.priorPreferredLabel, None)), "old label"),
-    (lambda g, rows: g.remove((node(rows, "CM-1-4"), OWL.deprecated, None)), "CM-1-4 should be owl:deprecated"),
+    (lambda g, rows: g.add((URIRef(d.OLD_PROC + "CM-1-4"), SKOS.prefLabel, Literal("IT Services", lang="en"))),
+     "CM-1-4 should be excluded"),
+    (lambda g, rows: g.set((node(rows, "CM-1-1-4-6"), SKOS.prefLabel, Literal("Renamed", lang="en"))),
+     "CM-1-1-4-6 is listed as unchanged but its label changed"),
+    (lambda g, rows: g.remove((node(rows, "CM-1-1-4-6"), OWL.deprecated, None)),
+     "CM-1-1-4-6 is listed as unchanged but its deprecation changed"),
     (lambda g, rows: g.add((node(rows, "CM-1-3-10"), SKOS.notation, Literal("CM 1.3.10"))), "still carries a notation"),
     (lambda g, rows: g.set((node(rows, "CM-1-1-4-6-3"), d.CORE.taxonomyLevel, Literal(3))), "should be level 2"),
 ])
@@ -165,3 +171,31 @@ def test_one_new_row_approves_one_node_and_rows_are_required(baseline, expected,
                for f in d.only_approved_changed(baseline, g, rows, approved, frozenset({SKOS.notation}))) == 2
     with pytest.raises(ValueError):
         ce.approved_ids(baseline, expected, g)
+
+
+def test_a_relabelled_baseline_concept_cannot_stand_in_for_a_new_one(baseline, expected, built):
+    g, rows = built
+    g = copy(g)
+    it = next(s for s in d.processes(g) if str(g.value(s, SKOS.prefLabel)) == "Information Technology")
+    g.remove((it, None, None))
+    g.set((node(rows, "CM-1-3-1"), SKOS.prefLabel, Literal("Information Technology", lang="en")))
+    assert any("new concept NEW:it" in f for f in ce.check(baseline, g, rows, expected))
+
+
+def test_the_unchanged_row_is_not_approved_for_v3(baseline, expected, built):
+    g, rows = built
+    assert "CM-1-1-4-6" not in ce.approved_ids(baseline, expected, g, rows)
+
+
+def test_moved_concepts_and_their_descendants_are_modified_in_the_map(baseline, expected, built):
+    _, rows = built
+    status = {d.local_id(r["baseline_iri"]): r["status"] for r in rows}
+    assert status["CM-1-1-4"] == "modified"
+    assert all(status[x] in ("modified", "deprecated") for x in ce.descendants(baseline, "CM-1-1-4"))
+    assert status["L1-process-excellence-it"] == "excluded"
+
+
+def test_new_concepts_join_their_parents_scheme(baseline, expected, built):
+    g, _ = built
+    for s in d.processes(g):
+        assert g.value(s, SKOS.inScheme) is not None, s

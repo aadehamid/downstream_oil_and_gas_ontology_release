@@ -9,9 +9,9 @@ key,baseline_id,change,new_label,new_parent,expected_level,decision,evidence,dra
 ,CM-1-3-10,move,,MS-1-2,3,DSBP-DEC-0021,"HF Sinclair, MPLX, Kinder Morgan",Its 4 children stay L4.
 ,CM-1-1-4-6-1,move,,NEW:strategy,2,DSBP-DEC-0026,APQC 1.0,Its definition is still missing; one is drafted in batch B5 (evidence).
 ,CM-1-1-4-6-3,move,,NEW:erm,2,DSBP-DEC-0027,APQC 11.1,
-,CM-1-4,deprecate,,CM-1,2,DSBP-DEC-0017,6+ companies put IT in corporate,Replaced by NEW:it. Kept as a deprecated concept so old links resolve.
-,L1-process-excellence-it,deprecate,,L0-enabling-functions,1,DSBP-DEC-0017,APQC 8.0 and 13.1; MPC,Replaced by NEW:it and NEW:bpe.
-,L2-refinery-performance-and-risk-coordination,deprecate,,L1-refining,2,DSBP-DEC-0027,APQC 11.1,Emptied by the move of CM-1-1-4-6-3. Replaced by NEW:erm.
+,CM-1-4,exclude,,,,DSBP-DEC-0017,6+ companies put IT in corporate,"Empty in 1.2; it leaves Commercial (DSBP-DEC-0017), as Shared Services leaves (DSBP-DEC-0018). Its work goes to NEW:it; the migration map says so."
+,L1-process-excellence-it,exclude,,,,DSBP-DEC-0017,APQC 8.0 and 13.1; MPC,"Empty in 1.2; split into NEW:it and NEW:bpe (DSBP-DEC-0017). The migration map names both replacements."
+,L2-refinery-performance-and-risk-coordination,exclude,,,,DSBP-DEC-0027,APQC 11.1,"Emptied by the move of CM-1-1-4-6-3 and removed (DSBP-DEC-0027). Its work goes to NEW:erm; the migration map says so."
 ,L1-shared-services,exclude,,,,DSBP-DEC-0018,0 companies name it,Removed from the release; the migration map gives the reason.
 ,CM-1-1-4-6,unchanged,,CM-1-1,3,DSBP-DEC-0026,,"Already retired in 1.2 (PTC-001); stays deprecated, now with no child."
 NEW:it,,new,Information Technology,L0-enabling-functions,1,DSBP-DEC-0017,APQC 8.0; 6+ companies,"Plan, build, run and secure the information technology that the business uses: applications, data, infrastructure and cyber security."

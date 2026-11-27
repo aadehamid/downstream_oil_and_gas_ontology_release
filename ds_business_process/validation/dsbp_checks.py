@@ -5,29 +5,35 @@ failure messages; an empty list means the check passed. ``main`` runs them all a
 
 The checks and what each proves:
 
-V1  baseline_untouched      every file listed in a KPI Store 1.2 release manifest still has its recorded SHA-256
+V1  baseline_untouched      every KPI Store 1.2 release manifest in the recorded list is present and unchanged, and
+                            every file it lists still has its recorded SHA-256
 V2  nothing_lost            every baseline process IRI has exactly one row in the migration map, with a known status;
-                            each living concept has its own neutral new ID (DSBP-P-000123) and is in the candidate;
-                            an excluded concept has no new IRI and is gone from the candidate
-V3  only_approved_changed   a concept that differs from the baseline, is excluded, or is new, is on the approved list
+                            each living concept has its own neutral new ID (DSBP-P-000123) and is in the candidate,
+                            and its old IRI is gone; a deprecated row is owl:deprecated in the candidate and no other
+                            row is; an excluded concept has no new IRI and is gone from the candidate
+V3  only_approved_changed   a concept that differs from the baseline, is excluded, or is new, is on the approved list;
+                            so is any other subject (a class, a property, the ontology header) whose statements differ
 V4  structure               no cycles; one parent below the top, and that parent is a process; one level, not negative,
-                            = parent level + 1; unique preferred labels; one non-blank definition on every concept
-                            that is not deprecated; optional SHACL shapes conform
-V5  company_neutral         no term from the company-terms register in any reader-facing text of the candidate,
-                            on any subject; skos:example may name a company, never a company-built system
-V6  evidence                every new or changed definition cites a public source with title, publisher, URL,
-                            version or issue date, and access date, none of them blank
-V7  relationships_kept      the baseline's process-to-process statements still hold, unless one end is excluded or
-                            the batch lists the statement as an approved removal
-V8  logic                   the candidate is consistent under the HermiT reasoner (needs Java and owlready2)
-
-V9 (competency questions) is not built yet; see README.md.
+                            = parent level + 1; skos:narrower, where given, is the inverse of skos:broader; one
+                            preferred label on every concept, unique; one non-blank definition on every concept that
+                            is not deprecated; optional SHACL shapes conform
+V5  company_neutral         no term from the company-terms register in any literal of the candidate, on any subject
+                            and any property; skos:example may name a company, never a company-built system; a
+                            phrase in the allowed-terms register (a generic meaning of the same letters) is not a hit
+V6  evidence                every new or changed definition, on any subject, cites a public source with title,
+                            publisher, URL, version or issue date, and access date, none of them blank, and cites no
+                            internal source beside it
+V7  relationships_kept      the baseline's process-to-process statements (core properties, skos:related) still hold,
+                            unless one end is excluded or the batch lists the statement as an approved removal
+V8  logic                   the candidate, without its owl:imports, is consistent under the HermiT reasoner (needs Java
+                            and owlready2)
+V9  competency questions    not built yet; see README.md. It counts as a failure until it is built, unless skipped.
 
 Usage, from the repository root:
 
     uv run --with rdflib --with pyshacl --with owlready2 python ds_business_process/validation/dsbp_checks.py \\
         --candidate <candidate.ttl> --map <migration-map.csv> --approved <approved.txt> [--shapes <shapes.ttl>] \\
-        [--removals <removals.txt>]
+        [--removals <removals.txt>] [--ignore skos:notation ...]
 """
 from __future__ import annotations
 
@@ -48,6 +54,8 @@ ROOT = Path(__file__).resolve().parents[2]
 RELEASES = ROOT / "business_architecture" / "ontology" / "releases"
 BASELINE_CORE = RELEASES / "core" / "2.4.0" / "core.ttl"
 TERMS = Path(__file__).resolve().parents[1] / "registers" / "company-terms.csv"
+ALLOWED = Path(__file__).resolve().parents[1] / "registers" / "company-terms-allowed.csv"
+MANIFESTS = Path(__file__).resolve().parents[1] / "registers" / "baseline-manifests.csv"
 
 OLD_PROC = "https://w3id.org/mpc/ontology/process/"
 CORE = rdflib.Namespace("https://w3id.org/mpc/ontology/modules/core/")
@@ -56,14 +64,10 @@ STATUSES = {"retained", "relabeled", "modified", "deprecated", "excluded"}
 KEEPS_IRI = {"retained", "relabeled", "modified", "deprecated"}  # statuses whose concept lives on under a new IRI
 NEW_PROC = str(DSBP) + "process/"
 NEW_ID = re.compile(r"DSBP-P-\d{6}")  # neutral IDs that say nothing about place (DSBP-DEC-0031)
-# Literal-valued properties that carry reference-layer text a reader sees (V5), in the old and the new namespace.
-_MODULE_TEXT = ["primaryPurpose", "keyInputFlow", "primaryOutputFlow", "plannedInput", "plannedOutput",
-                "priorPreferredLabel", "plannedChildNote"]
-TEXT_PROPS = [SKOS.prefLabel, SKOS.altLabel, SKOS.hiddenLabel, SKOS.definition, SKOS.scopeNote, SKOS.note,
-              SKOS.editorialNote, SKOS.changeNote, SKOS.historyNote, DCTERMS.provenance, DCTERMS.title,
-              DCTERMS.description, RDFS.label, RDFS.comment] + [ns[n] for ns in (CORE, DSBP) for n in _MODULE_TEXT]
-# Sources that are evidence of the predecessor only, never public evidence (V6).
-INTERNAL_SOURCE = re.compile(r"(step3c-definition-workbook|^urn:)", re.IGNORECASE)
+# Sources that are evidence of the predecessor only, never public evidence (V6). A `urn:` source IRI is one this
+# project or its predecessor named without a place to find it; an identifier may still be a URN, such as an ISBN.
+INTERNAL_SOURCE = re.compile(r"step3c-definition-workbook", re.IGNORECASE)
+INTERNAL_IRI = re.compile(r"^urn:", re.IGNORECASE)
 # IRIs this project or its predecessor minted: they name a source, but they are not where a reader can find it (V6).
 MINTED = ("https://w3id.org/ds-bp/", "https://w3id.org/mpc/")
 NEW_IRI = re.compile(re.escape(NEW_PROC) + r"DSBP-P-\d{6}")
@@ -76,7 +80,8 @@ def load(path: Path) -> rdflib.Graph:
 
 
 def local_id(iri: str) -> str:
-    return iri.rstrip("/").rsplit("/", 1)[-1]
+    """The last segment of an IRI, after its last `/` or `#`: `CM-1-1`, `related`."""
+    return re.split(r"[/#]", iri.rstrip("/"))[-1]
 
 
 def processes(g: rdflib.Graph) -> set[URIRef]:
@@ -112,11 +117,25 @@ def read_approved(path: Path | None) -> set[str]:
 
 
 # V1 ---------------------------------------------------------------------------------------------------------------
-def baseline_untouched(releases: Path = RELEASES) -> list[str]:
+def read_manifest_list(path: Path = MANIFESTS) -> dict[str, str]:
+    """The baseline's manifests, by path under the releases folder, with each manifest's own SHA-256."""
+    with path.open(newline="", encoding="utf-8") as fh:
+        return {r["manifest"]: r["sha256"] for r in csv.DictReader(fh)}
+
+
+def baseline_untouched(releases: Path = RELEASES, listed: dict[str, str] | None = None) -> list[str]:
+    """``listed`` is the recorded set of manifests; a manifest deleted or edited fails, not only a file one lists."""
     fails = []
+    listed = read_manifest_list() if listed is None else listed
     manifests = sorted(releases.rglob("manifest.json"))
     if not manifests:
         return [f"V1: no release manifest found under {releases}"]
+    for name, want in sorted(listed.items()):
+        m = releases / name
+        if not m.exists():
+            fails.append(f"V1: manifest {name} is in the recorded list and missing")
+        elif hashlib.sha256(m.read_bytes()).hexdigest() != want:
+            fails.append(f"V1: manifest {name} differs from its recorded hash")
     for m in manifests:
         files = json.loads(m.read_text(encoding="utf-8")).get("files", {})
         for name, want in files.items():
@@ -149,6 +168,15 @@ def nothing_lost(baseline: rdflib.Graph, rows: list[dict], candidate: rdflib.Gra
             if candidate is not None and URIRef(new) not in procs_c:
                 fails.append(f"V2: {r['baseline_iri']} is {r['status']} but its new IRI {local_id(new)} "
                              f"is not a process in the candidate")
+            old = URIRef(r["baseline_iri"])
+            if candidate is not None and ((old, None, None) in candidate or (None, None, old) in candidate):
+                fails.append(f"V2: {r['baseline_iri']} has the new IRI {local_id(new)} but the old IRI is "
+                             f"still in the candidate")
+            if candidate is not None and URIRef(new) in procs_c:
+                dep = (URIRef(new), OWL.deprecated, Literal(True)) in candidate
+                if dep != (r["status"] == "deprecated"):
+                    fails.append(f"V2: {local_id(new)} is {r['status']} in the map but "
+                                 f"{'is' if dep else 'is not'} owl:deprecated in the candidate")
         if r["status"] == "excluded":
             if not r.get("note", "").strip():
                 fails.append(f"V2: {r['baseline_iri']} is excluded with no reason in the note column")
@@ -182,8 +210,22 @@ def _statements(g: rdflib.Graph, s: URIRef, mapping: dict[str, str], ignore: fro
         if p in ignore:
             continue
         if isinstance(o, URIRef):
-            o = URIRef(mapping.get(str(o), str(o)))
+            o = _same_predicate(URIRef(mapping.get(str(o), str(o))))
         out.add((p, o))
+    return out
+
+
+def _others(g: rdflib.Graph, mapping: dict[str, str], ignore: frozenset) -> dict[URIRef, set]:
+    """The statements of every named subject that is not a process, with module IRIs moved to the new namespace.
+    Statements with a blank-node object are left out: a blank node has no name to compare across two graphs."""
+    procs = processes(g)
+    out: dict[URIRef, set] = {}
+    for s in set(g.subjects()):
+        if not isinstance(s, URIRef) or s in procs or str(s) in mapping:
+            continue
+        stmts = {(p, o) for p, o in _statements(g, s, mapping, ignore) if not isinstance(o, rdflib.BNode)}
+        if stmts:
+            out[_same_predicate(s)] = stmts
     return out
 
 
@@ -212,6 +254,12 @@ def only_approved_changed(baseline: rdflib.Graph, candidate: rdflib.Graph, rows:
             fails.append(f"V3: {s} is in the candidate but is neither a mapped concept nor a new neutral ID")
         elif local_id(str(s)) not in approved:
             fails.append(f"V3: {local_id(str(s))} is a new concept but is not on the approved list")
+    before, after = _others(baseline, mapping, ignore), _others(candidate, {}, ignore)
+    for s in sorted(set(before) | set(after), key=str):
+        if before.get(s, set()) != after.get(s, set()) and local_id(str(s)) not in approved and str(s) not in approved:
+            fails.append(f"V3: {s} is not a process, changed, and is not on the approved list "
+                         f"({len(before.get(s, set()) - after.get(s, set()))} statements removed, "
+                         f"{len(after.get(s, set()) - before.get(s, set()))} added)")
     # A property in both namespaces at once is a half-done move, which the comparison above cannot see.
     for s, p, _ in sorted(candidate):
         if str(p).startswith(str(CORE)) and (s, _same_predicate(p), None) in candidate:
@@ -261,9 +309,23 @@ def structure(candidate: rdflib.Graph, shapes: Path | None = None) -> list[str]:
                 state[nxt] = 1
                 stack.append((nxt, iter(parents.get(nxt, []))))
     fails += [f"V4: the hierarchy has a cycle through {local_id(str(s))}" for s in sorted(cyclic, key=str)]
+    # skos:narrower is optional, but where it is given it must be the exact inverse of skos:broader.
+    for s, n in sorted(candidate.subject_objects(SKOS.narrower)):
+        if (n, SKOS.broader, s) not in candidate:
+            fails.append(f"V4: {local_id(str(s))} has narrower {local_id(str(n))}, which does not have it as broader")
+    if any(True for _ in candidate.triples((None, SKOS.narrower, None))):
+        for s, b in sorted(candidate.subject_objects(SKOS.broader)):
+            if (b, SKOS.narrower, s) not in candidate:
+                fails.append(f"V4: {local_id(str(s))} has broader {local_id(str(b))}, which does not list it as "
+                             f"narrower")
     labels: dict[str, list] = {}
     for s in procs:
-        for lab in candidate.objects(s, SKOS.prefLabel):
+        prefs = list(candidate.objects(s, SKOS.prefLabel))
+        if not [x for x in prefs if str(x).strip()]:
+            fails.append(f"V4: {local_id(str(s))} has no preferred label")
+        elif len({getattr(x, "language", None) for x in prefs}) < len(prefs):
+            fails.append(f"V4: {local_id(str(s))} has {len(prefs)} preferred labels in one language; it needs one")
+        for lab in prefs:
             labels.setdefault(str(lab).casefold(), []).append(local_id(str(s)))
         deprecated = (s, OWL.deprecated, Literal(True)) in candidate
         defs = [x for x in candidate.objects(s, SKOS.definition) if str(x).strip()]
@@ -284,38 +346,51 @@ def structure(candidate: rdflib.Graph, shapes: Path | None = None) -> list[str]:
 
 # V5 ---------------------------------------------------------------------------------------------------------------
 def read_terms(path: Path = TERMS) -> list[tuple[str, re.Pattern, str]]:
-    """Each term as a whole word, with its kind. A hyphen does not join words here, so "XPIMS-based" and
-    "MPC-owned" match."""
+    """Each term as a whole word, with its kind. Only a letter or a digit joins words here, so "XPIMS-based",
+    "MPC-owned" and "XPIMS_run" match."""
     with path.open(newline="", encoding="utf-8") as fh:
         rows = list(csv.DictReader(fh))
     out = []
     for r in rows:
         flags = 0 if r["case_sensitive"].strip().lower() == "yes" else re.IGNORECASE
-        out.append((r["term"], re.compile(r"(?<!\w)" + re.escape(r["term"]) + r"(?!\w)", flags),
+        out.append((r["term"], re.compile(r"(?<![A-Za-z0-9])" + re.escape(r["term"]) + r"(?![A-Za-z0-9])", flags),
                     r.get("kind", "").strip()))
     return out
 
 
-def company_neutral(candidate: rdflib.Graph, terms_path: Path = TERMS) -> list[str]:
-    """Every reader-facing literal of every subject, not only of the processes. skos:example is read for
-    company-built systems, which leave the reference ontology even as examples (DSBP-DEC-0006); a company name
-    may stand in an example (GOAL.md, done line 4), and in the title or description of a cited source, such
-    as a peer's filing. A commercial product is not in the register at all."""
+def read_allowed(path: Path = ALLOWED) -> list[re.Pattern]:
+    """Phrases in which a register term has a generic meaning, such as "days payable outstanding (DPO)". A
+    missing file allows nothing."""
+    if not path.exists():
+        return []
+    with path.open(newline="", encoding="utf-8") as fh:
+        return [re.compile(re.escape(r["phrase"]), re.IGNORECASE) for r in csv.DictReader(fh) if r["phrase"].strip()]
+
+
+def company_neutral(candidate: rdflib.Graph, terms_path: Path = TERMS, allowed_path: Path = ALLOWED) -> list[str]:
+    """Every literal of every subject on every property, the ontology header and module properties included.
+    skos:example is read for company-built systems, which leave the reference ontology even as examples
+    (DSBP-DEC-0006); a company name may stand in an example (GOAL.md, done line 4), and in the title,
+    description or publisher of a cited source, such as a peer's filing. A commercial product is not in the
+    register at all."""
     terms = read_terms(terms_path)
+    allowed = read_allowed(allowed_path)
     sources = set(candidate.objects(None, DCTERMS.source))
     fails = []
-    for prop in TEXT_PROPS + [SKOS.example]:
-        for s, o in sorted(candidate.subject_objects(prop), key=lambda x: (str(x[0]), str(x[1]))):
-            if not isinstance(o, Literal):
+    for s, prop, o in sorted(candidate, key=lambda x: (str(x[0]), str(x[1]), str(x[2]))):
+        if not isinstance(o, Literal):
+            continue
+        text = str(o)
+        for rx in allowed:
+            text = rx.sub(" ", text)
+        # A cited source's own words: a peer's filing may name the peer (DSBP-DEC-0002).
+        citation = s in sources and prop in (DCTERMS.title, DCTERMS.description, DCTERMS.publisher)
+        for term, rx, kind in terms:
+            if kind == "company" and (prop == SKOS.example or citation):
                 continue
-            # A cited source's title or description is the publisher's own words: a peer's filing may name the peer (DSBP-DEC-0002).
-            citation = s in sources and prop in (DCTERMS.title, DCTERMS.description)
-            for term, rx, kind in terms:
-                if kind == "company" and (prop == SKOS.example or citation):
-                    continue
-                if rx.search(str(o)):
-                    fails.append(f"V5: {local_id(str(s))} {prop.n3(candidate.namespace_manager)} "
-                                 f"contains {term!r}")
+            if rx.search(text):
+                fails.append(f"V5: {local_id(str(s))} {prop.n3(candidate.namespace_manager)} "
+                             f"contains {term!r}")
     return fails
 
 
@@ -333,7 +408,7 @@ def _public(g: rdflib.Graph, src: URIRef) -> list[str]:
     """What a source lacks to count as public evidence. The URL is a dcterms:identifier that is a web address, or
     else the source's own IRI; an IRI this project or its predecessor minted is not a place a reader can go."""
     ids = [str(x) for x in g.objects(src, DCTERMS.identifier)]
-    if any(INTERNAL_SOURCE.search(x) for x in [str(src)] + ids):
+    if INTERNAL_IRI.search(str(src)) or any(INTERNAL_SOURCE.search(x) for x in [str(src)] + ids):
         return ["a public source (this one is internal)"]
     missing = []
     if not _filled(g, src, DCTERMS.title):
@@ -352,15 +427,18 @@ def _public(g: rdflib.Graph, src: URIRef) -> list[str]:
 def evidence(baseline: rdflib.Graph, candidate: rdflib.Graph, rows: list[dict]) -> list[str]:
     back = {r["new_iri"]: r["baseline_iri"] for r in rows if r.get("new_iri")}
     fails = []
-    for s in sorted(processes(candidate), key=str):
+    for s in sorted(set(candidate.subjects(SKOS.definition, None)), key=str):
         new_defs = set(candidate.objects(s, SKOS.definition))
-        if not new_defs:
-            continue
-        old = back.get(str(s))
-        if old is not None and set(baseline.objects(URIRef(old), SKOS.definition)) == new_defs:
+        # The same concept in the baseline: by the map, under the same IRI, or moved from the old module namespace.
+        olds = [back.get(str(s)), str(s), str(s).replace(str(DSBP), str(CORE), 1)]
+        if any(o and set(baseline.objects(URIRef(o), SKOS.definition)) == new_defs for o in olds):
             continue  # definition unchanged: the predecessor's provenance stands
         problems = [(src, _public(candidate, src)) for src in candidate.objects(s, DCTERMS.source)]
-        if not any(not miss for _, miss in problems):
+        internal = [src for src, miss in problems if miss == ["a public source (this one is internal)"]]
+        if internal:
+            fails.append(f"V6: {local_id(str(s))} has a new or changed definition that still cites an internal "
+                         f"source ({', '.join(local_id(str(x)) for x in internal)})")
+        elif not any(not miss for _, miss in problems):
             detail = "; ".join(f"{local_id(str(src))} lacks {', '.join(m)}" for src, m in problems) or "no source"
             fails.append(f"V6: {local_id(str(s))} has a new or changed definition without a complete public "
                          f"source ({detail})")
@@ -385,7 +463,7 @@ def relationships_kept(baseline: rdflib.Graph, candidate: rdflib.Graph, rows: li
     procs = processes(baseline)
     fails = []
     for s, p, o in sorted(baseline):
-        if s in procs and o in procs and str(p).startswith(str(CORE)):
+        if s in procs and o in procs and (str(p).startswith(str(CORE)) or p == SKOS.related):
             if str(s) in excluded or str(o) in excluded:
                 continue
             if f"{local_id(str(s))} {local_id(str(p))} {local_id(str(o))}" in removals:
@@ -402,20 +480,40 @@ def logic(candidate: rdflib.Graph) -> list[str]:
         import owlready2
     except ImportError:
         return ["V8: owlready2 is not installed, so the reasoner did not run"]
+    g = rdflib.Graph()
+    for t in candidate.triples((None, None, None)):
+        if t[1] != OWL.imports:  # the reasoner reads this file alone; an import would fetch from the web or fail
+            g.add(t)
     with tempfile.TemporaryDirectory() as tmp:
         nt = Path(tmp) / "candidate.nt"
-        candidate.serialize(nt, format="nt", encoding="utf-8")
+        g.serialize(nt, format="nt", encoding="utf-8")
         world = owlready2.World()
-        onto = world.get_ontology(nt.as_uri()).load()
         try:
+            onto = world.get_ontology(nt.as_uri()).load()
             with onto:
                 owlready2.sync_reasoner_hermit(world, infer_property_values=False, debug=0)
         except owlready2.OwlReadyInconsistentOntologyError:
             return ["V8: the reasoner found the candidate inconsistent"]
         except (owlready2.OwlReadyJavaError, FileNotFoundError, OSError) as e:
             return [f"V8: the reasoner could not run ({type(e).__name__}); HermiT needs a working Java"]
+        except Exception as e:  # noqa: BLE001 - a file the loader cannot read is a failure, not a crash
+            return [f"V8: the candidate could not be loaded for the reasoner ({type(e).__name__}: {e})"]
         bad = list(world.inconsistent_classes())
         return [f"V8: class {c} is unsatisfiable" for c in bad]
+
+
+_PREFIXES = {"skos": str(SKOS), "dcterms": str(DCTERMS), "rdfs": str(RDFS), "owl": str(OWL), "rdf": str(RDF),
+             "core": str(CORE), "dsbp": str(DSBP)}
+
+
+def expand(name: str) -> URIRef:
+    """A predicate given on the command line, as a full IRI or as prefix:name with a known prefix."""
+    if name.startswith(("http://", "https://")):
+        return URIRef(name)
+    prefix, sep, rest = name.partition(":")
+    if not sep or prefix not in _PREFIXES:
+        raise ValueError(f"--ignore {name!r}: give a full IRI or one of {', '.join(sorted(_PREFIXES))}:<name>")
+    return URIRef(_PREFIXES[prefix] + rest)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -426,20 +524,25 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--shapes", type=Path)
     ap.add_argument("--removals", type=Path, help="approved removals of statements, one `S P O` per line (V7)")
     ap.add_argument("--baseline", type=Path, default=BASELINE_CORE)
+    ap.add_argument("--ignore", nargs="*", default=[],
+                    help="predicates V3 leaves out, as full IRIs or skos:/dcterms:/rdfs:/owl: names, such as "
+                         "skos:notation, which the ID batch moves to the migration map (DSBP-DEC-0031)")
     ap.add_argument("--skip", nargs="*", default=[], help="check IDs to skip, such as V8")
     a = ap.parse_args(argv)
     baseline, candidate, rows = load(a.baseline), load(a.candidate), read_map(a.map)
     approved = read_approved(a.approved)
     removals = read_removals(a.removals)
+    ignore = frozenset(expand(x) for x in a.ignore)
     checks = {
         "V1": lambda: baseline_untouched(),
         "V2": lambda: nothing_lost(baseline, rows, candidate),
-        "V3": lambda: only_approved_changed(baseline, candidate, rows, approved),
+        "V3": lambda: only_approved_changed(baseline, candidate, rows, approved, ignore),
         "V4": lambda: structure(candidate, a.shapes),
         "V5": lambda: company_neutral(candidate),
         "V6": lambda: evidence(baseline, candidate, rows),
         "V7": lambda: relationships_kept(baseline, candidate, rows, removals),
         "V8": lambda: logic(candidate),
+        "V9": lambda: ["V9: the competency-question check is not built yet"],
     }
     failed = 0
     for cid, fn in checks.items():
@@ -453,7 +556,6 @@ def main(argv: list[str] | None = None) -> int:
         if len(fails) > 50:
             print(f"    ... and {len(fails) - 50} more")
         failed += bool(fails)
-    print("V9: not built yet (competency questions)")
     return 1 if failed else 0
 
 

@@ -11,7 +11,7 @@ move        the concept's parent is the new parent, and its level is the expecte
 deprecate   the concept is owl:deprecated and dcterms:isReplacedBy names each replacement in the row's note
 exclude     the concept is not in the candidate, and its migration-map row says excluded, with a reason
 new         a concept with the new label exists under the new parent at the expected level, with a definition
-unchanged   nothing to check here; the release checks cover it
+unchanged   the concept keeps its baseline label, parent, level and deprecation (it is not on V3's approved list)
 
 And for the whole candidate (DSBP-DEC-0031): no process concept carries a skos:notation, every concept that lives
 on has an ID of the form DSBP-P-000123, and the old codes appear only in the migration map.
@@ -41,8 +41,10 @@ def read_expected(path: Path = EXPECTED) -> list[dict]:
         return list(csv.DictReader(fh))
 
 
-def _by_label(g: rdflib.Graph) -> dict[str, URIRef]:
-    return {str(o): s for s in d.processes(g) for o in g.objects(s, SKOS.prefLabel)}
+def _by_label(g: rdflib.Graph, mapped: set = frozenset()) -> dict[str, URIRef]:
+    """New concepts by label. A node the migration map gives to a baseline concept is never a new concept, so a
+    baseline concept relabelled with a new concept's name cannot stand in for it."""
+    return {str(o): s for s in d.processes(g) if s not in mapped for o in g.objects(s, SKOS.prefLabel)}
 
 
 def _resolve(ref: str, mapping: dict[str, str], new_nodes: dict[str, URIRef]) -> URIRef | None:
@@ -71,7 +73,7 @@ def approved_ids(baseline: rdflib.Graph, expected: list[dict], candidate: rdflib
     no other new concept. A node that the migration map gives to a baseline concept is never counted as new, so a
     baseline concept relabelled with a new concept's name does not approve itself. Each new row approves at most one
     node."""
-    ids = {r["baseline_id"] for r in expected if r["baseline_id"]}
+    ids = {r["baseline_id"] for r in expected if r["baseline_id"] and r["change"] != "unchanged"}
     if candidate is not None:
         if rows is None:
             raise ValueError("approved_ids needs the migration rows with a candidate, to tell new nodes from mapped ones")
@@ -88,9 +90,10 @@ def approved_ids(baseline: rdflib.Graph, expected: list[dict], candidate: rdflib
             ids |= descendants(baseline, r["baseline_id"])
         if r["new_parent"] and not r["new_parent"].startswith("NEW:"):
             ids.add(r["new_parent"])
+    unchanged = {r["baseline_id"] for r in expected if r["change"] == "unchanged"}
     for r in expected:
         old_parent = baseline.value(URIRef(d.OLD_PROC + r["baseline_id"]), SKOS.broader) if r["baseline_id"] else None
-        if old_parent is not None:
+        if old_parent is not None and d.local_id(str(old_parent)) not in unchanged:
             ids.add(d.local_id(str(old_parent)))
     return ids
 
@@ -100,7 +103,7 @@ def check(baseline: rdflib.Graph, candidate: rdflib.Graph, rows: list[dict],
     expected = read_expected() if expected is None else expected
     mapping = d.old_to_new(rows)
     status = {d.local_id(r["baseline_iri"]): r for r in rows}
-    labels = _by_label(candidate)
+    labels = _by_label(candidate, {URIRef(r["new_iri"]) for r in rows if r.get("new_iri")})
     fails: list[str] = []
 
     new_nodes = {}
@@ -149,14 +152,27 @@ def check(baseline: rdflib.Graph, candidate: rdflib.Graph, rows: list[dict],
             if (node, OWL.deprecated, Literal(True)) not in candidate:
                 fails.append(f"B3: {old} should be owl:deprecated")
             for key in re.findall(r"NEW:\w+", r["draft_definition"]):
-                if (node, DCTERMS.isReplacedBy, new_nodes.get(key)) not in candidate:
+                repl = new_nodes.get(key)
+                # rdflib reads a None in a triple as "anything", so a missing replacement must fail here.
+                if repl is None or (node, DCTERMS.isReplacedBy, repl) not in candidate:
                     fails.append(f"B3: {old} should be replaced by {key}")
+        if what == "unchanged":
+            was = URIRef(d.OLD_PROC + old)
+            if str(candidate.value(node, SKOS.prefLabel)) != str(baseline.value(was, SKOS.prefLabel)):
+                fails.append(f"B3: {old} is listed as unchanged but its label changed")
+            want = _resolve(r["new_parent"], mapping, new_nodes) if r["new_parent"] else None
+            if candidate.value(node, SKOS.broader) != want:
+                fails.append(f"B3: {old} is listed as unchanged but its parent changed")
+            if r["expected_level"] and d.level(candidate, node) != int(r["expected_level"]):
+                fails.append(f"B3: {old} is listed as unchanged but its level changed")
+            if ((was, OWL.deprecated, Literal(True)) in baseline) != ((node, OWL.deprecated, Literal(True)) in candidate):
+                fails.append(f"B3: {old} is listed as unchanged but its deprecation changed")
 
     for s in d.processes(candidate):
         if candidate.value(s, SKOS.notation) is not None:
             fails.append(f"B3: {d.local_id(str(s))} still carries a notation; old codes live only in the map")
-        if str(s).startswith(d.OLD_PROC):
-            fails.append(f"B3: {d.local_id(str(s))} still has its 1.2 IRI")
+        if not d.NEW_IRI.fullmatch(str(s)):
+            fails.append(f"B3: {d.local_id(str(s))} does not have a neutral ID of the form DSBP-P-000123")
     return fails
 
 

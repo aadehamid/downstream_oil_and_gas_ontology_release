@@ -5,7 +5,8 @@ approves expected-changes.csv; until then the tests use it to show that check_ex
 candidate and fails a wrong one.
 
 ID rule (DSBP-DEC-0031): every baseline process that lives on gets DSBP-P-<n>, numbered 1 to 707 in the sorted
-order of its 1.2 IRI; each new concept gets the next number, in the file's order. Old codes (the IRI's local part
+order of its 1.2 IRI (an excluded concept keeps its number unused, so the numbers have gaps); each new concept
+gets the next number after 707, in the file's order. Old codes (the IRI's local part
 and skos:notation) go to the migration map only.
 """
 from __future__ import annotations
@@ -27,16 +28,20 @@ import dsbp_checks as d  # noqa: E402
 
 def migration_rows(baseline: rdflib.Graph, expected: list[dict]) -> list[dict]:
     change = {r["baseline_id"]: r for r in expected if r["baseline_id"]}
+    shifted = {d.OLD_PROC + x for r in expected if r["change"] == "move"
+               for x in ce.descendants(baseline, r["baseline_id"])}
     rows = []
     for i, s in enumerate(sorted(d.processes(baseline), key=str), start=1):
         old = d.local_id(str(s))
         r = change.get(old, {})
         kind = r.get("change", "")
         if kind == "exclude":
-            rows.append({"baseline_iri": str(s), "new_iri": "", "status": "excluded",
-                         "note": f"{r['decision']}: {r['evidence']}"})
+            why = f"{r['decision']}: {r['draft_definition'] or r['evidence']}"
+            rows.append({"baseline_iri": str(s), "new_iri": "", "status": "excluded", "note": why})
             continue
-        status = {"rename": "relabeled", "deprecate": "deprecated"}.get(kind, "retained")
+        status = {"rename": "relabeled", "deprecate": "deprecated", "move": "modified"}.get(kind, "retained")
+        if str(s) in shifted and status == "retained":
+            status = "modified"  # its level changes because an ancestor moves
         if (s, OWL.deprecated, Literal(True)) in baseline:
             status = "deprecated"
         note = f"notation {baseline.value(s, SKOS.notation)}" if baseline.value(s, SKOS.notation) else ""
@@ -55,6 +60,7 @@ def build(baseline: rdflib.Graph, expected: list[dict]) -> tuple[rdflib.Graph, l
         g.add((m.get(s, s), p, m.get(o, o)))
     nxt = len(rows) + 1
     new_nodes = {}
+    new_rows = []
     for r in expected:
         if r["change"] == "new":
             n = URIRef(f"{d.NEW_PROC}DSBP-P-{nxt:06d}")
@@ -64,6 +70,7 @@ def build(baseline: rdflib.Graph, expected: list[dict]) -> tuple[rdflib.Graph, l
             g.add((n, SKOS.prefLabel, Literal(r["new_label"], lang="en")))
             g.add((n, SKOS.definition, Literal(r["draft_definition"], lang="en")))
             g.add((n, d.CORE.taxonomyLevel, Literal(int(r["expected_level"]))))
+            new_rows.append((n, r))
     resolve = lambda ref: ce._resolve(ref, {str(k): str(v) for k, v in m.items()}, new_nodes)  # noqa: E731
     for r in expected:
         node = new_nodes.get(r["key"]) if r["change"] == "new" else resolve(r["baseline_id"])
@@ -77,6 +84,13 @@ def build(baseline: rdflib.Graph, expected: list[dict]) -> tuple[rdflib.Graph, l
             g.set((node, OWL.deprecated, Literal(True)))
             for key in re.findall(r"NEW:\w+", r["draft_definition"]):
                 g.add((node, DCTERMS.isReplacedBy, new_nodes[key]))
+    # A new concept joins the scheme its parent is in, as every baseline concept is in one.
+    for n, r in new_rows:
+        parent = resolve(r["new_parent"])
+        while parent is not None and g.value(parent, SKOS.inScheme) is None and parent in new_nodes.values():
+            parent = g.value(parent, SKOS.broader)
+        for scheme in (g.objects(parent, SKOS.inScheme) if parent is not None else []):
+            g.add((n, SKOS.inScheme, scheme))
     # Levels follow the parents: recompute from the roots down.
     procs = d.processes(g)
     roots = [s for s in procs if g.value(s, SKOS.broader) is None]

@@ -34,8 +34,10 @@ def baseline() -> rdflib.Graph:
 
 @pytest.fixture(scope="session")
 def rows(baseline) -> list[dict]:
-    """Every baseline process retained under a new neutral ID (DSBP-DEC-0031)."""
-    return [{"baseline_iri": str(s), "new_iri": f"{d.NEW_PROC}DSBP-P-{i:06d}", "status": "retained", "note": ""}
+    """Every baseline process under a new neutral ID (DSBP-DEC-0031): retained, or deprecated where the baseline
+    already deprecates it."""
+    return [{"baseline_iri": str(s), "new_iri": f"{d.NEW_PROC}DSBP-P-{i:06d}",
+             "status": "deprecated" if (s, OWL.deprecated, Literal(True)) in baseline else "retained", "note": ""}
             for i, s in enumerate(sorted(d.processes(baseline), key=str), start=1)]
 
 
@@ -115,7 +117,8 @@ def test_v1_fails_when_one_byte_changes(tmp_path):
     data = bytearray(f.read_bytes())
     data[-2] = ord(" ") if data[-2] != ord(" ") else ord("\t")
     f.write_bytes(bytes(data))
-    assert d.baseline_untouched(rel) == ["V1: core/2.4.0/core.ttl differs from its manifest hash"]
+    core_only = {k: v for k, v in d.read_manifest_list().items() if k.startswith("core/2.4.0/")}
+    assert d.baseline_untouched(rel, core_only) == ["V1: core/2.4.0/core.ttl differs from its manifest hash"]
 
 
 def test_v2_fails_when_a_row_is_dropped(baseline, rows):
@@ -311,14 +314,18 @@ def test_cli_exits_non_zero_on_the_identity_candidate_because_of_v5(rows, candid
         w.writerows(rows)
     c = tmp_path / "candidate.ttl"
     candidate.serialize(c, format="turtle")
-    assert d.main(["--candidate", str(c), "--map", str(m), "--skip", "V8"]) == 1
+    assert d.main(["--candidate", str(c), "--map", str(m), "--skip", "V8", "V9"]) == 1
     out = capsys.readouterr().out
     assert "V5: FAIL" in out and "V2: pass" in out and "V3: pass" in out and "V7: pass" in out
     # V5 alone makes it fail: with V4 skipped too it still fails, and with V5 skipped as well it passes.
-    assert d.main(["--candidate", str(c), "--map", str(m), "--skip", "V4", "V8"]) == 1
+    assert d.main(["--candidate", str(c), "--map", str(m), "--skip", "V4", "V8", "V9"]) == 1
     out = capsys.readouterr().out
     assert [line.split(":")[0] for line in out.splitlines() if ": FAIL" in line] == ["V5"]
-    assert d.main(["--candidate", str(c), "--map", str(m), "--skip", "V4", "V5", "V8"]) == 0
+    assert d.main(["--candidate", str(c), "--map", str(m), "--skip", "V4", "V5", "V8", "V9"]) == 0
+    capsys.readouterr()
+    # V9 is not built, so it fails unless it is skipped: an unbuilt check never reads as a pass.
+    assert d.main(["--candidate", str(c), "--map", str(m), "--skip", "V4", "V5", "V8"]) == 1
+    assert "V9: FAIL" in capsys.readouterr().out
     capsys.readouterr()
     with pytest.raises(FileNotFoundError):
         d.main(["--candidate", str(c), "--map", str(m), "--approved", str(tmp_path / "typo.txt")])
@@ -501,7 +508,7 @@ def test_cli_passes_removals_and_shapes_through(baseline, rows, candidate, tmp_p
         w.writeheader()
         w.writerows(rows)
     g.serialize(c, format="turtle")
-    only7 = ["--skip", "V1", "V2", "V3", "V4", "V5", "V6", "V8"]
+    only7 = ["--skip", "V1", "V2", "V3", "V4", "V5", "V6", "V8", "V9"]
     assert d.main(["--candidate", str(c), "--map", str(mp)] + only7) == 1
     rm = tmp_path / "removals.txt"
     rm.write_text(f"{d.local_id(str(s))} {d.local_id(str(p))} {d.local_id(str(o))}\n", encoding="utf-8")
@@ -556,3 +563,200 @@ def test_v5_lets_a_cited_filing_name_its_company_but_not_a_system(tmp_path):
 def test_v6_refuses_minted_iris_in_any_scheme_or_case(baseline, rows, candidate, iri):
     g = _sourced(candidate, URIRef(iri), FULL)
     assert any("URL" in f for f in d.evidence(baseline, g, rows))
+
+
+# Fixes from Gemini's round-1 review of PR #87, each shown failing on a broken copy ------------------------------------
+def test_v1_fails_when_a_whole_manifest_is_deleted(tmp_path):
+    rel = tmp_path / "releases"
+    shutil.copytree(d.RELEASES / "core" / "2.4.0", rel / "core" / "2.4.0")
+    listed = {k: v for k, v in d.read_manifest_list().items() if k.startswith(("core/2.4.0/", "data-product/"))}
+    assert d.baseline_untouched(rel, listed) == [
+        "V1: manifest data-product/1.2.0/manifest.json is in the recorded list and missing"]
+
+
+def test_v1_fails_when_a_manifest_is_edited(tmp_path):
+    rel = tmp_path / "releases"
+    shutil.copytree(d.RELEASES / "core" / "2.4.0", rel / "core" / "2.4.0")
+    m = rel / "core" / "2.4.0" / "manifest.json"
+    m.write_text(m.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    core_only = {k: v for k, v in d.read_manifest_list().items() if k.startswith("core/2.4.0/")}
+    assert d.baseline_untouched(rel, core_only) == ["V1: manifest core/2.4.0/manifest.json differs from its recorded hash"]
+
+
+def test_v2_fails_when_an_old_iri_stays_beside_the_new_one(baseline, rows, candidate):
+    g = copy(candidate)
+    g.add((URIRef(rows[3]["baseline_iri"]), SKOS.prefLabel, Literal("left behind", lang="en")))
+    fails = d.nothing_lost(baseline, rows, g)
+    assert len(fails) == 1 and "old IRI is still in the candidate" in fails[0]
+
+
+def test_v2_fails_when_the_map_and_owl_deprecated_disagree(baseline, rows, candidate):
+    g = copy(candidate)
+    live = next(r for r in rows if r["status"] == "retained")
+    g.add((URIRef(live["new_iri"]), OWL.deprecated, Literal(True)))
+    fails = d.nothing_lost(baseline, rows, g)
+    assert len(fails) == 1 and "is owl:deprecated" in fails[0]
+    marked = [dict(r, status="deprecated") if r is live else r for r in rows]
+    assert d.nothing_lost(baseline, marked, g) == []
+    assert any("is not owl:deprecated" in f for f in d.nothing_lost(baseline, marked, candidate))
+
+
+def test_v3_sees_a_change_to_a_class_or_the_ontology_header(baseline, rows, candidate):
+    s = sorted(x for x in set(baseline.subjects(RDF.type, OWL.Class)) if isinstance(x, URIRef))[0]
+    g = copy(candidate)
+    g.add((s, RDFS.comment, Literal("A new comment.", lang="en")))
+    fails = d.only_approved_changed(baseline, g, rows, set())
+    assert len(fails) == 1 and "is not a process" in fails[0]
+    assert d.only_approved_changed(baseline, g, rows, {d.local_id(str(s))}) == []
+
+
+def test_v3_treats_a_class_moved_to_the_new_namespace_as_unchanged(baseline, rows, candidate):
+    def move(x):
+        return URIRef(str(x).replace(str(d.CORE), str(d.DSBP), 1)) if isinstance(x, URIRef) else x
+    g = rdflib.Graph()
+    for s, p, o in candidate:
+        g.add((move(s), move(p), move(o)))
+    assert d.only_approved_changed(baseline, g, rows, set()) == []
+
+
+def test_cli_ignore_leaves_notation_out_of_v3(baseline, rows, candidate, tmp_path, capsys):
+    g = copy(candidate)
+    g.remove((None, SKOS.notation, None))
+    if len(g) == len(candidate):
+        pytest.skip("the baseline has no skos:notation")
+    mp, c = tmp_path / "map.csv", tmp_path / "candidate.ttl"
+    with mp.open("w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=["baseline_iri", "new_iri", "status", "note"])
+        w.writeheader()
+        w.writerows(rows)
+    g.serialize(c, format="turtle")
+    only3 = ["--skip", "V1", "V2", "V4", "V5", "V6", "V7", "V8", "V9"]
+    assert d.main(["--candidate", str(c), "--map", str(mp)] + only3) == 1
+    assert d.main(["--candidate", str(c), "--map", str(mp), "--ignore", "skos:notation"] + only3) == 0
+    with pytest.raises(ValueError):
+        d.expand("notation")
+
+
+def test_v4_fails_on_a_narrower_link_that_does_not_match_broader(baseline, candidate):
+    g = copy(candidate)
+    child = some_process(g, 2)
+    parent = g.value(child, SKOS.broader)
+    g.add((parent, SKOS.narrower, child))
+    fails = d.structure(g)
+    assert any("does not list it as narrower" in f for f in fails)          # the other links have no inverse
+    g = copy(candidate)
+    g.add((parent, SKOS.narrower, some_process(g, 3)))
+    assert any("which does not have it as broader" in f for f in d.structure(g))
+
+
+def test_v4_fails_on_a_missing_or_doubled_preferred_label(candidate):
+    base = len(d.structure(candidate))
+    g = copy(candidate)
+    s = some_process(g, 3)
+    g.remove((s, SKOS.prefLabel, None))
+    assert any("has no preferred label" in f for f in d.structure(g))
+    g = copy(candidate)
+    g.add((s, SKOS.prefLabel, Literal("A second English label", lang="en")))
+    assert len(d.structure(g)) == base + 1
+
+
+def test_v5_reads_any_property_and_the_ontology_header(tmp_path):
+    terms = tmp_path / "terms.csv"
+    terms.write_text("term,case_sensitive,kind,why\nXPIMS,yes,system,test\n", encoding="utf-8")
+    onto = URIRef(d.DSBP)
+    for prop in (DCTERMS.creator, URIRef("https://example.org/anyProperty"), OWL.versionInfo):
+        g = rdflib.Graph()
+        g.add((onto, prop, Literal("Built from XPIMS")))
+        assert len(d.company_neutral(g, terms, tmp_path / "none.csv")) == 1, prop
+
+
+def test_v5_treats_an_underscore_as_a_boundary(tmp_path):
+    terms = tmp_path / "terms.csv"
+    terms.write_text("term,case_sensitive,kind,why\nXPIMS,yes,system,test\n", encoding="utf-8")
+    g = rdflib.Graph()
+    g.add((URIRef(d.DSBP + "x"), RDFS.label, Literal("XPIMS_run_2")))
+    assert len(d.company_neutral(g, terms, tmp_path / "none.csv")) == 1
+    g.set((URIRef(d.DSBP + "x"), RDFS.label, Literal("XPIMSX")))      # a letter joins words: a different word
+    assert d.company_neutral(g, terms, tmp_path / "none.csv") == []
+
+
+def test_v5_allows_a_registered_generic_meaning_only(tmp_path):
+    terms = tmp_path / "terms.csv"
+    terms.write_text("term,case_sensitive,kind,why\nDPO,yes,system,test\n", encoding="utf-8")
+    allowed = tmp_path / "allowed.csv"
+    allowed.write_text("term,phrase,why\nDPO,days payable outstanding (DPO),finance measure\n", encoding="utf-8")
+    g = rdflib.Graph()
+    s = URIRef(d.DSBP + "measure/x")
+    g.add((s, SKOS.definition, Literal("Days payable outstanding (DPO) is a working-capital measure.", lang="en")))
+    assert d.company_neutral(g, terms, allowed) == []
+    g.add((s, SKOS.scopeNote, Literal("Planned in DPO.", lang="en")))
+    assert len(d.company_neutral(g, terms, allowed)) == 1
+
+
+def test_v5_lets_a_cited_source_name_its_publisher(tmp_path):
+    terms = tmp_path / "terms.csv"
+    terms.write_text("term,case_sensitive,kind,why\nMPC,yes,company,test\n", encoding="utf-8")
+    g = rdflib.Graph()
+    s, src = URIRef(d.NEW_PROC + "DSBP-P-000001"), URIRef("https://example.org/10-k")
+    g.add((s, DCTERMS.source, src))
+    g.add((src, DCTERMS.publisher, Literal("MPC")))
+    assert d.company_neutral(g, terms, tmp_path / "none.csv") == []
+
+
+def test_v6_fails_when_an_internal_source_stays_beside_a_public_one(baseline, rows, candidate):
+    g = _sourced(candidate, URIRef("https://example.org/standard"), FULL)
+    s = some_process(g, 5)
+    g.add((s, DCTERMS.source, URIRef("urn:step3c-definition-workbook")))
+    fails = d.evidence(baseline, g, rows)
+    assert len(fails) == 1 and "still cites an internal source" in fails[0]
+
+
+def test_v6_accepts_a_urn_identifier_on_a_public_source(baseline, rows, candidate):
+    g = _sourced(candidate, URIRef("https://example.org/book"), FULL + [(DCTERMS.identifier, "urn:isbn:9780000000000")])
+    assert d.evidence(baseline, g, rows) == []
+
+
+def test_v6_reads_definitions_of_subjects_that_are_not_processes(baseline, rows, candidate):
+    g = copy(candidate)
+    cls = URIRef(d.DSBP + "measure/SomeNewClass")
+    g.add((cls, SKOS.definition, Literal("A new class.", lang="en")))
+    assert len(d.evidence(baseline, g, rows)) == 1
+    s = sorted(x for x in set(baseline.subjects(SKOS.definition, None))
+               if isinstance(x, URIRef) and x not in d.processes(baseline))
+    if s:  # an unchanged definition of a baseline class needs no new source
+        assert d.evidence(baseline, candidate, rows) == []
+
+
+def test_v7_reads_skos_related(baseline):
+    procs = sorted(d.processes(baseline), key=str)
+    a, b = procs[0], procs[1]
+    g = copy(baseline)
+    g.add((a, SKOS.related, b))
+    rows = [{"baseline_iri": str(s), "new_iri": str(s), "status": "retained", "note": ""} for s in procs]
+    assert d.relationships_kept(g, baseline, rows) == [
+        f"V7: {d.local_id(str(a))} related {d.local_id(str(b))} is gone"]
+
+
+def test_v8_ignores_owl_imports():
+    pytest.importorskip("owlready2")
+    if not java_works():
+        pytest.skip("HermiT needs Java")
+    g = rdflib.Graph()
+    o = URIRef("https://example.org/i")
+    g.add((o, RDF.type, OWL.Ontology))
+    g.add((o, OWL.imports, URIRef("https://example.invalid/never-there.ttl")))
+    assert d.logic(g) == []
+
+
+def test_v8_reports_a_load_failure_instead_of_crashing(monkeypatch):
+    owlready2 = pytest.importorskip("owlready2")
+
+    class Broken:
+        def load(self):
+            raise ValueError("cannot parse")
+
+    monkeypatch.setattr(owlready2.World, "get_ontology", lambda self, iri: Broken())
+    g = rdflib.Graph()
+    g.add((URIRef("https://example.org/j"), RDF.type, OWL.Ontology))
+    fails = d.logic(g)
+    assert len(fails) == 1 and "could not be loaded" in fails[0]
