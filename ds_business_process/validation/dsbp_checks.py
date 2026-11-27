@@ -303,18 +303,22 @@ def _others(g: rdflib.Graph, mapping: dict[str, str], ignore: frozenset) -> dict
         key = frozenset(_statements(g, b, mapping, ignore))
         if key:
             counts[key] = counts.get(key, 0) + 1
-    for b in loose:  # a detached loop has no first node: it is read from each of its nodes, as one group
-        if b in covered:
-            continue
-        group, todo = set(), [b]
+    # What is left holds a loop, with any blank nodes hanging off it. Each connected group, followed both ways so no
+    # node's label decides where it starts, is read from each of its nodes, since a loop has no first node.
+    rest = set(loose) - covered
+    while rest:
+        group, todo = set(), [min(rest, key=str)]
         while todo:
             x = todo.pop()
-            if x not in group:
-                group.add(x)
-                todo += [o for o in g.objects(x, None) if isinstance(o, rdflib.BNode)]
-        covered |= group
-        key = ("_:loop", frozenset(frozenset(_statements(g, x, mapping, ignore)) for x in group))
-        counts[key] = counts.get(key, 0) + 1
+            if x in group:
+                continue
+            group.add(x)
+            todo += [o for o in g.objects(x, None) if o in rest] + [y for y in g.subjects(None, x) if y in rest]
+        rest -= group
+        stmts = frozenset(k for x in group if (k := frozenset(_statements(g, x, mapping, ignore))))
+        if stmts:
+            key = ("_:loop", stmts)
+            counts[key] = counts.get(key, 0) + 1
     if counts:
         out[UNREFERENCED] = {(k, n) for k, n in counts.items()}
     return out
@@ -512,7 +516,7 @@ def company_neutral(candidate: rdflib.Graph, terms_path: Path = TERMS, allowed_p
                            (o, p == DCTERMS.source or (s in sources and p == DCTERMS.identifier))):
             if not isinstance(iri, URIRef):
                 continue
-            cited = cited and not str(iri).lower().replace("http://", "https://", 1).startswith(MINTED)
+            cited = cited and not re.sub(r"^[a-z][a-z0-9+.-]*://", "https://", str(iri).lower()).startswith(MINTED)
             for term, _, kind in terms:
                 if (kind == "company" and cited) or (iri, term) in seen or not _iri_names(str(iri), term):
                     continue

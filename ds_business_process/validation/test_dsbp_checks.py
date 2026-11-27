@@ -1047,3 +1047,34 @@ def test_v3_compares_detached_blank_node_loops_and_skips_empty_ones(baseline, ro
     note = URIRef("https://example.org/ignoredOnly")
     cand.add((rdflib.BNode(), note, Literal("x")))
     assert d.only_approved_changed(baseline, cand, rows, set(), frozenset({note})) == []
+
+
+@pytest.mark.parametrize("labels", [("a", "b", "c"), ("z", "y", "a")])
+def test_v3_reads_a_detached_loop_with_a_tail_as_one_group_whatever_its_labels(baseline, rows, candidate, labels):
+    def loop_with_tail(g, names):
+        a, b, c = (rdflib.BNode(n) for n in names)
+        g.add((a, RDFS.seeAlso, b))
+        g.add((b, RDFS.seeAlso, a))
+        g.add((a, RDFS.seeAlso, c))
+        g.add((c, RDFS.comment, Literal("x")))
+    base, cand = copy(baseline), copy(candidate)
+    loop_with_tail(base, ("m1", "m2", "m3"))
+    loop_with_tail(cand, labels)
+    assert d.only_approved_changed(base, cand, rows, set()) == []
+
+
+def test_v3_skips_a_detached_loop_of_ignored_statements(baseline, rows, candidate):
+    cand = copy(candidate)
+    note = URIRef("https://example.org/ignoredOnly")
+    a, b = rdflib.BNode(), rdflib.BNode()
+    cand.add((a, note, b))
+    cand.add((b, note, a))
+    assert d.only_approved_changed(baseline, cand, rows, set(), frozenset({note})) == []
+
+
+def test_v5_treats_a_minted_iri_in_any_scheme_as_minted(tmp_path):
+    terms = tmp_path / "terms.csv"
+    terms.write_text("term,case_sensitive,kind,why\nMPC,yes,company,test\n", encoding="utf-8")
+    g = rdflib.Graph()
+    g.add((URIRef(d.NEW_PROC + "DSBP-P-000001"), DCTERMS.source, URIRef("ftp://w3id.org/mpc/source/x")))
+    assert any("w3id.org/mpc" in f for f in d.company_neutral(g, terms, tmp_path / "none.csv"))
