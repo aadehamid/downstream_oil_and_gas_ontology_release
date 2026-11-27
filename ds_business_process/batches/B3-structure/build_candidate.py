@@ -77,7 +77,7 @@ def build(baseline: rdflib.Graph, expected: list[dict]) -> tuple[rdflib.Graph, l
     # A map note names a replacement by its new ID and label, not by the file's working key (NEW:it).
     labels = {r["key"]: r["new_label"] for r in expected if r["change"] == "new"}
     for row in rows:
-        row["note"] = re.sub(r"NEW:\w+", lambda k: f"{d.local_id(str(new_nodes[k.group(0)]))} ({labels[k.group(0)]})",
+        row["note"] = re.sub(r"NEW:[\w-]+", lambda k: f"{d.local_id(str(new_nodes[k.group(0)]))} ({labels[k.group(0)]})",
                              row["note"])
     for r in expected:
         node = new_nodes.get(r["key"]) if r["change"] == "new" else resolve(r["baseline_id"])
@@ -89,7 +89,7 @@ def build(baseline: rdflib.Graph, expected: list[dict]) -> tuple[rdflib.Graph, l
             g.set((node, SKOS.prefLabel, Literal(r["new_label"], lang="en")))
         if r["change"] == "deprecate":
             g.set((node, OWL.deprecated, Literal(True)))
-            for key in re.findall(r"NEW:\w+", r["draft_definition"]):
+            for key in re.findall(r"NEW:[\w-]+", r["draft_definition"]):
                 g.add((node, DCTERMS.isReplacedBy, new_nodes[key]))
     # A new concept joins the scheme its parent is in, as every baseline concept is in one.
     for n, r in new_rows:

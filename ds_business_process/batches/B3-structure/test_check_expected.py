@@ -213,6 +213,13 @@ def test_map_notes_name_replacements_by_new_id_not_by_working_key(built):
     assert "(Strategy & Business Development)" in notes["CM-1-1-4-6"]
 
 
+def test_the_batch_check_fails_on_a_map_note_that_keeps_a_working_key(baseline, expected, built):
+    g, rows = built
+    rows = [dict(r) for r in rows]
+    next(r for r in rows if r["baseline_iri"].endswith("L1-shared-services"))["note"] += " See NEW:risk-mgmt."
+    assert any("still names the working key NEW:risk-mgmt" in f for f in ce.check(baseline, g, rows, expected))
+
+
 def test_the_retired_commercial_development_is_excluded_not_deprecated(baseline, built):
     g, rows = built
     status = {d.local_id(r["baseline_iri"]): r for r in rows}

@@ -820,9 +820,26 @@ def test_v4_lets_one_concept_carry_one_label_in_two_languages(candidate):
     g = copy(candidate)
     s = some_process(g, 3)
     g.add((s, SKOS.prefLabel, Literal(str(g.value(s, SKOS.prefLabel)), lang="fr")))
-    g.add((s, SKOS.prefLabel, Literal("  ")))
-    assert not any("is shared by" in f for f in d.structure(g))
     assert len(d.structure(g)) == len(base)
+
+
+@pytest.mark.parametrize("blank", [Literal("  "), Literal("", lang="fr"), Literal(" ", lang="en")])
+def test_v4_fails_on_a_blank_label_beside_a_real_one(candidate, blank):
+    g = copy(candidate)
+    s = some_process(g, 3)
+    g.add((s, SKOS.prefLabel, blank))
+    fails = d.structure(g)
+    assert any(f"{d.local_id(str(s))} has a blank preferred label" in f for f in fails)
+    assert not any("is shared by" in f for f in fails)
+
+
+def test_v4_counts_labels_per_language(candidate):
+    g = copy(candidate)
+    s = some_process(g, 3)
+    g.add((s, SKOS.prefLabel, Literal("Second", lang="en")))
+    g.add((s, SKOS.prefLabel, Literal("Premier", lang="fr")))
+    fails = [f for f in d.structure(g) if d.local_id(str(s)) in f and "preferred labels" in f]
+    assert fails == [f"V4: {d.local_id(str(s))} has 2 preferred labels in en; it needs one"]
 
 
 def test_v4_reports_a_level_that_is_not_a_whole_number(candidate):
@@ -852,15 +869,40 @@ def test_v5_reads_iris_but_lets_a_cited_source_keep_its_own(tmp_path):
     g.add((s, d.DSBP.taxonomyLevel, Literal(0)))
     g.add((s, URIRef(d.DSBP + "feedsSystem"), URIRef(d.DSBP + "system/xpims-run")))
     assert any("IRI" in f and "XPIMS" in f for f in d.company_neutral(g, terms, none))
-    g = rdflib.Graph()
     src = URIRef("https://www.marathonpetroleum.com/Investors/")
+    g = rdflib.Graph()
+    g.add((s, RDFS.seeAlso, src))                                 # not a cited source: a hit
+    assert any("the IRI" in f and "Marathon" in f for f in d.company_neutral(g, terms, none))
+    g = rdflib.Graph()
     g.add((s, DCTERMS.source, src))
     g.add((src, DCTERMS.identifier, Literal("https://www.marathon.example/10-k.htm")))
+    g.add((src, DCTERMS.identifier, URIRef("https://www.marathon.example/10-k.htm")))
     assert d.company_neutral(g, terms, none) == []
+    g.add((src, DCTERMS.identifier, URIRef("https://vendor.example/xpims-guide")))  # a system, even on a source
+    assert any("xpims-guide" in f for f in d.company_neutral(g, terms, none))
+
+
+@pytest.mark.parametrize("iri", ["https://w3id.org/mpc/ontology/modules/core/taxonomyLevel",
+                                 "https://example.org/hasXpimsId", "https://example.org/MPCProcess",
+                                 "https://example.org/mpc_process"])
+def test_v5_reads_an_iri_in_any_letter_case_and_word_split(tmp_path, iri):
+    terms = tmp_path / "terms.csv"
+    terms.write_text("term,case_sensitive,kind,why\nMPC,yes,company,test\nXPIMS,no,system,test\n", encoding="utf-8")
+    g = rdflib.Graph()
+    g.add((URIRef(d.NEW_PROC + "DSBP-P-000001"), URIRef(iri), Literal(1)))
+    assert any("the IRI" in f for f in d.company_neutral(g, terms, tmp_path / "none.csv"))
+
+
+def test_v5_does_not_read_a_short_term_inside_a_longer_word(tmp_path):
+    terms = tmp_path / "terms.csv"
+    terms.write_text("term,case_sensitive,kind,why\nMPC,yes,company,test\n", encoding="utf-8")
+    g = rdflib.Graph()
+    g.add((URIRef(d.NEW_PROC + "DSBP-P-000001"), URIRef("https://example.org/rmpcx"), Literal(1)))
+    assert d.company_neutral(g, terms, tmp_path / "none.csv") == []
 
 
 @pytest.mark.parametrize("text", ["Retired per PTC-001.", "See step3c-parked-tree-changes.md.",
-                                  "From the plan.xlsx sheet"])
+                                  "From the plan.xlsx sheet", "ptc-001", "PTC-001-AB", "See PLAN.XLSX", "Notes.MD"])
 def test_v5_refuses_the_predecessors_working_trace(tmp_path, text):
     terms = tmp_path / "terms.csv"
     terms.write_text("term,case_sensitive,kind,why\nXPIMS,no,system,test\n", encoding="utf-8")
@@ -878,3 +920,88 @@ def test_v5_lets_a_cited_source_name_its_own_file(tmp_path):
     g.add((s, DCTERMS.source, src))
     g.add((src, DCTERMS.title, Literal("Refinery capacity data, refcap.xlsx")))
     assert d.company_neutral(g, terms, tmp_path / "none.csv") == []
+
+
+def test_v5_reads_web_addresses_and_examples_as_no_working_file(tmp_path):
+    terms = tmp_path / "terms.csv"
+    terms.write_text("term,case_sensitive,kind,why\nXPIMS,no,system,test\n", encoding="utf-8")
+    s = URIRef(d.NEW_PROC + "DSBP-P-000001")
+    g = rdflib.Graph()
+    g.add((s, SKOS.scopeNote, Literal("Published at https://gov.md/energy and https://data.example/refcap.xlsx")))
+    g.add((s, SKOS.example, Literal("A shipper files the nomination as nominations.csv.")))
+    assert d.company_neutral(g, terms, tmp_path / "none.csv") == []
+    g.add((s, SKOS.example, Literal("Parked under PTC-002.")))              # a code is never public
+    assert len(d.company_neutral(g, terms, tmp_path / "none.csv")) == 1
+
+
+def test_v5_refuses_a_trace_code_on_a_cited_source(tmp_path):
+    terms = tmp_path / "terms.csv"
+    terms.write_text("term,case_sensitive,kind,why\nXPIMS,no,system,test\n", encoding="utf-8")
+    s, src = URIRef(d.NEW_PROC + "DSBP-P-000001"), URIRef("https://www.eia.gov/petroleum/")
+    g = rdflib.Graph()
+    g.add((s, DCTERMS.source, src))
+    g.add((src, DCTERMS.description, Literal("Chosen under PTC-001")))
+    assert len(d.company_neutral(g, terms, tmp_path / "none.csv")) == 1
+
+
+def test_v3_counts_two_equal_blank_nodes_and_compares_unreferenced_ones(baseline, rows, candidate):
+    s, old = URIRef(rows[0]["new_iri"]), URIRef(rows[0]["baseline_iri"])
+    note = URIRef("https://example.org/qualifiedNote")
+    base, cand = copy(baseline), copy(candidate)
+    for g, subj in ((base, old), (cand, s)):
+        b = rdflib.BNode()
+        g.add((subj, note, b))
+        g.add((b, RDFS.comment, Literal("same")))
+    assert d.only_approved_changed(base, cand, rows, set()) == []
+    b = rdflib.BNode()
+    cand.add((s, note, b))                               # a second blank node with the same content
+    cand.add((b, RDFS.comment, Literal("same")))
+    assert any(d.local_id(str(old)) in f for f in d.only_approved_changed(base, cand, rows, set()))
+    cand = copy(candidate)
+    axiom = rdflib.BNode()                               # an axiom that no named subject points at
+    cand.add((axiom, RDF.type, OWL.AllDisjointClasses))
+    assert any("blank-nodes" in f for f in d.only_approved_changed(baseline, cand, rows, set()))
+
+
+def test_v3_tells_loops_to_different_blank_nodes_apart(baseline, rows):
+    def chain(back_to):
+        g = rdflib.Graph()
+        s = URIRef("https://example.org/thing")
+        b = [rdflib.BNode() for _ in range(3)]
+        g.add((s, RDFS.seeAlso, b[0]))
+        g.add((b[0], RDFS.seeAlso, b[1]))
+        g.add((b[1], RDFS.seeAlso, b[2]))
+        g.add((b[2], RDFS.seeAlso, b[back_to]))
+        return d._statements(g, s, {})
+    assert chain(0) != chain(1)
+    g = rdflib.Graph()
+    b = rdflib.BNode()
+    g.add((URIRef("https://example.org/x"), RDFS.seeAlso, b))
+    g.add((b, RDFS.seeAlso, b))
+    assert d._statements(g, URIRef("https://example.org/x"), {}) == {
+        (RDFS.seeAlso, ("_:", frozenset({(RDFS.seeAlso, ("_:cycle", 1))})))}
+
+
+@pytest.mark.parametrize("value", [Literal("3.0", datatype=rdflib.XSD.decimal), Literal("1", datatype=rdflib.XSD.boolean),
+                                   Literal("3"), rdflib.BNode("123")])
+def test_a_level_must_be_an_integer_literal(value):
+    assert d._whole(value) is None
+    assert d._whole(Literal(3)) == 3
+
+
+def test_v4_takes_no_level_from_a_concept_with_a_good_and_a_bad_one(candidate):
+    g = copy(candidate)
+    s = some_process(g, 3)
+    g.add((s, d.DSBP.taxonomyLevel, Literal("three")))
+    assert d.level(g, s) is None
+    assert any("not a whole number" in f for f in d.structure(g) if d.local_id(str(s)) in f)
+
+
+def test_v6_needs_the_access_date_written_as_a_date(baseline, rows, candidate):
+    facts = [(p, "last week" if p == d.DSBP.accessDate else o) for p, o in FULL]
+    g = _sourced(candidate, URIRef("https://example.org/standard"), facts)
+    assert any("access date" in f for f in d.evidence(baseline, g, rows))
+    g = _sourced(candidate, URIRef("https://example.org/standard"),
+                 [(p, o) for p, o in FULL if p != d.DSBP.accessDate] +
+                 [(d.DSBP.accessDate, Literal("2026-11-27", datatype=rdflib.XSD.date))])
+    assert d.evidence(baseline, g, rows) == []
