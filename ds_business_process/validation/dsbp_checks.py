@@ -141,9 +141,9 @@ def baseline_untouched(releases: Path = RELEASES, listed: dict[str, str] | None 
         for name, want in files.items():
             f = m.parent / name
             if not f.exists():
-                fails.append(f"V1: {f.relative_to(releases)} is listed in its manifest and missing")
+                fails.append(f"V1: {f.relative_to(releases).as_posix()} is listed in its manifest and missing")
             elif hashlib.sha256(f.read_bytes()).hexdigest() != want:
-                fails.append(f"V1: {f.relative_to(releases)} differs from its manifest hash")
+                fails.append(f"V1: {f.relative_to(releases).as_posix()} differs from its manifest hash")
     return fails
 
 
@@ -489,7 +489,12 @@ def logic(candidate: rdflib.Graph) -> list[str]:
         g.serialize(nt, format="nt", encoding="utf-8")
         world = owlready2.World()
         try:
-            onto = world.get_ontology(nt.as_uri()).load()
+            # Load from an open file: owlready2 cannot open a file: URI with a drive letter on Windows.
+            with open(nt, "rb") as f:
+                onto = world.get_ontology("https://w3id.org/ds-bp/v8-candidate/").load(fileobj=f, format="ntriples")
+        except Exception as e:  # noqa: BLE001 - a file the loader cannot read is a failure, not a crash
+            return [f"V8: the candidate could not be loaded for the reasoner ({type(e).__name__}: {e})"]
+        try:
             with onto:
                 owlready2.sync_reasoner_hermit(world, infer_property_values=False, debug=0)
         except owlready2.OwlReadyInconsistentOntologyError:
