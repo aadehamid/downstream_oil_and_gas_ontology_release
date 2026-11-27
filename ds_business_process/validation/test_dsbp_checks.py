@@ -1005,3 +1005,45 @@ def test_v6_needs_the_access_date_written_as_a_date(baseline, rows, candidate):
                  [(p, o) for p, o in FULL if p != d.DSBP.accessDate] +
                  [(d.DSBP.accessDate, Literal("2026-11-27", datatype=rdflib.XSD.date))])
     assert d.evidence(baseline, g, rows) == []
+
+
+def test_v5_exempts_a_cited_iri_only_where_it_is_cited(tmp_path):
+    terms = tmp_path / "terms.csv"
+    terms.write_text("term,case_sensitive,kind,why\nMarathon,no,company,test\nMPC,yes,company,test\n", encoding="utf-8")
+    none = tmp_path / "none.csv"
+    s, src = URIRef(d.NEW_PROC + "DSBP-P-000001"), URIRef("https://www.marathonpetroleum.com/Investors/")
+    g = rdflib.Graph()
+    g.add((s, DCTERMS.source, src))
+    g.add((src, DCTERMS.title, Literal("Investors")))
+    assert d.company_neutral(g, terms, none) == []
+    g.add((s, RDFS.seeAlso, src))                                 # the same IRI, used outside the citation
+    assert any("the IRI" in f for f in d.company_neutral(g, terms, none))
+    g = rdflib.Graph()
+    minted = URIRef("https://w3id.org/mpc/ontology/source/a-filing")
+    g.add((s, DCTERMS.source, minted))                            # the predecessor's own name for a source
+    assert any("w3id.org/mpc" in f for f in d.company_neutral(g, terms, none))
+
+
+def test_v6_refuses_an_access_date_that_is_not_on_the_calendar(baseline, rows, candidate):
+    facts = [(p, "2026-02-31" if p == d.DSBP.accessDate else o) for p, o in FULL]
+    g = _sourced(candidate, URIRef("https://example.org/standard"), facts)
+    assert any("access date" in f for f in d.evidence(baseline, g, rows))
+
+
+def test_v3_compares_detached_blank_node_loops_and_skips_empty_ones(baseline, rows, candidate):
+    def loop(g, text):
+        a, b = rdflib.BNode(), rdflib.BNode()
+        g.add((a, RDFS.seeAlso, b))
+        g.add((b, RDFS.seeAlso, a))
+        g.add((a, RDFS.comment, Literal(text)))
+    base, cand = copy(baseline), copy(candidate)
+    loop(base, "same")
+    loop(cand, "same")
+    assert d.only_approved_changed(base, cand, rows, set()) == []
+    cand = copy(candidate)
+    loop(cand, "edited")
+    assert any("blank-nodes" in f for f in d.only_approved_changed(base, cand, rows, set()))
+    cand = copy(candidate)
+    note = URIRef("https://example.org/ignoredOnly")
+    cand.add((rdflib.BNode(), note, Literal("x")))
+    assert d.only_approved_changed(baseline, cand, rows, set(), frozenset({note})) == []

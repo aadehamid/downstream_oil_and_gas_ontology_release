@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import datetime
 import hashlib
 import json
 import re
@@ -278,9 +279,41 @@ def _others(g: rdflib.Graph, mapping: dict[str, str], ignore: frozenset) -> dict
         stmts = _statements(g, s, mapping, ignore)
         if stmts:
             out[_same_predicate(s)] = stmts
+    # Blank nodes no named subject reaches: those nothing points at, and one node of each detached loop.
+    reached, todo = set(), [o for s in g.subjects() if isinstance(s, URIRef) for o in g.objects(s, None)
+                            if isinstance(o, rdflib.BNode)]
+    while todo:
+        b = todo.pop()
+        if b not in reached:
+            reached.add(b)
+            todo += [o for o in g.objects(b, None) if isinstance(o, rdflib.BNode)]
+    loose = sorted({x for x in g.subjects() if isinstance(x, rdflib.BNode)} - reached, key=str)
+    roots = [b for b in loose if (None, None, b) not in g]
+    covered = set(roots)
+    for b in roots:
+        todo = [b]
+        while todo:
+            x = todo.pop()
+            for o in g.objects(x, None):
+                if isinstance(o, rdflib.BNode) and o not in covered:
+                    covered.add(o)
+                    todo.append(o)
     counts: dict = {}
-    for b in {x for x in g.subjects() if isinstance(x, rdflib.BNode) and (None, None, x) not in g}:
+    for b in roots:
         key = frozenset(_statements(g, b, mapping, ignore))
+        if key:
+            counts[key] = counts.get(key, 0) + 1
+    for b in loose:  # a detached loop has no first node: it is read from each of its nodes, as one group
+        if b in covered:
+            continue
+        group, todo = set(), [b]
+        while todo:
+            x = todo.pop()
+            if x not in group:
+                group.add(x)
+                todo += [o for o in g.objects(x, None) if isinstance(o, rdflib.BNode)]
+        covered |= group
+        key = ("_:loop", frozenset(frozenset(_statements(g, x, mapping, ignore)) for x in group))
         counts[key] = counts.get(key, 0) + 1
     if counts:
         out[UNREFERENCED] = {(k, n) for k, n in counts.items()}
@@ -469,28 +502,36 @@ def company_neutral(candidate: rdflib.Graph, terms_path: Path = TERMS, allowed_p
     fails = []
     # IRIs, in every position. A cited source's own IRI, and an IRI given as its identifier, may name the company that
     # published it, such as a peer's filing, but never a company-built system.
-    cited = sources | {o for s in sources for o in candidate.objects(s, DCTERMS.identifier) if isinstance(o, URIRef)}
-    for iri in sorted({x for t in candidate for x in t if isinstance(x, URIRef)}, key=str):
-        for term, _, kind in terms:
-            if kind == "company" and iri in cited:
+    # The exemption holds only in those places: the object of dcterms:source, the subject of the source's own record,
+    # and a URIRef given as its identifier; never for an IRI this project or its predecessor minted.
+    record = (DCTERMS.title, DCTERMS.description, DCTERMS.publisher, DCTERMS.identifier, DCTERMS.hasVersion,
+              DCTERMS.issued, DSBP.accessDate)
+    seen = set()
+    for s, p, o in sorted(candidate, key=lambda x: (str(x[0]), str(x[1]), str(x[2]))):
+        for iri, cited in ((s, s in sources and p in record), (p, False),
+                           (o, p == DCTERMS.source or (s in sources and p == DCTERMS.identifier))):
+            if not isinstance(iri, URIRef):
                 continue
-            if _iri_names(str(iri), term):
+            cited = cited and not str(iri).lower().replace("http://", "https://", 1).startswith(MINTED)
+            for term, _, kind in terms:
+                if (kind == "company" and cited) or (iri, term) in seen or not _iri_names(str(iri), term):
+                    continue
+                seen.add((iri, term))
                 fails.append(f"V5: the IRI {iri} contains {term!r}")
     for s, prop, o in sorted(candidate, key=lambda x: (str(x[0]), str(x[1]), str(x[2]))):
         if not isinstance(o, Literal):
             continue
         text = str(o)
-        own_record = s in sources and prop in (DCTERMS.title, DCTERMS.description, DCTERMS.publisher, DCTERMS.identifier)
+        citation = s in sources and prop in (DCTERMS.title, DCTERMS.description, DCTERMS.publisher, DCTERMS.identifier)
         hit = TRACE_CODE.search(text)
-        if hit is None and not own_record and prop != SKOS.example:
+        if hit is None and not citation and prop != SKOS.example:
             hit = TRACE_FILE.search(WEB_ADDRESS.sub(" ", text))
         if hit:
             fails.append(f"V5: {local_id(str(s))} {prop.n3(candidate.namespace_manager)} carries the working "
                          f"trace {hit.group(0)!r}, which a reader outside the predecessor cannot follow")
         for rx in allowed:
             text = rx.sub(" ", text)
-        # A cited source's own words and address: a peer's filing may name the peer (DSBP-DEC-0002).
-        citation = s in sources and prop in (DCTERMS.title, DCTERMS.description, DCTERMS.publisher, DCTERMS.identifier)
+        # A cited source's own words and address (citation, above): a peer's filing may name the peer (DSBP-DEC-0002).
         for term, rx, kind in terms:
             if kind == "company" and (prop == SKOS.example or citation):
                 continue
@@ -510,6 +551,17 @@ def _is_url(x) -> bool:
     return low.startswith(("http://", "https://")) and not low.replace("http://", "https://", 1).startswith(MINTED)
 
 
+def _is_date(text: str) -> bool:
+    """A real calendar date written YYYY-MM-DD: 2026-02-31 is not one."""
+    if not ISO_DATE.fullmatch(text):
+        return False
+    try:
+        datetime.date.fromisoformat(text)
+    except ValueError:
+        return False
+    return True
+
+
 def _public(g: rdflib.Graph, src: URIRef) -> list[str]:
     """What a source lacks to count as public evidence. The URL is a dcterms:identifier that is a web address, or
     else the source's own IRI; an IRI this project or its predecessor minted is not a place a reader can go."""
@@ -525,7 +577,7 @@ def _public(g: rdflib.Graph, src: URIRef) -> list[str]:
         missing.append("URL")
     if not _filled(g, src, DCTERMS.hasVersion) and not _filled(g, src, DCTERMS.issued):
         missing.append("version or issue date")
-    if not any(ISO_DATE.fullmatch(str(o).strip()) for o in g.objects(src, DSBP.accessDate)):
+    if not any(_is_date(str(o).strip()) for o in g.objects(src, DSBP.accessDate)):
         missing.append("access date (as a date, such as 2026-11-27)")
     return missing
 
