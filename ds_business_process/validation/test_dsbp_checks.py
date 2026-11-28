@@ -85,6 +85,8 @@ def test_baseline_has_the_recorded_shape(baseline):
 
 
 def test_v1_passes_on_the_real_releases():
+    # Pinned (scripts/pinned-tests.txt): it asks whether 1.2's releases are still as shipped, so it fails, as it should,
+    # in a tree where the runner has cut a correction release. The tests above check V1 itself.
     assert d.baseline_untouched() == []
 
 
@@ -315,17 +317,19 @@ def test_cli_exits_non_zero_on_the_identity_candidate_because_of_v5(rows, candid
         w.writerows(rows)
     c = tmp_path / "candidate.ttl"
     candidate.serialize(c, format="turtle")
-    assert d.main(["--candidate", str(c), "--map", str(m), "--skip", "V8", "V9"]) == 1
+    # V1 reads this tree's releases, not the candidate, and a cut tree fails it (see the pinned test above), so it is
+    # skipped here: this test is about the candidate's checks.
+    assert d.main(["--candidate", str(c), "--map", str(m), "--skip", "V1", "V8", "V9"]) == 1
     out = capsys.readouterr().out
     assert "V5: FAIL" in out and "V2: pass" in out and "V3: pass" in out and "V7: pass" in out
     # V5 alone makes it fail: with V4 skipped too it still fails, and with V5 skipped as well it passes.
-    assert d.main(["--candidate", str(c), "--map", str(m), "--skip", "V4", "V8", "V9"]) == 1
+    assert d.main(["--candidate", str(c), "--map", str(m), "--skip", "V1", "V4", "V8", "V9"]) == 1
     out = capsys.readouterr().out
     assert [line.split(":")[0] for line in out.splitlines() if ": FAIL" in line] == ["V5"]
-    assert d.main(["--candidate", str(c), "--map", str(m), "--skip", "V4", "V5", "V8", "V9"]) == 0
+    assert d.main(["--candidate", str(c), "--map", str(m), "--skip", "V1", "V4", "V5", "V8", "V9"]) == 0
     capsys.readouterr()
     # V9 is not built, so it fails unless it is skipped: an unbuilt check never reads as a pass.
-    assert d.main(["--candidate", str(c), "--map", str(m), "--skip", "V4", "V5", "V8"]) == 1
+    assert d.main(["--candidate", str(c), "--map", str(m), "--skip", "V1", "V4", "V5", "V8"]) == 1
     assert "V9: FAIL" in capsys.readouterr().out
     capsys.readouterr()
     with pytest.raises(FileNotFoundError):
