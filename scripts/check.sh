@@ -103,7 +103,7 @@ run uv run -q --no-project --with pytest==9.2.0 --with rdflib==7.6.0 --with pysh
   python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcutdir "$ROOT" ds_business_process/validation/test_dsbp_checks.py \
   ds_business_process/batches/B3-structure/test_check_expected.py \
   ds_business_process/validation/test_dsbp_graph.py
-# The consistency graph of the DS_Business_Process documents (DSBP-DEC-0050). It reports where they disagree, and
+# The consistency graph of the DS_Business_Process documents (DSBP-DEC-0051). It reports where they disagree, and
 # stays report-only, so its findings print without failing this script, until they are fixed or settled.
 run "$PYTHON" ds_business_process/validation/dsbp_graph.py summary
 echo "--- $PYTHON ds_business_process/validation/dsbp_graph.py check (report-only)"

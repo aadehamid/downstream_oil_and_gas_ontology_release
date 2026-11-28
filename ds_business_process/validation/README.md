@@ -55,7 +55,7 @@ Renamed to the new IDs and otherwise unchanged (the tests' identity candidate), 
 
 ## The consistency graph: do the documents agree?
 
-V1 to V9 test the ontology. `dsbp_graph.py` tests the documents around it (DSBP-DEC-0050). It reads the decision register, the competency questions, B3's change file, the skill-gap register, every other text file of the build outside this folder, and the Step 4 facts, joins what they state into one graph, and reports where they disagree. It rebuilds the graph on every run, so it never drifts from the files. It started from the `consistency-graph` skill's template (personal-agent-skills, `skills/engineering/consistency-graph/`).
+V1 to V9 test the ontology. `dsbp_graph.py` tests the documents around it (DSBP-DEC-0051). It reads the decision register, the competency questions, B3's change file, the skill-gap register, every other text file of the build outside this folder, and the Step 4 facts, joins what they state into one graph, and reports where they disagree. It rebuilds the graph on every run, so it never drifts from the files. It started from the `consistency-graph` skill's template (personal-agent-skills, `skills/engineering/consistency-graph/`).
 
 | What it checks | Kind of finding |
 |---|---|

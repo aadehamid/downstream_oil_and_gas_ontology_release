@@ -292,7 +292,7 @@ def main(argv=None):
 # ----------------------------------------------------------------------------
 # PROJECT: DS_Business_Process. The documents of the build (decision register,
 # goal, build status, foundations, registers, batches) and the data files they
-# describe. Design: DSBP-DEC-0050. Each check names its kind in the skill's
+# describe. Design: DSBP-DEC-0051. Each check names its kind in the skill's
 # check catalog.
 # ----------------------------------------------------------------------------
 

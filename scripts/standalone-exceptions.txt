@@ -13,6 +13,7 @@ business_architecture/domain/kpi-store-decisions/answers/2026-11-11-kpi-store-1.
 business_architecture/ontology/build/output/step3-taxonomy.ttl :: reference-number :: #31 :: 2 :: ontology content, changed only through a cut; the intake note names an earlier change by its number
 business_architecture/ontology/releases/core/2.4.0/core.jsonld :: reference-number :: #31 :: 2 :: a released package never changes; the intake note names an earlier change by its number
 business_architecture/ontology/releases/core/2.4.0/core.ttl :: reference-number :: #31 :: 2 :: a released package never changes; the intake note names an earlier change by its number
+ds_business_process/ontology/core/core.ttl :: reference-number :: #31 :: 2 :: ontology content, written only by a batch script (DSBP-DEC-0050); the intake note 1.2 carries names an earlier change by its number, and stays until a batch rewrites 1.2's editorial notes
 business_architecture/ontology/releases/data-product/1.2.0/CHANGELOG.md :: other-release :: Share release :: 1 :: a released package never changes; its changelog names the release this one was cut from
 business_architecture/ontology/releases/data-product/CHANGELOG.md :: other-release :: Share release :: 1 :: the changelog a released package holds a copy of; the two must stay equal
 business_architecture/ontology/releases/integration/2.5.0/CHANGELOG.md :: other-release :: Share release :: 1 :: a released package never changes; its changelog names the release this one was cut from
@@ -47,4 +48,4 @@ skills/ontology-to-lpg/templates/run-config.json :: home-path :: ~/.config/neo4j
 skills/ontology-to-lpg/templates/run-config.json :: home-path :: ~/.config/neo4j/target.env :: 1 :: the skill template's example env file for the copy's target
 business_architecture/ontology/projection/skill-run/test_skill_run.py :: home-path :: ~/ :: 1 :: the test pins that the run configuration's two default paths start under the home folder, which the driver expands
 business_architecture/domain/kpi-store-decisions/answers/2026-11-23-kpi-store-1.2-changes.md :: reference-number :: #75 :: 1 :: the answers file records, word for word, the question the owner was asked, which named the issue
-scripts/DOC-SNIPPETS.md :: session :: .claude/ :: 3 :: the table of blocks no test runs names the shared-memory skill's link under .claude/ (DSBP-DEC-0050); the memory files and these rows leave the tree at the DS_Business_Process release cut
+scripts/DOC-SNIPPETS.md :: session :: .claude/ :: 3 :: the table of blocks no test runs names the shared-memory skill's link under .claude/ (DSBP-DEC-0051); the memory files and these rows leave the tree at the DS_Business_Process release cut
