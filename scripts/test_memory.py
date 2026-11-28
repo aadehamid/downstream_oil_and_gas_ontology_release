@@ -42,6 +42,12 @@ SLOT = "pump-101/owner"
 BASH = shutil.which("bash") or "bash"
 
 
+def same_path(path):
+    # One spelling of a path for comparing: on Windows, git and the script
+    # print C:/Users/..., and Python writes C:\Users\....
+    return os.path.normcase(os.path.normpath(path))
+
+
 def posix(path):
     # A Windows path with forward slashes, which Git Bash and sh both read.
     return path.replace("\\", "/")
@@ -129,19 +135,20 @@ class WithoutRelate(Base):
         tree = os.path.join(self.tmp.name, "tree")
         subprocess.run(git + ["worktree", "add", "-q", tree], env=git_env(), check=True)
         tree_script = os.path.join(tree, "scripts", "memory.sh")
-        paths = {self.run_memory("path", script=s, env=git_env()).stdout.strip()
+        paths = {same_path(self.run_memory("path", script=s, env=git_env()).stdout.strip())
                  for s in (main_script, tree_script)}
-        self.assertEqual(paths, {os.path.join(os.path.realpath(repo), ".relate-memory")})
+        self.assertEqual(paths, {same_path(os.path.join(os.path.realpath(repo), ".relate-memory"))})
 
     def test_git_dir_in_the_environment_is_ignored(self):
         repo, script, _ = make_repo(self.tmp.name, "repo")
         other, _, _ = make_repo(self.tmp.name, "other")
-        expected = os.path.join(os.path.realpath(repo), ".relate-memory") + "\n"
+        expected = same_path(os.path.join(os.path.realpath(repo), ".relate-memory"))
         for git_dir in (".git", os.path.join(other, ".git")):
             with self.subTest(git_dir):
                 env = dict(git_env(), GIT_DIR=git_dir, GIT_WORK_TREE=other)
                 p = self.run_memory("path", script=script, env=env)
-                self.assertEqual((p.returncode, p.stdout), (0, expected), p.stderr)
+                self.assertEqual((p.returncode, p.stdout.endswith("\n"), same_path(p.stdout.strip())),
+                                 (0, True, expected), p.stderr)
 
     def test_store_path_outside_git_fails(self):
         script = copy_script(os.path.join(self.tmp.name, "loose"))
