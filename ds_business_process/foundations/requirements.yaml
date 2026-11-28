@@ -19,7 +19,7 @@ inputs:
     note: "GOAL.md, approved by the owner (DSBP-DEC-0014), and the Phase 1 report."
   competency_questions:
     status: thin
-    note: "1.2 has 55 locked questions, several naming one company's systems. They must be made company-neutral, added to for the industry, and locked again, so Step 1 cannot close."
+    note: "61 of the 70 questions in competency-questions.md are locked (DSBP-DEC-0044), so Step 1 closes on them. Nine are held until their evidence is cited (59, 67 and 70, and the 1.2 assumptions in 20, 22, 41, 42, 43 and 50); until each is locked, no design choice may rest on it and the Step 11 regression does not test it."
   representative_data:
     status: have
     note: "The hierarchy is the 1.2 core process taxonomy (707 concepts), as a seed, reshaped by round 2 decisions DSBP-DEC-0012 and 0016 to 0031. The other 11 modules of 1.2 return as overlays."
@@ -39,27 +39,27 @@ competency_questions:
   - id: CQ1
     question: What are the child processes of process P, and what is its full path from the top?
     priority: must
-    rationale: Carried from 1.2 question 1; the backbone every other question uses.
+    rationale: Carried from 1.2 question 1; the backbone every other question uses. Locked by DSBP-DEC-0044.
     needs: [process hierarchy]
-    status: drafted
+    status: locked
   - id: CQ2
     question: Which measures evaluate process P, and what nature and roles does each have?
     priority: must
-    rationale: Owner's direction to keep every typical measure (DSBP-DEC-0033), classified by one nature and one or more roles (DSBP-DEC-0039).
+    rationale: Owner's direction to keep every typical measure (DSBP-DEC-0033), classified by one nature and one or more roles (DSBP-DEC-0039). Locked by DSBP-DEC-0044.
     needs: [measures, process hierarchy]
-    status: drafted
+    status: locked
   - id: CQ3
-    question: Which generic role is Accountable, Responsible, Consulted or Informed for process P?
+    question: Which role is Accountable, Responsible, Consulted or Informed for process P?
     priority: must
-    rationale: Carried from 1.2 question 3, now at the level of generic roles (DSBP-DEC-0033).
+    rationale: Carried from 1.2 question 3, now at the level of roles, all generic in the reference (DSBP-DEC-0033). Locked by DSBP-DEC-0044.
     needs: [roles and RACI, process hierarchy]
-    status: drafted
+    status: locked
   - id: CQ4
     question: Which system categories support process P, with which off-the-shelf products as examples?
     priority: should
-    rationale: Carried from 1.2 question 6 without company system names (DSBP-DEC-0034).
+    rationale: Carried from 1.2 question 6 without company system names (DSBP-DEC-0034). Locked by DSBP-DEC-0044.
     needs: [system categories, process hierarchy]
-    status: drafted
+    status: locked
 assumptions:
   - id: A1
     text: The base IRI is https://w3id.org/ds-bp/ until the owner approves hosting.
