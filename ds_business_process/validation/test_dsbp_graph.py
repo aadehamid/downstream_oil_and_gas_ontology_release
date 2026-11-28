@@ -231,7 +231,7 @@ class Project(Fixture):
     def test_summary_counts(self):
         self.assertEqual(json.loads(self.cli("summary").stdout), {
             "nodes": {"Change": 4, "Decision": 4, "Document": 6, "PendingPath": 1, "Question": 3, "SkillGap": 2},
-            "links": {"AMENDS": 1, "CITES": 16, "PROMISES": 1, "SUPERSEDED_BY": 1}})
+            "links": {"AMENDED_BY": 1, "AMENDS": 1, "CITES": 16, "PROMISES": 1, "SUPERSEDED_BY": 1}})
 
     def test_short_and_range_citations_expand(self):
         self.assertEqual([i for _, i in dsbp_graph.cited("DSBP-DEC-0012 and 0016 to 0018, 0020")],
@@ -267,6 +267,20 @@ class Project(Fixture):
             ("row has 4 cells, the header 5", dsbp_graph.REGISTER, '| "yes" | 2026-11-25, thread |', "| x |"),
             ("'DSBP-DEC-4' is not a decision ID", dsbp_graph.REGISTER, "| DSBP-DEC-0004 |", "| DSBP-DEC-4 |"),
             ("row has neither a key nor a baseline ID", dsbp_graph.B3_CHANGES, ",CM-3,", ",,"),
+            # Review round 1 (Gemini) cases.
+            ("DSBP-DEC-00045 is not defined by any source", dsbp_graph.BUILD_STATUS, "0001 to 0004)", "0001 to 0004) and DSBP-DEC-00045"),
+            ("does not run upwards", dsbp_graph.BUILD_STATUS, "DSBP-DEC-0001 to 0004", "DSBP-DEC-0004 to 0001"),
+            ("DSBP-DEC-0002 amended by DSBP-DEC-0004, but DSBP-DEC-0004's row does not name DSBP-DEC-0002",
+             dsbp_graph.REGISTER, "| Q4 (amends DSBP-DEC-0002) |", "| Q4 |"),
+            ("DSBP-DEC-0004 amends DSBP-DEC-0002, but DSBP-DEC-0002's row does not name DSBP-DEC-0004",
+             dsbp_graph.REGISTER, " Amended on 2026-11-25 by DSBP-DEC-0004.", " See DSBP-P-0004."),
+            ("is a second row for an ID already used", dsbp_graph.REGISTER, "| DSBP-DEC-0004 | Q4", "| DSBP-DEC-0003 | Q4"),
+            ("points to scripts/gone.sh, which is not in the repository", dsbp_graph.BUILD_STATUS,
+             "registers/decision-register.md", "scripts/gone.sh"),
+            ("points to registers/typo.md, which is not in the repository", dsbp_graph.GOAL,
+             "# Goal", "# Goal\n\nSee `registers/typo.md`."),
+            ("the decision cell 'see above' names no decision", dsbp_graph.B3_CHANGES, "move,DSBP-DEC-0002", "move,see above"),
+            ("skill-gaps.csv:3: row has no id", dsbp_graph.SKILL_GAPS, "SG-02,b", ",b"),
         ]
         for message, rel, old, new in cases:
             with self.subTest(message):
@@ -279,6 +293,33 @@ class Project(Fixture):
                 p = self.cli("check")
                 self.assertEqual(p.returncode, 1)
                 self.assertIn("finding(s)", p.stderr)
+
+    def test_a_date_after_a_citation_is_not_a_decision(self):
+        write(self.root, dsbp_graph.BUILD_STATUS, STATUS + "\nRecorded as DSBP-DEC-0004, 2026-11-28.\n")
+        self.assertEqual(self.findings(), [])
+
+    def test_counts_are_read_only_where_they_speak_of_questions(self):
+        write(self.root, dsbp_graph.BUILD_STATUS, STATUS + "\nOf the reviews, 2 are held.\n1 of the 3 questions is held.\n")
+        self.assertEqual(self.findings(), [])
+
+    def test_a_range_names_each_decision_in_it(self):
+        self.assertTrue(dsbp_graph.names("see DSBP-DEC-0001 to 0005", "DSBP-DEC-0003"))
+        self.assertFalse(dsbp_graph.names("see DSBP-P-0003", "DSBP-DEC-0003"))
+        self.assertTrue(dsbp_graph.names("replacing 0003.", "DSBP-DEC-0003"))
+
+    def test_two_decisions_in_one_b3_cell_are_both_cited(self):
+        write(self.root, dsbp_graph.B3_CHANGES, B3.replace("move,DSBP-DEC-0002", "move,DSBP-DEC-0002 and 0003"))
+        self.assertEqual(self.findings(), [])
+        self.assertIn(("B3:CM-2", "CITES", "DSBP-DEC-0003"), dsbp_graph.build(self.root).edges)
+
+    def test_a_path_into_the_skills_master_copy_is_not_checked(self):
+        write(self.root, dsbp_graph.BUILD_STATUS, STATUS + "\nSee `skills/data/ontology/SKILL.md`.\n")
+        self.assertEqual(self.findings(), [])
+
+    def test_without_git_the_root_is_the_folder_above_ds_business_process(self):
+        start = os.path.join(self.root, "ds_business_process", "validation")
+        os.makedirs(start, exist_ok=True)
+        self.assertEqual(dsbp_graph.repo_root(start), self.root)
 
     def test_a_path_a_done_line_promises_is_pending(self):
         graph = dsbp_graph.build(self.root)

@@ -26,8 +26,11 @@ def repo_root(start):
     path = start
     while not os.path.exists(os.path.join(path, ".git")):
         parent = os.path.dirname(path)
-        if parent == path:
-            return os.path.dirname(start)
+        if parent == path:  # no .git, as in an unpacked copy: the folder above ds_business_process
+            here = start
+            while os.path.basename(here) != "ds_business_process" and os.path.dirname(here) != here:
+                here = os.path.dirname(here)
+            return os.path.dirname(here) if os.path.basename(here) == "ds_business_process" else os.path.dirname(start)
         path = parent
     return path
 
@@ -309,20 +312,30 @@ SKIP_DIRS = {f"{DSBP}/validation"}
 # others (a path inside a cited standard's own files) lead outside on purpose.
 PATH_ROOTS = {"research", "registers", "foundations", "batches", "validation", "migration", "vision", "reviews",
               "tooling", DSBP, "scripts", "business_architecture", "kpi_store", "skills"}
-PATH = re.compile(r"`([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+\.(?:md|csv|py|ttl|yaml|txt|json))`")
-CITE = re.compile(r"DSBP-DEC-(\d{4})((?:(?:,| and|, and| to) \d{4})*)")
+PATH = re.compile(r"`([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+\.(?:md|csv|py|sh|ttl|yaml|txt|json))`")
+CITE = re.compile(r"DSBP-DEC-(\d+)((?:(?:,| and|, and| to) \d{4}(?![\d-]))*)(?![\d-])")
 # Links one decision's row states to another, and the way each reads. A link is stated on the row
 # that holds the phrase; the other row must name it back.
-DECISION_LINKS = [
-    ("AMENDS", re.compile(r"\bamends (DSBP-DEC-\d{4})")),
-    ("REFINES", re.compile(r"\brefines (DSBP-DEC-\d{4})")),
-    ("CONFIRMS", re.compile(r"\bConfirms (DSBP-DEC-\d{4})")),
-    ("SUPERSEDED_BY", re.compile(r"\bSuperseded on \d{4}-\d{2}-\d{2} by (DSBP-DEC-\d{4})")),
-    ("WIDENED_BY", re.compile(r"\bWidened \d{4}-\d{2}-\d{2} [^(]*\((DSBP-DEC-\d{4})\)")),
-]
+_ID = r"(DSBP-DEC-\d{4})(?![\d-])"
+_DATE = r"\d{4}-\d{2}-\d{2}"
+DECISION_LINKS = [(kind, re.compile(pattern, re.I)) for kind, pattern in [
+    ("AMENDS", rf"\bamends {_ID}"),
+    ("AMENDED_BY", rf"\bamended on {_DATE} by {_ID}"),
+    ("REFINES", rf"\brefines {_ID}"),
+    ("REFINED_BY", rf"\brefined on {_DATE} by {_ID}"),
+    ("CONFIRMS", rf"\bconfirms {_ID}"),
+    ("SUPERSEDES", rf"\bsupersedes {_ID}"),
+    ("SUPERSEDED_BY", rf"\bsuperseded on {_DATE} by {_ID}"),
+    ("WIDENED_BY", rf"\bwidened {_DATE} [^().|]*\({_ID}\)"),
+]]
 # Promised counts in prose, read where any document states them.
-CQ_LOCKED = re.compile(r"\b(\d+) of the (\d+) (?:competency )?questions\b")
-CQ_HELD = re.compile(r"\b(\d+) (?:are )?held\b")
+CQ_LOCKED = re.compile(r"\b(\d+) of the (\d+) (?:competency )?questions\b[^.;\n]*?\blocked\b|\b(\d+) of the (\d+) are locked\b")
+CQ_HELD = re.compile(r"\b(\d+) (?:are )?held\b")  # read only on a line about the questions
+# A path into the master copy of the skills (personal-agent-skills), which lives outside this repository;
+# this repository's own copy sits at skills/<name>/ with no group folder.
+MASTER_SKILL_PATHS = tuple(f"skills/{group}/" for group in ("data", "engineering", "planning", "research", "writing"))
+DONE_LINE = re.compile(r"\d+\. ")
+CQ_LINE = re.compile(r"\bquestions?\b", re.I)
 B3_KINDS = re.compile(r"\b(\d+) renames, (\d+) moves, (\d+) exclusions\b[^|]*?\b(\d+) new concepts\b")
 GAP_ROWS = re.compile(r"`registers/skill-gaps\.csv` \((\d+) rows\b")
 FACTS = re.compile(r"\b(\d[\d,]*) Step 4 relationship facts\b")
@@ -355,14 +368,24 @@ def documents(root):
     return sorted(out)
 
 
-def cited(text):
-    """(line number, decision ID) for every decision a text cites, short and range forms included."""
+def cited(text, problems=None, where=""):
+    """(line number, decision ID) for every decision a text cites, short and range forms included.
+    An ID of the wrong length is kept as written, so it is reported as defined by no source; a range
+    that runs backwards is added to problems, when given."""
     out = []
     for no, line in enumerate(text.split("\n"), 1):
         for m in CITE.finditer(line):
-            ids, prev = [int(m.group(1))], None
-            for sep, num in re.findall(r"(,|, and| and| to) (\d{4})", m.group(2)):
+            if len(m.group(1)) != 4:
+                out.append((no, f"DSBP-DEC-{m.group(1)}"))
+                continue
+            ids = [int(m.group(1))]
+            for sep, num in re.findall(r"(,|, and| and| to) (\d{4})(?![\d-])", m.group(2)):
                 n = int(num)
+                if sep == " to" and n <= ids[-1]:
+                    if problems is not None:
+                        problems.append(f"{where}{no}: the range {m.group(0)!r} does not run upwards")
+                    ids.append(n)
+                    continue
                 ids += list(range(ids[-1] + 1, n + 1)) if sep == " to" else [n]
             out += [(no, f"DSBP-DEC-{i:04d}") for i in ids]
     return out
@@ -391,12 +414,17 @@ def read_register(graph):
             if not re.fullmatch(r"DSBP-DEC-\d{4}", ident):
                 graph.problem(f"{REGISTER}:{row['_line']}: {ident!r} is not a decision ID")
                 continue
+            if ident in rows:
+                graph.problem(f"{REGISTER}:{row['_line']}: {ident} is a second row for an ID already used "
+                              f"on line {rows[ident][0]}")
+                continue
             graph.node("Decision", ident, REGISTER, question=row.get("Question"), date=row.get("Date, place"))
             rows[ident] = (row["_line"], " | ".join(row.get(h, "") for h in header))
     for ident, (line, text) in sorted(rows.items()):
         for kind, pattern in DECISION_LINKS:
             for target in pattern.findall(text):
-                graph.link(ident, kind, target, REGISTER)
+                target = target.upper()
+                graph.link(ident, kind, target, f"{REGISTER}:{line}")
                 if target in rows and not names(rows[target][1], ident):
                     graph.problem(f"{REGISTER}:{line}: {ident} {kind.lower().replace('_', ' ')} {target}, "
                                   f"but {target}'s row does not name {ident}")
@@ -404,8 +432,11 @@ def read_register(graph):
 
 
 def names(text, ident):
-    """Whether a text names a decision, in its full or four-digit form."""
-    return bool(re.search(rf"\b(?:DSBP-DEC-)?{ident[-4:]}\b", text))
+    """Whether a text names a decision: cited in full, short or range form, or as its bare four digits
+    standing alone (so not inside another ID such as DSBP-P-0004)."""
+    if ident in {d for _, d in cited(text)}:
+        return True
+    return bool(re.search(rf"(?<![A-Za-z0-9-]){ident[-4:]}(?![\d-])", text))
 
 
 def read_questions(graph):
@@ -433,27 +464,28 @@ def read_documents(graph):
         if text is None:
             continue
         graph.node("Document", rel, rel)
-        for no, ident in cited(text):
+        for no, ident in cited(text, graph.problems, f"{rel}:"):
             graph.link(rel, "CITES", ident, f"{rel}:{no}")
         for no, line in enumerate(text.split("\n"), 1):
             where = f"{rel}:{no}"
             for p in PATH.findall(line):
-                if p.split("/")[0] not in PATH_ROOTS or "personal-agent-skills" in line:
+                if p.split("/")[0] not in PATH_ROOTS or p.startswith(MASTER_SKILL_PATHS):
                     continue
                 here = os.path.dirname(rel)
                 if any(os.path.exists(os.path.join(graph.root, base, p)) for base in (here, DSBP, "")):
                     continue
-                if rel == GOAL:  # a done line promises files a later step makes
+                if rel == GOAL and DONE_LINE.match(line):  # a done line promises files a later step makes
                     graph.node("PendingPath", p, where)
                     graph.link(rel, "PROMISES", p, where)
                 else:
                     graph.problem(f"{where}: points to {p}, which is not in the repository")
             if questions:
-                for locked, total in CQ_LOCKED.findall(line):
+                for m in CQ_LOCKED.finditer(line):
+                    locked, total = (m.group(1), m.group(2)) if m.group(1) else (m.group(3), m.group(4))
                     if (int(locked), int(total)) != (len(questions) - held, len(questions)):
                         graph.problem(f"{where}: says {locked} of {total} questions are locked; "
                                       f"{QUESTIONS} locks {len(questions) - held} of {len(questions)}")
-                for n in CQ_HELD.findall(line):
+                for n in (CQ_HELD.findall(line) if CQ_LINE.search(line) else []):
                     if int(n) != held:
                         graph.problem(f"{where}: says {n} questions are held; {QUESTIONS} holds {held}")
             for m in B3_KINDS.findall(line):
@@ -475,10 +507,18 @@ def build(root):
             graph.problem(f"{B3_CHANGES}:{no}: row has neither a key nor a baseline ID")
             continue
         key = graph.node("Change", f"B3:{ident}", B3_CHANGES, change=row.get("change"))
-        if row.get("decision"):
-            graph.link(key, "CITES", row["decision"], B3_CHANGES)
-    for row in csv_rows(graph, SKILL_GAPS) or []:
-        graph.node("SkillGap", row.get("id") or row.get(next(iter(row))), SKILL_GAPS)
+        cell = (row.get("decision") or "").strip()
+        decisions = [d for _, d in cited(cell, graph.problems, f"{B3_CHANGES}:{no}:")]
+        if cell and not decisions:
+            graph.problem(f"{B3_CHANGES}:{no}: the decision cell {cell!r} names no decision")
+        for decision in decisions:
+            graph.link(key, "CITES", decision, f"{B3_CHANGES}:{no}")
+    for no, row in enumerate(csv_rows(graph, SKILL_GAPS) or [], 2):
+        ident = (row.get("id") or "").strip()
+        if not ident:
+            graph.problem(f"{SKILL_GAPS}:{no}: row has no id")
+            continue
+        graph.node("SkillGap", ident, SKILL_GAPS)
     read_documents(graph)
     return graph
 
