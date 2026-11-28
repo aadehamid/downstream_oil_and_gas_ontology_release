@@ -16,7 +16,6 @@ from pathlib import Path
 
 import pytest
 import rdflib
-import rdflib.compare
 from rdflib import Literal, URIRef
 from rdflib.namespace import DCTERMS, OWL, SKOS
 
@@ -355,25 +354,36 @@ def test_the_definition_review_covers_every_changed_concept(built, expected):
 
 
 
-# The applied batch: the release files are what build_candidate.py makes, so they carry every check above -------
+# The applied batch: the release files are what build_candidate.py writes, byte for byte -------------------------
+# DSBP-DEC-0050: the working core is the output of the last applied batch. When the next batch writes these files,
+# its own test takes over this comparison and this one is retired with it.
 
 RELEASE = HERE.parents[1]
-RELEASE_CORE = RELEASE / "ontology" / "core" / "core.ttl"
-RELEASE_MAP = RELEASE / "migration" / "core-process-map.csv"
-RELEASE_APPROVED = RELEASE / "migration" / "core-b3-approved.txt"
+RELEASE_FILES = {"--out": RELEASE / "ontology" / "core" / "core.ttl",
+                 "--map-out": RELEASE / "migration" / "core-process-map.csv",
+                 "--approved-out": RELEASE / "migration" / "core-b3-approved.txt"}
 
 
-def test_the_release_core_is_the_built_candidate(built):
-    g, _ = built
-    assert rdflib.compare.isomorphic(d.load(RELEASE_CORE), g)
+@pytest.fixture(scope="module")
+def fresh_build(tmp_path_factory):
+    out = tmp_path_factory.mktemp("fresh")
+    paths = {flag: out / path.name for flag, path in RELEASE_FILES.items()}
+    subprocess.run([sys.executable, str(HERE / "build_candidate.py"),
+                    *[x for flag, path in paths.items() for x in (flag, str(path))]], check=True, cwd=HERE)
+    return paths
 
 
-def test_the_release_map_is_the_built_map(built):
-    _, rows = built
-    with RELEASE_MAP.open(newline="", encoding="utf-8") as fh:
-        assert list(csv.DictReader(fh)) == [{k: str(v) for k, v in r.items()} for r in rows]
+@pytest.mark.parametrize("flag", sorted(RELEASE_FILES))
+def test_the_release_file_is_what_the_script_writes(fresh_build, flag):
+    assert RELEASE_FILES[flag].read_bytes() == fresh_build[flag].read_bytes()
+
+
+def test_the_release_map_has_its_columns_and_unix_line_ends():
+    data = RELEASE_FILES["--map-out"].read_bytes()
+    assert data.splitlines()[0] == b"baseline_iri,new_iri,status,note"
+    assert b"\r" not in data
 
 
 def test_the_release_approved_list_is_the_batch_list(baseline, expected, built):
     g, rows = built
-    assert d.read_approved(RELEASE_APPROVED) == ce.approved_ids(baseline, expected, g, rows)
+    assert d.read_approved(RELEASE_FILES["--approved-out"]) == ce.approved_ids(baseline, expected, g, rows)

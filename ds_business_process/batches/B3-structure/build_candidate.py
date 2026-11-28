@@ -121,10 +121,15 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--out", type=Path, required=True, help="where to write the candidate (Turtle)")
     ap.add_argument("--map-out", type=Path, required=True, help="where to write the migration map (CSV)")
+    ap.add_argument("--approved-out", type=Path, help="where to write the batch's approved list for check V3")
     a = ap.parse_args()
-    g, rows = build(d.load(d.BASELINE_CORE), ce.read_expected())
+    baseline, expected = d.load(d.BASELINE_CORE), ce.read_expected()
+    g, rows = build(baseline, expected)
     g.serialize(a.out, format="turtle")
     with a.map_out.open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=["baseline_iri", "new_iri", "status", "note"], lineterminator="\n")
         w.writeheader()
         w.writerows(rows)
+    if a.approved_out:
+        a.approved_out.write_text("".join(f"{x}\n" for x in sorted(ce.approved_ids(baseline, expected, g, rows))),
+                                  encoding="utf-8")
