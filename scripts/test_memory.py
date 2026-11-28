@@ -44,8 +44,10 @@ BASH = shutil.which("bash") or "bash"
 
 def same_path(path):
     # One spelling of a path for comparing: on Windows, git and the script
-    # print C:/Users/..., and Python writes C:\Users\....
-    return os.path.normcase(os.path.normpath(path))
+    # print C:/repo/..., and Python writes C:\repo\.... normcase turns each
+    # slash into a backslash and folds case there, and leaves POSIX paths as
+    # they are.
+    return os.path.normcase(path)
 
 
 def posix(path):
@@ -147,7 +149,7 @@ class WithoutRelate(Base):
             with self.subTest(git_dir):
                 env = dict(git_env(), GIT_DIR=git_dir, GIT_WORK_TREE=other)
                 p = self.run_memory("path", script=script, env=env)
-                self.assertEqual((p.returncode, p.stdout.endswith("\n"), same_path(p.stdout.strip())),
+                self.assertEqual((p.returncode, p.stdout.endswith("\n"), same_path(p.stdout.removesuffix("\n"))),
                                  (0, True, expected), p.stderr)
 
     def test_store_path_outside_git_fails(self):
