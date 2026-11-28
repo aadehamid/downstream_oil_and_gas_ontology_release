@@ -321,8 +321,8 @@ def test_this_trees_exceptions_are_only_for_fixed_content():
 
 def test_this_release_has_45_exceptions():
     # A cut moves a package and adds a line for the new one, so this count is the release's as shipped
-    # (scripts/pinned-tests.txt). The 44th is the working core's line (DSBP-DEC-0050); the memory skill's line makes
-    # 45 until the release cut removes it (DSBP-DEC-0051).
+    # (scripts/pinned-tests.txt). The memory skill's line (DSBP-DEC-0051) makes 45 until the release cut removes it,
+    # which brings the count back to 44.
     assert len(cs.read_exceptions()) == 45
 
 

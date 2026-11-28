@@ -9,7 +9,7 @@ PROJECT_MEMORY_DB, except the path tests, which run a copy of the script in a
 temporary git repository. No test touches the real memory.
 
 WithoutRelate runs everywhere, CI included: help, store paths, episode
-validation and the missing-relate exit. WithRelate needs the relate binary and
+validation, the choice of Python and the missing-relate exit. WithRelate needs the relate binary and
 skips where it is not installed.
 """
 import json
@@ -17,6 +17,7 @@ import os
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -36,6 +37,14 @@ REPO = find_repo(os.path.dirname(os.path.abspath(__file__)))
 HERE = os.path.join(REPO, "scripts")
 MEMORY = os.path.join(HERE, "memory.sh")
 SLOT = "pump-101/owner"
+# The bash on PATH. On Windows a bare "bash" can start WSL's bash.exe from
+# System32, which comes before PATH there.
+BASH = shutil.which("bash") or "bash"
+
+
+def posix(path):
+    # A Windows path with forward slashes, which Git Bash and sh both read.
+    return path.replace("\\", "/")
 
 
 def episode(eid, at, agent, facts, **extra):
@@ -87,7 +96,7 @@ class Base(unittest.TestCase):
         self.tmp.cleanup()
 
     def run_memory(self, *args, stdin=None, script=MEMORY, env=None):
-        return subprocess.run(["bash", script, *args], input=stdin, env=env or self.env,
+        return subprocess.run([BASH, script, *args], input=stdin, env=env or self.env,
                               capture_output=True, text=True, timeout=60)
 
     def rejected(self, payload):
@@ -189,6 +198,61 @@ class WithoutRelate(Base):
                 self.assertIn("is not readable JSON", p.stderr)
                 self.assertNotIn("Traceback", p.stderr)
                 self.assertFalse(os.path.exists(self.db))
+
+    def bin_dir(self, python3_stub=True, python=False):
+        # A folder of fakes: a python3 that fails the way a Windows Store stub
+        # does, and a python that runs this interpreter.
+        path = os.path.join(self.tmp.name, "bin")
+        os.makedirs(path)
+        if python3_stub:
+            self.script(path, "python3", "echo 'Python was not found' >&2\nexit 9")
+        if python:
+            self.script(path, "python", 'exec "%s" "$@"' % posix(sys.executable))
+        return path
+
+    def script(self, folder, name, body):
+        with open(os.path.join(folder, name), "w", newline="\n") as fh:
+            fh.write("#!/bin/sh\n" + body + "\n")
+        os.chmod(os.path.join(folder, name), 0o755)
+
+    def fake_path(self, folder):
+        # PATH is the folder of fakes, then the tools the script needs before
+        # it validates an episode. A tool whose own folder holds a Python is
+        # linked into the fakes' folder, so no real Python is on PATH.
+        parts = [folder]
+        for tool in ("cat", "mktemp", "dirname", "rm"):
+            found = shutil.which(tool, path=os.pathsep.join(("/usr/bin", "/bin"))) or shutil.which(tool)
+            home = os.path.dirname(found)
+            if any(shutil.which(c, path=home) for c in ("python3", "python", "py")):
+                os.symlink(found, os.path.join(folder, tool))
+            elif home not in parts:
+                parts.append(home)
+        return os.pathsep.join(parts)
+
+    def test_a_failing_python3_falls_back_to_python(self):
+        env = dict(self.env, PATH=self.fake_path(self.bin_dir(python=True)))
+        p = self.run_memory("remember", "-", stdin=json.dumps(episode("e1", "2026-11-27T10:00:00Z", "pi", [])), env=env)
+        self.assertEqual(p.returncode, 1, p.stderr)
+        self.assertIn("facts: needs at least one fact", p.stderr)
+        self.assertNotIn("Python was not found", p.stderr)
+
+    def test_memory_python_is_tried_first(self):
+        # This python3 passes the version probe but fails anything else, so
+        # the test fails if the script picks it over $MEMORY_PYTHON.
+        path = self.bin_dir(python3_stub=False)
+        self.script(path, "python3", 'case "$2" in *version_info*) exit 0 ;; esac\necho used-python3 >&2\nexit 9')
+        env = dict(self.env, PATH=self.fake_path(path), MEMORY_PYTHON=posix(sys.executable))
+        p = self.run_memory("remember", "-", stdin=json.dumps(episode("e1", "2026-11-27T10:00:00Z", "pi", [])), env=env)
+        self.assertEqual(p.returncode, 1, p.stderr)
+        self.assertIn("facts: needs at least one fact", p.stderr)
+        self.assertNotIn("used-python3", p.stderr)
+
+    def test_no_usable_python_exits_3(self):
+        env = dict(self.env, PATH=self.fake_path(self.bin_dir()))
+        p = self.run_memory("remember", "-", stdin=json.dumps(episode("e1", "2026-11-27T10:00:00Z", "pi", [])), env=env)
+        self.assertEqual(p.returncode, 3, p.stderr)
+        self.assertIn("needs Python 3.11 or later", p.stderr)
+        self.assertFalse(os.path.exists(self.db))
 
 
 @unittest.skipUnless(shutil.which("relate"), "relate is not installed")
@@ -482,7 +546,7 @@ class WithRelate(Base):
         for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGKILL):
             with self.subTest(sig.name):
                 shutil.rmtree(self.db, ignore_errors=True)
-                proc = subprocess.Popen(["bash", MEMORY, "init"], env=env, start_new_session=True,
+                proc = subprocess.Popen([BASH, MEMORY, "init"], env=env, start_new_session=True,
                                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 time.sleep(1.5)
                 self.assertEqual(len(builds()), 1, "the build folder should exist mid-build")
@@ -504,11 +568,17 @@ class WithRelate(Base):
 
     @staticmethod
     def _group_alive(pgid):
-        try:
-            os.killpg(pgid, 0)
-            return True
-        except ProcessLookupError:
-            return False
+        deadline = time.monotonic() + 1.0
+        while True:
+            try:
+                os.killpg(pgid, 0)
+                return True
+            except ProcessLookupError:
+                return False
+            except PermissionError:
+                if time.monotonic() >= deadline:
+                    return False
+                time.sleep(0.05)
 
     def make_build(self, path, hours_old):
         os.makedirs(path)
@@ -541,7 +611,7 @@ class WithRelate(Base):
     def test_waiters_never_fail_while_another_creates_the_store(self):
         for _ in range(5):
             shutil.rmtree(self.db, ignore_errors=True)
-            procs = [subprocess.Popen(["bash", MEMORY, "init"], env=self.env, stdout=subprocess.DEVNULL,
+            procs = [subprocess.Popen([BASH, MEMORY, "init"], env=self.env, stdout=subprocess.DEVNULL,
                                       stderr=subprocess.PIPE, text=True) for _ in range(6)]
             for proc in procs:
                 _, err = proc.communicate(timeout=60)
@@ -627,7 +697,7 @@ class WithRelate(Base):
             holder.stdin.write("CREATE (:Holder);\n")
             holder.stdin.flush()
             time.sleep(1)
-            writer = subprocess.Popen(["bash", MEMORY, "remember", "-"], stdin=subprocess.PIPE,
+            writer = subprocess.Popen([BASH, MEMORY, "remember", "-"], stdin=subprocess.PIPE,
                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                       env=self.env, text=True)
             writer.stdin.write(json.dumps(episode("e1", "2026-11-27T10:00:00Z", "pi",
@@ -647,7 +717,7 @@ class WithRelate(Base):
     def concurrent(self, payloads):
         procs = []
         for payload in payloads:
-            proc = subprocess.Popen(["bash", MEMORY, "remember", "-"], stdin=subprocess.PIPE,
+            proc = subprocess.Popen([BASH, MEMORY, "remember", "-"], stdin=subprocess.PIPE,
                                     env=self.env, stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE, text=True)
             proc.stdin.write(json.dumps(payload))
