@@ -59,7 +59,7 @@ IDs are given in the order the decisions were recorded, so a decision can carry 
 
 ## Open questions
 
-A question a review raised that a later decision must close. An open question does not undo an approved batch: the concept it names is applied as that batch says, and the text the question is about is not final until the question closes.
+A question a review raised that a later decision must close. An open question does not undo an approved batch: the concept it names is applied as that batch says, and the matter the question raises is not final until the question closes.
 
 | ID | Question | Raised | Closed by |
 |---|---|---|---|
