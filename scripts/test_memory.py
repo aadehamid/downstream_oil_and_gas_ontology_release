@@ -64,7 +64,7 @@ def fact(fid, text, slot=SLOT, **extra):
 
 def git_env():
     return {k: v for k, v in os.environ.items()
-            if not k.startswith("GIT_") and k != "PROJECT_MEMORY_DB"}
+            if not k.startswith("GIT_") and k not in ("PROJECT_MEMORY_DB", "MEMORY_PYTHON")}
 
 
 def copy_script(dest):
@@ -217,14 +217,18 @@ class WithoutRelate(Base):
 
     def fake_path(self, folder):
         # PATH is the folder of fakes, then the tools the script needs before
-        # it validates an episode. A tool whose own folder holds a Python is
-        # linked into the fakes' folder, so no real Python is on PATH.
+        # it validates an episode. A tool whose own folder holds a Python gets
+        # a wrapper in the fakes' folder instead, so no real Python is on PATH.
         parts = [folder]
+        beside_bash = os.path.join(os.path.dirname(os.path.dirname(BASH)), "usr", "bin")
         for tool in ("cat", "mktemp", "dirname", "rm"):
-            found = shutil.which(tool, path=os.pathsep.join(("/usr/bin", "/bin"))) or shutil.which(tool)
+            found = (shutil.which(tool, path=os.pathsep.join(("/usr/bin", "/bin")))
+                     or shutil.which(tool) or shutil.which(tool, path=beside_bash))
+            if not found:
+                self.fail(f"no {tool} on PATH or in {beside_bash}")
             home = os.path.dirname(found)
             if any(shutil.which(c, path=home) for c in ("python3", "python", "py")):
-                os.symlink(found, os.path.join(folder, tool))
+                self.script(folder, tool, 'exec "%s" "$@"' % posix(found))
             elif home not in parts:
                 parts.append(home)
         return os.pathsep.join(parts)
