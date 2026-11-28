@@ -458,7 +458,9 @@ def read_documents(graph):
     """What each document cites, points to and promises."""
     questions = [n for n in graph.nodes.values() if n["label"] == "Question"]
     held = sum(1 for n in questions if n["props"].get("status") == "held")
-    b3 = csv_rows(graph, B3_CHANGES) or []
+    has_questions = os.path.exists(os.path.join(graph.root, QUESTIONS))  # an empty file still checks the counts
+    b3_rows = csv_rows(graph, B3_CHANGES)
+    b3 = b3_rows or []
     kinds = {k: sum(1 for r in b3 if r.get("change") == k) for k in ("rename", "move", "exclude", "new")}
     facts = None
     if os.path.exists(os.path.join(graph.root, STEP4_FACTS)):
@@ -483,7 +485,7 @@ def read_documents(graph):
                     graph.link(rel, "PROMISES", p, where)
                 else:
                     graph.problem(f"{where}: points to {p}, which is not in the repository")
-            if questions and CQ_LINE.search(line):
+            if has_questions and CQ_LINE.search(line):
                 for m in CQ_LOCKED.finditer(line):
                     locked, total = next((m.group(i), m.group(i + 1)) for i in (1, 3, 5) if m.group(i))
                     if (int(locked), int(total)) != (len(questions) - held, len(questions)):
@@ -494,7 +496,7 @@ def read_documents(graph):
                         graph.problem(f"{where}: says {n} questions are held; {QUESTIONS} holds {held}")
             for m in B3_KINDS.findall(line):
                 said = dict(zip(("rename", "move", "exclude", "new"), map(int, m)))
-                if b3 and said != kinds:
+                if b3_rows is not None and said != kinds:
                     graph.problem(f"{where}: says B3 has {said}; {B3_CHANGES} has {kinds}")
             for n in FACTS.findall(line):
                 if facts is not None and int(n.replace(",", "")) != facts:

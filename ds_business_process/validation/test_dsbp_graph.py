@@ -320,6 +320,18 @@ class Project(Fixture):
         self.assertEqual(len(found), 1, found)
         self.assertTrue(found[0].startswith(f"{dsbp_graph.B3_CHANGES}:3: "), found)
 
+    def test_an_emptied_source_still_has_its_counts_checked(self):
+        # Bugbot on afdcdfd: a source that parses to no rows must not switch off the count it backs.
+        for rel, text, message in ((dsbp_graph.B3_CHANGES, B3.split("\n")[0] + "\n", "says B3 has"),
+                                   (dsbp_graph.QUESTIONS, "# Questions\n", "questions are locked")):
+            with self.subTest(rel):
+                self.tearDown()
+                self.setUp()
+                write(self.root, rel, text)
+                # The questions file states its own count, so the claim that outlives it is made in BUILD-STATUS.
+                write(self.root, dsbp_graph.BUILD_STATUS, STATUS + "\n2 of the 3 questions are locked.\n")
+                self.assertTrue(any(message in f for f in self.findings()), self.findings())
+
     def test_a_range_names_each_decision_in_it(self):
         self.assertTrue(dsbp_graph.names("see DSBP-DEC-0001 to 0005", "DSBP-DEC-0003"))
         self.assertFalse(dsbp_graph.names("see DSBP-P-0003", "DSBP-DEC-0003"))
