@@ -194,6 +194,7 @@ run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcu
   scripts/test_epm_facts.py \
   scripts/test_modules_guide.py \
   scripts/test_published_figures.py \
+  scripts/test_memory.py \
   scripts/test_rehearsal_workspace.py \
   scripts/test_skill_guides.py
 # The bundled skills' own checks, each with the dependencies its own check names (the list is written at the cut from
