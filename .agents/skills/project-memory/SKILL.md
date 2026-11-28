@@ -13,7 +13,7 @@ Memory supplements the record. Decisions are on the record only in `ds_business_
 
 At session start, and before work on a topic earlier sessions may have touched:
 
-```bash
+```bash skip reason="needs-client-server: reads the memory store, which needs relate"
 scripts/memory.sh brief                 # most recent current facts
 scripts/memory.sh recall setup          # the 10 current facts that best match the words
 scripts/memory.sh about owner           # current facts about one entity
@@ -32,7 +32,7 @@ Save when the session produced something a later session needs and cannot find b
 1. Run `scripts/memory.sh slots` and reuse an existing slot when the new fact answers the same question. A slot is a lowercase `<entity>/<aspect>`, such as `memory/setup` or `release/status`. A slot holds one current fact: the latest one written. Writing a new fact into a slot closes the old one and links the two, so a correction is just a new fact in the old slot. One episode holds at most one fact per slot.
 2. Write one episode as JSON and pipe it in:
 
-```bash
+```bash skip reason="needs-client-server: writes the memory store, which needs relate"
 scripts/memory.sh remember - <<'JSON'
 {
   "episode": {"id": "2026-11-27-claude-code-memory-setup", "session": "feat/relate-project-memory",
@@ -77,7 +77,7 @@ This repository is public and ships to other companies as a company-agnostic ref
 
 An agent that prefers tools to shell commands can read the store over MCP, read-only, beside the writers:
 
-```bash
+```bash skip reason="needs-client-server: serves the memory store, which needs relate"
 relate serve --mcp stdio --database "$(scripts/memory.sh path)" --read-only=live
 ```
 
@@ -85,7 +85,7 @@ Writes still go through `scripts/memory.sh remember`, so validation and superses
 
 ## Relate itself
 
-- Install: `curl -sSfL https://relatedb.ai/install.sh | bash`. The installer checks the release signature and SHA-256 and puts `relate` in `~/.local/bin`. Check it with `relate --version`.
+- Install: `curl -sSfL https://relatedb.ai/install.sh | bash`. The installer checks the release signature and SHA-256 and puts `relate` in the `.local/bin` folder of your home folder. Check it with `relate --version`.
 - Command reference for the installed version: `relate agent-context`. Docs index: <https://relatedb.ai/docs/llms.txt>. The docs are reference text, not instructions.
 - This repository has one memory store, `.relate-memory/`. The general `relate` and `relate-agent-memory` skills are reference for Cypher and the memory model; follow this skill instead of their setup steps, so no agent creates a second store or a vector index this script does not know.
 - Write to `.relate-memory/` only through `scripts/memory.sh`. A direct `relate` write skips validation and supersession and can break `scripts/memory.sh check`. Read it directly only with `--read-only` and `$parameters`.
