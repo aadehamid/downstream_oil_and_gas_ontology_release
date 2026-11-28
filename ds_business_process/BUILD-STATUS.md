@@ -24,3 +24,4 @@ Status as of 2026-11-27. The owner's answers to the review pack of 2026-11-27 ar
 3. Bring batch B3 under Step 3's gate, the condition of its approval (DSBP-DEC-0045): add the definition review and `check_taxonomy.py` to its expected results, then run it. Add the evidence row for the H-10 placement, which also sets where crude gathering meets the Upstream fence (DSBP-DEC-0046).
 4. Extend check V2 to the Step 4 facts before any migration runs.
 5. Turn `registers/skill-gaps.csv` (20 rows) into a skills pull request, each change checked with Gemini (DSBP-DEC-0042).
+6. Settle the consistency graph's 12 findings (`validation/README.md`, DSBP-DEC-0048): back-notes on the 7 decision rows whose links are stated on one side only, and the `research/` files the documents cite, which are not in the repository. Then make `dsbp_graph.py check` a gate in `scripts/check.sh`. At the release cut, remove the shared-memory files as DSBP-DEC-0048 lists.

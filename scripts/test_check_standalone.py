@@ -309,7 +309,10 @@ def test_this_trees_exceptions_are_only_for_fixed_content():
                "viewer/index.html", "horoi_viewer/index.html",
                # the test job signs in to a rehearsal workspace with a secret of the repository's settings; the
                # release holds no token, and the workflow holds only the secret's name
-               ".github/workflows/check.yml")
+               ".github/workflows/check.yml",
+               # the shared agent memory's .claude/ files, allowed during the DS_Business_Process build and removed
+               # with these two lines at its release cut (DSBP-DEC-0048)
+               "scripts/DOC-SNIPPETS.md", "ds_business_process/registers/decision-register.md")
     assert [path for path, _, _ in cs.read_exceptions() if not path.startswith(allowed)] == []
 
 
