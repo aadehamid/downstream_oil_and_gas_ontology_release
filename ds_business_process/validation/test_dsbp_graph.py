@@ -305,6 +305,7 @@ class Project(Fixture):
     def test_the_build_documents_forms_of_the_locked_count_are_read(self):
         # Review round 2 (Gemini): the register's and BUILD-STATUS's own wordings, each with a wrong count.
         for line in ("1 of the 3 questions in `foundations/competency-questions.md` are locked.",
+                     "1 of the 3 questions in competency-questions.md are locked.",
                      "Q-CQ by 0044, which locks 1 of the 3 questions in `foundations/competency-questions.md`"):
             with self.subTest(line):
                 write(self.root, dsbp_graph.BUILD_STATUS, STATUS + "\n" + line + "\n")
@@ -331,6 +332,11 @@ class Project(Fixture):
                 # The questions file states its own count, so the claim that outlives it is made in BUILD-STATUS.
                 write(self.root, dsbp_graph.BUILD_STATUS, STATUS + "\n2 of the 3 questions are locked.\n")
                 self.assertTrue(any(message in f for f in self.findings()), self.findings())
+
+    def test_a_path_into_the_ontology_folder_is_checked(self):
+        # Bugbot on 8dc043e: the working core lives under ontology/.
+        write(self.root, dsbp_graph.BUILD_STATUS, STATUS + "\nSee `ontology/core/gone.ttl`.\n")
+        self.assertTrue(any("points to ontology/core/gone.ttl" in f for f in self.findings()), self.findings())
 
     def test_a_range_names_each_decision_in_it(self):
         self.assertTrue(dsbp_graph.names("see DSBP-DEC-0001 to 0005", "DSBP-DEC-0003"))

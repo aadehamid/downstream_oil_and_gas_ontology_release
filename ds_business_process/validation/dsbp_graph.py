@@ -311,7 +311,7 @@ SKIP_DIRS = {f"{DSBP}/validation"}
 # A cited path is checked only when it starts in a folder of this repository or of the build;
 # others (a path inside a cited standard's own files) lead outside on purpose.
 PATH_ROOTS = {"research", "registers", "foundations", "batches", "validation", "migration", "vision", "reviews",
-              "tooling", DSBP, "scripts", "business_architecture", "kpi_store", "skills"}
+              "tooling", "ontology", DSBP, "scripts", "business_architecture", "kpi_store", "skills"}
 PATH = re.compile(r"`([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+\.(?:md|csv|py|sh|ttl|yaml|txt|json))`")
 CITE = re.compile(r"DSBP-DEC-(\d+)((?:(?:,| and|, and| to) \d{4}(?![\d-]))*)(?![\d-])")
 # Links one decision's row states to another, and the way each reads. A link is stated on the row
@@ -332,7 +332,7 @@ DECISION_LINKS = [(kind, re.compile(pattern, re.I)) for kind, pattern in [
 # "locks 61 of the 70 questions", "61 of the 70 questions in `file.md` are locked", "61 of the 70 are locked";
 # read only on a line about the questions
 CQ_LOCKED = re.compile(r"\blocks (\d+) of the (\d+) (?:competency )?questions\b"
-                       r"|\b(\d+) of the (\d+) (?:competency )?questions\b(?:[^.;`\n]|`[^`\n]+`)*?\blocked\b"
+                       r"|\b(\d+) of the (\d+) (?:competency )?questions\b(?:[^.;`\n]|\.(?=\w)|`[^`\n]+`)*?\blocked\b"
                        r"|\b(\d+) of the (\d+) are locked\b")
 CQ_HELD = re.compile(r"\b(\d+) (?:are )?held\b")  # read only on a line about the questions
 # A path into the master copy of the skills (personal-agent-skills), which lives outside this repository;
