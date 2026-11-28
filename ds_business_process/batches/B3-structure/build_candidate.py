@@ -7,7 +7,8 @@ candidate and fails a wrong one.
 ID rule (DSBP-DEC-0031): every baseline process that lives on gets DSBP-P-<n>, numbered 1 to 707 in the sorted
 order of its 1.2 IRI (an excluded concept keeps its number unused, so the numbers have gaps); each new concept
 gets the next number after 707, in the file's order. Old codes (the IRI's local part
-and skos:notation) go to the migration map only.
+and the old skos:notation) go to the migration map only; each concept's one skos:notation
+becomes its new ID (DSBP-DEC-0048).
 """
 from __future__ import annotations
 
