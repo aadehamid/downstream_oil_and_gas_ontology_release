@@ -86,7 +86,7 @@ def test_baseline_has_the_recorded_shape(baseline):
 
 def test_v1_passes_on_the_real_releases():
     # Pinned (scripts/pinned-tests.txt): it asks whether 1.2's releases are still as shipped, so it fails, as it should,
-    # in a tree where the runner has cut a correction release. The tests above check V1 itself.
+    # in a tree where the runner has cut a correction release. The V1 tests below build their own releases and still run.
     assert d.baseline_untouched() == []
 
 
@@ -334,6 +334,29 @@ def test_cli_exits_non_zero_on_the_identity_candidate_because_of_v5(rows, candid
     capsys.readouterr()
     with pytest.raises(FileNotFoundError):
         d.main(["--candidate", str(c), "--map", str(m), "--approved", str(tmp_path / "typo.txt")])
+
+
+def test_cli_reports_v1_and_fails_on_it(rows, candidate, tmp_path, capsys, monkeypatch):
+    # The CLI tests above skip V1, which reads this tree's releases. This one stands in a result for it, so the CLI's
+    # handling of V1 is tested on a shipped tree and a cut tree alike.
+    m = tmp_path / "map.csv"
+    with m.open("w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=["baseline_iri", "new_iri", "status", "note"])
+        w.writeheader()
+        w.writerows(rows)
+    c = tmp_path / "candidate.ttl"
+    candidate.serialize(c, format="turtle")
+    others = ["--skip", "V4", "V5", "V8", "V9"]
+    monkeypatch.setattr(d, "baseline_untouched", lambda: [])
+    assert d.main(["--candidate", str(c), "--map", str(m)] + others) == 0
+    assert "V1: pass" in capsys.readouterr().out
+    monkeypatch.setattr(d, "baseline_untouched", lambda: ["V1: manifest x/1.0.0/manifest.json is in the recorded list and missing"])
+    assert d.main(["--candidate", str(c), "--map", str(m)] + others) == 1
+    out = capsys.readouterr().out
+    assert [line.split(":")[0] for line in out.splitlines() if ": FAIL" in line] == ["V1"]
+    assert "x/1.0.0/manifest.json" in out
+    assert d.main(["--candidate", str(c), "--map", str(m), "--skip", "V1", "V4", "V5", "V8", "V9"]) == 0
+    capsys.readouterr()
 
 
 # Fixes from the independent review, rounds 1 and 2, each shown failing on a broken copy ---------------------------------
