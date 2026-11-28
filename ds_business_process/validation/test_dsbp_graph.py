@@ -302,6 +302,24 @@ class Project(Fixture):
         write(self.root, dsbp_graph.BUILD_STATUS, STATUS + "\nOf the reviews, 2 are held.\n1 of the 3 questions is held.\n")
         self.assertEqual(self.findings(), [])
 
+    def test_the_build_documents_forms_of_the_locked_count_are_read(self):
+        # Review round 2 (Gemini): the register's and BUILD-STATUS's own wordings, each with a wrong count.
+        for line in ("1 of the 3 questions in `foundations/competency-questions.md` are locked.",
+                     "Q-CQ by 0044, which locks 1 of the 3 questions in `foundations/competency-questions.md`"):
+            with self.subTest(line):
+                write(self.root, dsbp_graph.BUILD_STATUS, STATUS + "\n" + line + "\n")
+                self.assertTrue(any("says 1 of 3 questions are locked" in f for f in self.findings()), self.findings())
+
+    def test_a_locked_count_off_a_questions_line_is_not_read(self):
+        write(self.root, dsbp_graph.BUILD_STATUS, STATUS + "\nOf the gates, 4 of the 10 are locked.\n")
+        self.assertEqual(self.findings(), [])
+
+    def test_a_reversed_range_in_b3_is_reported_once_with_its_line(self):
+        write(self.root, dsbp_graph.B3_CHANGES, B3.replace("move,DSBP-DEC-0002", "move,DSBP-DEC-0004 to 0002"))
+        found = [f for f in self.findings() if "does not run upwards" in f]
+        self.assertEqual(len(found), 1, found)
+        self.assertTrue(found[0].startswith(f"{dsbp_graph.B3_CHANGES}:3: "), found)
+
     def test_a_range_names_each_decision_in_it(self):
         self.assertTrue(dsbp_graph.names("see DSBP-DEC-0001 to 0005", "DSBP-DEC-0003"))
         self.assertFalse(dsbp_graph.names("see DSBP-P-0003", "DSBP-DEC-0003"))
@@ -368,7 +386,7 @@ class Queries(Fixture):
         rows = dsbp_graph.run_relate(dsbp_graph.build(self.root),
                                      "MATCH (:Change {id: 'B3:CM-2'})-[r:CITES]->(d) RETURN d.id AS d, r.sources AS s", {})
         self.assertEqual([json.loads(r) for r in rows],
-                         [{"d": "DSBP-DEC-0002", "s": [dsbp_graph.B3_CHANGES]}])
+                         [{"d": "DSBP-DEC-0002", "s": [f"{dsbp_graph.B3_CHANGES}:3"]}])
 
 
 if __name__ == "__main__":

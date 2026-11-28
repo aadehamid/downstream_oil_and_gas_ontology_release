@@ -329,7 +329,11 @@ DECISION_LINKS = [(kind, re.compile(pattern, re.I)) for kind, pattern in [
     ("WIDENED_BY", rf"\bwidened {_DATE} [^().|]*\({_ID}\)"),
 ]]
 # Promised counts in prose, read where any document states them.
-CQ_LOCKED = re.compile(r"\b(\d+) of the (\d+) (?:competency )?questions\b[^.;\n]*?\blocked\b|\b(\d+) of the (\d+) are locked\b")
+# "locks 61 of the 70 questions", "61 of the 70 questions in `file.md` are locked", "61 of the 70 are locked";
+# read only on a line about the questions
+CQ_LOCKED = re.compile(r"\blocks (\d+) of the (\d+) (?:competency )?questions\b"
+                       r"|\b(\d+) of the (\d+) (?:competency )?questions\b(?:[^.;`\n]|`[^`\n]+`)*?\blocked\b"
+                       r"|\b(\d+) of the (\d+) are locked\b")
 CQ_HELD = re.compile(r"\b(\d+) (?:are )?held\b")  # read only on a line about the questions
 # A path into the master copy of the skills (personal-agent-skills), which lives outside this repository;
 # this repository's own copy sits at skills/<name>/ with no group folder.
@@ -479,13 +483,13 @@ def read_documents(graph):
                     graph.link(rel, "PROMISES", p, where)
                 else:
                     graph.problem(f"{where}: points to {p}, which is not in the repository")
-            if questions:
+            if questions and CQ_LINE.search(line):
                 for m in CQ_LOCKED.finditer(line):
-                    locked, total = (m.group(1), m.group(2)) if m.group(1) else (m.group(3), m.group(4))
+                    locked, total = next((m.group(i), m.group(i + 1)) for i in (1, 3, 5) if m.group(i))
                     if (int(locked), int(total)) != (len(questions) - held, len(questions)):
                         graph.problem(f"{where}: says {locked} of {total} questions are locked; "
                                       f"{QUESTIONS} locks {len(questions) - held} of {len(questions)}")
-                for n in (CQ_HELD.findall(line) if CQ_LINE.search(line) else []):
+                for n in CQ_HELD.findall(line):
                     if int(n) != held:
                         graph.problem(f"{where}: says {n} questions are held; {QUESTIONS} holds {held}")
             for m in B3_KINDS.findall(line):
@@ -508,7 +512,7 @@ def build(root):
             continue
         key = graph.node("Change", f"B3:{ident}", B3_CHANGES, change=row.get("change"))
         cell = (row.get("decision") or "").strip()
-        decisions = [d for _, d in cited(cell, graph.problems, f"{B3_CHANGES}:{no}:")]
+        decisions = [d for _, d in cited(cell)]  # a reversed range is reported once, by read_documents
         if cell and not decisions:
             graph.problem(f"{B3_CHANGES}:{no}: the decision cell {cell!r} names no decision")
         for decision in decisions:
