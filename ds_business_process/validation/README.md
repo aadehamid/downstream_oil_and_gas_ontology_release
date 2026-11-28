@@ -52,3 +52,20 @@ Renamed to the new IDs and otherwise unchanged (the tests' identity candidate), 
 - V5 finds only the terms in the register. A company reference written another way passes.
 - V7 compares direct statements between processes, in the core namespace and `skos:related`.
 - V3 compares a blank node through the named subject that points at it. Blank nodes that no named subject reaches are compared as a group, by content and count, a detached loop of them included; one whose every statement is on an ignored property is left out. A blank node that two statements share is compared as two copies of its content, so sharing one blank node and using two equal ones look the same.
+
+## The consistency graph: do the documents agree?
+
+V1 to V9 test the ontology. `dsbp_graph.py` tests the documents around it (DSBP-DEC-0048). It reads the decision register, the competency questions, B3's change file, the skill-gap register, every other text file of the build outside this folder, and the Step 4 facts, joins what they state into one graph, and reports where they disagree. It rebuilds the graph on every run, so it never drifts from the files. It started from the `consistency-graph` skill's template (personal-agent-skills, `skills/engineering/consistency-graph/`).
+
+| What it checks | Kind of finding |
+|---|---|
+| Every decision a file cites, in full, short or range form, is a row of the register | Link to nothing |
+| When a row says it amends, refines, confirms, supersedes or widens another, the other row names it back | Link stated on one side only |
+| Every B3 change names its decision | Required link missing |
+| The counts the documents promise match their sources: locked and held questions, B3's changes by kind, skill-gap rows, Step 4 facts | Count that does not add up |
+| Every repository path a file cites exists. A path a done line of `../GOAL.md` names, for a file a later step makes, is pending, not a finding | Link to nothing |
+| A row or ID the parser cannot read is reported, never skipped | Unreadable source form |
+
+Its commands: `check` prints the findings and exits 1 when there are any; `summary` counts nodes and links; `impact ID` lists what is linked to a decision, question, change or file within three hops, so run it before you change what the ID names; `query 'CYPHER'` runs read-only Cypher; `export` prints the graph as Cypher. `check`, `summary` and `export` need only Python. `impact` and `query` need `relate`.
+
+`scripts/check.sh` runs its tests, and runs `check` report-only: it prints the findings and does not fail. On 2026-11-28 it found 12: 7 links between decisions stated on one side only, and 5 citations of files in `research/`, which is not in the repository. Once those are fixed or settled, `check` becomes a gate.

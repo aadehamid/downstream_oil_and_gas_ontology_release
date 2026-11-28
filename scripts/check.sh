@@ -101,7 +101,13 @@ CORE_BUILDER="$(cd $ONT/release && "$PYTHON" -c 'import newest; print(newest.cor
 # without Java, the V8 tests that run the reasoner are skipped (pytest counts them as skipped), and the rest still run.
 run uv run -q --no-project --with pytest==9.2.0 --with rdflib==7.6.0 --with pyshacl==0.40.2 --with owlready2==0.51 \
   python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcutdir "$ROOT" ds_business_process/validation/test_dsbp_checks.py \
-  ds_business_process/batches/B3-structure/test_check_expected.py
+  ds_business_process/batches/B3-structure/test_check_expected.py \
+  ds_business_process/validation/test_dsbp_graph.py
+# The consistency graph of the DS_Business_Process documents (DSBP-DEC-0048). It reports where they disagree, and
+# stays report-only, so its findings print without failing this script, until they are fixed or settled.
+run "$PYTHON" ds_business_process/validation/dsbp_graph.py summary
+echo "--- $PYTHON ds_business_process/validation/dsbp_graph.py check (report-only)"
+"$PYTHON" ds_business_process/validation/dsbp_graph.py check || true
 # Every test file of the ontology and the scripts, in parallel (test_check_script.py checks the list is complete).
 run with_deps python -m pytest -q -p no:cacheprovider --rootdir "$ROOT" --confcutdir "$ROOT" -n "${CHECK_WORKERS:-auto}" --maxprocesses=8 --dist load \
   business_architecture/business_process/test_business_process.py \
