@@ -312,14 +312,18 @@ def test_this_trees_exceptions_are_only_for_fixed_content():
                "ds_business_process/ontology/core/core.ttl",
                # the test job signs in to a rehearsal workspace with a secret of the repository's settings; the
                # release holds no token, and the workflow holds only the secret's name
-               ".github/workflows/check.yml")
+               ".github/workflows/check.yml",
+               # the shared agent memory's .claude/ files, allowed during the DS_Business_Process build and removed
+               # with this line at its release cut (DSBP-DEC-0051)
+               "scripts/DOC-SNIPPETS.md")
     assert [path for path, _, _ in cs.read_exceptions() if not path.startswith(allowed)] == []
 
 
-def test_this_release_has_44_exceptions():
+def test_this_release_has_45_exceptions():
     # A cut moves a package and adds a line for the new one, so this count is the release's as shipped
-    # (scripts/pinned-tests.txt). The 44th is the working core's line (DSBP-DEC-0050).
-    assert len(cs.read_exceptions()) == 44
+    # (scripts/pinned-tests.txt). The memory skill's line (DSBP-DEC-0051) makes 45 until the release cut removes it,
+    # which brings the count back to 44.
+    assert len(cs.read_exceptions()) == 45
 
 
 def test_with_git_only_tracked_files_are_read(tmp_path):

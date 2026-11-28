@@ -4,3 +4,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+
+# Shared agent memory (scripts/memory.sh). Git ignores it; Dropbox may sync it.
+.relate-memory/
+.relate-memory.*
