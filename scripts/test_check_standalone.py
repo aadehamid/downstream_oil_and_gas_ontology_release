@@ -316,10 +316,10 @@ def test_this_trees_exceptions_are_only_for_fixed_content():
     assert [path for path, _, _ in cs.read_exceptions() if not path.startswith(allowed)] == []
 
 
-def test_this_release_has_43_exceptions():
+def test_this_release_has_44_exceptions():
     # A cut moves a package and adds a line for the new one, so this count is the release's as shipped
-    # (scripts/pinned-tests.txt).
-    assert len(cs.read_exceptions()) == 43
+    # (scripts/pinned-tests.txt). The 44th is the working core's line (DSBP-DEC-0050).
+    assert len(cs.read_exceptions()) == 44
 
 
 def test_with_git_only_tracked_files_are_read(tmp_path):

@@ -132,4 +132,4 @@ if __name__ == "__main__":
         w.writerows(rows)
     if a.approved_out:
         a.approved_out.write_text("".join(f"{x}\n" for x in sorted(ce.approved_ids(baseline, expected, g, rows))),
-                                  encoding="utf-8")
+                                  encoding="utf-8", newline="\n")
