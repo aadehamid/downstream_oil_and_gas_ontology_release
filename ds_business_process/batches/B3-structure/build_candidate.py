@@ -7,7 +7,8 @@ candidate and fails a wrong one.
 ID rule (DSBP-DEC-0031): every baseline process that lives on gets DSBP-P-<n>, numbered 1 to 707 in the sorted
 order of its 1.2 IRI (an excluded concept keeps its number unused, so the numbers have gaps); each new concept
 gets the next number after 707, in the file's order. Old codes (the IRI's local part
-and skos:notation) go to the migration map only.
+and the old skos:notation) go to the migration map only; each concept's one skos:notation
+becomes its new ID (DSBP-DEC-0048).
 """
 from __future__ import annotations
 
@@ -106,6 +107,12 @@ def build(baseline: rdflib.Graph, expected: list[dict]) -> tuple[rdflib.Graph, l
         s, lv = todo.pop()
         g.set((s, d.CORE.taxonomyLevel, Literal(lv)))
         todo += [(c, lv + 1) for c in g.subjects(SKOS.broader, s) if c in procs]
+    # The notation is the neutral ID, never the old code (DSBP-DEC-0031 and 0048). This follows the
+    # generalization exception to Step 2, rule 2 in the master copy of the ontology skill
+    # (personal-agent-skills, skills/data/ontology/references/identity-taxonomy.md); this repo's
+    # older copy under skills/ontology/ keeps the source's local IDs and lacks that exception.
+    for s in procs:
+        g.set((s, SKOS.notation, Literal(d.local_id(str(s)))))
     return g, rows
 
 
