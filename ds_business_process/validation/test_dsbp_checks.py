@@ -523,6 +523,22 @@ def test_read_approved_refuses_a_missing_file(tmp_path):
         d.read_approved(tmp_path / "missing.txt")
 
 
+def test_an_approved_iri_approves_that_iri_only(tmp_path):
+    # A full IRI on the list stays whole: shortened to its last segment, it would approve every IRI ending in
+    # "final" or "index.php?id=L", such as a source page's.
+    approved = tmp_path / "approved.txt"
+    approved.write_text("CM-1-1\nhttps://www.iso.org/standard/65694.html\n", encoding="utf-8")
+    assert d.read_approved(approved) == {"CM-1-1", "https://www.iso.org/standard/65694.html"}
+    old = rdflib.Graph()
+    new = rdflib.Graph()
+    for iri in ("https://www.iso.org/standard/65694.html", "https://example.org/other/65694.html"):
+        new.add((URIRef(iri), DCTERMS.title, Literal("A source", lang="en")))
+    fails = d.only_approved_changed(old, new, [], d.read_approved(approved))
+    assert [f for f in fails if "65694" in f] == [
+        "V3: https://example.org/other/65694.html is not a process, changed, and is not on the approved list "
+        "(0 statements removed, 1 added)"]
+
+
 def test_cli_passes_removals_and_shapes_through(baseline, rows, candidate, tmp_path, capsys):
     procs = d.processes(baseline)
     s, p, o = sorted((s, p, o) for s, p, o in baseline

@@ -5,6 +5,9 @@
   except V4's two known missing definitions. V5 (company terms) and V6 (public sources on the 8 new definitions)
   are not run here: both still fail, and batches B4 and B5 fix them.
 * The batch check fails on candidates that get exactly one change wrong.
+
+B3's script no longer writes the release files: batch B5 builds on its result, and B5's test compares the
+committed files with a fresh run (DSBP-DEC-0050, DSBP-DEC-0053).
 """
 from __future__ import annotations
 
@@ -351,39 +354,3 @@ def test_the_definition_review_covers_every_changed_concept(built, expected):
         elif r["change"] == "new":
             changed.add(d.local_id(str(labels[r["new_label"]])))
     assert changed and reviewed == changed
-
-
-
-# The applied batch: the release files are what build_candidate.py writes, byte for byte -------------------------
-# DSBP-DEC-0050: the working core is the output of the last applied batch. When the next batch writes these files,
-# its own test takes over this comparison and this one is retired with it.
-
-RELEASE = HERE.parents[1]
-RELEASE_FILES = {"--out": RELEASE / "ontology" / "core" / "core.ttl",
-                 "--map-out": RELEASE / "migration" / "core-process-map.csv",
-                 "--approved-out": RELEASE / "migration" / "core-b3-approved.txt"}
-
-
-@pytest.fixture(scope="module")
-def fresh_build(tmp_path_factory):
-    out = tmp_path_factory.mktemp("fresh")
-    paths = {flag: out / path.name for flag, path in RELEASE_FILES.items()}
-    subprocess.run([sys.executable, str(HERE / "build_candidate.py"),
-                    *[x for flag, path in paths.items() for x in (flag, str(path))]], check=True, cwd=HERE)
-    return paths
-
-
-@pytest.mark.parametrize("flag", sorted(RELEASE_FILES))
-def test_the_release_file_is_what_the_script_writes(fresh_build, flag):
-    assert RELEASE_FILES[flag].read_bytes() == fresh_build[flag].read_bytes()
-
-
-def test_the_release_map_has_its_columns_and_unix_line_ends():
-    data = RELEASE_FILES["--map-out"].read_bytes()
-    assert data.splitlines()[0] == b"baseline_iri,new_iri,status,note"
-    assert b"\r" not in data
-
-
-def test_the_release_approved_list_is_the_batch_list(baseline, expected, built):
-    g, rows = built
-    assert d.read_approved(RELEASE_FILES["--approved-out"]) == ce.approved_ids(baseline, expected, g, rows)

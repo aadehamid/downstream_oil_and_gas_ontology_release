@@ -40,7 +40,7 @@ A definition cites its source with `dcterms:source`. The source is its own subje
 
 V6 accepts an access date written as a real calendar date, `YYYY-MM-DD`, typed as `xsd:date` or not; any other text, such as "last week" or 2026-02-31, is no access date.
 
-Dublin Core has no term for the day a reader opened a source, so this project defines `dsbp:accessDate`. The release's ontology header declares it as an `owl:DatatypeProperty` with the range `xsd:date` when the first sourced batch (B5) lands. V6 reads it under that IRI only.
+Dublin Core has no term for the day a reader opened a source, so this project defines `dsbp:accessDate`. Batch B5, the first sourced batch, declares it as an `owl:AnnotationProperty`, as Dublin Core's own terms are in an OWL file, and its value is an `xsd:date`. It has no declared range: HermiT, the reasoner check V8 runs, accepts only the OWL 2 datatype map, which has no `xsd:date` (DSBP-DEC-0053). V6 reads it under that IRI only.
 
 ## What the baseline gives today
 

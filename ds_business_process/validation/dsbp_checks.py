@@ -146,13 +146,14 @@ def old_to_new(rows: list[dict]) -> dict[str, str]:
 
 def read_approved(path: Path | None) -> set[str]:
     """No path means nothing is approved. A path that does not exist is an error, not an empty list: a mistyped
-    name must not turn the check into one that passes everything or nothing by surprise."""
+    name must not turn the check into one that passes everything or nothing by surprise. A line that is a full IRI
+    (with "://") stays whole and approves that IRI only, such as a cited source's page; any other line is an ID."""
     if path is None:
         return set()
     if not path.exists():
         raise FileNotFoundError(f"approved list {path} does not exist")
-    return {local_id(x.strip()) for x in path.read_text(encoding="utf-8").splitlines()
-            if x.strip() and not x.strip().startswith("#")}
+    lines = [x.strip() for x in path.read_text(encoding="utf-8").splitlines()]
+    return {x if "://" in x else local_id(x) for x in lines if x and not x.startswith("#")}
 
 
 # V1 ---------------------------------------------------------------------------------------------------------------

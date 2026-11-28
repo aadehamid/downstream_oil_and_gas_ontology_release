@@ -1,10 +1,18 @@
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix ns1: <https://w3id.org/mpc/ontology/modules/core/> .
+@prefix ns2: <https://w3id.org/ds-bp/ontology/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ns2:accessDate a owl:AnnotationProperty ;
+    rdfs:label "access date"@en ;
+    dcterms:source <https://www.iso.org/standard/72642.html> ;
+    rdfs:isDefinedBy <https://w3id.org/ds-bp/ontology> ;
+    skos:definition "The day on which a cited source was last consulted and found to hold what it is cited for."@en ;
+    skos:scopeNote "ISO 690 calls it the date of citation. Dublin Core has no term for it, so this ontology defines one. Its value is an xsd:date, such as 2026-11-28 (check V6)."@en .
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000012> a skos:Concept ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000011> ;
@@ -776,13 +784,6 @@ Out of scope: Enterprise master-data policy and governance standards (Data Gover
     ns1:plannedOutput "Targets to Distribution Schedule"@en ;
     ns1:taxonomyLevel 4 .
 
-<https://w3id.org/ds-bp/ontology/process/DSBP-P-000103> a skos:Concept ;
-    skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000100> ;
-    skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
-    skos:notation "DSBP-P-000103" ;
-    skos:prefLabel "Process Business Renewal Request"@en ;
-    ns1:taxonomyLevel 5 .
-
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000114> a skos:Concept ;
     dcterms:provenance "Added in core 2.2.0 from the process map at commit 8259354, by the decision of 2026-10-19 (process-map gap: movement losses and gains); definition and scope note from the map's description (the decision of 2026-10-22)."@en ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000109> ;
@@ -920,10 +921,16 @@ Out of scope: Enterprise master-data policy and governance standards (Data Gover
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000144> a skos:Concept ;
     dcterms:provenance "Parked by PTC-001 (step3c-parked-tree-changes.md), 2026-09-18. the subject matter expert accepted Option A: this node leaves Refinery Planning. It cannot be moved yet — verified against downstream_process_map.json, the destination domain has no decomposition at all, so there is no parent to move it to. Set to blocked rather than left pending so it is not read as queued for definition. Revived by the Step 3d tree pass, not by a definition batch. Destination undecided: Finance or a future strategy domain. the subject matter expert ruled out creating a Strategy L1, since the ten L1 definitions are approved baseline and changing the L1 set is a charter-level decision. Step 3d PTC-001 tree pass (2026-09-21): stays blocked under PTC-001-B — enterprise strategy-ownership decision (options: Corporate Planning within Finance / Corporate Strategy / executive cross-functional governance). Parent Commercial Development tombstoned (owl:deprecated) pending PTC-001-B resolution."@en ;
+    dcterms:source <https://www.hfsinclair.com/about-us/leadership/default.aspx>,
+        <https://www.sec.gov/Archives/edgar/data/1510295/000151029526000009/mpc-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/1534504/000153450426000010/pbf-20251231.htm> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000710> ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0026)."@en ;
+    skos:definition "Develop, and take to approval, the company's multi-year strategic business plan: its goals and priorities, the businesses and assets it will grow, keep or leave, and the capital and resources needed to deliver them."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000144" ;
     skos:prefLabel "Develop Strategic Business Plan"@en ;
+    skos:scopeNote "Covers the plan and its periodic refresh. Setting the vision and finding and closing new business opportunities sit in its parent, Strategy & Business Development."@en ;
     ns1:holdReason "Parked by PTC-001 (step3c-parked-tree-changes.md), 2026-09-18. the subject matter expert accepted Option A: this node leaves Refinery Planning. It cannot be moved yet — verified against downstream_process_map.json, the destination domain has no decomposition at all, so there is no parent to move it to. Set to blocked rather than left pending so it is not read as queued for definition. Revived by the Step 3d tree pass, not by a definition batch. Destination undecided: Finance or a future strategy domain. the subject matter expert ruled out creating a Strategy L1, since the ten L1 definitions are approved baseline and changing the L1 set is a charter-level decision. Step 3d PTC-001 tree pass (2026-09-21): stays blocked under PTC-001-B — enterprise strategy-ownership decision (options: Corporate Planning within Finance / Corporate Strategy / executive cross-functional governance). Parent Commercial Development tombstoned (owl:deprecated) pending PTC-001-B resolution."@en ;
     ns1:holdStatus <https://w3id.org/mpc/ontology/modules/core/hold-status/implementation-hold> ;
     ns1:taxonomyLevel 2 .
@@ -960,9 +967,10 @@ Out of scope: enterprise strategic direction, portfolio choices, and capital all
     dcterms:source <https://w3id.org/mpc/ontology/source/src-apqc-pcf-001>,
         <https://w3id.org/mpc/ontology/source/src-epa-er-001>,
         <https://w3id.org/mpc/ontology/source/src-osha-psm-001>,
-        <https://w3id.org/mpc/ontology/source/step3c-definition-workbook> ;
+        <https://www.iso.org/standard/65694.html> ;
     skos:altLabel "Manage Site Specific Business Risk"@en ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000711> ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0027)."@en ;
     skos:definition "Identify, assess, document, prioritize, coordinate treatment of, monitor, and escalate site-specific business risks affecting refinery objectives, production reliability, cost, schedule, asset availability, supply, product disposition, and local stakeholder commitments, in accordance with enterprise risk policy, delegated authority, and specialist-control requirements."@en ;
     skos:editorialNote "Source note (SRC-APQC-PCF-001): structural consistency reference (discovery/comparison only)"@en,
         "Source note (SRC-EPA-ER-001): emergency-response boundary: release and emergency response sit with EHS"@en,
@@ -972,7 +980,8 @@ Out of scope: enterprise strategic direction, portfolio choices, and capital all
     skos:prefLabel "Coordinate Site Business Risk Management"@en ;
     skos:scopeNote """Coordinates site-level risk ownership, treatment, monitoring, and escalation; it does not set enterprise risk appetite or policy, replace EHS / process-safety management, administer insurance, approve capital, manage financial-market risk, conduct Internal Audit, or own Legal, Compliance, Security, Cybersecurity, or business-continuity authorities. The process is event-driven when new or changed risks, incidents, material threshold breaches, or escalation conditions arise; it also performs periodic monitoring and review of existing site-risk ownership, treatment plans, and status.
 In scope: identification, assessment, documentation, and prioritization of site-specific business risks | coordination of risk ownership and treatment | risk monitoring and escalation
-Out of scope: enterprise risk appetite and policy | EHS and process-safety management | insurance administration | capital approval | financial-market risk | Internal Audit | Legal, Compliance, Security, Cybersecurity, and business-continuity authorities | operation of refinery units"""@en ;
+Out of scope: enterprise risk appetite and policy | EHS and process-safety management | insurance administration | capital approval | financial-market risk | Internal Audit | Legal, Compliance, Security, Cybersecurity, and business-continuity authorities | operation of refinery units"""@en,
+        "It is part of Enterprise Risk Management, which sets the common way risks are assessed and reported across the company."@en ;
     ns1:apqcMappingDecision <https://w3id.org/mpc/ontology/modules/core/apqc-mapping-decision/no-source> ;
     ns1:businessDomain <https://w3id.org/mpc/ontology/modules/core/business-domain/refining> ;
     ns1:conceptKind <https://w3id.org/mpc/ontology/modules/core/concept-kind/process> ;
@@ -2088,26 +2097,33 @@ Out of scope: Leases, capital projects, construction, landlord contracts, buildi
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000681> a skos:Concept ;
     dcterms:references <https://w3id.org/mpc/ontology/source/apqc-pcf-7.2.2/element/18948> ;
-    dcterms:source <https://w3id.org/mpc/ontology/source/step3c-definition-workbook> ;
+    dcterms:source <https://www.sec.gov/Archives/edgar/data/1035002/000162828026011499/vlo-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/1510295/000151029526000009/mpc-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/1534504/000153450426000010/pbf-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/1534701/000153470126000006/psx-20251231.htm> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000677> ;
-    skos:definition "Provide legal counsel and legal-risk management, including contract and transaction support, litigation and dispute resolution, regulatory and compliance advice, corporate governance and entity support, and management of external legal providers; develop and deliver internal corporate communications and approved enterprise messaging."@en ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0029)."@en ;
+    skos:definition "Advise the business on the law and manage its legal risk, govern its corporate affairs, and manage its relations with governments, regulators and the public and its communications with its own people, so that the business acts lawfully and speaks consistently."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000681" ;
     skos:prefLabel "Legal & External Affairs"@en ;
-    skos:scopeNote "In scope: general counsel and legal advice to management and functions; legal review and support for contracts, transactions, claims, disputes, investigations, and litigation; regulatory interpretation and legal/compliance advice; corporate governance, entity management, board/committee administration where retained in the function, and corporate records; intellectual-property and outside-counsel management where not separate domains; employee, leadership, change, policy, crisis, and enterprise-wide internal communications; approval, stewardship, and consistency of official corporate messages. Out of scope (Step 8 decision): government relations, lobbying, and industry-association engagement; investor relations, shareholder engagement, and external board relations; public relations, media relations, community relations, philanthropy, and external reputation campaigns; distributor incentives, trade discounts, channel allowances, and other commercial-program design."@en ;
+    skos:scopeNote "Includes legal advice; contract, transaction and dispute support; litigation; regulatory and compliance advice; corporate governance, the corporate secretary and entity management; government and regulatory affairs; public, media and community relations; and internal communications. It advises Environment, Health & Safety on legal privilege, enforcement exposure and disclosure when an incident raises them."@en ;
     ns1:apqcMappingDecision <https://w3id.org/mpc/ontology/modules/core/apqc-mapping-decision/rejected> ;
     ns1:priorPreferredLabel "Legal & Corp Comm"@en ;
     ns1:taxonomyLevel 1 .
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000686> a skos:Concept ;
     dcterms:references <https://w3id.org/mpc/ontology/source/apqc-pcf-7.2.2/element/10215> ;
-    dcterms:source <https://w3id.org/mpc/ontology/source/step3c-definition-workbook> ;
+    dcterms:source <https://supplierdiversity.phillips66.com/>,
+        <https://www.marathonpetroleum.com/content/documents/Responsibility/Sustainability_Report/2025_sections/Engage_Staekholders.pdf>,
+        <https://www.valero.com/about/valero-suppliers> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000677> ;
-    skos:definition "The integrated planning, coordination, and optimization of feedstock, intermediate, product, inventory, capacity, logistics, and information flows across the downstream petroleum value chain — from supply and sourcing through refining, terminaling, distribution, and customer fulfilment."@en ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0012)."@en ;
+    skos:definition "Source, buy and manage the supply of the materials, equipment and services the business uses, such as chemicals, catalysts, maintenance materials and contracted services, and manage the suppliers that provide them, so that operations have what they need at an acceptable cost and risk."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000686" ;
     skos:prefLabel "Procurement & Supply Chain (Goods and Services)"@en ;
-    skos:scopeNote "Includes demand and supply balancing; sourcing and replenishment planning; production and refinery supply planning; inventory and working-capital optimization; network, terminal, and distribution planning; transportation and delivery planning; materials management; supplier and carrier coordination; performance management; and supply-chain risk and disruption management. It orchestrates, but does not replace, the physical execution performed by refining, midstream, distribution, procurement, and commercial operations."@en ;
+    skos:scopeNote "Includes supplier selection and contracting, purchasing, category management, supplier performance and risk, and materials management. It does not buy or sell crude oil, feedstocks or refined products, which belongs to Supply & Trading (DSBP-DEC-0012)."@en ;
     ns1:apqcMappingDecision <https://w3id.org/mpc/ontology/modules/core/apqc-mapping-decision/review-link> ;
     ns1:priorPreferredLabel "Supply Chain Mgmt."@en ;
     ns1:taxonomyLevel 1 .
@@ -2241,51 +2257,84 @@ Out of scope: Leases, capital projects, construction, landlord contracts, buildi
     ns1:taxonomyLevel 3 .
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000708> a skos:Concept ;
+    dcterms:source <https://csrc.nist.gov/pubs/cswp/29/the-nist-cybersecurity-framework-csf-20/final>,
+        <https://www.sec.gov/Archives/edgar/data/1035002/000162828026011499/vlo-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/1534701/000153470126000006/psx-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/789460/000078946026000015/wkc-20251231.htm> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000677> ;
-    skos:definition "Plan, build, run and secure the information technology that the business uses: applications, data, infrastructure and cyber security."@en ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0017)."@en ;
+    skos:definition "Plan, build, run and secure the information technology that the business uses: applications, data, infrastructure and cybersecurity."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000708" ;
     skos:prefLabel "Information Technology"@en ;
+    skos:scopeNote "Includes IT strategy, applications, data, infrastructure and the management of cybersecurity risk. Defining and improving business processes is Business Process Excellence; this area supplies the technology they use. Enterprise Risk Management sets the common way risks are assessed and reported; cybersecurity risk itself is managed here."@en ;
     ns1:taxonomyLevel 1 .
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000709> a skos:Concept ;
+    dcterms:source <https://www.hfsinclair.com/about-us/leadership/default.aspx>,
+        <https://www.sec.gov/Archives/edgar/data/1510295/000151029526000009/mpc-20251231.htm> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000677> ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0017)."@en ;
     skos:definition "Define, measure, manage and improve the company's business processes and its business transformation."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000709" ;
     skos:prefLabel "Business Process Excellence"@en ;
+    skos:scopeNote "Includes process architecture and ownership, process measurement and improvement, and business transformation programs. Information Technology supplies and runs the technology those processes use."@en ;
     ns1:taxonomyLevel 1 .
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000712> a skos:Concept ;
+    dcterms:source <https://www.eia.gov/tools/glossary/index.php?id=L>,
+        <https://www.sec.gov/Archives/edgar/data/1306965/000162828026017024/shel-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/1534701/000153470126000006/psx-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/2013745/000201374526000007/clmt-20251231x10k.htm>,
+        <https://www.sec.gov/Archives/edgar/data/34088/000003408826000045/xom-20251231.htm> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000676> ;
-    skos:definition "Make, package, sell and deliver finished lubricants, base oils and specialty products. Left empty by a company without this business."@en ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0030)."@en ;
+    skos:definition "Make, package, sell and deliver finished lubricants, base oils and specialty products."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000712" ;
     skos:prefLabel "Lubricants & Specialties"@en ;
+    skos:scopeNote "Includes base oil and finished lubricant manufacture, blending and packaging, specialty products such as waxes, white oils and solvents, and their marketing and delivery. Fuels made in the same refinery belong to Refining. A company without this business leaves this area empty."@en ;
     ns1:taxonomyLevel 1 .
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000713> a skos:Concept ;
+    dcterms:source <https://www.eia.gov/tools/glossary/index.php?id=P>,
+        <https://www.sec.gov/Archives/edgar/data/1534701/000153470126000006/psx-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/34088/000003408826000045/xom-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/93410/000009341026000078/cvx-20251231.htm> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000676> ;
-    skos:definition "Make and sell chemical products from refinery and gas-processing streams. Left empty by a company without this business."@en ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0030)."@en ;
+    skos:definition "Make and sell chemical products from refinery and gas-processing streams."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000713" ;
     skos:prefLabel "Petrochemicals"@en ;
+    skos:scopeNote "Includes making and selling petrochemicals and plastics from petrochemical feedstocks, whether in the company's own plants or through a joint venture it holds. Supplying the feedstock streams from a refinery belongs to Refining. A company without this business leaves this area empty."@en ;
     ns1:taxonomyLevel 1 .
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000714> a skos:Concept ;
+    dcterms:source <https://www.eia.gov/tools/glossary/index.php?id=R>,
+        <https://www.sec.gov/Archives/edgar/data/1306965/000162828026017024/shel-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/789460/000078946026000015/wkc-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/821483/000082148326000005/parr-20251231.htm> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000399> ;
-    skos:definition "Run fuel and convenience retail sites, and set prices and offers for consumers. Left empty by a company without retail."@en ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0045)."@en ;
+    skos:definition "Run fuel and convenience retail sites that sell to consumers, including the prices and offers at those sites."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000714" ;
     skos:prefLabel "Retail"@en ;
+    skos:scopeNote "Includes company-operated fuel stations, convenience stores, unattended cardlock sites and their site pricing and promotions. Selling and pricing to wholesale, branded and unbranded resellers stays with the other Marketing processes. A company without retail leaves this area empty."@en ;
     ns1:taxonomyLevel 3 .
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000715> a skos:Concept ;
+    dcterms:source <https://www.epa.gov/ghgreporting/learn-about-greenhouse-gas-reporting-program-ghgrp>,
+        <https://www.osha.gov/recordkeeping> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000678> ;
-    skos:definition "Prepare, check and file the environmental, health, safety and other reports that regulators require."@en ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0045)."@en ;
+    skos:definition "Prepare, check and file the environmental, health and safety reports that regulators require, such as emissions reports and injury and illness records."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000715" ;
     skos:prefLabel "Regulatory Reporting"@en ;
+    skos:scopeNote "Covers environmental, health and safety reports to regulators only. Financial and tax filings belong to Finance."@en ;
     ns1:taxonomyLevel 2 .
 
 <https://w3id.org/mpc/ontology/fact/CM-1-1-1-1-1--precedes--CM-1-1-1-1-2> a ns1:CanonicalFact ;
@@ -6691,6 +6740,19 @@ ns1:taxonomyLevel a owl:DatatypeProperty ;
     dcterms:rights "U.S. federal government work; public domain."@en ;
     dcterms:title "U.S. Energy Information Administration (EIA) Glossary"@en .
 
+<https://csrc.nist.gov/pubs/cswp/29/the-nist-cybersecurity-framework-csf-20/final> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "2.0"@en ;
+    dcterms:issued "2024-02-26"^^xsd:date ;
+    dcterms:publisher "National Institute of Standards and Technology"@en ;
+    dcterms:title "NIST CSWP 29, The NIST Cybersecurity Framework (CSF) 2.0"@en ;
+    ns2:accessDate "2026-11-28"^^xsd:date .
+
+<https://supplierdiversity.phillips66.com/> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "web page as read on the access date"@en ;
+    dcterms:publisher "Phillips 66"@en ;
+    dcterms:title "Phillips 66 Supplier Diversity"@en ;
+    ns2:accessDate "2026-11-24"^^xsd:date .
+
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000003> a skos:Concept ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000002> ;
     skos:definition "Demand forecasting processes for commercial planning across the value chain."@en ;
@@ -7807,26 +7869,27 @@ Out of scope: Promises of price, compensation, credit, product quality, tax, leg
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000678> a skos:Concept ;
     dcterms:references <https://w3id.org/mpc/ontology/source/apqc-pcf-7.2.2/element/10522> ;
-    dcterms:source <https://w3id.org/mpc/ontology/source/step3c-definition-workbook> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000677> ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0027; DSBP-DEC-0029)."@en ;
     skos:definition "Protect people, assets, and the environment through process safety; occupational health and safety; environmental management and compliance; emergency preparedness and response; incident, release, and near-miss management; corrective-action learning; and required regulatory reporting to government authorities."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000678" ;
     skos:prefLabel "Environment, Health & Safety"@en ;
-    skos:scopeNote "This domain governs EHS management, environmental and safety compliance, required regulator-facing reporting, and the enterprise coordination of incidents, releases, investigations, corrective actions, and emergency response. It does not replace operational ownership: operating sites, asset owners, maintenance, logistics, product stewardship, and business functions remain accountable for safely executing their work, preventing and containing events, and completing assigned corrective actions. Legal & Corporate Communications advises on legal privilege, enforcement exposure, disclosure, litigation hold, regulator strategy, and approved internal/external communications when those dimensions arise."@en ;
+    skos:scopeNote "This domain governs EHS management, environmental and safety compliance, required regulator-facing reporting, and the enterprise coordination of incidents, releases, investigations, corrective actions, and emergency response. It does not replace operational ownership: operating sites, asset owners, maintenance, logistics, product stewardship, and business functions remain accountable for safely executing their work, preventing and containing events, and completing assigned corrective actions. Legal & External Affairs advises on legal privilege, enforcement exposure, disclosure, litigation hold, regulator strategy, and approved internal and external communications when those dimensions arise. Enterprise Risk Management sets the common way risks are assessed and reported across the company; the process-safety and other EHS risks themselves are managed here."@en ;
     ns1:apqcMappingDecision <https://w3id.org/mpc/ontology/modules/core/apqc-mapping-decision/rejected> ;
     ns1:priorPreferredLabel "EHS & Gov Reporting"@en ;
     ns1:taxonomyLevel 1 .
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000679> a skos:Concept ;
     dcterms:references <https://w3id.org/mpc/ontology/source/apqc-pcf-7.2.2/element/10922> ;
-    dcterms:source <https://w3id.org/mpc/ontology/source/step3c-definition-workbook> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000677> ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0029)."@en ;
     skos:definition "Planning, recording, controlling, reporting, and managing the financial resources, performance, obligations, and risks of the downstream business, including financial planning and analysis, accounting, reporting, payroll, treasury, tax, and internal financial controls."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000679" ;
     skos:prefLabel "Finance"@en ;
-    skos:scopeNote "Includes budgeting, forecasting, financial and management accounting, period close, statutory and management reporting, accounts payable, expense reimbursement, payroll, treasury, liquidity and cash management, tax, financial compliance, internal controls, audit support, and financial risk management. Supports commercial, supply-chain, refining, midstream, distribution, and enabling-function processes through financial governance, measurement, and transaction processing. Excludes operational execution in those business domains and fixed-asset project accounting where it is intentionally governed and executed as an ERP-native capability outside this taxonomy's modeled scope."@en ;
+    skos:scopeNote "Environmental, health and safety reports to regulators belong to Regulatory Reporting."@en,
+        "Includes budgeting, forecasting, financial and management accounting, period close, statutory and management reporting, accounts payable, expense reimbursement, payroll, treasury, liquidity and cash management, tax, financial compliance, internal controls, audit support, and financial risk management. Supports commercial, supply-chain, refining, midstream, distribution, and enabling-function processes through financial governance, measurement, and transaction processing. Excludes operational execution in those business domains and fixed-asset project accounting where it is intentionally governed and executed as an ERP-native capability outside this taxonomy's modeled scope."@en ;
     ns1:apqcMappingDecision <https://w3id.org/mpc/ontology/modules/core/apqc-mapping-decision/no-candidate> ;
     ns1:taxonomyLevel 1 .
 
@@ -7855,19 +7918,27 @@ Out of scope: enterprise strategic direction, portfolio choices, and capital all
     ns1:taxonomyLevel 2 .
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000710> a skos:Concept ;
+    dcterms:source <https://www.hfsinclair.com/about-us/leadership/default.aspx>,
+        <https://www.sec.gov/Archives/edgar/data/1510295/000151029526000009/mpc-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/1534504/000153450426000010/pbf-20251231.htm> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000677> ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0026)."@en ;
     skos:definition "Set the company's vision and strategy, plan its portfolio, and find, assess and close new business opportunities."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000710" ;
     skos:prefLabel "Strategy & Business Development"@en ;
+    skos:scopeNote "Includes vision and strategy, portfolio planning, the strategic business plan (Develop Strategic Business Plan), and business development through acquisitions, divestitures, joint ventures and new businesses."@en ;
     ns1:taxonomyLevel 1 .
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000711> a skos:Concept ;
+    dcterms:source <https://www.iso.org/standard/65694.html> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000677> ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0027)."@en ;
     skos:definition "Identify, assess, treat, monitor and report the business risks across the company and its sites."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000711" ;
     skos:prefLabel "Enterprise Risk Management"@en ;
+    skos:scopeNote "Sets the common way risks are assessed and reported across the company, and coordinates site business risk (Coordinate Site Business Risk Management). The process-safety and other EHS risks themselves are managed in Environment, Health & Safety, and cybersecurity risk in Information Technology."@en ;
     ns1:taxonomyLevel 1 .
 
 <https://w3id.org/mpc/ontology/modules/core/business-domain/it-services> a skos:Concept ;
@@ -8788,6 +8859,85 @@ Out of scope: enterprise strategic direction, portfolio choices, and capital all
     dcterms:publisher "U.S. Department of the Treasury, Office of Foreign Assets Control"@en ;
     dcterms:rights "US sanctions-screening and compliance-program context, including SDN/consolidated-list screening and risk-based compliance expectations. Applicability, screening frequency, match handling, true/false-match adjudication, blocking/rejecting, reporting, and program design are determined by Compliance/Legal under applicable law and enterprise policy. The source does not determine commercial credit process ownership or legal conclusions."@en ;
     dcterms:title "OFAC sanctions programs and screening lists (SDN and consolidated lists; risk-based sanctions compliance program guidance for U.S. persons)"@en .
+
+<https://www.eia.gov/tools/glossary/index.php?id=L> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "web page as read on the access date"@en ;
+    dcterms:publisher "U.S. Energy Information Administration"@en ;
+    dcterms:title "EIA Glossary, L"@en ;
+    ns2:accessDate "2026-11-28"^^xsd:date .
+
+<https://www.eia.gov/tools/glossary/index.php?id=P> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "web page as read on the access date"@en ;
+    dcterms:publisher "U.S. Energy Information Administration"@en ;
+    dcterms:title "EIA Glossary, P"@en ;
+    ns2:accessDate "2026-11-28"^^xsd:date .
+
+<https://www.eia.gov/tools/glossary/index.php?id=R> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "web page as read on the access date"@en ;
+    dcterms:publisher "U.S. Energy Information Administration"@en ;
+    dcterms:title "EIA Glossary, R"@en ;
+    ns2:accessDate "2026-11-24"^^xsd:date .
+
+<https://www.epa.gov/ghgreporting/learn-about-greenhouse-gas-reporting-program-ghgrp> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "page modified 2026-11-10"@en ;
+    dcterms:publisher "U.S. Environmental Protection Agency"@en ;
+    dcterms:title "Learn About the Greenhouse Gas Reporting Program (GHGRP)"@en ;
+    ns2:accessDate "2026-11-28"^^xsd:date .
+
+<https://www.iso.org/standard/72642.html> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "edition 4"@en ;
+    dcterms:issued "2021-06"^^xsd:gYearMonth ;
+    dcterms:publisher "International Organization for Standardization"@en ;
+    dcterms:title "ISO 690:2021, Information and documentation: Guidelines for bibliographic references and citations to information resources"@en ;
+    ns2:accessDate "2026-11-28"^^xsd:date .
+
+<https://www.marathonpetroleum.com/content/documents/Responsibility/Sustainability_Report/2025_sections/Engage_Staekholders.pdf> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "2025 report"@en ;
+    dcterms:publisher "Marathon Petroleum Corporation"@en ;
+    dcterms:title "2025 Sustainability Report, Engage Stakeholders section"@en ;
+    ns2:accessDate "2026-11-24"^^xsd:date .
+
+<https://www.osha.gov/recordkeeping> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "web page as read on the access date"@en ;
+    dcterms:publisher "Occupational Safety and Health Administration"@en ;
+    dcterms:title "Recordkeeping"@en ;
+    ns2:accessDate "2026-11-28"^^xsd:date .
+
+<https://www.sec.gov/Archives/edgar/data/1323468/000110465926021381/glp-20251231x10k.htm> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "accession 0001104659-26-021381"@en ;
+    dcterms:publisher "Global Partners LP"@en ;
+    dcterms:title "Global Partners LP, Form 10-K for the fiscal year ended December 31, 2025"@en ;
+    ns2:accessDate "2026-11-24"^^xsd:date .
+
+<https://www.sec.gov/Archives/edgar/data/1506307/000150630726000011/kmi-20251231.htm> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "accession 0001506307-26-000011"@en ;
+    dcterms:publisher "Kinder Morgan, Inc."@en ;
+    dcterms:title "Kinder Morgan, Inc., Form 10-K for the fiscal year ended December 31, 2025"@en ;
+    ns2:accessDate "2026-11-24"^^xsd:date .
+
+<https://www.sec.gov/Archives/edgar/data/2013745/000201374526000007/clmt-20251231x10k.htm> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "accession 0002013745-26-000007"@en ;
+    dcterms:publisher "Calumet, Inc."@en ;
+    dcterms:title "Calumet, Inc., Form 10-K for the fiscal year ended December 31, 2025"@en ;
+    ns2:accessDate "2026-11-24"^^xsd:date .
+
+<https://www.sec.gov/Archives/edgar/data/821483/000082148326000005/parr-20251231.htm> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "accession 0000821483-26-000005"@en ;
+    dcterms:publisher "Par Pacific Holdings, Inc."@en ;
+    dcterms:title "Par Pacific Holdings, Inc., Form 10-K for the fiscal year ended December 31, 2025"@en ;
+    ns2:accessDate "2026-11-24"^^xsd:date .
+
+<https://www.sec.gov/Archives/edgar/data/93410/000009341026000078/cvx-20251231.htm> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "accession 0000093410-26-000078"@en ;
+    dcterms:publisher "Chevron Corporation"@en ;
+    dcterms:title "Chevron Corporation, Form 10-K for the fiscal year ended December 31, 2025"@en ;
+    ns2:accessDate "2026-11-24"^^xsd:date .
+
+<https://www.valero.com/about/valero-suppliers> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "web page as read on the access date"@en ;
+    dcterms:publisher "Valero Energy Corporation"@en ;
+    dcterms:title "Valero Suppliers"@en ;
+    ns2:accessDate "2026-11-24"^^xsd:date .
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000009> a skos:Concept ;
     dcterms:references <https://w3id.org/mpc/ontology/source/apqc-pcf-7.2.2/element/16574> ;
@@ -10884,13 +11034,14 @@ Out of scope: Employment status, classification, compensation, ratings, promotio
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000684> a skos:Concept ;
     dcterms:references <https://w3id.org/mpc/ontology/source/apqc-pcf-7.2.2/element/19948> ;
-    dcterms:source <https://w3id.org/mpc/ontology/source/step3c-definition-workbook> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000676> ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0030)."@en ;
     skos:definition "The operation of petroleum refineries to convert crude oil and other hydrocarbon feedstocks into specification-compliant fuels, blendstocks, lubricants, asphalt, petrochemical feedstocks, and other refined products through separation, conversion, treatment, blending, and associated refinery operations."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000684" ;
     skos:prefLabel "Refining"@en ;
-    skos:scopeNote "Encompasses refinery production operations and the planning, execution, and recovery activities required to maintain refinery assets, reliability, integrity, safety, and operating availability, including major maintenance and turnarounds."@en ;
+    skos:scopeNote "Encompasses refinery production operations and the planning, execution, and recovery activities required to maintain refinery assets, reliability, integrity, safety, and operating availability, including major maintenance and turnarounds."@en,
+        "Where a company has them, Lubricants & Specialties and Petrochemicals are areas of their own; Refining makes the fuels and supplies those areas their base stocks and feedstock streams."@en ;
     ns1:apqcMappingDecision <https://w3id.org/mpc/ontology/modules/core/apqc-mapping-decision/no-candidate> ;
     ns1:taxonomyLevel 1 .
 
@@ -11270,6 +11421,43 @@ Out of scope: Employment status, classification, compensation, ratings, promotio
     dcterms:publisher "World Wide Web Consortium"@en ;
     dcterms:rights "Ontology representation guidance, not downstream process content"@en ;
     dcterms:title "SKOS Simple Knowledge Organization System Reference"@en .
+
+<https://www.iso.org/standard/65694.html> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "edition 2"@en ;
+    dcterms:issued "2018-02"^^xsd:gYearMonth ;
+    dcterms:publisher "International Organization for Standardization"@en ;
+    dcterms:title "ISO 31000:2018, Risk management: Guidelines"@en ;
+    ns2:accessDate "2026-11-28"^^xsd:date .
+
+<https://www.sec.gov/Archives/edgar/data/1070423/000107042326000014/paa-20251231.htm> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "accession 0001070423-26-000014"@en ;
+    dcterms:publisher "Plains All American Pipeline, L.P."@en ;
+    dcterms:title "Plains All American Pipeline, L.P., Form 10-K for the fiscal year ended December 31, 2025"@en ;
+    ns2:accessDate "2026-11-24"^^xsd:date .
+
+<https://www.sec.gov/Archives/edgar/data/1552000/000155200026000009/mplx-20251231.htm> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "accession 0001552000-26-000009"@en ;
+    dcterms:publisher "MPLX LP"@en ;
+    dcterms:title "MPLX LP, Form 10-K for the fiscal year ended December 31, 2025"@en ;
+    ns2:accessDate "2026-11-24"^^xsd:date .
+
+<https://www.sec.gov/Archives/edgar/data/1915657/000191565726000016/dino-20251231.htm> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "accession 0001915657-26-000016"@en ;
+    dcterms:publisher "HF Sinclair Corporation"@en ;
+    dcterms:title "HF Sinclair Corporation, Form 10-K for the fiscal year ended December 31, 2025"@en ;
+    ns2:accessDate "2026-11-24"^^xsd:date .
+
+<https://www.sec.gov/Archives/edgar/data/34088/000003408826000045/xom-20251231.htm> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "accession 0000034088-26-000045"@en ;
+    dcterms:publisher "Exxon Mobil Corporation"@en ;
+    dcterms:title "Exxon Mobil Corporation, Form 10-K for the fiscal year ended December 31, 2025"@en ;
+    ns2:accessDate "2026-11-24"^^xsd:date .
+
+<https://www.sec.gov/Archives/edgar/data/789460/000078946026000015/wkc-20251231.htm> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "accession 0000789460-26-000015"@en ;
+    dcterms:publisher "World Kinect Corporation"@en ;
+    dcterms:title "World Kinect Corporation, Form 10-K for the fiscal year ended December 31, 2025"@en ;
+    ns2:accessDate "2026-11-24"^^xsd:date .
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000001> a skos:Concept ;
     dcterms:references <https://w3id.org/mpc/ontology/source/apqc-pcf-7.2.2/element/10102> ;
@@ -13787,11 +13975,12 @@ Out of scope: Service, staffing, and model decisions (Their owners) | costing me
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000694> a skos:Concept ;
     dcterms:provenance "Added in core 2.2.0 from the process map at commit 8259354, by the decision of 2026-10-18 (MPC-P01, fuels logistics); definition and scope note from the map's description (the decision of 2026-10-22)."@en ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000682> ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0049)."@en ;
     skos:definition "Provide the receipt, storage, throughput, blending and delivery of products at terminals for affiliated and third-party customers."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000694" ;
     skos:prefLabel "Terminal Services"@en ;
-    skos:scopeNote "This is the provider's service; running a terminal site (safety, fleet, tanks and racks) is CM 1.2.7.2 Terminal Operations Management, and customer loading and allocation is CM 1.3.10 Terminal Loading, so neither is repeated here."@en ;
+    skos:scopeNote "This is the provider's service. Running a terminal site, with its safety, fleet, tanks and racks, is a separate process, and controlling who may lift product and how much is Terminal Loading, which is part of this area."@en ;
     ns1:taxonomyLevel 2 .
 
 <https://w3id.org/mpc/ontology/modules/core/business-domain/finance> a skos:Concept ;
@@ -13960,6 +14149,24 @@ Out of scope: Service, staffing, and model decisions (Their owners) | costing me
     dcterms:rights "Product-level oil demand assessment and forecast practice; evidence only, not text to copy"@en ;
     dcterms:title "Oil Market Report (monthly series)"@en .
 
+<https://www.hfsinclair.com/about-us/leadership/default.aspx> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "web page as read on the access date"@en ;
+    dcterms:publisher "HF Sinclair Corporation"@en ;
+    dcterms:title "HF Sinclair Leadership"@en ;
+    ns2:accessDate "2026-11-24"^^xsd:date .
+
+<https://www.sec.gov/Archives/edgar/data/1035002/000162828026011499/vlo-20251231.htm> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "accession 0001628280-26-011499"@en ;
+    dcterms:publisher "Valero Energy Corporation"@en ;
+    dcterms:title "Valero Energy Corporation, Form 10-K for the fiscal year ended December 31, 2025"@en ;
+    ns2:accessDate "2026-11-24"^^xsd:date .
+
+<https://www.sec.gov/Archives/edgar/data/1306965/000162828026017024/shel-20251231.htm> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "accession 0001628280-26-017024"@en ;
+    dcterms:publisher "Shell plc"@en ;
+    dcterms:title "Shell plc, Annual Report and Form 20-F 2025"@en ;
+    ns2:accessDate "2026-11-24"^^xsd:date .
+
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000046> a skos:Concept ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000010> ;
     skos:definition "Discuss market demand and pricing outlook and align on list of standard scenarios for evaluation"@en ;
@@ -13994,6 +14201,38 @@ Out of scope: Service, staffing, and model decisions (Their owners) | costing me
     skos:prefLabel "Develop Network Premise for Prompt and Out Month"@en ;
     ns1:plannedInput "Data objects for Network Premise"@en ;
     ns1:plannedOutput "Finalized Network Premise"@en ;
+    ns1:taxonomyLevel 4 .
+
+<https://w3id.org/ds-bp/ontology/process/DSBP-P-000100> a skos:Concept ;
+    dcterms:references <https://w3id.org/mpc/ontology/source/apqc-pcf-7.2.2/element/16820> ;
+    dcterms:source <https://w3id.org/mpc/ontology/source/src-lnl-t2s-001>,
+        <https://w3id.org/mpc/ontology/source/src-orp-dpsc-001>,
+        <https://w3id.org/mpc/ontology/source/step3c-definition-workbook> ;
+    skos:altLabel "Network Product Scheduling"@en,
+        "Short-Term Product Supply Scheduling"@en ;
+    skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000087> ;
+    skos:definition "Develop and maintain the short-term product supply schedule for the primary distribution network — deciding which products move between refineries, terminals, and supply points, in what quantities and sequence over the coming days and weeks — so the approved regional plan is translated into an executable movement program."@en ;
+    skos:editorialNote "Batch 05 (2026-09-19). Sits between the approved monthly regional plan (CM-1-1-2) and movement administration (CM-1-1-3-6): this L4 decides the short-term schedule; its sibling administers the movements it creates. APQC 16820 'Design for product servicing' is an unrelated lexical match; no meaningful candidate."@en ;
+    skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
+    skos:notation "DSBP-P-000100" ;
+    skos:prefLabel "Product Scheduling"@en ;
+    skos:scopeNote """Covers short-term network scheduling within the approved regional plan: consolidating demand, stock, and supply projections into a rolling network schedule, sequencing bulk product movements, coordinating the trades needed to balance the schedule, and adjusting to disruptions. Excludes plan-period supply and disposition decisions, owned by Regional Optimization (CM-1-1-2); excludes mode-level nomination, load, and movement administration, owned by Physical Distribution Scheduling (CM-1-1-3-6); excludes secondary deliveries, owned by Secondary Distribution Management (CM-1-1-3-8); excludes trade negotiation and execution, owned by Supply And Trading.
+In scope: Consolidate short-term demand, stock, and supply projections | develop and maintain the rolling network product schedule | sequence and adjust bulk movements within plan and policy | initiate schedule-balancing trade requests
+Out of scope: Plan-period supply and disposition optimization (Regional Optimization, CM-1-1-2) | nomination, load, and movement administration (CM-1-1-3-6) | secondary delivery scheduling (CM-1-1-3-8) | trade negotiation and execution (Supply And Trading)"""@en ;
+    ns1:apqcMappingDecision <https://w3id.org/mpc/ontology/modules/core/apqc-mapping-decision/review-link> ;
+    ns1:businessDomain <https://w3id.org/mpc/ontology/modules/core/business-domain/commercial> ;
+    ns1:cadence <https://w3id.org/mpc/ontology/modules/core/cadence/weekly> ;
+    ns1:conceptKind <https://w3id.org/mpc/ontology/modules/core/concept-kind/process> ;
+    ns1:dependsOnOutputOf <https://w3id.org/ds-bp/ontology/process/DSBP-P-000113> ;
+    ns1:keyInputFlow "approved regional plan"@en,
+        "short-term demand and lifting forecasts"@en,
+        "stock positions and projections"@en,
+        "transport and terminal availability"@en ;
+    ns1:operatingMode <https://w3id.org/mpc/ontology/modules/core/operating-mode/periodic> ;
+    ns1:precedes <https://w3id.org/ds-bp/ontology/process/DSBP-P-000104> ;
+    ns1:primaryOutputFlow "rolling short-term network product schedule"@en ;
+    ns1:primaryPurpose "Decide the short-term product movement schedule the primary network runs on."@en ;
+    ns1:responsibleDomain "Commercial & Marketing"@en ;
     ns1:taxonomyLevel 4 .
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000108> a skos:Concept ;
@@ -15312,11 +15551,16 @@ Out of scope: Internal data production (owners) | analysis (CM-1-3-1-4-3) | cred
     ns1:taxonomyLevel 5 .
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000427> a skos:Concept ;
+    dcterms:source <https://www.sec.gov/Archives/edgar/data/1323468/000110465926021381/glp-20251231x10k.htm>,
+        <https://www.sec.gov/Archives/edgar/data/1552000/000155200026000009/mplx-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/1915657/000191565726000016/dino-20251231.htm> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000694> ;
-    skos:definition "Terminal Loading consist of processes such as monitoring customer sales activity and implementing control strategies based upon supply, customer credit and/or contract limitations. Allocation decisions are based on evaluating deals and transaction data to determine which product at the terminal should be made available to the customers. It is responsible for sending locks and unlocks to the terminal when it determines that availability should change."@en ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0021; DSBP-DEC-0049)."@en ;
+    skos:definition "Control the lifting of product at a terminal: authorize the customers, carriers and drivers who may lift, take in customers' lifting forecasts and nominations, enforce at the loading rack how much each customer may lift, and capture the terminal sales deals behind the liftings, so that only authorized liftings within agreed limits take place."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000427" ;
     skos:prefLabel "Terminal Loading"@en ;
+    skos:scopeNote "It is part of Terminal Services. Physical loading at the rack belongs to Terminal Operations Management. Plan-level allocation belongs to Allocate Finished Products, order-level allocation and release to Allocate & Release Order, and credit decisions and holds to Manage Credit & Risk; Terminal Loading enforces their results at the terminal (DSBP-DEC-0049)."@en ;
     ns1:taxonomyLevel 3 .
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000434> a skos:Concept ;
@@ -16195,9 +16439,9 @@ Out of scope: Pricing, terms, credit, and customer-action decisions (their owner
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000613> a skos:Concept ;
     dcterms:references <https://w3id.org/mpc/ontology/source/apqc-pcf-7.2.2/element/20081> ;
-    dcterms:source <https://w3id.org/mpc/ontology/source/src-apqc-pcf-001>,
-        <https://w3id.org/mpc/ontology/source/step3c-definition-workbook> ;
+    dcterms:source <https://w3id.org/mpc/ontology/source/src-apqc-pcf-001> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000611> ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0049)."@en ;
     skos:definition "Allocate available product and supply capacity to validated orders and release allocated orders to the physical scheduling and fulfillment processes. Apply approved allocation rules, including contractual commitments, approved priority classes, fairness rules, regulatory/safety obligations, and authorized shortage/disruption procedures."@en ;
     skos:editorialNote "Batch 33 (2026-09-20). Horizon set event-driven per review, with the daily/intraday cycle statement recorded verbatim; review allocation-rule wording (regulatory/safety obligations and authorized shortage/disruption procedures replace an absolute contract-first ordering), release-condition rule, and customer-communication sentence adopted verbatim."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
@@ -16205,7 +16449,8 @@ Out of scope: Pricing, terms, credit, and customer-action decisions (their owner
     skos:prefLabel "Allocate & Release Order"@en ;
     skos:scopeNote """Allocation rules are applied, not made: allocation policies, including shortage and disruption procedures, are approved by the accountable commercial and supply leadership under their own approvals, with Legal review where allocation touches contractual or regulatory obligations; this process applies the approved rules, documents allocation decisions, and escalates conflicts it cannot resolve within them. Allocation and release operate in daily/intraday operating cycles and may be re-run on supply, credit, order, contract, or disruption events. Release requires the applicable validation, allocation, credit, compliance, product-availability, authorization, and operational-readiness conditions to be satisfied. Where a condition is not met, the order remains held, partially released, substituted, or escalated under approved rules. Communicates hold, allocation, partial-release, substitution, or release status through the appropriate customer/service channel under approved communication rules. Release hands the order to the accountable scheduling/logistics processes — it does not schedule trucks, terminals, or deliveries.
 In scope: Allocation of supply and capacity to validated orders per approved rules, including regulatory/safety obligations and authorized shortage/disruption procedures | release on satisfied conditions, with hold, partial release, substitution, or escalation under approved rules otherwise | allocation documentation and conflict escalation | reallocation on supply, credit, order, contract, or disruption events | status communication through approved channels
-Out of scope: Allocation policy setting (commercial/supply leadership; Legal review) | physical scheduling and dispatch (logistics) | supply planning and inventory ownership (supply chain) | credit release decisions (CM-1-3-7-4)"""@en ;
+Out of scope: Allocation policy setting (commercial/supply leadership; Legal review) | physical scheduling and dispatch (logistics) | supply planning and inventory ownership (supply chain) | credit release decisions (CM-1-3-7-4)"""@en,
+        "Terminal Loading enforces released allocations at the terminal rack."@en ;
     ns1:apqcMappingDecision <https://w3id.org/mpc/ontology/modules/core/apqc-mapping-decision/review-link> ;
     ns1:businessDomain <https://w3id.org/mpc/ontology/modules/core/business-domain/marketing> ;
     ns1:conceptKind <https://w3id.org/mpc/ontology/modules/core/concept-kind/process> ;
@@ -16505,14 +16750,18 @@ Out of scope: Technical platform monitoring (IT) | infrastructure decisions (The
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000682> a skos:Concept ;
     dcterms:references <https://w3id.org/mpc/ontology/source/apqc-pcf-7.2.2/element/19948> ;
-    dcterms:source <https://w3id.org/mpc/ontology/source/step3c-definition-workbook> ;
+    dcterms:source <https://www.sec.gov/Archives/edgar/data/1070423/000107042326000014/paa-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/1506307/000150630726000011/kmi-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/1534504/000153450426000010/pbf-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/1534701/000153470126000006/psx-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/1552000/000155200026000009/mplx-20251231.htm> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000676> ;
-    skos:definition "The transportation, terminaling, storage, and bulk handling of crude oil, intermediates, and refined products between supply points, refineries, terminals, and downstream distribution locations."@en ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0025; DSBP-DEC-0046)."@en ;
+    skos:definition "Transport, terminal, store and handle crude oil, intermediates and refined products between supply points, refineries, terminals and distribution locations, so that product is where it is needed, in the quantity and quality agreed."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000682" ;
     skos:prefLabel "Midstream & Logistics"@en ;
-    skos:scopeNote "Includes receipt, dispatch, transfer, pipeline, marine, rail, and bulk-truck logistics; terminal and tank-farm operations; inventory management; blending and additive operations where performed outside refinery process units; product segregation; custody transfer; nominations; scheduling; and bulk delivery to downstream depots, customers, or other facilities."@en,
-        "Scope: Fuels Logistics supporting Refining and Marketing. Pipeline transportation, terminal, marine and storage services that move and hold crude oil, refined products and other hydrocarbons. Pipeline, terminal and storage services run for MPC under fee-based agreements, most of which include minimum committed volumes from MPC, and for third parties under their own agreements (MPLX FY2025 Form 10-K, Items 1 and 2). The towboat and barge fleet serves refineries and terminals owned by MPC in the Mid-Continent and Gulf Coast regions (MPLX FY2025 Form 10-K, Item 2). By the decision of 2026-10-18, four roles stay separate, and one party can hold several: the service provider, the asset operator, the asset owner and the service customer. The customer side of these services is in Commercial & Marketing: transport, storage and exchange agreements (CM 1.2.7.1), terminal operations management (CM 1.2.7.2), terminal loading (CM 1.3.10), physical distribution scheduling (CM 1.1.3.6), third-party storage in inventory management (CM 1.1.3.7), actualization (CM 1.2.3.1) and settlement (CM 1.2.4.1). Gas gathering, gas processing and NGL fractionation belong to midstream businesses such as MPLX's Natural Gas and NGL Services segment; they are outside the current model scope, not absent from the business (MPLX FY2025 Form 10-K, Items 1 and 2; the decision of 2026-10-18, MPC-P01)."@en ;
+    skos:scopeNote "Includes pipeline, marine, rail and truck transportation; terminal and tank-farm operations, with the controls on who may lift product at a terminal; storage; blending and additive services outside refinery process units; product segregation; and custody transfer. The asset owner, the asset operator, the service provider and the service customer are separate roles, and one party may hold several. What is bought, sold and delivered belongs to Supply & Trading, and planning volumes and timing belongs to Planning, Scheduling & Optimization. Crude gathering and NGL fractionation are placed here by the scope review (DSBP-DEC-0046) and added by a later batch once their evidence row is cited."@en ;
     ns1:apqcMappingDecision <https://w3id.org/mpc/ontology/modules/core/apqc-mapping-decision/no-candidate> ;
     ns1:priorPreferredLabel "Midstream"@en ;
     ns1:taxonomyLevel 1 .
@@ -16587,20 +16836,21 @@ ns1:EvidenceBases a skos:ConceptScheme ;
     dcterms:references <https://w3id.org/mpc/ontology/source/apqc-pcf-7.2.2/element/16820> ;
     dcterms:source <https://w3id.org/mpc/ontology/source/src-ascm-cscp-001>,
         <https://w3id.org/mpc/ontology/source/src-eia-gloss-001>,
-        <https://w3id.org/mpc/ontology/source/src-snf-refps-001>,
-        <https://w3id.org/mpc/ontology/source/step3c-definition-workbook> ;
+        <https://w3id.org/mpc/ontology/source/src-snf-refps-001> ;
     skos:altLabel "Finished Product Allocation"@en,
         "Product Allocation"@en,
         "Product Allocation Decision"@en,
         "Supply Allocation"@en ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000010> ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0049)."@en ;
     skos:definition "Assign available finished-product supply to markets, channels, terminals, and customer commitments for a planning period, so limited or constrained volumes are placed where they best serve contractual obligations and regional margin."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000021" ;
     skos:prefLabel "Allocate Finished Products"@en ;
     skos:scopeNote """Covers plan-level placement of finished product across markets, channels, and supply points, including the commercial priority rules applied when available supply cannot meet all demand, and reallocation when supply, demand, or logistics change. Excludes order-level allocation and release against an individual customer order, owned by Order Management; excludes rack and terminal loading allocation enforcement, owned by Terminal Loading; excludes physical movement and delivery execution, owned by Midstream and Distribution.
 In scope: Market and channel volume placement | supply-point-to-demand-point assignment | commercial priority rules under constrained supply | exchange and third-party placement within the plan | reallocation on plan change
-Out of scope: Order-level allocation and release (Allocate & Release Order, Order Management) | rack and terminal allocation enforcement (Manage Terminal Lifting Allocation, Terminal Loading) | sales-target setting (Determine & Allocate Sales Targets, Marketing) | pricing and offer construction (Commercial & Marketing pricing processes) | physical delivery (Midstream, Distribution)"""@en ;
+Out of scope: Order-level allocation and release (Allocate & Release Order, Order Management) | rack and terminal allocation enforcement (Manage Terminal Lifting Allocation, Terminal Loading) | sales-target setting (Determine & Allocate Sales Targets, Marketing) | pricing and offer construction (Commercial & Marketing pricing processes) | physical delivery (Midstream, Distribution)"""@en,
+        "Terminal Loading enforces the resulting allocation at the terminal rack."@en ;
     ns1:apqcMappingDecision <https://w3id.org/mpc/ontology/modules/core/apqc-mapping-decision/no-candidate> ;
     ns1:businessDomain <https://w3id.org/mpc/ontology/modules/core/business-domain/commercial> ;
     ns1:cadence <https://w3id.org/mpc/ontology/modules/core/cadence/monthly> ;
@@ -16679,38 +16929,6 @@ Out of scope: Finished-product inventory policy setting (Develop Finished Produc
         "Step Cases for NGL COPs"@en,
         "Step Cases for PetChem (Cumene) COPs"@en ;
     ns1:plannedOutput "COP / ACOP Reports - Regional Incentives"@en ;
-    ns1:taxonomyLevel 4 .
-
-<https://w3id.org/ds-bp/ontology/process/DSBP-P-000100> a skos:Concept ;
-    dcterms:references <https://w3id.org/mpc/ontology/source/apqc-pcf-7.2.2/element/16820> ;
-    dcterms:source <https://w3id.org/mpc/ontology/source/src-lnl-t2s-001>,
-        <https://w3id.org/mpc/ontology/source/src-orp-dpsc-001>,
-        <https://w3id.org/mpc/ontology/source/step3c-definition-workbook> ;
-    skos:altLabel "Network Product Scheduling"@en,
-        "Short-Term Product Supply Scheduling"@en ;
-    skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000087> ;
-    skos:definition "Develop and maintain the short-term product supply schedule for the primary distribution network — deciding which products move between refineries, terminals, and supply points, in what quantities and sequence over the coming days and weeks — so the approved regional plan is translated into an executable movement program."@en ;
-    skos:editorialNote "Batch 05 (2026-09-19). Sits between the approved monthly regional plan (CM-1-1-2) and movement administration (CM-1-1-3-6): this L4 decides the short-term schedule; its sibling administers the movements it creates. APQC 16820 'Design for product servicing' is an unrelated lexical match; no meaningful candidate."@en ;
-    skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
-    skos:notation "DSBP-P-000100" ;
-    skos:prefLabel "Product Scheduling"@en ;
-    skos:scopeNote """Covers short-term network scheduling within the approved regional plan: consolidating demand, stock, and supply projections into a rolling network schedule, sequencing bulk product movements, coordinating the trades needed to balance the schedule, and adjusting to disruptions. Excludes plan-period supply and disposition decisions, owned by Regional Optimization (CM-1-1-2); excludes mode-level nomination, load, and movement administration, owned by Physical Distribution Scheduling (CM-1-1-3-6); excludes secondary deliveries, owned by Secondary Distribution Management (CM-1-1-3-8); excludes trade negotiation and execution, owned by Supply And Trading.
-In scope: Consolidate short-term demand, stock, and supply projections | develop and maintain the rolling network product schedule | sequence and adjust bulk movements within plan and policy | initiate schedule-balancing trade requests
-Out of scope: Plan-period supply and disposition optimization (Regional Optimization, CM-1-1-2) | nomination, load, and movement administration (CM-1-1-3-6) | secondary delivery scheduling (CM-1-1-3-8) | trade negotiation and execution (Supply And Trading)"""@en ;
-    ns1:apqcMappingDecision <https://w3id.org/mpc/ontology/modules/core/apqc-mapping-decision/review-link> ;
-    ns1:businessDomain <https://w3id.org/mpc/ontology/modules/core/business-domain/commercial> ;
-    ns1:cadence <https://w3id.org/mpc/ontology/modules/core/cadence/weekly> ;
-    ns1:conceptKind <https://w3id.org/mpc/ontology/modules/core/concept-kind/process> ;
-    ns1:dependsOnOutputOf <https://w3id.org/ds-bp/ontology/process/DSBP-P-000113> ;
-    ns1:keyInputFlow "approved regional plan"@en,
-        "short-term demand and lifting forecasts"@en,
-        "stock positions and projections"@en,
-        "transport and terminal availability"@en ;
-    ns1:operatingMode <https://w3id.org/mpc/ontology/modules/core/operating-mode/periodic> ;
-    ns1:precedes <https://w3id.org/ds-bp/ontology/process/DSBP-P-000104> ;
-    ns1:primaryOutputFlow "rolling short-term network product schedule"@en ;
-    ns1:primaryPurpose "Decide the short-term product movement schedule the primary network runs on."@en ;
-    ns1:responsibleDomain "Commercial & Marketing"@en ;
     ns1:taxonomyLevel 4 .
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000105> a skos:Concept ;
@@ -17255,10 +17473,10 @@ Out of scope: Exchange agreement administration and contractual imbalance calcul
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000395> a skos:Concept ;
     dcterms:references <https://w3id.org/mpc/ontology/source/apqc-pcf-7.2.2/element/19948> ;
     dcterms:source <https://w3id.org/mpc/ontology/source/src-ei-hm32-001>,
-        <https://w3id.org/mpc/ontology/source/src-osha-psm-001>,
-        <https://w3id.org/mpc/ontology/source/step3c-definition-workbook> ;
+        <https://w3id.org/mpc/ontology/source/src-osha-psm-001> ;
     skos:altLabel "Company-Managed Terminal & Fleet Operations"@en ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000390> ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0049)."@en ;
     skos:definition "The capability to operate and maintain company-managed marketing and distribution terminals, loading facilities, and associated distribution fleet assets where the business unit is the designated operating entity, including site safety execution, fleet capability management, and site-asset integrity and availability."@en ;
     skos:editorialNote "Batch 20 (2026-09-20). Q2 decision (the decision owner, narrowed): this capability applies where the company is the designated operator — never categorically 'the terminal operator', since the same legal entity may own a facility operated by a third party, Midstream, Refining, a joint venture, or a terminal services company. Every prior operator exclusion is preserved: for facilities operated elsewhere, the operator remains external to this cluster. Concept-type: capability per the batch 11 test. Which terminals, tanks, racks, and fleet assets are actually company-managed by Marketing/Distribution is an asset-inventory follow-up carried in batch 20 of the process-map work. APQC 'Analyze internal operations' scored NONE; comparative only."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
@@ -17266,7 +17484,8 @@ Out of scope: Exchange agreement administration and contractual imbalance calcul
     skos:prefLabel "Terminal Operations Management"@en ;
     skos:scopeNote """Covers the management of company-managed marketing and distribution terminal and fleet operations under the Q2 reading: site safety management (CM-1-2-7-2-1), fleet management (CM-1-2-7-2-2), and site asset management (CM-1-2-7-2-3), applied where the Marketing/Distribution business is the designated operating entity. Asset ownership alone does not determine scope: this capability applies only where the Marketing/Distribution business is operationally accountable for the site or fleet — Refining-operated, Midstream-operated, third-party-operated, and centrally operated assets remain with their designated operating domains or providers, and where the company owns but does not operate a facility, its interest is held through agreements (CM-1-2-7-1-3), source-point coordination (CM-1-2-6-3-1), storage administration (CM-1-1-3-7-11), and settlement (CM-1-2-4-1-14). The capability is located in the Supply & Trading taxonomy because it supports marketing/distribution supply operations; its operational delivery may sit in a dedicated terminal operations, distribution operations, fleet, Midstream, engineering, or shared-services organization, depending on asset ownership and operating accountability. Scheduling remains with its owners (CM-1-1-3-6, CM-1-1-3-8, batch 05); EHS policy, regulatory reporting, and filings with EHS & Government Reporting under its locked rule. Excludes Refining-, Midstream-, centrally-, and third-party-operated assets (their designated operators, locked rules); movement and delivery scheduling (CM-1-1-3-6, CM-1-1-3-8); EHS policy and regulatory reporting (EHS & Government Reporting, locked rule); storage/terminal commercial agreements (CM-1-2-7-1-3).
 In scope: Operate site safety programs within the enterprise EHS framework at company-managed sites | manage own and contracted fleet capability and compliance | manage site-asset integrity coordination and availability | keep company-managed operations safe, compliant, and available
-Out of scope: Refining-, Midstream-, centrally-, and third-party-operated assets (designated operators, locked rules) | movement and delivery scheduling (CM-1-1-3-6, CM-1-1-3-8) | EHS policy and regulatory reporting (EHS & Government Reporting, locked rule) | storage/terminal agreements (CM-1-2-7-1-3)"""@en ;
+Out of scope: Refining-, Midstream-, centrally-, and third-party-operated assets (designated operators, locked rules) | movement and delivery scheduling (CM-1-1-3-6, CM-1-1-3-8) | EHS policy and regulatory reporting (EHS & Government Reporting, locked rule) | storage/terminal agreements (CM-1-2-7-1-3)"""@en,
+        "Physical loading at the rack is part of this process; Terminal Loading controls who may lift and how much."@en ;
     ns1:apqcMappingDecision <https://w3id.org/mpc/ontology/modules/core/apqc-mapping-decision/no-candidate> ;
     ns1:businessDomain <https://w3id.org/mpc/ontology/modules/core/business-domain/commercial> ;
     ns1:conceptKind <https://w3id.org/mpc/ontology/modules/core/concept-kind/capability> ;
@@ -17908,12 +18127,23 @@ ns1:requires a owl:ObjectProperty ;
     dcterms:rights "US federal motor-fuels excise tax mechanics and terminology context. Does not cover state motor-fuel or non-US regimes, does not determine internal tax-function ownership or process design, and is not tax advice. Evidence only, not text to copy."@en ;
     dcterms:title "Publication 510, Excise Taxes (federal motor-fuels excise taxes, fuel tax credits and refunds; Form 720 regime)"@en .
 
+<https://www.sec.gov/Archives/edgar/data/1534504/000153450426000010/pbf-20251231.htm> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "accession 0001534504-26-000010"@en ;
+    dcterms:publisher "PBF Energy Inc."@en ;
+    dcterms:title "PBF Energy Inc., Form 10-K for the fiscal year ended December 31, 2025"@en ;
+    ns2:accessDate "2026-11-24"^^xsd:date .
+
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000002> a skos:Concept ;
+    dcterms:source <https://www.sec.gov/Archives/edgar/data/1510295/000151029526000009/mpc-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/1534504/000153450426000010/pbf-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/1534701/000153470126000006/psx-20251231.htm> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000001> ;
-    skos:definition "Planning And Optimization Includes Processes Such As Demand Forecasting, Local And Regional Optimization, Backcasting And Inventory Management Across The Value Chain."@en ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0016)."@en ;
+    skos:definition "Forecast demand, and plan, schedule and optimize how crude oil, feedstocks and refined products move through refineries, terminals and the distribution network, so that supply meets forecast demand at the best margin the operating, inventory and contract limits allow."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000002" ;
     skos:prefLabel "Planning, Scheduling & Optimization"@en ;
+    skos:scopeNote "Includes demand forecasting, refinery production planning, regional and distribution optimization, distribution planning and scheduling with inventory planning, and comparing results with the approved plan and its assumptions. It decides volumes and timing. Buying, selling and trading the barrels belongs to Supply & Trading, and moving and storing them belongs to Midstream & Logistics."@en ;
     ns1:priorPreferredLabel "Planning & Scheduling"@en ;
     ns1:taxonomyLevel 2 .
 
@@ -19045,11 +19275,18 @@ Out of scope: Operational departures for safety and reliability (Refining) | res
     ns1:taxonomyLevel 4 .
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000229> a skos:Concept ;
+    dcterms:source <https://www.sec.gov/Archives/edgar/data/1035002/000162828026011499/vlo-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/1070423/000107042326000014/paa-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/1306965/000162828026017024/shel-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/1510295/000151029526000009/mpc-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/1915657/000191565726000016/dino-20251231.htm> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000001> ;
-    skos:definition "Supply And Trading Includes Processes Such As Managing Supply, Demand And Trading Of Crude Oil And Refined Products. It Involves Trading As Well As Planning & Managing Movements In The Most Efficient Way, Including Primary & Secondary Distribution."@en ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0012; DSBP-DEC-0020)."@en ;
+    skos:definition "Buy, sell, exchange and trade crude oil, feedstocks and refined products, and manage the resulting commercial positions and their risk through confirmation, actualization and settlement, so that the business has the supply it needs and sells what it makes."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000229" ;
     skos:prefLabel "Supply & Trading"@en ;
+    skos:scopeNote "Includes crude and feedstock supply, refined product supply, trading, confirmations and risk management, actualization of physical deliveries, settlement and accounting of trades, and the commercial management of product distribution. It decides what is bought, sold and delivered where. Planning volumes and timing belongs to Planning, Scheduling & Optimization, and moving and storing product belongs to Midstream & Logistics. Buying the materials and services the business uses belongs to Procurement & Supply Chain (Goods and Services)."@en ;
     ns1:priorPreferredLabel "Supply And Trading"@en ;
     ns1:taxonomyLevel 2 .
 
@@ -19592,6 +19829,18 @@ Out of scope: Dispute adjudication (CM-1-3-8-3-1) | bill adjustment and credits 
     dcterms:publisher "PCI Security Standards Council"@en ;
     dcterms:rights "PCI DSS payment-card security scope and control context for card-program processes that store, process, transmit, or can affect the security of applicable payment-card account data. Applicability is fact-dependent and must be determined by Security with relevant business, technology, processor, acquirer, Treasury, and legal owners. Closed-loop/proprietary card programs may have different scope depending on architecture and data handling. The source does not determine internal process ownership, card-program design, fraud liability, payment settlement, or legal compliance conclusions."@en ;
     dcterms:title "Payment Card Industry Data Security Standard (PCI DSS) — payment-card account data security requirements and scoping guidance"@en .
+
+<https://www.sec.gov/Archives/edgar/data/1510295/000151029526000009/mpc-20251231.htm> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "accession 0001510295-26-000009"@en ;
+    dcterms:publisher "Marathon Petroleum Corporation"@en ;
+    dcterms:title "Marathon Petroleum Corporation, Form 10-K for the fiscal year ended December 31, 2025"@en ;
+    ns2:accessDate "2026-11-24"^^xsd:date .
+
+<https://www.sec.gov/Archives/edgar/data/1534701/000153470126000006/psx-20251231.htm> a dcterms:BibliographicResource ;
+    dcterms:hasVersion "accession 0001534701-26-000006"@en ;
+    dcterms:publisher "Phillips 66"@en ;
+    dcterms:title "Phillips 66, Form 10-K for the fiscal year ended December 31, 2025"@en ;
+    ns2:accessDate "2026-11-24"^^xsd:date .
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000008> a skos:Concept ;
     dcterms:references <https://w3id.org/mpc/ontology/source/apqc-pcf-7.2.2/element/10306> ;
@@ -21929,9 +22178,9 @@ Out of scope: O2C transaction processing (CM-1-3-7-2/-3, CM-1-3-8) | credit (CM-
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000618> a skos:Concept ;
     dcterms:references <https://w3id.org/mpc/ontology/source/apqc-pcf-7.2.2/element/11211> ;
-    dcterms:source <https://w3id.org/mpc/ontology/source/src-apqc-pcf-001>,
-        <https://w3id.org/mpc/ontology/source/step3c-definition-workbook> ;
+    dcterms:source <https://w3id.org/mpc/ontology/source/src-apqc-pcf-001> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000595> ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0049)."@en ;
     skos:definition "The capability that owns customer credit and counterparty risk in commercial operations: maintaining credit policies that encode the approved risk appetite, establishing customer credit limits and risk codes, monitoring exposure against limits continuously, analyzing portfolio credit risk, deciding credit-driven closure and reinstatement of commercial eligibility, and executing KYC due diligence — the decision home for every credit control the commercial processes apply."@en ;
     skos:editorialNote "Batch 34 (2026-09-20). Capability per the heterogeneous-concurrent-control test; review credit authority rule adopted verbatim, replacing the absolute 'nowhere else' wording with the delegated-governance model; accountability-layer framing and trading-counterparty distinction adopted verbatim; responsible_domain set cross-functional per review (b26/b31 precedent)."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
@@ -21940,7 +22189,8 @@ Out of scope: O2C transaction processing (CM-1-3-7-2/-3, CM-1-3-8) | credit (CM-
     skos:prefLabel "Manage Credit & Risk"@en ;
     skos:scopeNote """Credit authority rule: enterprise credit-risk appetite, reserve/impairment methodology, and bad-debt accounting are owned by Finance and designated governance bodies. Credit policies translate approved appetite into decision criteria. Customer credit limits, risk codes, terms eligibility, security requirements, holds, releases, and credit-driven closure/reinstatement are decided by the authorized Credit process under those policies and delegations. Commercial, order, card, terms, payment-method, and fulfillment processes apply those decisions and never waive, override, or substitute them. Exceptions follow the approved delegation and escalation path. Accountability layers: Finance owns enterprise risk appetite, reserves, impairment, and bad-debt accounting; Credit and its delegated governance own credit policy substance, limits, holds/releases, and security requirements; Commercial O2C and Master Data own customer-data and commercial application; Compliance and Legal own the KYC/sanctions/AML frameworks and legal determinations, with designated KYC/Compliance operations executing; O2C Collections, Finance, and Legal own financial collections and disputes as applicable. Taxonomy placement does not assign a single functional owner. This capability covers O2C commercial customer credit; trading counterparty credit risk for trading positions remains with the counterparty credit-risk processes (the batch 11 cluster). KYC and sanctions screening execute the Compliance/Legal-owned frameworks and determine nothing themselves. Decisions take effect through governed master data submission. Personal data handled here is governed under the enterprise personal-data governance framework, with collection, use, retention, and disclosure limited to what the framework and applicable law permit. When the order or fulfillment action is subject to an applicable customer-credit control, Manage Credit & Risk (CM-1-3-7-4) maintains approved customer credit policies, exposure limits, hold/release rules, and credit decisions within which Capture And Manage Order Fulfillment (CM-1-3-7-3) operates; the recipient retains its other decisions and authorities.
 In scope: Credit policy maintenance within approved appetite | customer limit and risk-code decisions under delegated authority | continuous exposure monitoring, holds, and releases | portfolio credit-risk analysis | credit-driven closure and reinstatement of commercial eligibility | KYC due diligence and sanctions-screening execution
-Out of scope: Enterprise risk appetite, reserves, impairment, and bad-debt accounting (Finance; designated governance) | trading counterparty credit risk (the counterparty credit-risk processes) | collections and dispute management (CM-1-3-8-3) | sanctions/AML framework ownership and match adjudication (Compliance; Legal) | the commercial transactions credit controls gate (their processes) | payment execution"""@en ;
+Out of scope: Enterprise risk appetite, reserves, impairment, and bad-debt accounting (Finance; designated governance) | trading counterparty credit risk (the counterparty credit-risk processes) | collections and dispute management (CM-1-3-8-3) | sanctions/AML framework ownership and match adjudication (Compliance; Legal) | the commercial transactions credit controls gate (their processes) | payment execution"""@en,
+        "Terminal Loading enforces credit holds at the terminal by stopping liftings."@en ;
     ns1:apqcMappingDecision <https://w3id.org/mpc/ontology/modules/core/apqc-mapping-decision/no-source> ;
     ns1:businessDomain <https://w3id.org/mpc/ontology/modules/core/business-domain/cross-functional> ;
     ns1:conceptKind <https://w3id.org/mpc/ontology/modules/core/concept-kind/capability> ;
@@ -22186,8 +22436,10 @@ Out of scope: Enterprise accounting policy, valuation policy, material technical
 
 <https://w3id.org/ds-bp/ontology/process/DSBP-P-000128> a skos:Concept ;
     dcterms:references <https://w3id.org/mpc/ontology/source/apqc-pcf-7.2.2/element/19243> ;
-    dcterms:source <https://w3id.org/mpc/ontology/source/step3c-definition-workbook> ;
+    dcterms:source <https://www.sec.gov/Archives/edgar/data/1510295/000151029526000009/mpc-20251231.htm>,
+        <https://www.sec.gov/Archives/edgar/data/1534701/000153470126000006/psx-20251231.htm> ;
     skos:broader <https://w3id.org/ds-bp/ontology/process/DSBP-P-000002> ;
+    skos:changeNote "Revised by batch B5 under DSBP-DEC-0053 (DSBP-DEC-0016)."@en ;
     skos:definition "Develop the commercially optimal refinery production plan — selecting crude and feedstock intake, refinery operating modes, unit-throughput targets, product yield and quality targets, and production horizons — to fulfill commercial commitments and maximize margin within feasible refinery, supply, inventory, product-specification, and contractual constraints."@en ;
     skos:inScheme <https://w3id.org/mpc/ontology/modules/core> ;
     skos:notation "DSBP-P-000128" ;

@@ -101,7 +101,7 @@ https://w3id.org/mpc/ontology/process/CM-1-1-3-4,https://w3id.org/ds-bp/ontology
 https://w3id.org/mpc/ontology/process/CM-1-1-3-5,https://w3id.org/ds-bp/ontology/process/DSBP-P-000100,retained,notation CM 1.1.3.5
 https://w3id.org/mpc/ontology/process/CM-1-1-3-5-1,https://w3id.org/ds-bp/ontology/process/DSBP-P-000101,retained,notation CM 1.1.3.5.1
 https://w3id.org/mpc/ontology/process/CM-1-1-3-5-2,https://w3id.org/ds-bp/ontology/process/DSBP-P-000102,retained,notation CM 1.1.3.5.2
-https://w3id.org/mpc/ontology/process/CM-1-1-3-5-3,https://w3id.org/ds-bp/ontology/process/DSBP-P-000103,retained,notation CM 1.1.3.5.3
+https://w3id.org/mpc/ontology/process/CM-1-1-3-5-3,,excluded,"DSBP-DEC-0052: No definition in 1.2: its owner never confirmed what the process is, and its 1.2 record calls it pending that confirmation. No standard and no company's public material names such a process under product scheduling, so a reference definition would be invented"
 https://w3id.org/mpc/ontology/process/CM-1-1-3-6,https://w3id.org/ds-bp/ontology/process/DSBP-P-000104,retained,notation CM 1.1.3.6
 https://w3id.org/mpc/ontology/process/CM-1-1-3-6-1,https://w3id.org/ds-bp/ontology/process/DSBP-P-000105,retained,notation CM 1.1.3.6.1
 https://w3id.org/mpc/ontology/process/CM-1-1-3-6-2,https://w3id.org/ds-bp/ontology/process/DSBP-P-000106,retained,notation CM 1.1.3.6.2
