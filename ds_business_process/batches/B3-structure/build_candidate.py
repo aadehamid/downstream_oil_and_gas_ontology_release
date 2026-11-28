@@ -107,8 +107,10 @@ def build(baseline: rdflib.Graph, expected: list[dict]) -> tuple[rdflib.Graph, l
         s, lv = todo.pop()
         g.set((s, d.CORE.taxonomyLevel, Literal(lv)))
         todo += [(c, lv + 1) for c in g.subjects(SKOS.broader, s) if c in procs]
-    # The notation is the neutral ID, never the old code (DSBP-DEC-0031 and 0048; the ontology skill's
-    # identity-taxonomy.md, Step 2, rule 2, for a build that generalizes a release).
+    # The notation is the neutral ID, never the old code (DSBP-DEC-0031 and 0048). This follows the
+    # generalization exception to Step 2, rule 2 in the master copy of the ontology skill
+    # (personal-agent-skills, skills/data/ontology/references/identity-taxonomy.md); this repo's
+    # older copy under skills/ontology/ keeps the source's local IDs and lacks that exception.
     for s in procs:
         g.set((s, SKOS.notation, Literal(d.local_id(str(s)))))
     return g, rows

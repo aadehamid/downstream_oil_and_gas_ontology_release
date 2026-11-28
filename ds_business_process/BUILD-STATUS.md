@@ -23,4 +23,5 @@ Status as of 2026-11-27. The owner's answers to the review pack of 2026-11-27 ar
 2. Finish Step 0: the APQC re-check (cross-industry and downstream petroleum 7.2.2), OSDU's reference-data lists, ISO 14224 and the leads in the survey register.
 3. Apply batch B3, now under Step 3's gate (DSBP-DEC-0045 and 0048), to the release. Add the evidence row for the H-10 placement, which also sets where crude gathering meets the Upstream fence (DSBP-DEC-0046).
 4. Extend check V2 to the Step 4 facts before any migration runs.
-5. Turn the rest of `registers/skill-gaps.csv` (20 rows; SG-08, 09, 10 and 19 are done) into skills pull requests, each change checked with Gemini (DSBP-DEC-0042).
+5. Turn the rest of `registers/skill-gaps.csv` (20 rows; SG-08, 09, 10 and 19 are done in the skill's master copy in personal-agent-skills) into skills pull requests, each change checked with Gemini (DSBP-DEC-0042).
+6. Refresh this repo's copy of the ontology skill (`skills/ontology/`) from the master copy in personal-agent-skills (`skills/data/ontology/`) before the release, so the shipped copy carries SG-08, 09, 10 and 19 and the generalization exception to Step 2, rule 2.
