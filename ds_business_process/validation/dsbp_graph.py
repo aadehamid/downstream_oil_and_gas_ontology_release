@@ -289,7 +289,7 @@ def main(argv=None):
 # ----------------------------------------------------------------------------
 # PROJECT: DS_Business_Process. The documents of the build (decision register,
 # goal, build status, foundations, registers, batches) and the data files they
-# describe. Design: DSBP-DEC-0048. Each check names its kind in the skill's
+# describe. Design: DSBP-DEC-0050. Each check names its kind in the skill's
 # check catalog.
 # ----------------------------------------------------------------------------
 
@@ -324,7 +324,7 @@ DECISION_LINKS = [
 CQ_LOCKED = re.compile(r"\b(\d+) of the (\d+) (?:competency )?questions\b")
 CQ_HELD = re.compile(r"\b(\d+) (?:are )?held\b")
 B3_KINDS = re.compile(r"\b(\d+) renames, (\d+) moves, (\d+) exclusions\b[^|]*?\b(\d+) new concepts\b")
-GAP_ROWS = re.compile(r"`registers/skill-gaps\.csv` \((\d+) rows\)")
+GAP_ROWS = re.compile(r"`registers/skill-gaps\.csv` \((\d+) rows\b")
 FACTS = re.compile(r"\b(\d[\d,]*) Step 4 relationship facts\b")
 
 # (label, link type, "out" or "in", why the link is required)
@@ -340,7 +340,7 @@ def EXPECTED_COUNTS(graph):
         return []
     m = GAP_ROWS.search(text)
     if not m:
-        graph.problem(f"{BUILD_STATUS}: promises no skill-gap count (expected `registers/skill-gaps.csv` (N rows))")
+        graph.problem(f"{BUILD_STATUS}: promises no skill-gap count (expected `registers/skill-gaps.csv` (N rows ...))")
         return []
     return [("SkillGap", int(m.group(1)), BUILD_STATUS)]
 
@@ -381,7 +381,7 @@ def read_register(graph):
     """Decision nodes, and the links between decisions each row states."""
     rows = {}
     for header, table in markdown_tables(graph.read(REGISTER) or ""):
-        if header[:2] != ["ID", "Question"]:
+        if header[:3] != ["ID", "Question", "Decision"]:  # the decisions, not the open-questions table
             continue
         for row in table:
             if row["_cells"] != len(header):

@@ -28,6 +28,11 @@ REGISTER = """# Decision register
 | DSBP-DEC-0002 | Q2 | Second. Amended on 2026-11-25 by DSBP-DEC-0004. | "yes" | 2026-11-23, thread |
 | DSBP-DEC-0003 | Q3 | Third, replacing 0001. | "yes" | 2026-11-24, thread |
 | DSBP-DEC-0004 | Q4 (amends DSBP-DEC-0002) | Fourth. | "yes" | 2026-11-25, thread |
+## Open questions
+
+| ID | Question | Raised | Closed by |
+|---|---|---|---|
+| DSBP-Q-1 | Is it loading? | 2026-11-27 | DSBP-DEC-0004 |
 """
 
 QUESTIONS = """# Competency questions
@@ -51,7 +56,7 @@ GAPS = "id,need\nSG-01,a\nSG-02,b\n"
 STATUS = """# Build status
 
 B3 has 1 renames, 1 moves, 1 exclusions and 1 new concepts (DSBP-DEC-0001 to 0004).
-Turn `registers/skill-gaps.csv` (2 rows) into a pull request. 2 Step 4 relationship facts.
+Turn `registers/skill-gaps.csv` (2 rows; SG-01 is done) into a pull request. 2 Step 4 relationship facts.
 See `registers/decision-register.md`.
 """
 
@@ -252,9 +257,9 @@ class Project(Fixture):
             ("says B3 has {'rename': 2, 'move': 1, 'exclude': 1, 'new': 1}", dsbp_graph.BUILD_STATUS,
              "1 renames", "2 renames"),
             ("SkillGap: the sources define 2, but ds_business_process/BUILD-STATUS.md says 3",
-             dsbp_graph.BUILD_STATUS, "(2 rows)", "(3 rows)"),
+             dsbp_graph.BUILD_STATUS, "(2 rows;", "(3 rows;"),
             ("says 3 Step 4 facts", dsbp_graph.BUILD_STATUS, "2 Step 4", "3 Step 4"),
-            ("promises no skill-gap count", dsbp_graph.BUILD_STATUS, "(2 rows)", "(two rows)"),
+            ("promises no skill-gap count", dsbp_graph.BUILD_STATUS, "(2 rows;", "(two rows;"),
             # Link to nothing: a path no file holds; in GOAL it is pending, not a finding.
             ("points to registers/gone.md, which is not in the repository", dsbp_graph.BUILD_STATUS,
              "registers/decision-register.md", "registers/gone.md"),

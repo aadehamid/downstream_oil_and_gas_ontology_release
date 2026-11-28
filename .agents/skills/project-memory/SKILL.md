@@ -37,11 +37,11 @@ scripts/memory.sh remember - <<'JSON'
 {
   "episode": {"id": "2026-11-27-claude-code-memory-setup", "session": "feat/relate-project-memory",
               "agent": "claude-code", "kind": "handoff", "at": "2026-11-27T19:00:00Z",
-              "text": "Set up shared Relate memory (DSBP-DEC-0048) on branch feat/relate-project-memory."},
+              "text": "Set up shared Relate memory (DSBP-DEC-0050) on branch feat/relate-project-memory."},
   "mentions": [{"key": "owner", "name": "Owner"}, {"key": "file:scripts/memory.sh", "name": "scripts/memory.sh"}],
   "facts": [
     {"id": "2026-11-27-claude-code-memory-setup-1", "slot": "memory/setup",
-     "text": "Shared Relate memory lives in .relate-memory/ and is written only through scripts/memory.sh (DSBP-DEC-0048).",
+     "text": "Shared Relate memory lives in .relate-memory/ and is written only through scripts/memory.sh (DSBP-DEC-0050).",
      "about": ["owner", "file:scripts/memory.sh"], "validFrom": "2026-11-27T19:00:00Z"}
   ]
 }

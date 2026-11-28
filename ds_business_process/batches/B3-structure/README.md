@@ -1,6 +1,6 @@
 # Batch B3: the process structure and the new IDs (expected results, approved)
 
-Status: approved by the owner on 2026-11-27 (DSBP-DEC-0045), on the condition that the Step 3 definition review and `check_taxonomy.py` join these expected results before the script runs. Nothing in the release changes until then. The change is then made with `build_candidate.py` and checked with `check_expected.py`, `check_taxonomy.py` and the release checks.
+Status: approved by the owner on 2026-11-27 (DSBP-DEC-0045), on the condition that the Step 3 definition review and `check_taxonomy.py` join these expected results before the script runs. Both have joined (see "The Step 3 gate" below). The change is made with `build_candidate.py` and checked with `check_expected.py`, `check_taxonomy.py` and the release checks. Nothing in the release changes until the batch is applied.
 
 ## What changes
 
@@ -13,11 +13,11 @@ Status: approved by the owner on 2026-11-27 (DSBP-DEC-0045), on the condition th
 | Exclude | 5 | Shared Services (DSBP-DEC-0018) and IT Services (DSBP-DEC-0017) leave the release; Process Excellence & IT is split into the new IT and Business Process Excellence (DSBP-DEC-0017); the emptied Refinery Performance and Risk Coordination is removed (DSBP-DEC-0027); Commercial Development, already retired in 1.2 and emptied by this batch's move of its one child (Develop Strategic Business Plan), is excluded rather than kept as deprecated (H-7, DSBP-DEC-0043). All five are empty in 1.2 or emptied by this batch, and no relationship points at them. The migration map gives each one's reason and names each replacement by its new ID and label, such as "DSBP-P-000708 (Information Technology)", which is how an old 1.2 link finds its successor. |
 | New | 8 | Information Technology; Business Process Excellence; Strategy & Business Development; Enterprise Risk Management; Lubricants & Specialties; Petrochemicals; Retail (under Marketing); Regulatory Reporting (under EHS). Each has a draft definition in the file. |
 
-**On every concept (DSBP-DEC-0031):** a new ID from `DSBP-P-000001` to `DSBP-P-000707`, numbered in the sorted order of the 1.2 IRIs; the 5 excluded concepts leave their numbers unused, so 702 are taken. The 8 new concepts take 000708 to 000715, in the file's order, and each joins its parent's concept scheme. `skos:notation` (the old code, such as "CM 1.1.4") moves to the migration map and leaves the concepts.
+**On every concept (DSBP-DEC-0031):** a new ID from `DSBP-P-000001` to `DSBP-P-000707`, numbered in the sorted order of the 1.2 IRIs; the 5 excluded concepts leave their numbers unused, so 702 are taken. The 8 new concepts take 000708 to 000715, in the file's order, and each joins its parent's concept scheme. The old code, such as "CM 1.1.4", moves to the migration map, and each concept's one `skos:notation` becomes its neutral ID (DSBP-DEC-0048).
 
 ## What must not change
 
-- Every concept not named in the file, and not a descendant of a moved one, keeps its parent, labels, definition and every other statement (check V3, with `skos:notation` the one predicate the ID rule removes everywhere).
+- Every concept not named in the file, and not a descendant of a moved one, keeps its parent, labels, definition and every other statement (check V3, with `skos:notation` the one predicate the ID rule changes everywhere, from the old code to the neutral ID).
 - Every relationship between processes still holds under the new IDs (check V7).
 
 ## The tests, written first
@@ -25,9 +25,15 @@ Status: approved by the owner on 2026-11-27 (DSBP-DEC-0045), on the condition th
 `test_check_expected.py`:
 - On the baseline under new IDs, with nothing else changed, the batch check fails, as it should before the change.
 - On the candidate `build_candidate.py` makes, the batch check passes, and so do V2, V3 and V7. V4 finds only the two known missing definitions, which batch B5 adds.
-- The batch check fails on candidates with one wrong change: a move not made, a rename not made, an old label not kept, a notation left behind, a wrong level, a new concept missing, and an exclusion with no reason in the map. V3 fails when an unlisted concept moves, and when an unchanged parent of a moved or renamed concept is edited; a parent is never approved for its child's change.
+- The batch check fails on candidates with one wrong change: a move not made, a rename not made, an old label not kept, an old code left as a notation, a wrong level, a new concept missing, and an exclusion with no reason in the map. V3 fails when an unlisted concept moves, and when an unchanged parent of a moved or renamed concept is edited; a parent is never approved for its child's change.
 - A row of kind `unchanged` (the file has none now; the tests add one for CM-1-1-3) fails the check when that concept's label, parent or deprecation changes, and does not approve it for V3.
 - Every migration-map note names a replacement by its new ID and label, never by the file's working key (`NEW:it`), and the retired Commercial Development is excluded, with no trace left in the candidate.
+
+## The Step 3 gate (the condition of DSBP-DEC-0045)
+
+- **`definition-review.md`** checks the definition of every concept this batch renames, moves or adds (18 rows) against the 8 points of the ontology skill's definition guide. A test fails if a changed concept has no row. Each failing point names the batch that fixes it, and the one question it raised, whether Terminal Loading's text fits its new parent, is DSBP-Q-B3-1, recorded under "Open questions" in the decision register and closed by DSBP-DEC-0049: it is the lifting-control work at the terminal, without physical loading, and batch B5 rewrites its definition.
+- **`check_taxonomy.py`** (the copy in this repo's `skills/ontology/scripts/`) runs on the candidate. Its failures there are listed in `taxonomy-known.csv`, each with its count and the batch that fixes it: 46 core code-list values with no notation, the 2 missing definitions B5 adds, 3 core property domain or range issues, and 2 release-metadata values. The tests fail if the candidate fails anywhere else, if a listed count changes, or if a row has no fixing batch, and tests prove the gate catches a new failure and a changed count. A crash of the script fails the tests too.
+- Before this gate, `check_taxonomy.py` found 756 concepts with no notation: the 710 process concepts, whose old codes the ID rule removed, and the 46 core code-list values (TX-1). DSBP-DEC-0048 makes each process concept's one notation its neutral ID. The SKOS Reference defines a notation as a string that identifies a concept within its scheme, `check_taxonomy.py` fails a concept with none, and the master copy of the ontology skill (personal-agent-skills) makes a generalizing build's notations its neutral IDs (Step 2, rule 2). This repo's older copy under `skills/ontology/` lacks that exception until it is refreshed.
 
 ## Points the owner approved (DSBP-DEC-0045)
 

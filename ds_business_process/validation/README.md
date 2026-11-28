@@ -55,7 +55,7 @@ Renamed to the new IDs and otherwise unchanged (the tests' identity candidate), 
 
 ## The consistency graph: do the documents agree?
 
-V1 to V9 test the ontology. `dsbp_graph.py` tests the documents around it (DSBP-DEC-0048). It reads the decision register, the competency questions, B3's change file, the skill-gap register, every other text file of the build outside this folder, and the Step 4 facts, joins what they state into one graph, and reports where they disagree. It rebuilds the graph on every run, so it never drifts from the files. It started from the `consistency-graph` skill's template (personal-agent-skills, `skills/engineering/consistency-graph/`).
+V1 to V9 test the ontology. `dsbp_graph.py` tests the documents around it (DSBP-DEC-0050). It reads the decision register, the competency questions, B3's change file, the skill-gap register, every other text file of the build outside this folder, and the Step 4 facts, joins what they state into one graph, and reports where they disagree. It rebuilds the graph on every run, so it never drifts from the files. It started from the `consistency-graph` skill's template (personal-agent-skills, `skills/engineering/consistency-graph/`).
 
 | What it checks | Kind of finding |
 |---|---|
@@ -68,4 +68,4 @@ V1 to V9 test the ontology. `dsbp_graph.py` tests the documents around it (DSBP-
 
 Its commands: `check` prints the findings and exits 1 when there are any; `summary` counts nodes and links; `impact ID` lists what is linked to a decision, question, change or file within three hops, so run it before you change what the ID names; `query 'CYPHER'` runs read-only Cypher; `export` prints the graph as Cypher. `check`, `summary` and `export` need only Python. `impact` and `query` need `relate`.
 
-`scripts/check.sh` runs its tests, and runs `check` report-only: it prints the findings and does not fail. On 2026-11-28 it found 12: 7 links between decisions stated on one side only, and 5 citations of files in `research/`, which is not in the repository. Once those are fixed or settled, `check` becomes a gate.
+`scripts/check.sh` runs its tests, and runs `check` report-only: it prints the findings and does not fail. On 2026-11-28 it found 13: 8 links between decisions stated on one side only, and 5 citations of files in `research/`, which is not in the repository. Once those are fixed or settled, `check` becomes a gate.

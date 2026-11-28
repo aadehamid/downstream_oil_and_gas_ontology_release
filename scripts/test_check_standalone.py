@@ -311,7 +311,7 @@ def test_this_trees_exceptions_are_only_for_fixed_content():
                # release holds no token, and the workflow holds only the secret's name
                ".github/workflows/check.yml",
                # the shared agent memory's .claude/ files, allowed during the DS_Business_Process build and removed
-               # with these two lines at its release cut (DSBP-DEC-0048)
+               # with these two lines at its release cut (DSBP-DEC-0050)
                "scripts/DOC-SNIPPETS.md", "ds_business_process/registers/decision-register.md")
     assert [path for path, _, _ in cs.read_exceptions() if not path.startswith(allowed)] == []
 

@@ -8,13 +8,16 @@
 """
 from __future__ import annotations
 
+import csv
+import re
+import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 import rdflib
 from rdflib import Literal, URIRef
-from rdflib.namespace import OWL, SKOS
+from rdflib.namespace import DCTERMS, OWL, SKOS
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -69,7 +72,7 @@ def test_the_baseline_fails_the_batch_check(baseline, expected):
     fails = ce.check(baseline, renamed, rows, expected)
     assert any("new concept NEW:it" in f for f in fails)
     assert any("CM-1-1-4 should sit under CM-1-1" in f for f in fails)
-    assert any("still carries a notation" in f for f in fails)
+    assert any("its one notation is its neutral ID" in f for f in fails)
 
 
 def test_the_built_candidate_passes_the_batch_check(baseline, expected, built):
@@ -106,7 +109,10 @@ def test_v3_fails_when_an_unlisted_concept_moves(baseline, expected, built):
      "CM-1-4 should be excluded"),
     (lambda g, rows: g.add((URIRef(d.OLD_PROC + "CM-1-1-4-6"), SKOS.prefLabel, Literal("Commercial Development", lang="en"))),
      "CM-1-1-4-6 should be excluded"),
-    (lambda g, rows: g.add((node(rows, "CM-1-3-10"), SKOS.notation, Literal("CM 1.3.10"))), "still carries a notation"),
+    (lambda g, rows: g.add((node(rows, "CM-1-3-10"), SKOS.notation, Literal("CM 1.3.10"))), "its one notation is its neutral ID"),
+    (lambda g, rows: g.remove((node(rows, "CM-1-3-10"), SKOS.notation, None)), "its one notation is its neutral ID"),
+    (lambda g, rows: g.add((node(rows, "CM-1-3-10"), SKOS.notation, Literal(d.local_id(str(node(rows, "CM-1-3-10"))), lang="en"))),
+     "its one notation is its neutral ID"),
     (lambda g, rows: g.set((node(rows, "CM-1-1-4-6-3"), d.CORE.taxonomyLevel, Literal(3))), "should be level 2"),
 ])
 def test_the_batch_check_fails_on_one_wrong_change(baseline, expected, built, break_it, message):
@@ -260,3 +266,89 @@ def test_same_level_move_descendants_are_not_approved(baseline, expected, built)
     g, rows = built
     kids = ce.descendants(baseline, "CM-1-3-10")
     assert kids and not (kids & ce.approved_ids(baseline, expected, g, rows))
+
+
+# Step 3's gate (DSBP-DEC-0045): check_taxonomy.py runs on the candidate, and every failure it reports is one
+# that taxonomy-known.csv lists, with the batch that fixes it, at exactly the count listed. A new failure, or
+# a known one fixed without updating the file, fails this test.
+TAXONOMY = HERE.parents[2] / "skills" / "ontology" / "scripts" / "check_taxonomy.py"
+KNOWN = HERE / "taxonomy-known.csv"
+CODE_PROPERTIES = (str(d.CORE.evidenceRow), str(d.CORE.sourceRow), str(DCTERMS.identifier))
+
+
+def taxonomy_failures(graph: rdflib.Graph, tmp_path) -> list[str]:
+    path = tmp_path / "candidate.ttl"
+    graph.serialize(path, format="turtle")
+    out = subprocess.run([sys.executable, str(TAXONOMY), *(f"--code-property={c}" for c in CODE_PROPERTIES), str(path)],
+                         capture_output=True, text=True)
+    fails = [line[len("FAIL "):] for line in out.stdout.splitlines() if line.startswith("FAIL ")]
+    # A crash, or anything but the summary line on stderr, must not pass as a short list of failures.
+    assert out.returncode == (1 if fails else 0), out.stderr
+    assert out.stderr.strip() == (f"{len(fails)} check(s) failed" if fails else ""), out.stderr
+    return fails
+
+
+def unlisted_taxonomy_failures(failures: list[str]) -> tuple[list[str], dict[str, int]]:
+    """The gate: each failure must match exactly one row of taxonomy-known.csv, and each row's count must hold."""
+    known = list(csv.DictReader(KNOWN.open(encoding="utf-8")))
+    counts = {row["id"]: 0 for row in known}
+    unlisted = []
+    for failure in failures:
+        hits = [row["id"] for row in known if re.fullmatch(row["pattern"], failure)]
+        if len(hits) == 1:
+            counts[hits[0]] += 1
+        else:
+            unlisted.append(failure)
+    wrong_counts = {row["id"]: counts[row["id"]] for row in known if counts[row["id"]] != int(row["count"])}
+    return unlisted, wrong_counts
+
+
+def test_the_candidate_fails_check_taxonomy_only_where_listed(built, tmp_path):
+    assert unlisted_taxonomy_failures(taxonomy_failures(built[0], tmp_path)) == ([], {})
+
+
+def test_every_known_taxonomy_failure_names_the_batch_that_fixes_it():
+    for row in csv.DictReader(KNOWN.open(encoding="utf-8")):
+        assert row["reason"] and row["fixed_by"], row["id"]
+
+
+def test_the_taxonomy_gate_catches_a_new_failure(built, tmp_path):
+    g = rdflib.Graph()
+    for triple in built[0]:
+        g.add(triple)
+    some = next(s for s in sorted(d.processes(g)) if (s, SKOS.definition, None) in g)
+    g.remove((some, SKOS.definition, None))
+    unlisted, wrong_counts = unlisted_taxonomy_failures(taxonomy_failures(g, tmp_path))
+    assert any(f.startswith("definition:") and d.local_id(str(some)) in f for f in unlisted), unlisted
+    assert wrong_counts == {}
+
+
+def test_the_taxonomy_gate_catches_a_changed_count(built, tmp_path):
+    # Fixing a listed failure without updating taxonomy-known.csv changes its count, and the gate says so.
+    g = rdflib.Graph()
+    for triple in built[0]:
+        g.add(triple)
+    g.add((URIRef(d.NEW_PROC + "DSBP-P-000103"), SKOS.definition, rdflib.Literal("A placeholder definition.", lang="en")))
+    unlisted, wrong_counts = unlisted_taxonomy_failures(taxonomy_failures(g, tmp_path))
+    assert unlisted == [] and wrong_counts == {"TX-2": 1}
+
+
+# Step 3's other gate (DSBP-DEC-0045): the definition review has one row for every concept B3 renames,
+# moves or adds, named by its new ID.
+REVIEW = HERE / "definition-review.md"
+
+
+def test_the_definition_review_covers_every_changed_concept(built, expected):
+    candidate, rows = built
+    review = REVIEW.read_text(encoding="utf-8")
+    reviewed = set(re.findall(r"^\| `(DSBP-P-\d{6})`", review, re.M))
+    new_iri = {d.local_id(r["baseline_iri"]): r["new_iri"] for r in rows}
+    labels = {str(o): s for s, o in candidate.subject_objects(SKOS.prefLabel)}
+    changed = set()
+    for r in expected:
+        if r["change"] in ("rename", "move"):
+            changed.add(d.local_id(new_iri[r["baseline_id"]]))
+        elif r["change"] == "new":
+            changed.add(d.local_id(str(labels[r["new_label"]])))
+    assert changed and reviewed == changed
+

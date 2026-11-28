@@ -13,8 +13,8 @@ exclude     the concept is not in the candidate, and its migration-map row says 
 new         a concept with the new label exists under the new parent at the expected level, with a definition
 unchanged   the concept keeps its baseline label, parent, level and deprecation (it is not on V3's approved list)
 
-And for the whole candidate (DSBP-DEC-0031): no process concept carries a skos:notation, every concept that lives
-on has an ID of the form DSBP-P-000123, and the old codes appear only in the migration map. No map note names a
+And for the whole candidate (DSBP-DEC-0031 and 0048): every concept that lives on has an ID of the form
+DSBP-P-000123, its one skos:notation is that ID, and the old codes appear only in the migration map. No map note names a
 replacement by the file's working key (NEW:it); it gives the new ID.
 
 The release checks V1 to V8 still run as well. ``approved_ids`` gives V3 the concepts this batch may change.
@@ -171,8 +171,10 @@ def check(baseline: rdflib.Graph, candidate: rdflib.Graph, rows: list[dict],
         if key:
             fails.append(f"B3: the map note of {d.local_id(r['baseline_iri'])} still names the working key {key.group(0)}")
     for s in d.processes(candidate):
-        if candidate.value(s, SKOS.notation) is not None:
-            fails.append(f"B3: {d.local_id(str(s))} still carries a notation; old codes live only in the map")
+        notations = list(candidate.objects(s, SKOS.notation))
+        if notations != [Literal(d.local_id(str(s)))]:
+            fails.append(f"B3: {d.local_id(str(s))} has notation {sorted(n.n3() for n in notations)}; its one notation is its "
+                         "neutral ID, and old codes live only in the map")
         if not d.NEW_IRI.fullmatch(str(s)):
             fails.append(f"B3: {d.local_id(str(s))} does not have a neutral ID of the form DSBP-P-000123")
     return fails
