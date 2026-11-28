@@ -295,8 +295,8 @@ def test_two_exceptions_for_one_text_are_refused(tmp_path):
 def test_this_trees_exceptions_are_only_for_fixed_content():
     # Written by hand: an exception is for a released package and its changelog, the two taxonomy files, the
     # decision records, a test that names a word to prove it is gone, two run configurations, and the two viewer
-    # pages, which embed the released core package's text, and the workflow, which must name the test job's sign-in
-    # secret in order to read it. Nothing else.
+    # pages, which embed the released core package's text, DS_Business_Process's batch-built core, and the workflow,
+    # which must name the test job's sign-in secret in order to read it. Nothing else.
     allowed = ("business_architecture/ontology/releases/", "business_architecture/domain/kpi-store-decisions/",
                "business_architecture/ontology/build/output/step3-taxonomy.ttl",
                "business_architecture/ontology/step4/baseline/step3-taxonomy.ttl", "skills/ontology-to-lpg/scripts/test_",
@@ -307,6 +307,9 @@ def test_this_trees_exceptions_are_only_for_fixed_content():
                "business_architecture/ontology/projection/skill-run/test_skill_run.py",
                # the two pages built from the release packages; a test keeps each equal to a fresh build
                "viewer/index.html", "horoi_viewer/index.html",
+               # DS_Business_Process's working core, which only its batch scripts write; a test keeps it equal to a
+               # fresh build, and it carries 1.2's intake note until a batch rewrites 1.2's editorial notes
+               "ds_business_process/ontology/core/core.ttl",
                # the test job signs in to a rehearsal workspace with a secret of the repository's settings; the
                # release holds no token, and the workflow holds only the secret's name
                ".github/workflows/check.yml")

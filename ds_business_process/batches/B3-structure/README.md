@@ -1,6 +1,6 @@
 # Batch B3: the process structure and the new IDs (expected results, approved)
 
-Status: approved by the owner on 2026-11-27 (DSBP-DEC-0045), on the condition that the Step 3 definition review and `check_taxonomy.py` join these expected results before the script runs. Both have joined (see "The Step 3 gate" below). The change is made with `build_candidate.py` and checked with `check_expected.py`, `check_taxonomy.py` and the release checks. Nothing in the release changes until the batch is applied.
+Status: approved by the owner on 2026-11-27 (DSBP-DEC-0045), on the condition that the Step 3 definition review and `check_taxonomy.py` join these expected results before the script runs. Both have joined (see "The Step 3 gate" below). The change is made with `build_candidate.py` and checked with `check_expected.py`, `check_taxonomy.py` and the release checks. It is applied (DSBP-DEC-0050): `build_candidate.py`'s output is the working core, `../../ontology/core/core.ttl`, with `../../migration/core-process-map.csv` and the approved list `../../migration/core-b3-approved.txt`, and tests check that those files are what the script makes.
 
 ## What changes
 

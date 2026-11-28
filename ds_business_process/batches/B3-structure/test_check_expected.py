@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 import rdflib
+import rdflib.compare
 from rdflib import Literal, URIRef
 from rdflib.namespace import DCTERMS, OWL, SKOS
 
@@ -352,3 +353,27 @@ def test_the_definition_review_covers_every_changed_concept(built, expected):
             changed.add(d.local_id(str(labels[r["new_label"]])))
     assert changed and reviewed == changed
 
+
+
+# The applied batch: the release files are what build_candidate.py makes, so they carry every check above -------
+
+RELEASE = HERE.parents[1]
+RELEASE_CORE = RELEASE / "ontology" / "core" / "core.ttl"
+RELEASE_MAP = RELEASE / "migration" / "core-process-map.csv"
+RELEASE_APPROVED = RELEASE / "migration" / "core-b3-approved.txt"
+
+
+def test_the_release_core_is_the_built_candidate(built):
+    g, _ = built
+    assert rdflib.compare.isomorphic(d.load(RELEASE_CORE), g)
+
+
+def test_the_release_map_is_the_built_map(built):
+    _, rows = built
+    with RELEASE_MAP.open(newline="", encoding="utf-8") as fh:
+        assert list(csv.DictReader(fh)) == [{k: str(v) for k, v in r.items()} for r in rows]
+
+
+def test_the_release_approved_list_is_the_batch_list(baseline, expected, built):
+    g, rows = built
+    assert d.read_approved(RELEASE_APPROVED) == ce.approved_ids(baseline, expected, g, rows)

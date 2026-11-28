@@ -125,6 +125,6 @@ if __name__ == "__main__":
     g, rows = build(d.load(d.BASELINE_CORE), ce.read_expected())
     g.serialize(a.out, format="turtle")
     with a.map_out.open("w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=["baseline_iri", "new_iri", "status", "note"])
+        w = csv.DictWriter(fh, fieldnames=["baseline_iri", "new_iri", "status", "note"], lineterminator="\n")
         w.writeheader()
         w.writerows(rows)
