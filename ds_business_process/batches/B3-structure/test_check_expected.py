@@ -111,6 +111,8 @@ def test_v3_fails_when_an_unlisted_concept_moves(baseline, expected, built):
      "CM-1-1-4-6 should be excluded"),
     (lambda g, rows: g.add((node(rows, "CM-1-3-10"), SKOS.notation, Literal("CM 1.3.10"))), "its one notation is its neutral ID"),
     (lambda g, rows: g.remove((node(rows, "CM-1-3-10"), SKOS.notation, None)), "its one notation is its neutral ID"),
+    (lambda g, rows: g.add((node(rows, "CM-1-3-10"), SKOS.notation, Literal(d.local_id(str(node(rows, "CM-1-3-10"))), lang="en"))),
+     "its one notation is its neutral ID"),
     (lambda g, rows: g.set((node(rows, "CM-1-1-4-6-3"), d.CORE.taxonomyLevel, Literal(3))), "should be level 2"),
 ])
 def test_the_batch_check_fails_on_one_wrong_change(baseline, expected, built, break_it, message):
@@ -279,21 +281,30 @@ def taxonomy_failures(graph: rdflib.Graph, tmp_path) -> list[str]:
     graph.serialize(path, format="turtle")
     out = subprocess.run([sys.executable, str(TAXONOMY), *(f"--code-property={c}" for c in CODE_PROPERTIES), str(path)],
                          capture_output=True, text=True)
-    return [line[len("FAIL "):] for line in (out.stdout + out.stderr).splitlines() if line.startswith("FAIL ")]
+    fails = [line[len("FAIL "):] for line in out.stdout.splitlines() if line.startswith("FAIL ")]
+    # A crash, or anything but the summary line on stderr, must not pass as a short list of failures.
+    assert out.returncode == (1 if fails else 0), out.stderr
+    assert out.stderr.strip() == (f"{len(fails)} check(s) failed" if fails else ""), out.stderr
+    return fails
 
 
-def test_the_candidate_fails_check_taxonomy_only_where_listed(built, tmp_path):
+def unlisted_taxonomy_failures(failures: list[str]) -> tuple[list[str], dict[str, int]]:
+    """The gate: each failure must match exactly one row of taxonomy-known.csv, and each row's count must hold."""
     known = list(csv.DictReader(KNOWN.open(encoding="utf-8")))
     counts = {row["id"]: 0 for row in known}
     unlisted = []
-    for failure in taxonomy_failures(built[0], tmp_path):
+    for failure in failures:
         hits = [row["id"] for row in known if re.fullmatch(row["pattern"], failure)]
         if len(hits) == 1:
             counts[hits[0]] += 1
         else:
             unlisted.append(failure)
-    assert unlisted == []
-    assert counts == {row["id"]: int(row["count"]) for row in known}
+    wrong_counts = {row["id"]: counts[row["id"]] for row in known if counts[row["id"]] != int(row["count"])}
+    return unlisted, wrong_counts
+
+
+def test_the_candidate_fails_check_taxonomy_only_where_listed(built, tmp_path):
+    assert unlisted_taxonomy_failures(taxonomy_failures(built[0], tmp_path)) == ([], {})
 
 
 def test_every_known_taxonomy_failure_names_the_batch_that_fixes_it():
@@ -305,10 +316,21 @@ def test_the_taxonomy_gate_catches_a_new_failure(built, tmp_path):
     g = rdflib.Graph()
     for triple in built[0]:
         g.add(triple)
-    some = next(iter(d.processes(g)))
+    some = next(s for s in sorted(d.processes(g)) if (s, SKOS.definition, None) in g)
     g.remove((some, SKOS.definition, None))
-    failures = taxonomy_failures(g, tmp_path)
-    assert any(f.startswith("definition:") and d.local_id(str(some)) in f for f in failures)
+    unlisted, wrong_counts = unlisted_taxonomy_failures(taxonomy_failures(g, tmp_path))
+    assert any(f.startswith("definition:") and d.local_id(str(some)) in f for f in unlisted), unlisted
+    assert wrong_counts == {}
+
+
+def test_the_taxonomy_gate_catches_a_changed_count(built, tmp_path):
+    # Fixing a listed failure without updating taxonomy-known.csv changes its count, and the gate says so.
+    g = rdflib.Graph()
+    for triple in built[0]:
+        g.add(triple)
+    g.add((URIRef(d.NEW_PROC + "DSBP-P-000103"), SKOS.definition, rdflib.Literal("A placeholder definition.", lang="en")))
+    unlisted, wrong_counts = unlisted_taxonomy_failures(taxonomy_failures(g, tmp_path))
+    assert unlisted == [] and wrong_counts == {"TX-2": 1}
 
 
 # Step 3's other gate (DSBP-DEC-0045): the definition review has one row for every concept B3 renames,

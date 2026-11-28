@@ -171,9 +171,9 @@ def check(baseline: rdflib.Graph, candidate: rdflib.Graph, rows: list[dict],
         if key:
             fails.append(f"B3: the map note of {d.local_id(r['baseline_iri'])} still names the working key {key.group(0)}")
     for s in d.processes(candidate):
-        notations = {str(n) for n in candidate.objects(s, SKOS.notation)}
-        if notations != {d.local_id(str(s))}:
-            fails.append(f"B3: {d.local_id(str(s))} has notation {sorted(notations)}; its one notation is its "
+        notations = list(candidate.objects(s, SKOS.notation))
+        if notations != [Literal(d.local_id(str(s)))]:
+            fails.append(f"B3: {d.local_id(str(s))} has notation {sorted(n.n3() for n in notations)}; its one notation is its "
                          "neutral ID, and old codes live only in the map")
         if not d.NEW_IRI.fullmatch(str(s)):
             fails.append(f"B3: {d.local_id(str(s))} does not have a neutral ID of the form DSBP-P-000123")
